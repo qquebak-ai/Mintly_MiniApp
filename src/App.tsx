@@ -1444,6 +1444,15 @@ function GlobalStyle() {
       @keyframes spin360 { from{ transform: rotate(0deg); } to{ transform: rotate(360deg); } }
       @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
       @keyframes scaleIn { from{opacity:0; transform:scale(0.92);} to{opacity:1; transform:scale(1);} }
+      /* Сцены на баннерах: свечи растут, монеты плавают, лист качается,
+         ракета взлетает. Периоды разные, чтобы соседние баннеры не
+         бились в такт. */
+      @keyframes полБаннера { from { transform: rotateX(72deg) translateY(0); } to { transform: rotateX(72deg) translateY(40px); } }
+      @keyframes свечаРастёт { 0%, 100% { transform: scaleY(0.55); } 45%, 70% { transform: scaleY(1); } }
+      @keyframes монетаПлавает { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+      @keyframes листКачается { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(7deg); } }
+      @keyframes ракетаВзлетает { 0%, 100% { transform: translateY(4px); } 50% { transform: translateY(-8px); } }
+      @keyframes пламяДышит { from { transform: scaleY(0.75); opacity: 0.8; } to { transform: scaleY(1.15); opacity: 1; } }
       @keyframes gridDrift { from{background-position:0 0,0 0;} to{background-position:140px 140px,140px 140px;} }
       @keyframes starTwinkle { 0%,100%{opacity:.2;} 50%{opacity:1;} }
       @keyframes starPulse { 0%,100%{opacity:0;} 50%{opacity:var(--o);} }
@@ -8582,6 +8591,8 @@ function WelcomeScreen({ onCreate, onLogin, onSkip, insetTop = 0 }) {
       <div
         ref={лента}
         onScroll={приПрокрутке}
+        onTouchStart={() => { трогают.current = true; }}
+        onTouchEnd={() => { setTimeout(() => { трогают.current = false; }, 4000); }}
         className="no-scrollbar"
         style={{
           flex: 1, minHeight: 0, display: "flex", overflowX: "auto", overflowY: "hidden",
@@ -10930,50 +10941,78 @@ const БАННЕРЫ = [
   },
 ];
 
+/* Картинка баннера. Не декоративная заставка, а маленькая сцена: в ней
+   всё время что-то происходит, поэтому лента живая даже когда её не
+   листают. Формы фирменные — ромб TON, полосы Solana, лист Mintly — а не
+   нарисованные на глаз силуэты. */
 function ЗнакБаннера({ вид, цвет }) {
-  const общее = { width: 96, height: 96, viewBox: "0 0 96 96", fill: "none" };
+  const общее = { width: 104, height: 104, viewBox: "0 0 104 104", fill: "none" };
+
   if (вид === "свечи") {
-    // Свечи растут слева направо: тот же язык, что на экране токена.
+    // Свечи вырастают одна за другой и замирают — цикл читается как
+    // «рынок идёт вверх», а не как мигание.
     const палки = [
-      { x: 14, y: 56, h: 26 }, { x: 32, y: 40, h: 34 }, { x: 50, y: 30, h: 30 }, { x: 68, y: 16, h: 40 },
+      { x: 10, низ: 78, h: 26 }, { x: 30, низ: 70, h: 34 },
+      { x: 50, низ: 58, h: 30 }, { x: 70, низ: 44, h: 42 },
     ];
     return (
       <svg {...общее} aria-hidden>
         {палки.map((п, i) => (
-          <g key={i}>
-            <rect x={п.x + 5} y={п.y - 8} width="2" height={п.h + 16} rx="1" fill={цвет} opacity="0.55" />
-            <rect x={п.x} y={п.y} width="12" height={п.h} rx="3" fill={цвет} opacity={0.55 + i * 0.15} />
+          <g key={i} style={{ transformOrigin: `${п.x + 6}px ${п.низ}px`, animation: `свечаРастёт 3.2s ease-in-out ${i * 0.22}s infinite` }}>
+            <rect x={п.x + 5} y={п.низ - п.h - 9} width="2" height={п.h + 18} rx="1" fill={цвет} opacity="0.5" />
+            <rect x={п.x} y={п.низ - п.h} width="12" height={п.h} rx="3" fill={цвет} opacity={0.6 + i * 0.13} />
           </g>
         ))}
       </svg>
     );
   }
+
   if (вид === "монеты") {
+    // Монета TON: ромб на круге, как в самом кошельке. Стопка под ней
+    // покачивается — видно, что баланс живой.
     return (
       <svg {...общее} aria-hidden>
-        <ellipse cx="46" cy="70" rx="30" ry="10" fill={цвет} opacity="0.18" />
-        <circle cx="38" cy="52" r="22" fill={цвет} opacity="0.30" />
-        <circle cx="38" cy="46" r="22" fill={цвет} opacity="0.85" />
-        <circle cx="66" cy="30" r="15" fill={цвет} opacity="0.45" />
-        <circle cx="66" cy="26" r="15" fill={цвет} />
+        <ellipse cx="52" cy="86" rx="30" ry="7" fill={цвет} opacity="0.16" />
+        <g style={{ animation: "монетаПлавает 3.6s ease-in-out infinite" }}>
+          <circle cx="52" cy="50" r="26" fill={цвет} />
+          <path d="M64 41H40c-4.4 0-7.2 4.8-5 8.6l14.8 25.6c1 1.7 3.4 1.7 4.4 0L69 49.6c2.2-3.8-.6-8.6-5-8.6zM49.8 67.6l-3.2-6.2-7.8-13.9c-.5-.9.1-2 1.2-2h9.8v22.1zm15.4-20.1l-7.8 13.9-3.2 6.2V45.5h9.8c1.1 0 1.7 1.1 1.2 2z" fill="#0B0D12" opacity="0.85" />
+        </g>
+        <g style={{ animation: "монетаПлавает 3.6s ease-in-out -1.8s infinite" }}>
+          <circle cx="82" cy="30" r="13" fill={цвет} opacity="0.55" />
+        </g>
       </svg>
     );
   }
+
   if (вид === "лист") {
+    // Лист Mintly покачивается на ветру — знак бренда, а не абстракция.
     return (
       <svg {...общее} aria-hidden>
-        <path d="M48 12 C 22 30, 20 62, 48 84 C 76 62, 74 30, 48 12 Z" fill={цвет} opacity="0.9" />
-        <path d="M48 20 V 78" stroke="#0B0D12" strokeWidth="3" opacity="0.5" />
-        <path d="M48 38 L 30 30 M48 38 L 66 30 M48 56 L 28 46 M48 56 L 68 46" stroke="#0B0D12" strokeWidth="2.5" opacity="0.45" />
+        <g style={{ transformOrigin: "52px 88px", animation: "листКачается 4.4s ease-in-out infinite" }}>
+          <path d="M52 14C28 32 26 62 52 84c26-22 24-52 0-70z" fill={цвет} opacity="0.92" />
+          <path d="M52 22v62" stroke="#0B0D12" strokeWidth="3" opacity="0.45" strokeLinecap="round" />
+          <path d="M52 40L34 32M52 40l18-8M52 58L32 48M52 58l20-10" stroke="#0B0D12" strokeWidth="2.4" opacity="0.4" strokeLinecap="round" />
+          <path d="M52 84v10" stroke={цвет} strokeWidth="3" opacity="0.7" strokeLinecap="round" />
+        </g>
       </svg>
     );
   }
+
+  // Ракета: корпус, иллюминатор, крылья и пламя. Взлетает по кругу —
+  // покачивание вверх-вниз плюс живое пламя.
   return (
     <svg {...общее} aria-hidden>
-      <path d="M52 14 c 16 8, 22 26, 18 44 l -14 14 -18 0 -12 -14 c -2 -20, 8 -36, 26 -44 z" fill={цвет} opacity="0.9" />
-      <circle cx="49" cy="42" r="8" fill="#0B0D12" opacity="0.55" />
-      <path d="M34 74 c -6 6, -8 14, -8 14 s 9 -2, 14 -8" fill={цвет} opacity="0.5" />
-      <path d="M58 74 c 6 6, 8 14, 8 14 s -9 -2, -14 -8" fill={цвет} opacity="0.5" />
+      <g style={{ animation: "ракетаВзлетает 3s ease-in-out infinite" }}>
+        <path d="M52 10c11 10 16 24 15 40l-4 14H41l-4-14c-1-16 4-30 15-40z" fill={цвет} />
+        <circle cx="52" cy="40" r="8" fill="#0B0D12" opacity="0.8" />
+        <circle cx="52" cy="40" r="4.5" fill={цвет} opacity="0.9" />
+        <path d="M37 52l-11 12 4 8 11-6z" fill={цвет} opacity="0.65" />
+        <path d="M67 52l11 12-4 8-11-6z" fill={цвет} opacity="0.65" />
+        <g style={{ transformOrigin: "52px 66px", animation: "пламяДышит 0.45s ease-in-out infinite alternate" }}>
+          <path d="M45 66h14l-7 20z" fill="#FFB020" opacity="0.9" />
+          <path d="M48 66h8l-4 12z" fill="#FFE6A0" />
+        </g>
+      </g>
     </svg>
   );
 }
@@ -10983,6 +11022,20 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
   const язык = lang === "EN" ? "EN" : "RU";
   const лента = useRef(null);
   const [текущий, setТекущий] = useState(0);
+  // Палец на ленте останавливает автолистание: уводить карточку из-под
+  // руки — худшее, что может сделать карусель.
+  const трогают = useRef(false);
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const э = лента.current;
+      if (!э || трогают.current || document.visibilityState !== "visible") return;
+      const шаг = э.clientWidth + 12;
+      const следующий = (Math.round(э.scrollLeft / шаг) + 1) % БАННЕРЫ.length;
+      э.scrollTo({ left: следующий * шаг, behavior: "smooth" });
+    }, 5200);
+    return () => clearInterval(iv);
+  }, []);
 
   // Точка подсвечивается по тому, что реально в кадре, а не по счётчику
   // нажатий: листают пальцем, и счётчик разошёлся бы с картинкой.
@@ -11005,6 +11058,8 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
       <div
         ref={лента}
         onScroll={приПрокрутке}
+        onTouchStart={() => { трогают.current = true; }}
+        onTouchEnd={() => { setTimeout(() => { трогают.current = false; }, 4000); }}
         className="no-scrollbar"
         style={{
           display: "flex", gap: 12, overflowX: "auto",
@@ -11041,6 +11096,7 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
                   backgroundImage: `linear-gradient(${hexA(б.цвет, 0.20)} 1px, transparent 1px), linear-gradient(90deg, ${hexA(б.цвет, 0.14)} 1px, transparent 1px)`,
                   backgroundSize: "40px 40px",
                   transform: "rotateX(72deg)", transformOrigin: "50% 0%",
+                  animation: "полБаннера 9s linear infinite",
                   WebkitMaskImage: "linear-gradient(to bottom, #000 0%, transparent 70%)",
                   maskImage: "linear-gradient(to bottom, #000 0%, transparent 70%)",
                 }} />
