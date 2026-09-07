@@ -1444,14 +1444,14 @@ function GlobalStyle() {
       @keyframes spin360 { from{ transform: rotate(0deg); } to{ transform: rotate(360deg); } }
       @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
       @keyframes scaleIn { from{opacity:0; transform:scale(0.92);} to{opacity:1; transform:scale(1);} }
-      /* Дыхание фоновых пятен: смещение и лёгкий масштаб. Медленно и с
-         разными периодами — картинка не повторяется на глазах. */
-      @keyframes blobDrift {
-        0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-        33%      { transform: translate3d(9%, 6%, 0) scale(1.12); }
-        66%      { transform: translate3d(-7%, 10%, 0) scale(0.94); }
+      /* Фон: свет дышит, плоскость едет к зрителю, искры мигают.
+         Периоды разные и не кратные — картинка не повторяется на глазах. */
+      @keyframes фонДышит { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+      @keyframes фонПлоскость { from { transform: rotateX(74deg) translate3d(0, 0, 0); } to { transform: rotateX(74deg) translate3d(0, 52px, 0); } }
+      @keyframes фонИскра {
+        0%, 100% { transform: translate3d(0, 0, 0); opacity: 0.15; }
+        50%      { transform: translate3d(0, -10px, 0); opacity: 1; }
       }
-      @keyframes фонСетка { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(44px, 44px, 0); } }
       @media (prefers-reduced-motion: reduce) { .fx-blob { animation: none !important; } }
       @keyframes gridDrift { from{background-position:0 0,0 0;} to{background-position:140px 140px,140px 140px;} }
       @keyframes starTwinkle { 0%,100%{opacity:.2;} 50%{opacity:1;} }
@@ -10895,50 +10895,71 @@ function МояАктивность({ userId }) {
   );
 }
 
-/* Живой фон под всем интерфейсом.
+/* Фон приложения — тот же мир, что на баннере: неоновая плоскость,
+ * уходящая к горизонту, зарево над ней и редкие искры.
  *
- * Плоская заливка делает приложение похожим на документ: глазу не за что
- * зацепиться, и любое движение внутри выглядит случайным. Здесь под
- * содержимым медленно дышат три пятна фирменного цвета и почти незаметно
- * плывёт сетка — глубина появляется, а читаемость текста не страдает,
- * потому что всё это сильно размыто и приглушено.
+ * Прошлый вариант был набором размытых пятен: он давал цвет, но не давал
+ * пространства — а нужно именно оно, ощущение сцены, на которой стоит
+ * интерфейс. Здесь глубину задаёт перспектива: сетка сходится к точке у
+ * верхнего края, а под ней тлеет горизонт.
  *
- * Слой ничего не ловит (pointerEvents: none) и не перерисовывается: вся
- * анимация идёт трансформациями, то есть на стороне композитора, а не в
- * потоке разметки. */
+ * Слой ничего не ловит и не перерисовывается: всё держится на градиентах
+ * и трансформациях, то есть на композиторе. */
 function ЖивойФон() {
-  const пятна = [
-    { левое: "-18%", верх: "-10%", размер: 320, цвет: T.electric, прозр: 0.20, длит: 26, задержка: 0 },
-    { левое: "58%", верх: "18%", размер: 300, цвет: T.violet, прозр: 0.16, длит: 34, задержка: -8 },
-    { левое: "6%", верх: "62%", размер: 340, цвет: T.turquoise, прозр: 0.13, длит: 30, задержка: -16 },
-  ];
+  const искры = useMemo(() => {
+    const rnd = seededRand(20260907);
+    return Array.from({ length: 14 }, () => ({
+      левая: rnd() * 100,
+      верх: 4 + rnd() * 64,
+      размер: 1.5 + rnd() * 2.5,
+      длит: 5 + rnd() * 7,
+      задержка: -rnd() * 12,
+      сила: 0.25 + rnd() * 0.45,
+    }));
+  }, []);
+
   return (
     <div aria-hidden style={{ position: "absolute", inset: 0, zIndex: 0, overflow: "hidden", pointerEvents: "none" }}>
-      {пятна.map((п, i) => (
-        <div
-          key={i}
-          className="fx-blob"
-          style={{
-            position: "absolute", left: п.левое, top: п.верх, width: п.размер, height: п.размер,
-            borderRadius: "50%", filter: "blur(70px)",
-            background: `radial-gradient(circle, ${hexA(п.цвет, п.прозр)} 0%, ${hexA(п.цвет, 0)} 70%)`,
-            animation: `blobDrift ${п.длит}s ease-in-out ${п.задержка}s infinite`,
-            willChange: "transform",
-          }}
-        />
+      {/* Зарево сверху: свет, из которого «растёт» интерфейс. */}
+      <div style={{
+        position: "absolute", left: "-30%", right: "-30%", top: "-38%", height: "78%",
+        background: `radial-gradient(ellipse at 50% 100%, ${hexA(T.electric, 0.22)} 0%, ${hexA(T.violet, 0.09)} 38%, ${hexA(T.electric, 0)} 70%)`,
+        animation: "фонДышит 18s ease-in-out infinite",
+        willChange: "opacity",
+      }} />
+
+      {/* Плоскость в перспективе. Линии бегут к зрителю — медленно,
+          чтобы движение читалось краем глаза, а не спорило с прокруткой. */}
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "52%", perspective: 260, perspectiveOrigin: "50% 0%", opacity: 0.55 }}>
+        <div style={{
+          position: "absolute", left: "-60%", right: "-60%", top: 0, height: "260%",
+          backgroundImage: `linear-gradient(${hexA(T.electric, 0.30)} 1px, transparent 1px), linear-gradient(90deg, ${hexA(T.electric, 0.22)} 1px, transparent 1px)`,
+          backgroundSize: "52px 52px",
+          transform: "rotateX(74deg)", transformOrigin: "50% 0%",
+          animation: "фонПлоскость 14s linear infinite",
+          WebkitMaskImage: "linear-gradient(to bottom, #000 0%, transparent 62%)",
+          maskImage: "linear-gradient(to bottom, #000 0%, transparent 62%)",
+          willChange: "transform",
+        }} />
+      </div>
+
+      {/* Тлеющий горизонт — стык плоскости и пустоты. */}
+      <div style={{
+        position: "absolute", left: "-20%", right: "-20%", bottom: "44%", height: 160,
+        background: `radial-gradient(ellipse at 50% 100%, ${hexA(T.electric, 0.16)} 0%, ${hexA(T.electric, 0)} 72%)`,
+        animation: "фонДышит 12s ease-in-out -6s infinite",
+      }} />
+
+      {искры.map((и, i) => (
+        <span key={i} className="fx-blob" style={{
+          position: "absolute", left: `${и.левая}%`, top: `${и.верх}%`,
+          width: и.размер, height: и.размер, borderRadius: "50%",
+          background: T.ice, boxShadow: `0 0 ${и.размер * 4}px ${hexA(T.electric, 0.9)}`,
+          opacity: и.сила,
+          animation: `фонИскра ${и.длит}s ease-in-out ${и.задержка}s infinite`,
+          willChange: "transform, opacity",
+        }} />
       ))}
-      {/* Сетка держит эти пятна вместе: без неё они читаются как грязь на
-          экране, с ней — как подсвеченная плоскость. */}
-      <div
-        style={{
-          position: "absolute", inset: -40,
-          backgroundImage: `linear-gradient(${hexA(T.ice, 0.045)} 1px, transparent 1px), linear-gradient(90deg, ${hexA(T.ice, 0.045)} 1px, transparent 1px)`,
-          backgroundSize: "44px 44px",
-          animation: "фонСетка 48s linear infinite",
-          WebkitMaskImage: "radial-gradient(ellipse at 50% 20%, #000 20%, transparent 78%)",
-          maskImage: "radial-gradient(ellipse at 50% 20%, #000 20%, transparent 78%)",
-        }}
-      />
     </div>
   );
 }
