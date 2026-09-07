@@ -10886,6 +10886,212 @@ function МояАктивность({ userId }) {
   );
 }
 
+/* Баннеры на главной — лента, которую листают пальцем.
+ *
+ * Рисуются кодом, а не картинками: текст остаётся резким на любом
+ * экране, переводится вместе с остальным интерфейсом, а добавить новый
+ * баннер — это строка в списке, а не поход к дизайнеру.
+ *
+ * Прилипание по горизонтали держит карточку целиком в кадре, а точки
+ * внизу показывают, сколько их всего: без них лента выглядит обрезанной
+ * страницей. */
+const БАННЕРЫ = [
+  {
+    id: "launch",
+    строки: { RU: ["Запусти свой", "мемкоин за минуту"], EN: ["Launch your", "memecoin in a minute"] },
+    кнопка: { RU: "Создать токен", EN: "Create token" },
+    цвет: "#6C7CFF",
+    действие: "create",
+    знак: "ракета",
+  },
+  {
+    id: "trade",
+    строки: { RU: ["Торгуй мемкоинами", "TON и Solana"], EN: ["Trade memecoins", "on TON and Solana"] },
+    кнопка: { RU: "Открыть мемпад", EN: "Open mempad" },
+    цвет: "#2ED47A",
+    действие: "mempad",
+    знак: "свечи",
+  },
+  {
+    id: "wallet",
+    строки: { RU: ["Кошелёк, покупки", "и вывод — внутри"], EN: ["Wallet, buys", "and payouts inside"] },
+    кнопка: { RU: "Мой кошелёк", EN: "My wallet" },
+    цвет: "#0098EA",
+    действие: "wallet",
+    знак: "монеты",
+  },
+  {
+    id: "shop",
+    строки: { RU: ["Собери свой облик", "в магазине"], EN: ["Build your look", "in the shop"] },
+    кнопка: { RU: "В магазин", EN: "Open shop" },
+    цвет: "#C08BFF",
+    действие: "shop",
+    знак: "лист",
+  },
+];
+
+function ЗнакБаннера({ вид, цвет }) {
+  const общее = { width: 96, height: 96, viewBox: "0 0 96 96", fill: "none" };
+  if (вид === "свечи") {
+    // Свечи растут слева направо: тот же язык, что на экране токена.
+    const палки = [
+      { x: 14, y: 56, h: 26 }, { x: 32, y: 40, h: 34 }, { x: 50, y: 30, h: 30 }, { x: 68, y: 16, h: 40 },
+    ];
+    return (
+      <svg {...общее} aria-hidden>
+        {палки.map((п, i) => (
+          <g key={i}>
+            <rect x={п.x + 5} y={п.y - 8} width="2" height={п.h + 16} rx="1" fill={цвет} opacity="0.55" />
+            <rect x={п.x} y={п.y} width="12" height={п.h} rx="3" fill={цвет} opacity={0.55 + i * 0.15} />
+          </g>
+        ))}
+      </svg>
+    );
+  }
+  if (вид === "монеты") {
+    return (
+      <svg {...общее} aria-hidden>
+        <ellipse cx="46" cy="70" rx="30" ry="10" fill={цвет} opacity="0.18" />
+        <circle cx="38" cy="52" r="22" fill={цвет} opacity="0.30" />
+        <circle cx="38" cy="46" r="22" fill={цвет} opacity="0.85" />
+        <circle cx="66" cy="30" r="15" fill={цвет} opacity="0.45" />
+        <circle cx="66" cy="26" r="15" fill={цвет} />
+      </svg>
+    );
+  }
+  if (вид === "лист") {
+    return (
+      <svg {...общее} aria-hidden>
+        <path d="M48 12 C 22 30, 20 62, 48 84 C 76 62, 74 30, 48 12 Z" fill={цвет} opacity="0.9" />
+        <path d="M48 20 V 78" stroke="#0B0D12" strokeWidth="3" opacity="0.5" />
+        <path d="M48 38 L 30 30 M48 38 L 66 30 M48 56 L 28 46 M48 56 L 68 46" stroke="#0B0D12" strokeWidth="2.5" opacity="0.45" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...общее} aria-hidden>
+      <path d="M52 14 c 16 8, 22 26, 18 44 l -14 14 -18 0 -12 -14 c -2 -20, 8 -36, 26 -44 z" fill={цвет} opacity="0.9" />
+      <circle cx="49" cy="42" r="8" fill="#0B0D12" opacity="0.55" />
+      <path d="M34 74 c -6 6, -8 14, -8 14 s 9 -2, 14 -8" fill={цвет} opacity="0.5" />
+      <path d="M58 74 c 6 6, 8 14, 8 14 s -9 -2, -14 -8" fill={цвет} opacity="0.5" />
+    </svg>
+  );
+}
+
+function БаннерыГлавной({ onGoTab, onGoCreate }) {
+  // Язык берётся из общей настройки приложения, как и весь остальной текст.
+  const язык = lang === "EN" ? "EN" : "RU";
+  const лента = useRef(null);
+  const [текущий, setТекущий] = useState(0);
+
+  // Точка подсвечивается по тому, что реально в кадре, а не по счётчику
+  // нажатий: листают пальцем, и счётчик разошёлся бы с картинкой.
+  function приПрокрутке() {
+    const э = лента.current;
+    if (!э) return;
+    const шаг = э.scrollWidth / БАННЕРЫ.length;
+    const н = Math.round(э.scrollLeft / шаг);
+    if (н !== текущий) setТекущий(Math.max(0, Math.min(БАННЕРЫ.length - 1, н)));
+  }
+
+  const открыть = (б) => {
+    haptic("light");
+    if (б.действие === "create") onGoCreate && onGoCreate();
+    else onGoTab && onGoTab(б.действие);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div
+        ref={лента}
+        onScroll={приПрокрутке}
+        className="no-scrollbar"
+        style={{
+          display: "flex", gap: 12, overflowX: "auto",
+          scrollSnapType: "x mandatory", overscrollBehaviorX: "contain",
+          // Лента идёт от края до края, карточки отступают внутри: из-за
+          // края выглядывает следующая, и видно, что баннер не один.
+          margin: "0 -16px", padding: "0 16px",
+        }}
+      >
+        {БАННЕРЫ.map((б) => (
+          <div
+            key={б.id}
+            onClick={() => открыть(б)}
+            role="button"
+            className="fx-tap"
+            style={{
+              position: "relative", flex: "0 0 100%", scrollSnapAlign: "center",
+              borderRadius: 20, overflow: "hidden", padding: "20px 18px",
+              minHeight: 150, display: "flex", flexDirection: "column", justifyContent: "space-between",
+              background: T.surface, border: `1px solid ${T.line}`, cursor: "pointer",
+            }}
+          >
+            {/* Сетка в перспективе — то же ощущение сцены, что на
+                рекламных баннерах: плоскость, на которой стоит предмет. */}
+            <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+              <div style={{
+                position: "absolute", inset: 0,
+                backgroundImage: `linear-gradient(${hexA(T.ice, 0.05)} 1px, transparent 1px), linear-gradient(90deg, ${hexA(T.ice, 0.05)} 1px, transparent 1px)`,
+                backgroundSize: "34px 34px",
+              }} />
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "55%", perspective: 150, perspectiveOrigin: "50% 0%" }}>
+                <div style={{
+                  position: "absolute", left: "-50%", right: "-50%", top: 0, height: "220%",
+                  backgroundImage: `linear-gradient(${hexA(б.цвет, 0.20)} 1px, transparent 1px), linear-gradient(90deg, ${hexA(б.цвет, 0.14)} 1px, transparent 1px)`,
+                  backgroundSize: "40px 40px",
+                  transform: "rotateX(72deg)", transformOrigin: "50% 0%",
+                  WebkitMaskImage: "linear-gradient(to bottom, #000 0%, transparent 70%)",
+                  maskImage: "linear-gradient(to bottom, #000 0%, transparent 70%)",
+                }} />
+              </div>
+              <div style={{
+                position: "absolute", right: -30, top: -20, width: 220, height: 220, borderRadius: "50%",
+                background: `radial-gradient(circle, ${hexA(б.цвет, 0.22)} 0%, ${hexA(б.цвет, 0)} 70%)`,
+                filter: "blur(6px)",
+              }} />
+            </div>
+
+            <div style={{ position: "relative", zIndex: 1, maxWidth: "68%" }}>
+              {(б.строки[язык] || б.строки.RU).map((строка, i) => (
+                <div key={i} style={{ fontFamily: displayFont, fontSize: 19, fontWeight: 700, color: T.ice, letterSpacing: "-0.01em", lineHeight: 1.25 }}>
+                  {строка}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ position: "relative", zIndex: 1 }}>
+              <span
+                className="fx-tap"
+                style={{
+                  display: "inline-block", padding: "10px 18px", borderRadius: 999,
+                  background: T.ice, color: T.bg, fontFamily: displayFont, fontSize: 14, fontWeight: 700,
+                }}
+              >
+                {(б.кнопка[язык] || б.кнопка.RU)}
+              </span>
+            </div>
+
+            <div aria-hidden style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", zIndex: 1 }}>
+              <ЗнакБаннера вид={б.знак} цвет={б.цвет} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
+        {БАННЕРЫ.map((б, i) => (
+          <span key={б.id} style={{
+            width: i === текущий ? 18 : 6, height: 6, borderRadius: 999,
+            background: i === текущий ? T.ice : T.line,
+            transition: `width ${EASE}, background ${EASE}`,
+          }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function HomeView({
   onGoTab, onGoCreate, curveTokens = [], onOpenToken, onOpenProfile,
   profile = null, accountCreated = false, myTokens = [], achievements = [], userId = null,
@@ -10901,6 +11107,7 @@ function HomeView({
     // должна висеть над пустотой, а не над последней строкой топа.
     <div className="flex flex-col" style={{ gap: 26, paddingTop: 8, paddingBottom: 96 }}>
       <ШапкаГлавной profile={profile} accountCreated={accountCreated} onOpenMyProfile={onOpenMyProfile} />
+      <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
       <ГлавнаяСводка live={боевые} />
       <БегущаяЛента />
       <МоиДела
