@@ -10732,7 +10732,9 @@ function ГлавнаяСводка({ live = [] }) {
       style={{
         position: "relative", overflow: "hidden", borderRadius: 22, padding: "18px 18px 16px",
         background: `linear-gradient(140deg, ${hexA(T.electric, 0.22)} 0%, ${hexA(T.violet, 0.10)} 42%, ${T.surface} 100%)`,
-        border: `1px solid ${T.line}`,
+        // Без обводки: серая линия поверх фирменной заливки читалась
+        // грязным кантом и рвала градиент по краю.
+        border: "none",
         boxShadow: `0 18px 40px ${hexA("#000000", 0.45)}`,
       }}
     >
@@ -11429,7 +11431,9 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
               position: "relative", flex: "0 0 100%", scrollSnapAlign: "center",
               borderRadius: 20, overflow: "hidden", padding: "20px 18px",
               minHeight: 150, display: "flex", flexDirection: "column", justifyContent: "space-between",
-              background: T.surface, border: `1px solid ${T.line}`, cursor: "pointer",
+              // Обводки нет: сцена внутри баннера окрашена фирменным
+              // цветом, и серая линия по краю смотрелась кантом поверх неё.
+              background: T.surface, border: "none", cursor: "pointer",
             }}
           >
             {/* Сетка в перспективе — то же ощущение сцены, что на
@@ -11959,7 +11963,8 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         style={{
           position: "relative", overflow: "hidden", borderRadius: 22, padding: "18px 18px 16px",
           background: `linear-gradient(140deg, ${hexA(T.electric, 0.22)} 0%, ${hexA(T.violet, 0.10)} 42%, ${T.surface} 100%)`,
-          border: `1px solid ${T.line}`,
+          // Без обводки — см. такую же карту на главной.
+          border: "none",
           boxShadow: `0 18px 40px ${hexA("#000000", 0.45)}`,
         }}
       >
