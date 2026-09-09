@@ -19318,11 +19318,14 @@ function mapTokenRow(row) {
             и браузер пересчитывал бы его на каждом кадре списка. Плотная
             заливка выглядит так же и ничего не стоит. */}
         <div
-          className="flex items-center justify-around"
+          // Панель уже и ниже, иконки ближе друг к другу: без подписей
+          // прежняя ширина оставляла между ними пустоту во весь палец, и
+          // капсула выглядела растянутой.
+          className="flex items-center justify-center"
           style={{
             position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: insetBottom + 6, zIndex: 5,
-            width: "92%", maxWidth: 420,
-            padding: "12px 10px 10px",
+            width: "auto", maxWidth: 420, gap: 26,
+            padding: "9px 20px 8px",
             borderRadius: 999,
             background: hexA(T.bg, 0.92),
             border: `1px solid ${T.lineHi}`,
@@ -19346,10 +19349,10 @@ function mapTokenRow(row) {
                 // строится десятую долю секунды, и без него кажется, что
                 // нажатие не прошло — человек жмёт второй раз.
                 onClick={() => { haptic("light"); goTab(id); }}
-                className="fx-tap flex flex-col items-center gap-1.5"
+                className="fx-tap flex flex-col items-center gap-1"
                 style={{ position: "relative", background: "transparent", border: "none", padding: 0 }}
               >
-                <Icon size={24} strokeWidth={1.9} color={active ? T.ice : T.faint} style={{ transition: `color ${EASE}` }} />
+                <Icon size={22} strokeWidth={1.9} color={active ? T.ice : T.faint} style={{ transition: `color ${EASE}` }} />
                 {locked && (
                   <div style={{ position: "absolute", top: -3, right: -3, width: 14, height: 14, borderRadius: "50%", background: T.surface, border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Lock size={8} color={T.muted} />
