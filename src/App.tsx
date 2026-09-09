@@ -1577,6 +1577,13 @@ function GlobalStyle() {
         85%  { background-position: 22% 66%; }
         100% { background-position: 0% 50%; }
       }
+      /* Ореол вокруг карты: рамка отходит от её краёв и растворяется.
+         Идёт сама по себе, без касания, — карта на экране одна и должна
+         быть заметна среди ровных прямоугольников. */
+      @keyframes ореолКарты {
+        0%   { transform: scale(1); opacity: 0.5; }
+        100% { transform: scale(1.085); opacity: 0; }
+      }
       /* Волна от нажатия: расходится из точки касания и гаснет. */
       @keyframes волнаОтНажатия {
         from { transform: translate(-50%, -50%) scale(0); opacity: 0.34; }
@@ -12908,6 +12915,22 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       {/* Карта баланса. Сумма читается одним взглядом: целые рубли
           крупно и белым, копейки приглушены — так глаз не спотыкается о
           мелкую часть, которая на решение не влияет. */}
+      <div style={{ position: "relative" }}>
+      {/* Три волны вдогонку друг другу: пока одна растворяется, следующая
+          только отходит от края — получается непрерывное дыхание, а не
+          мигание. */}
+      {[0, 1.7, 3.4].map((задержка) => (
+        <span
+          key={задержка}
+          aria-hidden
+          style={{
+            position: "absolute", inset: 0, borderRadius: 24,
+            border: `1.5px solid ${hexA("#A855F7", 0.55)}`,
+            pointerEvents: "none",
+            animation: `ореолКарты 5.1s ease-out ${задержка}s infinite`,
+          }}
+        />
+      ))}
       <section
         onPointerDown={волнаОт}
         style={{
@@ -12961,6 +12984,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           ≈ ${usd.toFixed(2)}
         </span>
       </section>
+      </div>
 
       {/* Ряд действий — то, за чем в кошелёк заходят чаще всего. */}
       <div className="flex items-start" style={{ gap: 10, marginTop: 16 }}>
