@@ -19350,7 +19350,7 @@ function mapTokenRow(row) {
           style={{
             position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: insetBottom + 6, zIndex: 5,
             width: "auto", maxWidth: 420, gap: 30,
-            padding: "12px 26px 14px",
+            padding: "13px 26px 13px",
             borderRadius: 999,
             background: hexA(T.bg, 0.92),
             border: `1px solid ${T.lineHi}`,
@@ -19379,21 +19379,23 @@ function mapTokenRow(row) {
                 // отдельным слоем и не сдвигает его вверх.
                 style={{ position: "relative", background: "transparent", border: "none", padding: 0, width: 34, height: 34 }}
               >
-                <Icon size={26} strokeWidth={1.9} color={active ? T.ice : T.faint} style={{ transition: `color ${EASE}` }} />
+                {/* Активный раздел — сам значок: он горит фирменным
+                    фиолетовым и светится, а не отмечается точкой снизу. */}
+                <Icon
+                  size={26}
+                  strokeWidth={1.9}
+                  color={active ? T.electric : T.faint}
+                  style={{
+                    transition: `color ${EASE}, filter ${EASE}`,
+                    filter: active ? `drop-shadow(0 0 8px ${hexA(T.electric, 0.85)}) drop-shadow(0 0 16px ${hexA(T.electric, 0.45)})` : "none",
+                  }}
+                />
                 {locked && (
                   <div style={{ position: "absolute", top: -3, right: -3, width: 14, height: 14, borderRadius: "50%", background: T.surface, border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Lock size={8} color={T.muted} />
                   </div>
                 )}
-                {/* Подписей нет: по плану навигация читается по одним
-                    пиктограммам, а активный раздел отмечен точкой под
-                    иконкой — так панель ниже и спокойнее. */}
-                <span style={{
-                  position: "absolute", left: "50%", bottom: -7, transform: "translateX(-50%)",
-                  width: 4, height: 4, borderRadius: 999,
-                  background: active ? T.electric : "transparent",
-                  transition: `background ${EASE}`,
-                }} />
+
               </button>
             );
           })}
