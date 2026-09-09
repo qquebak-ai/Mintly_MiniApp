@@ -54,11 +54,13 @@ function загрузитьЗапуск() {
  * язык рынка, и подменять его нечем.
  */
 const DARK_THEME = {
-  bg: "#08090B",
-  surface: "#101216",
-  surfaceHi: "#15181D",
-  line: "#242830",
-  lineHi: "#2E333C",
+  // Чисто чёрный фон по дизайн-плану: карточки не выделяются заливкой,
+  // элементы разводят отступы и волосяные линии.
+  bg: "#000000",
+  surface: "#0A0B0E",
+  surfaceHi: "#101216",
+  line: "#1A1D24",
+  lineHi: "#262A33",
   ice: "#F5F7FA",
   paper: "#E4E7EC",
   muted: "#8B929D",
@@ -1104,8 +1106,13 @@ function tf(key, vars) {
 /* Flat, not gradient — the brief is explicit that the accent should read
    as confident and solid, not decorative. Both themes share one Ember so
    the brand doesn't shift when the user switches appearance. */
-const DARK_PRISM = "#6C7CFF";
-const LIGHT_PRISM = "#6C7CFF";
+/* Акцент — не плоский цвет, а неоновый градиент синий→фиолетовый: он
+   взят с маскота, и по дизайн-плану им держится вся фирменная линия.
+   Один и тот же градиент на кнопках, активных состояниях и подсветках —
+   так они читаются как одно семейство. */
+const ГРАДИЕНТ_БРЕНДА = "linear-gradient(135deg, #4B7BFF 0%, #6C7CFF 48%, #A56BFF 100%)";
+const DARK_PRISM = ГРАДИЕНТ_БРЕНДА;
+const LIGHT_PRISM = ГРАДИЕНТ_БРЕНДА;
 let PRISM = DARK_PRISM;
 let PRISM_TEXT = "#FFFFFF"; // Midnight ink reads best set on solid Ember in both themes
 const FACET = "polygon(18% 0%, 100% 0%, 100% 82%, 82% 100%, 0% 100%, 0% 18%)";
@@ -1121,9 +1128,12 @@ const FACET = "polygon(18% 0%, 100% 0%, 100% 82%, 82% 100%, 0% 100%, 0% 18%)";
    Отдельного моноширинного нет намеренно: он выглядел бы заплаткой
    посреди геометрического гротеска, а ровные столбцы цифр даёт
    табличная разметка — она включена глобально ниже, в GlobalStyle. */
-const displayFont = "'Jost', 'Futura', 'Century Gothic', 'Segoe UI', sans-serif";
-const bodyFont = "'Jost', 'Futura', 'Century Gothic', -apple-system, sans-serif";
-const monoFont = "'Jost', 'Futura', 'Century Gothic', 'Courier New', monospace";
+/* Nunito по дизайн-плану: округлый, дружелюбный — интерфейс мемпада, а
+   не банковского терминала. Jost остаётся запасным на случай, если файл
+   шрифта не доехал: он ближе всех по пропорциям. */
+const displayFont = "'Nunito', 'Jost', 'Segoe UI', sans-serif";
+const bodyFont = "'Nunito', 'Jost', -apple-system, sans-serif";
+const monoFont = "'Nunito', 'Jost', 'Courier New', monospace";
 
 /* Motion stays quiet: no overshoot/bounce, 200–300ms, ease-out. */
 const SPRING = "240ms cubic-bezier(0.16, 1, 0.3, 1)";
@@ -8356,7 +8366,7 @@ function PageLoader({ minHeight = 260 }) {
     <div className="fx-view" style={{ minHeight, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
       <LeafLoader size={72} />
       <div style={{ width: 96, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
-        <div style={{ width: "40%", height: "100%", borderRadius: 999, background: T.electric, animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
+        <div style={{ width: "40%", height: "100%", borderRadius: 999, background: PRISM, animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
       </div>
     </div>
   );
@@ -8928,7 +8938,7 @@ function BootSplash({ steps, done, insetTop = 0 }) {
         <div style={{ width: 132, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
           <div style={{
             width: `${Math.round(progress * 100)}%`, height: "100%", borderRadius: 999,
-            background: T.electric, transition: "width 420ms cubic-bezier(0.16,1,0.3,1)",
+            background: PRISM, transition: "width 420ms cubic-bezier(0.16,1,0.3,1)",
           }} />
         </div>
       </div>
@@ -9042,7 +9052,7 @@ function AchievementsView({ achievements = [], onGoShop, onBack }) {
           <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{tf("achUnlockedOf", { done, total: achievements.length })}</span>
         </div>
         <div style={{ height: 6, borderRadius: 3, background: T.surfaceHi, overflow: "hidden" }}>
-          <div style={{ width: `${achievements.length ? (done / achievements.length) * 100 : 0}%`, height: "100%", background: T.electric, transition: `width ${EASE}` }} />
+          <div style={{ width: `${achievements.length ? (done / achievements.length) * 100 : 0}%`, height: "100%", background: PRISM, transition: `width ${EASE}` }} />
         </div>
       </div>
 
@@ -10327,7 +10337,7 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
             className="fx-tap flex items-center gap-1.5"
             style={{
               padding: "8px 14px", borderRadius: 10,
-              background: T.electric, color: PRISM_TEXT, border: "none",
+              background: PRISM, color: PRISM_TEXT, border: "none",
               fontFamily: displayFont, fontSize: 13.5, fontWeight: 600,
               // В Solana кнопка появляется только когда программа
               // кривой развёрнута: до этого запускать там нечем.
@@ -10687,7 +10697,7 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
         {pct != null && (
           <div style={{ position: "relative", marginTop: 12 }}>
             <div style={{ height: 5, borderRadius: 3, background: T.surfaceHi, overflow: "hidden" }}>
-              <div style={{ width: `${Math.min(100, pct)}%`, height: "100%", background: T.electric, borderRadius: 3 }} />
+              <div style={{ width: `${Math.min(100, pct)}%`, height: "100%", background: PRISM, borderRadius: 3 }} />
             </div>
             <div className="flex items-baseline justify-between" style={{ marginTop: 7 }}>
               <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>
@@ -11372,7 +11382,7 @@ function HomeView({
           className="fx-tap w-full flex items-center justify-center gap-2"
           style={{
             padding: "14px 16px", borderRadius: 16,
-            background: T.electric, color: PRISM_TEXT, border: "none",
+            background: PRISM, color: PRISM_TEXT, border: "none",
             fontFamily: displayFont, fontSize: 15, fontWeight: 600,
             boxShadow: `0 10px 30px ${hexA(T.electric, 0.35)}`,
           }}
@@ -11767,7 +11777,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         <button
           onClick={onConnect}
           className="fx-tap w-full flex items-center justify-center gap-2"
-          style={{ padding: "13px 16px", borderRadius: 14, background: T.electric, color: PRISM_TEXT, border: "none", fontFamily: displayFont, fontSize: 15, fontWeight: 600 }}
+          style={{ padding: "13px 16px", borderRadius: 14, background: PRISM, color: PRISM_TEXT, border: "none", fontFamily: displayFont, fontSize: 15, fontWeight: 600 }}
         >
           <Wallet size={16} strokeWidth={1.8} /> {t("connectWallet")}
         </button>
