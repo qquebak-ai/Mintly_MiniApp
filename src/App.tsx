@@ -13633,10 +13633,13 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
 
         <button onClick={handleConfirm} disabled={!canConfirm} className="fx-tap w-full rounded-[20px] py-3 mt-5" style={{
           fontFamily: displayFont, fontWeight: 700, fontSize: 15,
-          background: canConfirm ? (isBuy ? T.turquoise : T.rose) : T.surfaceHi,
+          // Покупка — фирменным градиентом, продажа — цветом падения:
+          // два действия не должны выглядеть одинаково, и по цвету видно,
+          // что сейчас нажимаешь.
+          background: canConfirm ? (isBuy ? PRISM : T.down) : T.surfaceHi,
           color: canConfirm ? PRISM_TEXT : T.muted,
           opacity: canConfirm ? 1 : 0.6,
-          boxShadow: canConfirm ? `0 0 20px ${isBuy ? glow(0.3) : hexA(T.rose, 0.25)}` : "none",
+          boxShadow: canConfirm ? `0 10px 26px ${isBuy ? hexA(T.electric, 0.35) : hexA(T.down, 0.28)}` : "none",
         }}>
           {amount > 0 ? (isBuy ? `${t("buyFor")} ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}` : `${t("sellFor")} ${amount.toLocaleString("ru-RU")} ${token.ticker}`) : (isBuy && tonPriceUsd <= 0 ? t("rateLoading") : !isBuy && holdingTokens <= 0 ? t("nothingToSell") : t("enterAmount"))}
         </button>
