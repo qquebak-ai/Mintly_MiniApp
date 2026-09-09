@@ -1490,6 +1490,8 @@ function GlobalStyle() {
       /* Вереница котов: едет ровно на один шаг и повторяется — из-за
          второго набора картинка бесшовная. */
       @keyframes котыБегут { from { transform: translate3d(calc(var(--шаг) * -5), 0, 0); } to { transform: translate3d(0, 0, 0); } }
+      @keyframes лентаГаснет { from { opacity: 1; } to { opacity: 0; } }
+      @keyframes котОстаётся { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
       @keyframes gridDrift { from{background-position:0 0,0 0;} to{background-position:140px 140px,140px 140px;} }
       @keyframes starTwinkle { 0%,100%{opacity:.2;} 50%{opacity:1;} }
       @keyframes starPulse { 0%,100%{opacity:0;} 50%{opacity:var(--o);} }
@@ -8350,45 +8352,44 @@ const LEAF_LOADER_SPAN = 34;
 function LeafLoader({ progress = null, size = 104, остановлен = false, отклик = false }) {
   const шаг = size * 1.28;
   const котов = 5;
-  const ХОД_МС = 1800;              // за столько лента проходит один шаг
-  const ТОРМОЖЕНИЕ_МС = 1100;       // и за столько гаснет ход в конце
+  const ХОД_МС = 620;               // пока идёт загрузка лента летит
+  const ТОРМОЖЕНИЕ_МС = 1500;       // и тормозит долго, до полной остановки
+  const УХОД_МС = 500;              // столько лишние коты растворяются
 
   const надоСтоп = остановлен || (progress != null && progress >= 1);
-  // Останавливаемся не сразу: сперва лента замедляется, и только потом на
-  // её месте остаётся один кот. Резкая подмена читалась как сбой, а не
-  // как «загрузка кончилась».
-  const [тормозим, setТормозим] = useState(false);
-  const [стоп, setСтоп] = useState(false);
+  /* Три состояния: летит → тормозит → остался один.
+     Резкая подмена ленты одним котом читалась как сбой; здесь лента
+     доезжает по инерции, гаснет, и на её месте проявляется один. */
+  const [фаза, setФаза] = useState("бег");
 
   useEffect(() => {
-    if (!надоСтоп) { setТормозим(false); setСтоп(false); return; }
-    setТормозим(true);
-    const t = setTimeout(() => setСтоп(true), ТОРМОЖЕНИЕ_МС);
+    if (!надоСтоп) { setФаза("бег"); return; }
+    setФаза("тормоз");
+    const t = setTimeout(() => setФаза("один"), ТОРМОЖЕНИЕ_МС + УХОД_МС);
     return () => clearTimeout(t);
   }, [надоСтоп]);
 
-  /* Отклик на каждого прошедшего кота.
-     Один толчок в такт ходу ленты: ожидание перестаёт быть немым, а
-     частота совпадает с картинкой — палец чувствует ровно то, что видит
-     глаз. Пока лента тормозит или стоит, молчим. */
+  /* Отклик на каждого прошедшего кота: ожидание перестаёт быть немым, а
+     частота совпадает с картинкой — палец чувствует то, что видит глаз.
+     На торможении и в покое молчим. */
   useEffect(() => {
-    // Отклик даёт только один лоадер на экране — заставка. Иначе
-    // маленькие лоадеры внутри разделов трясли бы телефон хором.
-    if (!отклик || стоп || тормозим) return;
+    if (!отклик || фаза !== "бег") return;
     const iv = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       haptic("light");
-    }, (ХОД_МС / котов) * 2);
+    }, ХОД_МС);
     return () => clearInterval(iv);
-  }, [отклик, стоп, тормозим]);
+  }, [отклик, фаза]);
 
-  if (стоп) {
+  if (фаза === "один") {
     return (
       <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
         <КотПланета size={size} />
       </div>
     );
   }
+
+  const тормозит = фаза === "тормоз";
 
   return (
     <div
@@ -8404,16 +8405,29 @@ function LeafLoader({ progress = null, size = 104, остановлен = false,
       <div style={{
         position: "absolute", top: 0, left: 0, height: "100%",
         display: "flex", alignItems: "center", gap: шаг - size,
-        // Ровный ход без подпрыгиваний: линейная скорость, а в конце
-        // одно замедление до полной остановки.
-        animation: `котыБегут ${тормозим ? ТОРМОЖЕНИЕ_МС : ХОД_МС}ms ${тормозим ? "cubic-bezier(0.15, 0.7, 0.2, 1) forwards" : "linear infinite"}`,
-        willChange: "transform",
+        // Ход ровный: пока грузится — линейный и быстрый, на остановке —
+        // одно долгое замедление по инерции.
+        animation: тормозит
+          ? `котыБегут ${ТОРМОЖЕНИЕ_МС}ms cubic-bezier(0.08, 0.62, 0.12, 1) forwards, лентаГаснет ${УХОД_МС}ms ease-in ${ТОРМОЖЕНИЕ_МС}ms forwards`
+          : `котыБегут ${ХОД_МС}ms linear infinite`,
+        willChange: "transform, opacity",
         "--шаг": `${шаг}px`,
       }}>
         {Array.from({ length: котов * 2 }, (_, i) => (
           <КотПланета key={i} size={size} glow={i % 2 === 0} качается={false} />
         ))}
       </div>
+
+      {/* Тот, кто останется: проявляется ровно там, где встанет, пока
+          лента доезжает и гаснет. */}
+      {тормозит && (
+        <div style={{
+          position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+          animation: `котОстаётся ${УХОД_МС}ms ease-out ${ТОРМОЖЕНИЕ_МС - 120}ms both`,
+        }}>
+          <КотПланета size={size} />
+        </div>
+      )}
     </div>
   );
 }
