@@ -1479,6 +1479,12 @@ function GlobalStyle() {
       @keyframes картаБлик { 0%, 70%, 100% { transform: translateX(-40px) rotate(18deg); opacity: 0; } 12% { opacity: 1; } 35% { transform: translateX(420px) rotate(18deg); opacity: 0; } }
       /* Конфетти: падает, сносит вбок и крутится. Одна анимация на все
          частицы, разница — в переменных на каждой. */
+      /* Планета уходит вверх и растворяется — один проход на событие. */
+      @keyframes планетаВзлетает {
+        0%   { transform: translate(-50%, 40px) scale(0.6); opacity: 0; }
+        22%  { opacity: 1; }
+        100% { transform: translate(-50%, -320px) scale(1.05); opacity: 0; }
+      }
       @keyframes конфеттиЛетит {
         0%   { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 0; }
         10%  { opacity: 1; }
@@ -5769,6 +5775,32 @@ function КотПланета({ size = 120, glow = true, качается = true
         height={size}
         style={{ position: "relative", width: size, height: size, display: "block", animation: качается ? "маскотДышит 6s ease-in-out infinite" : "none" }}
       />
+    </div>
+  );
+}
+
+/* Взлёт планеты — то, чем отмечается запуск токена.
+ *
+ * Дизайн-план просит обыграть запуск как старт планеты: маскот уходит
+ * вверх, оставляя за собой след, и растворяется. Один проход, без
+ * повторов: событие однократное, и мигающая анимация превратила бы его
+ * в фон. */
+function ВзлётПланеты() {
+  return (
+    <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 80 }}>
+      <div style={{
+        position: "absolute", left: "50%", bottom: -20, transform: "translateX(-50%)",
+        animation: "планетаВзлетает 1.5s cubic-bezier(0.3, 0, 0.2, 1) both",
+      }}>
+        {/* След — вытянутое свечение под маскотом, оно и читается как
+            тяга. */}
+        <div style={{
+          position: "absolute", left: "50%", top: 40, width: 26, height: 150, transform: "translateX(-50%)",
+          background: `linear-gradient(180deg, ${hexA(T.electric, 0.5)} 0%, ${hexA(T.electric, 0)} 100%)`,
+          filter: "blur(7px)",
+        }} />
+        <КотПланета size={92} качается={false} />
+      </div>
     </div>
   );
 }
@@ -12733,6 +12765,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             </div>
           ) : !chartReady ? (
             <div className="flex flex-col items-center justify-center gap-3" style={{ height: 360, padding: "0 20px" }}>
+              <КотПланета size={86} />
               <span style={{ fontFamily: monoFont, fontSize: 12, color: T.muted, textAlign: "center" }}>{tr("chartNoData")}</span>
               <button
                 onClick={() => setChartReload((v) => v + 1)}
@@ -13983,8 +14016,18 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
     <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "absolute", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.92)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(20px + var(--tg-inset-top, 0px)) 20px calc(20px + var(--tg-inset-bottom, 0px))", overflowY: "auto" }}>
       {error ? (
         <div className="fx-modal-card flex flex-col items-center text-center gap-4" style={{ width: "100%", maxWidth: 340, background: T.surface, border: `1px solid ${T.lineHi}`, borderRadius: 24, padding: 24 }}>
-          <div style={{ width: 64, height: 64, clipPath: FACET, background: hexA(T.down, 0.12), border: `1px solid ${hexA(T.down, 0.35)}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ShieldAlert size={26} color={T.down} />
+          {/* Ошибку встречает маскот, а не безликий значок: тот же
+              персонаж, что и в удачных местах, — так неудача остаётся
+              частью приложения, а не аварийным экраном. */}
+          <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <КотПланета size={78} />
+            <span style={{
+              position: "absolute", right: -2, bottom: -2, width: 26, height: 26, borderRadius: 999,
+              background: T.bg, border: `1px solid ${hexA(T.down, 0.5)}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <ShieldAlert size={14} color={T.down} />
+            </span>
           </div>
           <div style={{ maxHeight: 220, overflowY: "auto", width: "100%" }}>
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700 }}>{t("launchFailedTitle")}</div>
@@ -14042,7 +14085,10 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
         </div>
       ) : (
         <div className="fx-modal-card fx-view flex flex-col items-center text-center gap-4" style={{ position: "relative", width: "100%", maxWidth: 360, background: T.surface, border: `1px solid ${T.lineHi}`, borderRadius: 24, padding: 24 }}>
-          {/* Запуск токена — то самое событие, ради которого сюда шли. */}
+          {/* Запуск токена — то самое событие, ради которого сюда шли:
+              маскот уходит вверх, как планета со старта, и следом летят
+              частицы. */}
+          <ВзлётПланеты />
           <Конфетти />
           <div style={{ width: 68, height: 68, borderRadius: "50%", overflow: "hidden", background: result.logoUrl ? `center/cover no-repeat url(${result.logoUrl})` : T.surfaceHi, border: `1px solid ${T.lineHi}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
             {/* Без логотипа место занимает маскот: он же встречает и в
