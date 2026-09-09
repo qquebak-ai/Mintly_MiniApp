@@ -18,9 +18,20 @@ sudo -u "$USR" git -C "$DIR" reset --hard --quiet origin/main
 sudo -u "$USR" git -C "$DIR" log -1 --oneline
 
 echo "== зависимости =="
-# Сборщик нужен здесь же: сайт собирается на сервере, а не приезжает
-# готовым, поэтому dev-зависимости не отбрасываем.
-sudo -u "$USR" env HOME="$DIR" npm --prefix "$DIR" ci --no-audit --no-fund
+# Ставим их, только когда список правда изменился.
+# npm ci сносит node_modules и качает полтысячи пакетов заново — минута
+# на каждую выкладку, хотя в девяти случаях из десяти меняется только
+# код. Сверяем отпечаток package-lock.json с прошлым разом.
+LOCK_HASH=$(sha1sum "$DIR/package-lock.json" | cut -d" " -f1)
+LOCK_FILE="$DIR/.deps-hash"
+if [ -d "$DIR/node_modules" ] && [ -f "$LOCK_FILE" ] && [ "$(cat "$LOCK_FILE")" = "$LOCK_HASH" ]; then
+  echo "список не менялся — пропускаем"
+else
+  # Сборщик нужен здесь же: сайт собирается на сервере, а не приезжает
+  # готовым, поэтому dev-зависимости не отбрасываем.
+  sudo -u "$USR" env HOME="$DIR" npm --prefix "$DIR" ci --no-audit --no-fund --prefer-offline
+  echo "$LOCK_HASH" | sudo -u "$USR" tee "$LOCK_FILE" >/dev/null
+fi
 
 echo "== сборка сайта =="
 # Ключи для страниц берутся из .env: сборщик вшивает их в код, поэтому
