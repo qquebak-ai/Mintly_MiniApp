@@ -11186,11 +11186,22 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile }) 
       >
         {!аватар && <User size={17} color={T.muted} />}
       </span>
+      {/* Без аккаунта имени нет. Раньше на его месте стояло «Mintly» —
+          человек читал это как своё имя, хотя так называется само
+          приложение; остаётся одна честная строка о том, что аккаунта
+          пока нет. */}
       <span>
-        <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em" }}>
-          {accountCreated && profile && profile.nickname ? profile.nickname : "Mintly"}
-        </span>
-        <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 1 }}>
+        {accountCreated && profile && profile.nickname && (
+          <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em" }}>
+            {profile.nickname}
+          </span>
+        )}
+        <span style={{
+          display: "block", fontFamily: accountCreated ? bodyFont : displayFont,
+          color: accountCreated ? T.muted : T.ice,
+          fontSize: accountCreated ? 12.5 : 17, fontWeight: accountCreated ? 400 : 600,
+          marginTop: accountCreated ? 1 : 0,
+        }}>
           {accountCreated ? t("homeHello") : t("accountNotCreated")}
         </span>
       </span>
