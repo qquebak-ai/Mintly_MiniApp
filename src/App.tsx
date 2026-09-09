@@ -19300,6 +19300,23 @@ function mapTokenRow(row) {
       />
 
       <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column" }}>
+        {/* Мягкие края прокрутки.
+            Содержимое обрывалось ровно по границе экрана — строка или
+            карточка резались пополам, и это читалось как поломка. Две
+            узкие полосы размывают и растворяют то, что уходит за край:
+            сверху под самой кромкой, снизу над панелью разделов. */}
+        <div aria-hidden style={{
+          position: "absolute", left: 0, right: 0, top: 0, height: 18, zIndex: 4, pointerEvents: "none",
+          backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+          WebkitMaskImage: "linear-gradient(180deg, #000 0%, transparent 100%)",
+          maskImage: "linear-gradient(180deg, #000 0%, transparent 100%)",
+        }} />
+        <div aria-hidden style={{
+          position: "absolute", left: 0, right: 0, bottom: 0, height: 26, zIndex: 4, pointerEvents: "none",
+          backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+          WebkitMaskImage: "linear-gradient(0deg, #000 0%, transparent 100%)",
+          maskImage: "linear-gradient(0deg, #000 0%, transparent 100%)",
+        }} />
         {/* header with logo/wallet removed — content now starts right at the top.
             The bottom nav is an absolutely-positioned overlay (not a flex
             sibling) so the feed actually scrolls underneath it — that's what
