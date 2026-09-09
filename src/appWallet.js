@@ -99,6 +99,17 @@ export async function сделкаВнутренним({ mint, продажа = 
   return j && j.signature;
 }
 
+/* Курс обмена. Спрашивается на каждое изменение суммы, поэтому без
+   ключа операции и без подписи: это только предпросмотр. */
+export async function курсОбмена({ вход, выход, сумма, проскальзывание = 150 }) {
+  const п = new URLSearchParams({
+    action: "quote", input: вход, output: выход,
+    amount: String(сумма), slippage: String(проскальзывание),
+  });
+  const j = await запрос(`/api/wallet-solana?${п}`);
+  return j || null;
+}
+
 export async function свопВнутренним({ вход, выход, сумма, проскальзывание = 150 }) {
   const j = await запрос("/api/wallet-solana?action=swap", {
     input: вход, output: выход, amount: String(сумма),

@@ -616,6 +616,27 @@ export default async function handler(req, res) {
       });
     }
 
+    /* Курс обмена — до самой сделки.
+       Показать «вы получите столько-то» иначе нечем: маршрут и выход
+       считает биржа, и её же цифру человек увидит в подтверждении.
+       Ничего не подписывает и ничего не тратит, поэтому GET. */
+    if (действие === "quote") {
+      const вход = String((req.query && req.query.input) || "").trim();
+      const выход = String((req.query && req.query.output) || "").trim();
+      const сумма = String((req.query && req.query.amount) || "").trim();
+      if (!/^\d+$/.test(сумма) || сумма === "0") return res.status(400).json({ error: "bad_amount" });
+      const кот = await котировка({
+        input: вход, output: выход, amount: сумма,
+        slippageBps: Number((req.query && req.query.slippage)) || 150,
+      });
+      res.setHeader("Cache-Control", "no-store");
+      if (!кот) return res.status(200).json({ out: null });
+      return res.status(200).json({
+        out: кот.outAmount,
+        impact: кот.priceImpactPct == null ? null : Number(кот.priceImpactPct),
+      });
+    }
+
     if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
     const тело = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const ключЗапроса = String(тело.requestKey || "").slice(0, 64) || null;

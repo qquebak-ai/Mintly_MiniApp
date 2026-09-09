@@ -271,6 +271,18 @@ const STR = {
     nickTaken: "Имя {name} уже занято",
     walletHoldings: "Твои токены",
     walletHistory: "История",
+    swapTitle: "Обмен",
+    swapYouPay: "Вы отдаёте",
+    swapYouGet: "Вы получите",
+    swapAvailable: "Доступно",
+    swapAll: "Всё",
+    swapDo: "Обменять",
+    swapGoing: "Меняем…",
+    swapDone: "Обмен прошёл",
+    swapFailed: "Обмен не прошёл",
+    swapNotEnough: "На кошельке столько нет",
+    swapRouteNote: "Курс биржи, с запасом на проскальзывание",
+    swapOnlyInApp: "Меняется только то, что лежит на кошельке Mintly",
     walletSeeAll: "Все",
     walletActBuy: "Купить",
     walletActReceive: "Получить",
@@ -748,6 +760,18 @@ const STR = {
     nickTaken: "{name} is already taken",
     walletHoldings: "Your tokens",
     walletHistory: "History",
+    swapTitle: "Swap",
+    swapYouPay: "You pay",
+    swapYouGet: "You get",
+    swapAvailable: "Available",
+    swapAll: "Max",
+    swapDo: "Swap",
+    swapGoing: "Swapping…",
+    swapDone: "Swap complete",
+    swapFailed: "Swap failed",
+    swapNotEnough: "Not enough on the wallet",
+    swapRouteNote: "Exchange rate, slippage included",
+    swapOnlyInApp: "Only what sits on the Mintly wallet can be swapped",
     walletSeeAll: "See all",
     walletActBuy: "Buy",
     walletActReceive: "Receive",
@@ -12059,6 +12083,314 @@ function AppWalletCard({ showToast }) {
 }
 
 
+/* Обмен внутри приложения.
+ *
+ * Меняется только то, что лежит на кошельке Mintly: своими ключами
+ * человек ничего не подписывает, сделку собирает и отправляет сервер —
+ * ровно как при покупке на кривой. Внешний TON-кошелёк здесь не при
+ * делах: он не наш, и распоряжаться его содержимым мы не можем.
+ *
+ * Курс не выдумывается: и «вы получите», и сама сделка идут через
+ * маршрутизатор биржи, так что цифра в предпросмотре — та же, по
+ * которой сделка и уйдёт (с допуском на проскальзывание).
+ */
+const МОНЕТЫ_ОБМЕНА = [
+  { тикер: "SOL", имя: "Solana", mint: "So11111111111111111111111111111111111111112", знаки: 9 },
+  { тикер: "USDC", имя: "USD Coin", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", знаки: 6 },
+  { тикер: "USDT", имя: "Tether", mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", знаки: 6 },
+  { тикер: "JUP", имя: "Jupiter", mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", знаки: 6 },
+  { тикер: "BONK", имя: "Bonk", mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", знаки: 5 },
+];
+
+/* Сумма в наименьших долях монеты — то, чем считает биржа. Идём через
+   строку, а не через умножение с плавающей точкой: 0.1 * 1e9 в двоичной
+   арифметике даёт 100000000.00000001, и BigInt на этом падает. */
+function вДоли(текст, знаки) {
+  const чистое = String(текст || "0").replace(",", ".").trim();
+  if (!/^\d*\.?\d*$/.test(чистое) || чистое === "" || чистое === ".") return 0n;
+  const [целое, дробь = ""] = чистое.split(".");
+  const хвост = (дробь + "0".repeat(знаки)).slice(0, знаки);
+  return BigInt((целое || "0") + хвост);
+}
+
+function изДолей(доли, знаки, точность = 6) {
+  const n = Number(доли || 0) / Math.pow(10, знаки);
+  if (!Number.isFinite(n)) return "0";
+  if (n === 0) return "0";
+  if (n < 0.000001) return n.toExponential(2);
+  return n.toLocaleString("ru-RU", { maximumFractionDigits: точность });
+}
+
+/* Клавиатура своя, а не системная: поле ввода на телефоне поднимает
+   клавиатуру поверх половины экрана, и человек перестаёт видеть то, что
+   получает взамен. */
+function КлавишиОбмена({ onКлавиша }) {
+  const ряды = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], [".", "0", "←"]];
+  return (
+    <div className="flex flex-col" style={{ gap: 4 }}>
+      {ряды.map((ряд, i) => (
+        <div key={i} className="flex" style={{ gap: 4 }}>
+          {ряд.map((к) => (
+            <button
+              key={к}
+              onClick={() => { haptic("light"); onКлавиша(к); }}
+              className="fx-tap flex-1 flex items-center justify-center"
+              style={{
+                height: 58, borderRadius: 18, border: "none", background: "transparent",
+                fontFamily: displayFont, fontSize: 24, fontWeight: 600, color: T.paper,
+              }}
+            >
+              {к === "←" ? <ChevronLeft size={22} color={T.paper} /> : к}
+            </button>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ЭкранОбмена({ открыт, onClose, солНаКошельке = 0, showToast = () => {}, onГотово = () => {} }) {
+  const [отдаю, setОтдаю] = useState(МОНЕТЫ_ОБМЕНА[0]);
+  const [беру, setБеру] = useState(МОНЕТЫ_ОБМЕНА[1]);
+  const [сумма, setСумма] = useState("");
+  const [выход, setВыход] = useState(null);      // сколько дадут, в долях
+  const [считаем, setСчитаем] = useState(false);
+  const [идёт, setИдёт] = useState(false);
+  const [выбор, setВыбор] = useState(null);       // какую сторону меняем: "дать" | "взять"
+
+  // Экран открывается заново — начинаем с чистого листа: чужая сумма из
+  // прошлого раза сбивает с толку сильнее, чем пустое поле.
+  useEffect(() => {
+    if (!открыт) { setСумма(""); setВыход(null); setВыбор(null); }
+  }, [открыт]);
+
+  const доли = вДоли(сумма, отдаю.знаки);
+
+  /* Курс пересчитывается не на каждую цифру: пока человек набирает,
+     запросы уходили бы пачкой, а нужен только последний. */
+  useEffect(() => {
+    if (!открыт || доли <= 0n || отдаю.mint === беру.mint) { setВыход(null); return; }
+    let брошено = false;
+    setСчитаем(true);
+    const т = setTimeout(async () => {
+      try {
+        const { курсОбмена } = await import("./appWallet");
+        const ответ = await курсОбмена({ вход: отдаю.mint, выход: беру.mint, сумма: доли.toString() });
+        if (!брошено) setВыход(ответ && ответ.out != null ? ответ.out : null);
+      } catch {
+        if (!брошено) setВыход(null);
+      } finally {
+        if (!брошено) setСчитаем(false);
+      }
+    }, 400);
+    return () => { брошено = true; clearTimeout(т); setСчитаем(false); };
+  }, [открыт, доли.toString(), отдаю.mint, беру.mint]);
+
+  if (!открыт) return null;
+
+  const солью = отдаю.тикер === "SOL";
+  const свободно = Math.max(0, Number(солНаКошельке) - 0.01);  // запас на комиссию сети
+
+  function клавиша(к) {
+    setСумма((было) => {
+      if (к === "←") return было.slice(0, -1);
+      if (к === ".") return было.includes(".") ? было : (было === "" ? "0." : было + ".");
+      const новое = было === "0" ? к : было + к;
+      // Больше восьми знаков не набирают даже с копейками, а строка
+      // уезжает за край карточки.
+      return новое.length > 12 ? было : новое;
+    });
+  }
+
+  function доля(часть) {
+    if (!солью || !(свободно > 0)) return;
+    const v = свободно * часть;
+    setСумма(v < 0.000001 ? "" : String(Number(v.toFixed(6))));
+  }
+
+  function поменять() {
+    haptic("light");
+    setОтдаю(беру);
+    setБеру(отдаю);
+    setСумма("");
+    setВыход(null);
+  }
+
+  async function обменять() {
+    if (идёт || доли <= 0n) return;
+    if (солью && Number(сумма.replace(",", ".")) > свободно) { showToast(t("swapNotEnough")); return; }
+    setИдёт(true);
+    try {
+      const { свопВнутренним } = await import("./appWallet");
+      await свопВнутренним({ вход: отдаю.mint, выход: беру.mint, сумма: доли.toString() });
+      haptic("success");
+      showToast(t("swapDone"));
+      setСумма("");
+      setВыход(null);
+      onГотово();
+      onClose();
+    } catch (e) {
+      showToast(`${t("swapFailed")}: ${String((e && e.message) || e).slice(0, 60)}`);
+    } finally {
+      setИдёт(false);
+    }
+  }
+
+  const готово = доли > 0n && выход != null && !идёт;
+
+  return createPortal(
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 400, background: T.bg,
+      display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto",
+    }}>
+      <div className="flex items-center justify-between" style={{ padding: "14px 16px 8px" }}>
+        <button onClick={onClose} className="fx-tap flex items-center justify-center"
+          style={{ width: 38, height: 38, borderRadius: "50%", background: T.surfaceHi, border: "none" }}>
+          <X size={18} color={T.ice} />
+        </button>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16.5, fontWeight: 700 }}>{t("swapTitle")}</span>
+        <span style={{ width: 38 }} />
+      </div>
+
+      <div style={{ padding: "6px 16px 0" }}>
+        {/* Что отдаём */}
+        <div style={{ borderRadius: 22, background: T.surfaceHi, padding: "14px 16px" }}>
+          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("swapYouPay")}</div>
+          <div className="flex items-center justify-between" style={{ gap: 12, marginTop: 8 }}>
+            <span className="truncate" style={{ fontFamily: displayFont, color: сумма ? T.ice : T.faint, fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em" }}>
+              {сумма || "0"}
+            </span>
+            <button onClick={() => setВыбор("дать")} className="fx-tap flex items-center"
+              style={{ gap: 6, padding: "8px 12px", borderRadius: 999, background: T.surface, border: "none", flexShrink: 0 }}>
+              <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{отдаю.тикер}</span>
+              <ChevronDown size={14} color={T.muted} />
+            </button>
+          </div>
+          {солью && (
+            <div style={{ fontFamily: monoFont, color: T.faint, fontSize: 12, marginTop: 6 }}>
+              {t("swapAvailable")}: {свободно.toFixed(4)} SOL
+            </div>
+          )}
+        </div>
+
+        {/* Разворот направления — на границе карточек, как принято в
+            обменниках: одно нажатие вместо двух выборов монеты. */}
+        <div className="flex justify-center" style={{ height: 0, position: "relative", zIndex: 1 }}>
+          <button onClick={поменять} className="fx-tap flex items-center justify-center"
+            style={{
+              position: "relative", top: -13, width: 38, height: 38, borderRadius: "50%",
+              background: T.surface, border: `3px solid ${T.bg}`,
+            }}>
+            <Repeat size={16} color={T.ice} />
+          </button>
+        </div>
+
+        {/* Что получим */}
+        <div style={{ borderRadius: 22, background: T.surfaceHi, padding: "14px 16px", marginTop: 4 }}>
+          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("swapYouGet")}</div>
+          <div className="flex items-center justify-between" style={{ gap: 12, marginTop: 8 }}>
+            <span className="truncate" style={{ fontFamily: displayFont, color: выход != null ? T.ice : T.faint, fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em" }}>
+              {считаем ? "…" : выход != null ? изДолей(выход, беру.знаки) : "0"}
+            </span>
+            <button onClick={() => setВыбор("взять")} className="fx-tap flex items-center"
+              style={{ gap: 6, padding: "8px 12px", borderRadius: 999, background: T.surface, border: "none", flexShrink: 0 }}>
+              <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{беру.тикер}</span>
+              <ChevronDown size={14} color={T.muted} />
+            </button>
+          </div>
+          <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 6 }}>{t("swapRouteNote")}</div>
+        </div>
+
+        {/* Доли — только когда отдаём SOL: чем владеет кошелёк в токенах,
+            приложение не знает, и проценты от неизвестного были бы враньём. */}
+        {солью && (
+          <div className="flex items-center" style={{ gap: 8, marginTop: 14 }}>
+            {[[0.25, "25%"], [0.5, "50%"], [1, t("swapAll")]].map(([ч, подпись]) => (
+              <button key={подпись} onClick={() => доля(ч)} className="fx-tap flex-1"
+                style={{
+                  padding: "11px 0", borderRadius: 999, background: T.surfaceHi, border: "none",
+                  fontFamily: displayFont, fontSize: 14, fontWeight: 600, color: T.paper,
+                }}>
+                {подпись}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ flex: 1 }} />
+
+      <div style={{ padding: "0 8px" }}>
+        <КлавишиОбмена onКлавиша={клавиша} />
+      </div>
+
+      <div style={{ padding: "8px 16px 22px" }}>
+        <button
+          onClick={обменять}
+          disabled={!готово}
+          className="fx-tap w-full"
+          style={{
+            padding: "16px 0", borderRadius: 20, border: "none",
+            background: готово ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+            color: готово ? PRISM_TEXT : T.faint,
+            fontFamily: displayFont, fontSize: 16, fontWeight: 700,
+          }}
+        >
+          {идёт ? t("swapGoing") : t("swapDo")}
+        </button>
+      </div>
+
+      {/* Выбор монеты — списком поверх экрана: раскрывающийся список в
+          такой раскладке пришлось бы прокручивать вместе с клавиатурой. */}
+      {выбор && (
+        <div
+          onClick={() => setВыбор(null)}
+          style={{ position: "absolute", inset: 0, zIndex: 2, background: hexA("#000000", 0.6), display: "flex", alignItems: "flex-end" }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{
+            width: "100%", background: T.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+            padding: "16px 12px 26px",
+          }}>
+            <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, padding: "0 6px 10px" }}>
+              {выбор === "дать" ? t("swapYouPay") : t("swapYouGet")}
+            </div>
+            {МОНЕТЫ_ОБМЕНА.map((м) => (
+              <button
+                key={м.mint}
+                onClick={() => {
+                  const другая = выбор === "дать" ? беру : отдаю;
+                  // Менять монету саму на себя нельзя: если выбрали ту же,
+                  // что и с другой стороны, стороны просто меняются местами.
+                  if (м.mint === другая.mint) { поменять(); setВыбор(null); return; }
+                  if (выбор === "дать") setОтдаю(м); else setБеру(м);
+                  setСумма((было) => (выбор === "дать" ? "" : было));
+                  setВыход(null);
+                  setВыбор(null);
+                }}
+                className="fx-tap w-full flex items-center"
+                style={{ gap: 12, padding: "12px 10px", borderRadius: 16, background: "transparent", border: "none" }}
+              >
+                <span className="flex items-center justify-center" style={{
+                  width: 34, height: 34, borderRadius: "50%", background: T.surfaceHi,
+                  fontFamily: displayFont, fontSize: 12.5, fontWeight: 700, color: T.ice,
+                }}>
+                  {м.тикер.slice(0, 2)}
+                </span>
+                <span className="flex-1 text-left">
+                  <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{м.тикер}</span>
+                  <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>{м.имя}</span>
+                </span>
+                {(выбор === "дать" ? отдаю.mint : беру.mint) === м.mint && <Check size={16} color={T.ice} />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+}
+
 /* Кошелёк.
  *
  * Экран сложён по образцу банковского приложения: тёмный верх с картой
@@ -12191,39 +12523,44 @@ function ИсторияКошелька({ userId }) {
 
 function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onConnect, onDisconnect, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {} }) {
   const [copied, setCopied] = useState(false);
-  const balance = useCountUp(connected ? tonBalance : 0, 900, connected);
-  const usd = useCountUp(connected ? tonBalance * tonPriceUsd : 0, 900, connected);
-  const short = walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-6)}` : "";
   const низ = useRef(null);
 
+  /* Главный кошелёк здесь — внутренний, кошелёк Mintly: им человек
+     платит на кривой и им же меняет одно на другое, не подписывая
+     ничего снаружи. Внешний TON-кошелёк остаётся ниже отдельной
+     карточкой: он не наш, и распоряжаться его содержимым мы не можем. */
+  const [внутр, setВнутр] = useState(null);
+  const [обменОткрыт, setОбменОткрыт] = useState(false);
+
+  const обновитьВнутренний = useCallback(async () => {
+    const { состояниеВнутреннего } = await import("./appWallet");
+    const s = await состояниеВнутреннего();
+    if (s) setВнутр(s);
+  }, []);
+
+  useEffect(() => {
+    let жив = true;
+    const тик = () => { if (жив) обновитьВнутренний(); };
+    тик();
+    // Пополнение приходит мимо приложения — заметить его можно только
+    // переспросив сеть.
+    const id = setInterval(тик, 15000);
+    return () => { жив = false; clearInterval(id); };
+  }, [обновитьВнутренний]);
+
+  const солНаКошельке = внутр && !внутр.нуженВход && !внутр.ошибка ? Number(внутр.sol) || 0 : 0;
+  const адресВнутри = внутр && внутр.address ? внутр.address : "";
+  const balance = useCountUp(солНаКошельке, 900, !!адресВнутри);
+  const usd = useCountUp(солНаКошельке * (solUsd() || 0), 900, !!адресВнутри);
+  const short = адресВнутри ? `${адресВнутри.slice(0, 4)}…${адресВнутри.slice(-4)}` : "";
+
   function скопироватьАдрес() {
-    onCopy();
+    if (!адресВнутри) { showToast(t("appWalletNeedAuth")); return; }
+    if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(адресВнутри).catch(() => {});
+    showToast(t("appWalletAddressCopied"));
     setCopied(true);
     haptic("light");
     setTimeout(() => setCopied(false), 1400);
-  }
-
-  if (!connected) {
-    return (
-      <div className="flex flex-col" style={{ gap: 24, paddingTop: 8 }}>
-        <div>
-          <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, margin: 0 }}>{t("navWallet")}</h1>
-          <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 6, lineHeight: 1.45 }}>{t("walletEmptyBody")}</p>
-        </div>
-        <button
-          onClick={onConnect}
-          className="fx-tap w-full flex items-center justify-center gap-2"
-          style={{ padding: "13px 16px", borderRadius: 14, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, border: "none", fontFamily: displayFont, fontSize: 15, fontWeight: 600 }}
-        >
-          <Wallet size={16} strokeWidth={1.8} /> {t("connectWallet")}
-        </button>
-
-        {/* Кошельки друг от друга не зависят: мемкоины Solana можно
-            торговать и не подключая TON-кошелёк вовсе. */}
-        <AppWalletCard showToast={showToast} />
-        <SolanaWalletCard showToast={showToast} />
-      </div>
-    );
   }
 
   /* Доля в долларах меняется вместе с курсом, и в макете на карте стоит
@@ -12270,7 +12607,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             {Math.floor(balance).toLocaleString("ru-RU")}
             <span style={{ color: hexA("#FFFFFF", 0.55) }}>{(balance % 1).toFixed(2).slice(1)}</span>
           </span>
-          <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.7), fontSize: 14 }}>TON</span>
+          <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.7), fontSize: 14 }}>SOL</span>
         </div>
         <span
           className="inline-flex items-center"
@@ -12288,7 +12625,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <div className="flex items-start" style={{ gap: 10, marginTop: 16 }}>
         <ДействиеКошелька icon={Plus} label={t("walletActBuy")} onClick={() => onGoTab("mempad")} />
         <ДействиеКошелька icon={ArrowDownLeft} label={t("walletActReceive")} onClick={скопироватьАдрес} />
-        <ДействиеКошелька icon={Repeat} label={t("walletActSwap")} onClick={() => onGoTab("mempad")} />
+        <ДействиеКошелька icon={Repeat} label={t("walletActSwap")} onClick={() => setОбменОткрыт(true)} />
         <ДействиеКошелька
           icon={Clock}
           label={t("walletActHistory")}
@@ -12300,6 +12637,40 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           «сколько и где лежит», а не про историю операций. */}
       <div className="flex flex-col" style={{ gap: 14, marginTop: 20 }}>
         <AppWalletCard showToast={showToast} />
+
+        {/* TON-кошелёк. Он внешний: им подписывают покупки на кривой TON,
+            но менять на нём нечего — обмен живёт только внутри. */}
+        <div className="w-full rounded-[22px] p-4" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
+          {connected ? (
+            <div className="flex items-center justify-between" style={{ gap: 12 }}>
+              <div className="min-w-0">
+                <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>TON-кошелёк</div>
+                <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 12.5, marginTop: 5 }}>
+                  {tonBalance.toFixed(2)} TON · ≈ ${(tonBalance * tonPriceUsd).toFixed(2)}
+                </div>
+              </div>
+              <button onClick={onCopy} className="fx-tap flex items-center" style={{ gap: 6, padding: "8px 12px", borderRadius: 999, background: T.surfaceHi, border: "none", flexShrink: 0 }}>
+                <span style={{ fontFamily: monoFont, color: T.paper, fontSize: 12 }}>
+                  {walletAddress ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}` : ""}
+                </span>
+                <Copy size={12} color={T.faint} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>TON-кошелёк</div>
+              <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 5, lineHeight: 1.45 }}>{t("walletEmptyBody")}</p>
+              <button
+                onClick={onConnect}
+                className="fx-tap w-full flex items-center justify-center"
+                style={{ gap: 7, marginTop: 12, padding: "11px 14px", borderRadius: 14, background: ЦВЕТ_КНОПКИ, border: "none", color: PRISM_TEXT, fontFamily: displayFont, fontSize: 14, fontWeight: 700 }}
+              >
+                <Wallet size={14} /> {t("connectWallet")}
+              </button>
+            </>
+          )}
+        </div>
+
         <SolanaWalletCard showToast={showToast} />
       </div>
 
@@ -12386,14 +12757,24 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
 
         <ИсторияКошелька userId={userId} />
 
-        <button
-          onClick={onDisconnect}
-          className="fx-tap flex items-center gap-1.5 self-start"
-          style={{ background: "transparent", border: "none", padding: 0, marginTop: 24, fontFamily: bodyFont, fontSize: 13.5, color: T.muted }}
-        >
-          <LogOut size={13} /> {t("disconnectShort")}
-        </button>
+        {connected && (
+          <button
+            onClick={onDisconnect}
+            className="fx-tap flex items-center gap-1.5 self-start"
+            style={{ background: "transparent", border: "none", padding: 0, marginTop: 24, fontFamily: bodyFont, fontSize: 13.5, color: T.muted }}
+          >
+            <LogOut size={13} /> {t("disconnectShort")}
+          </button>
+        )}
       </div>
+
+      <ЭкранОбмена
+        открыт={обменОткрыт}
+        onClose={() => setОбменОткрыт(false)}
+        солНаКошельке={солНаКошельке}
+        showToast={showToast}
+        onГотово={обновитьВнутренний}
+      />
     </div>
   );
 }
