@@ -184,6 +184,10 @@ const STR = {
     needAccountShort: "Нужен вход в аккаунт",
     navProfileItem: "Профиль",
     searchPlaceholder: "Поиск",
+    slideToDisconnect: "Сдвинь, чтобы отключить",
+    disconnected: "Отключено",
+    walletAddressLabel: "Адрес",
+    walletBalanceRow: "Баланс",
     achTitleShort: "Достижения",
     appWalletNeedAuth: "Баланс в приложении привязан к аккаунту — войди или создай его в профиле, и адрес появится здесь.",
     walletEmptyTitle: "Кошелёк не подключён",
@@ -681,6 +685,10 @@ const STR = {
     needAccountShort: "Sign in first",
     navProfileItem: "Profile",
     searchPlaceholder: "Search",
+    slideToDisconnect: "Slide to disconnect",
+    disconnected: "Disconnected",
+    walletAddressLabel: "Address",
+    walletBalanceRow: "Balance",
     achTitleShort: "Achievements",
     appWalletNeedAuth: "The app balance belongs to your account — sign in or create one in your profile and the address shows up here.",
     walletEmptyTitle: "No wallet connected",
@@ -11313,6 +11321,124 @@ function ТопСтрока({ onOpenToken, onOpenProfile, live = [] }) {
   );
 }
 
+/* Ползунок «сдвинь, чтобы отключить».
+ *
+ * Отключение кошелька — не то действие, которое должно случаться от
+ * случайного касания: кнопка рядом с балансом слишком легко ловит палец.
+ * Здесь нужно провести ручку до конца дорожки, и по дороге видно, что
+ * происходит: дорожка наливается от фиолетового к красному.
+ */
+function ПолзунокОтключения({ подпись, готовоПодпись, onГотово }) {
+  const дорожка = useRef(null);
+  const [доля, setДоля] = useState(0);       // 0..1
+  const [ведут, setВедут] = useState(false);
+  const [сработал, setСработал] = useState(false);
+  const РУЧКА = 54;
+
+  function отТочки(clientX) {
+    const эл = дорожка.current;
+    if (!эл) return 0;
+    const р = эл.getBoundingClientRect();
+    const путь = Math.max(1, р.width - РУЧКА - 8);
+    return Math.max(0, Math.min(1, (clientX - р.left - РУЧКА / 2 - 4) / путь));
+  }
+
+  function начало(e) {
+    if (сработал) return;
+    setВедут(true);
+    e.currentTarget.setPointerCapture && e.currentTarget.setPointerCapture(e.pointerId);
+    setДоля(отТочки(e.clientX));
+  }
+  function ход(e) {
+    if (!ведут || сработал) return;
+    const д = отТочки(e.clientX);
+    setДоля(д);
+    // Отклик у самого конца: палец чувствует границу до того, как отпустит.
+    if (д > 0.985) { setСработал(true); setВедут(false); haptic("success"); setTimeout(() => onГотово(), 260); }
+  }
+  function конец() {
+    if (сработал) return;
+    setВедут(false);
+    setДоля(0);
+  }
+
+  return (
+    <div
+      ref={дорожка}
+      style={{
+        position: "relative", height: 62, borderRadius: 999, background: T.surfaceHi,
+        overflow: "hidden", touchAction: "none", userSelect: "none",
+      }}
+    >
+      {/* Заливка идёт за ручкой и меняет цвет: чем ближе к концу, тем
+          краснее — цвет предупреждает раньше, чем сработает действие. */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute", inset: 0,
+          background: `linear-gradient(90deg, ${ЦВЕТ_КНОПКИ} 0%, #B7237E 55%, ${T.down} 100%)`,
+          clipPath: `inset(0 ${(1 - (сработал ? 1 : доля)) * 100}% 0 0)`,
+          transition: ведут ? "none" : "clip-path 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+        }}
+      />
+      <span
+        style={{
+          position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+          fontFamily: displayFont, fontSize: 15, fontWeight: 700,
+          color: доля > 0.35 || сработал ? "#FFFFFF" : T.muted,
+          opacity: сработал ? 1 : 1 - доля * 0.55,
+          transition: ведут ? "none" : `opacity 260ms ease-out, color ${EASE}`,
+          pointerEvents: "none",
+        }}
+      >
+        {сработал ? готовоПодпись : подпись}
+      </span>
+      <span
+        onPointerDown={начало}
+        onPointerMove={ход}
+        onPointerUp={конец}
+        onPointerCancel={конец}
+        style={{
+          position: "absolute", top: 4, width: РУЧКА, height: РУЧКА, borderRadius: "50%",
+          background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center",
+          left: `calc(4px + ${сработал ? 1 : доля} * (100% - ${РУЧКА + 8}px))`,
+          transition: ведут ? "none" : "left 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+          boxShadow: "0 6px 18px rgba(0,0,0,0.45)",
+          cursor: "grab",
+        }}
+      >
+        {сработал ? <Check size={20} color="#14151A" strokeWidth={2.6} /> : <ChevronRight size={22} color="#14151A" strokeWidth={2.4} />}
+      </span>
+    </div>
+  );
+}
+
+/* Страница кошелька: что это за кошелёк и как его отключить. */
+function ЭкранКошелька({ открыт, onClose, название, строки = [], onОтключить, insetTop = 0, insetBottom = 0 }) {
+  return (
+    <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={название} insetTop={insetTop} insetBottom={insetBottom}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 18px" }}>
+        <div style={{ borderRadius: 22, background: T.surfaceHi, padding: "16px 18px" }}>
+          {строки.map((с, i) => (
+            <div key={i} className="flex items-center justify-between" style={{ gap: 12, padding: "7px 0" }}>
+              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{с.имя}</span>
+              <span className="truncate" style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, maxWidth: "62%" }}>{с.значение}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: "16px 18px 22px", flexShrink: 0 }}>
+        <ПолзунокОтключения
+          подпись={t("slideToDisconnect")}
+          готовоПодпись={t("disconnected")}
+          onГотово={() => { onОтключить(); onClose(); }}
+        />
+      </div>
+    </ЭкранСнизу>
+  );
+}
+
 /* Настройки отдельным экраном.
  *
  * Сложены группами, как это принято в системных настройках: несколько
@@ -12063,7 +12189,8 @@ function HomeView({
    держит оба: TON-кошелёк платит за свои токены, Solana-кошелёк — за
    мемкоины из ленты Solana. Ни один из них не заменяет другой, поэтому
    и подключаются они по отдельности. */
-function SolanaWalletCard({ showToast }) {
+function SolanaWalletCard({ showToast, insetTop = 0, insetBottom = 0 }) {
+  const [страница, setСтраница] = useState(false);
   const [сессия, setСессия] = useState(null);
   const [баланс, setБаланс] = useState(null);
   const [идёт, setИдёт] = useState(false);
@@ -12112,14 +12239,19 @@ function SolanaWalletCard({ showToast }) {
   return (
     <div className="w-full rounded-[22px] p-4" style={{ marginTop: 20, background: T.surface, border: `1px solid ${T.line}` }}>
       <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{t("solWalletTitle")}</div>
-          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 3, lineHeight: 1.4 }}>
+        <button
+          onClick={() => сессия && setСтраница(true)}
+          className={сессия ? "fx-tap min-w-0 text-left" : "min-w-0 text-left"}
+          style={{ background: "transparent", border: "none", padding: 0, flex: 1 }}
+        >
+          <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{t("solWalletTitle")}</span>
+          <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 3, lineHeight: 1.4 }}>
             {сессия
               ? (баланс == null ? t("solWalletLoading") : `${баланс.toFixed(4)} SOL`)
               : t("solWalletNote")}
-          </div>
-        </div>
+          </span>
+        </button>
+        {сессия && <ChevronRight size={17} color={T.faint} />}
         {/* Адреса рядом с кошельком нет: он есть на «Получить» целиком и
             кодом, а обрубок в углу карточки ничего не добавлял. */}
         {сессия ? null : (
@@ -12139,15 +12271,20 @@ function SolanaWalletCard({ showToast }) {
         )}
       </div>
 
-      {сессия && (
-        <button
-          onClick={отключиться}
-          className="fx-tap flex items-center gap-1.5"
-          style={{ marginTop: 12, background: "transparent", border: "none", padding: 0, fontFamily: bodyFont, fontSize: 13, color: T.rose }}
-        >
-          <LogOut size={12} /> {t("solWalletDisconnect")}
-        </button>
-      )}
+      {/* Отключение переехало на страницу кошелька: она открывается по
+          нажатию на саму карточку, и там его надо провести ползунком. */}
+      <ЭкранКошелька
+        открыт={страница}
+        onClose={() => setСтраница(false)}
+        название={t("solWalletTitle")}
+        строки={[
+          { имя: t("walletBalanceRow"), значение: баланс == null ? "…" : `${баланс.toFixed(4)} SOL` },
+          { имя: t("walletAddressLabel"), значение: сессия ? `${сессия.wallet.slice(0, 6)}…${сессия.wallet.slice(-6)}` : "—" },
+        ]}
+        onОтключить={отключиться}
+        insetTop={insetTop}
+        insetBottom={insetBottom}
+      />
     </div>
   );
 }
@@ -12991,6 +13128,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const [внутр, setВнутр] = useState(null);
   const [обменОткрыт, setОбменОткрыт] = useState(false);
   const [получитьОткрыт, setПолучитьОткрыт] = useState(false);
+  const [страницаTON, setСтраницаTON] = useState(false);
   /* Волны от касаний карты. Каждая живёт своё время и убирается сама —
      иначе их накапливались бы десятки за один сеанс. */
   const [волны, setВолны] = useState([]);
@@ -13149,23 +13287,22 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             но менять на нём нечего — обмен живёт только внутри. */}
         <div className="w-full rounded-[22px] p-4" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
           {connected ? (
-            <>
-              <div className="min-w-0">
-                <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>TON-кошелёк</div>
-                <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 12.5, marginTop: 5 }}>
+            /* Карточка целиком — вход на страницу кошелька: там же и
+               отключение, ползунком. Кнопка рядом с балансом слишком
+               легко ловила палец. */
+            <button
+              onClick={() => setСтраницаTON(true)}
+              className="fx-tap w-full flex items-center justify-between"
+              style={{ gap: 12, background: "transparent", border: "none", padding: 0 }}
+            >
+              <span className="min-w-0 text-left">
+                <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>TON-кошелёк</span>
+                <span style={{ display: "block", fontFamily: monoFont, color: T.muted, fontSize: 12.5, marginTop: 5 }}>
                   {tonBalance.toFixed(2)} TON · ≈ ${(tonBalance * tonPriceUsd).toFixed(2)}
-                </div>
-              </div>
-              {/* Отключение — там же, где у кошелька Solana: одно и то же
-                  действие должно лежать на одном и том же месте. */}
-              <button
-                onClick={onDisconnect}
-                className="fx-tap flex items-center gap-1.5"
-                style={{ marginTop: 12, background: "transparent", border: "none", padding: 0, fontFamily: bodyFont, fontSize: 13, color: T.rose }}
-              >
-                <LogOut size={12} /> {t("disconnectShort")}
-              </button>
-            </>
+                </span>
+              </span>
+              <ChevronRight size={17} color={T.faint} />
+            </button>
           ) : (
             <>
               <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>TON-кошелёк</div>
@@ -13181,7 +13318,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           )}
         </div>
 
-        <SolanaWalletCard showToast={showToast} />
+        <SolanaWalletCard showToast={showToast} insetTop={insetTop} insetBottom={insetBottom} />
       </div>
 
       {/* Светлая страница. Уходит за края прокрутки и вниз за экран:
@@ -13261,6 +13398,19 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         <ИсторияКошелька userId={userId} />
 
       </div>
+
+      <ЭкранКошелька
+        открыт={страницаTON}
+        onClose={() => setСтраницаTON(false)}
+        название="TON-кошелёк"
+        строки={[
+          { имя: t("walletBalanceRow"), значение: `${tonBalance.toFixed(2)} TON` },
+          { имя: t("walletAddressLabel"), значение: walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-6)}` : "—" },
+        ]}
+        onОтключить={onDisconnect}
+        insetTop={insetTop}
+        insetBottom={insetBottom}
+      />
 
       <ЭкранПолучить
         открыт={получитьОткрыт}
