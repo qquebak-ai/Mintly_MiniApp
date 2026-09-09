@@ -12199,6 +12199,38 @@ function кодВSVG(сетка) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(свг)}`;
 }
 
+/* Копирование в буфер.
+ *
+ * Современный API есть не везде: в старых webview его нет, а в
+ * некоторых он бросает исключение прямо на вызове. Тогда остаётся приём
+ * с невидимым полем и execCommand — он древний, но работает там, где не
+ * работает ничего другого.
+ */
+function скопироватьВБуфер(текст) {
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+      const п = navigator.clipboard.writeText(текст);
+      if (п && typeof п.catch === "function") п.catch(() => черезПоле(текст));
+      return;
+    }
+  } catch { /* пробуем запасным путём */ }
+  черезПоле(текст);
+}
+
+function черезПоле(текст) {
+  try {
+    const поле = document.createElement("textarea");
+    поле.value = текст;
+    поле.setAttribute("readonly", "");
+    поле.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none";
+    document.body.appendChild(поле);
+    поле.select();
+    поле.setSelectionRange(0, текст.length);
+    document.execCommand("copy");
+    document.body.removeChild(поле);
+  } catch { /* дальше идти некуда */ }
+}
+
 /* Экран «Получить»: адрес кошелька Mintly кодом и строкой.
  *
  * Код рисуется на месте, а не берётся картинкой со стороннего сервиса:
@@ -12230,10 +12262,15 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", sh
   const короткий = адрес ? `${адрес.slice(0, 6)}…${адрес.slice(-6)}` : "";
 
   function копировать() {
-    if (!адрес) return;
-    if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(адрес).catch(() => {});
+    if (!адрес) { showToast(t("needAccountShort")); return; }
+    /* Отклик — первым делом. Буфер обмена в webview Telegram отвечает
+       по-разному: где-то отдаёт обещание, где-то бросает прямо на вызове,
+       а где-то его нет вовсе. Если сначала копировать, а потом красить
+       кнопку, при таком отказе она не отзывалась вообще. */
+    setСкопировано(true);
     haptic("light");
-    showToast(t("appWalletAddressCopied"));
+    setTimeout(() => setСкопировано(false), 1600);
+    скопироватьВБуфер(адрес);
   }
 
   async function поделиться() {
