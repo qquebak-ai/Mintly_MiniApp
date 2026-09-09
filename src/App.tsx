@@ -1550,6 +1550,13 @@ function GlobalStyle() {
          второго набора картинка бесшовная. */
       @keyframes котыБегут { from { transform: translate3d(calc(var(--шаг) * -5), 0, 0); } to { transform: translate3d(0, 0, 0); } }
       @keyframes лентаГаснет { from { opacity: 1; } to { opacity: 0; } }
+      /* Обмен: экран выезжает снизу, лист монет — из-под него, значения
+         в карточках подхватываются мягким подъёмом. */
+      @keyframes обменВъезжает { from { transform: translateY(100%); } to { transform: translateY(0); } }
+      @keyframes обменФон { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes листМонет { from { transform: translateY(100%); } to { transform: translateY(0); } }
+      @keyframes значениеПришло { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes карточкаОбмена { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes котОстаётся { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
       @keyframes gridDrift { from{background-position:0 0,0 0;} to{background-position:140px 140px,140px 140px;} }
       @keyframes starTwinkle { 0%,100%{opacity:.2;} 50%{opacity:1;} }
@@ -12095,12 +12102,27 @@ function AppWalletCard({ showToast }) {
  * которой сделка и уйдёт (с допуском на проскальзывание).
  */
 const МОНЕТЫ_ОБМЕНА = [
-  { тикер: "SOL", имя: "Solana", mint: "So11111111111111111111111111111111111111112", знаки: 9 },
-  { тикер: "USDC", имя: "USD Coin", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", знаки: 6 },
-  { тикер: "USDT", имя: "Tether", mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", знаки: 6 },
-  { тикер: "JUP", имя: "Jupiter", mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", знаки: 6 },
-  { тикер: "BONK", имя: "Bonk", mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", знаки: 5 },
+  { тикер: "SOL", имя: "Solana", mint: "So11111111111111111111111111111111111111112", знаки: 9, лого: "/coins/sol.png" },
+  { тикер: "USDC", имя: "USD Coin", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", знаки: 6, лого: "/coins/usdc.png" },
+  { тикер: "USDT", имя: "Tether", mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", знаки: 6, лого: "/coins/usdt.svg" },
+  { тикер: "JUP", имя: "Jupiter", mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", знаки: 6, лого: "/coins/jup.png" },
+  { тикер: "BONK", имя: "Bonk", mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", знаки: 5, лого: "/coins/bonk.png" },
 ];
+
+/* Значок монеты. Картинки лежат у нас, а не тянутся с чужих сайтов:
+   в мини-приложении сеть бывает медленной, и логотип, приезжающий на
+   секунду позже суммы, выглядит поломкой. */
+function ЗначокМонеты({ монета, size = 26 }) {
+  return (
+    <img
+      src={монета.лого}
+      alt=""
+      width={size}
+      height={size}
+      style={{ width: size, height: size, borderRadius: "50%", display: "block", flexShrink: 0, background: T.surfaceHi }}
+    />
+  );
+}
 
 /* Сумма в наименьших долях монеты — то, чем считает биржа. Идём через
    строку, а не через умножение с плавающей точкой: 0.1 * 1e9 в двоичной
@@ -12160,12 +12182,55 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
   const [считаем, setСчитаем] = useState(false);
   const [идёт, setИдёт] = useState(false);
   const [выбор, setВыбор] = useState(null);       // какую сторону меняем: "дать" | "взять"
+  /* Экран закрывается не мгновенно: сперва уезжает вниз, и только потом
+     снимается. Иначе он исчезает под пальцем, которым его тянут. */
+  const [уходит, setУходит] = useState(false);
+  const [тяга, setТяга] = useState(0);            // сколько утянули вниз, px
+  const [развернуто, setРазвернуто] = useState(0); // сколько раз меняли стороны — по нему крутится кнопка
+  const жест = useRef(null);
+  const верх = useRef(null);
 
   // Экран открывается заново — начинаем с чистого листа: чужая сумма из
   // прошлого раза сбивает с толку сильнее, чем пустое поле.
   useEffect(() => {
-    if (!открыт) { setСумма(""); setВыход(null); setВыбор(null); }
+    if (!открыт) { setСумма(""); setВыход(null); setВыбор(null); setУходит(false); setТяга(0); }
   }, [открыт]);
+
+  const закрыть = useCallback(() => {
+    setУходит(true);
+    // Столько же длится и въезд — экран уходит тем же ходом, каким пришёл.
+    setTimeout(() => { setУходит(false); setТяга(0); onClose(); }, 260);
+  }, [onClose]);
+
+  /* Тянут экран вниз — он едет за пальцем. Отпустили ниже трети —
+     закрываем, выше — возвращаем на место. Жест не перехватывается, если
+     под пальцем прокрученный список: там вниз листают содержимое. */
+  function началоЖеста(e) {
+    if (выбор) return;
+    const у = верх.current;
+    const внутриСписка = у && e.target instanceof Node && у.contains(e.target);
+    if (внутриСписка && у.scrollTop > 2) return;
+    const т = e.touches && e.touches[0];
+    if (!т) return;
+    жест.current = { y0: т.clientY, тянем: false };
+  }
+  function ходЖеста(e) {
+    const ж = жест.current;
+    const т = e.touches && e.touches[0];
+    if (!ж || !т) return;
+    const dy = т.clientY - ж.y0;
+    if (!ж.тянем && dy < 12) return;
+    ж.тянем = true;
+    setТяга(Math.max(0, dy));
+  }
+  function конецЖеста() {
+    const ж = жест.current;
+    жест.current = null;
+    if (!ж || !ж.тянем) return;
+    const порог = typeof window !== "undefined" ? window.innerHeight * 0.22 : 160;
+    if (тяга > порог) { haptic("light"); закрыть(); return; }
+    setТяга(0);
+  }
 
   const доли = вДоли(сумма, отдаю.знаки);
 
@@ -12213,6 +12278,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
 
   function поменять() {
     haptic("light");
+    setРазвернуто((n) => n + 1);
     setОтдаю(беру);
     setБеру(отдаю);
     setСумма("");
@@ -12231,7 +12297,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
       setСумма("");
       setВыход(null);
       onГотово();
-      onClose();
+      закрыть();
     } catch (e) {
       showToast(`${t("swapFailed")}: ${String((e && e.message) || e).slice(0, 60)}`);
     } finally {
@@ -12242,34 +12308,46 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
   const готово = доли > 0n && выход != null && !идёт;
 
   return createPortal(
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 400, background: T.bg,
-      display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto",
-      // Сверху — запас под шапку Telegram (часы и «Закрыть» лежат прямо
-      // на приложении), снизу — под системную полосу. Без него первая
-      // карточка уходила под кнопку закрытия.
-      paddingTop: insetTop, paddingBottom: insetBottom,
-      overflow: "hidden",
-    }}>
-      <div className="flex items-center justify-between" style={{ padding: "10px 16px 6px", flexShrink: 0 }}>
-        <button onClick={onClose} className="fx-tap flex items-center justify-center"
-          style={{ width: 38, height: 38, borderRadius: "50%", background: T.surfaceHi, border: "none" }}>
-          <X size={18} color={T.ice} />
-        </button>
+    <div
+      onTouchStart={началоЖеста}
+      onTouchMove={ходЖеста}
+      onTouchEnd={конецЖеста}
+      onTouchCancel={конецЖеста}
+      style={{
+        position: "fixed", inset: 0, zIndex: 400, background: T.bg,
+        display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto",
+        // Сверху — запас под шапку Telegram (часы и «Закрыть» лежат прямо
+        // на приложении), снизу — под системную полосу. Без него первая
+        // карточка уходила под кнопку закрытия.
+        paddingTop: insetTop, paddingBottom: insetBottom,
+        overflow: "hidden",
+        // Пока тянут — экран идёт за пальцем без перехода, отпустили —
+        // возвращается или уезжает уже с ним.
+        transform: уходит ? "translateY(100%)" : `translateY(${тяга}px)`,
+        transition: жест.current ? "none" : "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+        borderTopLeftRadius: тяга > 0 ? 22 : 0, borderTopRightRadius: тяга > 0 ? 22 : 0,
+        animation: уходит ? "none" : "обменВъезжает 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+        touchAction: "pan-y",
+      }}
+    >
+      {/* Крестика нет: экран закрывают тем же движением, каким открыли —
+          потянув вниз. Полоска показывает, что он тянется. */}
+      <div className="flex flex-col items-center" style={{ padding: "8px 16px 6px", flexShrink: 0, gap: 8 }}>
+        <span aria-hidden style={{ width: 40, height: 4, borderRadius: 999, background: hexA("#FFFFFF", 0.22) }} />
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16.5, fontWeight: 700 }}>{t("swapTitle")}</span>
-        <span style={{ width: 38 }} />
       </div>
 
-      <div className="no-scrollbar" style={{ padding: "4px 16px 0", overflowY: "auto", flexShrink: 1, minHeight: 0 }}>
+      <div ref={верх} className="no-scrollbar" style={{ padding: "4px 16px 0", overflowY: "auto", flexShrink: 1, minHeight: 0 }}>
         {/* Что отдаём */}
-        <div style={{ borderRadius: 22, background: T.surfaceHi, padding: "14px 16px" }}>
+        <div style={{ borderRadius: 22, background: T.surfaceHi, padding: "14px 16px", animation: "карточкаОбмена 320ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
           <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("swapYouPay")}</div>
           <div className="flex items-center justify-between" style={{ gap: 12, marginTop: 8 }}>
             <span className="truncate" style={{ fontFamily: displayFont, color: сумма ? T.ice : T.faint, fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em" }}>
               {сумма || "0"}
             </span>
             <button onClick={() => setВыбор("дать")} className="fx-tap flex items-center"
-              style={{ gap: 6, padding: "8px 12px", borderRadius: 999, background: T.surface, border: "none", flexShrink: 0 }}>
+              style={{ gap: 7, padding: "7px 12px 7px 8px", borderRadius: 999, background: T.surface, border: "none", flexShrink: 0 }}>
+              <ЗначокМонеты монета={отдаю} size={24} />
               <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{отдаю.тикер}</span>
               <ChevronDown size={14} color={T.muted} />
             </button>
@@ -12288,20 +12366,30 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
             style={{
               position: "relative", top: -13, width: 38, height: 38, borderRadius: "50%",
               background: T.surface, border: `3px solid ${T.bg}`,
+              transform: `rotate(${развернуто * 180}deg)`,
+              transition: "transform 320ms cubic-bezier(0.22, 1, 0.36, 1)",
             }}>
             <Repeat size={16} color={T.ice} />
           </button>
         </div>
 
         {/* Что получим */}
-        <div style={{ borderRadius: 22, background: T.surfaceHi, padding: "14px 16px", marginTop: 4 }}>
+        <div style={{ borderRadius: 22, background: T.surfaceHi, padding: "14px 16px", marginTop: 4, animation: "карточкаОбмена 320ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both" }}>
           <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("swapYouGet")}</div>
           <div className="flex items-center justify-between" style={{ gap: 12, marginTop: 8 }}>
-            <span className="truncate" style={{ fontFamily: displayFont, color: выход != null ? T.ice : T.faint, fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em" }}>
+            <span
+              key={считаем ? "счёт" : String(выход)}
+              className="truncate"
+              style={{
+                fontFamily: displayFont, color: выход != null ? T.ice : T.faint, fontSize: 30, fontWeight: 700,
+                letterSpacing: "-0.02em", animation: "значениеПришло 260ms ease-out both",
+              }}
+            >
               {считаем ? "…" : выход != null ? изДолей(выход, беру.знаки) : "0"}
             </span>
             <button onClick={() => setВыбор("взять")} className="fx-tap flex items-center"
-              style={{ gap: 6, padding: "8px 12px", borderRadius: 999, background: T.surface, border: "none", flexShrink: 0 }}>
+              style={{ gap: 7, padding: "7px 12px 7px 8px", borderRadius: 999, background: T.surface, border: "none", flexShrink: 0 }}>
+              <ЗначокМонеты монета={беру} size={24} />
               <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{беру.тикер}</span>
               <ChevronDown size={14} color={T.muted} />
             </button>
@@ -12353,11 +12441,14 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
       {выбор && (
         <div
           onClick={() => setВыбор(null)}
-          style={{ position: "absolute", inset: 0, zIndex: 2, background: hexA("#000000", 0.6), display: "flex", alignItems: "flex-end" }}
+          style={{
+            position: "absolute", inset: 0, zIndex: 2, background: hexA("#000000", 0.6),
+            display: "flex", alignItems: "flex-end", animation: "обменФон 200ms ease-out both",
+          }}
         >
           <div onClick={(e) => e.stopPropagation()} style={{
             width: "100%", background: T.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-            padding: "16px 12px 26px",
+            padding: "16px 12px 26px", animation: "листМонет 280ms cubic-bezier(0.22, 1, 0.36, 1) both",
           }}>
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, padding: "0 6px 10px" }}>
               {выбор === "дать" ? t("swapYouPay") : t("swapYouGet")}
@@ -12378,12 +12469,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
                 className="fx-tap w-full flex items-center"
                 style={{ gap: 12, padding: "12px 10px", borderRadius: 16, background: "transparent", border: "none" }}
               >
-                <span className="flex items-center justify-center" style={{
-                  width: 34, height: 34, borderRadius: "50%", background: T.surfaceHi,
-                  fontFamily: displayFont, fontSize: 12.5, fontWeight: 700, color: T.ice,
-                }}>
-                  {м.тикер.slice(0, 2)}
-                </span>
+                <ЗначокМонеты монета={м} size={34} />
                 <span className="flex-1 text-left">
                   <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{м.тикер}</span>
                   <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>{м.имя}</span>
