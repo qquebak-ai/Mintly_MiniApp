@@ -1469,6 +1469,11 @@ function GlobalStyle() {
       /* Маскот: медленно покачивается, свечение вокруг дышит. */
       @keyframes маскотДышит { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-6px) rotate(-2deg); } }
       @keyframes маскотСветит { 0%, 100% { opacity: 0.55; transform: scale(0.94); } 50% { opacity: 1; transform: scale(1.06); } }
+      /* Вереница котов: едет ровно на один шаг и повторяется — из-за
+         второго набора картинка бесшовная. Дрожание отдельное, чтобы
+         каждый кот шёл по-своему. */
+      @keyframes котыБегут { from { transform: translate3d(calc(var(--шаг) * -5), 0, 0); } to { transform: translate3d(0, 0, 0); } }
+      @keyframes котДрожит { from { transform: translateY(-3px) rotate(-3deg); } to { transform: translateY(3px) rotate(3deg); } }
       @keyframes gridDrift { from{background-position:0 0,0 0;} to{background-position:140px 140px,140px 140px;} }
       @keyframes starTwinkle { 0%,100%{opacity:.2;} 50%{opacity:1;} }
       @keyframes starPulse { 0%,100%{opacity:0;} 50%{opacity:var(--o);} }
@@ -8286,40 +8291,60 @@ function KeepAlive({ show, children }) {
 const LEAF_LOADER_TOP = -31;
 const LEAF_LOADER_SPAN = 34;
 
-function LeafLoader({ progress = null, size = 104 }) {
-  const leaf = LEAF_KINDS[2];
-  const clipId = React.useId();
-  const running = progress == null;
+/* Загрузка — лента маскотов.
+ *
+ * Раньше здесь наливался лист. Теперь по экрану бежит вереница котов:
+ * они уходят вправо за край и появляются слева, чуть подрагивая на ходу
+ * — так видно, что ожидание идёт, а не подвисло.
+ *
+ * Когда ждать больше нечего (progress дошёл до единицы или данные
+ * приехали), вереница останавливается и остаётся один кот по центру:
+ * ожидание кончилось — и картинка это показывает без слов.
+ *
+ * Ширину ленты держит сам блок, поэтому лоадер одинаково работает и в
+ * узкой карточке, и во весь экран. */
+function LeafLoader({ progress = null, size = 104, остановлен = false }) {
+  const шаг = size * 1.35;
+  const котов = 5;
+  const стоп = остановлен || (progress != null && progress >= 1);
+
+  if (стоп) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
+        <КотПланета size={size} />
+      </div>
+    );
+  }
+
   return (
-    <svg width={size} height={size * 1.115} viewBox="-17 -33 34 38" style={{ overflow: "visible", display: "block" }} aria-hidden="true">
-      <defs>
-        <clipPath id={clipId}>
-          {/* Прямоугольник закрывает лист целиком и уезжает вниз, а по
-              мере готовности возвращается наверх. Двигаем сдвигом, а не
-              координатой: координату браузер меняет скачком. */}
-          <rect
-            x="-17" y={LEAF_LOADER_TOP} width="34" height={LEAF_LOADER_SPAN}
-            style={running ? {
-              animation: "leafLoaderFill 1.6s cubic-bezier(0.4,0,0.2,1) infinite",
-            } : {
-              transform: `translateY(${(1 - progress) * LEAF_LOADER_SPAN}px)`,
-              transition: "transform 520ms cubic-bezier(0.16,1,0.3,1)",
-            }}
-          />
-        </clipPath>
-      </defs>
-      <path d={leaf.outline} fill="none" stroke={hexA(T.electric, 0.45)} strokeWidth={1.1} strokeLinejoin="round" />
-      {leaf.veins.map((v, i) => (
-        <path key={i} d={v} fill="none" stroke={hexA(T.electric, 0.28)} strokeWidth={0.6} strokeLinecap="round" />
-      ))}
-      <g clipPath={`url(#${clipId})`}>
-        <path d={leaf.outline} fill={T.electric} />
-        {leaf.veins.map((v, i) => (
-          <path key={i} d={v} fill="none" stroke={T.bg} strokeWidth={0.6} opacity={0.35} strokeLinecap="round" />
+    <div
+      aria-hidden
+      style={{
+        position: "relative", width: "100%", height: size * 1.2, overflow: "hidden",
+        // Края растворяются: коты не «влетают из ниоткуда», а проявляются
+        // и гаснут у границ.
+        WebkitMaskImage: "linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%)",
+        maskImage: "linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%)",
+      }}
+    >
+      <div style={{
+        position: "absolute", top: 0, left: 0, height: "100%",
+        display: "flex", alignItems: "center", gap: шаг - size,
+        animation: `котыБегут 2.6s linear infinite`,
+        willChange: "transform",
+        "--шаг": `${шаг}px`,
+      }}>
+        {Array.from({ length: котов * 2 }, (_, i) => (
+          <div key={i} style={{
+            // Дрожание у каждого своё: одинаковое читалось бы как
+            // дрожание всей ленты, а не отдельных котов.
+            animation: `котДрожит ${0.28 + (i % 3) * 0.06}s ease-in-out ${i * 0.05}s infinite alternate`,
+          }}>
+            <КотПланета size={size} glow={i % 2 === 0} />
+          </div>
         ))}
-      </g>
-      <path d={leaf.stem} fill="none" stroke={hexA(T.electric, 0.5)} strokeWidth={0.9} strokeLinecap="round" />
-    </svg>
+      </div>
+    </div>
   );
 }
 
@@ -8329,7 +8354,7 @@ function LeafLoader({ progress = null, size = 104 }) {
 function PageLoader({ minHeight = 260 }) {
   return (
     <div className="fx-view" style={{ minHeight, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
-      <LeafLoader size={76} />
+      <LeafLoader size={72} />
       <div style={{ width: 96, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
         <div style={{ width: "40%", height: "100%", borderRadius: 999, background: T.electric, animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
       </div>
