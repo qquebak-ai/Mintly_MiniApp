@@ -182,6 +182,8 @@ const STR = {
     homeTopAll: "Весь топ",
     homeTopHide: "Свернуть",
     needAccountShort: "Нужен вход в аккаунт",
+    navProfileItem: "Профиль",
+    achTitleShort: "Достижения",
     appWalletNeedAuth: "Баланс в приложении привязан к аккаунту — войди или создай его в профиле, и адрес появится здесь.",
     walletEmptyTitle: "Кошелёк не подключён",
     walletEmptyBody: "Подключи TON-кошелёк, чтобы покупать, продавать и запускать токены.",
@@ -675,6 +677,8 @@ const STR = {
     homeTopAll: "Full top",
     homeTopHide: "Collapse",
     needAccountShort: "Sign in first",
+    navProfileItem: "Profile",
+    achTitleShort: "Achievements",
     appWalletNeedAuth: "The app balance belongs to your account — sign in or create one in your profile and the address shows up here.",
     walletEmptyTitle: "No wallet connected",
     walletEmptyBody: "Connect a TON wallet to buy, sell and launch tokens.",
@@ -1568,6 +1572,7 @@ function GlobalStyle() {
         50%  { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
       }
+      @keyframes менюВъезжает { from { transform: translateX(-100%); } to { transform: translateX(0); } }
       @keyframes обменВъезжает { from { transform: translateY(100%); } to { transform: translateY(0); } }
       @keyframes обменФон { from { opacity: 0; } to { opacity: 1; } }
       @keyframes листМонет { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -11272,6 +11277,163 @@ function ТопСтрока({ onOpenToken, onOpenProfile, live = [] }) {
   );
 }
 
+/* Боковое меню — то, что открывается по аватарке в углу.
+ *
+ * Раньше аватарка сразу уводила в профиль, и всё остальное «про себя» —
+ * достижения, магазин, настройки, поддержка — приходилось искать уже
+ * внутри него. Меню выкладывает эти двери в один список и закрывается
+ * тем же движением, каким открылось.
+ */
+function БоковоеМеню({ открыто, onClose, profile, accountCreated, supportUnread = 0, onПункт, onВход }) {
+  const [уходит, setУходит] = useState(false);
+  const [тяга, setТяга] = useState(0);
+  const жест = useRef(null);
+  const аватар = profile && profile.avatarUrl;
+  const ник = accountCreated && profile && profile.nickname ? `@${profile.nickname}` : t("accountNotCreated");
+
+  useEffect(() => { if (!открыто) { setУходит(false); setТяга(0); } }, [открыто]);
+
+  const закрыть = useCallback(() => {
+    setУходит(true);
+    setTimeout(() => { setУходит(false); setТяга(0); onClose(); }, 240);
+  }, [onClose]);
+
+  // Пока меню открыто, вертикальный жест окна не нужен: тянут его вбок,
+  // а Telegram по вертикали сворачивает всё приложение.
+  useEffect(() => {
+    if (!открыто) return;
+    const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    if (!tg || !tg.disableVerticalSwipes) return;
+    try { tg.disableVerticalSwipes(); } catch { /* старый клиент */ }
+    return () => { try { tg.disableVerticalSwipes(); } catch { /* старый клиент */ } };
+  }, [открыто]);
+
+  function началоЖеста(e) {
+    const т = e.touches && e.touches[0];
+    if (!т) return;
+    жест.current = { x0: т.clientX, тянем: false };
+  }
+  function ходЖеста(e) {
+    const ж = жест.current;
+    const т = e.touches && e.touches[0];
+    if (!ж || !т) return;
+    const dx = т.clientX - ж.x0;
+    if (!ж.тянем && dx > -12) return;
+    ж.тянем = true;
+    ж.путь = -dx;
+    setТяга(Math.min(96, Math.pow(Math.max(0, -dx), 0.86)));
+  }
+  function конецЖеста() {
+    const ж = жест.current;
+    жест.current = null;
+    if (!ж || !ж.тянем) return;
+    if ((ж.путь || 0) > 110) { haptic("light"); закрыть(); return; }
+    setТяга(0);
+  }
+
+  if (!открыто) return null;
+
+  const пункты = [
+    { key: "profile", icon: User, label: t("navProfileItem") },
+    { key: "achievements", icon: Crown, label: t("achTitleShort") },
+    { key: "shop", icon: ShoppingBag, label: t("navShop") },
+    { key: "wallet", icon: Wallet, label: t("navWallet") },
+  ];
+  const низ = [
+    { key: "settings", icon: Settings, label: t("settings") },
+    { key: "support", icon: LifeBuoy, label: t("support"), метка: supportUnread },
+  ];
+
+  const Строка = ({ item }) => (
+    <button
+      onClick={() => { haptic("light"); onПункт(item.key); закрыть(); }}
+      className="fx-tap w-full flex items-center"
+      style={{ gap: 14, padding: "13px 18px", background: "transparent", border: "none" }}
+    >
+      <item.icon size={19} color={T.paper} strokeWidth={1.8} />
+      <span className="flex-1 truncate text-left" style={{ fontFamily: displayFont, color: T.ice, fontSize: 16.5, fontWeight: 700 }}>
+        {item.label}
+      </span>
+      {item.метка > 0 && (
+        <span style={{
+          minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
+          background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: monoFont, fontSize: 12, fontWeight: 700,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          {item.метка > 9 ? "9+" : item.метка}
+        </span>
+      )}
+    </button>
+  );
+
+  return createPortal(
+    <>
+      <div
+        onClick={закрыть}
+        style={{
+          position: "fixed", inset: 0, zIndex: 398, background: hexA("#000000", 0.55),
+          opacity: уходит ? 0 : 1, transition: "opacity 240ms ease-out",
+        }}
+      />
+      <div
+        data-sheet="1"
+        onTouchStart={началоЖеста}
+        onTouchMove={ходЖеста}
+        onTouchEnd={конецЖеста}
+        onTouchCancel={конецЖеста}
+        className="no-scrollbar"
+        style={{
+          position: "fixed", top: 0, bottom: 0, left: 0, zIndex: 399,
+          width: "min(78%, 320px)", background: T.bg,
+          display: "flex", flexDirection: "column",
+          overflowY: "auto", overscrollBehavior: "contain",
+          transform: уходит ? "translateX(-100%)" : `translateX(${-тяга}px)`,
+          transition: жест.current ? "none" : "transform 240ms cubic-bezier(0.22, 1, 0.36, 1)",
+          animation: уходит ? "none" : "менюВъезжает 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+          boxShadow: "18px 0 40px rgba(0,0,0,0.5)",
+          touchAction: "pan-y",
+        }}
+      >
+        <div style={{ padding: "22px 18px 10px" }}>
+          <span
+            style={{
+              display: "block", width: 62, height: 62, borderRadius: "50%",
+              background: аватар ? `center/cover no-repeat url(${аватар})` : T.surfaceHi,
+              border: `1.5px solid ${T.lineHi}`,
+            }}
+          />
+          <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, marginTop: 14, letterSpacing: "-0.02em" }}>
+            {ник}
+          </div>
+          {!accountCreated && (
+            <button
+              onClick={() => { onВход(); закрыть(); }}
+              className="fx-tap flex items-center"
+              style={{ gap: 7, marginTop: 10, padding: 0, background: "transparent", border: "none" }}
+            >
+              <Send size={14} color={КОШ_РОСТ_ТЕКСТ} />
+              <span style={{ fontFamily: displayFont, color: КОШ_РОСТ_ТЕКСТ, fontSize: 14.5, fontWeight: 700 }}>{t("tgAuthCta")}</span>
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-col" style={{ marginTop: 12 }}>
+          {пункты.map((п) => <Строка key={п.key} item={п} />)}
+        </div>
+
+        {/* Служебное — внизу, отдельной группой: туда заходят реже, чем в
+            свои разделы, и держать его в общем списке значит мешать
+            частому редким. */}
+        <div style={{ flex: 1, minHeight: 24 }} />
+        <div className="flex flex-col" style={{ paddingBottom: 22 }}>
+          {низ.map((п) => <Строка key={п.key} item={п} />)}
+        </div>
+      </div>
+    </>,
+    document.body
+  );
+}
+
 /* Своя строка сверху: кто ты и куда идти за своим.
  *
  * Профиля в панели разделов больше нет — там переключаются между
@@ -18469,6 +18631,7 @@ function mapTokenRow(row) {
   // Какую вкладку примерки открыть, когда в профиль пришли из магазина.
   const [lookFocus, setLookFocus] = useState(null);
   const [settingsItem, setSettingsItem] = useState(null);
+  const [менюОткрыто, setМенюОткрыто] = useState(false);
   const [manageToken_, setManageToken_] = useState(null);
   const [tradeModal, setTradeModal] = useState(null); // { mode: 'buy' | 'sell' }
   // Настоящий баланс открытого токена на кошельке. Пока он не пришёл —
@@ -20198,7 +20361,7 @@ function mapTokenRow(row) {
               myTokens={myTokens}
               achievements={achievements}
               userId={userId}
-              onOpenMyProfile={() => goTab("profile")}
+              onOpenMyProfile={() => setМенюОткрыто(true)}
               onOpenAchievements={() => setView("achievements")}
             />
           </KeepAlive>
@@ -20269,6 +20432,22 @@ function mapTokenRow(row) {
             />
           )}
         </div>
+
+        <БоковоеМеню
+          открыто={менюОткрыто}
+          onClose={() => setМенюОткрыто(false)}
+          profile={profile}
+          accountCreated={accountCreated}
+          supportUnread={supportUnread}
+          onВход={openLoginProfile}
+          onПункт={(ключ) => {
+            if (ключ === "profile") { goTab("profile"); return; }
+            if (ключ === "achievements") { setView("achievements"); return; }
+            if (ключ === "shop" || ключ === "wallet") { goTab(ключ); return; }
+            if (ключ === "settings") { goTab("profile"); return; }
+            if (ключ === "support") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "support")); return; }
+          }}
+        />
 
         {/* Профиль — отдельная страница поверх главной. Уйти с неё можно
             панелью разделов: она остаётся выше по слою. */}
