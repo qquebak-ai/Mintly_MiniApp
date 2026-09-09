@@ -11897,20 +11897,36 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
     const dy = т.clientY - ж.y0;
     if (!ж.тянем && dy < 12) return;
     ж.тянем = true;
-    setТяга(Math.max(0, dy));
+    /* Лист идёт за пальцем с сопротивлением и недалеко: если тянуть его
+       один к одному, из-под него открывается полоса экрана, которой там
+       быть не должно — обрезанная карточка и пустота под ней. */
+    const ход = Math.max(0, dy);
+    setТяга(Math.min(96, Math.pow(ход, 0.86)));
+    ж.путь = ход;
   }
   function конецЖеста() {
     const ж = жест.current;
     жест.current = null;
     if (!ж || !ж.тянем) return;
-    const порог = typeof window !== "undefined" ? window.innerHeight * 0.22 : 160;
-    if (тяга > порог) { haptic("light"); закрыть(); return; }
+    const порог = typeof window !== "undefined" ? window.innerHeight * 0.18 : 140;
+    if ((ж.путь || 0) > порог) { haptic("light"); закрыть(); return; }
     setТяга(0);
   }
 
   if (!открыт) return null;
 
   return createPortal(
+    <>
+    {/* Ровная подложка во весь экран: пока лист едет, за ним не должно
+        показываться то, что лежит ниже, — обрезанная карточка кошелька и
+        полоса пустоты под ней. */}
+    <div
+      aria-hidden
+      style={{
+        position: "fixed", inset: 0, zIndex: 399, background: T.bg,
+        opacity: уходит ? 0 : 1, transition: "opacity 260ms ease-out", pointerEvents: "none",
+      }}
+    />
     <div
       // Пометка для main.tsx: внутри такого экрана вертикальный жест наш,
       // и отдавать его Telegram нельзя — иначе потягивание вниз сворачивает
@@ -11943,7 +11959,8 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
         </div>
       )}
       {children}
-    </div>,
+    </div>
+    </>,
     document.body
   );
 }
