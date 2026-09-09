@@ -9140,7 +9140,7 @@ function BootSplash({ steps, done, уходит = false, insetTop = 0 }) {
         {/* Лента тормозит по тому же признаку, по которому уходит сама
             заставка: и когда данные пришли, и когда мы устали их ждать —
             вид один и тот же. */}
-        <LeafLoader progress={progress} size={124} остановлен={done} отклик />
+        <LeafLoader progress={progress} size={223} остановлен={done} отклик />
         <div style={{ width: 132, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
           <div style={{
             width: `${Math.round(progress * 100)}%`, height: "100%", borderRadius: 999,
