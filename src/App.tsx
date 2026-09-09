@@ -5787,6 +5787,60 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
  * Фон у файла вырезан, поэтому маскот ложится на любой тёмный слой.
  * Дышит и чуть покачивается — на пустом экране это единственное
  * движение, и оно объясняет, что приложение живо. */
+/* Значки разделов.
+ *
+ * Срисованы с макета один в один: тот же скруглённый контур одинаковой
+ * толщины, те же пропорции. Готовых из набора не берём — там дом выше,
+ * сумка с другой ручкой, а стрелки обмена длиннее, и в одном ряду это
+ * видно сразу.
+ */
+function ЗначокДом({ size = 22, color = "#FFFFFF", strokeWidth = 1.8 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 10.4 12 4l8 6.4V19a1.4 1.4 0 0 1-1.4 1.4H5.4A1.4 1.4 0 0 1 4 19z" />
+    </svg>
+  );
+}
+
+function ЗначокСумка({ size = 22, color = "#FFFFFF", strokeWidth = 1.8 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      {/* Корпус с мягкими углами и ручка-дужка сверху — как в макете. */}
+      <path d="M3.8 7.8h16.4v11a1.8 1.8 0 0 1-1.8 1.8H5.6a1.8 1.8 0 0 1-1.8-1.8z" />
+      <path d="M8.4 7.8V6.2A3.6 3.6 0 0 1 12 2.6a3.6 3.6 0 0 1 3.6 3.6v1.6" />
+    </svg>
+  );
+}
+
+function ЗначокОбмен({ size = 22, color = "#FFFFFF", strokeWidth = 1.8 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      {/* Две стрелки навстречу: верхняя уходит вправо, нижняя — влево. */}
+      <path d="M4 8.6h13.2" />
+      <path d="M14.4 5.4 17.8 8.6l-3.4 3.2" />
+      <path d="M20 15.4H6.8" />
+      <path d="M9.6 12.2 6.2 15.4l3.4 3.2" />
+    </svg>
+  );
+}
+
+function ЗначокСтолбики({ size = 22, color = "#FFFFFF", strokeWidth = 1.8 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      {/* Столбики разной высоты, все от одной линии низа — тот же ритм,
+          что в макете, и весь значок стоит по центру кружка. */}
+      <path d="M4.8 13.2v6" />
+      <path d="M9.6 8.4v10.8" />
+      <path d="M14.4 5.2v14" />
+      <path d="M19.2 10.6v8.6" />
+    </svg>
+  );
+}
+
 function КотПланета({ size = 120, glow = true, качается = true, стиль = null }) {
   return (
     <div style={{ position: "relative", width: size, height: size, flexShrink: 0, ...(стиль || {}) }}>
@@ -19782,19 +19836,23 @@ function mapTokenRow(row) {
             width: "auto", maxWidth: 420, gap: 6,
             padding: 7,
             borderRadius: 999,
-            background: "#26272E",
-            border: "none",
-            boxShadow: "0 12px 34px rgba(0,0,0,0.5)",
+            // Панель просвечивает: под ней видно, что список продолжается,
+            // — плотная заливка обрубала экран полосой.
+            background: hexA("#26272E", 0.55),
+            backdropFilter: "blur(18px) saturate(1.4)",
+            WebkitBackdropFilter: "blur(18px) saturate(1.4)",
+            border: `1px solid ${hexA("#FFFFFF", 0.08)}`,
+            boxShadow: "0 12px 34px rgba(0,0,0,0.45)",
           }}
         >
           {/* Профиля в панели нет: туда ходят за своими делами, а не
               переключаются между ним и рынком. Вход — по аватарке в углу
               главной, как это устроено везде. */}
           {[
-            { id: "home", label: t("navHome"), icon: HomeIcon },
-            { id: "shop", label: t("navShop"), icon: ShoppingBag },
-            { id: "mempad", label: t("navMempad"), icon: Rocket },
-            { id: "wallet", label: t("navWallet"), icon: Wallet },
+            { id: "home", label: t("navHome"), icon: ЗначокДом },
+            { id: "shop", label: t("navShop"), icon: ЗначокСумка },
+            { id: "mempad", label: t("navMempad"), icon: ЗначокОбмен },
+            { id: "wallet", label: t("navWallet"), icon: ЗначокСтолбики },
           ].map(({ id, label, icon: Icon, locked }) => {
             const active = tab === id;
             return (
@@ -19814,9 +19872,8 @@ function mapTokenRow(row) {
               >
                 <Icon
                   size={22}
-                  strokeWidth={active ? 2.1 : 1.9}
+                  strokeWidth={active ? 2 : 1.8}
                   color={active ? "#14151A" : "#9B9FA9"}
-                  style={{ transition: `color ${EASE}` }}
                 />
                 {locked && (
                   <div style={{ position: "absolute", top: -3, right: -3, width: 14, height: 14, borderRadius: "50%", background: T.surface, border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
