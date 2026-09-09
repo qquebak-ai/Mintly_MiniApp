@@ -183,6 +183,7 @@ const STR = {
     homeTopHide: "Свернуть",
     needAccountShort: "Нужен вход в аккаунт",
     navProfileItem: "Профиль",
+    searchPlaceholder: "Поиск",
     achTitleShort: "Достижения",
     appWalletNeedAuth: "Баланс в приложении привязан к аккаунту — войди или создай его в профиле, и адрес появится здесь.",
     walletEmptyTitle: "Кошелёк не подключён",
@@ -679,6 +680,7 @@ const STR = {
     homeTopHide: "Collapse",
     needAccountShort: "Sign in first",
     navProfileItem: "Profile",
+    searchPlaceholder: "Search",
     achTitleShort: "Achievements",
     appWalletNeedAuth: "The app balance belongs to your account — sign in or create one in your profile and the address shows up here.",
     walletEmptyTitle: "No wallet connected",
@@ -11311,6 +11313,124 @@ function ТопСтрока({ onOpenToken, onOpenProfile, live = [] }) {
   );
 }
 
+/* Настройки отдельным экраном.
+ *
+ * Сложены группами, как это принято в системных настройках: несколько
+ * строк в одной карточке, между ними тонкая линия, справа — значение
+ * или стрелка. Раньше каждый пункт был своей плашкой, и десяток
+ * одинаковых прямоугольников читался как список кнопок, а не как
+ * разделы.
+ */
+const ГРУППЫ_НАСТРОЕК = [
+  ["security", "notify", "language"],
+  ["referral", "support"],
+  ["architecture", "privacy"],
+];
+
+function СтрокаНастройки({ item, значение, метка, последняя, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="fx-tap w-full flex items-center"
+      style={{
+        gap: 13, padding: "15px 16px", background: "transparent", border: "none",
+        borderBottom: последняя ? "none" : `1px solid ${T.line}`,
+      }}
+    >
+      <item.icon size={18} color={T.paper} strokeWidth={1.8} />
+      <span className="flex-1 truncate text-left" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700 }}>
+        {t(item.tKey)}
+      </span>
+      {значение && (
+        <span className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, maxWidth: 120 }}>{значение}</span>
+      )}
+      {метка > 0 && (
+        <span style={{
+          minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
+          background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: monoFont, fontSize: 12, fontWeight: 700,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          {метка > 9 ? "9+" : метка}
+        </span>
+      )}
+      <ChevronRight size={17} color={T.faint} />
+    </button>
+  );
+}
+
+function ЭкранНастроек({ открыт, onClose, profile, accountCreated, supportUnread = 0, onПункт, onПрофиль, insetTop = 0, insetBottom = 0 }) {
+  const [запрос, setЗапрос] = useState("");
+
+  useEffect(() => { if (!открыт) setЗапрос(""); }, [открыт]);
+
+  const аватар = profile && profile.avatarUrl;
+  const ник = accountCreated && profile && profile.nickname ? `@${profile.nickname}` : t("accountNotCreated");
+  const строка = запрос.trim().toLowerCase();
+
+  // Поиск не перекладывает пункты в другие группы: он просто прячет то,
+  // что не подходит, и пустые группы вместе с ними.
+  const группы = ГРУППЫ_НАСТРОЕК
+    .map((ключи) => ключи
+      .map((к) => SETTINGS_ITEMS.find((s) => s.key === к))
+      .filter((s) => s && (!строка || t(s.tKey).toLowerCase().includes(строка))))
+    .filter((г) => г.length);
+
+  return (
+    <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={t("settings")} insetTop={insetTop} insetBottom={insetBottom}>
+      <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 24px" }}>
+        <div
+          className="flex items-center"
+          style={{ gap: 10, padding: "12px 14px", borderRadius: 18, background: T.surfaceHi, marginBottom: 14 }}
+        >
+          <Search size={17} color={T.faint} />
+          <input
+            value={запрос}
+            onChange={(e) => setЗапрос(e.target.value)}
+            placeholder={t("searchPlaceholder")}
+            style={{
+              flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none",
+              fontFamily: bodyFont, color: T.ice, fontSize: 16,
+            }}
+          />
+        </div>
+
+        <button
+          onClick={onПрофиль}
+          className="fx-tap w-full flex items-center"
+          style={{ gap: 13, padding: "13px 16px", borderRadius: 20, background: T.surfaceHi, border: "none", marginBottom: 16 }}
+        >
+          <span style={{
+            width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
+            background: аватар ? `center/cover no-repeat url(${аватар})` : T.surface,
+            border: `1px solid ${T.lineHi}`,
+          }} />
+          <span className="flex-1 truncate text-left" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>
+            {ник}
+          </span>
+          <ChevronRight size={17} color={T.faint} />
+        </button>
+
+        <div className="flex flex-col" style={{ gap: 16 }}>
+          {группы.map((группа, i) => (
+            <div key={i} style={{ borderRadius: 20, background: T.surfaceHi, overflow: "hidden" }}>
+              {группа.map((item, j) => (
+                <СтрокаНастройки
+                  key={item.key}
+                  item={item}
+                  значение={item.key === "language" ? (lang === "RU" ? "Русский" : "English") : null}
+                  метка={item.key === "support" ? supportUnread : 0}
+                  последняя={j === группа.length - 1}
+                  onClick={() => onПункт(item)}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </ЭкранСнизу>
+  );
+}
+
 /* Боковое меню — то, что открывается по аватарке в углу.
  *
  * Раньше аватарка сразу уводила в профиль, и всё остальное «про себя» —
@@ -18761,6 +18881,7 @@ function mapTokenRow(row) {
   const [lookFocus, setLookFocus] = useState(null);
   const [settingsItem, setSettingsItem] = useState(null);
   const [менюОткрыто, setМенюОткрыто] = useState(false);
+  const [настройкиОткрыты, setНастройкиОткрыты] = useState(false);
   const [manageToken_, setManageToken_] = useState(null);
   const [tradeModal, setTradeModal] = useState(null); // { mode: 'buy' | 'sell' }
   // Настоящий баланс открытого токена на кошельке. Пока он не пришёл —
@@ -20566,6 +20687,18 @@ function mapTokenRow(row) {
           )}
         </div>
 
+        <ЭкранНастроек
+          открыт={настройкиОткрыты}
+          onClose={() => setНастройкиОткрыты(false)}
+          profile={profile}
+          accountCreated={accountCreated}
+          supportUnread={supportUnread}
+          onПункт={(item) => setSettingsItem(item)}
+          onПрофиль={() => { setНастройкиОткрыты(false); goTab("profile"); }}
+          insetTop={insetTop}
+          insetBottom={insetBottom}
+        />
+
         <БоковоеМеню
           открыто={менюОткрыто}
           onClose={() => setМенюОткрыто(false)}
@@ -20579,7 +20712,7 @@ function mapTokenRow(row) {
             if (ключ === "profile") { goTab("profile"); return; }
             if (ключ === "achievements") { setView("achievements"); return; }
             if (ключ === "shop" || ключ === "wallet") { goTab(ключ); return; }
-            if (ключ === "settings") { goTab("profile"); return; }
+            if (ключ === "settings") { setНастройкиОткрыты(true); return; }
             if (ключ === "support") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "support")); return; }
           }}
         />
