@@ -9074,7 +9074,10 @@ function BootSplash({ steps, done, insetTop = 0 }) {
       {/* Во всю ширину: вереница котов должна уходить за края экрана, а
           не толкаться в узкой колонке. */}
       <div style={{ position: "relative", zIndex: 1, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-        <LeafLoader progress={progress} size={124} отклик />
+        {/* Лента тормозит по тому же признаку, по которому уходит сама
+            заставка: и когда данные пришли, и когда мы устали их ждать —
+            вид один и тот же. */}
+        <LeafLoader progress={progress} size={124} остановлен={done} отклик />
         <div style={{ width: 132, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
           <div style={{
             width: `${Math.round(progress * 100)}%`, height: "100%", borderRadius: 999,
@@ -19154,22 +19157,29 @@ function mapTokenRow(row) {
     { key: "bootStepTokens", done: communityLoaded },
     { key: "bootStepRate", done: tonPriceChecked },
   ];
-  const bootDone = bootSteps.every((s) => s.done);
+  const шагиГотовы = bootSteps.every((s) => s.done);
+  /* Заставка гаснет в два приёма: сперва лента маскотов тормозит, и
+     только потом экран уходит.
+     Раньше был ещё и жёсткий предел в девять секунд, который прятал
+     заставку мгновенно: если какой-то запрос завис, человек видел, как
+     коты крутятся и вдруг исчезают на полном ходу. Теперь предел просто
+     запускает ту же остановку — вид один и тот же, независимо от того,
+     дождались мы данных или устали ждать. */
+  const [bootDone, setBootDone] = useState(false);
   const [bootHidden, setBootHidden] = useState(false);
-  // Страховка: даже если какой-то запрос завис, дольше 9 секунд держать
-  // человека на заставке нельзя.
+
   useEffect(() => {
-    const to = setTimeout(() => setBootHidden(true), 9000);
+    if (шагиГотовы) { setBootDone(true); return; }
+    // Дольше семи секунд держать человека на заставке нельзя, даже если
+    // что-то не ответило.
+    const to = setTimeout(() => setBootDone(true), 7000);
     return () => clearTimeout(to);
-  }, []);
-  // Заставка ждёт, пока лента маскотов доедет и остановится: раньше
-  // экран успевал открыться прямо посреди торможения, и остановка
-  // выглядела оборванной. Числа те же, что в самом лоадере: 900 мс
-  // торможения плюс 320 мс на уход лишних.
+  }, [шагиГотовы]);
+
   useEffect(() => {
     if (!bootDone) return;
-    // Ровно столько живёт лента маскотов: минимум бега плюс
-    // торможение и уход лишних.
+    // Ровно столько живёт лента маскотов: минимум бега плюс торможение
+    // и уход лишних (см. LeafLoader).
     const to = setTimeout(() => setBootHidden(true), 2720);
     return () => clearTimeout(to);
   }, [bootDone]);
