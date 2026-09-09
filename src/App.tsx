@@ -5661,6 +5661,19 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
             {возраст ? ` · ${возраст}` : ""}
             {tok.dexName ? ` · ${tok.dexName}` : ""}
           </div>
+          {/* Сколько кривой собрано — числом, а не только кольцом вокруг
+              логотипа: по кольцу видно «много/мало», а решение принимают
+              по проценту. */}
+          {своя && (
+            <div className="flex items-center" style={{ gap: 6, marginTop: 5 }}>
+              <div style={{ flex: 1, maxWidth: 96, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
+                <div style={{ width: `${Math.round(доляДоБиржи * 100)}%`, height: "100%", background: PRISM }} />
+              </div>
+              <span style={{ fontFamily: monoFont, fontSize: 11, color: доляДоБиржи >= 0.8 ? T.up : T.faint }}>
+                {Math.round(доляДоБиржи * 100)}%
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Спарклайн между названием и ценой: форма движения читается
