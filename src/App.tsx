@@ -5770,9 +5770,9 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
  * Фон у файла вырезан, поэтому маскот ложится на любой тёмный слой.
  * Дышит и чуть покачивается — на пустом экране это единственное
  * движение, и оно объясняет, что приложение живо. */
-function КотПланета({ size = 120, glow = true, качается = true }) {
+function КотПланета({ size = 120, glow = true, качается = true, стиль = null }) {
   return (
-    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0, ...(стиль || {}) }}>
       {glow && (
         <div aria-hidden style={{
           position: "absolute", inset: "-18%", borderRadius: "50%",
@@ -8395,16 +8395,14 @@ const LEAF_LOADER_SPAN = 34;
  * узкой карточке, и во весь экран. */
 function LeafLoader({ progress = null, size = 104, остановлен = false, отклик = false }) {
   const шаг = size * 1.28;
-  const котов = 5;
-  const ХОД_МС = 620;               // пока идёт загрузка лента летит
-  const ТОРМОЖЕНИЕ_МС = 900;        // и тормозит по инерции до остановки
-  const УХОД_МС = 320;              // столько лишние коты растворяются
+  const ПЕРИОД = 5;                 // столько шагов проходит цикл — на нём узор повторяется
+  const КОТОВ = 13;                 // с запасом: лента не должна кончиться, пока тормозит
+  const ЦЕНТР = 4;                  // этот кот стоит ровно в середине при нулевом сдвиге
+  const ХОД_МС = 620;               // цикл бега: за него проезжает ПЕРИОД котов
+  const УХОД_МС = 300;              // столько растворяется каждый лишний кот
+  const ЗАДЕРЖКА_МС = 70;           // и столько ждёт следующий за ним
 
   const надоСтоп = остановлен || (progress != null && progress >= 1);
-  /* Три состояния: летит → тормозит → остался один.
-     Резкая подмена ленты одним котом читалась как сбой; здесь лента
-     доезжает по инерции, гаснет, и на её месте проявляется один. */
-  const [фаза, setФаза] = useState("бег");
 
   /* Лента живёт минимум секунду с лишним, даже если данные приехали
      мгновенно: иначе она мелькала — не успевала ни разогнаться, ни
@@ -8412,18 +8410,71 @@ function LeafLoader({ progress = null, size = 104, остановлен = false,
   const МИН_БЕГ_МС = 1400;
   const началось = useRef(Date.now());
 
+  const лента = useRef(null);
+  const бег = useRef(null);
+  const [фаза, setФаза] = useState("бег");
+  /* Сколько шагов лента проехала до остановки. По нему считается, какой
+     именно кот встал в середину: остальные гаснут от него в стороны. */
+  const [сдвиг, setСдвиг] = useState(0);
+
+  /* Ход ведём Web Animations API, а не CSS-анимацией.
+     У CSS-анимации нельзя подхватить ход с того места, где он сейчас:
+     новая анимация начинается со своего первого кадра, и лента на
+     торможении прыгала назад. Здесь позиция считается по времени, и
+     остановка продолжает движение оттуда, где оно застало ленту. */
   useEffect(() => {
-    if (!надоСтоп) { setФаза("бег"); return; }
+    const эл = лента.current;
+    if (!эл || typeof эл.animate !== "function") return;
+    const анимация = эл.animate(
+      [{ transform: "translate3d(0,0,0)" }, { transform: `translate3d(${-ПЕРИОД * шаг}px,0,0)` }],
+      { duration: ХОД_МС, iterations: Infinity, easing: "linear" }
+    );
+    бег.current = анимация;
+    return () => { анимация.cancel(); бег.current = null; };
+  }, [шаг]);
+
+  useEffect(() => {
+    if (!надоСтоп) return;
     const прошло = Date.now() - началось.current;
     const ждать = Math.max(0, МИН_БЕГ_МС - прошло);
-    const старт = setTimeout(() => setФаза("тормоз"), ждать);
-    const конец = setTimeout(() => setФаза("один"), ждать + ТОРМОЖЕНИЕ_МС + УХОД_МС);
-    return () => { clearTimeout(старт); clearTimeout(конец); };
-  }, [надоСтоп]);
+    let финал = null;
+    const пуск = setTimeout(() => {
+      const эл = лента.current;
+      if (!эл || typeof эл.animate !== "function") { setФаза("стоит"); return; }
+      setФаза("тормоз");
 
-  /* Отклик на каждого прошедшего кота: ожидание перестаёт быть немым, а
-     частота совпадает с картинкой — палец чувствует то, что видит глаз.
-     На торможении и в покое молчим. */
+      // Где лента прямо сейчас: цикл линейный, поэтому положение —
+      // это просто доля пройденного времени.
+      const анимация = бег.current;
+      const внутри = анимация ? Number(анимация.currentTime || 0) % ХОД_МС : 0;
+      const сейчас = -(внутри / ХОД_МС) * ПЕРИОД * шаг;
+      if (анимация) анимация.cancel();
+
+      /* Встаём только на целом шаге: там кот приходится ровно на
+         середину. Добираем два шага сверх ближайшего — чтобы тормозить
+         было где, а не втыкаться в ближайшую метку. */
+      const шагов = Math.ceil(-сейчас / шаг) + 2;
+      const цель = -шагов * шаг;
+      const путь = цель - сейчас;
+
+      /* Торможение равнозамедленное: начальная скорость совпадает со
+         скоростью бега, конечная — ровно ноль. Отсюда и время: при
+         таком замедлении путь равен половине от «скорость × время».
+         Кривая — квадратичный ease-out, её производная в конце нулевая,
+         поэтому лента именно останавливается, а не подрубается. */
+      const скорость = (ПЕРИОД * шаг) / ХОД_МС;
+      const время = Math.max(320, Math.min(1400, (2 * Math.abs(путь)) / скорость));
+      финал = эл.animate(
+        [{ transform: `translate3d(${сейчас}px,0,0)` }, { transform: `translate3d(${цель}px,0,0)` }],
+        { duration: время, easing: "cubic-bezier(0.25, 0.46, 0.45, 0.94)", fill: "forwards" }
+      );
+      финал.onfinish = () => { setСдвиг(шагов); setФаза("стоит"); };
+    }, ждать);
+    return () => { clearTimeout(пуск); if (финал) снятьАнимацию(финал); };
+  }, [надоСтоп, шаг]);
+
+  /* Отклик на бегущих котов: ожидание перестаёт быть немым. На
+     торможении и в покое молчим. */
   useEffect(() => {
     if (!отклик || фаза !== "бег") return;
     const iv = setInterval(() => {
@@ -8433,15 +8484,8 @@ function LeafLoader({ progress = null, size = 104, остановлен = false,
     return () => clearInterval(iv);
   }, [отклик, фаза]);
 
-  if (фаза === "один") {
-    return (
-      <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
-        <КотПланета size={size} />
-      </div>
-    );
-  }
-
-  const тормозит = фаза === "тормоз";
+  const стоит = фаза === "стоит";
+  const остался = ЦЕНТР + сдвиг;
 
   return (
     <div
@@ -8449,39 +8493,50 @@ function LeafLoader({ progress = null, size = 104, остановлен = false,
       style={{
         position: "relative", width: "100%", height: size * 1.15, overflow: "hidden",
         // Края растворяются: коты не «влетают из ниоткуда», а проявляются
-        // и гаснут у границ.
-        WebkitMaskImage: "linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%)",
-        maskImage: "linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%)",
+        // и гаснут у границ. После остановки маска не нужна — она бы
+        // приглушала того, кто остался, если он окажется не по центру.
+        WebkitMaskImage: стоит ? "none" : "linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%)",
+        maskImage: стоит ? "none" : "linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%)",
       }}
     >
-      <div style={{
-        position: "absolute", top: 0, left: 0, height: "100%",
-        display: "flex", alignItems: "center", gap: шаг - size,
-        // Ход ровный: пока грузится — линейный и быстрый, на остановке —
-        // одно долгое замедление по инерции.
-        animation: тормозит
-          ? `котыБегут ${ТОРМОЖЕНИЕ_МС}ms cubic-bezier(0.08, 0.62, 0.12, 1) forwards, лентаГаснет ${УХОД_МС}ms ease-in ${ТОРМОЖЕНИЕ_МС}ms forwards`
-          : `котыБегут ${ХОД_МС}ms linear infinite`,
-        willChange: "transform, opacity",
-        "--шаг": `${шаг}px`,
-      }}>
-        {Array.from({ length: котов * 2 }, (_, i) => (
-          <КотПланета key={i} size={size} glow={i % 2 === 0} качается={false} />
-        ))}
+      {/* Лента выставлена так, что при сдвиге на целое число шагов
+          очередной кот приходится ровно на середину блока: отсюда и
+          «идеальная» остановка — она всегда попадает в метку. */}
+      <div
+        ref={лента}
+        style={{
+          position: "absolute", top: 0, left: "50%", height: "100%",
+          marginLeft: -(size / 2 + ЦЕНТР * шаг),
+          display: "flex", alignItems: "center", gap: шаг - size,
+          willChange: "transform",
+        }}
+      >
+        {Array.from({ length: КОТОВ }, (_, i) => {
+          // Гаснут от середины наружу: сперва соседи остановившегося,
+          // потом те, кто дальше. Так уход читается волной от него, а не
+          // общим затемнением ленты.
+          const дальше = Math.abs(i - остался);
+          return (
+            <КотПланета
+              key={i}
+              size={size}
+              glow={стоит ? i === остался : i % 2 === 0}
+              качается={стоит && i === остался}
+              стиль={стоит && i !== остался
+                ? { animation: `лентаГаснет ${УХОД_МС}ms ease-in ${(дальше - 1) * ЗАДЕРЖКА_МС}ms both` }
+                : undefined}
+            />
+          );
+        })}
       </div>
-
-      {/* Тот, кто останется: проявляется ровно там, где встанет, пока
-          лента доезжает и гаснет. */}
-      {тормозит && (
-        <div style={{
-          position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-          animation: `котОстаётся ${УХОД_МС}ms ease-out ${ТОРМОЖЕНИЕ_МС - 120}ms both`,
-        }}>
-          <КотПланета size={size} />
-        </div>
-      )}
     </div>
   );
+}
+
+/* Отменять доигравшую анимацию нельзя: с fill: forwards она держит
+   конечное положение ленты, и cancel вернул бы её к началу. */
+function снятьАнимацию(анимация) {
+  if (анимация.playState !== "finished") анимация.cancel();
 }
 
 /* PageLoader — тот же лист, но поверх страницы, пока её данные не
@@ -19193,8 +19248,8 @@ function mapTokenRow(row) {
     // и уход лишних (см. LeafLoader). Гасить начинаем за длину самого
     // перехода до снятия — чтобы заставка не висела прозрачной поверх
     // приложения и не глотала прокрутку.
-    const гаснет = setTimeout(() => setBootFading(true), 2300);
-    const снять = setTimeout(() => setBootHidden(true), 2720);
+    const гаснет = setTimeout(() => setBootFading(true), 2600);
+    const снять = setTimeout(() => setBootHidden(true), 3020);
     return () => { clearTimeout(гаснет); clearTimeout(снять); };
   }, [bootDone]);
 
