@@ -1116,6 +1116,11 @@ function tf(key, vars) {
 /* Готовые сочетания из тёмной подборки, а не подобранные на глаз:
    «Amin» (#8E2DE2 → #4A00E0) — фирменный акцент, он же цвет маскота. */
 const ГРАДИЕНТ_БРЕНДА = "linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%)";
+/* Кнопки заливаются одним цветом — серединой того же градиента.
+   Переливание на кнопке спорит с надписью и делает её похожей на
+   картинку: градиент остаётся там, где он украшает (карточки, полосы,
+   крупные цифры), а нажимаемое — плоское и однозначное. */
+const ЦВЕТ_КНОПКИ = "#6C16E1";
 /* Пара под рост и падение — оттуда же: «Green Beach» (#02AAB0 → #00CDAC)
    и «Bloody Mary» (#FF512F → #DD2476). Плоские цвета остаются для текста
    и линий: их градиентом не покрасишь, а плашки и цифры держат. */
@@ -9066,7 +9071,7 @@ function WelcomeScreen({ onCreate, onLogin, onSkip, insetTop = 0 }) {
               className="fx-tap вст-кнопка w-full flex items-center justify-center gap-2"
               style={{
                 padding: "17px 0", borderRadius: 20,
-                background: `linear-gradient(135deg, #8A93FF 0%, ${T.electric} 52%, #5A66EE 100%)`,
+                background: ЦВЕТ_КНОПКИ,
                 color: PRISM_TEXT, border: "none",
                 boxShadow: `inset 0 1px 0 ${hexA("#FFFFFF", 0.3)}, 0 14px 34px ${hexA(T.electric, 0.34)}`,
                 fontFamily: displayFont, fontWeight: 600, fontSize: 15.5, letterSpacing: "-0.01em",
@@ -9094,9 +9099,7 @@ function WelcomeScreen({ onCreate, onLogin, onSkip, insetTop = 0 }) {
             className="fx-tap вст-кнопка w-full flex items-center justify-center gap-2"
             style={{
               padding: "17px 0", borderRadius: 20,
-              // Свет внутри кнопки идёт наискось: ровная заливка на тёмном
-              // фоне выглядит наклейкой, а не поверхностью.
-              background: `linear-gradient(135deg, #8A93FF 0%, ${T.electric} 52%, #5A66EE 100%)`,
+              background: ЦВЕТ_КНОПКИ,
               color: PRISM_TEXT, border: "none",
               boxShadow: `inset 0 1px 0 ${hexA("#FFFFFF", 0.3)}, 0 14px 34px ${hexA(T.electric, 0.34)}`,
               fontFamily: displayFont, fontWeight: 600, fontSize: 15.5, letterSpacing: "-0.01em",
@@ -9388,7 +9391,7 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
         <button
           onClick={() => onBuy(kind, item.id)}
           className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3.5"
-          style={{ marginTop: 12, background: PRISM, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15.5 }}
+          style={{ marginTop: 12, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15.5 }}
         >
           {tf("shopBuyFor", { n: price })}
         </button>
@@ -9487,7 +9490,7 @@ function ChestBuySheet({ coins, owned, onConfirm, onClose }) {
           className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3.5"
           style={{
             marginTop: 12,
-            background: хватает ? PRISM : T.surfaceHi,
+            background: хватает ? ЦВЕТ_КНОПКИ : T.surfaceHi,
             color: хватает ? PRISM_TEXT : T.muted,
             border: хватает ? "none" : `1px solid ${T.line}`,
             fontFamily: displayFont, fontWeight: 700, fontSize: 15.5,
@@ -10013,7 +10016,7 @@ function ChestReveal({ prize, onClose }) {
             <button
               onClick={onClose}
               className="fx-tap rounded-[20px] px-7 py-3"
-              style={{ marginTop: 18, background: PRISM, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
+              style={{ marginTop: 18, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
             >
               {t("chestTake")}
             </button>
@@ -10116,7 +10119,7 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onOpenChest, ach
           <button
             onClick={() => onOpenLogin && onOpenLogin()}
             className="fx-tap flex items-center justify-center gap-1.5 rounded-[14px] px-5 py-3"
-            style={{ alignSelf: "flex-start", background: PRISM, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 600, fontSize: 14.5 }}
+            style={{ alignSelf: "flex-start", background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 600, fontSize: 14.5 }}
           >
             <Send size={14} /> {t("tgAuthCta")}
           </button>
@@ -10540,7 +10543,7 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
             className="fx-tap flex items-center gap-1.5"
             style={{
               padding: "8px 14px", borderRadius: 10,
-              background: PRISM, color: PRISM_TEXT, border: "none",
+              background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, border: "none",
               fontFamily: displayFont, fontSize: 13.5, fontWeight: 600,
               // В Solana кнопка появляется только когда программа
               // кривой развёрнута: до этого запускать там нечем.
@@ -11599,7 +11602,7 @@ function HomeView({
           className="fx-tap w-full flex items-center justify-center gap-2"
           style={{
             padding: "14px 16px", borderRadius: 16,
-            background: PRISM, color: PRISM_TEXT, border: "none",
+            background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, border: "none",
             fontFamily: displayFont, fontSize: 15, fontWeight: 600,
             boxShadow: `0 10px 30px ${hexA(T.electric, 0.35)}`,
           }}
@@ -11994,7 +11997,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         <button
           onClick={onConnect}
           className="fx-tap w-full flex items-center justify-center gap-2"
-          style={{ padding: "13px 16px", borderRadius: 14, background: PRISM, color: PRISM_TEXT, border: "none", fontFamily: displayFont, fontSize: 15, fontWeight: 600 }}
+          style={{ padding: "13px 16px", borderRadius: 14, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, border: "none", fontFamily: displayFont, fontSize: 15, fontWeight: 600 }}
         >
           <Wallet size={16} strokeWidth={1.8} /> {t("connectWallet")}
         </button>
@@ -12185,7 +12188,7 @@ function TokenComments({ tokenId, currentUserId, onNeedAuth, onOpenProfile, show
             className={`fx-tap flex items-center justify-center${sending ? " fx-busy" : ""}`}
             style={{
               width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
-              background: draft.trim() && !sending ? PRISM : T.surfaceHi,
+              background: draft.trim() && !sending ? ЦВЕТ_КНОПКИ : T.surfaceHi,
               border: draft.trim() && !sending ? "none" : `1px solid ${T.line}`,
             }}
           >
@@ -12910,7 +12913,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             а не по отдельному блоку внизу страницы. */}
         {curve && curve.graduated && !рынокОткрыт ? null : (connected || token.chain === "solana") ? (
           <div className="flex gap-2">
-            <button onClick={onBuy} className="fx-tap flex-1 rounded-[14px] py-2.5 flex items-center justify-center gap-1.5" style={{ fontFamily: displayFont, fontWeight: 600, fontSize: 14.5, background: PRISM, color: PRISM_TEXT, opacity: unlocked ? 1 : 0.55 }}>{!unlocked && <Lock size={13} />}{tr("buy")}</button>
+            <button onClick={onBuy} className="fx-tap flex-1 rounded-[14px] py-2.5 flex items-center justify-center gap-1.5" style={{ fontFamily: displayFont, fontWeight: 600, fontSize: 14.5, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, opacity: unlocked ? 1 : 0.55 }}>{!unlocked && <Lock size={13} />}{tr("buy")}</button>
             <button onClick={onSell} className="fx-tap flex-1 rounded-[14px] py-2.5 flex items-center justify-center gap-1.5" style={{ fontFamily: displayFont, fontWeight: 600, fontSize: 14.5, background: "transparent", color: T.ice, border: `1px solid ${T.lineHi}`, opacity: unlocked ? 1 : 0.55 }}>{!unlocked && <Lock size={13} />}{tr("sell")}</button>
           </div>
         ) : (
@@ -13826,7 +13829,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           // Покупка — фирменным градиентом, продажа — цветом падения:
           // два действия не должны выглядеть одинаково, и по цвету видно,
           // что сейчас нажимаешь.
-          background: canConfirm ? (isBuy ? PRISM : T.down) : T.surfaceHi,
+          background: canConfirm ? (isBuy ? ЦВЕТ_КНОПКИ : T.down) : T.surfaceHi,
           color: canConfirm ? PRISM_TEXT : T.muted,
           opacity: canConfirm ? 1 : 0.6,
           boxShadow: canConfirm ? `0 10px 26px ${isBuy ? hexA(T.electric, 0.35) : hexA(T.down, 0.28)}` : "none",
@@ -14035,7 +14038,7 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
         </div>
         <div className="flex items-center gap-2 w-full">
           <button onClick={onCancel} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>{t("cancel")}</button>
-          <button onClick={handleConfirm} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ background: PRISM, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>{t("cropConfirm")}</button>
+          <button onClick={handleConfirm} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>{t("cropConfirm")}</button>
         </div>
       </div>
     </div>
@@ -14131,7 +14134,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
             <button onClick={copyErrorLog} className="fx-tap w-full rounded-[20px] py-3" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.ice, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
               <Copy size={14} color={T.ice} /> {logCopied ? t("linkCopied") : "Скопировать лог"}
             </button>
-            <button onClick={onRetry} className="fx-tap w-full rounded-[20px] py-3" style={{ background: PRISM, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
+            <button onClick={onRetry} className="fx-tap w-full rounded-[20px] py-3" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
               {t("retry")}
             </button>
             <button onClick={() => onClose && onClose(null)} className="fx-tap w-full rounded-[20px] py-3" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>
@@ -14234,7 +14237,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
             <button
               onClick={() => onViewToken && onViewToken(result)}
               className="fx-tap w-full rounded-[20px] py-3"
-              style={{ background: PRISM, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
+              style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
             >
               {t("launchBuyCta")}
             </button>
@@ -14385,7 +14388,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         </p>
         <div className="flex flex-col gap-2 w-full mt-2" style={{ maxWidth: 260 }}>
           {!accountCreated && (
-            <button onClick={onOpenCreateProfile} className="fx-tap w-full rounded-[20px] py-3" style={{ background: PRISM, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>
+            <button onClick={onOpenCreateProfile} className="fx-tap w-full rounded-[20px] py-3" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>
               {t("createAccount")}
             </button>
           )}
@@ -14506,7 +14509,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         </div>
       )}
 
-      <button onClick={handleLaunch} className="cta-launch fx-tap rounded-[22px]" style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17.5, color: PRISM_TEXT, background: PRISM, position: "sticky", bottom: 12, padding: "18px 0" }}>
+      <button onClick={handleLaunch} className="cta-launch fx-tap rounded-[22px]" style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17.5, color: PRISM_TEXT, background: ЦВЕТ_КНОПКИ, position: "sticky", bottom: 12, padding: "18px 0" }}>
         {t("launchTokenCta")}
       </button>
 
@@ -14571,7 +14574,7 @@ function PinDots({ length = PIN_LENGTH, filled, error }) {
       {Array.from({ length }).map((_, i) => (
         <div key={i} style={{
           width: 14, height: 14, borderRadius: "50%",
-          background: i < filled ? (error ? T.down : PRISM) : "transparent",
+          background: i < filled ? (error ? T.down : ЦВЕТ_КНОПКИ) : "transparent",
           border: `1.5px solid ${i < filled && !error ? "transparent" : error ? T.down : "rgba(255,255,255,0.20)"}`,
           transition: `background ${EASE}, border-color ${EASE}`,
         }} />
@@ -14765,7 +14768,7 @@ function ConnectModal({ open, onClose, onConnect }) {
           <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700, marginTop: 6 }}>{t("connectWalletModalTitle")}</div>
           <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5 }}>{t("walletRequiredNote")}</div>
         </div>
-        <button onClick={() => { onConnect(); onClose(); }} className="fx-tap w-full rounded-[20px] py-3 mt-5" style={{ background: PRISM, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
+        <button onClick={() => { onConnect(); onClose(); }} className="fx-tap w-full rounded-[20px] py-3 mt-5" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
           {t("connectWalletCta")}
         </button>
       </div>
@@ -14781,7 +14784,7 @@ function ToggleSwitch({ on, onChange }) {
       className="fx-tap"
       style={{
         width: 42, height: 24, borderRadius: 999, flexShrink: 0, position: "relative",
-        background: on ? PRISM : T.surfaceHi, border: `1px solid ${on ? "transparent" : T.line}`,
+        background: on ? ЦВЕТ_КНОПКИ : T.surfaceHi, border: `1px solid ${on ? "transparent" : T.line}`,
         transition: `background ${EASE}, border-color ${EASE}`,
       }}
     >
@@ -15028,7 +15031,7 @@ function SupportChat({ accountCreated, showToast, onRead }) {
         <button
           onClick={() => setMode("chat")}
           className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3"
-          style={{ marginTop: 14, background: PRISM, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
+          style={{ marginTop: 14, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
         >
           <Send size={14} /> {t("supportOther")}
         </button>
@@ -15113,7 +15116,7 @@ function SupportChat({ accountCreated, showToast, onRead }) {
             className={`fx-tap flex items-center justify-center${sending ? " fx-busy" : ""}`}
             style={{
               width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
-              background: draft.trim() && !sending ? PRISM : T.surfaceHi,
+              background: draft.trim() && !sending ? ЦВЕТ_КНОПКИ : T.surfaceHi,
               border: draft.trim() && !sending ? "none" : `1px solid ${T.line}`,
             }}
           >
@@ -15374,7 +15377,7 @@ function SettingsPanel({
             <button onClick={copyReferral} className="fx-tap" disabled={!refLink}><Copy size={14} color={T.muted} /></button>
           </div>
           {refLink && (
-            <button onClick={shareReferral} className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3 mt-3" style={{ background: PRISM, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
+            <button onClick={shareReferral} className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3 mt-3" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
               <Send size={14} /> {t("refShare")}
             </button>
           )}
@@ -15965,7 +15968,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               disabled={!canEnter}
               className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3.5 mt-1"
               style={{
-                background: canEnter ? PRISM : T.surfaceHi,
+                background: canEnter ? ЦВЕТ_КНОПКИ : T.surfaceHi,
                 color: canEnter ? PRISM_TEXT : T.muted,
                 fontFamily: displayFont, fontWeight: 700, fontSize: 15,
                 boxShadow: canEnter ? `0 0 22px ${glow(0.28)}` : "none",
@@ -16116,7 +16119,7 @@ async function uploadAvatarIfNeeded(userId) {
                   onClick={() => { setAuthTab(id); setServerError(""); }}
                   className="fx-tap tf-btn flex-1 flex items-center justify-center gap-1.5 rounded-[16px] py-2"
                   style={{
-                    background: active ? PRISM : "transparent",
+                    background: active ? ЦВЕТ_КНОПКИ : "transparent",
                     color: active ? PRISM_TEXT : T.muted,
                     fontFamily: displayFont, fontWeight: 700, fontSize: 14,
                   }}
@@ -16201,7 +16204,7 @@ async function uploadAvatarIfNeeded(userId) {
                       disabled={!NICKNAME_RE.test(newNick.trim())}
                       className="fx-tap flex-1 flex items-center justify-center gap-1.5 rounded-[20px] px-4 py-2.5"
                       style={{
-                        background: NICKNAME_RE.test(newNick.trim()) ? PRISM : T.surfaceHi,
+                        background: NICKNAME_RE.test(newNick.trim()) ? ЦВЕТ_КНОПКИ : T.surfaceHi,
                         color: NICKNAME_RE.test(newNick.trim()) ? PRISM_TEXT : T.muted,
                         border: NICKNAME_RE.test(newNick.trim()) ? "none" : `1px solid ${T.line}`,
                         fontFamily: displayFont, fontWeight: 700, fontSize: 13.5,
@@ -16350,7 +16353,7 @@ function ProfileView({
               <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 18.5, fontWeight: 700, marginTop: 4 }}>{t("accountNotCreated")}</div>
               <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, maxWidth: 260, lineHeight: 1.5 }}>{t("accountNotCreatedBody")}</p>
               <div className="flex items-center gap-2 mt-2" style={{ width: "100%", maxWidth: 300 }}>
-                <button onClick={onOpenLogin} className="fx-tap flex-1 flex items-center justify-center gap-1.5 rounded-[20px] px-4 py-3" style={{ background: PRISM, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14 }}>
+                <button onClick={onOpenLogin} className="fx-tap flex-1 flex items-center justify-center gap-1.5 rounded-[20px] px-4 py-3" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14 }}>
                   <Send size={14} /> {t("tgAuthCta")}
                 </button>
               </div>
@@ -16428,7 +16431,7 @@ function ProfileView({
                 {s.key === "support" && supportUnread > 0 && (
                   <span style={{
                     minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
-                    background: PRISM, color: PRISM_TEXT,
+                    background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT,
                     fontFamily: monoFont, fontSize: 12, fontWeight: 700,
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
@@ -19307,7 +19310,7 @@ function mapTokenRow(row) {
           <button
             onClick={() => { const с = ждётПодписи || ждётПокупкиСумма; if (с > 0) { setЖдётПодписи(0); автопокупка(с); } }}
             className="fx-tap w-full rounded-[20px] py-3 mt-2"
-            style={{ maxWidth: 320, background: PRISM, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
+            style={{ maxWidth: 320, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
           >
             {t("openWalletCta")}
           </button>
