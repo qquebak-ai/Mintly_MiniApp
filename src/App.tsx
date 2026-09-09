@@ -1488,10 +1488,8 @@ function GlobalStyle() {
       @keyframes маскотДышит { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-6px) rotate(-2deg); } }
       @keyframes маскотСветит { 0%, 100% { opacity: 0.55; transform: scale(0.94); } 50% { opacity: 1; transform: scale(1.06); } }
       /* Вереница котов: едет ровно на один шаг и повторяется — из-за
-         второго набора картинка бесшовная. Дрожание отдельное, чтобы
-         каждый кот шёл по-своему. */
+         второго набора картинка бесшовная. */
       @keyframes котыБегут { from { transform: translate3d(calc(var(--шаг) * -5), 0, 0); } to { transform: translate3d(0, 0, 0); } }
-      @keyframes котДрожит { from { transform: translateY(-3px) rotate(-3deg); } to { transform: translateY(3px) rotate(3deg); } }
       @keyframes gridDrift { from{background-position:0 0,0 0;} to{background-position:140px 140px,140px 140px;} }
       @keyframes starTwinkle { 0%,100%{opacity:.2;} 50%{opacity:1;} }
       @keyframes starPulse { 0%,100%{opacity:0;} 50%{opacity:var(--o);} }
@@ -5751,7 +5749,7 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
  * Фон у файла вырезан, поэтому маскот ложится на любой тёмный слой.
  * Дышит и чуть покачивается — на пустом экране это единственное
  * движение, и оно объясняет, что приложение живо. */
-function КотПланета({ size = 120, glow = true }) {
+function КотПланета({ size = 120, glow = true, качается = true }) {
   return (
     <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
       {glow && (
@@ -5766,7 +5764,7 @@ function КотПланета({ size = 120, glow = true }) {
         alt=""
         width={size}
         height={size}
-        style={{ position: "relative", width: size, height: size, display: "block", animation: "маскотДышит 6s ease-in-out infinite" }}
+        style={{ position: "relative", width: size, height: size, display: "block", animation: качается ? "маскотДышит 6s ease-in-out infinite" : "none" }}
       />
     </div>
   );
@@ -8348,10 +8346,40 @@ const LEAF_LOADER_SPAN = 34;
  *
  * Ширину ленты держит сам блок, поэтому лоадер одинаково работает и в
  * узкой карточке, и во весь экран. */
-function LeafLoader({ progress = null, size = 104, остановлен = false }) {
-  const шаг = size * 1.35;
+function LeafLoader({ progress = null, size = 104, остановлен = false, отклик = false }) {
+  const шаг = size * 1.28;
   const котов = 5;
-  const стоп = остановлен || (progress != null && progress >= 1);
+  const ХОД_МС = 1800;              // за столько лента проходит один шаг
+  const ТОРМОЖЕНИЕ_МС = 1100;       // и за столько гаснет ход в конце
+
+  const надоСтоп = остановлен || (progress != null && progress >= 1);
+  // Останавливаемся не сразу: сперва лента замедляется, и только потом на
+  // её месте остаётся один кот. Резкая подмена читалась как сбой, а не
+  // как «загрузка кончилась».
+  const [тормозим, setТормозим] = useState(false);
+  const [стоп, setСтоп] = useState(false);
+
+  useEffect(() => {
+    if (!надоСтоп) { setТормозим(false); setСтоп(false); return; }
+    setТормозим(true);
+    const t = setTimeout(() => setСтоп(true), ТОРМОЖЕНИЕ_МС);
+    return () => clearTimeout(t);
+  }, [надоСтоп]);
+
+  /* Отклик на каждого прошедшего кота.
+     Один толчок в такт ходу ленты: ожидание перестаёт быть немым, а
+     частота совпадает с картинкой — палец чувствует ровно то, что видит
+     глаз. Пока лента тормозит или стоит, молчим. */
+  useEffect(() => {
+    // Отклик даёт только один лоадер на экране — заставка. Иначе
+    // маленькие лоадеры внутри разделов трясли бы телефон хором.
+    if (!отклик || стоп || тормозим) return;
+    const iv = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      haptic("light");
+    }, (ХОД_МС / котов) * 2);
+    return () => clearInterval(iv);
+  }, [отклик, стоп, тормозим]);
 
   if (стоп) {
     return (
@@ -8365,7 +8393,7 @@ function LeafLoader({ progress = null, size = 104, остановлен = false 
     <div
       aria-hidden
       style={{
-        position: "relative", width: "100%", height: size * 1.2, overflow: "hidden",
+        position: "relative", width: "100%", height: size * 1.15, overflow: "hidden",
         // Края растворяются: коты не «влетают из ниоткуда», а проявляются
         // и гаснут у границ.
         WebkitMaskImage: "linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%)",
@@ -8375,18 +8403,14 @@ function LeafLoader({ progress = null, size = 104, остановлен = false 
       <div style={{
         position: "absolute", top: 0, left: 0, height: "100%",
         display: "flex", alignItems: "center", gap: шаг - size,
-        animation: `котыБегут 2.6s linear infinite`,
+        // Ровный ход без подпрыгиваний: линейная скорость, а в конце
+        // одно замедление до полной остановки.
+        animation: `котыБегут ${тормозим ? ТОРМОЖЕНИЕ_МС : ХОД_МС}ms ${тормозим ? "cubic-bezier(0.15, 0.7, 0.2, 1) forwards" : "linear infinite"}`,
         willChange: "transform",
         "--шаг": `${шаг}px`,
       }}>
         {Array.from({ length: котов * 2 }, (_, i) => (
-          <div key={i} style={{
-            // Дрожание у каждого своё: одинаковое читалось бы как
-            // дрожание всей ленты, а не отдельных котов.
-            animation: `котДрожит ${0.28 + (i % 3) * 0.06}s ease-in-out ${i * 0.05}s infinite alternate`,
-          }}>
-            <КотПланета size={size} glow={i % 2 === 0} />
-          </div>
+          <КотПланета key={i} size={size} glow={i % 2 === 0} качается={false} />
         ))}
       </div>
     </div>
@@ -8399,7 +8423,7 @@ function LeafLoader({ progress = null, size = 104, остановлен = false 
 function PageLoader({ minHeight = 260 }) {
   return (
     <div className="fx-view" style={{ minHeight, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
-      <LeafLoader size={72} />
+      <LeafLoader size={92} />
       <div style={{ width: 96, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
         <div style={{ width: "40%", height: "100%", borderRadius: 999, background: PRISM, animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
       </div>
@@ -8983,7 +9007,7 @@ function BootSplash({ steps, done, insetTop = 0 }) {
       {/* Во всю ширину: вереница котов должна уходить за края экрана, а
           не толкаться в узкой колонке. */}
       <div style={{ position: "relative", zIndex: 1, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-        <LeafLoader progress={progress} size={104} />
+        <LeafLoader progress={progress} size={124} отклик />
         <div style={{ width: 132, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
           <div style={{
             width: `${Math.round(progress * 100)}%`, height: "100%", borderRadius: 999,
