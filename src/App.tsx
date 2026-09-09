@@ -20324,11 +20324,13 @@ function mapTokenRow(row) {
             borderRadius: 999,
             // Панель просто чёрная и прозрачная: под ней видно, что список
             // продолжается, а цвет ничего не добавляет к значкам.
-            background: hexA("#000000", 0.55),
-            backdropFilter: "blur(18px) saturate(1.4)",
-            WebkitBackdropFilter: "blur(18px) saturate(1.4)",
-            border: `1px solid ${hexA("#FFFFFF", 0.08)}`,
-            boxShadow: "0 12px 34px rgba(0,0,0,0.45)",
+            background: hexA("#000000", 0.22),
+            // Заливки почти нет — форму держит размытие: сквозь панель
+            // видно ленту, но значки не тонут в ней.
+            backdropFilter: "blur(26px) saturate(1.5)",
+            WebkitBackdropFilter: "blur(26px) saturate(1.5)",
+            border: `1px solid ${hexA("#FFFFFF", 0.06)}`,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.32)",
           }}
         >
           {/* Профиля в панели нет: туда ходят за своими делами, а не
