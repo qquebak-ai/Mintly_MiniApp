@@ -1558,6 +1558,14 @@ function GlobalStyle() {
       @keyframes лентаГаснет { from { opacity: 1; } to { opacity: 0; } }
       /* Обмен: экран выезжает снизу, лист монет — из-под него, значения
          в карточках подхватываются мягким подъёмом. */
+      /* Карта кошелька: фиолетовый медленно перетекает по ней из угла в
+         угол. Двигается фон, а не сама карта — ни одного пересчёта
+         разметки, поэтому анимация ничего не стоит списку под ней. */
+      @keyframes картаПереливается {
+        0%   { background-position: 0% 50%; }
+        50%  { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
       @keyframes обменВъезжает { from { transform: translateY(100%); } to { transform: translateY(0); } }
       @keyframes обменФон { from { opacity: 0; } to { opacity: 1; } }
       @keyframes листМонет { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -12632,7 +12640,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <section
         style={{
           position: "relative", overflow: "hidden", borderRadius: 24, padding: "16px 18px 18px",
-          background: "radial-gradient(120% 150% at 10% 15%, #C13AE6 0%, #8E2DE2 34%, #5A0FD8 66%, #2C0A78 100%)",
+          background: "linear-gradient(115deg, #C13AE6 0%, #8E2DE2 26%, #5A0FD8 52%, #7B1FE0 74%, #2C0A78 100%)",
+          backgroundSize: "260% 260%",
+          animation: "картаПереливается 18s ease-in-out infinite",
           border: "none",
         }}
       >
