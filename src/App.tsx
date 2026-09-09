@@ -12935,18 +12935,13 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
      вторая величина, а не выдуманный процент. */
   return (
     <div className="flex flex-col" style={{ paddingTop: 4 }}>
-      <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
+      {/* Адреса в шапке нет: за ним ходят на «Получить», где он показан
+          целиком и кодом, а обрубок в углу только занимал место рядом с
+          заголовком. */}
+      <div style={{ marginBottom: 14 }}>
         <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
           {t("navWallet")}
         </h1>
-        <button
-          onClick={скопироватьАдрес}
-          className="fx-tap flex items-center"
-          style={{ gap: 6, padding: "7px 12px", borderRadius: 999, background: T.surfaceHi, border: "none" }}
-        >
-          <span style={{ fontFamily: monoFont, color: T.paper, fontSize: 12 }}>{short}</span>
-          {copied ? <CheckCircle2 size={12} color={T.up} /> : <Copy size={12} color={T.faint} />}
-        </button>
       </div>
 
       {/* Карта баланса. Сумма читается одним взглядом: целые рубли
@@ -13050,12 +13045,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
                   {tonBalance.toFixed(2)} TON · ≈ ${(tonBalance * tonPriceUsd).toFixed(2)}
                 </div>
               </div>
-              <button onClick={onCopy} className="fx-tap flex items-center" style={{ gap: 6, padding: "8px 12px", borderRadius: 999, background: T.surfaceHi, border: "none", flexShrink: 0 }}>
-                <span style={{ fontFamily: monoFont, color: T.paper, fontSize: 12 }}>
-                  {walletAddress ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}` : ""}
-                </span>
-                <Copy size={12} color={T.faint} />
-              </button>
+
             </div>
           ) : (
             <>
