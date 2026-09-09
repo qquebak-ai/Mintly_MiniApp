@@ -1114,6 +1114,11 @@ function tf(key, vars) {
    Один и тот же градиент на кнопках, активных состояниях и подсветках —
    так они читаются как одно семейство. */
 const ГРАДИЕНТ_БРЕНДА = "linear-gradient(135deg, #4B7BFF 0%, #6C7CFF 48%, #A56BFF 100%)";
+/* Пара под рост и падение — из тёмной подборки градиентов, о которой
+   говорит дизайн-план. Плоские цвета остаются для текста и линий: их
+   градиентом не покрасишь, а вот плашки и полосы держат объём. */
+const ГРАДИЕНТ_РОСТА = "linear-gradient(135deg, #1FD1A5 0%, #2BE8A5 55%, #7BF7C4 100%)";
+const ГРАДИЕНТ_ПАДЕНИЯ = "linear-gradient(135deg, #FF4D7E 0%, #FF5C8A 55%, #FF8FB0 100%)";
 const DARK_PRISM = ГРАДИЕНТ_БРЕНДА;
 const LIGHT_PRISM = ГРАДИЕНТ_БРЕНДА;
 let PRISM = DARK_PRISM;
@@ -2094,7 +2099,16 @@ function ChangeBadge({ value, size = "sm" }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full ${size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm"}`}
-      style={{ color, background: up ? "rgba(49,208,123,0.14)" : "rgba(255,77,77,0.14)", fontFamily: monoFont }}
+      // Подложка — фирменный градиент под нужный знак, приглушённый до
+      // фона: плоская заливка на чёрном выглядела наклейкой.
+      style={{
+        color,
+        backgroundImage: up ? ГРАДИЕНТ_РОСТА : ГРАДИЕНТ_ПАДЕНИЯ,
+        backgroundBlendMode: "multiply",
+        boxShadow: `inset 0 0 0 999px ${hexA(T.bg, 0.82)}`,
+        border: `1px solid ${hexA(up ? T.up : T.down, 0.28)}`,
+        fontFamily: monoFont,
+      }}
     >
       {up ? <ArrowUpRight size={size === "sm" ? 12 : 14} /> : <ArrowDownRight size={size === "sm" ? 12 : 14} />}
       {Math.abs(value).toFixed(1)}%
@@ -5667,7 +5681,12 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
           {своя && (
             <div className="flex items-center" style={{ gap: 6, marginTop: 5 }}>
               <div style={{ flex: 1, maxWidth: 96, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
-                <div style={{ width: `${Math.round(доляДоБиржи * 100)}%`, height: "100%", background: PRISM }} />
+                <div style={{
+                  width: `${Math.round(доляДоБиржи * 100)}%`, height: "100%",
+                  // На подходе к бирже полоса зеленеет: это и есть тот
+                  // самый момент, ради которого раздел открывают.
+                  background: доляДоБиржи >= 0.8 ? ГРАДИЕНТ_РОСТА : PRISM,
+                }} />
               </div>
               <span style={{ fontFamily: monoFont, fontSize: 11, color: доляДоБиржи >= 0.8 ? T.up : T.faint }}>
                 {Math.round(доляДоБиржи * 100)}%
