@@ -1584,6 +1584,8 @@ function GlobalStyle() {
         100% { transform: scale(1); }
       }
       @keyframes меткаПришла { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+      /* Блик пробегает по кнопке слева направо — вслед за заливкой. */
+      @keyframes бликПоКнопке { from { transform: translateX(-120%); } to { transform: translateX(220%); } }
       @keyframes менюВъезжает { from { transform: translateX(-100%); } to { transform: translateX(0); } }
       @keyframes обменВъезжает { from { transform: translateY(100%); } to { transform: translateY(0); } }
       @keyframes обменФон { from { opacity: 0; } to { opacity: 1; } }
@@ -12289,14 +12291,41 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", sh
           onClick={копировать}
           className="fx-tap w-full flex items-center justify-center"
           style={{
+            position: "relative", overflow: "hidden",
             gap: 8, padding: "16px 0", borderRadius: 999, border: "none",
-            background: скопировано ? "#38B27A" : ЦВЕТ_КНОПКИ,
+            background: ЦВЕТ_КНОПКИ,
             color: PRISM_TEXT, fontFamily: displayFont, fontSize: 16, fontWeight: 800,
-            transition: "background 240ms ease-out",
             animation: скопировано ? "кнопкаКивнула 420ms cubic-bezier(0.22, 1, 0.36, 1)" : "none",
           }}
         >
-          <span key={скопировано ? "да" : "нет"} className="flex items-center" style={{ gap: 8, animation: "меткаПришла 240ms ease-out both" }}>
+          {/* Цвет заливает кнопку слева направо — движение показывает,
+              что именно сейчас произошло, лучше простой смены оттенка. */}
+          <span
+            aria-hidden
+            style={{
+              position: "absolute", inset: 0,
+              background: "linear-gradient(90deg, #2FA968 0%, #38C07F 55%, #45D08C 100%)",
+              transform: скопировано ? "scaleX(1)" : "scaleX(0)",
+              transformOrigin: "left center",
+              transition: "transform 360ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+          />
+          {/* Вслед за заливкой пробегает светлая полоса. */}
+          {скопировано && (
+            <span
+              aria-hidden
+              style={{
+                position: "absolute", top: 0, bottom: 0, width: "45%",
+                background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.35)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
+                animation: "бликПоКнопке 760ms ease-out 120ms both",
+              }}
+            />
+          )}
+          <span
+            key={скопировано ? "да" : "нет"}
+            className="flex items-center"
+            style={{ position: "relative", gap: 8, animation: "меткаПришла 240ms ease-out both" }}
+          >
             {скопировано && <Check size={17} strokeWidth={2.6} />}
             {скопировано ? t("receiveCopied") : t("receiveCopy")}
           </span>
