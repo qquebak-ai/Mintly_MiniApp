@@ -11989,8 +11989,6 @@ function SolanaWalletCard({ showToast }) {
     showToast(t("solDisconnected"));
   }
 
-  const короткий = сессия ? `${сессия.wallet.slice(0, 4)}…${сессия.wallet.slice(-4)}` : "";
-
   return (
     <div className="w-full rounded-[22px] p-4" style={{ marginTop: 20, background: T.surface, border: `1px solid ${T.line}` }}>
       <div className="flex items-center justify-between gap-3">
@@ -12002,16 +12000,9 @@ function SolanaWalletCard({ showToast }) {
               : t("solWalletNote")}
           </div>
         </div>
-        {сессия ? (
-          <button
-            onClick={() => { navigator.clipboard?.writeText(сессия.wallet); setСкопировано(true); setTimeout(() => setСкопировано(false), 1400); }}
-            className="fx-tap flex items-center gap-1.5 rounded-full flex-shrink-0"
-            style={{ padding: "7px 12px", background: T.bg, border: `1px solid ${T.line}` }}
-          >
-            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 12.5 }}>{короткий}</span>
-            {скопировано ? <CheckCircle2 size={12} color={T.up} /> : <Copy size={12} color={T.muted} />}
-          </button>
-        ) : (
+        {/* Адреса рядом с кошельком нет: он есть на «Получить» целиком и
+            кодом, а обрубок в углу карточки ничего не добавлял. */}
+        {сессия ? null : (
           <button
             onClick={подключиться}
             disabled={идёт}
