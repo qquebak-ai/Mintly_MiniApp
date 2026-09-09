@@ -272,6 +272,9 @@ const STR = {
     walletHoldings: "Твои токены",
     walletHistory: "История",
     swapTitle: "Обмен",
+    receiveTitle: "Получить",
+    receiveCopy: "Копировать адрес",
+    receiveShare: "Поделиться",
     swapYouPay: "Вы отдаёте",
     swapYouGet: "Вы получите",
     swapAvailable: "Доступно",
@@ -761,6 +764,9 @@ const STR = {
     walletHoldings: "Your tokens",
     walletHistory: "History",
     swapTitle: "Swap",
+    receiveTitle: "Receive",
+    receiveCopy: "Copy address",
+    receiveShare: "Share",
     swapYouPay: "You pay",
     swapYouGet: "You get",
     swapAvailable: "Available",
@@ -12090,6 +12096,228 @@ function AppWalletCard({ showToast }) {
 }
 
 
+/* Экран, приезжающий снизу.
+ *
+ * Общий каркас для «Обмена» и «Получить»: выезжает из-под нижнего края,
+ * закрывается тем же движением — потягиванием вниз. Крестика нет
+ * намеренно: в мини-приложении верхний угол занят кнопкой Telegram, и
+ * вторая крестик рядом с ней читалась как её дубль.
+ *
+ * Жест не перехватывается, если под пальцем прокрученный список: там
+ * движение вниз листает содержимое, а не закрывает экран.
+ */
+function ЭкранСнизу({ открыт, onClose, заголовок = "", insetTop = 0, insetBottom = 0, жестВыключен = false, children }) {
+  const [уходит, setУходит] = useState(false);
+  const [тяга, setТяга] = useState(0);
+  const жест = useRef(null);
+
+  useEffect(() => {
+    if (!открыт) { setУходит(false); setТяга(0); }
+  }, [открыт]);
+
+  const закрыть = useCallback(() => {
+    setУходит(true);
+    // Столько же длится и въезд — экран уходит тем же ходом, каким пришёл.
+    setTimeout(() => { setУходит(false); setТяга(0); onClose(); }, 260);
+  }, [onClose]);
+
+  function прокрученныйПредок(эл) {
+    for (let у = эл; у && у !== document.body; у = у.parentElement) {
+      const с = getComputedStyle(у);
+      if (/(auto|scroll)/.test(с.overflowY) && у.scrollTop > 2) return true;
+    }
+    return false;
+  }
+
+  function началоЖеста(e) {
+    if (жестВыключен) return;
+    const т = e.touches && e.touches[0];
+    if (!т) return;
+    if (e.target instanceof Element && прокрученныйПредок(e.target)) return;
+    жест.current = { y0: т.clientY, тянем: false };
+  }
+  function ходЖеста(e) {
+    const ж = жест.current;
+    const т = e.touches && e.touches[0];
+    if (!ж || !т) return;
+    const dy = т.clientY - ж.y0;
+    if (!ж.тянем && dy < 12) return;
+    ж.тянем = true;
+    setТяга(Math.max(0, dy));
+  }
+  function конецЖеста() {
+    const ж = жест.current;
+    жест.current = null;
+    if (!ж || !ж.тянем) return;
+    const порог = typeof window !== "undefined" ? window.innerHeight * 0.22 : 160;
+    if (тяга > порог) { haptic("light"); закрыть(); return; }
+    setТяга(0);
+  }
+
+  if (!открыт) return null;
+
+  return createPortal(
+    <div
+      onTouchStart={началоЖеста}
+      onTouchMove={ходЖеста}
+      onTouchEnd={конецЖеста}
+      onTouchCancel={конецЖеста}
+      style={{
+        position: "fixed", inset: 0, zIndex: 400, background: T.bg,
+        display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto",
+        // Сверху — запас под шапку Telegram (часы и «Закрыть» лежат прямо
+        // на приложении), снизу — под системную полосу.
+        paddingTop: insetTop, paddingBottom: insetBottom,
+        overflow: "hidden",
+        transform: уходит ? "translateY(100%)" : `translateY(${тяга}px)`,
+        transition: жест.current ? "none" : "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+        borderTopLeftRadius: тяга > 0 ? 22 : 0, borderTopRightRadius: тяга > 0 ? 22 : 0,
+        animation: уходит ? "none" : "обменВъезжает 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+        touchAction: "pan-y",
+      }}
+    >
+      <div className="flex flex-col items-center" style={{ padding: "8px 16px 4px", flexShrink: 0, gap: 8 }}>
+        <span aria-hidden style={{ width: 40, height: 4, borderRadius: 999, background: hexA("#FFFFFF", 0.22) }} />
+      </div>
+      {заголовок && (
+        <div style={{ padding: "6px 18px 10px", flexShrink: 0 }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>{заголовок}</span>
+        </div>
+      )}
+      {children}
+    </div>,
+    document.body
+  );
+}
+
+/* Экран «Получить»: адрес кошелька Mintly кодом и строкой.
+ *
+ * Код рисуется на месте, а не берётся картинкой со стороннего сервиса:
+ * адрес кошелька — не то, что стоит отправлять чужому серверу ради
+ * картинки.
+ */
+function ЭкранПолучить({ открыт, onClose, адрес = "", showToast = () => {}, insetTop = 0, insetBottom = 0 }) {
+  const [код, setКод] = useState(null);
+
+  useEffect(() => {
+    if (!открыт || !адрес) { setКод(null); return; }
+    let брошено = false;
+    (async () => {
+      try {
+        const QR = (await import("qrcode")).default;
+        const данные = await QR.toDataURL(адрес, {
+          margin: 1, width: 720, errorCorrectionLevel: "H",
+          // Белые модули на прозрачном: код лежит на тёмной плитке, и
+          // белое поле вокруг него выглядело бы наклейкой.
+          color: { dark: "#FFFFFFFF", light: "#00000000" },
+        });
+        if (!брошено) setКод(данные);
+      } catch { if (!брошено) setКод(null); }
+    })();
+    return () => { брошено = true; };
+  }, [открыт, адрес]);
+
+  const короткий = адрес ? `${адрес.slice(0, 6)}…${адрес.slice(-6)}` : "";
+
+  function копировать() {
+    if (!адрес) return;
+    if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(адрес).catch(() => {});
+    haptic("light");
+    showToast(t("appWalletAddressCopied"));
+  }
+
+  async function поделиться() {
+    if (!адрес) return;
+    haptic("light");
+    // В Telegram делимся его же окном, снаружи — системным.
+    const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    if (tg && tg.openTelegramLink) {
+      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(адрес)}`);
+      return;
+    }
+    try {
+      if (navigator.share) { await navigator.share({ text: адрес }); return; }
+    } catch { /* отменили — молчим */ }
+    копировать();
+  }
+
+  return (
+    <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={t("receiveTitle")} insetTop={insetTop} insetBottom={insetBottom}>
+      <div className="flex flex-col items-center justify-center" style={{ flex: 1, minHeight: 0, padding: "0 18px", gap: 18 }}>
+        <div
+          className="flex items-center justify-center"
+          style={{
+            position: "relative", width: "100%", maxWidth: 330, aspectRatio: "1 / 1",
+            borderRadius: 30, background: T.surfaceHi, padding: 18,
+            animation: "карточкаОбмена 340ms cubic-bezier(0.22, 1, 0.36, 1) both",
+          }}
+        >
+          {код ? (
+            <img src={код} alt="" style={{ width: "100%", height: "100%", display: "block", imageRendering: "pixelated" }} />
+          ) : адрес ? (
+            <div style={{ width: 120, height: 10, borderRadius: 999, background: T.surface, overflow: "hidden" }}>
+              <div style={{ width: "40%", height: "100%", borderRadius: 999, background: hexA("#8E2DE2", 0.55), animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
+            </div>
+          ) : (
+            // Кошелёк заводится вместе с аккаунтом: без входа адреса нет,
+            // и вместо вечной полоски честнее сказать об этом.
+            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5, textAlign: "center", padding: "0 22px" }}>
+              {t("appWalletNeedAuth")}
+            </div>
+          )}
+          {/* Значок сети в середине кода: по нему видно, куда именно
+              придут деньги, — код высокой избыточности это переживает. */}
+          {код && (
+            <span
+              className="flex items-center justify-center"
+              style={{
+                position: "absolute", width: 62, height: 62, borderRadius: 18,
+                background: T.surfaceHi, border: `4px solid ${T.surfaceHi}`,
+              }}
+            >
+              <img src="/coins/sol.png" alt="" width={44} height={44} style={{ width: 44, height: 44, borderRadius: 12, display: "block" }} />
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={копировать}
+          className="fx-tap flex items-center"
+          style={{ gap: 8, background: "transparent", border: "none", padding: 0, maxWidth: "100%" }}
+        >
+          <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
+            Solana · <span style={{ color: T.muted }}>{короткий}</span>
+          </span>
+          <Copy size={15} color={T.muted} />
+        </button>
+      </div>
+
+      <div className="flex flex-col" style={{ gap: 10, padding: "0 18px 22px", flexShrink: 0 }}>
+        <button
+          onClick={копировать}
+          className="fx-tap w-full"
+          style={{
+            padding: "16px 0", borderRadius: 999, border: "none", background: ЦВЕТ_КНОПКИ,
+            color: PRISM_TEXT, fontFamily: displayFont, fontSize: 16, fontWeight: 700,
+          }}
+        >
+          {t("receiveCopy")}
+        </button>
+        <button
+          onClick={поделиться}
+          className="fx-tap w-full"
+          style={{
+            padding: "16px 0", borderRadius: 999, border: "none", background: T.surfaceHi,
+            color: T.ice, fontFamily: displayFont, fontSize: 16, fontWeight: 700,
+          }}
+        >
+          {t("receiveShare")}
+        </button>
+      </div>
+    </ЭкранСнизу>
+  );
+}
+
 /* Обмен внутри приложения.
  *
  * Меняется только то, что лежит на кошельке Mintly: своими ключами
@@ -12182,55 +12410,13 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
   const [считаем, setСчитаем] = useState(false);
   const [идёт, setИдёт] = useState(false);
   const [выбор, setВыбор] = useState(null);       // какую сторону меняем: "дать" | "взять"
-  /* Экран закрывается не мгновенно: сперва уезжает вниз, и только потом
-     снимается. Иначе он исчезает под пальцем, которым его тянут. */
-  const [уходит, setУходит] = useState(false);
-  const [тяга, setТяга] = useState(0);            // сколько утянули вниз, px
-  const [развернуто, setРазвернуто] = useState(0); // сколько раз меняли стороны — по нему крутится кнопка
-  const жест = useRef(null);
-  const верх = useRef(null);
+  /* Закрытие идёт через каркас: он же ведёт жест и уводит экран вниз.
+     Здесь остаётся только сброс полей при открытии. */
+  const закрыть = onClose;
 
-  // Экран открывается заново — начинаем с чистого листа: чужая сумма из
-  // прошлого раза сбивает с толку сильнее, чем пустое поле.
   useEffect(() => {
-    if (!открыт) { setСумма(""); setВыход(null); setВыбор(null); setУходит(false); setТяга(0); }
+    if (!открыт) { setСумма(""); setВыход(null); setВыбор(null); }
   }, [открыт]);
-
-  const закрыть = useCallback(() => {
-    setУходит(true);
-    // Столько же длится и въезд — экран уходит тем же ходом, каким пришёл.
-    setTimeout(() => { setУходит(false); setТяга(0); onClose(); }, 260);
-  }, [onClose]);
-
-  /* Тянут экран вниз — он едет за пальцем. Отпустили ниже трети —
-     закрываем, выше — возвращаем на место. Жест не перехватывается, если
-     под пальцем прокрученный список: там вниз листают содержимое. */
-  function началоЖеста(e) {
-    if (выбор) return;
-    const у = верх.current;
-    const внутриСписка = у && e.target instanceof Node && у.contains(e.target);
-    if (внутриСписка && у.scrollTop > 2) return;
-    const т = e.touches && e.touches[0];
-    if (!т) return;
-    жест.current = { y0: т.clientY, тянем: false };
-  }
-  function ходЖеста(e) {
-    const ж = жест.current;
-    const т = e.touches && e.touches[0];
-    if (!ж || !т) return;
-    const dy = т.clientY - ж.y0;
-    if (!ж.тянем && dy < 12) return;
-    ж.тянем = true;
-    setТяга(Math.max(0, dy));
-  }
-  function конецЖеста() {
-    const ж = жест.current;
-    жест.current = null;
-    if (!ж || !ж.тянем) return;
-    const порог = typeof window !== "undefined" ? window.innerHeight * 0.22 : 160;
-    if (тяга > порог) { haptic("light"); закрыть(); return; }
-    setТяга(0);
-  }
 
   const доли = вДоли(сумма, отдаю.знаки);
 
@@ -12307,37 +12493,18 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
 
   const готово = доли > 0n && выход != null && !идёт;
 
-  return createPortal(
-    <div
-      onTouchStart={началоЖеста}
-      onTouchMove={ходЖеста}
-      onTouchEnd={конецЖеста}
-      onTouchCancel={конецЖеста}
-      style={{
-        position: "fixed", inset: 0, zIndex: 400, background: T.bg,
-        display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto",
-        // Сверху — запас под шапку Telegram (часы и «Закрыть» лежат прямо
-        // на приложении), снизу — под системную полосу. Без него первая
-        // карточка уходила под кнопку закрытия.
-        paddingTop: insetTop, paddingBottom: insetBottom,
-        overflow: "hidden",
-        // Пока тянут — экран идёт за пальцем без перехода, отпустили —
-        // возвращается или уезжает уже с ним.
-        transform: уходит ? "translateY(100%)" : `translateY(${тяга}px)`,
-        transition: жест.current ? "none" : "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
-        borderTopLeftRadius: тяга > 0 ? 22 : 0, borderTopRightRadius: тяга > 0 ? 22 : 0,
-        animation: уходит ? "none" : "обменВъезжает 300ms cubic-bezier(0.22, 1, 0.36, 1)",
-        touchAction: "pan-y",
-      }}
+  return (
+    <ЭкранСнизу
+      открыт={открыт}
+      onClose={onClose}
+      заголовок={t("swapTitle")}
+      insetTop={insetTop}
+      insetBottom={insetBottom}
+      // Пока открыт список монет, тянуть экран нельзя: жест принадлежит
+      // списку, а не окну под ним.
+      жестВыключен={!!выбор}
     >
-      {/* Крестика нет: экран закрывают тем же движением, каким открыли —
-          потянув вниз. Полоска показывает, что он тянется. */}
-      <div className="flex flex-col items-center" style={{ padding: "8px 16px 6px", flexShrink: 0, gap: 8 }}>
-        <span aria-hidden style={{ width: 40, height: 4, borderRadius: 999, background: hexA("#FFFFFF", 0.22) }} />
-        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16.5, fontWeight: 700 }}>{t("swapTitle")}</span>
-      </div>
-
-      <div ref={верх} className="no-scrollbar" style={{ padding: "4px 16px 0", overflowY: "auto", flexShrink: 1, minHeight: 0 }}>
+      <div className="no-scrollbar" style={{ padding: "4px 16px 0", overflowY: "auto", flexShrink: 1, minHeight: 0 }}>
         {/* Что отдаём */}
         <div style={{ borderRadius: 22, background: T.surfaceHi, padding: "14px 16px", animation: "карточкаОбмена 320ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
           <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("swapYouPay")}</div>
@@ -12480,8 +12647,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
           </div>
         </div>
       )}
-    </div>,
-    document.body
+    </ЭкранСнизу>
   );
 }
 
@@ -12625,6 +12791,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
      карточкой: он не наш, и распоряжаться его содержимым мы не можем. */
   const [внутр, setВнутр] = useState(null);
   const [обменОткрыт, setОбменОткрыт] = useState(false);
+  const [получитьОткрыт, setПолучитьОткрыт] = useState(false);
 
   const обновитьВнутренний = useCallback(async () => {
     const { состояниеВнутреннего } = await import("./appWallet");
@@ -12718,7 +12885,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       {/* Ряд действий — то, за чем в кошелёк заходят чаще всего. */}
       <div className="flex items-start" style={{ gap: 10, marginTop: 16 }}>
         <ДействиеКошелька icon={Plus} label={t("walletActBuy")} onClick={() => onGoTab("mempad")} />
-        <ДействиеКошелька icon={ArrowDownLeft} label={t("walletActReceive")} onClick={скопироватьАдрес} />
+        <ДействиеКошелька icon={ArrowDownLeft} label={t("walletActReceive")} onClick={() => setПолучитьОткрыт(true)} />
         <ДействиеКошелька icon={Repeat} label={t("walletActSwap")} onClick={() => setОбменОткрыт(true)} />
         <ДействиеКошелька
           icon={Clock}
@@ -12730,8 +12897,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       {/* Свои кошельки — на тёмном верху, рядом с балансом: они про
           «сколько и где лежит», а не про историю операций. */}
       <div className="flex flex-col" style={{ gap: 14, marginTop: 20 }}>
-        <AppWalletCard showToast={showToast} />
-
         {/* TON-кошелёк. Он внешний: им подписывают покупки на кривой TON,
             но менять на нём нечего — обмен живёт только внутри. */}
         <div className="w-full rounded-[22px] p-4" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
@@ -12861,6 +13026,15 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           </button>
         )}
       </div>
+
+      <ЭкранПолучить
+        открыт={получитьОткрыт}
+        onClose={() => setПолучитьОткрыт(false)}
+        адрес={адресВнутри}
+        showToast={showToast}
+        insetTop={insetTop}
+        insetBottom={insetBottom}
+      />
 
       <ЭкранОбмена
         открыт={обменОткрыт}
