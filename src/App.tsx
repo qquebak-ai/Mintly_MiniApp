@@ -12308,7 +12308,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <div
         ref={низ}
         style={{
-          marginTop: 22, marginLeft: -16, marginRight: -16, marginBottom: -(96 + 40),
+          // Ширину берём от самого окна, а не вычитаем отступы родителя:
+          // так страница ложится в край экрана при любой вложенности и
+          // на любом запасе по бокам.
+          marginTop: 22, width: "100vw", marginLeft: "calc(50% - 50vw)", marginRight: "calc(50% - 50vw)",
+          marginBottom: -(96 + 40),
           borderTopLeftRadius: 26, borderTopRightRadius: 26,
           background: КОШ_СТРАНИЦА, padding: "18px 16px 120px", minHeight: 420,
           // Тонкий свет по верхней кромке: в тёмном на тёмном граница
@@ -12331,11 +12335,12 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
 
         {!holdingsReady ? (
           <div className="flex items-center justify-center" style={{ height: 90 }}>
-            <КотПланета size={52} />
+            <div style={{ width: 120, height: 10, borderRadius: 999, background: КОШ_КАРТОЧКА, overflow: "hidden" }}>
+              <div style={{ width: "40%", height: "100%", borderRadius: 999, background: hexA("#8E2DE2", 0.55), animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
+            </div>
           </div>
         ) : !holdings.length ? (
-          <div className="flex items-center" style={{ gap: 14, padding: "14px 14px", borderRadius: 20, background: КОШ_КАРТОЧКА }}>
-            <КотПланета size={54} />
+          <div style={{ padding: "16px 16px", borderRadius: 20, background: КОШ_КАРТОЧКА }}>
             <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.45 }}>
               {t("walletHoldingsEmpty")}
             </div>
