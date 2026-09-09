@@ -305,7 +305,7 @@ const STR = {
     mempadSpotlight: "В центре внимания",
     mempadLaunchToken: "Запустить токен",
     tickerBought: "купил", tickerSold: "продал",
-    sinceSec: "с", sinceMin: "м", sinceHour: "ч", mempadFilterNew: "Новые", mempadFilterTrend: "Трендовые", mempadFilterHot: "Горячие", mempadFilterBluming: "В росте", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Создать токен", homeActionMempad: "Мемпад", homeActionProfile: "Профиль",
+    sinceSec: "с", sinceMin: "м", sinceHour: "ч", mempadFilterNew: "Новые", mempadFilterTrend: "Трендовые", mempadFilterHot: "Горячие", mempadFilterSoon: "Скоро на бирже", mempadFilterVol: "По обороту", mempadFilterBluming: "В росте", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Создать токен", homeActionMempad: "Мемпад", homeActionProfile: "Профиль",
     feedTitle: "Прямо сейчас",
     feedSub: "Что происходит на площадке",
     feedTrade: "{who} купил ${ticker} на {ton} TON",
@@ -776,7 +776,7 @@ const STR = {
     mempadSpotlight: "Spotlight",
     mempadLaunchToken: "Launch token",
     tickerBought: "bought", tickerSold: "sold",
-    sinceSec: "s", sinceMin: "m", sinceHour: "h", mempadFilterNew: "New", mempadFilterTrend: "Trending", mempadFilterHot: "Hot", mempadFilterBluming: "Bluming", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Launch token", homeActionMempad: "Mempad", homeActionProfile: "Profile",
+    sinceSec: "s", sinceMin: "m", sinceHour: "h", mempadFilterNew: "New", mempadFilterTrend: "Trending", mempadFilterHot: "Hot", mempadFilterSoon: "Almost listed", mempadFilterVol: "By volume", mempadFilterBluming: "Bluming", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Launch token", homeActionMempad: "Mempad", homeActionProfile: "Profile",
     feedTitle: "Right now",
     feedSub: "What's happening here",
     feedTrade: "{who} bought ${ticker} for {ton} TON",
@@ -1453,6 +1453,23 @@ function GlobalStyle() {
       @keyframes листКачается { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(7deg); } }
       @keyframes ракетаВзлетает { 0%, 100% { transform: translateY(4px); } 50% { transform: translateY(-8px); } }
       @keyframes пламяДышит { from { transform: scaleY(0.75); opacity: 0.8; } to { transform: scaleY(1.15); opacity: 1; } }
+      /* Точка «живого» токена: дышит, а не мигает — мигание в списке из
+         сорока строк превращается в рябь. */
+      @keyframes живаяТочка { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }
+      /* Блик по карте баланса: проходит редко и медленно — карта
+         выглядит из материала, а не мигает. */
+      @keyframes картаБлик { 0%, 70%, 100% { transform: translateX(-40px) rotate(18deg); opacity: 0; } 12% { opacity: 1; } 35% { transform: translateX(420px) rotate(18deg); opacity: 0; } }
+      /* Конфетти: падает, сносит вбок и крутится. Одна анимация на все
+         частицы, разница — в переменных на каждой. */
+      @keyframes конфеттиЛетит {
+        0%   { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 0; }
+        10%  { opacity: 1; }
+        100% { transform: translate3d(var(--сдвиг, 0), 460px, 0) rotate(var(--поворот, 180deg)); opacity: 0; }
+      }
+      /* Маскот: моргает раз в несколько секунд и по кольцу бежит блик —
+         достаточно, чтобы он казался живым, и мало, чтобы отвлекать. */
+      @keyframes котМоргает { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+      @keyframes кольцоБежит { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -206; } }
       @keyframes gridDrift { from{background-position:0 0,0 0;} to{background-position:140px 140px,140px 140px;} }
       @keyframes starTwinkle { 0%,100%{opacity:.2;} 50%{opacity:1;} }
       @keyframes starPulse { 0%,100%{opacity:0;} 50%{opacity:var(--o);} }
@@ -2494,6 +2511,8 @@ async function fetchFeedFromCache(network = GT_NETWORK, limit = FEED_LIMIT, { с
       mcapNum: Number(r.mcap) || 0,
       liq: fmtCompact(Number(r.liq) || 0),
       vol: fmtCompact(Number(r.vol24) || 0),
+      // Оборот числом: по строке «$1.2M» не отсортируешь.
+      vol24hNum: Number(r.vol24) || 0,
       tx1h: Number(r.tx1h) || 0,
       tx6h: Number(r.tx6h) || 0,
       tx24h: Number(r.tx24) || 0,
@@ -2586,6 +2605,7 @@ function normalizePools(json, network = GT_NETWORK) {
         mcapNum,
         liq: fmtCompact(liqNum),
         vol: fmtCompact(volNum),
+        vol24hNum: volNum,
         tx1h: txCount("h1"),
         tx6h: txCount("h6"),
         tx24h: txCount("h24"),
@@ -5421,9 +5441,21 @@ function RocketIconFX() {
 const MEMPAD_FILTERS = [
   { id: "new", labelKey: "mempadFilterNew" },
   { id: "trend", labelKey: "mempadFilterTrend" },
+  // «Скоро на бирже» — те, у кого кривая почти собрана: момент, когда
+  // токен интересен больше всего, а найти его раньше было негде.
+  { id: "soon", labelKey: "mempadFilterSoon" },
+  { id: "vol", labelKey: "mempadFilterVol" },
   { id: "dex", labelKey: "mempadFilterDex" },
   { id: "hot", labelKey: "mempadFilterHot" },
 ];
+
+/* Насколько кривая близка к выходу на биржу: 0 — только запустили, 1 —
+   собрана. У биржевых пар кривой нет, им здесь делать нечего. */
+function долевКривой(tok) {
+  const цель = Number(tok && tok.graduationTon) || 0;
+  if (!(цель > 0)) return null;
+  return Math.max(0, Math.min(1, (Number(tok.raisedTon) || 0) / цель));
+}
 
 /* Трендовые — где прямо сейчас идут сделки.
  *
@@ -5597,6 +5629,14 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center" style={{ gap: 6 }}>
             <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 600 }}>${tok.ticker}</span>
+            {/* «Живой» — не украшение: он стоит только там, где за
+                последний час были сделки. Без сделок точка врала бы. */}
+            {(tok.tx1h || 0) > 0 && (
+              <span className="flex items-center" style={{ gap: 4 }}>
+                <span style={{ width: 5, height: 5, borderRadius: 999, background: T.up, animation: "живаяТочка 1.6s ease-in-out infinite" }} />
+                <span style={{ fontFamily: monoFont, fontSize: 10, letterSpacing: "0.06em", color: T.up }}>LIVE</span>
+              </span>
+            )}
             <ПометкаТест сеть={tok.network} />
           </div>
           <div className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2 }}>
@@ -5604,6 +5644,22 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
             {возраст ? ` · ${возраст}` : ""}
             {tok.dexName ? ` · ${tok.dexName}` : ""}
           </div>
+        </div>
+
+        {/* Спарклайн между названием и ценой: форма движения читается
+            быстрее, чем проценты, и ради неё карточку и открывают. */}
+        <div className="flex-shrink-0" style={{ width: 74 }}>
+          <MiniChart
+            id={`лента-${tok.id}`}
+            base={tok.mcapNum || tok.raisedTon || 0}
+            seed={tok.id}
+            poolAddress={tok.dexPoolAddress}
+            curveAddress={tok.curveAddress}
+            tokenAddress={tok.tokenAddress}
+            positive={рост}
+            width={74}
+            height={30}
+          />
         </div>
 
         <div className="text-right flex-shrink-0">
@@ -5634,6 +5690,96 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
     </button>
   );
 });
+
+/* Маскот — кот-планета.
+ *
+ * Утверждён дизайн-планом: тёмная кошачья морда, почти сливающаяся с
+ * фоном, кольцо планеты вокруг и светящиеся глаза. Рисуется вектором, а
+ * не картинкой: он появляется в пустых состояниях разного размера, и
+ * растягивать растр под каждое место — значит получить мыло.
+ *
+ * Свечение даёт сам маскот: на чёрном фоне контур с неоновым градиентом
+ * читается как источник света. */
+function КотПланета({ size = 120, glow = true }) {
+  const id = React.useId().replace(/:/g, "");
+  return (
+    <svg width={size} height={size} viewBox="0 0 120 120" fill="none" aria-hidden style={{ display: "block" }}>
+      <defs>
+        <linearGradient id={`к${id}`} x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0%" stopColor="#4B7BFF" />
+          <stop offset="55%" stopColor={T.electric} />
+          <stop offset="100%" stopColor="#C08BFF" />
+        </linearGradient>
+        <radialGradient id={`г${id}`} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0%" stopColor={T.electric} stopOpacity="0.5" />
+          <stop offset="100%" stopColor={T.electric} stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      {glow && <circle cx="60" cy="60" r="56" fill={`url(#г${id})`} />}
+
+      {/* Кольцо планеты — эллипс под углом, обрезанный мордой: так оно
+          читается «за» котом, а не поверх. */}
+      <ellipse cx="60" cy="64" rx="52" ry="17" transform="rotate(-16 60 64)"
+        stroke={`url(#к${id})`} strokeWidth="2.5" fill="none" opacity="0.85" />
+
+      {/* Голова: круг с ушами. Заливка почти чёрная — маскот должен
+          сливаться с фоном, светится только контур и глаза. */}
+      <path d="M28 44 L34 20 L52 32 Z" fill="#0B0D12" stroke={`url(#к${id})`} strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M92 44 L86 20 L68 32 Z" fill="#0B0D12" stroke={`url(#к${id})`} strokeWidth="2.5" strokeLinejoin="round" />
+      <circle cx="60" cy="60" r="30" fill="#0B0D12" stroke={`url(#к${id})`} strokeWidth="2.5" />
+
+      {/* Глаза — единственное яркое пятно, поэтому взгляд идёт к ним. */}
+      <ellipse cx="49" cy="57" rx="5" ry="6.5" fill={T.turquoise} style={{ animation: "котМоргает 5.5s ease-in-out infinite" }} />
+      <ellipse cx="71" cy="57" rx="5" ry="6.5" fill={T.turquoise} style={{ animation: "котМоргает 5.5s ease-in-out infinite" }} />
+      <path d="M56 70 q4 4 8 0" stroke={`url(#к${id})`} strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M34 62 h-12 M34 68 h-10 M86 62 h12 M86 68 h10" stroke={`url(#к${id})`} strokeWidth="1.6" opacity="0.5" strokeLinecap="round" />
+
+      <ellipse cx="60" cy="64" rx="52" ry="17" transform="rotate(-16 60 64)"
+        stroke={`url(#к${id})`} strokeWidth="2.5" fill="none" opacity="0.35"
+        strokeDasharray="6 200" style={{ animation: "кольцоБежит 6s linear infinite" }} />
+    </svg>
+  );
+}
+
+/* Конфетти на успешных действиях.
+ *
+ * По дизайн-плану успех отмечается частицами: покупка, крупный профит,
+ * запуск токена. Частицы — обычные div-ы с трансформацией, а не canvas:
+ * их два десятка, живут секунду и не требуют своего кадрового цикла.
+ *
+ * Цвета фирменные, а не радужные: праздник должен выглядеть частью
+ * приложения, а не открыткой. */
+function Конфетти({ количество = 26 }) {
+  const частицы = useMemo(() => {
+    const rnd = seededRand(Date.now() % 100000);
+    const цвета = [T.electric, T.violet, T.up, T.ice, T.turquoise];
+    return Array.from({ length: количество }, () => ({
+      левая: rnd() * 100,
+      цвет: цвета[Math.floor(rnd() * цвета.length)],
+      ширина: 5 + rnd() * 5,
+      высота: 8 + rnd() * 8,
+      длит: 1.1 + rnd() * 0.9,
+      задержка: rnd() * 0.35,
+      поворот: rnd() * 360,
+      сдвиг: -60 + rnd() * 120,
+    }));
+  }, [количество]);
+
+  return (
+    <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 90 }}>
+      {частицы.map((ч, i) => (
+        <span key={i} style={{
+          position: "absolute", left: `${ч.левая}%`, top: -14,
+          width: ч.ширина, height: ч.высота, borderRadius: 2,
+          background: ч.цвет,
+          "--сдвиг": `${ч.сдвиг}px`, "--поворот": `${ч.поворот}deg`,
+          animation: `конфеттиЛетит ${ч.длит}s cubic-bezier(0.2, 0.6, 0.4, 1) ${ч.задержка}s both`,
+        }} />
+      ))}
+    </div>
+  );
+}
 
 function MempadRowSkeleton({ index }) {
   return (
@@ -10097,12 +10243,21 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
         .filter((tok) => !tok.graduated)
         .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     }
+    /* «Скоро на бирже» — только свои кривые, отсортированные по тому,
+       сколько осталось собрать. Биржевым здесь места нет: они уже
+       пришли туда, куда эти идут. */
+    if (filter === "soon") {
+      return свои
+        .filter((tok) => !tok.graduated && долевКривой(tok) != null)
+        .sort((a, b) => (долевКривой(b) || 0) - (долевКривой(a) || 0));
+    }
     if (сеть === "sol") {
       const featured = new Set(spotlightTop.map((tok) => tok.id));
       let arr = (solTokens || []).filter((tok) => !featured.has(tok.id));
       switch (filter) {
         case "trend": arr = поТренду(arr); break;
         case "hot": arr = [...arr].sort((a, b) => b.change - a.change); break;
+        case "vol": arr = [...arr].sort((a, b) => (b.vol24hNum || 0) - (a.vol24hNum || 0)); break;
         case "dex": arr = arr.filter((tok) => tok.verified); break;
         default: break;
       }
@@ -10113,6 +10268,7 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
     switch (filter) {
       case "trend": arr = поТренду(arr); break;
       case "hot": arr = [...arr].sort((a, b) => b.change - a.change); break;
+      case "vol": arr = [...arr].sort((a, b) => (b.vol24hNum || 0) - (a.vol24hNum || 0)); break;
       case "dex": arr = arr.filter(tok => tok.verified); break;
       default: break;
     }
@@ -10303,8 +10459,11 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
           ? Array.from({ length: 4 }).map((_, i) => <MempadRowSkeleton key={i} index={i} />)
           : list.slice(0, 60).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)}
         {!идётЗагрузка && list.length === 0 && (
-          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, padding: "16px 0" }}>
-            {t("emptyFilter")}
+          <div className="flex flex-col items-center text-center" style={{ gap: 14, padding: "26px 0 10px" }}>
+            {/* Пустой раздел — место для маскота: он объясняет, что это
+                не поломка, лучше любой надписи. */}
+            <КотПланета size={116} />
+            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("emptyFilter")}</div>
           </div>
         )}
       </div>
@@ -10395,9 +10554,27 @@ function ГлавнаяСводка({ live = [] }) {
     { число: String(наБирже), подпись: t("homeEcoDex") },
   ];
 
+  /* Карта, а не строка чисел.
+     По дизайн-плану баланс площадки оформлен как банковская карта: он
+     приподнят над фоном и читается как предмет, а не как заголовок
+     раздела. Блик по диагонали медленно проходит — карта выглядит
+     сделанной из материала, а не нарисованной заливкой. */
   return (
-    <section>
-      <div className="flex items-center" style={{ gap: 7 }}>
+    <section
+      style={{
+        position: "relative", overflow: "hidden", borderRadius: 22, padding: "18px 18px 16px",
+        background: `linear-gradient(140deg, ${hexA(T.electric, 0.22)} 0%, ${hexA(T.violet, 0.10)} 42%, ${T.surface} 100%)`,
+        border: `1px solid ${T.line}`,
+        boxShadow: `0 18px 40px ${hexA("#000000", 0.45)}`,
+      }}
+    >
+      <div aria-hidden style={{
+        position: "absolute", top: -60, left: -80, width: 240, height: 300,
+        background: `linear-gradient(90deg, ${hexA(T.ice, 0)} 0%, ${hexA(T.ice, 0.10)} 50%, ${hexA(T.ice, 0)} 100%)`,
+        transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
+      }} />
+
+      <div className="flex items-center" style={{ gap: 7, position: "relative" }}>
         <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.up }} />
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, letterSpacing: "0.04em", textTransform: "uppercase" }}>
           {t("homeInCurves")}
@@ -10406,14 +10583,14 @@ function ГлавнаяСводка({ live = [] }) {
 
       {/* Единственное крупное число на экране. Всё остальное — мельче,
           и потому взгляд начинает отсюда. */}
-      <div className="flex items-baseline" style={{ gap: 8, marginTop: 8 }}>
+      <div className="flex items-baseline" style={{ gap: 8, marginTop: 10, position: "relative" }}>
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 42, fontWeight: 600, lineHeight: 1, letterSpacing: "-0.03em" }}>
           {fmtTon(плавно).replace(" TON", "")}
         </span>
         <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 15 }}>TON</span>
       </div>
 
-      <div className="flex items-center" style={{ gap: 18, marginTop: 12 }}>
+      <div className="flex items-center" style={{ gap: 18, marginTop: 14, position: "relative" }}>
         {показатели.map((п, i) => (
           <div key={i} className="flex items-baseline" style={{ gap: 5 }}>
             <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14, fontWeight: 600 }}>{п.число}</span>
@@ -13688,7 +13865,9 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
           </div>
         </div>
       ) : (
-        <div className="fx-modal-card fx-view flex flex-col items-center text-center gap-4" style={{ width: "100%", maxWidth: 360, background: T.surface, border: `1px solid ${T.lineHi}`, borderRadius: 24, padding: 24 }}>
+        <div className="fx-modal-card fx-view flex flex-col items-center text-center gap-4" style={{ position: "relative", width: "100%", maxWidth: 360, background: T.surface, border: `1px solid ${T.lineHi}`, borderRadius: 24, padding: 24 }}>
+          {/* Запуск токена — то самое событие, ради которого сюда шли. */}
+          <Конфетти />
           <div style={{ width: 68, height: 68, borderRadius: "50%", overflow: "hidden", background: result.logoUrl ? `center/cover no-repeat url(${result.logoUrl})` : T.surfaceHi, border: `1px solid ${T.lineHi}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
             {!result.logoUrl && <Rocket size={26} color={T.electric} />}
           </div>
