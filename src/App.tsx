@@ -12126,6 +12126,9 @@ function изДолей(доли, знаки, точность = 6) {
    получает взамен. */
 function КлавишиОбмена({ onКлавиша }) {
   const ряды = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], [".", "0", "←"]];
+  /* Высота клавиши считается от окна: на невысоких экранах фиксированные
+     58 пикселей выдавливали карточки за верхний край. */
+  const высота = typeof window !== "undefined" ? Math.max(42, Math.min(58, Math.round(window.innerHeight * 0.068))) : 52;
   return (
     <div className="flex flex-col" style={{ gap: 4 }}>
       {ряды.map((ряд, i) => (
@@ -12136,8 +12139,8 @@ function КлавишиОбмена({ onКлавиша }) {
               onClick={() => { haptic("light"); onКлавиша(к); }}
               className="fx-tap flex-1 flex items-center justify-center"
               style={{
-                height: 58, borderRadius: 18, border: "none", background: "transparent",
-                fontFamily: displayFont, fontSize: 24, fontWeight: 600, color: T.paper,
+                height: высота, borderRadius: 18, border: "none", background: "transparent",
+                fontFamily: displayFont, fontSize: 23, fontWeight: 600, color: T.paper,
               }}
             >
               {к === "←" ? <ChevronLeft size={22} color={T.paper} /> : к}
@@ -12149,7 +12152,7 @@ function КлавишиОбмена({ onКлавиша }) {
   );
 }
 
-function ЭкранОбмена({ открыт, onClose, солНаКошельке = 0, showToast = () => {}, onГотово = () => {} }) {
+function ЭкранОбмена({ открыт, onClose, солНаКошельке = 0, showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0 }) {
   const [отдаю, setОтдаю] = useState(МОНЕТЫ_ОБМЕНА[0]);
   const [беру, setБеру] = useState(МОНЕТЫ_ОБМЕНА[1]);
   const [сумма, setСумма] = useState("");
@@ -12242,8 +12245,13 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
     <div style={{
       position: "fixed", inset: 0, zIndex: 400, background: T.bg,
       display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto",
+      // Сверху — запас под шапку Telegram (часы и «Закрыть» лежат прямо
+      // на приложении), снизу — под системную полосу. Без него первая
+      // карточка уходила под кнопку закрытия.
+      paddingTop: insetTop, paddingBottom: insetBottom,
+      overflow: "hidden",
     }}>
-      <div className="flex items-center justify-between" style={{ padding: "14px 16px 8px" }}>
+      <div className="flex items-center justify-between" style={{ padding: "10px 16px 6px", flexShrink: 0 }}>
         <button onClick={onClose} className="fx-tap flex items-center justify-center"
           style={{ width: 38, height: 38, borderRadius: "50%", background: T.surfaceHi, border: "none" }}>
           <X size={18} color={T.ice} />
@@ -12252,7 +12260,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
         <span style={{ width: 38 }} />
       </div>
 
-      <div style={{ padding: "6px 16px 0" }}>
+      <div className="no-scrollbar" style={{ padding: "4px 16px 0", overflowY: "auto", flexShrink: 1, minHeight: 0 }}>
         {/* Что отдаём */}
         <div style={{ borderRadius: 22, background: T.surfaceHi, padding: "14px 16px" }}>
           <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("swapYouPay")}</div>
@@ -12318,13 +12326,13 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
         )}
       </div>
 
-      <div style={{ flex: 1 }} />
+      <div style={{ flex: 1, minHeight: 8 }} />
 
-      <div style={{ padding: "0 8px" }}>
+      <div style={{ padding: "0 8px", flexShrink: 0 }}>
         <КлавишиОбмена onКлавиша={клавиша} />
       </div>
 
-      <div style={{ padding: "8px 16px 22px" }}>
+      <div style={{ padding: "8px 16px 14px", flexShrink: 0 }}>
         <button
           onClick={обменять}
           disabled={!готово}
@@ -12521,7 +12529,7 @@ function ИсторияКошелька({ userId }) {
   );
 }
 
-function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onConnect, onDisconnect, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {} }) {
+function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onConnect, onDisconnect, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0 }) {
   const [copied, setCopied] = useState(false);
   const низ = useRef(null);
 
@@ -12774,6 +12782,8 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         солНаКошельке={солНаКошельке}
         showToast={showToast}
         onГотово={обновитьВнутренний}
+        insetTop={insetTop}
+        insetBottom={insetBottom}
       />
     </div>
   );
@@ -20128,6 +20138,8 @@ function mapTokenRow(row) {
               showToast={showToast}
               userId={userId}
               onGoTab={goTab}
+              insetTop={insetTop}
+              insetBottom={insetBottom}
             />
           </KeepAlive>
           <KeepAlive show={view === "shop"}>
