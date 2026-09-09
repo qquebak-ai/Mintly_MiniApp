@@ -8406,11 +8406,19 @@ function LeafLoader({ progress = null, size = 104, остановлен = false,
      доезжает по инерции, гаснет, и на её месте проявляется один. */
   const [фаза, setФаза] = useState("бег");
 
+  /* Лента живёт минимум секунду с лишним, даже если данные приехали
+     мгновенно: иначе она мелькала — не успевала ни разогнаться, ни
+     затормозить, и остановка выглядела оборванной. */
+  const МИН_БЕГ_МС = 1400;
+  const началось = useRef(Date.now());
+
   useEffect(() => {
     if (!надоСтоп) { setФаза("бег"); return; }
-    setФаза("тормоз");
-    const t = setTimeout(() => setФаза("один"), ТОРМОЖЕНИЕ_МС + УХОД_МС);
-    return () => clearTimeout(t);
+    const прошло = Date.now() - началось.current;
+    const ждать = Math.max(0, МИН_БЕГ_МС - прошло);
+    const старт = setTimeout(() => setФаза("тормоз"), ждать);
+    const конец = setTimeout(() => setФаза("один"), ждать + ТОРМОЖЕНИЕ_МС + УХОД_МС);
+    return () => { clearTimeout(старт); clearTimeout(конец); };
   }, [надоСтоп]);
 
   /* Отклик на каждого прошедшего кота: ожидание перестаёт быть немым, а
@@ -19160,7 +19168,9 @@ function mapTokenRow(row) {
   // торможения плюс 320 мс на уход лишних.
   useEffect(() => {
     if (!bootDone) return;
-    const to = setTimeout(() => setBootHidden(true), 1320);
+    // Ровно столько живёт лента маскотов: минимум бега плюс
+    // торможение и уход лишних.
+    const to = setTimeout(() => setBootHidden(true), 2720);
     return () => clearTimeout(to);
   }, [bootDone]);
 
