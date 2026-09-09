@@ -10479,11 +10479,16 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
               key={f.id}
               onClick={() => setFilter(f.id)}
               className="fx-tap whitespace-nowrap flex-shrink-0"
+              // Капсулы вместо ряда слов: фильтров стало шесть, и без
+              // формы активный терялся среди остальных — особенно на
+              // прокрутке, где виден кусок ряда.
               style={{
-                background: "transparent", border: "none", padding: 0,
-                fontFamily: displayFont, fontSize: 14, fontWeight: active ? 600 : 500,
+                background: active ? hexA(T.ice, 0.10) : "transparent",
+                border: `1px solid ${active ? T.lineHi : "transparent"}`,
+                padding: "7px 14px", borderRadius: 999,
+                fontFamily: displayFont, fontSize: 13.5, fontWeight: active ? 700 : 500,
                 color: active ? T.ice : T.faint,
-                transition: `color ${EASE}`,
+                transition: `color ${EASE}, background ${EASE}, border-color ${EASE}`,
               }}
             >
               {t(f.labelKey)}
