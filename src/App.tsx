@@ -1587,7 +1587,7 @@ function GlobalStyle() {
       @keyframes ореолКарты {
         0%   { inset: 0; border-radius: 24px; opacity: 0; }
         18%  { opacity: 0.75; }
-        100% { inset: -20px; border-radius: 44px; opacity: 0; }
+        100% { inset: -14px; border-radius: 40px; opacity: 0; }
       }
       /* Волна от нажатия: расходится из точки касания и гаснет. */
       @keyframes волнаОтНажатия {
@@ -20462,7 +20462,11 @@ function mapTokenRow(row) {
             behind the bar instead of just a flat tinted strip. paddingBottom
             below reserves the nav's own height so the last row of content
             can still scroll clear of it. */}
-        <div className="no-scrollbar px-4 подложка" style={{ flex: 1, overflowY: "auto", minHeight: 0, paddingTop: contentTopPad(insetTop), /* Панель разделов стала ниже капсулы: и запас под неё нужен меньше. */
+        <div className="no-scrollbar px-4 подложка" style={{ flex: 1, overflowY: "auto",
+          /* Только по вертикали. Любой элемент, выходящий за поля — ореол
+             карты, тень, широкая строка, — иначе даёт вбок несколько
+             точек хода, и всё приложение ездит под пальцем. */
+          overflowX: "hidden", minHeight: 0, paddingTop: contentTopPad(insetTop), /* Панель разделов стала ниже капсулы: и запас под неё нужен меньше. */
           // Ключа по разделу здесь нет намеренно: он пересоздавал весь
           // контейнер при каждом переходе, а вместе с ним и все вкладки
           // внутри KeepAlive — то есть ровно то, ради чего KeepAlive и
