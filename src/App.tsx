@@ -11811,22 +11811,38 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     <div className="flex flex-col" style={{ gap: 28, paddingTop: 8, paddingBottom: 16 }}>
       {/* Баланс. Крупно только само число — это единственная цифра на
           экране, ради которой сюда заходят. */}
-      <section>
-        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("walletBalanceLabel")}</div>
-        <div className="flex items-baseline" style={{ gap: 8, marginTop: 6 }}>
-          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 34, fontWeight: 600, lineHeight: 1, letterSpacing: "-0.02em" }}>
+      {/* Баланс оформлен картой — как и на главной: по дизайн-плану это
+          предмет, а не строка текста. Блик проходит редко, чтобы карта
+          читалась материалом и не мельтешила. */}
+      <section
+        style={{
+          position: "relative", overflow: "hidden", borderRadius: 22, padding: "18px 18px 16px",
+          background: `linear-gradient(140deg, ${hexA(T.electric, 0.22)} 0%, ${hexA(T.violet, 0.10)} 42%, ${T.surface} 100%)`,
+          border: `1px solid ${T.line}`,
+          boxShadow: `0 18px 40px ${hexA("#000000", 0.45)}`,
+        }}
+      >
+        <div aria-hidden style={{
+          position: "absolute", top: -60, left: -80, width: 240, height: 300,
+          background: `linear-gradient(90deg, ${hexA(T.ice, 0)} 0%, ${hexA(T.ice, 0.10)} 50%, ${hexA(T.ice, 0)} 100%)`,
+          transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
+        }} />
+
+        <div style={{ position: "relative", fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("walletBalanceLabel")}</div>
+        <div className="flex items-baseline" style={{ gap: 8, marginTop: 8, position: "relative" }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 36, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.02em" }}>
             {balance.toFixed(2)}
           </span>
           <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 15 }}>TON</span>
         </div>
-        <div style={{ fontFamily: monoFont, color: T.faint, fontSize: 13.5, marginTop: 6 }}>≈ ${usd.toFixed(2)}</div>
+        <div style={{ position: "relative", fontFamily: monoFont, color: T.faint, fontSize: 13.5, marginTop: 6 }}>≈ ${usd.toFixed(2)}</div>
 
         <button
           onClick={() => { onCopy(); setCopied(true); setTimeout(() => setCopied(false), 1400); }}
           className="fx-tap flex items-center gap-2"
-          style={{ marginTop: 14, padding: "8px 12px", borderRadius: 10, background: T.surface, border: `1px solid ${T.line}` }}
+          style={{ position: "relative", marginTop: 16, padding: "8px 12px", borderRadius: 999, background: hexA(T.ice, 0.06), border: `1px solid ${T.line}` }}
         >
-          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 12.5 }}>{short}</span>
+          <span style={{ fontFamily: monoFont, color: T.paper, fontSize: 12.5 }}>{short}</span>
           {copied ? <CheckCircle2 size={13} color={T.up} /> : <Copy size={13} color={T.faint} />}
         </button>
       </section>
@@ -11846,7 +11862,12 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         ) : !holdings.length ? (
           // Пустое состояние строкой, а не пустым контейнером во весь
           // экран: сказать тут нечего, и занимать место незачем.
-          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 8 }}>{t("walletHoldingsEmpty")}</div>
+          <div className="flex items-center" style={{ gap: 14, marginTop: 10 }}>
+            {/* Маскот вместо пустоты: он же встречает в ленте и на
+                заставке, и раздел не выглядит сломанным. */}
+            <КотПланета size={64} />
+            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("walletHoldingsEmpty")}</div>
+          </div>
         ) : (
           <div className="flex flex-col">
             {holdings.map(({ tok, amount }) => (
@@ -12519,6 +12540,14 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           <div className="flex items-center gap-1.5">
             <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 600 }}>{token.name}</span>
             {token.verified && <ShieldCheck size={13} color={T.electric} style={{ flexShrink: 0 }} />}
+            {/* Тот же знак живой торговли, что в ленте: если за час были
+                сделки, рынок работает прямо сейчас. */}
+            {(token.tx1h || 0) > 0 && (
+              <span className="flex items-center flex-shrink-0" style={{ gap: 4 }}>
+                <span style={{ width: 5, height: 5, borderRadius: 999, background: T.up, animation: "живаяТочка 1.6s ease-in-out infinite" }} />
+                <span style={{ fontFamily: monoFont, fontSize: 10, letterSpacing: "0.06em", color: T.up }}>LIVE</span>
+              </span>
+            )}
             <ПометкаТест сеть={token.network} size={10.5} />
           </div>
           <div className="truncate" style={{ fontFamily: monoFont, color: T.faint, fontSize: 12 }}>
