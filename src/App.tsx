@@ -1581,8 +1581,9 @@ function GlobalStyle() {
          Идёт сама по себе, без касания, — карта на экране одна и должна
          быть заметна среди ровных прямоугольников. */
       @keyframes ореолКарты {
-        0%   { transform: scale(1); opacity: 0.5; }
-        100% { transform: scale(1.085); opacity: 0; }
+        0%   { transform: scale(0.995); opacity: 0; }
+        18%  { opacity: 0.75; }
+        100% { transform: scale(1.075); opacity: 0; }
       }
       /* Волна от нажатия: расходится из точки касания и гаснет. */
       @keyframes волнаОтНажатия {
@@ -12919,15 +12920,16 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       {/* Три волны вдогонку друг другу: пока одна растворяется, следующая
           только отходит от края — получается непрерывное дыхание, а не
           мигание. */}
-      {[0, 1.7, 3.4].map((задержка) => (
+      {[0, 1.4, 2.8].map((задержка) => (
         <span
           key={задержка}
           aria-hidden
           style={{
             position: "absolute", inset: 0, borderRadius: 24,
-            border: `1.5px solid ${hexA("#A855F7", 0.55)}`,
+            border: `2px solid ${hexA("#B15CFF", 0.9)}`,
+            boxShadow: `0 0 18px ${hexA("#8E2DE2", 0.55)}`,
             pointerEvents: "none",
-            animation: `ореолКарты 5.1s ease-out ${задержка}s infinite`,
+            animation: `ореолКарты 4.2s ease-out ${задержка}s infinite`,
           }}
         />
       ))}
