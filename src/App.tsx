@@ -1571,8 +1571,16 @@ function GlobalStyle() {
          разметки, поэтому анимация ничего не стоит списку под ней. */
       @keyframes картаПереливается {
         0%   { background-position: 0% 50%; }
-        50%  { background-position: 100% 50%; }
+        22%  { background-position: 38% 18%; }
+        45%  { background-position: 100% 42%; }
+        68%  { background-position: 62% 92%; }
+        85%  { background-position: 22% 66%; }
         100% { background-position: 0% 50%; }
+      }
+      /* Волна от нажатия: расходится из точки касания и гаснет. */
+      @keyframes волнаОтНажатия {
+        from { transform: translate(-50%, -50%) scale(0); opacity: 0.34; }
+        to   { transform: translate(-50%, -50%) scale(1); opacity: 0; }
       }
       /* Кнопка копирования: короткий кивок и вспышка — по нему видно, что
          нажатие принято, даже если всплывающую подсказку человек не
@@ -12828,6 +12836,23 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const [внутр, setВнутр] = useState(null);
   const [обменОткрыт, setОбменОткрыт] = useState(false);
   const [получитьОткрыт, setПолучитьОткрыт] = useState(false);
+  /* Волны от касаний карты. Каждая живёт своё время и убирается сама —
+     иначе их накапливались бы десятки за один сеанс. */
+  const [волны, setВолны] = useState([]);
+  /* Ход перелива у каждого запуска свой: одинаковая на всех устройствах
+     анимация выдаёт заготовку, а разная читается как живая поверхность. */
+  const перелив = useMemo(() => ({
+    длительность: 34 + Math.random() * 22,   // 34–56 секунд на круг
+    сдвиг: -Math.round(Math.random() * 30),  // и начинается не с начала
+  }), []);
+
+  function волнаОт(e) {
+    const блок = e.currentTarget.getBoundingClientRect();
+    const т = e.touches && e.touches[0] ? e.touches[0] : e;
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    setВолны((было) => [...было, { id, x: т.clientX - блок.left, y: т.clientY - блок.top }]);
+    setTimeout(() => setВолны((было) => было.filter((в) => в.id !== id)), 900);
+  }
 
   const обновитьВнутренний = useCallback(async () => {
     const { состояниеВнутреннего } = await import("./appWallet");
@@ -12884,14 +12909,31 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           крупно и белым, копейки приглушены — так глаз не спотыкается о
           мелкую часть, которая на решение не влияет. */}
       <section
+        onPointerDown={волнаОт}
         style={{
           position: "relative", overflow: "hidden", borderRadius: 24, padding: "16px 18px 18px",
-          background: "linear-gradient(115deg, #C13AE6 0%, #8E2DE2 26%, #5A0FD8 52%, #7B1FE0 74%, #2C0A78 100%)",
-          backgroundSize: "260% 260%",
-          animation: "картаПереливается 18s ease-in-out infinite",
+          // Оттенков больше, чем нужно для простого градиента: розовый,
+          // сиреневый, синий и почти чёрный ходят друг за другом, и
+          // поверхность не повторяет один и тот же переход.
+          background: "linear-gradient(115deg, #E44BC8 0%, #C13AE6 18%, #8E2DE2 36%, #6A17E8 54%, #4A00E0 70%, #7B1FE0 84%, #2C0A78 100%)",
+          backgroundSize: "320% 320%",
+          animation: `картаПереливается ${перелив.длительность}s ease-in-out ${перелив.сдвиг}s infinite`,
           border: "none",
         }}
       >
+        {/* Волны от касаний — поверх заливки, но под текстом. */}
+        {волны.map((в) => (
+          <span
+            key={в.id}
+            aria-hidden
+            style={{
+              position: "absolute", left: в.x, top: в.y, width: 460, height: 460, borderRadius: "50%",
+              background: `radial-gradient(circle, ${hexA("#FFFFFF", 0.5)} 0%, ${hexA("#FFFFFF", 0)} 70%)`,
+              pointerEvents: "none",
+              animation: "волнаОтНажатия 880ms cubic-bezier(0.22, 1, 0.36, 1) both",
+            }}
+          />
+        ))}
         <div aria-hidden style={{
           position: "absolute", top: -70, left: -90, width: 260, height: 320,
           background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.13)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
