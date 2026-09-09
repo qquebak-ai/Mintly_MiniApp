@@ -19349,8 +19349,8 @@ function mapTokenRow(row) {
           className="flex items-center justify-center"
           style={{
             position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: insetBottom + 6, zIndex: 5,
-            width: "auto", maxWidth: 420, gap: 26,
-            padding: "9px 20px 8px",
+            width: "auto", maxWidth: 420, gap: 30,
+            padding: "12px 26px 14px",
             borderRadius: 999,
             background: hexA(T.bg, 0.92),
             border: `1px solid ${T.lineHi}`,
@@ -19374,10 +19374,12 @@ function mapTokenRow(row) {
                 // строится десятую долю секунды, и без него кажется, что
                 // нажатие не прошло — человек жмёт второй раз.
                 onClick={() => { haptic("light"); goTab(id); }}
-                className="fx-tap flex flex-col items-center gap-1"
-                style={{ position: "relative", background: "transparent", border: "none", padding: 0 }}
+                className="fx-tap flex items-center justify-center"
+                // Значок ровно по центру: точка активного раздела висит
+                // отдельным слоем и не сдвигает его вверх.
+                style={{ position: "relative", background: "transparent", border: "none", padding: 0, width: 34, height: 34 }}
               >
-                <Icon size={22} strokeWidth={1.9} color={active ? T.ice : T.faint} style={{ transition: `color ${EASE}` }} />
+                <Icon size={26} strokeWidth={1.9} color={active ? T.ice : T.faint} style={{ transition: `color ${EASE}` }} />
                 {locked && (
                   <div style={{ position: "absolute", top: -3, right: -3, width: 14, height: 14, borderRadius: "50%", background: T.surface, border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Lock size={8} color={T.muted} />
@@ -19387,6 +19389,7 @@ function mapTokenRow(row) {
                     пиктограммам, а активный раздел отмечен точкой под
                     иконкой — так панель ниже и спокойнее. */}
                 <span style={{
+                  position: "absolute", left: "50%", bottom: -7, transform: "translateX(-50%)",
                   width: 4, height: 4, borderRadius: 999,
                   background: active ? T.electric : "transparent",
                   transition: `background ${EASE}`,
