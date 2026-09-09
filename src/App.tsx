@@ -1118,6 +1118,16 @@ const ГРАДИЕНТ_БРЕНДА = "linear-gradient(135deg, #4B7BFF 0%, #6C7C
    говорит дизайн-план. Плоские цвета остаются для текста и линий: их
    градиентом не покрасишь, а вот плашки и полосы держат объём. */
 const ГРАДИЕНТ_РОСТА = "linear-gradient(135deg, #1FD1A5 0%, #2BE8A5 55%, #7BF7C4 100%)";
+/* Заливка текста градиентом. Крупные числа — единственное место, где
+   градиент виден по-настоящему: на тонких надписях он превращается в
+   грязь, поэтому применяем только к ним. */
+const текстГрадиентом = (градиент) => ({
+  backgroundImage: градиент,
+  WebkitBackgroundClip: "text",
+  backgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  color: "transparent",
+});
 const ГРАДИЕНТ_ПАДЕНИЯ = "linear-gradient(135deg, #FF4D7E 0%, #FF5C8A 55%, #FF8FB0 100%)";
 const DARK_PRISM = ГРАДИЕНТ_БРЕНДА;
 const LIGHT_PRISM = ГРАДИЕНТ_БРЕНДА;
@@ -5719,7 +5729,7 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
         </div>
 
         <div className="text-right flex-shrink-0">
-          <div style={{ fontFamily: monoFont, color: T.ice, fontSize: 15, fontWeight: 600 }}>{fmtUSD(tok.mcapNum)}</div>
+          <div style={{ fontFamily: monoFont, fontSize: 15, fontWeight: 700, ...текстГрадиентом(рост ? ГРАДИЕНТ_РОСТА : ГРАДИЕНТ_ПАДЕНИЯ) }}>{fmtUSD(tok.mcapNum)}</div>
           <div style={{ fontFamily: monoFont, color: рост ? T.up : T.down, fontSize: 12.5, marginTop: 3 }}>
             {рост ? "+" : ""}{(tok.change || 0).toFixed(1)}%
           </div>
@@ -10724,7 +10734,7 @@ function ГлавнаяСводка({ live = [] }) {
       {/* Единственное крупное число на экране. Всё остальное — мельче,
           и потому взгляд начинает отсюда. */}
       <div className="flex items-baseline" style={{ gap: 8, marginTop: 10, position: "relative" }}>
-        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 42, fontWeight: 600, lineHeight: 1, letterSpacing: "-0.03em" }}>
+        <span style={{ fontFamily: displayFont, fontSize: 42, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.03em", ...текстГрадиентом(ГРАДИЕНТ_БРЕНДА) }}>
           {fmtTon(плавно).replace(" TON", "")}
         </span>
         <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 15 }}>TON</span>
@@ -11943,7 +11953,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
 
         <div style={{ position: "relative", fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("walletBalanceLabel")}</div>
         <div className="flex items-baseline" style={{ gap: 8, marginTop: 8, position: "relative" }}>
-          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 36, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.02em" }}>
+          <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.02em", ...текстГрадиентом(ГРАДИЕНТ_БРЕНДА) }}>
             {balance.toFixed(2)}
           </span>
           <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 15 }}>TON</span>
@@ -12692,7 +12702,13 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-end gap-2 flex-wrap">
-              <span style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 34, lineHeight: 1.05, color: T.ice, letterSpacing: "-0.02em", wordBreak: "break-all" }}>
+              <span style={{
+                fontFamily: displayFont, fontWeight: 700, fontSize: 34, lineHeight: 1.05,
+                letterSpacing: "-0.02em", wordBreak: "break-all",
+                // Цена залита градиентом своего направления: рост и
+                // падение видно раньше, чем прочитан процент.
+                ...текстГрадиентом(up ? ГРАДИЕНТ_РОСТА : ГРАДИЕНТ_ПАДЕНИЯ),
+              }}>
                 {fmtPrice(token.price)}
               </span>
               <div style={{ marginBottom: 3 }}><ChangeBadge value={token.change} size="md" /></div>
