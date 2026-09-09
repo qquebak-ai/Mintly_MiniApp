@@ -10229,11 +10229,13 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onOpenChest, ach
         {[["frames", t("shopTabFrames")], ["cards", t("shopTabCards")]].map(([id, label]) => {
           const active = tab === id;
           return (
-            <button key={id} onClick={() => setTab(id)} className="fx-tap fx-chip rounded-full px-3.5 py-1.5"
+            <button key={id} onClick={() => setTab(id)} className="fx-tap"
+              // Те же правила, что у фильтров мемпада: только слова.
               style={{
-                fontFamily: bodyFont, fontSize: 14, fontWeight: 600,
-                background: active ? T.ice : "transparent", color: active ? T.bg : T.muted,
-                border: `1px solid ${active ? T.ice : T.line}`,
+                fontFamily: bodyFont, fontSize: 14.5, fontWeight: active ? 700 : 600,
+                background: "transparent", color: active ? T.ice : T.faint,
+                border: "none", padding: "6px 0", marginRight: 18,
+                transition: `color ${EASE}`,
               }}>
               {label}
             </button>
@@ -10721,16 +10723,15 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
               key={f.id}
               onClick={() => setFilter(f.id)}
               className="fx-tap whitespace-nowrap flex-shrink-0"
-              // Капсулы вместо ряда слов: фильтров стало шесть, и без
-              // формы активный терялся среди остальных — особенно на
-              // прокрутке, где виден кусок ряда.
+              // Ряд слов, без подложек: выбранное держится белым и жирным,
+              // остальные приглушены — капсула вокруг текста добавляла
+              // рамку там, где хватает самого текста.
               style={{
-                background: active ? hexA(T.ice, 0.10) : "transparent",
-                border: `1px solid ${active ? T.lineHi : "transparent"}`,
-                padding: "7px 14px", borderRadius: 999,
+                background: "transparent", border: "none",
+                padding: "7px 0", borderRadius: 0,
                 fontFamily: displayFont, fontSize: 13.5, fontWeight: active ? 700 : 500,
                 color: active ? T.ice : T.faint,
-                transition: `color ${EASE}, background ${EASE}, border-color ${EASE}`,
+                transition: `color ${EASE}`,
               }}
             >
               {t(f.labelKey)}
@@ -16046,11 +16047,12 @@ function LookPicker({ cosmetics, owned, onEquip, focus }) {
           {[["frame", t("shopTabFrames")], ["card", t("shopTabCards")]].map(([id, label]) => {
             const active = tab === id;
             return (
-              <button key={id} onClick={() => setTab(id)} className="fx-tap fx-chip rounded-full px-3 py-1"
+              <button key={id} onClick={() => setTab(id)} className="fx-tap"
                 style={{
-                  fontFamily: bodyFont, fontSize: 12.5, fontWeight: 600,
-                  background: active ? T.ice : "transparent", color: active ? T.bg : T.muted,
-                  border: `1px solid ${active ? T.ice : T.line}`,
+                  fontFamily: bodyFont, fontSize: 13, fontWeight: active ? 700 : 600,
+                  background: "transparent", color: active ? T.ice : T.faint,
+                  border: "none", padding: "4px 0", marginLeft: 14,
+                  transition: `color ${EASE}`,
                 }}>
                 {label}
               </button>
