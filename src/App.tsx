@@ -277,6 +277,7 @@ const STR = {
     swapTitle: "Обмен",
     receiveTitle: "Получить",
     receiveCopy: "Копировать адрес",
+    receiveCopied: "Скопировано",
     receiveShare: "Поделиться",
     swapYouPay: "Вы отдаёте",
     swapYouGet: "Вы получите",
@@ -772,6 +773,7 @@ const STR = {
     swapTitle: "Swap",
     receiveTitle: "Receive",
     receiveCopy: "Copy address",
+    receiveCopied: "Copied",
     receiveShare: "Share",
     swapYouPay: "You pay",
     swapYouGet: "You get",
@@ -1572,6 +1574,16 @@ function GlobalStyle() {
         50%  { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
       }
+      /* Кнопка копирования: короткий кивок и вспышка — по нему видно, что
+         нажатие принято, даже если всплывающую подсказку человек не
+         заметил. */
+      @keyframes кнопкаКивнула {
+        0%   { transform: scale(1); }
+        35%  { transform: scale(0.965); }
+        70%  { transform: scale(1.02); }
+        100% { transform: scale(1); }
+      }
+      @keyframes меткаПришла { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes менюВъезжает { from { transform: translateX(-100%); } to { transform: translateX(0); } }
       @keyframes обменВъезжает { from { transform: translateY(100%); } to { transform: translateY(0); } }
       @keyframes обменФон { from { opacity: 0; } to { opacity: 1; } }
@@ -12178,6 +12190,9 @@ function кодВSVG(сетка) {
  */
 function ЭкранПолучить({ открыт, onClose, адрес = "", showToast = () => {}, insetTop = 0, insetBottom = 0 }) {
   const [код, setКод] = useState(null);
+  // Кнопка отвечает сама: подтверждение прямо на ней надёжнее всплывающей
+  // подсказки — та живёт наверху экрана, а палец в этот момент внизу.
+  const [скопировано, setСкопировано] = useState(false);
 
   useEffect(() => {
     if (!открыт || !адрес) { setКод(null); return; }
@@ -12272,13 +12287,19 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", sh
       <div className="flex flex-col" style={{ gap: 10, padding: "0 18px 22px", flexShrink: 0 }}>
         <button
           onClick={копировать}
-          className="fx-tap w-full"
+          className="fx-tap w-full flex items-center justify-center"
           style={{
-            padding: "16px 0", borderRadius: 999, border: "none", background: ЦВЕТ_КНОПКИ,
-            color: PRISM_TEXT, fontFamily: displayFont, fontSize: 16, fontWeight: 700,
+            gap: 8, padding: "16px 0", borderRadius: 999, border: "none",
+            background: скопировано ? "#38B27A" : ЦВЕТ_КНОПКИ,
+            color: PRISM_TEXT, fontFamily: displayFont, fontSize: 16, fontWeight: 800,
+            transition: "background 240ms ease-out",
+            animation: скопировано ? "кнопкаКивнула 420ms cubic-bezier(0.22, 1, 0.36, 1)" : "none",
           }}
         >
-          {t("receiveCopy")}
+          <span key={скопировано ? "да" : "нет"} className="flex items-center" style={{ gap: 8, animation: "меткаПришла 240ms ease-out both" }}>
+            {скопировано && <Check size={17} strokeWidth={2.6} />}
+            {скопировано ? t("receiveCopied") : t("receiveCopy")}
+          </span>
         </button>
         <button
           onClick={поделиться}
