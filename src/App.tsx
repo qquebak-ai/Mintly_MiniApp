@@ -13029,15 +13029,23 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             но менять на нём нечего — обмен живёт только внутри. */}
         <div className="w-full rounded-[22px] p-4" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
           {connected ? (
-            <div className="flex items-center justify-between" style={{ gap: 12 }}>
+            <>
               <div className="min-w-0">
                 <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>TON-кошелёк</div>
                 <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 12.5, marginTop: 5 }}>
                   {tonBalance.toFixed(2)} TON · ≈ ${(tonBalance * tonPriceUsd).toFixed(2)}
                 </div>
               </div>
-
-            </div>
+              {/* Отключение — там же, где у кошелька Solana: одно и то же
+                  действие должно лежать на одном и том же месте. */}
+              <button
+                onClick={onDisconnect}
+                className="fx-tap flex items-center gap-1.5"
+                style={{ marginTop: 12, background: "transparent", border: "none", padding: 0, fontFamily: bodyFont, fontSize: 13, color: T.rose }}
+              >
+                <LogOut size={12} /> {t("disconnectShort")}
+              </button>
+            </>
           ) : (
             <>
               <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>TON-кошелёк</div>
