@@ -9055,7 +9055,7 @@ function WelcomeScreen({ onCreate, onLogin, onSkip, insetTop = 0 }) {
   );
 }
 
-function BootSplash({ steps, done, insetTop = 0 }) {
+function BootSplash({ steps, done, уходит = false, insetTop = 0 }) {
   const readyCount = steps.filter((s) => s.done).length;
   const progress = steps.length ? readyCount / steps.length : 1;
 
@@ -9066,7 +9066,12 @@ function BootSplash({ steps, done, insetTop = 0 }) {
         background: T.bg,
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         gap: 18, paddingTop: insetTop,
-        opacity: done ? 0 : 1,
+        // Гаснет заставка в самом конце, а не по готовности данных: иначе
+        // экран пустел за полсекунды, а торможение ленты никто не видел.
+        opacity: уходит ? 0 : 1,
+        // Прозрачный слой всё ещё ловит касания — и приложение первые
+        // секунды не прокручивалось, хотя заставки уже не видно.
+        pointerEvents: уходит ? "none" : "auto",
         transition: "opacity 420ms ease-out",
       }}
     >
@@ -19166,6 +19171,7 @@ function mapTokenRow(row) {
      запускает ту же остановку — вид один и тот же, независимо от того,
      дождались мы данных или устали ждать. */
   const [bootDone, setBootDone] = useState(false);
+  const [bootFading, setBootFading] = useState(false);
   const [bootHidden, setBootHidden] = useState(false);
 
   useEffect(() => {
@@ -19179,9 +19185,12 @@ function mapTokenRow(row) {
   useEffect(() => {
     if (!bootDone) return;
     // Ровно столько живёт лента маскотов: минимум бега плюс торможение
-    // и уход лишних (см. LeafLoader).
-    const to = setTimeout(() => setBootHidden(true), 2720);
-    return () => clearTimeout(to);
+    // и уход лишних (см. LeafLoader). Гасить начинаем за длину самого
+    // перехода до снятия — чтобы заставка не висела прозрачной поверх
+    // приложения и не глотала прокрутку.
+    const гаснет = setTimeout(() => setBootFading(true), 2300);
+    const снять = setTimeout(() => setBootHidden(true), 2720);
+    return () => { clearTimeout(гаснет); clearTimeout(снять); };
   }, [bootDone]);
 
   return (
@@ -19214,7 +19223,7 @@ function mapTokenRow(row) {
           onSkip={закрытьПриветствие}
         />
       )}
-      {!bootHidden && !сразуВКошелёк && <BootSplash steps={bootSteps} done={bootDone} insetTop={insetTop} />}
+      {!bootHidden && !сразуВКошелёк && <BootSplash steps={bootSteps} done={bootDone} уходит={bootFading} insetTop={insetTop} />}
       <Toast key={toastSeq} toast={toast} insetTop={insetTop} leaving={toastLeaving} />
 
       {/* Проход в кошелёк из чата. Приложение здесь — только мостик к
