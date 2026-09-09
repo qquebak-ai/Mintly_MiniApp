@@ -8933,7 +8933,9 @@ function BootSplash({ steps, done, insetTop = 0 }) {
       }}
     >
 
-      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+      {/* Во всю ширину: вереница котов должна уходить за края экрана, а
+          не толкаться в узкой колонке. */}
+      <div style={{ position: "relative", zIndex: 1, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
         <LeafLoader progress={progress} size={104} />
         <div style={{ width: 132, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
           <div style={{
@@ -13884,7 +13886,9 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
           {/* Запуск токена — то самое событие, ради которого сюда шли. */}
           <Конфетти />
           <div style={{ width: 68, height: 68, borderRadius: "50%", overflow: "hidden", background: result.logoUrl ? `center/cover no-repeat url(${result.logoUrl})` : T.surfaceHi, border: `1px solid ${T.lineHi}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {!result.logoUrl && <Rocket size={26} color={T.electric} />}
+            {/* Без логотипа место занимает маскот: он же встречает и в
+                других пустых местах, поэтому экран остаётся своим. */}
+            {!result.logoUrl && <КотПланета size={52} glow={false} />}
           </div>
           <div className="flex items-center gap-1.5 rounded-full px-3 py-1" style={{ background: hexA(T.up, 0.12), border: `1px solid ${hexA(T.up, 0.35)}` }}>
             <ShieldCheck size={13} color={T.up} />
@@ -16742,6 +16746,16 @@ const FEE_PERCENT = 0.01; // 1% комиссии
   // scrolling view), so it's never clipped no matter which screen
   // triggered it.
   const [toast, setToast] = useState(null);
+  /* Праздник на успешной покупке — по дизайн-плану частицы отмечают
+     удачные действия. Слой общий: покупка случается на разных экранах, а
+     конфетти должно лететь поверх всего. */
+  const [праздник, setПраздник] = useState(0);
+  const отпраздновать = useCallback(() => {
+    setПраздник((н) => н + 1);
+    // Частицы живут около двух секунд; дальше слой убираем, чтобы он не
+    // висел в разметке до конца сессии.
+    setTimeout(() => setПраздник(0), 2200);
+  }, []);
   // Отдельный признак ухода: сама подсказка ещё в разметке, но уже
   // проигрывает анимацию вверх. Без него она исчезала мгновенно.
   const [toastLeaving, setToastLeaving] = useState(false);
@@ -18807,6 +18821,7 @@ function mapTokenRow(row) {
         recordTrade("buy", totalTon, rawEstimate);
         setTradeModal(null);
         showToast(tf("boughtToast", { receive: receiveAmount, ticker: token.ticker, pay: payAmount, unit }));
+        отпраздновать();
         // Баланс на цепочке обновится не мгновенно — даём блокчейну
         // пару секунд на подтверждение, потом перезапрашиваем его.
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
@@ -18989,6 +19004,12 @@ function mapTokenRow(row) {
           >
             {t("changeAmountCta")}
           </button>
+        </div>
+      )}
+
+      {праздник > 0 && (
+        <div key={праздник} style={{ position: "absolute", inset: 0, zIndex: 700, pointerEvents: "none" }}>
+          <Конфетти количество={32} />
         </div>
       )}
 
