@@ -1,4 +1,10 @@
 node_modules/
-dist/
+# Собранный сайт лежит в репозитории: сервер двухъядерный, vite build на
+# нём идёт под две минуты, и всё это время выкладка висит. Собираем здесь,
+# на сервер приезжает готовое. Копии public в dist не нужны — их кладёт
+# server/deploy.sh, поэтому в репозиторий идут только index.html и assets.
+dist/*
+!dist/index.html
+!dist/assets
 .env.local
 *.local

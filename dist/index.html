@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Mintly — запуск мемкоинов на TON и Solana</title>
+    <meta name="description" content="Свой токен за пару секунд: бондинг-кривая, выход на биржу при 1500 TON или 85 SOL, комиссия 1%. TON и Solana в одном приложении." />
+    <meta name="theme-color" content="#000000" />
+    <!-- Иконка вкладки — маскот: он же встречает на заставке и в пустых
+         экранах, поэтому приложение узнаётся ещё до открытия. -->
+    <link rel="icon" type="image/png" href="/mascot.png" />
+    <link rel="apple-touch-icon" href="/mascot.png" />
+
+    <!-- Карточка ссылки. Без неё приложение, отправленное в чат,
+         разворачивалось пустым прямоугольником — а ссылку пересылают
+         чаще, чем открывают сам бот, и это первое, что видят те, кто о
+         площадке ещё не слышал.
+
+         Адрес картинки абсолютный: Telegram и соцсети читают эти теги
+         своим сервером, относительный путь ему не от чего считать.
+         Номер версии в конце — чтобы обновлённую картинку показали, а
+         не достали из кеша, который живёт неделями. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Mintly" />
+    <meta property="og:title" content="Mintly — запуск мемкоинов на TON и Solana" />
+    <meta property="og:description" content="Свой токен за пару секунд: бондинг-кривая, выход на биржу при 1500 TON или 85 SOL, комиссия 1%." />
+    <meta property="og:url" content="https://mintly.company/" />
+    <meta property="og:image" content="https://mintly.company/start-og.png?v=1" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Mintly — запуск мемкоинов на TON и Solana" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Mintly — запуск мемкоинов на TON и Solana" />
+    <meta name="twitter:description" content="Свой токен за пару секунд: бондинг-кривая, выход на биржу при 1500 TON или 85 SOL, комиссия 1%." />
+    <meta name="twitter:image" content="https://mintly.company/start-og.png?v=1" />
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Ловушка ошибок стоит до самого приложения. Обработчик внутри
+         main.tsx не помогал: ошибка в импортируемом модуле случается
+         раньше, чем этот файл начинает выполняться, и человек видел
+         чёрный экран без единого слова о причине. -->
+    <script>
+      // Отправка поломки хозяину приложения. Обработчик на сервере уже
+      // склеивает одинаковые и держит потолок частоты, но и отсюда не
+      // стоит частить: при цикле с ошибкой страница слала бы по сотне
+      // запросов в секунду.
+      //
+      // Придерживаем повторы одной и той же ошибки, а не всё подряд:
+      // общий замок глушил оборванное обещание, если за секунду до него
+      // случилась другая поломка, — а это как раз тот случай, когда
+      // важны обе. От бесконечного цикла защищает отдельный потолок.
+      var повторы = {};
+      var окно = { с: 0, счёт: 0 };
+      function сообщить(где, текст) {
+        var сейчас = Date.now();
+        if (!текст) return;
+        var ключ = где + "|" + String(текст).slice(0, 120);
+        if (сейчас - (повторы[ключ] || 0) < 5000) return;
+        if (сейчас - окно.с > 10000) окно = { с: сейчас, счёт: 0 };
+        if (окно.счёт >= 6) return;
+        окно.счёт++;
+        повторы[ключ] = сейчас;
+        try {
+          fetch("/api/report-error", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            keepalive: true,
+            body: JSON.stringify({
+              where: где,
+              message: String(текст).slice(0, 1500),
+              url: location.href,
+            }),
+          }).catch(function () {});
+        } catch (e) { /* даже отправка сообщения об ошибке не должна падать */ }
+      }
+
+      window.addEventListener("error", function (e) {
+        var msg = (e.error && (e.error.stack || e.error.message)) || e.message || "неизвестная ошибка";
+        сообщить("browser", msg);
+        var el = document.createElement("pre");
+        el.style.cssText = "background:#1a0000;color:#ff8080;padding:16px;font-size:12px;white-space:pre-wrap;word-break:break-word;position:fixed;inset:0;overflow:auto;z-index:99999;margin:0;";
+        el.textContent = "ОШИБКА ЗАГРУЗКИ ПРИЛОЖЕНИЯ:\n\n" + msg;
+        document.body.appendChild(el);
+      });
+
+      // Оборванное обещание экран не гасит, но ломает ровно то место,
+      // где его ждали: сделку, вход, загрузку ленты. Такое видно только
+      // отсюда.
+      window.addEventListener("unhandledrejection", function (e) {
+        var r = e && e.reason;
+        сообщить("promise", (r && (r.stack || r.message)) || String(r || "отказ без причины"));
+      });
+    </script>
+    <script type="module" crossorigin src="/assets/index-DDqxHRqh.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-DS-kCp2g.js">
+    <link rel="modulepreload" crossorigin href="/assets/supabase-QBHRJHLH.js">
+    <link rel="modulepreload" crossorigin href="/assets/icons-BZ8reKU-.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-Dx_adtD4.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
