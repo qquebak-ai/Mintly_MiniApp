@@ -11526,11 +11526,10 @@ function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, 
   return (
     <>
       <section>
-        <SectionTitle action={
-          <button onClick={onGoCreate} className="fx-tap flex items-center gap-1" style={{ fontFamily: bodyFont, fontSize: 12.5, color: T.electric }}>
-            <PlusCircle size={13} /> {t("myTokensCreate")}
-          </button>
-        }>{t("myTokensTitle")}</SectionTitle>
+        {/* Мелких текстовых кнопок в заголовках больше нет: запуск токена
+            живёт крупной кнопкой внизу главной и в мемпаде, а мелкая
+            надпись сбоку только соперничала с ней за внимание. */}
+        <SectionTitle>{t("myTokensTitle")}</SectionTitle>
         {myTokens.length === 0 ? (
           <div className="flex items-center" style={{ gap: 14 }}>
             {/* Маскот на месте пустого списка: раздел выглядит своим, а
@@ -11548,11 +11547,7 @@ function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, 
       <МояАктивность userId={userId} />
 
       <section>
-        <SectionTitle action={
-          <button onClick={onOpenAchievements} className="fx-tap flex items-center gap-1" style={{ fontFamily: bodyFont, fontSize: 12.5, color: T.electric }}>
-            {t("achAll")} <ChevronRight size={13} />
-          </button>
-        }>{t("achievementsTitle")}</SectionTitle>
+        <SectionTitle>{t("achievementsTitle")}</SectionTitle>
         <button onClick={onOpenAchievements} className="fx-tap w-full text-left" style={{ padding: "2px 0" }}>
           <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("achProgress")}</span>
@@ -13057,17 +13052,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           boxShadow: `inset 0 1px 0 ${hexA("#FFFFFF", 0.07)}`,
         }}
       >
-        <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: 12 }}>
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700 }}>
             {t("walletHoldings")}
           </span>
-          <button
-            onClick={() => onGoTab("mempad")}
-            className="fx-tap"
-            style={{ background: "transparent", border: "none", padding: 0, fontFamily: bodyFont, fontSize: 13, color: КОШ_РОСТ_ТЕКСТ, fontWeight: 700 }}
-          >
-            {t("walletSeeAll")}
-          </button>
         </div>
 
         {!holdingsReady ? (
@@ -13122,15 +13110,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
 
         <ИсторияКошелька userId={userId} />
 
-        {connected && (
-          <button
-            onClick={onDisconnect}
-            className="fx-tap flex items-center gap-1.5 self-start"
-            style={{ background: "transparent", border: "none", padding: 0, marginTop: 24, fontFamily: bodyFont, fontSize: 13.5, color: T.muted }}
-          >
-            <LogOut size={13} /> {t("disconnectShort")}
-          </button>
-        )}
       </div>
 
       <ЭкранПолучить
