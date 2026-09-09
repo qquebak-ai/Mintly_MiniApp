@@ -181,6 +181,7 @@ const STR = {
     homeMoving: "В движении",
     homeTopAll: "Весь топ",
     homeTopHide: "Свернуть",
+    needAccountShort: "Нужен вход в аккаунт",
     appWalletNeedAuth: "Баланс в приложении привязан к аккаунту — войди или создай его в профиле, и адрес появится здесь.",
     walletEmptyTitle: "Кошелёк не подключён",
     walletEmptyBody: "Подключи TON-кошелёк, чтобы покупать, продавать и запускать токены.",
@@ -673,6 +674,7 @@ const STR = {
     homeMoving: "On the move",
     homeTopAll: "Full top",
     homeTopHide: "Collapse",
+    needAccountShort: "Sign in first",
     appWalletNeedAuth: "The app balance belongs to your account — sign in or create one in your profile and the address shows up here.",
     walletEmptyTitle: "No wallet connected",
     walletEmptyBody: "Connect a TON wallet to buy, sell and launch tokens.",
@@ -12071,11 +12073,10 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", sh
               <div style={{ width: "40%", height: "100%", borderRadius: 999, background: hexA("#8E2DE2", 0.55), animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
             </div>
           ) : (
-            // Кошелёк заводится вместе с аккаунтом: без входа адреса нет,
-            // и вместо вечной полоски честнее сказать об этом.
-            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5, textAlign: "center", padding: "0 22px" }}>
-              {t("appWalletNeedAuth")}
-            </div>
+            // Без аккаунта адреса нет. Объяснять это здесь незачем:
+            // про вход говорят главные разделы, а подстраница не должна
+            // повторять то же самое третий раз.
+            <span aria-hidden style={{ width: 120, height: 10, borderRadius: 999, background: T.surface }} />
           )}
           {/* Значок сети в середине кода: по нему видно, куда именно
               придут деньги, — код высокой избыточности это переживает. */}
@@ -12637,7 +12638,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const short = адресВнутри ? `${адресВнутри.slice(0, 4)}…${адресВнутри.slice(-4)}` : "";
 
   function скопироватьАдрес() {
-    if (!адресВнутри) { showToast(t("appWalletNeedAuth")); return; }
+    if (!адресВнутри) { showToast(t("needAccountShort")); return; }
     if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(адресВнутри).catch(() => {});
     showToast(t("appWalletAddressCopied"));
     setCopied(true);
