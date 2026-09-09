@@ -2097,14 +2097,15 @@ function ChangeBadge({ value, size = "sm" }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full ${size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm"}`}
-      // Подложка — фирменный градиент под нужный знак, приглушённый до
-      // фона: плоская заливка на чёрном выглядела наклейкой.
+      // Подложка — тот же градиент, что и везде, но полупрозрачный:
+      // плоская заливка на чёрном выглядела наклейкой, а сплошной
+      // градиент забивал сам процент.
       style={{
         color,
-        backgroundImage: up ? ГРАДИЕНТ_РОСТА : ГРАДИЕНТ_ПАДЕНИЯ,
-        backgroundBlendMode: "multiply",
-        boxShadow: `inset 0 0 0 999px ${hexA(T.bg, 0.82)}`,
-        border: `1px solid ${hexA(up ? T.up : T.down, 0.28)}`,
+        backgroundImage: up
+          ? "linear-gradient(135deg, rgba(31,209,165,0.30) 0%, rgba(123,247,196,0.12) 100%)"
+          : "linear-gradient(135deg, rgba(255,77,126,0.30) 0%, rgba(255,143,176,0.12) 100%)",
+        border: `1px solid ${hexA(up ? T.up : T.down, 0.32)}`,
         fontFamily: monoFont,
       }}
     >
