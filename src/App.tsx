@@ -350,7 +350,7 @@ const STR = {
     gradListedTitle: "Свободный рынок",
     gradListedBody: "Кривая отработала: теперь цена ходит вверх и вниз по резервам пула. Ликвидность заперта в контракте — вынуть её не может никто, поэтому продать можно в любой момент.",
     tabChart: "График", tabInfo: "Инфо", tabTx: "Транзакции", chartModePrice: "Цена",
-    tabHolders: "Держатели", tabFeed: "Лента", tabAbout: "О токене",
+    tabHolders: "Держатели", tabFeed: "Лента", tabAbout: "О токене", tabStats: "Статистика", statMcap: "Капитализация", statLiq: "Ликвидность", statVol24: "Объём за сутки", statTrades24: "Сделок за сутки", statAge: "Возраст", statCurve: "Кривая собрана", statDex: "Биржа",
     positionTitle: "Ваша позиция", positionValue: "Стоимость", positionAmount: "Количество",
     positionChange24: "За 24 часа", positionEmpty: "Токенов пока нет",
     thesisAdd: "Добавить тезис", thesisHint: "Зачем взял и когда выйдешь — заметка видна только тебе",
@@ -12113,7 +12113,9 @@ function useТезис(tokenId) {
 function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = true, connected = true, onConnectWallet, themeKey, currentUserId = null, onNeedAuth, onOpenProfile, tonPriceUsd = 0, walletAddress = null, onManage = null }) {
   // График вынесен из вкладок наверх, поэтому здесь остались только
   // разделы под ним: держатели, лента, о токене.
-  const [tab, setTab] = useState("feed"); // holders | feed | about
+  // Экран открывается на статистике: цифры рынка важнее ленты чужих
+  // сделок, за ними сюда и заходят.
+  const [tab, setTab] = useState("stats"); // stats | holders | feed | about
   const [chartMode] = useState("mcap"); // always market cap — price toggle removed
   const [tf, setTf] = useState(() => {
     try {
@@ -12731,7 +12733,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       {/* Вкладки: держатели, лента, о токене. График выше — он больше не
           прячется за вкладкой, а лежит на виду. */}
       <div className="flex items-center" style={{ gap: 20, borderBottom: `1px solid ${T.line}` }}>
-        {[["holders", tr("tabHolders")], ["feed", tr("tabFeed")], ["about", tr("tabAbout")]].map(([id, label]) => (
+        {[["stats", tr("tabStats")], ["holders", tr("tabHolders")], ["feed", tr("tabFeed")], ["about", tr("tabAbout")]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className="fx-tap" style={{
             fontFamily: displayFont, fontSize: 14, fontWeight: tab === id ? 600 : 500, padding: "0 0 10px",
             color: tab === id ? T.ice : T.faint,
@@ -12740,6 +12742,35 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           }}>{label}</button>
         ))}
       </div>
+
+      {/* Статистика — числа, ради которых на экран и заходят: цена уже
+          в шапке, а здесь то, что говорит о самом рынке. Заливок нет,
+          строки разводит волосяная линия. */}
+      {tab === "stats" && (
+        <div className="fx-swap flex flex-col" style={{ gap: 0 }}>
+          {[
+            [tr("statMcap"), fmtUSD(token.mcapNum)],
+            [tr("statLiq"), `$${token.liq ?? "—"}`],
+            [tr("statVol24"), `$${token.vol ?? "—"}`],
+            [tr("statTrades24"), (token.tx24h || 0).toLocaleString("ru-RU")],
+            [tr("statHolders"), holdersCount == null ? "—" : holdersCount.toLocaleString("ru-RU")],
+            [tr("statAge"), fmtAge(token.createdAt) || "—"],
+            ...(token.graduationTon > 0
+              ? [[tr("statCurve"), `${Math.round(Math.min(1, (Number(token.raisedTon) || 0) / token.graduationTon) * 100)}%`]]
+              : []),
+            ...(token.dexName ? [[tr("statDex"), token.dexName]] : []),
+          ].map(([подпись, значение], i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between"
+              style={{ padding: "13px 0", borderBottom: `1px solid ${T.line}` }}
+            >
+              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{подпись}</span>
+              <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 600 }}>{значение}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {tab === "holders" && (
         <div className="fx-swap flex flex-col" style={{ gap: 14 }}>
