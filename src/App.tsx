@@ -12012,14 +12012,17 @@ function AppWalletCard({ showToast }) {
  * край экрана. Разделение не украшение: сверху то, что человек читает
  * («сколько у меня»), снизу то, что он листает («что и когда»).
  */
-const КОШ_СТРАНИЦА = "#EFEAFB";   // светлая страница снизу
-const КОШ_КАРТОЧКА = "#FFFFFF";   // строки на ней
-const КОШ_ЧЕРНИЛА = "#14101F";    // текст на светлом
-const КОШ_ТЕНЬ_ТЕКСТА = "#6B6580"; // второстепенный текст на светлом
-const КОШ_РОСТ_ФОН = "#E2D6FD";
-const КОШ_РОСТ_ТЕКСТ = "#5A12C4";
-const КОШ_ПАДЕНИЕ_ФОН = "#FADBE2";
-const КОШ_ПАДЕНИЕ_ТЕКСТ = "#C22A4E";
+/* Страница остаётся страницей — отдельной плоскостью со скруглением, —
+   но в тёмной гамме приложения: в макете она была светлой, а в чёрном
+   интерфейсе белое полотно на пол-экрана слепит и выглядит чужим
+   куском. Отделяется она не светлотой, а тоном: чуть светлее фона,
+   строки на ней — ещё на ступень светлее. */
+const КОШ_СТРАНИЦА = "#0E1015";   // сама страница снизу
+const КОШ_КАРТОЧКА = "#171A21";   // строки на ней
+const КОШ_РОСТ_ФОН = hexA("#8E2DE2", 0.20);
+const КОШ_РОСТ_ТЕКСТ = "#C79BFF";
+const КОШ_ПАДЕНИЕ_ФОН = hexA("#FF4D6D", 0.16);
+const КОШ_ПАДЕНИЕ_ТЕКСТ = "#FF7D93";
 
 /* Пилюля с изменением — как в макете: цветной фон, стрелка, проценты.
    Рост идёт фирменным фиолетовым, а не зелёным: зелёный в этой палитре
@@ -12085,11 +12088,11 @@ function ИсторияКошелька({ userId }) {
 
   return (
     <section style={{ marginTop: 22 }}>
-      <div style={{ fontFamily: displayFont, color: КОШ_ЧЕРНИЛА, fontSize: 15.5, fontWeight: 700, marginBottom: 10 }}>
+      <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, marginBottom: 10 }}>
         {t("walletHistory")}
       </div>
       {ряд.length === 0 ? (
-        <div style={{ fontFamily: bodyFont, color: КОШ_ТЕНЬ_ТЕКСТА, fontSize: 13.5, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
           {t("noActivityYet")}
         </div>
       ) : (
@@ -12114,12 +12117,12 @@ function ИсторияКошелька({ userId }) {
                     : <ArrowUpRight size={16} strokeWidth={2.2} color={КОШ_ПАДЕНИЕ_ТЕКСТ} />}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="truncate" style={{ fontFamily: displayFont, color: КОШ_ЧЕРНИЛА, fontSize: 14.5, fontWeight: 700 }}>
+                  <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
                     {покупка ? t("tickerBought") : t("tickerSold")} ${String(с.ticker || "?").toUpperCase()}
                   </div>
-                  <div style={{ fontFamily: bodyFont, color: КОШ_ТЕНЬ_ТЕКСТА, fontSize: 12 }}>{fmtSince(с.created_at)}</div>
+                  <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>{fmtSince(с.created_at)}</div>
                 </div>
-                <div style={{ fontFamily: monoFont, color: КОШ_ЧЕРНИЛА, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>
+                <div style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>
                   {покупка ? "−" : "+"}{fmtCoin(Number(с.ton_amount) || 0)} TON
                 </div>
               </div>
@@ -12254,10 +12257,13 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           marginTop: 22, marginLeft: -16, marginRight: -16, marginBottom: -(96 + 40),
           borderTopLeftRadius: 26, borderTopRightRadius: 26,
           background: КОШ_СТРАНИЦА, padding: "18px 16px 120px", minHeight: 420,
+          // Тонкий свет по верхней кромке: в тёмном на тёмном граница
+          // страницы иначе не читается и скругление пропадает.
+          boxShadow: `inset 0 1px 0 ${hexA("#FFFFFF", 0.07)}`,
         }}
       >
         <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
-          <span style={{ fontFamily: displayFont, color: КОШ_ЧЕРНИЛА, fontSize: 15.5, fontWeight: 700 }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700 }}>
             {t("walletHoldings")}
           </span>
           <button
@@ -12276,7 +12282,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         ) : !holdings.length ? (
           <div className="flex items-center" style={{ gap: 14, padding: "14px 14px", borderRadius: 20, background: КОШ_КАРТОЧКА }}>
             <КотПланета size={54} />
-            <div style={{ fontFamily: bodyFont, color: КОШ_ТЕНЬ_ТЕКСТА, fontSize: 13.5, lineHeight: 1.45 }}>
+            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.45 }}>
               {t("walletHoldingsEmpty")}
             </div>
           </div>
@@ -12292,10 +12298,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
                 >
                   <TokenAvatar size={38} src={tok.logoUrl} />
                   <div className="min-w-0" style={{ flex: 1 }}>
-                    <div className="truncate" style={{ fontFamily: displayFont, color: КОШ_ЧЕРНИЛА, fontSize: 14.5, fontWeight: 700 }}>
+                    <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
                       ${String(tok.ticker || "").toUpperCase()}
                     </div>
-                    <div className="truncate" style={{ fontFamily: bodyFont, color: КОШ_ТЕНЬ_ТЕКСТА, fontSize: 12 }}>
+                    <div className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>
                       {tok.name || ""}
                     </div>
                     {Number.isFinite(изм) && изм !== 0 && (
@@ -12305,10 +12311,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
                     )}
                   </div>
                   <div className="text-right">
-                    <div style={{ fontFamily: monoFont, color: КОШ_ЧЕРНИЛА, fontSize: 14, fontWeight: 700 }}>
+                    <div style={{ fontFamily: monoFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>
                       {fmtCompact(amount)}
                     </div>
-                    <div style={{ fontFamily: bodyFont, color: КОШ_ТЕНЬ_ТЕКСТА, fontSize: 11.5 }}>
+                    <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 11.5 }}>
                       ${String(tok.ticker || "").toUpperCase()}
                     </div>
                   </div>
@@ -12323,7 +12329,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         <button
           onClick={onDisconnect}
           className="fx-tap flex items-center gap-1.5 self-start"
-          style={{ background: "transparent", border: "none", padding: 0, marginTop: 24, fontFamily: bodyFont, fontSize: 13.5, color: КОШ_ТЕНЬ_ТЕКСТА }}
+          style={{ background: "transparent", border: "none", padding: 0, marginTop: 24, fontFamily: bodyFont, fontSize: 13.5, color: T.muted }}
         >
           <LogOut size={13} /> {t("disconnectShort")}
         </button>
