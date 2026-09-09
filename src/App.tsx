@@ -11351,7 +11351,7 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
       style={{ gap: 14, padding: "13px 18px", background: "transparent", border: "none" }}
     >
       <item.icon size={19} color={T.paper} strokeWidth={1.8} />
-      <span className="flex-1 truncate text-left" style={{ fontFamily: displayFont, color: T.ice, fontSize: 16.5, fontWeight: 700 }}>
+      <span className="flex-1 truncate text-left" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>
         {item.label}
       </span>
       {item.метка > 0 && (
@@ -11404,7 +11404,7 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
               border: `1.5px solid ${T.lineHi}`,
             }}
           />
-          <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, marginTop: 14, letterSpacing: "-0.02em" }}>
+          <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 800, marginTop: 14, letterSpacing: "-0.02em" }}>
             {ник}
           </div>
           {!accountCreated && (
@@ -11414,7 +11414,7 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
               style={{ gap: 7, marginTop: 10, padding: 0, background: "transparent", border: "none" }}
             >
               <Send size={14} color={КОШ_РОСТ_ТЕКСТ} />
-              <span style={{ fontFamily: displayFont, color: КОШ_РОСТ_ТЕКСТ, fontSize: 14.5, fontWeight: 700 }}>{t("tgAuthCta")}</span>
+              <span style={{ fontFamily: displayFont, color: КОШ_РОСТ_ТЕКСТ, fontSize: 14.5, fontWeight: 800 }}>{t("tgAuthCta")}</span>
             </button>
           )}
         </div>
