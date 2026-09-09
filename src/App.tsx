@@ -11017,7 +11017,12 @@ function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, 
           </button>
         }>{t("myTokensTitle")}</SectionTitle>
         {myTokens.length === 0 ? (
-          <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>{t("noTokensYet")}</p>
+          <div className="flex items-center" style={{ gap: 14 }}>
+            {/* Маскот на месте пустого списка: раздел выглядит своим, а
+                не сломанным. */}
+            <КотПланета size={58} />
+            <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5, flex: 1 }}>{t("noTokensYet")}</p>
+          </div>
         ) : (
           <div className="flex flex-col gap-2">
             {myTokens.slice(0, 3).map((tok) => <MyTokenCard key={tok.id} t={tok} onOpen={onOpenToken} />)}
