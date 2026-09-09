@@ -5,7 +5,7 @@ import {
   Wallet, Home as HomeIcon, PlusCircle, User, ChevronLeft, Share2, Star,
   ShieldCheck, ShieldAlert, Globe, Globe2, Send, Twitter, Image as ImageIcon, Upload,
   Copy, ExternalLink, LogOut, ChevronRight, ChevronDown, Rocket, HeartCrack,
-  Lock, Gift, LifeBuoy,
+  Lock, Gift, LifeBuoy, Plus, ArrowDownLeft, Repeat,
   FileText, CheckCircle2, RefreshCw, X,
   Eye, EyeOff, LogIn, ShoppingBag, Trash2, Crown, Bell, Check, Cpu, Settings
 } from "lucide-react";
@@ -270,6 +270,12 @@ const STR = {
     nickChanged: "Теперь ты {name}",
     nickTaken: "Имя {name} уже занято",
     walletHoldings: "Твои токены",
+    walletHistory: "История",
+    walletSeeAll: "Все",
+    walletActBuy: "Купить",
+    walletActReceive: "Получить",
+    walletActSwap: "Обменять",
+    walletActHistory: "История",
     walletHoldingsEmpty: "Пока пусто. Купи токен в мемпаде — он появится здесь.",
     saveFailed: "Не удалось сохранить — попробуй ещё раз",
     langFullNote: "Интерфейс переведён на выбранный язык.",
@@ -741,6 +747,12 @@ const STR = {
     nickChanged: "You are {name} now",
     nickTaken: "{name} is already taken",
     walletHoldings: "Your tokens",
+    walletHistory: "History",
+    walletSeeAll: "See all",
+    walletActBuy: "Buy",
+    walletActReceive: "Receive",
+    walletActSwap: "Swap",
+    walletActHistory: "History",
     walletHoldingsEmpty: "Nothing yet. Buy a token in the mempad and it shows up here.",
     saveFailed: "Could not save — try again",
     langFullNote: "The interface is translated into the selected language.",
@@ -11992,11 +12004,146 @@ function AppWalletCard({ showToast }) {
 }
 
 
-function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onConnect, onDisconnect, onCopy, holdings = [], holdingsReady = false, showToast = () => {} }) {
+/* Кошелёк.
+ *
+ * Экран сложён по образцу банковского приложения: тёмный верх с картой
+ * баланса и рядом действий, а всё остальное — активы и операции — лежит
+ * на светлой странице, которая начинается скруглением и уходит вниз за
+ * край экрана. Разделение не украшение: сверху то, что человек читает
+ * («сколько у меня»), снизу то, что он листает («что и когда»).
+ */
+const КОШ_СТРАНИЦА = "#EFEAFB";   // светлая страница снизу
+const КОШ_КАРТОЧКА = "#FFFFFF";   // строки на ней
+const КОШ_ЧЕРНИЛА = "#14101F";    // текст на светлом
+const КОШ_ТЕНЬ_ТЕКСТА = "#6B6580"; // второстепенный текст на светлом
+const КОШ_РОСТ_ФОН = "#E2D6FD";
+const КОШ_РОСТ_ТЕКСТ = "#5A12C4";
+const КОШ_ПАДЕНИЕ_ФОН = "#FADBE2";
+const КОШ_ПАДЕНИЕ_ТЕКСТ = "#C22A4E";
+
+/* Пилюля с изменением — как в макете: цветной фон, стрелка, проценты.
+   Рост идёт фирменным фиолетовым, а не зелёным: зелёный в этой палитре
+   чужой. */
+function ПилюляИзменения({ значение, подпись }) {
+  const рост = значение >= 0;
+  return (
+    <span
+      className="flex items-center"
+      style={{
+        gap: 3, padding: "3px 8px", borderRadius: 999,
+        background: рост ? КОШ_РОСТ_ФОН : КОШ_ПАДЕНИЕ_ФОН,
+        color: рост ? КОШ_РОСТ_ТЕКСТ : КОШ_ПАДЕНИЕ_ТЕКСТ,
+        fontFamily: monoFont, fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap",
+      }}
+    >
+      {подпись}
+      {рост ? <ArrowUpRight size={11} strokeWidth={2.4} /> : <ArrowDownRight size={11} strokeWidth={2.4} />}
+    </span>
+  );
+}
+
+/* Кнопка действия под картой: тёмный квадрат со значком и подписью под
+   ним. Подпись снаружи квадрата — так значок остаётся крупным, а слово
+   не жмётся к его краям. */
+function ДействиеКошелька({ icon: Icon, label, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="fx-tap flex flex-col items-center"
+      style={{ gap: 7, background: "transparent", border: "none", padding: 0, flex: 1 }}
+    >
+      <span
+        className="flex items-center justify-center"
+        style={{ width: 54, height: 54, borderRadius: 18, background: T.surfaceHi }}
+      >
+        <Icon size={20} strokeWidth={1.9} color={T.ice} />
+      </span>
+      <span style={{ fontFamily: bodyFont, fontSize: 12, color: T.muted }}>{label}</span>
+    </button>
+  );
+}
+
+/* Операции по счёту. Берутся оттуда же, откуда активность на главной, —
+   из сделок человека; здесь их больше и с суммой в TON. */
+function ИсторияКошелька({ userId }) {
+  const [ряд, setРяд] = useState(null);
+
+  useEffect(() => {
+    if (!userId) { setРяд([]); return; }
+    let брошено = false;
+    supabase
+      .from("trades")
+      .select("id, ticker, side, ton_amount, token_amount, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(12)
+      .then(({ data, error }) => { if (!брошено) setРяд(error ? [] : (data || [])); });
+    return () => { брошено = true; };
+  }, [userId]);
+
+  if (!ряд) return null;
+
+  return (
+    <section style={{ marginTop: 22 }}>
+      <div style={{ fontFamily: displayFont, color: КОШ_ЧЕРНИЛА, fontSize: 15.5, fontWeight: 700, marginBottom: 10 }}>
+        {t("walletHistory")}
+      </div>
+      {ряд.length === 0 ? (
+        <div style={{ fontFamily: bodyFont, color: КОШ_ТЕНЬ_ТЕКСТА, fontSize: 13.5, lineHeight: 1.5 }}>
+          {t("noActivityYet")}
+        </div>
+      ) : (
+        <div className="flex flex-col" style={{ gap: 8 }}>
+          {ряд.map((с) => {
+            const покупка = с.side !== "sell";
+            return (
+              <div
+                key={с.id}
+                className="flex items-center"
+                style={{ gap: 12, padding: "12px 14px", borderRadius: 18, background: КОШ_КАРТОЧКА }}
+              >
+                <span
+                  className="flex items-center justify-center"
+                  style={{
+                    width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
+                    background: покупка ? КОШ_РОСТ_ФОН : КОШ_ПАДЕНИЕ_ФОН,
+                  }}
+                >
+                  {покупка
+                    ? <ArrowDownLeft size={16} strokeWidth={2.2} color={КОШ_РОСТ_ТЕКСТ} />
+                    : <ArrowUpRight size={16} strokeWidth={2.2} color={КОШ_ПАДЕНИЕ_ТЕКСТ} />}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="truncate" style={{ fontFamily: displayFont, color: КОШ_ЧЕРНИЛА, fontSize: 14.5, fontWeight: 700 }}>
+                    {покупка ? t("tickerBought") : t("tickerSold")} ${String(с.ticker || "?").toUpperCase()}
+                  </div>
+                  <div style={{ fontFamily: bodyFont, color: КОШ_ТЕНЬ_ТЕКСТА, fontSize: 12 }}>{fmtSince(с.created_at)}</div>
+                </div>
+                <div style={{ fontFamily: monoFont, color: КОШ_ЧЕРНИЛА, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>
+                  {покупка ? "−" : "+"}{fmtCoin(Number(с.ton_amount) || 0)} TON
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onConnect, onDisconnect, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {} }) {
   const [copied, setCopied] = useState(false);
   const balance = useCountUp(connected ? tonBalance : 0, 900, connected);
   const usd = useCountUp(connected ? tonBalance * tonPriceUsd : 0, 900, connected);
   const short = walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-6)}` : "";
+  const низ = useRef(null);
+
+  function скопироватьАдрес() {
+    onCopy();
+    setCopied(true);
+    haptic("light");
+    setTimeout(() => setCopied(false), 1400);
+  }
 
   if (!connected) {
     return (
@@ -12021,94 +12168,166 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     );
   }
 
+  /* Доля в долларах меняется вместе с курсом, и в макете на карте стоит
+     именно она — приросток к сумме. Считаем от суточного изменения
+     курса нет откуда, поэтому показываем сам эквивалент: это честная
+     вторая величина, а не выдуманный процент. */
   return (
-    <div className="flex flex-col" style={{ gap: 28, paddingTop: 8, paddingBottom: 16 }}>
-      {/* Баланс. Крупно только само число — это единственная цифра на
-          экране, ради которой сюда заходят. */}
-      {/* Баланс оформлен картой — как и на главной: по дизайн-плану это
-          предмет, а не строка текста. Блик проходит редко, чтобы карта
-          читалась материалом и не мельтешила. */}
+    <div className="flex flex-col" style={{ paddingTop: 4 }}>
+      <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
+        <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
+          {t("navWallet")}
+        </h1>
+        <button
+          onClick={скопироватьАдрес}
+          className="fx-tap flex items-center"
+          style={{ gap: 6, padding: "7px 12px", borderRadius: 999, background: T.surfaceHi, border: "none" }}
+        >
+          <span style={{ fontFamily: monoFont, color: T.paper, fontSize: 12 }}>{short}</span>
+          {copied ? <CheckCircle2 size={12} color={T.up} /> : <Copy size={12} color={T.faint} />}
+        </button>
+      </div>
+
+      {/* Карта баланса. Сумма читается одним взглядом: целые рубли
+          крупно и белым, копейки приглушены — так глаз не спотыкается о
+          мелкую часть, которая на решение не влияет. */}
       <section
         style={{
-          position: "relative", overflow: "hidden", borderRadius: 22, padding: "18px 18px 16px",
-          background: `linear-gradient(140deg, ${hexA(T.electric, 0.22)} 0%, ${hexA(T.violet, 0.10)} 42%, ${T.surface} 100%)`,
-          // Без обводки — см. такую же карту на главной.
+          position: "relative", overflow: "hidden", borderRadius: 24, padding: "16px 18px 18px",
+          background: "radial-gradient(120% 150% at 10% 15%, #C13AE6 0%, #8E2DE2 34%, #5A0FD8 66%, #2C0A78 100%)",
           border: "none",
-          boxShadow: `0 18px 40px ${hexA("#000000", 0.45)}`,
         }}
       >
         <div aria-hidden style={{
-          position: "absolute", top: -60, left: -80, width: 240, height: 300,
-          background: `linear-gradient(90deg, ${hexA(T.ice, 0)} 0%, ${hexA(T.ice, 0.10)} 50%, ${hexA(T.ice, 0)} 100%)`,
+          position: "absolute", top: -70, left: -90, width: 260, height: 320,
+          background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.13)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
           transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
         }} />
 
-        <div style={{ position: "relative", fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("walletBalanceLabel")}</div>
-        <div className="flex items-baseline" style={{ gap: 8, marginTop: 8, position: "relative" }}>
-          <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.02em", ...текстГрадиентом(ГРАДИЕНТ_БРЕНДА) }}>
-            {balance.toFixed(2)}
-          </span>
-          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 15 }}>TON</span>
+        <div style={{ position: "relative", fontFamily: bodyFont, color: hexA("#FFFFFF", 0.72), fontSize: 13 }}>
+          {t("walletBalanceLabel")}
         </div>
-        <div style={{ position: "relative", fontFamily: monoFont, color: T.faint, fontSize: 13.5, marginTop: 6 }}>≈ ${usd.toFixed(2)}</div>
-
-        <button
-          onClick={() => { onCopy(); setCopied(true); setTimeout(() => setCopied(false), 1400); }}
-          className="fx-tap flex items-center gap-2"
-          style={{ position: "relative", marginTop: 16, padding: "8px 12px", borderRadius: 999, background: hexA(T.ice, 0.06), border: `1px solid ${T.line}` }}
+        <div className="flex items-baseline" style={{ gap: 7, marginTop: 6, position: "relative" }}>
+          <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#FFFFFF" }}>
+            {Math.floor(balance).toLocaleString("ru-RU")}
+            <span style={{ color: hexA("#FFFFFF", 0.55) }}>{(balance % 1).toFixed(2).slice(1)}</span>
+          </span>
+          <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.7), fontSize: 14 }}>TON</span>
+        </div>
+        <span
+          className="inline-flex items-center"
+          style={{
+            position: "relative", marginTop: 12, padding: "5px 11px", borderRadius: 999,
+            background: hexA("#FFFFFF", 0.18), color: "#FFFFFF",
+            fontFamily: monoFont, fontSize: 12.5, fontWeight: 700,
+          }}
         >
-          <span style={{ fontFamily: monoFont, color: T.paper, fontSize: 12.5 }}>{short}</span>
-          {copied ? <CheckCircle2 size={13} color={T.up} /> : <Copy size={13} color={T.faint} />}
-        </button>
+          ≈ ${usd.toFixed(2)}
+        </span>
       </section>
 
-      <AppWalletCard showToast={showToast} />
-      <SolanaWalletCard showToast={showToast} />
+      {/* Ряд действий — то, за чем в кошелёк заходят чаще всего. */}
+      <div className="flex items-start" style={{ gap: 10, marginTop: 16 }}>
+        <ДействиеКошелька icon={Plus} label={t("walletActBuy")} onClick={() => onGoTab("mempad")} />
+        <ДействиеКошелька icon={ArrowDownLeft} label={t("walletActReceive")} onClick={скопироватьАдрес} />
+        <ДействиеКошелька icon={Repeat} label={t("walletActSwap")} onClick={() => onGoTab("mempad")} />
+        <ДействиеКошелька
+          icon={Clock}
+          label={t("walletActHistory")}
+          onClick={() => низ.current && низ.current.scrollIntoView({ behavior: "smooth", block: "start" })}
+        />
+      </div>
 
-      {/* Что куплено на этом кошельке. Только состав: сколько чего лежит.
-          Прибыль, счётчик строк и кнопка продажи отсюда убраны — за
-          сделкой человек идёт на экран токена, где видно и цену, и
-          график, а не решает вслепую по одной цифре. */}
-      <section className="w-full">
-        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 600, marginBottom: 4 }}>{t("walletHoldings")}</div>
+      {/* Свои кошельки — на тёмном верху, рядом с балансом: они про
+          «сколько и где лежит», а не про историю операций. */}
+      <div className="flex flex-col" style={{ gap: 14, marginTop: 20 }}>
+        <AppWalletCard showToast={showToast} />
+        <SolanaWalletCard showToast={showToast} />
+      </div>
+
+      {/* Светлая страница. Уходит за края прокрутки и вниз за экран:
+          так видно, что она лежит поверх тёмного верха, а не является
+          очередной карточкой в столбце. */}
+      <div
+        ref={низ}
+        style={{
+          marginTop: 22, marginLeft: -16, marginRight: -16, marginBottom: -(96 + 40),
+          borderTopLeftRadius: 26, borderTopRightRadius: 26,
+          background: КОШ_СТРАНИЦА, padding: "18px 16px 120px", minHeight: 420,
+        }}
+      >
+        <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+          <span style={{ fontFamily: displayFont, color: КОШ_ЧЕРНИЛА, fontSize: 15.5, fontWeight: 700 }}>
+            {t("walletHoldings")}
+          </span>
+          <button
+            onClick={() => onGoTab("mempad")}
+            className="fx-tap"
+            style={{ background: "transparent", border: "none", padding: 0, fontFamily: bodyFont, fontSize: 13, color: КОШ_РОСТ_ТЕКСТ, fontWeight: 700 }}
+          >
+            {t("walletSeeAll")}
+          </button>
+        </div>
 
         {!holdingsReady ? (
-          <PageLoader minHeight={100} />
+          <div className="flex items-center justify-center" style={{ height: 90 }}>
+            <КотПланета size={52} />
+          </div>
         ) : !holdings.length ? (
-          // Пустое состояние строкой, а не пустым контейнером во весь
-          // экран: сказать тут нечего, и занимать место незачем.
-          <div className="flex items-center" style={{ gap: 14, marginTop: 10 }}>
-            {/* Маскот вместо пустоты: он же встречает в ленте и на
-                заставке, и раздел не выглядит сломанным. */}
-            <КотПланета size={64} />
-            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("walletHoldingsEmpty")}</div>
+          <div className="flex items-center" style={{ gap: 14, padding: "14px 14px", borderRadius: 20, background: КОШ_КАРТОЧКА }}>
+            <КотПланета size={54} />
+            <div style={{ fontFamily: bodyFont, color: КОШ_ТЕНЬ_ТЕКСТА, fontSize: 13.5, lineHeight: 1.45 }}>
+              {t("walletHoldingsEmpty")}
+            </div>
           </div>
         ) : (
-          <div className="flex flex-col">
-            {holdings.map(({ tok, amount }) => (
-              <div
-                key={tok.id}
-                className="w-full flex items-center"
-                style={{ gap: 12, padding: "13px 0" }}
-              >
-                <TokenAvatar size={36} src={tok.logoUrl} />
-                <div className="flex-1 min-w-0 text-left">
-                  <span className="truncate block" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 600 }}>${tok.ticker}</span>
+          <div className="flex flex-col" style={{ gap: 10 }}>
+            {holdings.map(({ tok, amount }) => {
+              const изм = Number(tok.change24 ?? tok.change ?? 0);
+              return (
+                <div
+                  key={tok.id}
+                  className="flex items-center"
+                  style={{ gap: 12, padding: "13px 14px", borderRadius: 20, background: КОШ_КАРТОЧКА }}
+                >
+                  <TokenAvatar size={38} src={tok.logoUrl} />
+                  <div className="min-w-0" style={{ flex: 1 }}>
+                    <div className="truncate" style={{ fontFamily: displayFont, color: КОШ_ЧЕРНИЛА, fontSize: 14.5, fontWeight: 700 }}>
+                      ${String(tok.ticker || "").toUpperCase()}
+                    </div>
+                    <div className="truncate" style={{ fontFamily: bodyFont, color: КОШ_ТЕНЬ_ТЕКСТА, fontSize: 12 }}>
+                      {tok.name || ""}
+                    </div>
+                    {Number.isFinite(изм) && изм !== 0 && (
+                      <div style={{ marginTop: 6 }}>
+                        <ПилюляИзменения значение={изм} подпись={`${изм > 0 ? "+" : ""}${изм.toFixed(2)}%`} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <div style={{ fontFamily: monoFont, color: КОШ_ЧЕРНИЛА, fontSize: 14, fontWeight: 700 }}>
+                      {fmtCompact(amount)}
+                    </div>
+                    <div style={{ fontFamily: bodyFont, color: КОШ_ТЕНЬ_ТЕКСТА, fontSize: 11.5 }}>
+                      ${String(tok.ticker || "").toUpperCase()}
+                    </div>
+                  </div>
                 </div>
-                <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 13 }}>{fmtCompact(amount)}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
-      </section>
 
-      <button
-        onClick={onDisconnect}
-        className="fx-tap flex items-center gap-1.5 self-start"
-        style={{ background: "transparent", border: "none", padding: 0, fontFamily: bodyFont, fontSize: 13.5, color: T.faint }}
-      >
-        <LogOut size={13} /> {t("disconnectShort")}
-      </button>
+        <ИсторияКошелька userId={userId} />
+
+        <button
+          onClick={onDisconnect}
+          className="fx-tap flex items-center gap-1.5 self-start"
+          style={{ background: "transparent", border: "none", padding: 0, marginTop: 24, fontFamily: bodyFont, fontSize: 13.5, color: КОШ_ТЕНЬ_ТЕКСТА }}
+        >
+          <LogOut size={13} /> {t("disconnectShort")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -19459,6 +19678,8 @@ function mapTokenRow(row) {
               holdings={walletHoldings}
               holdingsReady={holdingsReady}
               showToast={showToast}
+              userId={userId}
+              onGoTab={goTab}
             />
           </KeepAlive>
           <KeepAlive show={view === "shop"}>
@@ -19547,14 +19768,17 @@ function mapTokenRow(row) {
           // прежняя ширина оставляла между ними пустоту во весь палец, и
           // капсула выглядела растянутой.
           className="flex items-center justify-center"
+          // Капсула плотная и тёмная, разделы внутри — кружки: выбранный
+          // залит белым, остальные прозрачные. Так видно, где стоишь,
+          // без подписи под значком и без свечения вокруг него.
           style={{
             position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: insetBottom + 6, zIndex: 5,
-            width: "auto", maxWidth: 420, gap: 30,
-            padding: "13px 26px 13px",
+            width: "auto", maxWidth: 420, gap: 6,
+            padding: 7,
             borderRadius: 999,
-            background: hexA(T.bg, 0.92),
-            border: `1px solid ${T.lineHi}`,
-            boxShadow: "0 10px 34px rgba(0,0,0,0.4)",
+            background: "#26272E",
+            border: "none",
+            boxShadow: "0 12px 34px rgba(0,0,0,0.5)",
           }}
         >
           {/* Профиля в панели нет: туда ходят за своими делами, а не
@@ -19575,20 +19799,18 @@ function mapTokenRow(row) {
                 // нажатие не прошло — человек жмёт второй раз.
                 onClick={() => { haptic("light"); goTab(id); }}
                 className="fx-tap flex items-center justify-center"
-                // Значок ровно по центру: точка активного раздела висит
-                // отдельным слоем и не сдвигает его вверх.
-                style={{ position: "relative", background: "transparent", border: "none", padding: 0, width: 34, height: 34 }}
+                style={{
+                  position: "relative", border: "none", padding: 0,
+                  width: 48, height: 48, borderRadius: "50%",
+                  background: active ? "#FFFFFF" : "transparent",
+                  transition: `background ${EASE}`,
+                }}
               >
-                {/* Активный раздел — сам значок: он горит фирменным
-                    фиолетовым и светится, а не отмечается точкой снизу. */}
                 <Icon
-                  size={26}
-                  strokeWidth={1.9}
-                  color={active ? T.electric : T.faint}
-                  style={{
-                    transition: `color ${EASE}, filter ${EASE}`,
-                    filter: active ? `drop-shadow(0 0 8px ${hexA(T.electric, 0.85)}) drop-shadow(0 0 16px ${hexA(T.electric, 0.45)})` : "none",
-                  }}
+                  size={22}
+                  strokeWidth={active ? 2.1 : 1.9}
+                  color={active ? "#14151A" : "#9B9FA9"}
+                  style={{ transition: `color ${EASE}` }}
                 />
                 {locked && (
                   <div style={{ position: "absolute", top: -3, right: -3, width: 14, height: 14, borderRadius: "50%", background: T.surface, border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
