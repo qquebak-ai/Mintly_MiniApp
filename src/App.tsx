@@ -11284,7 +11284,7 @@ function ТопСтрока({ onOpenToken, onOpenProfile, live = [] }) {
  * внутри него. Меню выкладывает эти двери в один список и закрывается
  * тем же движением, каким открылось.
  */
-function БоковоеМеню({ открыто, onClose, profile, accountCreated, supportUnread = 0, onПункт, onВход }) {
+function БоковоеМеню({ открыто, onClose, profile, accountCreated, supportUnread = 0, onПункт, onВход, insetTop = 0, insetBottom = 0 }) {
   const [уходит, setУходит] = useState(false);
   const [тяга, setТяга] = useState(0);
   const жест = useRef(null);
@@ -11394,7 +11394,9 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
           touchAction: "pan-y",
         }}
       >
-        <div style={{ padding: "22px 18px 10px" }}>
+        {/* Сверху — запас под шапку Telegram: там висят часы и кнопка
+            «Закрыть», и аватар уходил прямо под них. */}
+        <div style={{ padding: `${insetTop + 18}px 18px 10px` }}>
           <span
             style={{
               display: "block", width: 62, height: 62, borderRadius: "50%",
@@ -11425,7 +11427,7 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
             свои разделы, и держать его в общем списке значит мешать
             частому редким. */}
         <div style={{ flex: 1, minHeight: 24 }} />
-        <div className="flex flex-col" style={{ paddingBottom: 22 }}>
+        <div className="flex flex-col" style={{ paddingBottom: insetBottom + 20 }}>
           {низ.map((п) => <Строка key={п.key} item={п} />)}
         </div>
       </div>
@@ -20440,6 +20442,8 @@ function mapTokenRow(row) {
           accountCreated={accountCreated}
           supportUnread={supportUnread}
           onВход={openLoginProfile}
+          insetTop={insetTop}
+          insetBottom={insetBottom}
           onПункт={(ключ) => {
             if (ключ === "profile") { goTab("profile"); return; }
             if (ключ === "achievements") { setView("achievements"); return; }
