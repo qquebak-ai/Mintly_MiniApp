@@ -11926,6 +11926,45 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
   );
 }
 
+/* Отрисовка кода точками.
+ *
+ * Обычные модули — кружки, три угловых маркера — скруглённая рамка с
+ * таким же квадратиком внутри, середина оставлена пустой под значок
+ * сети. Высокая избыточность (H) позволяет закрыть до трети кода, так
+ * что вырезанная середина ему не мешает.
+ */
+function кодВSVG(сетка) {
+  const N = сетка.modules.size;
+  const биты = сетка.modules.data;
+  const есть = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !!биты[y * N + x];
+
+  // Углы маркеров: внутри них точки не рисуем, там своя форма.
+  const маркеры = [[0, 0], [N - 7, 0], [0, N - 7]];
+  const вМаркере = (x, y) => маркеры.some(([mx, my]) => x >= mx && x < mx + 7 && y >= my && y < my + 7);
+
+  // Окно под значок: чуть больше самого значка, чтобы точки не липли к
+  // его краям.
+  const серединаОт = Math.floor(N / 2) - 3;
+  const серединаДо = Math.floor(N / 2) + 3;
+  const вСередине = (x, y) => x >= серединаОт && x <= серединаДо && y >= серединаОт && y <= серединаДо;
+
+  let части = "";
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      if (!есть(x, y) || вМаркере(x, y) || вСередине(x, y)) continue;
+      части += `<circle cx="${x + 0.5}" cy="${y + 0.5}" r="0.42"/>`;
+    }
+  }
+  for (const [mx, my] of маркеры) {
+    части += `<rect x="${mx + 0.5}" y="${my + 0.5}" width="6" height="6" rx="2" ry="2" fill="none" stroke="#FFFFFF" stroke-width="1"/>`;
+    части += `<rect x="${mx + 2}" y="${my + 2}" width="3" height="3" rx="1" ry="1"/>`;
+  }
+
+  const поле = 1;
+  const свг = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-поле} ${-поле} ${N + поле * 2} ${N + поле * 2}" fill="#FFFFFF" shape-rendering="geometricPrecision">${части}</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(свг)}`;
+}
+
 /* Экран «Получить»: адрес кошелька Mintly кодом и строкой.
  *
  * Код рисуется на месте, а не берётся картинкой со стороннего сервиса:
@@ -11940,14 +11979,12 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", sh
     let брошено = false;
     (async () => {
       try {
-        const QR = (await import("qrcode")).default;
-        const данные = await QR.toDataURL(адрес, {
-          margin: 1, width: 720, errorCorrectionLevel: "H",
-          // Белые модули на прозрачном: код лежит на тёмной плитке, и
-          // белое поле вокруг него выглядело бы наклейкой.
-          color: { dark: "#FFFFFFFF", light: "#00000000" },
-        });
-        if (!брошено) setКод(данные);
+        const QR = await import("qrcode");
+        // Матрица, а не готовая картинка: код рисуем сами точками и
+        // скруглёнными углами — квадратная сетка из коробки выглядит как
+        // распечатка с чека, а не как часть приложения.
+        const сетка = QR.create(адрес, { errorCorrectionLevel: "H" });
+        if (!брошено) setКод(кодВSVG(сетка));
       } catch { if (!брошено) setКод(null); }
     })();
     return () => { брошено = true; };
@@ -11989,7 +12026,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", sh
           }}
         >
           {код ? (
-            <img src={код} alt="" style={{ width: "100%", height: "100%", display: "block", imageRendering: "pixelated" }} />
+            <img src={код} alt="" style={{ width: "100%", height: "100%", display: "block" }} />
           ) : адрес ? (
             <div style={{ width: 120, height: 10, borderRadius: 999, background: T.surface, overflow: "hidden" }}>
               <div style={{ width: "40%", height: "100%", borderRadius: 999, background: hexA("#8E2DE2", 0.55), animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
@@ -12180,6 +12217,9 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
 
   const солью = отдаю.тикер === "SOL";
   const свободно = Math.max(0, Number(солНаКошельке) - 0.01);  // запас на комиссию сети
+  /* Нехватку показываем на вводе, а не по нажатию: узнать, что денег
+     мало, после того как потянулся к кнопке, — обидно и лишний шаг. */
+  const нехватка = солью && доли > 0n && Number(String(сумма).replace(",", ".")) > свободно;
 
   function клавиша(к) {
     setСумма((было) => {
@@ -12227,7 +12267,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
     }
   }
 
-  const готово = доли > 0n && выход != null && !идёт;
+  const готово = доли > 0n && выход != null && !идёт && !нехватка;
 
   return (
     <ЭкранСнизу
@@ -12256,8 +12296,11 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
             </button>
           </div>
           {солью && (
-            <div style={{ fontFamily: monoFont, color: T.faint, fontSize: 12, marginTop: 6 }}>
-              {t("swapAvailable")}: {свободно.toFixed(4)} SOL
+            <div style={{
+              fontFamily: monoFont, color: нехватка ? T.down : T.faint, fontSize: 12, marginTop: 6,
+              transition: `color ${EASE}`,
+            }}>
+              {нехватка ? t("swapNotEnough") : `${t("swapAvailable")}: ${свободно.toFixed(4)} SOL`}
             </div>
           )}
         </div>
