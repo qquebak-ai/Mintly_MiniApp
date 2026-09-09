@@ -1466,10 +1466,9 @@ function GlobalStyle() {
         10%  { opacity: 1; }
         100% { transform: translate3d(var(--сдвиг, 0), 460px, 0) rotate(var(--поворот, 180deg)); opacity: 0; }
       }
-      /* Маскот: моргает раз в несколько секунд и по кольцу бежит блик —
-         достаточно, чтобы он казался живым, и мало, чтобы отвлекать. */
-      @keyframes котМоргает { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
-      @keyframes кольцоБежит { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -206; } }
+      /* Маскот: медленно покачивается, свечение вокруг дышит. */
+      @keyframes маскотДышит { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-6px) rotate(-2deg); } }
+      @keyframes маскотСветит { 0%, 100% { opacity: 0.55; transform: scale(0.94); } 50% { opacity: 1; transform: scale(1.06); } }
       @keyframes gridDrift { from{background-position:0 0,0 0;} to{background-position:140px 140px,140px 140px;} }
       @keyframes starTwinkle { 0%,100%{opacity:.2;} 50%{opacity:1;} }
       @keyframes starPulse { 0%,100%{opacity:0;} 50%{opacity:var(--o);} }
@@ -5693,52 +5692,33 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
 
 /* Маскот — кот-планета.
  *
- * Утверждён дизайн-планом: тёмная кошачья морда, почти сливающаяся с
- * фоном, кольцо планеты вокруг и светящиеся глаза. Рисуется вектором, а
- * не картинкой: он появляется в пустых состояниях разного размера, и
- * растягивать растр под каждое место — значит получить мыло.
+ * Утверждён дизайн-планом и нарисован заказчиком: тёмная кошачья морда
+ * со светящимися глазами, вокруг — орбита с неоновым сине-фиолетовым
+ * градиентом. Берём его картинкой, а не повторяем вектором: рисованный
+ * от руки контур и свечение вектором не воспроизвести, а разойтись
+ * образу с фирменным нельзя.
  *
- * Свечение даёт сам маскот: на чёрном фоне контур с неоновым градиентом
- * читается как источник света. */
+ * Фон у файла вырезан, поэтому маскот ложится на любой тёмный слой.
+ * Дышит и чуть покачивается — на пустом экране это единственное
+ * движение, и оно объясняет, что приложение живо. */
 function КотПланета({ size = 120, glow = true }) {
-  const id = React.useId().replace(/:/g, "");
   return (
-    <svg width={size} height={size} viewBox="0 0 120 120" fill="none" aria-hidden style={{ display: "block" }}>
-      <defs>
-        <linearGradient id={`к${id}`} x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor="#4B7BFF" />
-          <stop offset="55%" stopColor={T.electric} />
-          <stop offset="100%" stopColor="#C08BFF" />
-        </linearGradient>
-        <radialGradient id={`г${id}`} cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%" stopColor={T.electric} stopOpacity="0.5" />
-          <stop offset="100%" stopColor={T.electric} stopOpacity="0" />
-        </radialGradient>
-      </defs>
-
-      {glow && <circle cx="60" cy="60" r="56" fill={`url(#г${id})`} />}
-
-      {/* Кольцо планеты — эллипс под углом, обрезанный мордой: так оно
-          читается «за» котом, а не поверх. */}
-      <ellipse cx="60" cy="64" rx="52" ry="17" transform="rotate(-16 60 64)"
-        stroke={`url(#к${id})`} strokeWidth="2.5" fill="none" opacity="0.85" />
-
-      {/* Голова: круг с ушами. Заливка почти чёрная — маскот должен
-          сливаться с фоном, светится только контур и глаза. */}
-      <path d="M28 44 L34 20 L52 32 Z" fill="#0B0D12" stroke={`url(#к${id})`} strokeWidth="2.5" strokeLinejoin="round" />
-      <path d="M92 44 L86 20 L68 32 Z" fill="#0B0D12" stroke={`url(#к${id})`} strokeWidth="2.5" strokeLinejoin="round" />
-      <circle cx="60" cy="60" r="30" fill="#0B0D12" stroke={`url(#к${id})`} strokeWidth="2.5" />
-
-      {/* Глаза — единственное яркое пятно, поэтому взгляд идёт к ним. */}
-      <ellipse cx="49" cy="57" rx="5" ry="6.5" fill={T.turquoise} style={{ animation: "котМоргает 5.5s ease-in-out infinite" }} />
-      <ellipse cx="71" cy="57" rx="5" ry="6.5" fill={T.turquoise} style={{ animation: "котМоргает 5.5s ease-in-out infinite" }} />
-      <path d="M56 70 q4 4 8 0" stroke={`url(#к${id})`} strokeWidth="2" fill="none" strokeLinecap="round" />
-      <path d="M34 62 h-12 M34 68 h-10 M86 62 h12 M86 68 h10" stroke={`url(#к${id})`} strokeWidth="1.6" opacity="0.5" strokeLinecap="round" />
-
-      <ellipse cx="60" cy="64" rx="52" ry="17" transform="rotate(-16 60 64)"
-        stroke={`url(#к${id})`} strokeWidth="2.5" fill="none" opacity="0.35"
-        strokeDasharray="6 200" style={{ animation: "кольцоБежит 6s linear infinite" }} />
-    </svg>
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      {glow && (
+        <div aria-hidden style={{
+          position: "absolute", inset: "-18%", borderRadius: "50%",
+          background: `radial-gradient(circle, ${hexA(T.electric, 0.28)} 0%, ${hexA(T.electric, 0)} 68%)`,
+          animation: "маскотСветит 4.5s ease-in-out infinite",
+        }} />
+      )}
+      <img
+        src="/mascot.png"
+        alt=""
+        width={size}
+        height={size}
+        style={{ position: "relative", width: size, height: size, display: "block", animation: "маскотДышит 6s ease-in-out infinite" }}
+      />
+    </div>
   );
 }
 
