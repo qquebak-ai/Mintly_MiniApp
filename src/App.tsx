@@ -14681,14 +14681,24 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             position: "absolute", top: -отступСверху, left: 0, right: 0,
             height: ВЫСОТА_ПОЛОСЫ + отступСверху,
             display: "flex", alignItems: "flex-end", padding: `0 14px ${(ВЫСОТА_ПОЛОСЫ - 40) / 2}px`,
-            backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
-            background: "linear-gradient(180deg, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.52) 58%, rgba(0,0,0,0) 100%)",
-            // Размытие тает к низу вместе с заливкой — иначе под полосой
-            // видна её ровная нижняя кромка.
-            WebkitMaskImage: "linear-gradient(180deg, #000 68%, transparent 100%)",
-            maskImage: "linear-gradient(180deg, #000 68%, transparent 100%)",
           }}
         >
+          {/* Размытие — отдельным слоем под содержимым. Пока маска висела
+              на самой полосе, она гасила и аватарку с ценой: маска
+              применяется ко всему поддереву, а не только к фону. */}
+          <div
+            aria-hidden
+            style={{
+              position: "absolute", inset: 0,
+              backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
+              background: "linear-gradient(180deg, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.52) 58%, rgba(0,0,0,0) 100%)",
+              // Размытие тает к низу вместе с заливкой — иначе под
+              // полосой видна её ровная нижняя кромка.
+              WebkitMaskImage: "linear-gradient(180deg, #000 68%, transparent 100%)",
+              maskImage: "linear-gradient(180deg, #000 68%, transparent 100%)",
+              pointerEvents: "none",
+            }}
+          />
           <div className="flex items-center flex-shrink-0" style={{ gap: 8, position: "relative", zIndex: 1 }}>
             {!hasTelegramBack() && (
               <button onClick={onBack} className="fx-tap flex items-center justify-center flex-shrink-0"
