@@ -14683,21 +14683,21 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
                  задавалось долей от всей высоты полосы, а высота эта
                  вместе с отступом под шапку клиента больше сотни точек —
                  «последние 14%» начинались задолго до аватарки. */
-              height: отступСверху + ВЫСОТА_ПОЛОСЫ / 2 + 18,
+              height: отступСверху + ВЫСОТА_ПОЛОСЫ / 2 + 34,
               /* Размытие с приглушением, а не тёмная плёнка поверх.
                  Белый текст, проезжающий под полосой, при одном лишь
                  размытии превращается в яркое пятно — оно светилось
                  сквозь неё и спорило с именем токена. brightness гасит
                  его прямо в подложке, поэтому сама полоса может
                  оставаться почти прозрачной. */
-              backdropFilter: "blur(14px) brightness(0.45)",
-              WebkitBackdropFilter: "blur(14px) brightness(0.45)",
+              backdropFilter: "blur(26px) brightness(0.5) saturate(1.1)",
+              WebkitBackdropFilter: "blur(26px) brightness(0.5) saturate(1.1)",
               background: "linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.06) 60%, rgba(0,0,0,0) 100%)",
               // Держится до самого низа и тает у последних точек: иначе
               // размытие пропадает задолго до края и полоса кажется
               // короче, чем она есть.
-              WebkitMaskImage: "linear-gradient(180deg, #000 calc(100% - 18px), transparent 100%)",
-              maskImage: "linear-gradient(180deg, #000 calc(100% - 18px), transparent 100%)",
+              WebkitMaskImage: "linear-gradient(180deg, #000 calc(100% - 34px), transparent 100%)",
+              maskImage: "linear-gradient(180deg, #000 calc(100% - 34px), transparent 100%)",
               pointerEvents: "none",
             }}
           />
