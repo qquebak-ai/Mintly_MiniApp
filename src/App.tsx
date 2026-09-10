@@ -14335,8 +14335,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         const r = эл.getBoundingClientRect();
         if (!r.height) return 0;
         const своё = r.top - верх + прокручено;
-        const начало = Math.max(0, своё + r.height - ВЫСОТА_ПОЛОСЫ);
-        return Math.max(0, Math.min(1, (прокручено - начало) / r.height));
+        // Начинаем не когда блок скрылся целиком, а когда он наполовину
+        // заехал под полосу: к моменту, как он исчезнет из виду, копия
+        // уже стоит на месте. Раньше отсчёт шёл от полного исчезновения и
+        // растягивался на всю высоту блока — имя с ценой появлялись,
+        // когда их давно пролистнули.
+        const начало = Math.max(0, своё + r.height / 2 - ВЫСОТА_ПОЛОСЫ);
+        // Двадцать точек хода — примерно треть движения пальца, этого
+        // достаточно, чтобы переход читался как плавный, а не как щелчок.
+        return Math.max(0, Math.min(1, (прокручено - начало) / 20));
       };
       const след = { аватар: доля(рядАватарки.current), текст: доля(блокЦены.current) };
       setШапкаДоля((было) => (
@@ -14738,7 +14745,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       <div className="flex flex-col" style={{ gap: 8 }}>
         {/* Имя крупно, тикер — справа от него мелким: имя читают, тикером
             сверяются. */}
-        <div className="flex items-baseline justify-between" style={{ gap: 12 }}>
+        <div ref={блокЦены} className="flex items-baseline justify-between" style={{ gap: 12 }}>
           <div className="flex items-baseline min-w-0" style={{ gap: 6 }}>
             <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em" }}>
               {token.name}
@@ -14756,7 +14763,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         {/* Цена и под ней изменение — в деньгах и в процентах разом.
             Оба числа считаются по видимому участку графика: сдвинул окно
             — увидел, сколько монета прошла именно там. */}
-        <div ref={блокЦены}>
+        <div>
           <div style={{
             fontFamily: displayFont, fontWeight: 800, fontSize: 34, lineHeight: 1.05,
             letterSpacing: "-0.02em", color: T.ice, wordBreak: "break-all",
