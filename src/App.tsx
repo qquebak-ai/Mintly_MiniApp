@@ -1298,7 +1298,7 @@ const SHEET_BACK = {
 function sheetCard(pad = 22, extra = {}) {
   return {
     width: "100%", maxWidth: 440,
-    background: T.surface, border: `1px solid ${T.lineHi}`,
+    background: T.surface, border: "none",
     borderRadius: 26,
     padding: pad,
     // Высоту ограничивает подложка: она уже вычла и чёлку, и нижнюю
@@ -5327,7 +5327,7 @@ function TokenAvatar({ size = 52, tone = "neutral", src }) {
 
 function GlassCard({ children, style, className = "", ...rest }) {
   return (
-    <div className={`fx-card rounded-[20px] ${className}`} style={{ background: T.surface, border: `1px solid ${T.line}`, ...style }} {...rest}>
+    <div className={`fx-card rounded-[20px] ${className}`} style={{ background: T.surface, border: "none", ...style }} {...rest}>
       {children}
     </div>
   );
@@ -5335,7 +5335,7 @@ function GlassCard({ children, style, className = "", ...rest }) {
 
 function StatChip({ icon: Icon, label, value }) {
   return (
-    <div className="fx-chip flex items-center gap-2 rounded-[20px] px-3 py-2" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
+    <div className="fx-chip flex items-center gap-2 rounded-[20px] px-3 py-2" style={{ background: T.surface, border: "none" }}>
       <Icon size={14} color={T.muted} />
       <div>
         <div style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, lineHeight: 1.1 }}>{value}</div>
@@ -6184,7 +6184,7 @@ function TokenCreatorCard({ ownerId, currentUserId, onNeedAuth, showToast, onOpe
   if (!ownerId) return null;
   if (loading && !creator) {
     return (
-      <div className="rounded-[22px] p-4 flex items-center justify-center" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
+      <div className="rounded-[22px] p-4 flex items-center justify-center" style={{ background: T.surface, border: "none" }}>
         <LeafLoader size={34} />
       </div>
     );
@@ -6192,7 +6192,7 @@ function TokenCreatorCard({ ownerId, currentUserId, onNeedAuth, showToast, onOpe
   if (!creator) return null;
 
   return (
-    <div className="rounded-[22px] p-4 flex items-center gap-3" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
+    <div className="rounded-[22px] p-4 flex items-center gap-3" style={{ background: T.surface, border: "none" }}>
       {/* Аватарка с ником — переход на профиль создателя. Кнопка подписки
           рядом отдельная, чтобы не приходилось открывать профиль ради
           одного нажатия. */}
@@ -6249,7 +6249,7 @@ function PublicProfileView({ userId: ownerId, currentUserId, onBack, onOpenToken
     return (
       <div className="fx-view flex flex-col gap-4">
         {!hasTelegramBack() && (
-          <button onClick={onBack} className="fx-tap self-start flex items-center gap-1 rounded-full px-3 py-1.5" style={{ color: T.ice, fontFamily: bodyFont, fontSize: 14.5, background: T.surface, border: `1px solid ${T.line}` }}>
+          <button onClick={onBack} className="fx-tap self-start flex items-center gap-1 rounded-full px-3 py-1.5" style={{ color: T.ice, fontFamily: bodyFont, fontSize: 14.5, background: T.surface, border: "none" }}>
             <ChevronLeft size={16} /> {tr("back")}
           </button>
         )}
@@ -6276,7 +6276,7 @@ function PublicProfileView({ userId: ownerId, currentUserId, onBack, onOpenToken
             абсолютом в углу и налезала на рамку. */}
         {!hasTelegramBack() && (
           <div className="flex" style={{ position: "relative", zIndex: 2, width: "100%", justifyContent: "flex-start", marginBottom: 6 }}>
-            <button onClick={onBack} className="fx-tap flex items-center gap-1 rounded-full px-3 py-1.5" style={{ background: T.surface, border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>
+            <button onClick={onBack} className="fx-tap flex items-center gap-1 rounded-full px-3 py-1.5" style={{ background: T.surface, border: "none", fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>
               <ChevronLeft size={16} /> {tr("back")}
             </button>
           </div>
@@ -6320,7 +6320,7 @@ function PublicProfileView({ userId: ownerId, currentUserId, onBack, onOpenToken
                 key={row.id}
                 onClick={() => onOpenToken(row)}
                 className="fx-card flex items-center gap-3 rounded-[22px] w-full"
-                style={{ background: T.surface, border: `1px solid ${T.line}`, padding: "12px 14px" }}
+                style={{ background: T.surface, border: "none", padding: "12px 14px" }}
               >
                 <TokenAvatar size={40} src={row.logo_url} />
                 <div className="flex-1 min-w-0 flex flex-col items-start">
@@ -7035,7 +7035,7 @@ function BadgeSheet({ onClose, art, title, subtitle, text }) {
           <button
             onClick={onClose}
             className="fx-tap w-full rounded-[20px] py-3"
-            style={{ marginTop: 18, maxWidth: 320, background: T.surfaceHi, border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}
+            style={{ marginTop: 18, maxWidth: 320, background: T.surfaceHi, border: "none", fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}
           >
             {tr("wreathClose")}
           </button>
@@ -7167,7 +7167,7 @@ function TrustPanel({ token, testnet = false, holders = null }) {
   if (pct != null) rows.push([tr("trustCreatorHolds"), `${pct.toFixed(pct < 10 ? 1 : 0)}${tr("trustOfSupply")}`, pct > 20 ? T.down : T.ice]);
 
   return (
-    <div className="rounded-[22px] p-3.5" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
+    <div className="rounded-[22px] p-3.5" style={{ background: T.surface, border: "none" }}>
       <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, marginBottom: 8 }}>{tr("trustTitle")}</div>
       {rows.map(([label, value, color]) => (
         <div key={label} className="flex items-center justify-between" style={{ padding: "3px 0" }}>
@@ -7216,7 +7216,7 @@ function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false }) {
     );
   }
   return (
-    <div className="rounded-[22px] p-3.5" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
+    <div className="rounded-[22px] p-3.5" style={{ background: T.surface, border: "none" }}>
       <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{tr("gradTitle")}</span>
         <span style={{ fontFamily: monoFont, color: done ? T.up : T.ice, fontSize: 13, fontWeight: 700 }}>
@@ -9552,7 +9552,7 @@ function AchievementsView({ achievements = [], onGoShop, onBack }) {
         <button
           onClick={onGoShop}
           className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3"
-          style={{ background: T.surface, border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}
+          style={{ background: T.surface, border: "none", fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}
         >
           <ShoppingBag size={15} color={T.electric} /> {t("achGoShop")}
         </button>
@@ -9613,7 +9613,7 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
           {kind === "frame" ? t("shopTabFrames") : t("shopTabCards")}
         </span>
 
-        <div className="flex items-center justify-between w-full rounded-[18px] px-4 py-3" style={{ marginTop: 14, background: T.bg, border: `1px solid ${T.line}` }}>
+        <div className="flex items-center justify-between w-full rounded-[18px] px-4 py-3" style={{ marginTop: 14, background: T.bg, border: "none" }}>
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("shopLeftAfter")}</span>
           <span className="flex items-center gap-1.5">
             <CoinIcon size={14} />
@@ -9691,7 +9691,7 @@ function ChestBuySheet({ coins, owned, onConfirm, onClose }) {
             {pool.slice(0, 4).map((это) => (
               <div key={`${это.kind}:${это.id}`} style={{
                 width: 52, height: 52, borderRadius: 13, overflow: "hidden", position: "relative",
-                background: T.bg, border: `1px solid ${T.line}`,
+                background: T.bg, border: "none",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 {это.kind === "frame" ? (
@@ -9709,7 +9709,7 @@ function ChestBuySheet({ coins, owned, onConfirm, onClose }) {
           </div>
         )}
 
-        <div className="flex items-center justify-between w-full rounded-[18px] px-4 py-3" style={{ marginTop: 16, background: T.bg, border: `1px solid ${T.line}` }}>
+        <div className="flex items-center justify-between w-full rounded-[18px] px-4 py-3" style={{ marginTop: 16, background: T.bg, border: "none" }}>
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("shopLeftAfter")}</span>
           <span className="flex items-center gap-1.5">
             <CoinIcon size={14} dim={!хватает} />
@@ -10214,7 +10214,7 @@ function ChestReveal({ prize, onClose }) {
               <div key={i} style={{
                 width: ROLL_ITEM, height: ROLL_ITEM, flexShrink: 0,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                borderRadius: 14, background: T.surface, border: `1px solid ${T.line}`,
+                borderRadius: 14, background: T.surface, border: "none",
                 position: "relative", overflow: "hidden",
               }}>
                 {это.kind === "frame" ? (
@@ -10524,7 +10524,7 @@ function NetworkSlider({ value, onChange, ширина = 168, высота = 38 
       style={{
         position: "relative", width: ширина, height: высота, flexShrink: 0,
         boxSizing: "border-box",
-        borderRadius: 999, background: T.surface, border: `1px solid ${T.line}`,
+        borderRadius: 999, background: T.surface, border: "none",
         // Иначе первое же движение пальца уводит страницу в прокрутку и
         // ползунок остаётся на месте.
         touchAction: "none", userSelect: "none", cursor: "grab",
@@ -10537,7 +10537,7 @@ function NetworkSlider({ value, onChange, ширина = 168, высота = 38 
           // Рамка считается внутрь ширины: иначе бегунок шире половины
           // дорожки на её толщину и в правом положении вылезает за край.
           boxSizing: "border-box",
-          background: T.surfaceHi, border: `1px solid ${T.lineHi}`,
+          background: T.surfaceHi, border: "none",
           transform: `translateX(${x}px)`,
           transition: сдвиг == null ? `transform 220ms cubic-bezier(0.32,1.2,0.5,1)` : "none",
         }}
@@ -10815,7 +10815,7 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
             key={spotlight.id}
             onClick={() => onOpen(spotlight)}
             className="fx-tap w-full flex items-center text-left"
-            style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface, border: `1px solid ${T.line}`, position: "relative", overflow: "hidden" }}
+            style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface, border: "none", position: "relative", overflow: "hidden" }}
           >
             {/* Своя обложка вытесняет ауру: автор нарисовал её сам, и
                 подкрашивать её усреднённым цветом логотипа незачем.
@@ -11096,7 +11096,7 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
       <button
         onClick={() => onOpen && onOpen(tok)}
         className="fx-card fx-tap w-full text-left rounded-[24px]"
-        style={{ position: "relative", overflow: "hidden", padding: 16, background: T.surface, border: `1px solid ${T.line}` }}
+        style={{ position: "relative", overflow: "hidden", padding: 16, background: T.surface, border: "none" }}
       >
         {/* Подложка берёт цвет из самого логотипа — у каждого токена
             своя, и подборка каждый раз выглядит по-новому. */}
@@ -11881,7 +11881,7 @@ function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, 
           </div>
           <div className="flex items-center gap-1.5" style={{ marginTop: 10, flexWrap: "wrap" }}>
             {achievements.filter((a) => !a.done).slice(0, 3).map((a) => (
-              <span key={a.id} className="flex items-center gap-1 rounded-full px-2 py-1" style={{ background: T.surfaceHi, border: `1px solid ${T.line}` }}>
+              <span key={a.id} className="flex items-center gap-1 rounded-full px-2 py-1" style={{ background: T.surfaceHi, border: "none" }}>
                 <a.icon size={11} color={T.muted} />
                 <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: T.muted }}>{a.label}</span>
               </span>
@@ -12308,7 +12308,7 @@ function SolanaWalletCard({ showToast, insetTop = 0, insetBottom = 0 }) {
   }
 
   return (
-    <div className="w-full rounded-[22px] p-4" style={{ marginTop: 20, background: T.surface, border: `1px solid ${T.line}` }}>
+    <div className="w-full rounded-[22px] p-4" style={{ marginTop: 20, background: T.surface, border: "none" }}>
       <div className="flex items-center justify-between gap-3">
         <button
           onClick={() => сессия && setСтраница(true)}
@@ -13464,7 +13464,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <div className="flex flex-col" style={{ gap: 14, marginTop: 20, padding: "0 16px" }}>
         {/* TON-кошелёк. Он внешний: им подписывают покупки на кривой TON,
             но менять на нём нечего — обмен живёт только внутри. */}
-        <div className="w-full rounded-[22px] p-4" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
+        <div className="w-full rounded-[22px] p-4" style={{ background: T.surface, border: "none" }}>
           {connected ? (
             /* Карточка целиком — вход на страницу кошелька: там же и
                отключение, ползунком. Кнопка рядом с балансом слишком
@@ -13692,7 +13692,7 @@ function TokenComments({ tokenId, currentUserId, onNeedAuth, onOpenProfile, show
             style={{
               flex: 1, minWidth: 0, resize: "none",
               fontFamily: bodyFont, fontSize: 16, lineHeight: 1.4, color: T.ice,
-              background: T.surface, border: `1px solid ${T.line}`, borderRadius: 18,
+              background: T.surface, border: "none", borderRadius: 18,
               padding: "10px 13px", outline: "none",
             }}
           />
@@ -13728,7 +13728,7 @@ function TokenComments({ tokenId, currentUserId, onNeedAuth, onOpenProfile, show
       ) : (
         <div className="flex flex-col gap-2">
           {items.map((c) => (
-            <div key={c.id} className="flex gap-2.5 rounded-[20px] p-3" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
+            <div key={c.id} className="flex gap-2.5 rounded-[20px] p-3" style={{ background: T.surface, border: "none" }}>
               <button
                 onClick={() => onOpenProfile && c.user_id && onOpenProfile(c.user_id)}
                 className="fx-tap"
@@ -14444,7 +14444,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               <button
                 onClick={() => setChartReload((v) => v + 1)}
                 className="fx-tap rounded-full px-3.5 py-1.5"
-                style={{ background: T.surface, border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 13, color: T.ice }}
+                style={{ background: T.surface, border: "none", fontFamily: bodyFont, fontSize: 13, color: T.ice }}
               >
                 {tr("chartRetry")}
               </button>
@@ -14457,7 +14457,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
 
       {/* Позиция — сразу под графиком: посмотрел на цену и увидел, что
           она значит именно для тебя. */}
-      <div className="flex flex-col" style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface, border: `1px solid ${T.line}` }}>
+      <div className="flex flex-col" style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface, border: "none" }}>
         <div className="flex items-center justify-between">
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 600 }}>{tr("positionTitle")}</span>
           {позиция != null && позиция > 0 && (
@@ -14511,7 +14511,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             rows={3}
             style={{
               width: "100%", resize: "none", padding: "10px 12px", borderRadius: 12,
-              background: T.surface, border: `1px solid ${T.line}`, outline: "none",
+              background: T.surface, border: "none", outline: "none",
               fontFamily: bodyFont, fontSize: 14, color: T.ice, lineHeight: 1.45,
             }}
           />
@@ -14520,7 +14520,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             <button
               onClick={() => { сохранитьТезис(черновикТезиса); setТезисОткрыт(false); }}
               className="fx-tap rounded-[12px] px-3.5 py-1.5 flex-shrink-0"
-              style={{ background: T.surfaceHi, border: `1px solid ${T.lineHi}`, fontFamily: displayFont, fontSize: 13, color: T.ice }}
+              style={{ background: T.surfaceHi, border: "none", fontFamily: displayFont, fontSize: 13, color: T.ice }}
             >
               {tr("thesisSave")}
             </button>
@@ -15149,14 +15149,14 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
             onClick={saveFile}
             disabled={!ready}
             className="fx-tap flex-1 flex items-center justify-center gap-1.5 rounded-[18px] py-2.5"
-            style={{ background: T.surfaceHi, border: `1px solid ${T.line}`, color: T.ice, fontFamily: displayFont, fontWeight: 700, fontSize: 13, opacity: ready ? 1 : 0.5 }}
+            style={{ background: T.surfaceHi, border: "none", color: T.ice, fontFamily: displayFont, fontWeight: 700, fontSize: 13, opacity: ready ? 1 : 0.5 }}
           >
             <ImageIcon size={14} color={T.muted} /> {t("shareCardSave")}
           </button>
           <button
             onClick={copyLink}
             className="fx-tap flex-1 flex items-center justify-center gap-1.5 rounded-[18px] py-2.5"
-            style={{ background: T.surfaceHi, border: `1px solid ${T.line}`, color: T.ice, fontFamily: displayFont, fontWeight: 700, fontSize: 13 }}
+            style={{ background: T.surfaceHi, border: "none", color: T.ice, fontFamily: displayFont, fontWeight: 700, fontSize: 13 }}
           >
             <Copy size={14} color={T.muted} /> {t("shareCardCopy")}
           </button>
@@ -15344,7 +15344,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           <button onClick={onClose} className="fx-tap fx-close"><X size={16} color={T.muted} /></button>
         </div>
 
-        <div className="flex rounded-[20px] p-1" style={{ background: T.bg, border: `1px solid ${T.line}` }}>
+        <div className="flex rounded-[20px] p-1" style={{ background: T.bg, border: "none" }}>
           {[{ id: "buy", label: t("buy") }, { id: "sell", label: t("sell") }].map(o => {
             const active = mode === o.id;
             return (
@@ -15390,13 +15390,13 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
 
         <div className="grid grid-cols-4 gap-1.5" style={{ marginTop: 8 }}>
           {[0.25, 0.5, 0.75, 1].map(pct => (
-            <button key={pct} onClick={() => setPct(pct)} className="fx-tap rounded-[16px] py-1.5" style={{ background: T.surfaceHi, border: `1px solid ${T.line}`, fontFamily: monoFont, fontSize: 12.5, color: T.ice }}>
+            <button key={pct} onClick={() => setPct(pct)} className="fx-tap rounded-[16px] py-1.5" style={{ background: T.surfaceHi, border: "none", fontFamily: monoFont, fontSize: 12.5, color: T.ice }}>
               {pct === 1 ? t("maxLabel") : `${pct * 100}%`}
             </button>
           ))}
         </div>
 
-        <div className="rounded-[20px] p-3.5 mt-3.5" style={{ background: T.bg, border: `1px solid ${T.line}` }}>
+        <div className="rounded-[20px] p-3.5 mt-3.5" style={{ background: T.bg, border: "none" }}>
           <div className="flex items-center justify-between">
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("youReceive")}</span>
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>
@@ -15608,7 +15608,7 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
       }}
       onClick={(e) => { e.stopPropagation(); onCancel(); }}
     >
-      <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 340, maxHeight: "100%", overflowY: "auto", background: T.surface, border: `1px solid ${T.lineHi}`, borderRadius: 24, padding: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+      <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 340, maxHeight: "100%", overflowY: "auto", background: T.surface, border: "none", borderRadius: 24, padding: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
         <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>{t("cropImageTitle")}</div>
         <div
           onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp} onMouseLeave={onPointerUp}
@@ -15717,7 +15717,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
   return (
     <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "absolute", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.92)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(20px + var(--tg-inset-top, 0px)) 20px calc(20px + var(--tg-inset-bottom, 0px))", overflowY: "auto" }}>
       {error ? (
-        <div className="fx-modal-card flex flex-col items-center text-center gap-4" style={{ width: "100%", maxWidth: 340, background: T.surface, border: `1px solid ${T.lineHi}`, borderRadius: 24, padding: 24 }}>
+        <div className="fx-modal-card flex flex-col items-center text-center gap-4" style={{ width: "100%", maxWidth: 340, background: T.surface, border: "none", borderRadius: 24, padding: 24 }}>
           {/* Ошибку встречает маскот, а не безликий значок: тот же
               персонаж, что и в удачных местах, — так неудача остаётся
               частью приложения, а не аварийным экраном. */}
@@ -15786,7 +15786,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
           </div>
         </div>
       ) : (
-        <div className="fx-modal-card fx-view flex flex-col items-center text-center gap-4" style={{ position: "relative", width: "100%", maxWidth: 360, background: T.surface, border: `1px solid ${T.lineHi}`, borderRadius: 24, padding: 24 }}>
+        <div className="fx-modal-card fx-view flex flex-col items-center text-center gap-4" style={{ position: "relative", width: "100%", maxWidth: 360, background: T.surface, border: "none", borderRadius: 24, padding: 24 }}>
           {/* Запуск токена — то самое событие, ради которого сюда шли:
               маскот уходит вверх, как планета со старта, и следом летят
               частицы. */}
@@ -15808,11 +15808,11 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
           <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5, marginTop: -6 }}>{t("launchSuccessSub")}</p>
 
           <div className="w-full flex flex-col gap-2 mt-1">
-            <div className="flex items-center justify-between rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: `1px solid ${T.line}` }}>
+            <div className="flex items-center justify-between rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: "none" }}>
               <span style={{ fontFamily: bodyFont, fontSize: 12, color: T.muted }}>{t("totalSupply")}</span>
               <span style={{ fontFamily: monoFont, fontSize: 13, color: T.ice }}>{result.supply}</span>
             </div>
-            <div className="flex items-center justify-between rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: `1px solid ${T.line}` }}>
+            <div className="flex items-center justify-between rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: "none" }}>
               <span style={{ fontFamily: bodyFont, fontSize: 12, color: T.muted }}>{t("initialBuy")}</span>
               <span style={{ fontFamily: monoFont, fontSize: 13, color: T.ice, textAlign: "right" }}>
                 {result.buyAmount} {result.chain === "solana" ? "SOL" : "TON"}<br />
@@ -15821,7 +15821,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
                 </span>
               </span>
             </div>
-            <div className="flex items-center justify-between rounded-[20px] px-3 py-2.5 gap-2" style={{ background: T.surfaceHi, border: `1px solid ${T.line}` }}>
+            <div className="flex items-center justify-between rounded-[20px] px-3 py-2.5 gap-2" style={{ background: T.surfaceHi, border: "none" }}>
               <div className="flex flex-col items-start min-w-0">
                 <span style={{ fontFamily: bodyFont, fontSize: 12, color: T.muted }}>{t("contractAddress")}</span>
                 <span style={{ fontFamily: monoFont, fontSize: 12.5, color: T.ice, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 190 }}>{result.address}</span>
@@ -15831,7 +15831,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
               </button>
             </div>
             {result.explorerUrl && (
-              <a href={result.explorerUrl} target="_blank" rel="noreferrer" className="fx-tap flex items-center justify-center gap-1.5 rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: `1px solid ${T.line}`, textDecoration: "none" }}>
+              <a href={result.explorerUrl} target="_blank" rel="noreferrer" className="fx-tap flex items-center justify-center gap-1.5 rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: "none", textDecoration: "none" }}>
                 <ExternalLink size={13} color={T.muted} />
                 <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: T.muted }}>{t("viewOnExplorer")}</span>
               </a>
@@ -15945,7 +15945,7 @@ function ЗаготовкиЗапуска({ onВыбрать }) {
             className="fx-tap flex-shrink-0 text-left"
             style={{
               width: 168, padding: "12px 13px", borderRadius: 18,
-              background: T.surface, border: `1px solid ${T.line}`,
+              background: T.surface, border: "none",
             }}
           >
             <span style={{ fontSize: 20 }}>{з.знак}</span>
@@ -16752,7 +16752,7 @@ const SUPPORT_FAQ = [
 /* Одна строка вопроса: нажатие раскрывает ответ. */
 function FaqItem({ item, open, onToggle }) {
   return (
-    <div style={{ background: T.surfaceHi, border: `1px solid ${T.line}`, borderRadius: 18, overflow: "hidden" }}>
+    <div style={{ background: T.surfaceHi, border: "none", borderRadius: 18, overflow: "hidden" }}>
       <button
         onClick={onToggle}
         className="fx-tap w-full flex items-center gap-2"
@@ -16965,7 +16965,7 @@ function SupportChat({ accountCreated, showToast, onRead }) {
             style={{
               flex: 1, minWidth: 0, resize: "none",
               fontFamily: bodyFont, fontSize: 16, lineHeight: 1.4, color: T.ice,
-              background: T.bg, border: `1px solid ${T.line}`, borderRadius: 18,
+              background: T.bg, border: "none", borderRadius: 18,
               padding: "10px 13px", outline: "none",
             }}
           />
@@ -17028,7 +17028,7 @@ function ReferralShare({ showToast }) {
   const оборот = Number(state.volume) || 0;
 
   return (
-    <div className="mt-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surfaceHi, border: `1px solid ${T.line}` }}>
+    <div className="mt-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surfaceHi, border: "none" }}>
       <div className="flex items-center justify-between">
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("refVolume")}</span>
         <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>{fmtTon(оборот)} TON</span>
@@ -17098,7 +17098,7 @@ function SettingsPanel({
           <button
             onClick={() => { if (appSettings.pinEnabled) onChangePin(); else showToast(t("enablePinFirst")); }}
             className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3 mt-3"
-            style={{ background: T.surfaceHi, border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: appSettings.pinEnabled ? T.ice : T.muted, opacity: appSettings.pinEnabled ? 1 : 0.55 }}
+            style={{ background: T.surfaceHi, border: "none", fontFamily: bodyFont, fontSize: 14.5, color: appSettings.pinEnabled ? T.ice : T.muted, opacity: appSettings.pinEnabled ? 1 : 0.55 }}
           >
             <Lock size={14} color={T.muted} /> {t("changePinCta")}
           </button>
@@ -17117,7 +17117,7 @@ function SettingsPanel({
           )}
           {deleteConfirmOpen && (
             <div className="fx-modal-back" style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(24px + var(--tg-inset-top, 0px)) 24px calc(24px + var(--tg-inset-bottom, 0px))", overflowY: "auto" }} onClick={() => !deleting && setDeleteConfirmOpen(false)}>
-              <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 340, background: T.surface, border: `1px solid ${T.lineHi}`, borderRadius: 20, padding: 22 }}>
+              <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 340, background: T.surface, border: "none", borderRadius: 20, padding: 22 }}>
                 <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
                   <ShieldAlert size={18} color={T.down} />
                   <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700 }}>{t("deleteAccountQ")}</span>
@@ -17126,7 +17126,7 @@ function SettingsPanel({
                   {t("deleteAccountBody")}
                 </p>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setDeleteConfirmOpen(false)} disabled={deleting} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ background: T.surfaceHi, border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.ice, opacity: deleting ? 0.6 : 1 }}>
+                  <button onClick={() => setDeleteConfirmOpen(false)} disabled={deleting} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ background: T.surfaceHi, border: "none", fontFamily: bodyFont, fontSize: 14.5, color: T.ice, opacity: deleting ? 0.6 : 1 }}>
                     {t("cancel")}
                   </button>
                   <button onClick={confirmDeleteAccount} disabled={deleting} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ background: T.down, border: "none", fontFamily: displayFont, fontWeight: 700, fontSize: 14.5, color: "#1a0000", opacity: deleting ? 0.6 : 1 }}>
@@ -17216,11 +17216,11 @@ function SettingsPanel({
               <CoinIcon size={16} /> {REFERRAL_COINS}
             </span>
           </div>
-          <div className="flex items-center justify-between mt-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surfaceHi, border: `1px solid ${T.line}` }}>
+          <div className="flex items-center justify-between mt-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surfaceHi, border: "none" }}>
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("refInvited")}</span>
             <span style={{ fontFamily: displayFont, color: T.turquoise, fontSize: 17.5, fontWeight: 700 }}>{inviteCount}</span>
           </div>
-          <div className="flex items-center justify-between mt-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surfaceHi, border: `1px solid ${T.line}` }}>
+          <div className="flex items-center justify-between mt-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surfaceHi, border: "none" }}>
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("refEarned")}</span>
             <span className="flex items-center gap-1.5" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700 }}>
               <CoinIcon size={16} /> {coinsFromInvites(inviteCount)}
@@ -17231,7 +17231,7 @@ function SettingsPanel({
               капает дальше. */}
           <ReferralShare showToast={showToast} />
 
-          <div className="flex items-center gap-2 mt-2 rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: `1px solid ${T.line}` }}>
+          <div className="flex items-center gap-2 mt-2 rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: "none" }}>
             <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 12.5, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{refLink || "—"}</span>
             <button onClick={copyReferral} className="fx-tap" disabled={!refLink}><Copy size={14} color={T.muted} /></button>
           </div>
@@ -17263,7 +17263,7 @@ function SettingsPanel({
             <div
               key={заголовок}
               className="fx-card rounded-[18px]"
-              style={{ background: T.surfaceHi, border: `1px solid ${T.line}`, padding: "13px 15px", animationDelay: `${i * 45}ms` }}
+              style={{ background: T.surfaceHi, border: "none", padding: "13px 15px", animationDelay: `${i * 45}ms` }}
             >
               <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{t(заголовок)}</div>
               <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.6, marginTop: 6 }}>{t(текст)}</p>
@@ -17285,7 +17285,7 @@ function SettingsPanel({
         className="fx-modal-card"
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: "100%", maxWidth: 440, background: T.surface, border: `1px solid ${T.lineHi}`, borderRadius: 26,
+          width: "100%", maxWidth: 440, background: T.surface, border: "none", borderRadius: 26,
           // Считаем от окна приложения, а не от vh: внутри Telegram высота
           // окна меньше высоты браузерного экрана, и 88vh вылезали за край.
           maxHeight: `calc(100% - ${insetTop + 14}px)`, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden",
@@ -17335,7 +17335,7 @@ function TokenManageSheet({ token: tokenProp, onClose, showToast, onDelete }) {
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          <button onClick={copyLink} className="fx-tap w-full flex items-center gap-2 rounded-[20px] py-3 px-3.5" style={{ background: T.surfaceHi, border: `1px solid ${T.line}` }}>
+          <button onClick={copyLink} className="fx-tap w-full flex items-center gap-2 rounded-[20px] py-3 px-3.5" style={{ background: T.surfaceHi, border: "none" }}>
             <Copy size={15} color={T.muted} /><span style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>{t("copyLink")}</span>
           </button>
           {/* Список приходит из базы и содержит только свои токены,
@@ -17353,7 +17353,7 @@ function TokenManageSheet({ token: tokenProp, onClose, showToast, onDelete }) {
                 <button
                   onClick={() => setConfirmingDelete(false)}
                   className="fx-tap flex-1 flex items-center justify-center gap-2 rounded-[20px] py-3 px-3.5"
-                  style={{ background: T.surfaceHi, border: `1px solid ${T.line}` }}
+                  style={{ background: T.surfaceHi, border: "none" }}
                 >
                   <span style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>{t("cancel")}</span>
                 </button>
@@ -17971,7 +17971,7 @@ async function uploadAvatarIfNeeded(userId) {
         </div>
 
         {!isEdit && (
-          <div className="flex" style={{ background: T.bg, border: `1px solid ${T.line}`, borderRadius: 12, padding: 3, marginBottom: 16 }}>
+          <div className="flex" style={{ background: T.bg, border: "none", borderRadius: 12, padding: 3, marginBottom: 16 }}>
             {[
               { id: "login", label: t("loginTab"), icon: LogIn },
               { id: "create", label: t("createTab"), icon: Sparkles },
@@ -18008,7 +18008,7 @@ async function uploadAvatarIfNeeded(userId) {
           <div className="flex flex-col items-center gap-1.5" style={{ marginBottom: 16 }}>
             <input ref={avatarInputRef} type="file" accept="image/*" onChange={onPickAvatar} style={{ display: "none" }} />
             {isEdit && onEquip ? (
-              <div style={{ position: "relative", width: "100%", height: 132, borderRadius: 20, overflow: "hidden", background: T.bg, border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ position: "relative", width: "100%", height: 132, borderRadius: 20, overflow: "hidden", background: T.bg, border: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <ProfileCardBg cardId={cosmetics.card} height={132} radius={20} />
                 <button
                   onClick={() => avatarInputRef.current && avatarInputRef.current.click()}
@@ -18059,7 +18059,7 @@ async function uploadAvatarIfNeeded(userId) {
                     <button
                       onClick={() => { setNickEditing(false); setNewNick(""); setNickTouched(false); }}
                       className="fx-tap rounded-[20px] px-4 py-2.5"
-                      style={{ background: T.surfaceHi, border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 13.5, color: T.ice }}
+                      style={{ background: T.surfaceHi, border: "none", fontFamily: bodyFont, fontSize: 13.5, color: T.ice }}
                     >
                       {t("cancel")}
                     </button>
@@ -18080,12 +18080,12 @@ async function uploadAvatarIfNeeded(userId) {
                 </>
               ) : (
                 <>
-                  <div className="flex items-center gap-2 rounded-[20px] px-3.5 py-2.5" style={{ background: T.bg, border: `1px solid ${T.line}` }}>
+                  <div className="flex items-center gap-2 rounded-[20px] px-3.5 py-2.5" style={{ background: T.bg, border: "none" }}>
                     <span className="flex-1" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{nickname}</span>
                     <button
                       onClick={() => { setNickEditing(true); setNewNick(nickname); }}
                       className="fx-tap flex items-center gap-1.5 rounded-full px-3 py-1.5"
-                      style={{ background: T.surfaceHi, border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 12.5, color: T.ice }}
+                      style={{ background: T.surfaceHi, border: "none", fontFamily: bodyFont, fontSize: 12.5, color: T.ice }}
                     >
                       <CoinIcon size={13} /> {t("nickChange")}
                     </button>
@@ -18210,7 +18210,7 @@ function ProfileView({
               <div className="flex items-center gap-3" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>
                 <span className="flex items-center gap-1"><Clock size={12} /> {t("memberSince")}</span>
               </div>
-              <button onClick={onOpenEditProfile} className="fx-tap rounded-[18px] px-5 py-2 mt-1" style={{ background: T.surface, border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14, color: T.ice }}>{t("editProfileBtn")}</button>
+              <button onClick={onOpenEditProfile} className="fx-tap rounded-[18px] px-5 py-2 mt-1" style={{ background: T.surface, border: "none", fontFamily: bodyFont, fontSize: 14, color: T.ice }}>{t("editProfileBtn")}</button>
             </>
           ) : (
             <>
@@ -18262,7 +18262,7 @@ function ProfileView({
                   <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 600 }}>{t("notVerifiedStatus")}</div>
                   <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("verifyCta")}</div>
                 </div>
-                <button onClick={startVerify} className="fx-tap rounded-[16px] px-3 py-2 flex items-center gap-1.5" style={{ background: T.surfaceHi, border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 13, color: T.ice, opacity: unlocked ? 1 : 0.55 }}>
+                <button onClick={startVerify} className="fx-tap rounded-[16px] px-3 py-2 flex items-center gap-1.5" style={{ background: T.surfaceHi, border: "none", fontFamily: bodyFont, fontSize: 13, color: T.ice, opacity: unlocked ? 1 : 0.55 }}>
                   {!unlocked && <Lock size={11} color={T.muted} />} {t("verifyAccountBtn")}
                 </button>
               </>
@@ -21448,7 +21448,7 @@ function mapTokenRow(row) {
             // видно ленту, но значки не тонут в ней.
             backdropFilter: "blur(26px) saturate(1.5)",
             WebkitBackdropFilter: "blur(26px) saturate(1.5)",
-            border: `1px solid ${hexA("#FFFFFF", 0.06)}`,
+            border: "none",
             boxShadow: "0 10px 30px rgba(0,0,0,0.32)",
           }}
         >
@@ -21483,7 +21483,7 @@ function mapTokenRow(row) {
                   color={active ? "#14151A" : "#9B9FA9"}
                 />
                 {locked && (
-                  <div style={{ position: "absolute", top: -3, right: -3, width: 14, height: 14, borderRadius: "50%", background: T.surface, border: `1px solid ${T.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ position: "absolute", top: -3, right: -3, width: 14, height: 14, borderRadius: "50%", background: T.surface, border: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Lock size={8} color={T.muted} />
                   </div>
                 )}
