@@ -4747,19 +4747,10 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       ctx.textAlign = "left";
     }
 
-    // Crosshair — only on an explicit tap (see handleTap), not while
-    // dragging/panning, so it never fights the pan gesture.
-    if (hoverIdxRef.current != null) {
-      const x = xFor(hoverIdxRef.current);
-      ctx.strokeStyle = T.ice;
-      ctx.setLineDash([3, 3]);
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
+    /* Белой черты по нажатию больше нет.
+       Цифры выбранной свечи по-прежнему уезжают наверх (onHover), а вот
+       линия поперёк всего поля только перечёркивала картинку: на телефоне
+       палец и так стоит там, куда смотришь. */
 
     /* Сообщаем шапке, что сейчас в окне.
        Цена и процент над графиком относятся к видимому участку: сдвинул
