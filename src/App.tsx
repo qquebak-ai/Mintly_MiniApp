@@ -8751,13 +8751,26 @@ function снятьАнимацию(анимация) {
 /* PageLoader — тот же лист, но поверх страницы, пока её данные не
    приехали. Занимает место контента, а не весь экран: шапка и нижнее
    меню остаются на местах, и переход не выглядит как перезапуск. */
+/* Пока данных нет — на их месте стоят серые плашки той же формы, что и
+   будущие карточки, и по ним пробегает мягкий блик. Так экран сразу
+   выглядит собой, а не заставкой: человек видит раскладку и понимает,
+   что именно грузится, а не смотрит на крутящийся значок. */
 function PageLoader({ minHeight = 260 }) {
+  const блоки = [
+    { высота: 12, ширина: "42%", радиус: 6 },
+    { высота: 12, ширина: "68%", радиус: 6 },
+    { высота: 96, ширина: "100%", радиус: 22 },
+    { высота: 140, ширина: "100%", радиус: 22 },
+  ];
   return (
-    <div className="fx-view" style={{ minHeight, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
-      <LeafLoader size={92} />
-      <div style={{ width: 96, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
-        <div style={{ width: "40%", height: "100%", borderRadius: 999, background: PRISM, animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
-      </div>
+    <div className="fx-view flex flex-col" style={{ minHeight, gap: 12, paddingTop: 4 }}>
+      {блоки.map((б, i) => (
+        <div
+          key={i}
+          className="fx-skeleton"
+          style={{ height: б.высота, width: б.ширина, borderRadius: б.радиус, animationDelay: `${i * 90}ms` }}
+        />
+      ))}
     </div>
   );
 }
@@ -21014,44 +21027,9 @@ function mapTokenRow(row) {
   // Экран загрузки на старте: держим его, пока не отработали все
   // стартовые запросы — восстановление сессии, лента пулов (из неё же
   // берутся покупки для тикера), токены сообщества и курс TON. Каждый
-  // шаг «готов» и по успеху, и по ошибке: если API недоступен, в
-  // приложение всё равно надо пустить.
-  const bootSteps = [
-    { key: "bootStepAuth", done: authChecked },
-    { key: "bootStepFeed", done: !tokensLoading },
-    { key: "bootStepTokens", done: communityLoaded },
-    { key: "bootStepRate", done: tonPriceChecked },
-  ];
-  const шагиГотовы = bootSteps.every((s) => s.done);
-  /* Заставка гаснет в два приёма: сперва лента маскотов тормозит, и
-     только потом экран уходит.
-     Раньше был ещё и жёсткий предел в девять секунд, который прятал
-     заставку мгновенно: если какой-то запрос завис, человек видел, как
-     коты крутятся и вдруг исчезают на полном ходу. Теперь предел просто
-     запускает ту же остановку — вид один и тот же, независимо от того,
-     дождались мы данных или устали ждать. */
-  const [bootDone, setBootDone] = useState(false);
-  const [bootFading, setBootFading] = useState(false);
-  const [bootHidden, setBootHidden] = useState(false);
-
-  useEffect(() => {
-    if (шагиГотовы) { setBootDone(true); return; }
-    // Дольше семи секунд держать человека на заставке нельзя, даже если
-    // что-то не ответило.
-    const to = setTimeout(() => setBootDone(true), 7000);
-    return () => clearTimeout(to);
-  }, [шагиГотовы]);
-
-  useEffect(() => {
-    if (!bootDone) return;
-    // Ровно столько живёт лента маскотов: минимум бега плюс торможение
-    // и уход лишних (см. LeafLoader). Гасить начинаем за длину самого
-    // перехода до снятия — чтобы заставка не висела прозрачной поверх
-    // приложения и не глотала прокрутку.
-    const гаснет = setTimeout(() => setBootFading(true), 2600);
-    const снять = setTimeout(() => setBootHidden(true), 3020);
-    return () => { clearTimeout(гаснет); clearTimeout(снять); };
-  }, [bootDone]);
+  /* Заставки на входе нет. Приложение открывается сразу, а данные,
+     которые ещё едут, стоят на своих местах серыми плашками — раскладку
+     видно с первой секунды, и ждать нечего. */
 
   return (
     <div
@@ -21075,7 +21053,7 @@ function mapTokenRow(row) {
           кошелёк, а не знакомство с приложением. */}
       {/* Приветствие ждёт, пока догрузится приложение: показывать его
           поверх заставки — значит перебивать одно ожидание другим. */}
-      {приветствие && !accountCreated && bootHidden && !сразуВКошелёк && (
+      {приветствие && !accountCreated && !сразуВКошелёк && (
         <WelcomeScreen
           insetTop={insetTop}
           onCreate={() => { закрытьПриветствие(); openCreateProfile(); }}
@@ -21083,7 +21061,9 @@ function mapTokenRow(row) {
           onSkip={закрытьПриветствие}
         />
       )}
-      {!bootHidden && !сразуВКошелёк && <BootSplash steps={bootSteps} done={bootDone} уходит={bootFading} insetTop={insetTop} />}
+      {/* Заставки на входе больше нет: приложение открывается сразу, а
+          то, что ещё не приехало, стоит серыми плашками на своих местах.
+          Ждать чёрный экран с котом ради тех же двух секунд незачем. */}
       <Toast key={toastSeq} toast={toast} insetTop={insetTop} leaving={toastLeaving} />
 
       {/* Проход в кошелёк из чата. Приложение здесь — только мостик к
