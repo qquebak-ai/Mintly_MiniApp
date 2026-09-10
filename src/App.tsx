@@ -4216,7 +4216,7 @@ async function fetchSparkCloses(poolAddress, n = 24, jettonAddress = null) {
    волосками, между которыми не разобрать ни тела, ни фитиля. Поэтому у
    масштаба есть оба края, и он в них упирается мягко. */
 // Высота полосы, которая всегда висит у верхней кромки экрана токена.
-const ВЫСОТА_ПОЛОСЫ = 52;
+const ВЫСОТА_ПОЛОСЫ = 64;
 const CHART_MIN_VISIBLE = 20;
 const CHART_MAX_VISIBLE = 150;
 const CHART_DEFAULT_VISIBLE = 60;
@@ -14647,35 +14647,54 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
 
   return (
     <div className="fx-view flex flex-col pb-4" style={{ position: "relative", gap: 18 }}>
-      {/* Полоса у кромки — всегда на месте.
-          Она ничего не занимает в потоке (высота ноль, содержимое поверх)
-          и просто размывает всё, что под неё заезжает. Аватарка, имя и
-          цена появляются в ней не рывком, а по мере того, как настоящие
-          уходят под неё: доля пути и есть их прозрачность и подъём. */}
+      {/* Полоса у кромки — всегда на месте и всегда с аватаркой.
+          Аватарка, кнопки и размытие не уезжают вместе со страницей:
+          они и есть постоянная шапка экрана. Имя с ценой появляются
+          между ними — ровно по мере того, как крупные уходят под полосу,
+          и к моменту их исчезновения копия уже стоит на месте.
+          В потоке полоса ничего не занимает: высота ноль, содержимое
+          лежит поверх, а страница отступает от верха на её высоту. */}
       <div style={{ position: "sticky", top: 0, height: 0, zIndex: 6, marginLeft: -16, marginRight: -16, marginBottom: -18 }}>
         <div
           style={{
             position: "absolute", top: 0, left: 0, right: 0, height: ВЫСОТА_ПОЛОСЫ,
             display: "flex", alignItems: "center", gap: 10, padding: "0 14px",
-            backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
-            background: "linear-gradient(180deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0) 100%)",
-            WebkitMaskImage: "linear-gradient(180deg, #000 62%, transparent 100%)",
-            maskImage: "linear-gradient(180deg, #000 62%, transparent 100%)",
-            pointerEvents: шапкаДоля.текст > 0.6 ? "auto" : "none",
+            backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
+            background: "linear-gradient(180deg, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.52) 58%, rgba(0,0,0,0) 100%)",
+            // Размытие тает к низу вместе с заливкой — иначе под полосой
+            // видна её ровная нижняя кромка.
+            WebkitMaskImage: "linear-gradient(180deg, #000 68%, transparent 100%)",
+            maskImage: "linear-gradient(180deg, #000 68%, transparent 100%)",
           }}
         >
-          <div style={{
-            opacity: шапкаДоля.аватар,
-            transform: `translateY(${(1 - шапкаДоля.аватар) * 12}px)`,
-            flexShrink: 0,
-          }}>
-            <TokenAvatar size={32} tone={up ? "up" : "down"} src={логотип} />
+          <div className="flex items-center flex-shrink-0" style={{ gap: 8 }}>
+            {!hasTelegramBack() && (
+              <button onClick={onBack} className="fx-tap flex items-center justify-center flex-shrink-0"
+                style={{ width: 32, height: 32, borderRadius: 999, background: T.surface, border: "none", color: T.ice }}>
+                <ChevronLeft size={17} />
+              </button>
+            )}
+            <TokenAvatar size={36} tone={up ? "up" : "down"} src={логотип} />
+            {/* Знак живой торговли уезжает вместе с именем: рядом с
+                аватаркой ему тесно, когда в полосе появляется название. */}
+            {(token.tx1h || 0) > 0 && (
+              <span className="flex items-center flex-shrink-0" style={{ gap: 4, opacity: 1 - шапкаДоля.текст }}>
+                <span style={{ width: 5, height: 5, borderRadius: 999, background: T.up, animation: "живаяТочка 1.6s ease-in-out infinite" }} />
+                <span style={{ fontFamily: monoFont, fontSize: 10, letterSpacing: "0.06em", color: T.up }}>LIVE</span>
+              </span>
+            )}
+            <span style={{ opacity: 1 - шапкаДоля.текст }}><ПометкаТест сеть={token.network} size={10.5} /></span>
           </div>
-          <div className="flex-1 min-w-0 flex flex-col items-center" style={{
-            gap: 0,
-            opacity: шапкаДоля.текст,
-            transform: `translateY(${(1 - шапкаДоля.текст) * 12}px)`,
-          }}>
+
+          <div
+            className="flex-1 min-w-0 flex flex-col items-center"
+            style={{
+              gap: 0,
+              opacity: шапкаДоля.текст,
+              transform: `translateY(${(1 - шапкаДоля.текст) * 10}px)`,
+              pointerEvents: "none",
+            }}
+          >
             <span className="truncate w-full" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800, textAlign: "center" }}>
               {token.name}
             </span>
@@ -14683,13 +14702,20 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               {fmtPrice(ценаОкна)}
             </span>
           </div>
-          <button
-            onClick={handleShare}
-            className="fx-tap flex items-center justify-center flex-shrink-0"
-            style={{ width: 30, height: 30, borderRadius: 999, background: T.surface, border: "none", opacity: шапкаДоля.текст }}
-          >
-            <Share2 size={14} color={T.paper} />
-          </button>
+
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button onClick={handleShare} className="fx-tap flex items-center justify-center"
+              style={{ width: 32, height: 32, borderRadius: 999, background: T.surface, border: "none" }}>
+              <Share2 size={14} color={T.paper} />
+            </button>
+            {onManage && (
+              <button onClick={() => onManage(token)} className="fx-tap flex items-center justify-center"
+                aria-label={tr("manageBtn")}
+                style={{ width: 32, height: 32, borderRadius: 999, background: T.surface, border: "none" }}>
+                <Settings size={14} color={T.paper} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -14704,43 +14730,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       />
       <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: 18 }}>
 
-      {/* Шапка карточки. Порядок чтения сверху вниз: кто это (аватарка и
-          имя), почём (цена) и куда идёт (изменение). Кнопки уходят
-          вправо, чтобы не встревать между именем и ценой. */}
-      <div ref={рядАватарки} className="flex items-center justify-between" style={{ gap: 10 }}>
-        <div className="flex items-center" style={{ gap: 10 }}>
-          {!hasTelegramBack() && (
-            <button onClick={onBack} className="fx-tap flex items-center justify-center flex-shrink-0"
-              style={{ width: 34, height: 34, borderRadius: 999, background: T.surface, border: "none", color: T.ice }}>
-              <ChevronLeft size={18} />
-            </button>
-          )}
-          <TokenAvatar size={40} tone={up ? "up" : "down"} src={логотип} />
-          {(token.tx1h || 0) > 0 && (
-            <span className="flex items-center flex-shrink-0" style={{ gap: 4 }}>
-              <span style={{ width: 5, height: 5, borderRadius: 999, background: T.up, animation: "живаяТочка 1.6s ease-in-out infinite" }} />
-              <span style={{ fontFamily: monoFont, fontSize: 10, letterSpacing: "0.06em", color: T.up }}>LIVE</span>
-            </span>
-          )}
-          <ПометкаТест сеть={token.network} size={10.5} />
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={handleShare} className="fx-tap flex items-center justify-center"
-            style={{ width: 34, height: 34, borderRadius: 999, background: T.surface, border: "none" }}>
-            <Share2 size={15} color={T.paper} />
-          </button>
-          {/* Ссылка и удаление — только у своего токена. Раньше они жили
-              кнопкой «Управлять» на карточке в профиле, но карточка ведёт
-              на этот экран, и распоряжаться токеном логично здесь же. */}
-          {onManage && (
-            <button onClick={() => onManage(token)} className="fx-tap flex items-center justify-center"
-              aria-label={tr("manageBtn")}
-              style={{ width: 34, height: 34, borderRadius: 999, background: T.surface, border: "none" }}>
-              <Settings size={15} color={T.paper} />
-            </button>
-          )}
-        </div>
-      </div>
+      {/* Аватарка и кнопки живут в полосе наверху, поэтому здесь их
+          нет — только отступ под неё. */}
+      <div ref={рядАватарки} aria-hidden style={{ height: ВЫСОТА_ПОЛОСЫ - 18 }} />
 
       <div className="flex flex-col" style={{ gap: 8 }}>
         {/* Имя крупно, тикер — справа от него мелким: имя читают, тикером
