@@ -661,7 +661,10 @@ export default async function handler(req, res) {
     // Заодно говорим, в какой сети работает кошелёк: без этого «почему
     // не приходит перевод» выясняется гаданием, а не одним запросом.
     const сеть = /devnet/.test(RPC) ? "devnet" : /testnet/.test(RPC) ? "testnet" : "mainnet-beta";
-    return res.status(200).json({ enabled: !!(db && набор), cluster: сеть });
+    // Метка ключа площадки — те же восемь знаков, что лежат в базе рядом
+    // с кошельком. По ним видно, тем ли ключом сервер пытается открыть
+    // строку: иначе «ключ кошелька не читается» выясняется наугад.
+    return res.status(200).json({ enabled: !!(db && набор), cluster: сеть, key: набор ? набор.метка : null });
   }
   if (!db || !набор) return res.status(503).json({ error: "not_configured" });
 
