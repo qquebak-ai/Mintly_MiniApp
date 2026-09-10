@@ -4215,6 +4215,8 @@ async function fetchSparkCloses(poolAddress, n = 24, jettonAddress = null) {
    шириной с палец. Дальше полутора сотен — наоборот, свечи становятся
    волосками, между которыми не разобрать ни тела, ни фитиля. Поэтому у
    масштаба есть оба края, и он в них упирается мягко. */
+// Высота полосы, которая всегда висит у верхней кромки экрана токена.
+const ВЫСОТА_ПОЛОСЫ = 52;
 const CHART_MIN_VISIBLE = 20;
 const CHART_MAX_VISIBLE = 150;
 const CHART_DEFAULT_VISIBLE = 60;
@@ -14308,18 +14310,46 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
    * Момент появления считает наблюдатель по маячку, поставленному сразу
    * под ценой: как только маячок ушёл за верхний край прокрутки, полоса
    * проявляется. */
-  const [шапкаНаверху, setШапкаНаверху] = useState(false);
-  const маячокШапки = useRef(null);
+  const рядАватарки = useRef(null);
+  const блокЦены = useRef(null);
+  // Насколько аватарка и текст уже «уехали» под полосу: 0 — ещё на
+  // месте, 1 — целиком скрылись и должны стоять в полосе.
+  const [шапкаДоля, setШапкаДоля] = useState({ аватар: 0, текст: 0 });
   useEffect(() => {
-    const эл = маячокШапки.current;
-    if (!эл || typeof IntersectionObserver === "undefined") return;
-    const корень = эл.closest(".подложка") || null;
-    const наблюдатель = new IntersectionObserver(
-      ([запись]) => setШапкаНаверху(!запись.isIntersecting),
-      { root: корень, threshold: 0 },
-    );
-    наблюдатель.observe(эл);
-    return () => наблюдатель.disconnect();
+    const якорь = рядАватарки.current;
+    const контейнер = якорь && якорь.closest(".подложка");
+    if (!контейнер) return;
+    let кадр = null;
+    const считать = () => {
+      кадр = null;
+      const верх = контейнер.getBoundingClientRect().top;
+      const прокручено = контейнер.scrollTop;
+      /* Доля пути под полосу.
+         Ноль — пока низ блока ещё ниже её кромки, единица — когда блок
+         ушёл под неё целиком. Считается от места блока на нетронутой
+         странице, а не от его нынешнего положения: строка с аватаркой
+         стоит у самого верха и попадает под полосу сразу, а показывать
+         её копию в полосе, пока настоящая на виду, нельзя. */
+      const доля = (эл) => {
+        if (!эл) return 0;
+        const r = эл.getBoundingClientRect();
+        if (!r.height) return 0;
+        const своё = r.top - верх + прокручено;
+        const начало = Math.max(0, своё + r.height - ВЫСОТА_ПОЛОСЫ);
+        return Math.max(0, Math.min(1, (прокручено - начало) / r.height));
+      };
+      const след = { аватар: доля(рядАватарки.current), текст: доля(блокЦены.current) };
+      setШапкаДоля((было) => (
+        Math.abs(было.аватар - след.аватар) < 0.01 && Math.abs(было.текст - след.текст) < 0.01 ? было : след
+      ));
+    };
+    const наПрокрутку = () => { if (!кадр) кадр = requestAnimationFrame(считать); };
+    считать();
+    контейнер.addEventListener("scroll", наПрокрутку, { passive: true });
+    return () => {
+      контейнер.removeEventListener("scroll", наПрокрутку);
+      if (кадр) cancelAnimationFrame(кадр);
+    };
   }, [token.id]);
 
   /* Что показывает шапка: цена и изменение видимого участка графика.
@@ -14610,36 +14640,50 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
 
   return (
     <div className="fx-view flex flex-col pb-4" style={{ position: "relative", gap: 18 }}>
-      {/* Полоса у кромки. Она размывает всё, что проезжает под ней, —
-          так же, как это делает верхний край самой прокрутки. */}
-      <div
-        aria-hidden={!шапкаНаверху}
-        style={{
-          position: "sticky", top: 0, zIndex: 6,
-          marginLeft: -16, marginRight: -16, marginBottom: -18,
-          padding: "8px 14px 14px",
-          display: "flex", alignItems: "center", gap: 10,
-          backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
-          background: "linear-gradient(180deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0) 100%)",
-          opacity: шапкаНаверху ? 1 : 0,
-          transform: `translateY(${шапкаНаверху ? 0 : -8}px)`,
-          transition: "opacity .22s ease, transform .22s ease",
-          pointerEvents: шапкаНаверху ? "auto" : "none",
-        }}
-      >
-        <TokenAvatar size={34} tone={up ? "up" : "down"} src={логотип} />
-        <div className="flex-1 min-w-0 flex flex-col items-center" style={{ gap: 1 }}>
-          <span className="truncate w-full" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 800, textAlign: "center" }}>
-            {token.name}
-          </span>
-          <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 13.5, fontWeight: 700 }}>
-            {fmtPrice(ценаОкна)}
-          </span>
+      {/* Полоса у кромки — всегда на месте.
+          Она ничего не занимает в потоке (высота ноль, содержимое поверх)
+          и просто размывает всё, что под неё заезжает. Аватарка, имя и
+          цена появляются в ней не рывком, а по мере того, как настоящие
+          уходят под неё: доля пути и есть их прозрачность и подъём. */}
+      <div style={{ position: "sticky", top: 0, height: 0, zIndex: 6, marginLeft: -16, marginRight: -16, marginBottom: -18 }}>
+        <div
+          style={{
+            position: "absolute", top: 0, left: 0, right: 0, height: ВЫСОТА_ПОЛОСЫ,
+            display: "flex", alignItems: "center", gap: 10, padding: "0 14px",
+            backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+            background: "linear-gradient(180deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0) 100%)",
+            WebkitMaskImage: "linear-gradient(180deg, #000 62%, transparent 100%)",
+            maskImage: "linear-gradient(180deg, #000 62%, transparent 100%)",
+            pointerEvents: шапкаДоля.текст > 0.6 ? "auto" : "none",
+          }}
+        >
+          <div style={{
+            opacity: шапкаДоля.аватар,
+            transform: `translateY(${(1 - шапкаДоля.аватар) * 12}px)`,
+            flexShrink: 0,
+          }}>
+            <TokenAvatar size={32} tone={up ? "up" : "down"} src={логотип} />
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col items-center" style={{
+            gap: 0,
+            opacity: шапкаДоля.текст,
+            transform: `translateY(${(1 - шапкаДоля.текст) * 12}px)`,
+          }}>
+            <span className="truncate w-full" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800, textAlign: "center" }}>
+              {token.name}
+            </span>
+            <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 13, fontWeight: 700 }}>
+              {fmtPrice(ценаОкна)}
+            </span>
+          </div>
+          <button
+            onClick={handleShare}
+            className="fx-tap flex items-center justify-center flex-shrink-0"
+            style={{ width: 30, height: 30, borderRadius: 999, background: T.surface, border: "none", opacity: шапкаДоля.текст }}
+          >
+            <Share2 size={14} color={T.paper} />
+          </button>
         </div>
-        <button onClick={handleShare} className="fx-tap flex items-center justify-center flex-shrink-0"
-          style={{ width: 32, height: 32, borderRadius: 999, background: T.surface, border: "none" }}>
-          <Share2 size={14} color={T.paper} />
-        </button>
       </div>
 
       <TrendFX up={up} seedKey={token.seed} />
@@ -14656,7 +14700,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       {/* Шапка карточки. Порядок чтения сверху вниз: кто это (аватарка и
           имя), почём (цена) и куда идёт (изменение). Кнопки уходят
           вправо, чтобы не встревать между именем и ценой. */}
-      <div className="flex items-center justify-between" style={{ gap: 10 }}>
+      <div ref={рядАватарки} className="flex items-center justify-between" style={{ gap: 10 }}>
         <div className="flex items-center" style={{ gap: 10 }}>
           {!hasTelegramBack() && (
             <button onClick={onBack} className="fx-tap flex items-center justify-center flex-shrink-0"
@@ -14712,7 +14756,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         {/* Цена и под ней изменение — в деньгах и в процентах разом.
             Оба числа считаются по видимому участку графика: сдвинул окно
             — увидел, сколько монета прошла именно там. */}
-        <div>
+        <div ref={блокЦены}>
           <div style={{
             fontFamily: displayFont, fontWeight: 800, fontSize: 34, lineHeight: 1.05,
             letterSpacing: "-0.02em", color: T.ice, wordBreak: "break-all",
@@ -14723,9 +14767,6 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             {ростОкна ? "+" : "−"}{fmtPrice(Math.abs(дельтаОкна))} ({ростОкна ? "+" : "−"}{Math.abs(процентОкна).toFixed(2)}%)
           </div>
         </div>
-
-        {/* Маячок закреплённой шапки: пока он виден, полосы наверху нет. */}
-        <div ref={маячокШапки} aria-hidden style={{ height: 1 }} />
 
         <div className="flex items-center justify-between gap-3">
           {token.tokenAddress ? (
