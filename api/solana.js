@@ -174,10 +174,19 @@ export async function держатели({ mint }) {
   if (!адресОк(mint)) return null;
   const было = держателиКеш.get(mint);
   if (было && Date.now() - было.ts < ДЕРЖАТЕЛИ_МС) return было.тело;
-  const [крупные, запас] = await Promise.all([
-    rpc("getTokenLargestAccounts", [mint], УЗЛЫ),
-    rpc("getTokenSupply", [mint], УЗЛЫ).catch(() => null),
-  ]);
+  let крупные = null, запас = null;
+  try {
+    [крупные, запас] = await Promise.all([
+      rpc("getTokenLargestAccounts", [mint], УЗЛЫ),
+      rpc("getTokenSupply", [mint], УЗЛЫ).catch(() => null),
+    ]);
+  } catch (err) {
+    // Публичные узлы отбиваются по лимиту, и спрашивать их снова прямо
+    // сейчас — только тратить время карточки. Помним отказ полминуты и
+    // отдаём пустой список: «держателей не видно» честнее ошибки.
+    держателиКеш.set(mint, { ts: Date.now() - ДЕРЖАТЕЛИ_МС + 30000, тело: { всего: 0, счета: [] } });
+    return { всего: 0, счета: [] };
+  }
   const всего = Number(запас && запас.value && запас.value.uiAmount) || 0;
   const счета = ((крупные && крупные.value) || []).map((с) => ({
     адрес: с.address,
