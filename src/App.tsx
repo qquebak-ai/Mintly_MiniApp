@@ -6052,13 +6052,12 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center" style={{ gap: 6 }}>
             <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 600 }}>${tok.ticker}</span>
-            {/* «Живой» — не украшение: он стоит только там, где за
-                последний час были сделки. Без сделок точка врала бы. */}
+            {/* «Живой» — не украшение: точка стоит только там, где за
+                последний час были сделки. Без сделок она врала бы.
+                Подписи рядом больше нет: слово повторяло то, что и так
+                говорит мигающая точка, и забивало строку. */}
             {(tok.tx1h || 0) > 0 && (
-              <span className="flex items-center" style={{ gap: 4 }}>
-                <span style={{ width: 5, height: 5, borderRadius: 999, background: T.up, animation: "живаяТочка 1.6s ease-in-out infinite" }} />
-                <span style={{ fontFamily: monoFont, fontSize: 10, letterSpacing: "0.06em", color: T.up }}>LIVE</span>
-              </span>
+              <span style={{ width: 5, height: 5, borderRadius: 999, background: T.up, animation: "живаяТочка 1.6s ease-in-out infinite", flexShrink: 0 }} />
             )}
             <ПометкаТест сеть={tok.network} />
           </div>
