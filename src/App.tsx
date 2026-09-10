@@ -3611,7 +3611,7 @@ async function fetchTonapiChart(jettonAddress, tf, testnet = false) {
     if (!candles.length) return null;
     return {
       candles: candles.map((c) => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })),
-      volume: candles.map((c) => ({ time: c.time, value: 0, color: c.close >= c.open ? hexA(T.up, 0.32) : hexA(T.down, 0.32) })),
+      volume: candles.map((c) => ({ time: c.time, value: 0, color: c.close >= c.open ? hexA(СВЕЧА_РОСТ, 0.32) : hexA(СВЕЧА_ПАДЕНИЕ, 0.32) })),
     };
   } catch (err) {
     return null;
@@ -3707,7 +3707,7 @@ async function loadPoolOHLCV(poolAddress, tf, priority, signal, cacheKey, hit, n
     candles = fillCandleGaps(candles, TF_SECONDS[tf] || 3600, CHART_TOTAL);
     const result = {
       candles: candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })),
-      volume: candles.map(c => ({ time: c.time, value: Number.isFinite(c.volume) ? c.volume : 0, color: c.close >= c.open ? hexA(T.up, 0.32) : hexA(T.down, 0.32) })),
+      volume: candles.map(c => ({ time: c.time, value: Number.isFinite(c.volume) ? c.volume : 0, color: c.close >= c.open ? hexA(СВЕЧА_РОСТ, 0.32) : hexA(СВЕЧА_ПАДЕНИЕ, 0.32) })),
     };
     ohlcvCache.set(cacheKey, { value: result, ts: Date.now() });
     saveOhlcvStore();
@@ -3925,7 +3925,7 @@ function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL,
       low = Math.min(low, close);
     }
     candles.push({ time: bucket, open, high, low, close });
-    volume.push({ time: bucket, value: vol, color: close >= open ? hexA(T.up, 0.32) : hexA(T.down, 0.32) });
+    volume.push({ time: bucket, value: vol, color: close >= open ? hexA(СВЕЧА_РОСТ, 0.32) : hexA(СВЕЧА_ПАДЕНИЕ, 0.32) });
     price = close;
     bucket += step;
   }
@@ -4215,6 +4215,14 @@ async function fetchSparkCloses(poolAddress, n = 24, jettonAddress = null) {
    шириной с палец. Дальше полутора сотен — наоборот, свечи становятся
    волосками, между которыми не разобрать ни тела, ни фитиля. Поэтому у
    масштаба есть оба края, и он в них упирается мягко. */
+/* Цвета свечей.
+   На графике они ярче, чем те же рост и падение в тексте: свеча —
+   маленькая заливка на чёрном, и приглушённый тон на ней читается серым.
+   Родство с палитрой сохранено: это те же мятный и розовый, только
+   выведенные на полную яркость. */
+const СВЕЧА_РОСТ = "#00F5B0";
+const СВЕЧА_ПАДЕНИЕ = "#FF3B60";
+
 // Высота полосы, которая всегда висит у верхней кромки экрана токена.
 const ВЫСОТА_ПОЛОСЫ = 64;
 const CHART_MIN_VISIBLE = 20;
@@ -4578,7 +4586,7 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
       const x = xFor(i);
       if (x < -bodyW || x > plotW + bodyW) continue;
       const up = c.close >= c.open;
-      const color = up ? T.up : T.down;
+      const color = up ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
       ctx.strokeStyle = color;
       ctx.fillStyle = color;
       /* Свеча с закруглёнными концами.
@@ -4616,7 +4624,7 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
 
     if (lastCandle) {
       const lastUp = lastCandle.close >= lastCandle.open;
-      const lastColor = lastUp ? T.up : T.down;
+      const lastColor = lastUp ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
       const y = yFor(lastCandle.close);
       // Dashed guide line at the live price, spanning only the candle area.
       ctx.strokeStyle = lastColor;
@@ -4704,7 +4712,7 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
     // every second via the redraw interval below.
     if (lastCandle && pillTop != null) {
       const lastUp = lastCandle.close >= lastCandle.open;
-      const lastColor = lastUp ? T.up : T.down;
+      const lastColor = lastUp ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
       const priceLabel = fmt(lastCandle.close);
       const barSec = TF_SECONDS[tf] || 3600;
       const leftMs = (lastCandle.time + barSec) * 1000 - Date.now();
