@@ -8751,6 +8751,22 @@ function снятьАнимацию(анимация) {
 /* PageLoader — тот же лист, но поверх страницы, пока её данные не
    приехали. Занимает место контента, а не весь экран: шапка и нижнее
    меню остаются на местах, и переход не выглядит как перезапуск. */
+/* Плашка на месте числа, которого ещё нет.
+ *
+ * Ноль вместо неприехавшего баланса — это ложь: человек видит «0.00» и
+ * решает, что кошелёк пуст. Серая плашка того же размера говорит
+ * правду: считаем.
+ */
+function ПлашкаЧисла({ width = 90, height = 22, radius = 8, style = null }) {
+  return (
+    <span
+      aria-hidden
+      className="fx-skeleton"
+      style={{ display: "inline-block", width, height, borderRadius: radius, verticalAlign: "middle", ...(style || {}) }}
+    />
+  );
+}
+
 /* Пока данных нет — на их месте стоят серые плашки той же формы, что и
    будущие карточки, и по ним пробегает мягкий блик. Так экран сразу
    выглядит собой, а не заставкой: человек видит раскладку и понимает,
@@ -11022,16 +11038,24 @@ function ГлавнаяСводка({ live = [] }) {
       {/* Единственное крупное число на экране. Всё остальное — мельче,
           и потому взгляд начинает отсюда. */}
       <div className="flex items-baseline" style={{ gap: 8, marginTop: 10, position: "relative" }}>
-        <span style={{ fontFamily: displayFont, fontSize: 42, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.03em", ...текстГрадиентом(ГРАДИЕНТ_БРЕНДА) }}>
-          {fmtTon(плавно).replace(" TON", "")}
-        </span>
+        {/* Пока счётчики площадки не пришли, на месте суммы стоит плашка:
+            ноль здесь читался бы как «в токенах пусто». */}
+        {stats == null && !живые ? (
+          <ПлашкаЧисла width={140} height={38} radius={10} />
+        ) : (
+          <span style={{ fontFamily: displayFont, fontSize: 42, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.03em", ...текстГрадиентом(ГРАДИЕНТ_БРЕНДА) }}>
+            {fmtTon(плавно).replace(" TON", "")}
+          </span>
+        )}
         <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 15 }}>TON</span>
       </div>
 
       <div className="flex items-center" style={{ gap: 18, marginTop: 14, position: "relative" }}>
         {показатели.map((п, i) => (
           <div key={i} className="flex items-baseline" style={{ gap: 5 }}>
-            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14, fontWeight: 600 }}>{п.число}</span>
+            {stats == null
+              ? <ПлашкаЧисла width={22} height={12} radius={5} />
+              : <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14, fontWeight: 600 }}>{п.число}</span>}
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{п.подпись}</span>
           </div>
         ))}
@@ -12294,7 +12318,7 @@ function SolanaWalletCard({ showToast, insetTop = 0, insetBottom = 0 }) {
           <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{t("solWalletTitle")}</span>
           <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 3, lineHeight: 1.4 }}>
             {сессия
-              ? (баланс == null ? t("solWalletLoading") : `${баланс.toFixed(4)} SOL`)
+              ? (баланс == null ? <ПлашкаЧисла width={82} height={12} radius={6} /> : `${баланс.toFixed(4)} SOL`)
               : t("solWalletNote")}
           </span>
         </button>
@@ -13373,10 +13397,14 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           {t("walletBalanceLabel")}
         </div>
         <div className="flex items-baseline" style={{ gap: 7, marginTop: 6, position: "relative" }}>
-          <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#FFFFFF" }}>
-            {Math.floor(balance).toLocaleString("ru-RU")}
-            <span style={{ color: hexA("#FFFFFF", 0.55) }}>{(balance % 1).toFixed(2).slice(1)}</span>
-          </span>
+          {внутр == null ? (
+            <ПлашкаЧисла width={150} height={34} radius={10} style={{ background: hexA("#FFFFFF", 0.18) }} />
+          ) : (
+            <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#FFFFFF" }}>
+              {Math.floor(balance).toLocaleString("ru-RU")}
+              <span style={{ color: hexA("#FFFFFF", 0.55) }}>{(balance % 1).toFixed(2).slice(1)}</span>
+            </span>
+          )}
           <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.7), fontSize: 14 }}>SOL</span>
         </div>
         <span
@@ -13385,9 +13413,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             position: "relative", marginTop: 12, padding: "5px 11px", borderRadius: 999,
             background: hexA("#FFFFFF", 0.18), color: "#FFFFFF",
             fontFamily: monoFont, fontSize: 12.5, fontWeight: 700,
+            minHeight: 24,
           }}
         >
-          ≈ ${usd.toFixed(2)}
+          {внутр == null ? <ПлашкаЧисла width={56} height={12} radius={6} style={{ background: hexA("#FFFFFF", 0.25) }} /> : `≈ $${usd.toFixed(2)}`}
         </span>
       </section>
       </div>
