@@ -194,11 +194,16 @@ const STR = {
     mechBuybackBody: "Часть комиссии копится и выкупает токен на просадках, а не уходит из него.",
     mechLiveChart: "Живой график в чате",
     mechLiveChartBody: "Бот держит в чате одно сообщение и сам обновляет в нём свечу и цену.",
-    lockTitle: "Доля создателя",
-    lockNone: "Без замка",
-    lockMilestones: "По вехам",
-    lockGraduation: "До биржи",
-    lockHint: "Замок открывает долю создателя по мере того, как токен набирает объём: уйти с деньгами покупателей на старте нечем.",
+    lockTitle: "Когда сможешь продать свою часть",
+    lockOnToken: "Создатель не может продать свою часть",
+    lockIntro: "При запуске ты сам выкупаешь первые токены — это твоя часть. Замок говорит покупателям, когда ты сможешь её продать: чем позже, тем больше им спокойствия.",
+    lockNone: "Сразу",
+    lockNoneBody: "Продаёшь когда захочешь. Покупатели видят это и обычно осторожничают.",
+    lockMilestones: "На половине пути",
+    lockMilestonesBody: "Продажа откроется, когда токен наберёт половину суммы до выхода на биржу.",
+    lockGraduation: "После биржи",
+    lockGraduationBody: "Продажа откроется только после выхода на биржу. Самое сильное обещание.",
+    lockHint: "Пока замок закрыт, приложение не даст тебе продать свою часть — это видно на странице токена, и на это смотрят перед покупкой.",
     slideToDisconnect: "Сдвинь, чтобы отключить",
     disconnected: "Отключено",
     walletAddressLabel: "Адрес",
@@ -710,11 +715,16 @@ const STR = {
     mechBuybackBody: "Part of the fee accumulates and buys the token back on dips instead of leaving the curve.",
     mechLiveChart: "Live chart in chat",
     mechLiveChartBody: "The bot keeps one message in the chat and updates the candle and price inside it.",
-    lockTitle: "Creator's share",
-    lockNone: "No lock",
-    lockMilestones: "By milestones",
-    lockGraduation: "Until listing",
-    lockHint: "The lock releases the creator's share as the curve fills up — there is nothing to run away with at the start.",
+    lockTitle: "When you can sell your share",
+    lockOnToken: "The creator cannot sell their share",
+    lockIntro: "At launch you buy the first tokens yourself — that is your share. The lock tells buyers when you are able to sell it: the later, the calmer they feel.",
+    lockNone: "Right away",
+    lockNoneBody: "Sell whenever you want. Buyers see this and usually stay careful.",
+    lockMilestones: "At half way",
+    lockMilestonesBody: "Selling opens once the token collects half of the amount needed for listing.",
+    lockGraduation: "After listing",
+    lockGraduationBody: "Selling opens only after the token reaches the exchange. The strongest promise.",
+    lockHint: "While the lock holds, the app will not let you sell your share — it is shown on the token page and buyers look at it.",
     slideToDisconnect: "Slide to disconnect",
     disconnected: "Disconnected",
     walletAddressLabel: "Address",
@@ -13762,9 +13772,11 @@ function ОбещанияТокена({ механики, замок, tokenId })
             <Lock size={16} color="#C79BFF" style={{ marginTop: 1, flexShrink: 0 }} />
             <span className="flex-1 min-w-0">
               <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>
-                {t("lockTitle")}: {t(замок === "graduation" ? "lockGraduation" : "lockMilestones")}
+                {t("lockOnToken")}
               </span>
-              <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 2 }}>{t("lockHint")}</span>
+              <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 2 }}>
+                {t(замок === "graduation" ? "lockGraduationBody" : "lockMilestonesBody")}
+              </span>
             </span>
           </div>
         )}
@@ -15730,9 +15742,9 @@ const МЕХАНИКИ_ЗАПУСКА = [
    того, как кривая собирается, — уйти на старте с деньгами покупателей
    становится нечем. */
 const ЗАМКИ_СОЗДАТЕЛЯ = [
-  { key: "none", tKey: "lockNone" },
-  { key: "milestones", tKey: "lockMilestones" },
-  { key: "graduation", tKey: "lockGraduation" },
+  { key: "none", tKey: "lockNone", описание: "lockNoneBody" },
+  { key: "milestones", tKey: "lockMilestones", описание: "lockMilestonesBody" },
+  { key: "graduation", tKey: "lockGraduation", описание: "lockGraduationBody" },
 ];
 
 function ЗаготовкиЗапуска({ onВыбрать }) {
@@ -16124,27 +16136,49 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           ))}
         </div>
 
-        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, margin: "16px 0 8px" }}>
+        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, margin: "16px 0 6px" }}>
           {t("lockTitle")}
         </div>
-        <div className="flex" style={{ gap: 8 }}>
+        {/* Сперва — что это вообще такое. Раньше стояли три слова без
+            объяснения, и выбирать приходилось наугад. */}
+        <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.5, marginBottom: 10 }}>
+          {t("lockIntro")}
+        </p>
+        <div className="flex flex-col" style={{ gap: 8 }}>
           {ЗАМКИ_СОЗДАТЕЛЯ.map((з) => {
             const выбран = замок === з.key;
             return (
               <button
                 key={з.key}
                 onClick={() => { haptic("light"); setЗамок(з.key); }}
-                className="fx-tap flex-1"
+                className="fx-tap w-full flex items-start"
                 style={{
-                  padding: "11px 6px", borderRadius: 16,
+                  gap: 11, padding: "12px 14px", borderRadius: 18, textAlign: "left",
                   background: выбран ? hexA("#8E2DE2", 0.16) : T.surface,
                   border: `1px solid ${выбран ? hexA("#B15CFF", 0.55) : T.line}`,
-                  fontFamily: displayFont, fontSize: 13, fontWeight: 700,
-                  color: выбран ? T.ice : T.muted,
-                  transition: `background ${EASE}, border-color ${EASE}, color ${EASE}`,
+                  transition: `background ${EASE}, border-color ${EASE}`,
                 }}
               >
-                {t(з.tKey)}
+                {/* Кружок выбора: три варианта — это выбор одного из
+                    трёх, а не три независимых переключателя. */}
+                <span
+                  aria-hidden
+                  style={{
+                    width: 18, height: 18, borderRadius: "50%", marginTop: 1, flexShrink: 0,
+                    border: `2px solid ${выбран ? "#B15CFF" : T.lineHi}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  {выбран && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#B15CFF" }} />}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
+                    {t(з.tKey)}
+                  </span>
+                  <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 3 }}>
+                    {t(з.описание)}
+                  </span>
+                </span>
               </button>
             );
           })}
