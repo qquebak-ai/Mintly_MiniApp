@@ -300,6 +300,7 @@ const STR = {
     walletHoldings: "Твои токены",
     walletHistory: "История",
     swapTitle: "Обмен",
+    swapAppToken: "Токен Mintly",
     receiveTitle: "Получить",
     receiveCopy: "Копировать адрес",
     receiveCopied: "Скопировано",
@@ -821,6 +822,7 @@ const STR = {
     walletHoldings: "Your tokens",
     walletHistory: "History",
     swapTitle: "Swap",
+    swapAppToken: "Mintly token",
     receiveTitle: "Receive",
     receiveCopy: "Copy address",
     receiveCopied: "Copied",
@@ -10735,28 +10737,20 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
         <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, letterSpacing: "-0.01em", margin: 0 }}>
           {t("navMempad")}
         </h1>
-        <div className="flex items-center" style={{ gap: 8 }}>
-          <button
-            className="fx-tap flex items-center justify-center"
-            style={{ width: 34, height: 34, borderRadius: 10, background: "transparent", border: `1px solid ${T.line}` }}
-          >
-            <Search size={15} color={T.muted} />
-          </button>
-          <button
-            onClick={onLaunch}
-            className="fx-tap flex items-center gap-1.5"
-            style={{
-              padding: "8px 14px", borderRadius: 10,
-              background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, border: "none",
-              fontFamily: displayFont, fontSize: 13.5, fontWeight: 600,
-              // В Solana кнопка появляется только когда программа
-              // кривой развёрнута: до этого запускать там нечем.
-              display: сеть === "sol" && !solДоступен ? "none" : undefined,
-            }}
-          >
-            <Rocket size={14} strokeWidth={1.8} /> {t("mempadLaunchToken")}
-          </button>
-        </div>
+        {/* Лупа отсюда убрана: она ничего не делала — поиск по токенам
+            живёт в самой ленте. Запуск стоит в обеих сетях: в Solana
+            программа развёрнута, и запускать там есть чем. */}
+        <button
+          onClick={onLaunch}
+          className="fx-tap flex items-center gap-1.5"
+          style={{
+            padding: "8px 14px", borderRadius: 10,
+            background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, border: "none",
+            fontFamily: displayFont, fontSize: 13.5, fontWeight: 600,
+          }}
+        >
+          <Rocket size={14} strokeWidth={1.8} /> {t("mempadLaunchToken")}
+        </button>
       </div>
 
       {/* Сеть — ползунком: рынок меняется движением, а не случайным
@@ -12769,6 +12763,28 @@ function КлавишиОбмена({ onКлавиша }) {
   );
 }
 
+/* Обмен в истории кошелька.
+ *
+ * История читает сделки человека, и обмен обязан попадать туда же:
+ * иначе после него в списке пусто, и кажется, что ничего не произошло.
+ * Пишем с side = "swap" — по нему строка рисуется своим значком, а не
+ * как покупка.
+ */
+async function записатьОбмен({ отдал, получил, сумма, получено }) {
+  try {
+    const { data } = await supabase.auth.getUser();
+    const uid = data && data.user && data.user.id;
+    if (!uid) return;
+    await supabase.from("trades").insert({
+      user_id: uid,
+      side: "swap",
+      ticker: `${отдал}→${получил}`,
+      ton_amount: сумма,
+      token_amount: получено,
+    });
+  } catch { /* история не должна ронять сам обмен */ }
+}
+
 function ЭкранОбмена({ открыт, onClose, солНаКошельке = 0, showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0 }) {
   const [отдаю, setОтдаю] = useState(МОНЕТЫ_ОБМЕНА[0]);
   const [беру, setБеру] = useState(МОНЕТЫ_ОБМЕНА[1]);
@@ -12777,15 +12793,55 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
   const [считаем, setСчитаем] = useState(false);
   const [идёт, setИдёт] = useState(false);
   const [выбор, setВыбор] = useState(null);       // какую сторону меняем: "дать" | "взять"
+  /* Что вообще можно менять. В боевой сети — знакомые монеты, в
+     тестовой их не существует вовсе: там меняются токены, запущенные
+     здесь же, — у каждого своя кривая, и сделка идёт по ней. */
+  const [монеты, setМонеты] = useState(МОНЕТЫ_ОБМЕНА);
   // Сколько раз меняли стороны — по этому счётчику крутится кнопка
   // разворота: каждое нажатие доворачивает её на пол-оборота.
   const [развернуто, setРазвернуто] = useState(0);
+  const [праздник, setПраздник] = useState(false);
   /* Закрытие идёт через каркас: он же ведёт жест и уводит экран вниз.
      Здесь остаётся только сброс полей при открытии. */
   const закрыть = onClose;
 
   useEffect(() => {
     if (!открыт) { setСумма(""); setВыход(null); setВыбор(null); }
+  }, [открыт]);
+
+  useEffect(() => {
+    if (!открыт) return;
+    let брошено = false;
+    (async () => {
+      let сеть = "mainnet-beta";
+      try {
+        const ответ = await fetch(апи("/api/wallet-solana?action=enabled"));
+        const j = await ответ.json();
+        сеть = (j && j.cluster) || сеть;
+      } catch { /* не ответил — считаем, что боевая */ }
+      const { data } = await supabase
+        .from("tokens")
+        .select("address, ticker, logo_url")
+        .eq("chain", "solana")
+        .eq("network", сеть === "mainnet-beta" ? "mainnet" : сеть)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (брошено) return;
+      const наши = (data || [])
+        .filter((р) => р.address && р.ticker)
+        .map((р) => ({
+          тикер: String(р.ticker).toUpperCase(), имя: t("swapAppToken"),
+          mint: р.address, знаки: 6, лого: р.logo_url || "/mascot.png",
+        }));
+      const база = сеть === "mainnet-beta" ? МОНЕТЫ_ОБМЕНА : [МОНЕТЫ_ОБМЕНА[0]];
+      const список = [...база, ...наши.filter((н) => !база.some((б) => б.mint === н.mint))];
+      setМонеты(список);
+      // Вторая сторона по умолчанию — первое, на что вообще можно
+      // поменять: пустой выбор посреди тестовой сети выглядит поломкой.
+      if (!список.some((м) => м.mint === беру.mint)) setБеру(список[1] || список[0]);
+      if (!список.some((м) => м.mint === отдаю.mint)) setОтдаю(список[0]);
+    })();
+    return () => { брошено = true; };
   }, [открыт]);
 
   const доли = вДоли(сумма, отдаю.знаки);
@@ -12852,11 +12908,20 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
       const { свопВнутренним } = await import("./appWallet");
       await свопВнутренним({ вход: отдаю.mint, выход: беру.mint, сумма: доли.toString() });
       haptic("success");
+      /* Праздник прямо на экране обмена: человек ещё не ушёл отсюда, и
+         подтверждение должно быть там, куда он смотрит. */
+      setПраздник(true);
       showToast(t("swapDone"));
+      записатьОбмен({
+        отдал: отдаю.тикер, получил: беру.тикер,
+        сумма: Number(String(сумма).replace(",", ".")) || 0,
+        получено: выход != null ? Number(выход) / Math.pow(10, беру.знаки) : 0,
+      });
       setСумма("");
       setВыход(null);
       onГотово();
-      закрыть();
+      // Экран закрывается не мгновенно: конфетти должно успеть отыграть.
+      setTimeout(() => { setПраздник(false); закрыть(); }, 1500);
     } catch (e) {
       showToast(`${t("swapFailed")}: ${String((e && e.message) || e).slice(0, 60)}`);
     } finally {
@@ -12877,6 +12942,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
       // списку, а не окну под ним.
       жестВыключен={!!выбор}
     >
+      {праздник && <Конфетти количество={34} />}
       <div className="no-scrollbar" style={{ padding: "4px 16px 0", overflowY: "auto", flexShrink: 1, minHeight: 0 }}>
         {/* Что отдаём */}
         <div style={{ borderRadius: 22, background: T.surfaceHi, padding: "14px 16px", animation: "карточкаОбмена 320ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
@@ -12996,7 +13062,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, padding: "0 6px 10px" }}>
               {выбор === "дать" ? t("swapYouPay") : t("swapYouGet")}
             </div>
-            {МОНЕТЫ_ОБМЕНА.map((м) => (
+            {монеты.map((м) => (
               <button
                 key={м.mint}
                 onClick={() => {
@@ -13121,6 +13187,7 @@ function ИсторияКошелька({ userId }) {
       ) : (
         <div className="flex flex-col" style={{ gap: 8 }}>
           {ряд.map((с) => {
+            const обмен = с.side === "swap";
             const покупка = с.side !== "sell";
             return (
               <div
@@ -13132,21 +13199,25 @@ function ИсторияКошелька({ userId }) {
                   className="flex items-center justify-center"
                   style={{
                     width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-                    background: покупка ? КОШ_РОСТ_ФОН : КОШ_ПАДЕНИЕ_ФОН,
+                    background: обмен ? hexA("#8E2DE2", 0.22) : покупка ? КОШ_РОСТ_ФОН : КОШ_ПАДЕНИЕ_ФОН,
                   }}
                 >
-                  {покупка
-                    ? <ArrowDownLeft size={16} strokeWidth={2.2} color={КОШ_РОСТ_ТЕКСТ} />
-                    : <ArrowUpRight size={16} strokeWidth={2.2} color={КОШ_ПАДЕНИЕ_ТЕКСТ} />}
+                  {обмен
+                    ? <Repeat size={16} strokeWidth={2.2} color="#C79BFF" />
+                    : покупка
+                      ? <ArrowDownLeft size={16} strokeWidth={2.2} color={КОШ_РОСТ_ТЕКСТ} />
+                      : <ArrowUpRight size={16} strokeWidth={2.2} color={КОШ_ПАДЕНИЕ_ТЕКСТ} />}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
-                    {покупка ? t("tickerBought") : t("tickerSold")} ${String(с.ticker || "?").toUpperCase()}
+                    {обмен
+                      ? `${t("swapTitle")} ${String(с.ticker || "").replace("→", " → ")}`
+                      : `${покупка ? t("tickerBought") : t("tickerSold")} $${String(с.ticker || "?").toUpperCase()}`}
                   </div>
                   <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>{fmtSince(с.created_at)}</div>
                 </div>
                 <div style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>
-                  {покупка ? "−" : "+"}{fmtCoin(Number(с.ton_amount) || 0)} TON
+                  {обмен ? "" : покупка ? "−" : "+"}{fmtCoin(Number(с.ton_amount) || 0)}
                 </div>
               </div>
             );

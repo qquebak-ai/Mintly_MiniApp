@@ -564,6 +564,40 @@ async function свести(db, набор) {
   return сделано;
 }
 
+/* Цена по собственной кривой.
+ *
+ * Одна из сторон обмена — токен, запущенный в приложении: цену такой
+ * сделки знает сам контракт, а не биржа. Берём цену из обхода кривых —
+ * ту же, что показана на витрине, — и считаем выход по ней.
+ *
+ * Возвращает null, если это обычная пара: тогда считает биржа.
+ */
+async function котировкаКривой(db, { вход, выход, сумма }) {
+  if (!db) return null;
+  const наш = вход === SOL_MINT ? выход : вход === SOL_MINT ? null : вход;
+  if (!наш || (вход !== SOL_MINT && выход !== SOL_MINT)) return null;
+
+  const { data } = await db
+    .from("tokens")
+    .select("id, address, curve_cache(price_ton, graduated)")
+    .eq("address", наш)
+    .maybeSingle();
+  if (!data) return null;
+
+  const кеш = Array.isArray(data.curve_cache) ? data.curve_cache[0] : data.curve_cache;
+  const цена = Number(кеш && кеш.price_ton) || 0;
+  if (!(цена > 0)) return null;
+
+  const покупка = вход === SOL_MINT;
+  const вход_ = Number(сумма);
+  // Кривая торгует девятью знаками у SOL и шестью у токена — иначе
+  // человек увидит выход, отличающийся в тысячу раз.
+  const out = покупка
+    ? (вход_ / 1e9) / цена * 1e6
+    : (вход_ / 1e6) * цена * 1e9;
+  return { out: String(Math.floor(out)), impact: null, curve: true };
+}
+
 /* Правила запуска: честный старт и замок доли создателя.
  *
  * Обещания создателя не должны жить одной строкой в описании — сервер
@@ -680,11 +714,18 @@ export default async function handler(req, res) {
       const выход = String((req.query && req.query.output) || "").trim();
       const сумма = String((req.query && req.query.amount) || "").trim();
       if (!/^\d+$/.test(сумма) || сумма === "0") return res.status(400).json({ error: "bad_amount" });
+      /* Свои токены живут не на бирже, а на собственной кривой: у
+         маршрутизатора их нет вовсе, и в тестовой сети он молчит на всё.
+         Поэтому сперва пробуем посчитать по кривой — это те же цифры, по
+         которым пройдёт и сама сделка. */
+      const поКривой = await котировкаКривой(db, { вход, выход, сумма });
+      res.setHeader("Cache-Control", "no-store");
+      if (поКривой) return res.status(200).json(поКривой);
+
       const кот = await котировка({
         input: вход, output: выход, amount: сумма,
         slippageBps: Number((req.query && req.query.slippage)) || 150,
       });
-      res.setHeader("Cache-Control", "no-store");
       if (!кот) return res.status(200).json({ out: null });
       return res.status(200).json({
         out: кот.outAmount,
@@ -843,12 +884,35 @@ export default async function handler(req, res) {
       const оп = await начать(db, user, { дело: "swap", сумма: вSol, ключЗапроса, ip });
       if (оп.повтор) return res.status(200).json({ signature: оп.signature, repeat: true });
 
-      const кот = await котировка({
-        input: вход, output: выход, amount: сумма,
-        slippageBps: Number(тело.slippage) || 150,
-      });
-      if (!кот) throw new Error("маршрут не найден");
-      const собранная = await свопJupiter({ quote: кот, wallet: строка.address });
+      /* Свой токен — своя дорога: сделка идёт по кривой того же токена,
+         той же инструкцией, что и покупка на его странице. Маршрутизатор
+         биржи о таких токенах не знает, а в тестовой сети не знает ни о
+         каких вовсе. */
+      const свой = вход === SOL_MINT ? выход : выход === SOL_MINT ? вход : null;
+      let собранная = null;
+      if (свой) {
+        const { data: есть } = await db.from("tokens").select("id").eq("address", свой).maybeSingle();
+        if (есть) {
+          const покупкаКривой = вход === SOL_MINT;
+          const собрано = await собратьСделку({
+            wallet: строка.address,
+            mint: свой,
+            продажа: !покупкаКривой,
+            amount: покупкаКривой ? Number(сумма) / LAMPORTS : Number(сумма) / 1e6,
+            minOut: 0,
+          });
+          собранная = собрано && собрано.transaction;
+        }
+      }
+
+      if (!собранная) {
+        const кот = await котировка({
+          input: вход, output: выход, amount: сумма,
+          slippageBps: Number(тело.slippage) || 150,
+        });
+        if (!кот) throw new Error("маршрут не найден");
+        собранная = await свопJupiter({ quote: кот, wallet: строка.address });
+      }
       if (!собранная) throw new Error("сделка не собралась");
 
       const подпись = await подписатьИОтправить({
@@ -860,7 +924,7 @@ export default async function handler(req, res) {
       });
       await завершить(db, оп.id, подпись);
       res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ signature: подпись, out: кот.outAmount });
+      return res.status(200).json({ signature: подпись });
     }
 
     if (действие === "withdraw") {
