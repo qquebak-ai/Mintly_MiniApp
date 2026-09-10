@@ -13130,6 +13130,26 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
   );
 }
 
+/* Курс SOL как состояние.
+ *
+ * Сама функция solUsd() ходит за ценой в фоне и хранит её в переменной
+ * модуля — React о такой перемене не узнаёт и остаётся с нулём на
+ * экране. Хук переспрашивает её, пока цена не появится, и только тогда
+ * перерисовывает: до этого на месте суммы честнее держать плашку.
+ */
+function useSolUsd() {
+  const [курс, setКурс] = useState(() => solUsd());
+  useEffect(() => {
+    if (курс > 0) return;
+    const id = setInterval(() => {
+      const c = solUsd();
+      if (c > 0) { setКурс(c); clearInterval(id); }
+    }, 800);
+    return () => clearInterval(id);
+  }, [курс]);
+  return курс;
+}
+
 /* Кошелёк.
  *
  * Экран сложён по образцу банковского приложения: тёмный верх с картой
@@ -13311,10 +13331,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     return () => { жив = false; clearInterval(id); };
   }, [обновитьВнутренний]);
 
+  const курсSol = useSolUsd();
   const солНаКошельке = внутр && !внутр.нуженВход && !внутр.ошибка ? Number(внутр.sol) || 0 : 0;
   const адресВнутри = внутр && внутр.address ? внутр.address : "";
   const balance = useCountUp(солНаКошельке, 900, !!адресВнутри);
-  const usd = useCountUp(солНаКошельке * (solUsd() || 0), 900, !!адресВнутри);
+  const usd = useCountUp(солНаКошельке * курсSol, 900, !!адресВнутри);
   const short = адресВнутри ? `${адресВнутри.slice(0, 4)}…${адресВнутри.slice(-4)}` : "";
 
   function скопироватьАдрес() {
@@ -13416,7 +13437,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             minHeight: 24,
           }}
         >
-          {внутр == null ? <ПлашкаЧисла width={56} height={12} radius={6} style={{ background: hexA("#FFFFFF", 0.25) }} /> : `≈ $${usd.toFixed(2)}`}
+          {внутр == null || курсSol <= 0
+            ? <ПлашкаЧисла width={56} height={12} radius={6} style={{ background: hexA("#FFFFFF", 0.25) }} />
+            : `≈ $${usd.toFixed(2)}`}
         </span>
       </section>
       </div>
@@ -13451,7 +13474,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
               <span className="min-w-0 text-left">
                 <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>TON-кошелёк</span>
                 <span style={{ display: "block", fontFamily: monoFont, color: T.muted, fontSize: 12.5, marginTop: 5 }}>
-                  {tonBalance.toFixed(2)} TON · ≈ ${(tonBalance * tonPriceUsd).toFixed(2)}
+                  {tonBalance.toFixed(2)} TON · {tonPriceUsd > 0
+                    ? `≈ $${(tonBalance * tonPriceUsd).toFixed(2)}`
+                    : <ПлашкаЧисла width={44} height={10} radius={5} />}
                 </span>
               </span>
               <ChevronRight size={17} color={T.faint} />
