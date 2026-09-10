@@ -14693,13 +14693,19 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               // не размывается — размытие действует только на то, что
               // проезжает под ней.
               position: "absolute", top: 0, left: 0, right: 0,
-              height: отступСверху + ВЫСОТА_ПОЛОСЫ / 2 + 12,
+              // Ровно до середины круга: аватарка стоит поверх, и по её
+              // середине размытие обрывается.
+              height: отступСверху + ВЫСОТА_ПОЛОСЫ / 2,
               backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
-              background: "linear-gradient(180deg, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.52) 58%, rgba(0,0,0,0) 100%)",
-              // Размытие тает к низу вместе с заливкой — иначе под
-              // полосой видна её ровная нижняя кромка.
-              WebkitMaskImage: "linear-gradient(180deg, #000 68%, transparent 100%)",
-              maskImage: "linear-gradient(180deg, #000 68%, transparent 100%)",
+              // Заливка почти прозрачная: она нужна только чтобы белый
+              // текст под полосой не спорил с белым текстом на ней.
+              // Работу делает размытие, а не темнота.
+              background: "linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.16) 60%, rgba(0,0,0,0) 100%)",
+              // Держится до самого низа и тает у последних точек: иначе
+              // размытие пропадает задолго до края и полоса кажется
+              // короче, чем она есть.
+              WebkitMaskImage: "linear-gradient(180deg, #000 86%, transparent 100%)",
+              maskImage: "linear-gradient(180deg, #000 86%, transparent 100%)",
               pointerEvents: "none",
             }}
           />
@@ -21768,9 +21774,9 @@ function mapTokenRow(row) {
           // прятала — строка обрывалась на полуслове резким краем.
           position: "absolute", left: 0, right: 0, bottom: 0, height: 56, zIndex: 4, pointerEvents: "none",
           backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-          background: "linear-gradient(0deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%)",
-          WebkitMaskImage: "linear-gradient(0deg, #000 45%, transparent 100%)",
-          maskImage: "linear-gradient(0deg, #000 45%, transparent 100%)",
+          background: "linear-gradient(0deg, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0) 100%)",
+          WebkitMaskImage: "linear-gradient(0deg, #000 55%, transparent 100%)",
+          maskImage: "linear-gradient(0deg, #000 55%, transparent 100%)",
         }} />
         {/* header with logo/wallet removed — content now starts right at the top.
             The bottom nav is an absolutely-positioned overlay (not a flex
