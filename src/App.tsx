@@ -13505,10 +13505,15 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <div
         ref={низ}
         style={{
-          /* Ровно на ширину экрана: поля держит обёртка кошелька, и
-             страница выходит из них в край, не теряя скруглений — их
-             больше нечему срезать, у самой прокрутки полей нет. */
-          marginTop: 22, marginLeft: -16, marginRight: -16,
+          /* Ширина считается от окна и от рамки приложения разом:
+             min(100vw, 480px) — это ровно та полоса, которую занимает
+             само приложение, а сдвиг на половину ставит её по центру.
+             Вычитание отступов родителя сюда не годится: где-то они
+             шестнадцать точек, где-то к ним добавляется запас
+             безопасной зоны, и страница то не доходила до края, то
+             вылезала за него. */
+          marginTop: 22, width: "min(100vw, 480px)",
+          position: "relative", left: "50%", transform: "translateX(-50%)",
           marginBottom: -(96 + 40),
           borderTopLeftRadius: 26, borderTopRightRadius: 26,
           background: КОШ_СТРАНИЦА, padding: "18px 16px 120px", minHeight: 420,
