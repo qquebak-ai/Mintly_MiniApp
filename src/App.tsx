@@ -13352,7 +13352,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
      курса нет откуда, поэтому показываем сам эквивалент: это честная
      вторая величина, а не выдуманный процент. */
   return (
-    <div className="flex flex-col" style={{ paddingTop: 4 }}>
+    <div className="flex flex-col" style={{ paddingTop: 4, paddingLeft: 16, paddingRight: 16 }}>
       {/* Адреса в шапке нет: за ним ходят на «Получить», где он показан
           целиком и кодом, а обрубок в углу только занимал место рядом с
           заголовком. */}
@@ -13505,13 +13505,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <div
         ref={низ}
         style={{
-          /* Ширину берём от самого окна и с запасом в двадцать точек по
-             каждой стороне: страница должна упираться в край экрана при
-             любой вложенности, любом запасе по бокам и любом округлении
-             ширины. Лишнее срезает контейнер списка — он и так не даёт
-             прокручивать вбок. */
-          marginTop: 22, width: "calc(100vw + 40px)",
-          marginLeft: "calc(50% - 50vw - 20px)", marginRight: "calc(50% - 50vw - 20px)",
+          /* Ровно на ширину экрана: поля держит обёртка кошелька, и
+             страница выходит из них в край, не теряя скруглений — их
+             больше нечему срезать, у самой прокрутки полей нет. */
+          marginTop: 22, marginLeft: -16, marginRight: -16,
           marginBottom: -(96 + 40),
           borderTopLeftRadius: 26, borderTopRightRadius: 26,
           background: КОШ_СТРАНИЦА, padding: "18px 16px 120px", minHeight: 420,
@@ -21251,7 +21248,11 @@ function mapTokenRow(row) {
             behind the bar instead of just a flat tinted strip. paddingBottom
             below reserves the nav's own height so the last row of content
             can still scroll clear of it. */}
-        <div className="no-scrollbar px-4 подложка" style={{ flex: 1, overflowY: "auto",
+        {/* Боковых полей у самой прокрутки нет: она обрезает содержимое
+            по своей внутренней рамке, и любая страница, растянутая в
+            край, теряла по шестнадцать точек с каждой стороны. Поля
+            держат сами экраны — каждый в своей обёртке ниже. */}
+        <div className="no-scrollbar подложка" style={{ flex: 1, overflowY: "auto",
           /* Только по вертикали. Любой элемент, выходящий за поля — ореол
              карты, тень, широкая строка, — иначе даёт вбок несколько
              точек хода, и всё приложение ездит под пальцем. */
@@ -21263,6 +21264,10 @@ function mapTokenRow(row) {
           // Запас под капсулу: она висит над прокруткой, и последняя
           // строка списка должна уходить из-под неё целиком.
           paddingBottom: 96 + insetBottom }}>
+          {/* Поля страниц. Кошелёк из этой обёртки исключён: его нижняя
+              страница обязана упираться в край экрана, а свои отступы
+              она держит сама. */}
+          <div className="px-4">
           <KeepAlive show={view === "home"}>
             <HomeView
               onGoTab={goTab}
@@ -21282,6 +21287,7 @@ function mapTokenRow(row) {
           <KeepAlive show={view === "mempad"}>
             <MempadView tokens={tokens} loading={tokensLoading} myTokensLoading={!communityLoaded} myTokens={communityTokens} onOpen={openToken} onLaunch={openCreate} solДоступен={solЗапуск} />
           </KeepAlive>
+          </div>
           <KeepAlive show={view === "wallet"}>
             <WalletView
               connected={connected}
@@ -21303,6 +21309,7 @@ function mapTokenRow(row) {
               insetBottom={insetBottom}
             />
           </KeepAlive>
+          <div className="px-4">
           <KeepAlive show={view === "shop"}>
             <ShopView
               cosmetics={cosmetics}
@@ -21347,6 +21354,7 @@ function mapTokenRow(row) {
               solДоступен={solЗапуск}
             />
           )}
+          </div>
         </div>
 
         <ЭкранНастроек
