@@ -14298,6 +14298,30 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const curveSol = curveChart && token.chain === "solana";
   const курсSolДляГрафика = useSolUsd();
   // Момент выпуска: левее него у графика ничего нет и быть не может.
+  /* Закреплённая шапка.
+   *
+   * Когда крупное имя с ценой уходит вверх, на его месте у самой кромки
+   * остаётся узкая полоса: аватарка, имя и та же цена. Без неё, листая
+   * держателей или ленту, человек теряет из виду, чей это экран и почём
+   * монета, — а именно за этим он сюда и пришёл.
+   *
+   * Момент появления считает наблюдатель по маячку, поставленному сразу
+   * под ценой: как только маячок ушёл за верхний край прокрутки, полоса
+   * проявляется. */
+  const [шапкаНаверху, setШапкаНаверху] = useState(false);
+  const маячокШапки = useRef(null);
+  useEffect(() => {
+    const эл = маячокШапки.current;
+    if (!эл || typeof IntersectionObserver === "undefined") return;
+    const корень = эл.closest(".подложка") || null;
+    const наблюдатель = new IntersectionObserver(
+      ([запись]) => setШапкаНаверху(!запись.isIntersecting),
+      { root: корень, threshold: 0 },
+    );
+    наблюдатель.observe(эл);
+    return () => наблюдатель.disconnect();
+  }, [token.id]);
+
   /* Что показывает шапка: цена и изменение видимого участка графика.
      Пока график не сказал, что у него в окне, берём привычные сутки —
      то же, что и в ленте. */
@@ -14586,6 +14610,38 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
 
   return (
     <div className="fx-view flex flex-col pb-4" style={{ position: "relative", gap: 18 }}>
+      {/* Полоса у кромки. Она размывает всё, что проезжает под ней, —
+          так же, как это делает верхний край самой прокрутки. */}
+      <div
+        aria-hidden={!шапкаНаверху}
+        style={{
+          position: "sticky", top: 0, zIndex: 6,
+          marginLeft: -16, marginRight: -16, marginBottom: -18,
+          padding: "8px 14px 14px",
+          display: "flex", alignItems: "center", gap: 10,
+          backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+          background: "linear-gradient(180deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0) 100%)",
+          opacity: шапкаНаверху ? 1 : 0,
+          transform: `translateY(${шапкаНаверху ? 0 : -8}px)`,
+          transition: "opacity .22s ease, transform .22s ease",
+          pointerEvents: шапкаНаверху ? "auto" : "none",
+        }}
+      >
+        <TokenAvatar size={34} tone={up ? "up" : "down"} src={логотип} />
+        <div className="flex-1 min-w-0 flex flex-col items-center" style={{ gap: 1 }}>
+          <span className="truncate w-full" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 800, textAlign: "center" }}>
+            {token.name}
+          </span>
+          <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 13.5, fontWeight: 700 }}>
+            {fmtPrice(ценаОкна)}
+          </span>
+        </div>
+        <button onClick={handleShare} className="fx-tap flex items-center justify-center flex-shrink-0"
+          style={{ width: 32, height: 32, borderRadius: 999, background: T.surface, border: "none" }}>
+          <Share2 size={14} color={T.paper} />
+        </button>
+      </div>
+
       <TrendFX up={up} seedKey={token.seed} />
       <TokenShareSheet
         token={shareOpen ? { ...token, logoUrl: логотип } : null}
@@ -14667,6 +14723,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             {ростОкна ? "+" : "−"}{fmtPrice(Math.abs(дельтаОкна))} ({ростОкна ? "+" : "−"}{Math.abs(процентОкна).toFixed(2)}%)
           </div>
         </div>
+
+        {/* Маячок закреплённой шапки: пока он виден, полосы наверху нет. */}
+        <div ref={маячокШапки} aria-hidden style={{ height: 1 }} />
 
         <div className="flex items-center justify-between gap-3">
           {token.tokenAddress ? (
