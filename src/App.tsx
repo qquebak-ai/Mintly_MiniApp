@@ -13352,11 +13352,14 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
      курса нет откуда, поэтому показываем сам эквивалент: это честная
      вторая величина, а не выдуманный процент. */
   return (
-    <div className="flex flex-col" style={{ paddingTop: 4, paddingLeft: 16, paddingRight: 16 }}>
+    /* Поля держит не корень раздела, а каждый блок внутри: тогда нижняя
+       страница просто занимает всю ширину и упирается в край сама, без
+       отрицательных отступов и пересчёта ширины окна. */
+    <div className="flex flex-col" style={{ paddingTop: 4 }}>
       {/* Адреса в шапке нет: за ним ходят на «Получить», где он показан
           целиком и кодом, а обрубок в углу только занимал место рядом с
           заголовком. */}
-      <div style={{ marginBottom: 14 }}>
+      <div style={{ marginBottom: 14, padding: "0 16px" }}>
         <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
           {t("navWallet")}
         </h1>
@@ -13365,7 +13368,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       {/* Карта баланса. Сумма читается одним взглядом: целые рубли
           крупно и белым, копейки приглушены — так глаз не спотыкается о
           мелкую часть, которая на решение не влияет. */}
-      <div style={{ position: "relative" }}>
+      <div style={{ position: "relative", margin: "0 16px" }}>
       {/* Три волны вдогонку друг другу: пока одна растворяется, следующая
           только отходит от края — получается непрерывное дыхание, а не
           мигание. */}
@@ -13445,7 +13448,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       </div>
 
       {/* Ряд действий — то, за чем в кошелёк заходят чаще всего. */}
-      <div className="flex items-start" style={{ gap: 10, marginTop: 16 }}>
+      <div className="flex items-start" style={{ gap: 10, marginTop: 16, padding: "0 16px" }}>
         <ДействиеКошелька icon={Plus} label={t("walletActBuy")} onClick={() => onGoTab("mempad")} />
         <ДействиеКошелька icon={ArrowDownLeft} label={t("walletActReceive")} onClick={() => setПолучитьОткрыт(true)} />
         <ДействиеКошелька icon={Repeat} label={t("walletActSwap")} onClick={() => setОбменОткрыт(true)} />
@@ -13458,7 +13461,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
 
       {/* Свои кошельки — на тёмном верху, рядом с балансом: они про
           «сколько и где лежит», а не про историю операций. */}
-      <div className="flex flex-col" style={{ gap: 14, marginTop: 20 }}>
+      <div className="flex flex-col" style={{ gap: 14, marginTop: 20, padding: "0 16px" }}>
         {/* TON-кошелёк. Он внешний: им подписывают покупки на кривой TON,
             но менять на нём нечего — обмен живёт только внутри. */}
         <div className="w-full rounded-[22px] p-4" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
@@ -13505,15 +13508,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <div
         ref={низ}
         style={{
-          /* Ширина считается от окна и от рамки приложения разом:
-             min(100vw, 480px) — это ровно та полоса, которую занимает
-             само приложение, а сдвиг на половину ставит её по центру.
-             Вычитание отступов родителя сюда не годится: где-то они
-             шестнадцать точек, где-то к ним добавляется запас
-             безопасной зоны, и страница то не доходила до края, то
-             вылезала за него. */
-          marginTop: 22, width: "min(100vw, 480px)",
-          position: "relative", left: "50%", transform: "translateX(-50%)",
+          // Просто вся ширина раздела: поля живут в блоках выше, и
+          // вычитать их отсюда больше не нужно — страница и так стоит
+          // ровно по краям приложения.
+          marginTop: 22, width: "100%",
           marginBottom: -(96 + 40),
           borderTopLeftRadius: 26, borderTopRightRadius: 26,
           background: КОШ_СТРАНИЦА, padding: "18px 16px 120px", minHeight: 420,
