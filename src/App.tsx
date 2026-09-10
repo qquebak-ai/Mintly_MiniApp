@@ -4220,8 +4220,8 @@ async function fetchSparkCloses(poolAddress, n = 24, jettonAddress = null) {
    маленькая заливка на чёрном, и приглушённый тон на ней читается серым.
    Родство с палитрой сохранено: это те же мятный и розовый, только
    выведенные на полную яркость. */
-const СВЕЧА_РОСТ = "#00F5B0";
-const СВЕЧА_ПАДЕНИЕ = "#FF3B60";
+const СВЕЧА_РОСТ = "#00E96B";
+const СВЕЧА_ПАДЕНИЕ = "#FF3B47";
 
 // Высота полосы, которая всегда висит у верхней кромки экрана токена.
 const ВЫСОТА_ПОЛОСЫ = 64;
@@ -14670,11 +14670,12 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           и к моменту их исчезновения копия уже стоит на месте.
           В потоке полоса ничего не занимает: высота ноль, содержимое
           лежит поверх, а страница отступает от верха на её высоту. */}
-      {/* Прилипает не к самому верху прокрутки, а к началу содержимого:
-          верхние точки экрана занимает шапка Telegram, и полоса, севшая
-          под неё, была бы наполовину не видна. Размытие при этом уходит
-          и выше — под шапку, чтобы между ними не было щели. */}
-      <div style={{ position: "sticky", top: отступСверху, height: 0, zIndex: 6, marginLeft: -16, marginRight: -16, marginBottom: -18 }}>
+      {/* Липкий верх. Браузер сажает такую полосу не к самой кромке
+          прокрутки, а под её верхний отступ — то есть ровно к началу
+          содержимого, под шапкой Telegram. Поэтому смещение здесь
+          нулевое, а размытие уходит выше отдельным куском, чтобы полоса
+          страницы над ним не оставалась чистой. */}
+      <div style={{ position: "sticky", top: 0, height: 0, zIndex: 6, marginLeft: -16, marginRight: -16, marginBottom: -18 }}>
         <div
           style={{
             position: "absolute", top: -отступСверху, left: 0, right: 0,
@@ -14779,7 +14780,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           }}>
             {fmtPrice(ценаОкна)}
           </div>
-          <div style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 15, marginTop: 2, color: ростОкна ? T.up : T.down }}>
+          <div style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 15, marginTop: 2, color: ростОкна ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ }}>
             {ростОкна ? "+" : "−"}{fmtPrice(Math.abs(дельтаОкна))} ({ростОкна ? "+" : "−"}{Math.abs(процентОкна).toFixed(2)}%)
           </div>
         </div>
