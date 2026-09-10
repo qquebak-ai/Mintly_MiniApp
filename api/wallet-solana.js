@@ -131,6 +131,17 @@ function расшифровать(строка, набор, владелец) {
   throw new Error("ключ кошелька не читается");
 }
 
+// Тот же перебор, но вопросом «откроется ли»: нужен там, где ответ
+// решает судьбу строки, а не подписывает сделку.
+function читается(строка, набор, владелец) {
+  try {
+    расшифровать(строка, набор, владелец);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 let solana = null;
 async function библиотеки() {
   if (!solana) {
@@ -166,7 +177,17 @@ const ПОЛЯ = "user_id, address, secret_enc, key_id, payout_address, payout_p
    обработчика. */
 async function кошелёк(db, user, набор) {
   const { data } = await db.from("app_wallets").select(ПОЛЯ).eq("user_id", user.id).maybeSingle();
-  if (data) return data;
+  if (data) {
+    if (читается(data, набор, user.id)) return data;
+    // Ключ площадки сменили, а прежнего в APP_WALLET_KEY_OLD нет: строку
+    // уже не открыть никогда. Пустой кошелёк в этом случае честнее
+    // завести заново, чем показывать человеку адрес, которым он не
+    // сможет распорядиться. С деньгами на счету так делать нельзя —
+    // такой кошелёк оставляем как есть, пусть ошибка будет громкой.
+    const баланс = await rpc("getBalance", [data.address]).then((r) => Number(r && r.value)).catch(() => null);
+    if (баланс !== 0) return data;
+    await db.from("app_wallets").delete().eq("user_id", user.id);
+  }
 
   const { Keypair } = await библиотеки();
   const пара = Keypair.generate();
