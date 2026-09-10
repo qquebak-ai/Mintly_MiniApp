@@ -14743,7 +14743,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             <span className="truncate w-full" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800, textAlign: "center" }}>
               {token.name}
             </span>
-            <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 13, fontWeight: 700 }}>
+            <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 14.5, fontWeight: 700 }}>
               {fmtPrice(ценаОкна)}
             </span>
           </div>
