@@ -87,7 +87,9 @@ export const КРИВАЯ = {
 // запуск».
 const адресОк = (s) => typeof s === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
 
-const запускВключён = () => !!PROGRAM && адресОк(PROGRAM);
+// Без адреса комиссии запуск падал уже на сборке сделки — «включено» в
+// интерфейсе, а нажать нельзя. Поэтому оба адреса проверяем разом.
+const запускВключён = () => адресОк(PROGRAM) && адресОк(FEE_ACCOUNT);
 
 function программа() {
   if (!запускВключён()) return null;
@@ -456,7 +458,12 @@ export default async function handler(req, res) {
     }
 
     if (действие === "enabled") {
-      return res.status(200).json({ enabled: запускВключён(), program: PROGRAM || null });
+      return res.status(200).json({
+        enabled: запускВключён(),
+        program: PROGRAM || null,
+        fee: адресОк(FEE_ACCOUNT),
+        cluster: /devnet/.test(RPC) ? "devnet" : /testnet/.test(RPC) ? "testnet" : "mainnet-beta",
+      });
     }
 
     if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
