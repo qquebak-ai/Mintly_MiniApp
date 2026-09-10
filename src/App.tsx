@@ -4183,7 +4183,23 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt 
   const widthRef = useRef(320);
 
   const n = candles?.length || 0;
-  const viewRef = useRef({ start: Math.max(0, n - CHART_DEFAULT_VISIBLE), count: Math.min(n, CHART_DEFAULT_VISIBLE) || 1 });
+  /* Ряд короче окна — не повод растягивать десяток свечей во всю ширину.
+     У молодого токена так и было: одна свеча запуска занимала полэкрана,
+     а «график» стоял впритык к левой стенке. Поэтому окно живёт своей
+     длиной, а не длиной истории: свечи рисуются в привычном размере, а
+     пустое место остаётся пустым. */
+  const nВид = Math.max(n, CHART_DEFAULT_VISIBLE);
+  /* Сколько пустоты держим справа от последней свечи. Пока история
+     короткая — половина окна: тогда свежая свеча стоит посередине, а
+     история растёт влево, как и просили. Когда свечей набирается на всё
+     окно, остаётся обычный отступ терминала. */
+  function хвостСправа(count) {
+    return Math.max(count * 0.08, Math.min(count * 0.5, count - n));
+  }
+  const viewRef = useRef({ start: n - CHART_DEFAULT_VISIBLE * 0.5, count: CHART_DEFAULT_VISIBLE });
+  // Трогали ли масштаб пальцами. Пока нет — окно держит свою длину даже
+  // на короткой истории; после щипка длину выбирает человек.
+  const зумРукой = useRef(false);
   // Пока человек не двигал график рукой, окно держится за правый край.
   // Окно задавалось номерами свечей и не пересчитывалось при обновлении,
   // а число свечей меняется на каждом обновлении — от этого график сам
@@ -4313,7 +4329,7 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt 
 
   function clampView() {
     const v = viewRef.current;
-    v.count = Math.max(CHART_MIN_VISIBLE, Math.min(n, v.count || CHART_DEFAULT_VISIBLE));
+    v.count = Math.max(CHART_MIN_VISIBLE, Math.min(nВид, v.count || CHART_DEFAULT_VISIBLE));
     // Пустое место есть с обеих сторон. Справа за последней свечой — как
     // в любом терминале; слева до первой — потому что палец упирался в
     // невидимую стену ровно там, где у молодого токена всего десяток
@@ -4628,8 +4644,12 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt 
       // мало — в новом ответе их может быть вдвое больше на том же часе,
       // и масштаб менялся сам собой прямо под рукой.
       const поВремени = свечейВРазмахе();
-      v.count = Math.max(CHART_MIN_VISIBLE, Math.min(n, поВремени || v.count || CHART_DEFAULT_VISIBLE));
-      v.start = Math.max(0, n - v.count);
+      let хочу = поВремени || v.count || CHART_DEFAULT_VISIBLE;
+      // Пока масштаб не трогали руками, окно не сжимается до длины
+      // истории: иначе три свечи снова растянулись бы во всю ширину.
+      if (!зумРукой.current) хочу = Math.max(хочу, CHART_DEFAULT_VISIBLE);
+      v.count = Math.max(CHART_MIN_VISIBLE, Math.min(nВид, хочу));
+      v.start = n + хвостСправа(v.count) - v.count;
     } else if (anchorTimeRef.current != null) {
       // Ряд мог пересобраться с другим шагом: у свечей другие номера и
       // даже другие границы. Возвращаем окно на ту дату, где человек его
@@ -4772,7 +4792,8 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt 
       const d = dist(e.touches);
       const scale = d / (pinchRef.current.startDist || 1);
       let newCount = pinchRef.current.startCount / scale;
-      newCount = Math.max(CHART_MIN_VISIBLE, Math.min(n, newCount));
+      newCount = Math.max(CHART_MIN_VISIBLE, Math.min(nВид, newCount));
+      зумРукой.current = true;
       const mx = midX(e.touches);
       const newSlot = chartWidth() / newCount;
       viewRef.current = { start: pinchRef.current.anchorIdx - mx / newSlot, count: newCount };
