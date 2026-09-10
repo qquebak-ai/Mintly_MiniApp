@@ -4278,6 +4278,12 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
   // а число свечей меняется на каждом обновлении — от этого график сам
   // уезжал то влево, то вправо.
   const pinnedRef = useRef(true);
+  /* Стартовый масштаб — тот, с которым карточка открылась.
+     Пока график в нём, двигать его некуда: он и так показывает всё, что
+     есть, а от случайного смаха вбок оставалось непонятное «уехало и не
+     вернуть». Двигать разрешаем, только когда приблизили; отдалили
+     обратно — окно само встаёт на место. */
+  const стартовыйСчёт = useRef(CHART_DEFAULT_VISIBLE);
   // Время свечи, стоящей у левого края. Окно задано номерами свечей, а
   // ряд пересобирается на каждом обновлении — и шаг в нём зависит от
   // длины истории, то есть номера не значат ничего постоянного. Держим
@@ -4815,6 +4821,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       if (!зумРукой.current) хочу = Math.max(хочу, CHART_DEFAULT_VISIBLE);
       v.count = Math.max(CHART_MIN_VISIBLE, Math.min(CHART_MAX_VISIBLE, nВид, хочу));
       v.start = n + хвостСправа(v.count) - v.count;
+      if (!зумРукой.current) стартовыйСчёт.current = v.count;
     } else if (anchorTimeRef.current != null) {
       // Ряд мог пересобраться с другим шагом: у свечей другие номера и
       // даже другие границы. Возвращаем окно на ту дату, где человек его
@@ -4870,6 +4877,9 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     inertiaRaf.current = null;
   }
   function panByPixels(dxScreen) {
+    // В стартовом масштабе график стоит на месте: двигать его можно
+    // только после того, как приблизили.
+    if (viewRef.current.count >= стартовыйСчёт.current - 0.5) return;
     const layout = computeLayout();
     if (!layout) return;
     viewRef.current.start -= dxScreen / layout.slot;
@@ -4941,7 +4951,15 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       зумРукой.current = true;
       const mx = midX(e.touches);
       const newSlot = chartWidth() / newCount;
-      viewRef.current = { start: pinchRef.current.anchorIdx - mx / newSlot, count: newCount };
+      if (newCount >= стартовыйСчёт.current - 0.5) {
+        // Отдалили до исходного — возвращаем ровно то окно, с которым
+        // карточка открылась, а не «почти такое же».
+        const счёт = стартовыйСчёт.current;
+        viewRef.current = { start: n + хвостСправа(счёт) - счёт, count: счёт };
+        pinnedRef.current = true;
+      } else {
+        viewRef.current = { start: pinchRef.current.anchorIdx - mx / newSlot, count: newCount };
+      }
       clampView(true);
       запомнитьРазмахОкна();
       draw();
@@ -5017,7 +5035,13 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     const factor = e.deltaY > 0 ? 1.1 : 0.9;
     let newCount = Math.max(CHART_MIN_VISIBLE, Math.min(CHART_MAX_VISIBLE, nВид, viewRef.current.count * factor));
     const newSlot = chartWidth() / newCount;
-    viewRef.current = { start: anchorIdx - mx / newSlot, count: newCount };
+    if (newCount >= стартовыйСчёт.current - 0.5) {
+      const счёт = стартовыйСчёт.current;
+      viewRef.current = { start: n + хвостСправа(счёт) - счёт, count: счёт };
+      pinnedRef.current = true;
+    } else {
+      viewRef.current = { start: anchorIdx - mx / newSlot, count: newCount };
+    }
     clampView(true);
     запомнитьРазмахОкна();
     draw();
