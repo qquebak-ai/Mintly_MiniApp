@@ -310,6 +310,42 @@ if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.FEED_LOOP !== "0") {
   console.log(`[обход] цикл раз в ${Math.round(ШАГ_ОБХОДА_МС / 1000)} с, сети по очереди`);
 }
 
+/* Обход кривых — тем же способом.
+ *
+ * Ленту с биржи обходит цикл выше, а цену токена, который торгуется на
+ * своей кривой, считает api/refresh-curves: без него в curve_cache
+ * пусто, и на витрине у собственного токена ноль вместо цены, пустой
+ * график и «сделок 0». На Vercel его звало расписание, при переезде
+ * звать стало некому — и кеш встал.
+ *
+ * Свой круг быстрее чужого расписания: у токена на кривой цена меняется
+ * каждой сделкой, а не раз в сутки. */
+const ШАГ_КРИВЫХ_МС = Number(process.env.CURVES_INTERVAL_MS) || 20000;
+
+if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.CURVES_LOOP !== "0") {
+  const круг = async () => {
+    try {
+      const ф = await обработчик("/api/refresh-curves");
+      const ответ = дополнить({
+        statusCode: 200,
+        headersSent: false,
+        setHeader() {},
+        end() { this.headersSent = true; },
+      });
+      await ф(
+        { method: "GET", url: "/api/refresh-curves", query: {}, headers: { authorization: `Bearer ${process.env.CRON_SECRET || ""}` } },
+        ответ
+      );
+    } catch (err) {
+      console.warn("[кривые]", err && err.message);
+    } finally {
+      setTimeout(круг, ШАГ_КРИВЫХ_МС);
+    }
+  };
+  setTimeout(круг, 3000);
+  console.log(`[кривые] цикл раз в ${Math.round(ШАГ_КРИВЫХ_МС / 1000)} с`);
+}
+
 /* Уведомления о покупках — тем же способом.
  *
  * Их тоже звал чужой планировщик, и там же ломался: секрет в настройках

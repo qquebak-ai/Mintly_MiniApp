@@ -4004,6 +4004,70 @@ async function сделкиИзКеша(tokenId) {
   return ряд;
 }
 
+/* История кривой в Solana.
+ *
+ * Ряд тот же, что у TON, но записан иначе: обход хранит сделки
+ * изменением баланса счёта кривой в лямпортах ({t, d}), потому что
+ * деньги ходят только через неё и разбирать инструкции не нужно.
+ * Читаем его из того же кеша — сеть здесь ни при чём. */
+const СДЕЛКИ_SOL_МС = 5 * 60 * 1000;
+const сделкиSolКеш = new Map(); // tokenId -> { ряд, ts }
+
+async function сделкиSolИзКеша(tokenId) {
+  if (!tokenId) return null;
+  const было = сделкиSolКеш.get(tokenId);
+  if (было && Date.now() - было.ts < 20000) return было.ряд;
+  const { data, error } = await supabase
+    .from("curve_cache")
+    .select("trades, updated_at")
+    .eq("token_id", tokenId)
+    .maybeSingle();
+  if (error || !data || !Array.isArray(data.trades)) return null;
+  const свежесть = data.updated_at ? new Date(data.updated_at).getTime() : 0;
+  if (Date.now() - свежесть > СДЕЛКИ_SOL_МС) return null;
+  const ряд = data.trades
+    .map((п) => ({ time: Number(п.t != null ? п.t : п.time) || 0, дельта: Number(п.d) || 0 }))
+    .filter((с) => с.time > 0)
+    .sort((a, b) => a.time - b.time);
+  сделкиSolКеш.set(tokenId, { ряд, ts: Date.now() });
+  return ряд;
+}
+
+/* Свечи токена на кривой Solana.
+ *
+ * Считает их та же сборка, что и для TON, — разница только в разрядности
+ * сторон: там нанотоны против нанотокенов, здесь лямпорты (10⁹) против
+ * шести знаков у токена. Поэтому виртуальный запас токенов домножаем на
+ * тысячу: после этого «цена» из формулы выходит сразу в SOL за штуку, и
+ * курс к доллару подставляется как есть, без второго множителя, который
+ * пришлось бы протаскивать через всю сборку. */
+async function свечиКривойSol(mint, tokenId, timeframe, курсSolUsd, limit = CHART_TOTAL) {
+  if (!mint || !(курсSolUsd > 0)) return null;
+  const { состояниеКривойSol } = await import("./solLaunch");
+  const st = await состояниеКривойSol(mint);
+  if (!st || !(st.virtualSol > 0) || !(st.virtualTokens > 0)) return null;
+
+  const состояние = {
+    realTon: BigInt(Math.max(0, Math.round(st.realSol || 0))),
+    virtualTon: BigInt(Math.round(st.virtualSol)),
+    virtualTokens: BigInt(Math.round(st.virtualTokens)) * 1000n,
+    feeBps: BigInt(st.feeBps || 0),
+  };
+
+  const сделки = (await сделкиSolИзКеша(tokenId)) || [];
+  let собрано = 0;
+  const ряд = сделки.map((с) => {
+    собрано += с.дельта;
+    return {
+      time: с.time,
+      ton: BigInt(Math.abs(Math.round(с.дельта))),
+      realTon: BigInt(Math.round(собрано)),
+      kind: с.дельта < 0 ? "sell" : "buy",
+    };
+  });
+  return buildCurveCandles(ряд, timeframe, состояние, limit, курсSolUsd);
+}
+
 async function fetchCurveOHLCV(curveAddress, timeframe, testnet, rate = tonUsd(), tokenId = null) {
   if (!(rate > 0)) return null;
   // Состояние нужно не только ради последней точки: в нём лежат
@@ -14046,6 +14110,12 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   // для него история берётся прямо из транзакций контракта. Случайный
   // график остаётся только там, где реальных данных нет вовсе.
   const curveChart = !token.poolAddress && !!token.curveAddress;
+  // Кривая в Solana читается иначе: там свой узел, свой формат сделок и
+  // свой курс. Без этой развилки история такого токена уезжала в tonapi,
+  // тот про адрес Solana ничего не знал — и на экране висело «биржа не
+  // ответила» у токена, который отлично торгуется.
+  const curveSol = curveChart && token.chain === "solana";
+  const курсSolДляГрафика = useSolUsd();
   // Какой интервал выбран прямо сейчас. Ответы приходят не в том
   // порядке, в каком их спрашивали: пока идёт запрос на пять минут,
   // человек успевает нажать час, и медленный ответ на пятиминутку
@@ -14073,7 +14143,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       // Ветка идёт после биржевой и только если та ничего не дала: у
       // токена, вышедшего на биржу, есть оба адреса, и раньше свежий
       // биржевой график тут же затирался историей кривой.
-      if (!result && token.curveAddress) {
+      if (!result && curveSol) {
+        result = await свечиКривойSol(token.tokenAddress, token.id, tf, курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd());
+        if (result) src = "curve";
+      }
+      if (!result && !curveSol && token.curveAddress) {
         result = await fetchCurveOHLCV(token.curveAddress, tf, TON_TESTNET_NETWORK, tonPriceUsd > 0 ? tonPriceUsd : tonUsd(), token.id);
         if (result) src = "curve";
       }
@@ -14132,7 +14206,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     // линию строить не из чего, и попытку нужно повторить.
     // tonPriceUsd в зависимостях: график считается в долларах, и при
     // смене курса его нужно пересобрать, иначе он повиснет на старом.
-  }, [tf, token.id, token.poolAddress, token.curveAddress, token.price > 0, tonPriceUsd, chartReload]);
+  }, [tf, token.id, token.poolAddress, token.curveAddress, token.price > 0, tonPriceUsd, курсSolДляГрафика, curveSol, chartReload]);
 
   // Обновление открытого графика. Крутится и тогда, когда данных ещё
   // нет: первый запрос мог не пройти из-за лимита, и без повторов на
@@ -14146,7 +14220,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     const abort = typeof AbortController !== "undefined" ? new AbortController() : null;
     async function refresh() {
       let fresh = null;
-      if (curveChart) {
+      if (curveSol) {
+        fresh = await свечиКривойSol(token.tokenAddress, token.id, tf, курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd());
+      } else if (curveChart) {
         fresh = await fetchCurveOHLCV(token.curveAddress, tf, TON_TESTNET_NETWORK, tonPriceUsd > 0 ? tonPriceUsd : tonUsd(), token.id);
       } else {
         // Только биржа. Если она не ответила — на экране остаётся то, что
@@ -14162,7 +14238,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     }
     const iv = setInterval(refresh, 15000);
     return () => { cancelled = true; clearInterval(iv); if (abort) abort.abort(); };
-  }, [token.id, token.poolAddress, token.curveAddress, curveChart, tf, tonPriceUsd]);
+  }, [token.id, token.poolAddress, token.curveAddress, curveChart, curveSol, tf, tonPriceUsd, курсSolДляГрафика]);
 
   // Real supply estimate (mcap / price) derived from the same live data —
   // used only to scale the chart between "price" and "market cap" display,
