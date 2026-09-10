@@ -11946,7 +11946,7 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
  * Профиля в панели разделов больше нет — там переключаются между
  * рынками, а не между рынком и собой. Вход в него теперь один и там же,
  * где его ищут: аватарка в углу главной. */
-function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile }) {
+function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, грузится = false }) {
   const аватар = profile && profile.avatarUrl;
   // Аватарка и имя — одной кнопкой слева: это одна мысль «я», и целиться
   // в кружок диаметром в сорок точек, когда рядом стоит собственное имя,
@@ -11958,21 +11958,32 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile }) 
       style={{ gap: 11, background: "transparent", border: "none", padding: 0, alignSelf: "flex-start" }}
     >
       <span
+        className={грузится ? "fx-skeleton" : undefined}
         style={{
           width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
           border: `1.5px solid ${T.lineHi}`, overflow: "hidden",
           // Пока картинки нет — ровный тёмный кружок, а не серое пятно с
-          // чужим значком внутри.
-          background: аватар ? `center/cover no-repeat url(${аватар})` : T.bg,
+          // чужим значком внутри. А пока неизвестно, есть ли она вообще,
+          // кружок мерцает вместе с плашками имени.
+          background: грузится ? undefined : (аватар ? `center/cover no-repeat url(${аватар})` : T.bg),
           display: "flex", alignItems: "center", justifyContent: "center",
         }}
       >
-        {!аватар && <User size={17} color={T.muted} />}
+        {!грузится && !аватар && <User size={17} color={T.muted} />}
       </span>
       {/* Без аккаунта имени нет. Раньше на его месте стояло «Mintly» —
           человек читал это как своё имя, хотя так называется само
           приложение; остаётся одна честная строка о том, что аккаунта
           пока нет. */}
+      {/* Пока не известно, кто вошёл, на месте имени стоят плашки той же
+          формы. Раньше здесь на долю секунды загоралось «аккаунт не
+          создан» — и человек с аккаунтом читал это про себя. */}
+      {грузится ? (
+        <span className="flex flex-col" style={{ gap: 5 }}>
+          <span className="fx-skeleton" style={{ display: "block", width: 124, height: 17, borderRadius: 6 }} />
+          <span className="fx-skeleton" style={{ display: "block", width: 88, height: 10, borderRadius: 4 }} />
+        </span>
+      ) : (
       <span>
         {accountCreated && profile && profile.nickname && (
           <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em" }}>
@@ -11988,6 +11999,7 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile }) 
           {accountCreated ? t("homeHello") : t("accountNotCreated")}
         </span>
       </span>
+      )}
     </button>
   );
 }
@@ -12352,7 +12364,7 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
 function HomeView({
   onGoTab, onGoCreate, curveTokens = [], onOpenToken, onOpenProfile,
   profile = null, accountCreated = false, myTokens = [], achievements = [], userId = null,
-  onOpenMyProfile, onOpenAchievements,
+  onOpenMyProfile, onOpenAchievements, профильГрузится = false,
 }) {
   // Главная — витрина площадки: сводка, токен дня, движение, топ. Монетам
   // из пробной сети там не место — их цена ничего не значит, а сводка по
@@ -12363,7 +12375,7 @@ function HomeView({
     // Запас снизу — под закреплённую кнопку: в конце прокрутки она
     // должна висеть над пустотой, а не над последней строкой топа.
     <div className="flex flex-col" style={{ gap: 26, paddingTop: 8, paddingBottom: 96 }}>
-      <ШапкаГлавной profile={profile} accountCreated={accountCreated} onOpenMyProfile={onOpenMyProfile} />
+      <ШапкаГлавной profile={profile} accountCreated={accountCreated} onOpenMyProfile={onOpenMyProfile} грузится={профильГрузится} />
       <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
       <ГлавнаяСводка live={боевые} />
       <БегущаяЛента />
@@ -21532,6 +21544,7 @@ function mapTokenRow(row) {
               onOpenProfile={openUserProfile}
               profile={profile}
               accountCreated={accountCreated}
+              профильГрузится={!authChecked}
               myTokens={myTokens}
               achievements={achievements}
               userId={userId}
