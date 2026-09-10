@@ -26,10 +26,15 @@ const ЖДАТЬ_МС = 3500;
 // Пауза после отказа. Источник отвечает 429 не мгновенно отпуская: пока
 // он сердится, любой следующий запрос — потраченный впустую.
 const ПАУЗА_ПОСЛЕ_ОТКАЗА_МС = 15000;
+// Источник может держать отказ дольше своей же минуты — тогда пауза
+// растёт: первый отказ пятнадцать секунд, дальше вдвое, до пяти минут.
+// Возвращается к обычной, как только он снова ответил.
+const ПАУЗА_ПРЕДЕЛ_МС = 5 * 60 * 1000;
 
 const выпущено = [];      // времена последних запросов
 const вПути = new Map();  // url -> Promise, чтобы не спрашивать дважды
 let сердится = 0;         // до какого времени источник в отказе
+let подряд = 0;           // сколько отказов подряд
 
 const сон = (мс) => new Promise((r) => setTimeout(r, мс));
 
@@ -70,10 +75,12 @@ export async function gtЗапрос(url, { ждать = ЖДАТЬ_МС } = {})
     try {
       const res = await fetch(url, { headers: { accept: "application/json" } });
       if (res.status === 429 || res.status === 418) {
-        сердится = Date.now() + ПАУЗА_ПОСЛЕ_ОТКАЗА_МС;
+        подряд += 1;
+        сердится = Date.now() + Math.min(ПАУЗА_ПРЕДЕЛ_МС, ПАУЗА_ПОСЛЕ_ОТКАЗА_МС * 2 ** (подряд - 1));
         return { ok: false, status: res.status, json: null };
       }
       if (!res.ok) return { ok: false, status: res.status, json: null };
+      подряд = 0;
       return { ok: true, status: res.status, json: await res.json() };
     } catch (err) {
       return { ok: false, status: -1, json: null, error: (err && err.message) || String(err) };
@@ -95,6 +102,7 @@ export function gtСостояние() {
     лимит: ЛИМИТ_В_МИНУТУ,
     занято: выпущено.length,
     отказДо: сердится > Date.now() ? Math.round((сердится - Date.now()) / 1000) : 0,
+    отказовПодряд: подряд,
     вПути: вПути.size,
   };
 }

@@ -15,6 +15,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { gtЗапрос } from "./_gt.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -133,17 +134,15 @@ async function записать(admin, строки) {
 }
 
 async function страница(сеть, page, список = "trending_pools") {
-  try {
-    const res = await fetch(`${GT}/networks/${сеть}/${список}?page=${page}&include=base_token,dex`);
-    if (!res.ok) {
-      console.warn("[refresh-feed]", сеть, "стр.", page, "->", res.status);
-      return null;
-    }
-    return await res.json();
-  } catch (err) {
-    console.warn("[refresh-feed]", сеть, "стр.", page, "->", err && err.message);
+  // Через общую дверь: у биржи лимит на адрес, и обход, который ходил
+  // мимо счётчика, выбирал его весь — свечи и сделки живым людям
+  // доставались уже отказом.
+  const ответ = await gtЗапрос(`${GT}/networks/${сеть}/${список}?page=${page}&include=base_token,dex`, { ждать: 2000 });
+  if (!ответ.ok) {
+    console.warn("[refresh-feed]", сеть, "стр.", page, "->", ответ.status);
     return null;
   }
+  return ответ.json;
 }
 
 /* Подделки под известные монеты. В списке свежих пулов их всегда

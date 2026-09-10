@@ -185,9 +185,9 @@ export async function курсSol() {
     }
   } catch (err) { /* ниже запасной источник */ }
   try {
-    const res = await fetch("https://api.geckoterminal.com/api/v2/simple/networks/solana/token_price/So11111111111111111111111111111111111111112");
-    if (res.ok) {
-      const json = await res.json();
+    const ответ = await gtЗапрос("https://api.geckoterminal.com/api/v2/simple/networks/solana/token_price/So11111111111111111111111111111111111111112", { ждать: 1200 });
+    if (ответ.ok) {
+      const json = ответ.json;
       const цены = json && json.data && json.data.attributes && json.data.attributes.token_prices;
       const v = цены ? Number(Object.values(цены)[0]) || 0 : 0;
       if (v > 0) {
