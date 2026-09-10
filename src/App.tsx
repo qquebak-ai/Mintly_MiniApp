@@ -12308,7 +12308,7 @@ function SolanaWalletCard({ showToast, insetTop = 0, insetBottom = 0 }) {
   }
 
   return (
-    <div className="w-full rounded-[22px] p-4" style={{ marginTop: 20, background: T.surface, border: "none" }}>
+    <div className="w-full rounded-[22px] p-4" style={{ marginTop: 20, background: T.surface, border: `1px solid ${T.line}` }}>
       <div className="flex items-center justify-between gap-3">
         <button
           onClick={() => сессия && setСтраница(true)}
@@ -13464,7 +13464,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <div className="flex flex-col" style={{ gap: 14, marginTop: 20, padding: "0 16px" }}>
         {/* TON-кошелёк. Он внешний: им подписывают покупки на кривой TON,
             но менять на нём нечего — обмен живёт только внутри. */}
-        <div className="w-full rounded-[22px] p-4" style={{ background: T.surface, border: "none" }}>
+        <div className="w-full rounded-[22px] p-4" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
           {connected ? (
             /* Карточка целиком — вход на страницу кошелька: там же и
                отключение, ползунком. Кнопка рядом с балансом слишком
@@ -13516,9 +13516,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           marginBottom: -(96 + 40),
           borderTopLeftRadius: 26, borderTopRightRadius: 26,
           background: КОШ_СТРАНИЦА, padding: "18px 16px 120px", minHeight: 420,
-          // Тонкий свет по верхней кромке: в тёмном на тёмном граница
-          // страницы иначе не читается и скругление пропадает.
-          boxShadow: `inset 0 1px 0 ${hexA("#FFFFFF", 0.07)}`,
+          // Без кромки по верху: она читалась рамкой вокруг страницы, а
+          // отделяет её от фона сам тон — он на ступень светлее.
+          border: "none",
         }}
       >
         <div style={{ marginBottom: 12 }}>
