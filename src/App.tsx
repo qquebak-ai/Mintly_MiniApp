@@ -21749,10 +21749,14 @@ function mapTokenRow(row) {
           maskImage: "linear-gradient(180deg, #000 0%, transparent 100%)",
         }} />
         <div aria-hidden style={{
-          position: "absolute", left: 0, right: 0, bottom: 0, height: 26, zIndex: 4, pointerEvents: "none",
-          backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
-          WebkitMaskImage: "linear-gradient(0deg, #000 0%, transparent 100%)",
-          maskImage: "linear-gradient(0deg, #000 0%, transparent 100%)",
+          // Нижний край размывается сильнее и выше верхнего: там из-под
+          // капсулы разделов выезжает текст, и узкая полоска его не
+          // прятала — строка обрывалась на полуслове резким краем.
+          position: "absolute", left: 0, right: 0, bottom: 0, height: 56, zIndex: 4, pointerEvents: "none",
+          backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+          background: "linear-gradient(0deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%)",
+          WebkitMaskImage: "linear-gradient(0deg, #000 45%, transparent 100%)",
+          maskImage: "linear-gradient(0deg, #000 45%, transparent 100%)",
         }} />
         {/* header with logo/wallet removed — content now starts right at the top.
             The bottom nav is an absolutely-positioned overlay (not a flex
