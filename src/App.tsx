@@ -184,6 +184,9 @@ const STR = {
     needAccountShort: "Нужен вход в аккаунт",
     navProfileItem: "Профиль",
     searchPlaceholder: "Поиск",
+    solLaunchClosedTitle: "Запуск в Solana пока закрыт",
+    solLaunchClosedBody: "Программа токена в этой сети ещё не развёрнута. Запусти в TON — или подожди, пока Solana откроется.",
+    solLaunchSwitchTon: "Запустить в TON",
     draftFromChat: "Монета из сообщения — проверь и запускай",
     templatesTitle: "С чего начать",
     templateApplied: "Заготовка подставлена — правь как хочешь",
@@ -706,6 +709,9 @@ const STR = {
     needAccountShort: "Sign in first",
     navProfileItem: "Profile",
     searchPlaceholder: "Search",
+    solLaunchClosedTitle: "Solana launches are closed for now",
+    solLaunchClosedBody: "The token program is not deployed on this network yet. Launch on TON — or wait until Solana opens.",
+    solLaunchSwitchTon: "Launch on TON",
     draftFromChat: "Coin from the message — check and launch",
     templatesTitle: "Start from",
     templateApplied: "Template applied — edit as you like",
@@ -16028,7 +16034,12 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   useEffect(() => {
     try { if (typeof window !== "undefined") window.localStorage.setItem("mintly.network", сетьЗапуска); } catch { /* приватный режим */ }
   }, [сетьЗапуска]);
-  const вSolana = solДоступен && сетьЗапуска === "sol";
+  /* Подписи следуют выбору человека, а не готовности сервера: раньше
+     при выключенной программе Solana форма молча показывала TON — и в
+     разделе SOL всё было подписано тонами. Теперь выбор виден, а про
+     недоступность сказано прямо. */
+  const вSolana = сетьЗапуска === "sol";
+  const solЗакрыт = вSolana && !solДоступен;
   // Подпись обязательна: сама транзакция запуска эту сумму не тратит —
   // покупка идёт отдельным шагом сразу после создания. Без пояснения
   // человек ждёт токены на кошельке и не понимает, почему их нет.
@@ -16103,6 +16114,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   }
   function handleLaunch() {
     setTouched(true);
+    if (solЗакрыт) { showToast(t("solLaunchClosedTitle")); return; }
     if (!logoUrl) {
       showToast(t("logoRequired"));
       return;
@@ -16204,6 +16216,20 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           </div>
         )}
       </div>
+
+      {solЗакрыт && (
+        <div className="rounded-[22px] p-4 flex flex-col" style={{ gap: 10, background: hexA(T.warning, 0.12) }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{t("solLaunchClosedTitle")}</span>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.45 }}>{t("solLaunchClosedBody")}</span>
+          <button
+            onClick={() => setСетьЗапуска("ton")}
+            className="fx-tap self-start"
+            style={{ padding: "9px 14px", borderRadius: 999, background: ЦВЕТ_КНОПКИ, border: "none", color: PRISM_TEXT, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700 }}
+          >
+            {t("solLaunchSwitchTon")}
+          </button>
+        </div>
+      )}
 
       {/* Заготовки — первым делом: пустое поле «название» отпугивает
           сильнее, чем длинная форма. */}
