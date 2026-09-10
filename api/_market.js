@@ -12,6 +12,7 @@
  */
 
 import { adminClient } from "./_support.js";
+import { gtЗапрос } from "./_gt.js";
 
 // Сеть задаётся одним переключателем на всё приложение (см.
 // TON_TESTNET_NETWORK в src/App.tsx). Здесь по умолчанию тестовая —
@@ -244,15 +245,14 @@ async function gt(path) {
   gtLast.path = path;
   gtLast.status = null;
   gtLast.error = null;
-  try {
-    const res = await fetch(`${GT}${path}`, { headers: { Accept: "application/json" } });
-    gtLast.status = res.status;
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (err) {
-    gtLast.error = (err && err.message) || String(err);
-    return null;
-  }
+  // Через общую дверь (api/_gt.js): лимит источника один на весь
+  // сервер. Обход ленты идёт по кругу и может подождать следующего
+  // захода, поэтому очередь ему отмерена короткая — живой запрос с
+  // телефона важнее.
+  const ответ = await gtЗапрос(`${GT}${path}`, { ждать: 1500 });
+  gtLast.status = ответ.status;
+  if (ответ.error) gtLast.error = ответ.error;
+  return ответ.ok ? ответ.json : null;
 }
 
 /* Пул GeckoTerminal к общему виду. Поля те же, что читает лента в

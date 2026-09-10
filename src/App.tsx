@@ -3129,7 +3129,21 @@ function cachedFetcher(ttlMs) {
 const curveStateCached = cachedFetcher(8000);
 const curveTradesCached = cachedFetcher(12000);
 
+/* Похоже ли на адрес в TON.
+ *
+ * Токены Solana лежат в тех же списках, что и TON-овские, и все их
+ * адреса шли в tonapi: тот отвечал 400 на каждый, а лимит бесплатного
+ * ключа тратился всерьёз. Отличить одно от другого можно по виду:
+ * дружественный адрес TON — сорок восемь знаков base64url, сырой —
+ * «0:» и шестьдесят четыре шестнадцатеричных знака. Адрес Solana не
+ * подходит ни под то, ни под другое. */
+function похожеНаTON(адрес) {
+  const a = String(адрес || "");
+  return /^(-1|0):[0-9a-fA-F]{64}$/.test(a) || /^[A-Za-z0-9_-]{48}$/.test(a);
+}
+
 async function fetchCurveState(curveAddress, testnet, priority = TON_PRIORITY.feed) {
+  if (!похожеНаTON(curveAddress)) return null;
   if (!curveAddress) return null;
   return curveStateCached(`${testnet ? "t" : "m"}:${curveAddress}`, () => loadCurveState(curveAddress, testnet, priority));
 }
@@ -3217,6 +3231,7 @@ async function fetchJettonWalletAddress(jettonMaster, ownerAddress, testnet) {
 }
 
 async function fetchJettonAccount(jettonMaster, ownerAddress, testnet) {
+  if (!похожеНаTON(jettonMaster)) return null;
   if (!jettonMaster || !ownerAddress) return null;
   const host = testnet ? "https://testnet.tonapi.io" : TONAPI_MAINNET_BASE;
   try {
@@ -3250,6 +3265,7 @@ const holdersInflight = new Map(); // tokenAddress -> Promise, de-dupes concurre
 // всегда спрашивали у mainnet, и для своих токенов ответом был «нет
 // такого жетона», то есть прочерк вместо реального числа держателей.
 async function fetchJettonMeta(tokenAddress, testnet = false, priority = TON_PRIORITY.feed) {
+  if (!похожеНаTON(tokenAddress)) return null;
   if (!tokenAddress) return null;
   const key = `${testnet ? "t" : "m"}:${tokenAddress}`;
   const cached = holdersCache.get(key);
@@ -3286,6 +3302,7 @@ async function fetchJettonMeta(tokenAddress, testnet = false, priority = TON_PRI
 }
 
 async function fetchJettonHolders(tokenAddress, testnet = false) {
+  if (!похожеНаTON(tokenAddress)) return null;
   const meta = await fetchJettonMeta(tokenAddress, testnet);
   return meta ? meta.holders : null;
 }
@@ -3704,6 +3721,7 @@ function curvePriceFromReserve(realTon, params) {
 // сумму за вычетом газа, у продажи — сколько TON ушло продавцу: обе
 // величины видны в транзакции и не требуют разбора тела сообщения.
 async function fetchCurveTrades(curveAddress, testnet, feeBps = 0n, priority = TON_PRIORITY.feed) {
+  if (!похожеНаTON(curveAddress)) return null;
   if (!curveAddress) return null;
   return curveTradesCached(
     `${testnet ? "t" : "m"}:${curveAddress}:${feeBps}`,

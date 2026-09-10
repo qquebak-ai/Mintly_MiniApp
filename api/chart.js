@@ -14,6 +14,7 @@
  */
 
 import { createCanvas, downscale, encodePNG, fillRect, line, px, text, textWidth } from "./_png.js";
+import { gtЗапрос } from "./_gt.js";
 import { adminClient } from "./_support.js";
 import { curveState, priceFromState, looksLikeAddress, poolByAddress, курсTon, курсSol, цепочкаТокена } from "./_market.js";
 import { свопТонВЖетон, свопЖетонВТон } from "./_swap.js";
@@ -472,23 +473,30 @@ async function рынокДанные(req, res) {
     return res.status(200).json(было.тело);
   }
 
-  try {
-    const ответ = await fetch(url, { headers: { accept: "application/json" } });
-    if (!ответ.ok) throw new Error(`geckoterminal ${ответ.status}`);
-    const json = await ответ.json();
-    положить(ключ, json);
+  // Через общую дверь: лимит источника один на весь сервер, и без
+  // очереди свечи одного человека отбирали его у ленты всех остальных.
+  const ответ = await gtЗапрос(url);
+  if (ответ.ok && ответ.json) {
+    положить(ключ, ответ.json);
     res.setHeader("Cache-Control", сроки);
-    return res.status(200).json(json);
-  } catch (err) {
-    // Отдаём последнее удачное, даже протухшее: цифры получасовой
-    // давности честнее пустого экрана, а приложение всё равно дорисует
-    // свежие, когда источник ответит.
-    if (было) {
-      res.setHeader("Cache-Control", "public, s-maxage=10, stale-while-revalidate=300");
-      return res.status(200).json(было.тело);
-    }
-    return res.status(502).json({ error: "upstream", detail: String((err && err.message) || err).slice(0, 200) });
+    return res.status(200).json(ответ.json);
   }
+  // Не вышло — отдаём последнее удачное, даже протухшее: цифры
+  // получасовой давности честнее пустого экрана, а приложение дорисует
+  // свежие, когда источник ответит.
+  if (было) {
+    res.setHeader("Cache-Control", "public, s-maxage=10, stale-while-revalidate=300");
+    return res.status(200).json(было.тело);
+  }
+  // Отказ по лимиту — не поломка: приложению стоит зайти позже, а не
+  // идти к источнику самому и получать там тот же отказ.
+  const перегрузка = ответ.status === 429 || ответ.status === 0;
+  res.setHeader("Cache-Control", "no-store");
+  if (перегрузка) res.setHeader("Retry-After", "5");
+  return res.status(перегрузка ? 503 : 502).json({
+    error: перегрузка ? "busy" : "upstream",
+    detail: `geckoterminal ${ответ.status}`,
+  });
 }
 
 export default async function handler(req, res) {
