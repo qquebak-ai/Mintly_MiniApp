@@ -624,7 +624,10 @@ export default async function handler(req, res) {
   // Отдельным вопросом — включён ли внутренний кошелёк вообще: без ключа
   // площадки заводить его нечем, и приложение не должно его показывать.
   if (действие === "enabled") {
-    return res.status(200).json({ enabled: !!(db && набор) });
+    // Заодно говорим, в какой сети работает кошелёк: без этого «почему
+    // не приходит перевод» выясняется гаданием, а не одним запросом.
+    const сеть = /devnet/.test(RPC) ? "devnet" : /testnet/.test(RPC) ? "testnet" : "mainnet-beta";
+    return res.status(200).json({ enabled: !!(db && набор), cluster: сеть });
   }
   if (!db || !набор) return res.status(503).json({ error: "not_configured" });
 
