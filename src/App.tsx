@@ -184,6 +184,20 @@ const STR = {
     needAccountShort: "Нужен вход в аккаунт",
     navProfileItem: "Профиль",
     searchPlaceholder: "Поиск",
+    templatesTitle: "С чего начать",
+    templateApplied: "Заготовка подставлена — правь как хочешь",
+    mechTitle: "Механики запуска",
+    mechFairStart: "Честный старт",
+    mechFairStartBody: "Первую минуту кривая открыта только людям из Telegram — снайперы-боты не успевают.",
+    mechBuyback: "Обратный выкуп",
+    mechBuybackBody: "Часть комиссии копится и выкупает токен на просадках, а не уходит из кривой.",
+    mechLiveChart: "Живой график в чате",
+    mechLiveChartBody: "Бот держит в чате одно сообщение и сам обновляет в нём свечу и цену.",
+    lockTitle: "Доля создателя",
+    lockNone: "Без замка",
+    lockMilestones: "По вехам",
+    lockGraduation: "До биржи",
+    lockHint: "Замок открывает долю создателя по мере того, как кривая собирается: уйти с деньгами покупателей на старте нечем.",
     slideToDisconnect: "Сдвинь, чтобы отключить",
     disconnected: "Отключено",
     walletAddressLabel: "Адрес",
@@ -685,6 +699,20 @@ const STR = {
     needAccountShort: "Sign in first",
     navProfileItem: "Profile",
     searchPlaceholder: "Search",
+    templatesTitle: "Start from",
+    templateApplied: "Template applied — edit as you like",
+    mechTitle: "Launch mechanics",
+    mechFairStart: "Fair start",
+    mechFairStartBody: "For the first minute the curve is open to Telegram people only — sniper bots miss it.",
+    mechBuyback: "Buyback",
+    mechBuybackBody: "Part of the fee accumulates and buys the token back on dips instead of leaving the curve.",
+    mechLiveChart: "Live chart in chat",
+    mechLiveChartBody: "The bot keeps one message in the chat and updates the candle and price inside it.",
+    lockTitle: "Creator's share",
+    lockNone: "No lock",
+    lockMilestones: "By milestones",
+    lockGraduation: "Until listing",
+    lockHint: "The lock releases the creator's share as the curve fills up — there is nothing to run away with at the start.",
     slideToDisconnect: "Slide to disconnect",
     disconnected: "Disconnected",
     walletAddressLabel: "Address",
@@ -13682,6 +13710,46 @@ function useТезис(tokenId) {
   return [текст, сохранить];
 }
 
+/* Что создатель обещал при запуске.
+ *
+ * Показывается на вкладке «о токене» списком: включённые механики
+ * отмечены, выключенные не рисуются вовсе — перечислять, чего у токена
+ * нет, значит спорить с самим собой. Замок доли создателя стоит там же:
+ * это тоже обещание, только с тремя вариантами вместо да/нет.
+ */
+function ОбещанияТокена({ механики, замок }) {
+  const включённые = МЕХАНИКИ_ЗАПУСКА.filter((м) => механики && механики[м.key]);
+  const естьЗамок = замок && замок !== "none";
+  if (!включённые.length && !естьЗамок) return null;
+
+  return (
+    <div style={{ borderRadius: 20, background: T.surface, padding: "12px 14px" }}>
+      <div className="flex flex-col" style={{ gap: 10 }}>
+        {включённые.map((м) => (
+          <div key={м.key} className="flex items-start" style={{ gap: 10 }}>
+            <м.icon size={16} color="#C79BFF" style={{ marginTop: 1, flexShrink: 0 }} />
+            <span className="flex-1 min-w-0">
+              <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>{t(м.tKey)}</span>
+              <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 2 }}>{t(м.описание)}</span>
+            </span>
+          </div>
+        ))}
+        {естьЗамок && (
+          <div className="flex items-start" style={{ gap: 10 }}>
+            <Lock size={16} color="#C79BFF" style={{ marginTop: 1, flexShrink: 0 }} />
+            <span className="flex-1 min-w-0">
+              <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>
+                {t("lockTitle")}: {t(замок === "graduation" ? "lockGraduation" : "lockMilestones")}
+              </span>
+              <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 2 }}>{t("lockHint")}</span>
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = true, connected = true, onConnectWallet, themeKey, currentUserId = null, onNeedAuth, onOpenProfile, tonPriceUsd = 0, walletAddress = null, onManage = null }) {
   // График вынесен из вкладок наверх, поэтому здесь остались только
   // разделы под ним: держатели, лента, о токене.
@@ -14452,6 +14520,10 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
 
       {tab === "about" && (
         <div className="fx-swap flex flex-col" style={{ gap: 16 }}>
+          {/* Обещания создателя — первым делом. Механика ценна не тем,
+              что она включена в базе, а тем, что покупатель видит её до
+              покупки, а не после. */}
+          <ОбещанияТокена механики={token.механики} замок={token.замок} />
           {infoLoading && !info ? (
             <div className="flex flex-col gap-2">
               <div className="fx-skeleton" style={{ width: "100%", height: 12, borderRadius: 4 }} />
@@ -15583,6 +15655,151 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
   );
 }
 
+/* Заготовки запуска — «шаблоны трендов».
+ *
+ * Пустая форма — самая дорогая часть запуска: человек открывает её,
+ * упирается в поле «название» и уходит. Заготовка заполняет имя, тикер
+ * и описание за одно нажатие, дальше правится как обычный текст.
+ *
+ * Список живёт в таблице launch_templates, а встроенный набор ниже —
+ * запасной: без сети и до первой миграции форма всё равно должна
+ * предлагать, с чего начать.
+ */
+const ЗАГОТОВКИ_ЗАПУСКА = [
+  { знак: "🐸", name: "Pepe Revival", ticker: "PEPER", desc: "Классика мемов вернулась. Ни обещаний, ни дорожной карты — только лягушка и кривая." },
+  { знак: "🚀", name: "To The Moon", ticker: "MOON", desc: "Кривая, у которой одна цель. Комиссия одна для всех, условия зашиты в контракт." },
+  { знак: "🐕", name: "Doge Telegram", ticker: "DOGETG", desc: "Мемкоин для тех, кто живёт в переписке. Запуск — из чата, торговля — там же." },
+  { знак: "🧊", name: "Diamond Hands", ticker: "DIAMOND", desc: "Для тех, кто не продаёт. Держи и смотри, как кривая собирается до биржи." },
+  { знак: "🔥", name: "Burn It All", ticker: "BURN", desc: "Половина выпуска сгорает на старте. Остальное решает рынок." },
+  { знак: "🐈", name: "Cat Season", ticker: "CATS", desc: "Сезон котов открыт. Ни утилити, ни белой бумаги — только хвост и усы." },
+  { знак: "🍌", name: "Banana Pump", ticker: "NANA", desc: "Жёлтая, кривая и очень скользкая. Как раз то, что нужно этому рынку." },
+  { знак: "👽", name: "Alien Cash", ticker: "ALIEN", desc: "Деньги не с этой планеты. Кривая торгует с первой секунды." },
+];
+
+/* Механики запуска.
+ *
+ * Их включает создатель — и они видны покупателю на странице токена.
+ * В этом весь смысл: «честный старт» ценен не тем, что он есть в коде,
+ * а тем, что о нём знают до покупки.
+ */
+const МЕХАНИКИ_ЗАПУСКА = [
+  {
+    key: "fair_start",
+    icon: ShieldCheck,
+    tKey: "mechFairStart",
+    описание: "mechFairStartBody",
+  },
+  {
+    key: "buyback",
+    icon: RefreshCw,
+    tKey: "mechBuyback",
+    описание: "mechBuybackBody",
+  },
+  {
+    key: "live_chart",
+    icon: TrendingUp,
+    tKey: "mechLiveChart",
+    описание: "mechLiveChartBody",
+  },
+];
+
+/* Замок доли создателя. Не время, а вехи: доля открывается по мере
+   того, как кривая собирается, — уйти на старте с деньгами покупателей
+   становится нечем. */
+const ЗАМКИ_СОЗДАТЕЛЯ = [
+  { key: "none", tKey: "lockNone" },
+  { key: "milestones", tKey: "lockMilestones" },
+  { key: "graduation", tKey: "lockGraduation" },
+];
+
+function ЗаготовкиЗапуска({ onВыбрать }) {
+  const [набор, setНабор] = useState(ЗАГОТОВКИ_ЗАПУСКА);
+
+  // Живой список — из базы, если он там есть. Не доехал — остаётся
+  // встроенный: форма не должна ждать сеть, чтобы что-то предложить.
+  useEffect(() => {
+    let брошено = false;
+    supabase
+      .from("launch_templates")
+      .select("emoji, name, ticker, description")
+      .order("weight", { ascending: false })
+      .limit(12)
+      .then(({ data, error }) => {
+        if (брошено || error || !data || !data.length) return;
+        setНабор(data.map((р) => ({ знак: р.emoji || "✨", name: р.name, ticker: р.ticker, desc: р.description || "" })));
+      });
+    return () => { брошено = true; };
+  }, []);
+
+  return (
+    <div>
+      <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, marginBottom: 8 }}>
+        {t("templatesTitle")}
+      </div>
+      <div className="no-scrollbar flex" style={{ gap: 8, overflowX: "auto", paddingBottom: 2, touchAction: "pan-x" }}>
+        {набор.map((з) => (
+          <button
+            key={з.ticker}
+            onClick={() => { haptic("light"); onВыбрать(з); }}
+            className="fx-tap flex-shrink-0 text-left"
+            style={{
+              width: 168, padding: "12px 13px", borderRadius: 18,
+              background: T.surface, border: `1px solid ${T.line}`,
+            }}
+          >
+            <span style={{ fontSize: 20 }}>{з.знак}</span>
+            <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700, marginTop: 6 }}>
+              {з.name}
+            </span>
+            <span style={{ display: "block", fontFamily: monoFont, color: T.muted, fontSize: 12, marginTop: 2 }}>
+              ${String(з.ticker).toUpperCase()}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ПереключательМеханики({ item, включено, onToggle }) {
+  return (
+    <button
+      onClick={() => { haptic("light"); onToggle(); }}
+      className="fx-tap w-full flex items-start"
+      style={{
+        gap: 12, padding: "13px 14px", borderRadius: 18, textAlign: "left",
+        background: включено ? hexA("#8E2DE2", 0.16) : T.surface,
+        border: `1px solid ${включено ? hexA("#B15CFF", 0.55) : T.line}`,
+        transition: `background ${EASE}, border-color ${EASE}`,
+      }}
+    >
+      <item.icon size={17} color={включено ? "#C79BFF" : T.muted} style={{ marginTop: 2, flexShrink: 0 }} />
+      <span className="flex-1 min-w-0">
+        <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
+          {t(item.tKey)}
+        </span>
+        <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 3 }}>
+          {t(item.описание)}
+        </span>
+      </span>
+      {/* Переключатель, а не галочка: видно и то, что выключено. */}
+      <span
+        aria-hidden
+        style={{
+          width: 40, height: 24, borderRadius: 999, flexShrink: 0, position: "relative",
+          background: включено ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+          transition: `background ${EASE}`,
+        }}
+      >
+        <span style={{
+          position: "absolute", top: 3, left: включено ? 19 : 3, width: 18, height: 18, borderRadius: "50%",
+          background: включено ? "#FFFFFF" : T.muted, transition: `left ${SPRING}`,
+        }} />
+      </span>
+    </button>
+  );
+}
+
 function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCreateProfile, onOpenConnectModal, onLaunch, solДоступен = false }) {
   const [form, setForm] = useState({ name: "", ticker: "", buyAmount: "", desc: "", tg: "", x: "", site: "" });
   // В какой сети запускать. Пока программа кривой в Solana не
@@ -15613,6 +15830,11 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   // предпросмотр и умирал вместе со вкладкой, никуда не сохраняясь.
   const [bannerFile, setBannerFile] = useState(null);
   const [touched, setTouched] = useState(false);
+  /* Что включено при запуске. Хранится вместе с токеном и показывается
+     покупателю: механика ценна не тем, что она есть, а тем, что о ней
+     знают до покупки. */
+  const [механики, setМеханики] = useState({ fair_start: true, buyback: false, live_chart: true });
+  const [замок, setЗамок] = useState("milestones");
   const [logoCropFile, setLogoCropFile] = useState(null);
   const logoInputRef = useRef(null);
   const bannerInputRef = useRef(null);
@@ -15691,12 +15913,15 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
       form, category, logoUrl, logoFile, bannerFile,
       buyAmount: form.buyAmount.trim(),
       chain: вSolana ? "solana" : "ton",
+      механики, замок,
       onFinish: finishLaunch,
     });
   }
 
   function resetForm() {
     setForm({ name: "", ticker: "", buyAmount: "", desc: "", tg: "", x: "", site: "" });
+    setМеханики({ fair_start: true, buyback: false, live_chart: true });
+    setЗамок("milestones");
     setCategory(null);
     setLogoUrl(null);
     setLogoFile(null);
@@ -15752,6 +15977,15 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           </div>
         )}
       </div>
+
+      {/* Заготовки — первым делом: пустое поле «название» отпугивает
+          сильнее, чем длинная форма. */}
+      <ЗаготовкиЗапуска
+        onВыбрать={(з) => {
+          setForm((f) => ({ ...f, name: з.name, ticker: String(з.ticker).toUpperCase(), desc: з.desc || f.desc }));
+          showToast(t("templateApplied"));
+        }}
+      />
 
       <div>
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("logoLabel")}</span>
@@ -15832,6 +16066,53 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             </div>
           );
         })()}
+      </div>
+
+      {/* Механики запуска. Всё, что здесь включено, видно покупателю на
+          странице токена — иначе обещание ничего не стоит. */}
+      <div>
+        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, marginBottom: 8 }}>
+          {t("mechTitle")}
+        </div>
+        <div className="flex flex-col" style={{ gap: 8 }}>
+          {МЕХАНИКИ_ЗАПУСКА.map((м) => (
+            <ПереключательМеханики
+              key={м.key}
+              item={м}
+              включено={!!механики[м.key]}
+              onToggle={() => setМеханики((б) => ({ ...б, [м.key]: !б[м.key] }))}
+            />
+          ))}
+        </div>
+
+        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, margin: "16px 0 8px" }}>
+          {t("lockTitle")}
+        </div>
+        <div className="flex" style={{ gap: 8 }}>
+          {ЗАМКИ_СОЗДАТЕЛЯ.map((з) => {
+            const выбран = замок === з.key;
+            return (
+              <button
+                key={з.key}
+                onClick={() => { haptic("light"); setЗамок(з.key); }}
+                className="fx-tap flex-1"
+                style={{
+                  padding: "11px 6px", borderRadius: 16,
+                  background: выбран ? hexA("#8E2DE2", 0.16) : T.surface,
+                  border: `1px solid ${выбран ? hexA("#B15CFF", 0.55) : T.line}`,
+                  fontFamily: displayFont, fontSize: 13, fontWeight: 700,
+                  color: выбран ? T.ice : T.muted,
+                  transition: `background ${EASE}, border-color ${EASE}, color ${EASE}`,
+                }}
+              >
+                {t(з.tKey)}
+              </button>
+            );
+          })}
+        </div>
+        <p style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, lineHeight: 1.45, marginTop: 8 }}>
+          {t("lockHint")}
+        </p>
       </div>
 
       {!connected && (
@@ -18656,6 +18937,14 @@ function mapTokenRow(row) {
       // TON это 48 символов base64url с приставкой EQ/UQ/kQ/0Q, у
       // Solana — 32-44 символа base58.
       chain: цепочкаПоАдресу(row.chain, row.address),
+      // Механики, включённые при запуске. Колонки появились позже
+      // остальных: у токенов постарше их нет, и это просто «выключено».
+      механики: {
+        fair_start: !!row.fair_start,
+        buyback: !!row.buyback,
+        live_chart: !!row.live_chart,
+      },
+      замок: row.creator_lock || "none",
       ownerId: row.owner_id || null,
       createdAt: new Date(row.created_at).getTime(),
     };
@@ -19492,6 +19781,12 @@ function mapTokenRow(row) {
       // Сеть токена: по ней приложение решает, у какой цепочки
       // спрашивать цену и каким кошельком торговать.
       chain: result.chain || "ton",
+      /* Что создатель включил при запуске. Хранится вместе с токеном:
+         покупателю это нужно видеть до покупки, а не искать в описании. */
+      fair_start: !!(result.механики && result.механики.fair_start),
+      buyback: !!(result.механики && result.механики.buyback),
+      live_chart: !!(result.механики && result.механики.live_chart),
+      creator_lock: result.замок || "none",
     };
 
     // Токен уже в сети — потерять его из-за одной неудачной записи
@@ -19508,8 +19803,8 @@ function mapTokenRow(row) {
     // миграции нет, база отбивает всю строку целиком, и токен, уже
     // выпущенный в сети, терялся бы из-за одного текстового поля. Тогда
     // сохраняем без них.
-    if (error && (error.code === "42703" || /description|banner_url/i.test(error.message || ""))) {
-      const { description, banner_url, ...безЛишнего } = строка;
+    if (error && (error.code === "42703" || /description|banner_url|fair_start|buyback|live_chart|creator_lock/i.test(error.message || ""))) {
+      const { description, banner_url, fair_start, buyback, live_chart, creator_lock, ...безЛишнего } = строка;
       ({ data: row, error } = await supabase.from("tokens").insert(безЛишнего).select().single());
     }
 
@@ -19735,6 +20030,10 @@ function mapTokenRow(row) {
           buyTokens: chainResult.mintedTokens ?? tokens,
           buyPct: pct,
           category: req.category || null,
+          // Что включено при запуске — дальше это уходит в базу вместе с
+          // токеном и показывается покупателю.
+          механики: req.механики || {},
+          замок: req.замок || "none",
           // Описание автора: до сих пор оно уезжало только в
           // метаданные в цепочке, и в приложении его негде было
           // прочитать — карточка в мемпаде стояла безымянной.
@@ -19841,6 +20140,10 @@ function mapTokenRow(row) {
           buyTokens: куплено,
           buyPct: (куплено / 1_000_000_000) * 100,
           category: req.category || null,
+          // Что включено при запуске — дальше это уходит в базу вместе с
+          // токеном и показывается покупателю.
+          механики: req.механики || {},
+          замок: req.замок || "none",
           // Описание автора: до сих пор оно уезжало только в
           // метаданные в цепочке, и в приложении его негде было
           // прочитать — карточка в мемпаде стояла безымянной.
