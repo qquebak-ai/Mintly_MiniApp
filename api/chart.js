@@ -14,7 +14,7 @@
  */
 
 import { createCanvas, downscale, encodePNG, fillRect, line, px, text, textWidth } from "./_png.js";
-import { gtЗапрос } from "./_gt.js";
+import { gtЗапрос, gtСостояние } from "./_gt.js";
 import { adminClient } from "./_support.js";
 import { curveState, priceFromState, looksLikeAddress, poolByAddress, курсTon, курсSol, цепочкаТокена } from "./_market.js";
 import { свопТонВЖетон, свопЖетонВТон } from "./_swap.js";
@@ -399,6 +399,12 @@ function положить(ключ, тело) {
 
 async function рынокДанные(req, res) {
   const что = String((req.query && req.query.what) || "ohlcv").trim();
+  // Состояние очереди к бирже: почему именно «занято» — видно одним
+  // запросом, а не гаданием по логам.
+  if (что === "gt") {
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).json(gtСостояние());
+  }
   const сеть = String((req.query && req.query.network) || "ton").trim();
   if (!сетьОк(сеть)) return res.status(400).json({ error: "bad_request" });
 
@@ -496,6 +502,7 @@ async function рынокДанные(req, res) {
   return res.status(перегрузка ? 503 : 502).json({
     error: перегрузка ? "busy" : "upstream",
     detail: `geckoterminal ${ответ.status}`,
+    очередь: gtСостояние(),
   });
 }
 
