@@ -406,7 +406,7 @@ const STR = {
     gradClosedBody: "Токен набрал {target} TON. Токен отработала, и всё собранное вместе с остатком выпуска переезжает в пул токена. Как только переезд закончится, торговля откроется снова — здесь же.",
     gradListedTitle: "Свободный рынок",
     gradListedBody: "Токен отработала: теперь цена ходит вверх и вниз по резервам пула. Ликвидность заперта в контракте — вынуть её не может никто, поэтому продать можно в любой момент.",
-    tabChart: "График", tabInfo: "Инфо", tabTx: "Транзакции", chartModePrice: "Цена",
+    tabChart: "График", tabInfo: "Инфо", tabTx: "Транзакции", chartModePrice: "Цена", chartModeMcap: "Капитализация",
     tabHolders: "Держатели", tabFeed: "Лента", tabAbout: "О токене", tabStats: "Статистика", statMcap: "Капитализация", statLiq: "Ликвидность", statVol24: "Объём за сутки", statTrades24: "Сделок за сутки", statAge: "Возраст", statCurve: "Токен собрана", statDex: "Биржа",
     positionTitle: "Ваша позиция", positionValue: "Стоимость", positionAmount: "Количество",
     positionChange24: "За 24 часа", positionEmpty: "Токенов пока нет",
@@ -426,6 +426,7 @@ const STR = {
     profileNotFound: "Профиль не найден",
     txLoadFailed: "Не удалось загрузить сделки — обновим через несколько секунд",
     aboutToken: "О токене",
+    securityTitle: "Безопасность", securityVerified: "Проверен", securityNetwork: "Сеть", securityCurve: "Свой токен площадки", yes: "Да", no: "Нет",
     youPay: "Вы платите", youSell: "Вы продаёте", youReceive: "Вы получите",
     available: "Доступно",
     insufficientFunds: "Недостаточно средств для этой суммы",
@@ -934,7 +935,7 @@ const STR = {
     gradClosedBody: "The token reached {target} TON. The curve is done, and everything it collected — plus the unsold supply — is moving into the token's own pool. Trading reopens right here once it lands.",
     gradListedTitle: "Free market",
     gradListedBody: "The curve is done: the price now moves both ways with the pool's reserves. The liquidity is locked in the contract and nobody can pull it out, so you can always sell.",
-    tabChart: "Chart", tabInfo: "Info", tabTx: "Transactions", chartModePrice: "Price",
+    tabChart: "Chart", tabInfo: "Info", tabTx: "Transactions", chartModePrice: "Price", chartModeMcap: "Market cap",
     tabHolders: "Holders", tabFeed: "Feed", tabAbout: "About",
     positionTitle: "Your position", positionValue: "Value", positionAmount: "Amount",
     positionChange24: "24h change", positionEmpty: "No tokens yet",
@@ -954,6 +955,7 @@ const STR = {
     profileNotFound: "Profile not found",
     txLoadFailed: "Couldn't load trades — retrying in a few seconds",
     aboutToken: "About the token",
+    securityTitle: "Security", securityVerified: "Verified", securityNetwork: "Network", securityCurve: "Launched on Mintly", yes: "Yes", no: "No",
     youPay: "You pay", youSell: "You sell", youReceive: "You receive",
     available: "Available",
     insufficientFunds: "Not enough funds for this amount",
@@ -2425,6 +2427,18 @@ const MiniChart = React.memo(function MiniChart({ base, seed, poolAddress, curve
 });
 
 const TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1", "MN1"];
+/* Периоды на карточке монеты — человеческими словами, а не буквами
+   терминала. «M15» ничего не говорит тому, кто зашёл посмотреть на
+   мемкоин; «1 сут.» говорит всё. Под каждым словом — тот же интервал
+   свечей, что и раньше, менять данные не понадобилось. */
+const ПЕРИОДЫ = [
+  { tf: "M1", ru: "СЕЙЧАС", en: "LIVE" },
+  { tf: "M15", ru: "1 СУТ.", en: "1D" },
+  { tf: "H1", ru: "1 НЕД.", en: "1W" },
+  { tf: "H4", ru: "1 МЕС.", en: "1M" },
+  { tf: "D1", ru: "1 Г.", en: "1Y" },
+  { tf: "W1", ru: "ВСЕ", en: "ALL" },
+];
 const TF_SECONDS = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400, D1: 86400, W1: 604800, MN1: 2592000 };
 
 /* ---------------------------------------------------------
@@ -4204,7 +4218,7 @@ const CHART_DEFAULT_VISIBLE = 60;
 // оставляли слева от цифр пустую полосу, а места под свечи — меньше.
 const CHART_GUTTER = 76;
 
-function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt }) {
+function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt, onОкно = null }) {
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
   const [widthPx, setWidthPx] = useState(320);
@@ -4258,6 +4272,12 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt 
   // when the person actually drags/zooms vertically, so panning left/right
   // no longer rescales the chart under your finger.
   const yViewRef = useRef(null);
+  // Идёт ли догонялка шкалы прямо сейчас — по ней кадр просит следующий.
+  const yАнимация = useRef(false);
+  const кадрШкалы = useRef(null);
+  // Что сейчас в окне: цена справа и цена слева. По ним шапка считает
+  // рост или падение именно того участка, который человек видит.
+  const окноRef = useRef({ от: 0, до: 0, ts: 0 });
   const dragRef = useRef(null);     // { lastX, lastY, lastT, vx, vy, moved, startX, startY }
   const pinchRef = useRef(null);    // { startDist, startCount, anchorIdx }
   const yScaleRef = useRef(null);   // { startY, startMin, startMax } — right-edge scale handle
@@ -4381,20 +4401,45 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt 
     const endI = Math.min(n, Math.ceil(v.start + count) + 1);
     const visible = candles.slice(startI, endI);
     if (!visible.length) return null;
+    /* Шкала цены едет за окном — плавно.
+     *
+     * Раньше она подбиралась один раз и дальше стояла: при щипке свечи
+     * росли, а поле вокруг них оставалось прежним — картинка казалась
+     * растянутой, а не приближенной. Теперь у шкалы есть цель (края
+     * видимых свечей) и текущее положение, и каждый кадр оно
+     * подтягивается к цели долей пути. Отсюда и ощущение плавности: ни
+     * одного скачка, даже когда в окно въезжает свеча вдвое выше всех
+     * прочих.
+     *
+     * Пока шкалу двигали рукой — не трогаем вовсе: это уже выбор
+     * человека, и подгонять его под данные нельзя. */
+    const highs = visible.map((c) => c.high).filter(Number.isFinite);
+    const lows = visible.map((c) => c.low).filter(Number.isFinite);
+    const rawMax = highs.length ? Math.max(...highs) : 1;
+    const rawMin = lows.length ? Math.min(...lows) : 0;
+    const rawRange = (rawMax - rawMin) || (rawMax * 0.02) || 1;
+    const pad = rawRange * 0.08;
+    const цель = { min: rawMin - pad, max: rawMax + pad };
+    yАнимация.current = false;
     if (!yViewRef.current) {
-      // First time we have something to draw: auto-fit the price window
-      // to what's currently visible, with a little breathing room. After
-      // this it's frozen — only manual vertical drag / the scale handle
-      // touch it again, never an automatic recompute. Only finite values
-      // count here — a single bad candle (NaN/Infinity from a data
-      // hiccup) must never be allowed to blow up the whole scale.
-      const highs = visible.map(c => c.high).filter(Number.isFinite);
-      const lows = visible.map(c => c.low).filter(Number.isFinite);
-      const rawMax = highs.length ? Math.max(...highs) : 1;
-      const rawMin = lows.length ? Math.min(...lows) : 0;
-      const rawRange = (rawMax - rawMin) || (rawMax * 0.02) || 1;
-      const pad = rawRange * 0.08;
-      yViewRef.current = { min: rawMin - pad, max: rawMax + pad };
+      yViewRef.current = цель;
+    } else if (!yUserRef.current) {
+      const текущее = yViewRef.current;
+      const размах = (текущее.max - текущее.min) || 1;
+      const дельта = Math.max(Math.abs(цель.min - текущее.min), Math.abs(цель.max - текущее.max));
+      if (дельта > размах * 0.001) {
+        // Доля пути за кадр. 0.22 — то самое «плавно, но не вяло»: за
+        // пять-шесть кадров шкала доходит до цели, и палец не успевает
+        // заметить отставание.
+        const шаг = 0.22;
+        yViewRef.current = {
+          min: текущее.min + (цель.min - текущее.min) * шаг,
+          max: текущее.max + (цель.max - текущее.max) * шаг,
+        };
+        yАнимация.current = true;
+      } else {
+        yViewRef.current = цель;
+      }
     }
     const { min, max } = yViewRef.current;
     const range = (max - min) || (max * 0.02) || 1;
@@ -4512,14 +4557,34 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt 
       const color = up ? T.up : T.down;
       ctx.strokeStyle = color;
       ctx.fillStyle = color;
-      ctx.lineWidth = Math.max(1, bodyW * 0.14);
-      ctx.beginPath();
-      ctx.moveTo(x, yFor(c.high));
-      ctx.lineTo(x, yFor(c.low));
-      ctx.stroke();
+      /* Свеча с закруглёнными концами.
+         Прямоугольник с острыми углами и волосяной фитиль — это вид
+         терминала для трейдера. Здесь же карточка монеты, которую
+         листают пальцем, и форма должна быть мягкой: тело — пилюля,
+         фитиль — линия с круглыми концами. Заодно исчезает рябь на
+         мелком масштабе: острые углы на дробных координатах пиксель
+         ловят, скруглённые — нет. */
+      const толщина = Math.max(1.2, Math.min(2.6, bodyW * 0.2));
+      ctx.lineWidth = толщина;
+      ctx.lineCap = "round";
+      const yH = yFor(c.high), yL = yFor(c.low);
+      if (yL - yH > толщина) {
+        ctx.beginPath();
+        ctx.moveTo(x, yH + толщина / 2);
+        ctx.lineTo(x, yL - толщина / 2);
+        ctx.stroke();
+      }
       const yO = yFor(c.open), yC = yFor(c.close);
-      const top = Math.min(yO, yC), h = Math.max(1.5, Math.abs(yC - yO));
-      ctx.fillRect(x - bodyW / 2, top, bodyW, h);
+      // Тело не тоньше фитиля: у свечи без движения остаётся аккуратная
+      // чёрточка, а не исчезающая полоска в один пиксель.
+      const h = Math.max(толщина, Math.abs(yC - yO));
+      const top = Math.min(yO, yC) - Math.max(0, толщина - Math.abs(yC - yO)) / 2;
+      const радиус = Math.min(bodyW / 2, h / 2, 4);
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x - bodyW / 2, top, bodyW, h, радиус);
+      else ctx.rect(x - bodyW / 2, top, bodyW, h);
+      ctx.fill();
+      ctx.lineCap = "butt";
     }
 
     const lastCandle = Number.isFinite(candles[n - 1]?.close) ? candles[n - 1] : null;
@@ -4659,6 +4724,34 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt 
       ctx.stroke();
       ctx.setLineDash([]);
     }
+
+    /* Сообщаем шапке, что сейчас в окне.
+       Цена и процент над графиком относятся к видимому участку: сдвинул
+       окно на час назад — увидел, что было за тот час. Чаще десяти раз
+       в секунду обновлять незачем: глаз столько не читает, а каждое
+       обновление — перерисовка всей шапки. */
+    if (onОкно) {
+      const v3 = viewRef.current;
+      const iЛ = Math.max(0, Math.ceil(v3.start));
+      const iП = Math.min(n - 1, Math.max(iЛ, Math.floor(v3.start + v3.count) - 1));
+      const слева = candles[iЛ], справа = candles[iП];
+      if (слева && справа && Number.isFinite(слева.open) && Number.isFinite(справа.close)) {
+        const было = окноRef.current;
+        const пора = Date.now() - было.ts > 90;
+        if (пора && (было.от !== слева.open || было.до !== справа.close)) {
+          окноRef.current = { от: слева.open, до: справа.close, ts: Date.now() };
+          onОкно({ от: слева.open, до: справа.close, слева: слева.time, справа: справа.time });
+        }
+      }
+    }
+
+    // Шкала ещё не дошла до цели — просим следующий кадр. Это и есть та
+    // самая плавность: пока идёт догонялка, график перерисовывается по
+    // кадру, а как только дошёл — перестаёт вовсе и не жжёт батарею.
+    if (yАнимация.current) {
+      if (кадрШкалы.current) cancelAnimationFrame(кадрШкалы.current);
+      кадрШкалы.current = requestAnimationFrame(() => { кадрШкалы.current = null; draw(); });
+    }
   }
 
   // Redraw on data refresh (live tick), resize, or theme swap — but this
@@ -4708,29 +4801,12 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt 
     // графике «дышит» каждые пятнадцать секунд. Трогаем его только
     // когда данные действительно перестали помещаться — вышли за края
     // или, наоборот, съёжились в узкую полосу посреди пустого поля.
-    if (!yUserRef.current && pinnedRef.current && yViewRef.current) {
-      const v2 = viewRef.current;
-      const from = Math.max(0, Math.floor(v2.start));
-      const to = Math.min(n, Math.ceil(v2.start + v2.count) + 1);
-      let lo = Infinity, hi = -Infinity;
-      for (let i = from; i < to; i++) {
-        const c = candles[i];
-        if (Number.isFinite(c.low) && c.low < lo) lo = c.low;
-        if (Number.isFinite(c.high) && c.high > hi) hi = c.high;
-      }
-      if (Number.isFinite(lo) && Number.isFinite(hi)) {
-        const win = yViewRef.current;
-        const winRange = (win.max - win.min) || 1;
-        const outside = lo < win.min || hi > win.max;
-        const tooSmall = (hi - lo) / winRange < 0.35;
-        if (outside || tooSmall) yViewRef.current = null;
-      }
-    } else if (!yUserRef.current && pinnedRef.current) {
-      yViewRef.current = null;
-    }
+    // Подгонять шкалу отдельно больше не нужно: она сама идёт за краями
+    // видимых свечей и приходит к ним плавно (см. computeLayout).
   }, [n, candles]);
 
   useEffect(() => { draw(); });
+  useEffect(() => () => { if (кадрШкалы.current) cancelAnimationFrame(кадрШкалы.current); }, []);
 
   // The bar-close countdown needs a redraw every second even when nothing
   // else about the data has changed, or it would just sit frozen.
@@ -14093,13 +14169,47 @@ function ОбещанияТокена({ механики, замок, tokenId })
   );
 }
 
+/* Карточка со строками «свойство — значение».
+ *
+ * Та же форма, что у настроек: скруглённая плашка, внутри строки с
+ * тонкой чертой между ними. Числа о токене раньше жили бегущей строкой
+ * под ценой — их приходилось листать вбок и читать по слогам. */
+function КарточкаСтрок({ заголовок, строки }) {
+  const видимые = (строки || []).filter(Boolean);
+  if (!видимые.length) return null;
+  return (
+    <div className="flex flex-col" style={{ gap: 10 }}>
+      {заголовок ? (
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800, letterSpacing: "-0.01em" }}>{заголовок}</span>
+      ) : null}
+      <div style={{ background: T.surface, borderRadius: 20, padding: "2px 16px" }}>
+        {видимые.map(([подпись, значение, цвет], i) => (
+          <div
+            key={подпись}
+            className="flex items-center justify-between"
+            style={{ gap: 12, padding: "13px 0", borderTop: i ? `1px solid ${T.line}` : "none" }}
+          >
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 600 }}>{подпись}</span>
+            <span style={{ fontFamily: monoFont, color: цвет || T.muted, fontSize: 14 }}>{значение}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = true, connected = true, onConnectWallet, themeKey, currentUserId = null, onNeedAuth, onOpenProfile, tonPriceUsd = 0, walletAddress = null, onManage = null }) {
   // График вынесен из вкладок наверх, поэтому здесь остались только
   // разделы под ним: держатели, лента, о токене.
   // Экран открывается на статистике: цифры рынка важнее ленты чужих
   // сделок, за ними сюда и заходят.
   const [tab, setTab] = useState("stats"); // stats | holders | feed | about
-  const [chartMode] = useState("mcap"); // always market cap — price toggle removed
+  /* Что рисует график: цену или капитализацию.
+     По умолчанию — цена: то же число, что крупно стоит в шапке, и то,
+     на что смотрят в первую очередь. Капитализация остаётся рядом, но
+     переключателем, а не единственным режимом: раньше шапка говорила о
+     цене, а график — о капитализации, и числа не сходились. */
+  const [chartMode, setChartMode] = useState("price");
   const [tf, setTf] = useState(() => {
     try {
       if (typeof window !== "undefined") {
@@ -14204,6 +14314,20 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const curveSol = curveChart && token.chain === "solana";
   const курсSolДляГрафика = useSolUsd();
   // Момент выпуска: левее него у графика ничего нет и быть не может.
+  /* Что показывает шапка: цена и изменение видимого участка графика.
+     Пока график не сказал, что у него в окне, берём привычные сутки —
+     то же, что и в ленте. */
+  const [окноГрафика, setОкноГрафика] = useState(null);
+  useEffect(() => { setОкноГрафика(null); }, [token.id, tf]);
+  const ценаОкна = окноГрафика ? окноГрафика.до : token.price;
+  const дельтаОкна = окноГрафика
+    ? окноГрафика.до - окноГрафика.от
+    : (token.price * (token.change || 0)) / 100;
+  const процентОкна = окноГрафика
+    ? (окноГрафика.от > 0 ? ((окноГрафика.до - окноГрафика.от) / окноГрафика.от) * 100 : 0)
+    : (token.change || 0);
+  const ростОкна = процентОкна >= 0;
+
   const запущенВ = useMemo(() => {
     const t = token.createdAt ? new Date(token.createdAt).getTime() : 0;
     return t > 0 ? Math.floor(t / 1000) : 0;
@@ -14489,39 +14613,30 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       />
       <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: 18 }}>
 
-      {/* Шапка — одной строкой вместо двух. Раньше кнопка «назад» жила
-          этажом выше имени токена, и первый экран начинался с двух
-          полупустых полос. */}
-      <div className="flex items-center gap-3">
-        {!hasTelegramBack() && (
-          <button onClick={onBack} className="fx-tap flex items-center justify-center flex-shrink-0"
-            style={{ width: 32, height: 32, borderRadius: 10, background: "transparent", border: `1px solid ${T.line}`, color: T.ice }}>
-            <ChevronLeft size={17} />
-          </button>
-        )}
-        <TokenAvatar size={38} tone={up ? "up" : "down"} src={логотип} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 600 }}>{token.name}</span>
-            {token.verified && <ShieldCheck size={13} color={T.electric} style={{ flexShrink: 0 }} />}
-            {/* Тот же знак живой торговли, что в ленте: если за час были
-                сделки, рынок работает прямо сейчас. */}
-            {(token.tx1h || 0) > 0 && (
-              <span className="flex items-center flex-shrink-0" style={{ gap: 4 }}>
-                <span style={{ width: 5, height: 5, borderRadius: 999, background: T.up, animation: "живаяТочка 1.6s ease-in-out infinite" }} />
-                <span style={{ fontFamily: monoFont, fontSize: 10, letterSpacing: "0.06em", color: T.up }}>LIVE</span>
-              </span>
-            )}
-            <ПометкаТест сеть={token.network} size={10.5} />
-          </div>
-          <div className="truncate" style={{ fontFamily: monoFont, color: T.faint, fontSize: 12 }}>
-            ${token.ticker}{fmtAge(token.createdAt) ? ` · ${fmtAge(token.createdAt)}` : ""}{token.dexName ? ` · ${token.dexName}` : ""}
-          </div>
+      {/* Шапка карточки. Порядок чтения сверху вниз: кто это (аватарка и
+          имя), почём (цена) и куда идёт (изменение). Кнопки уходят
+          вправо, чтобы не встревать между именем и ценой. */}
+      <div className="flex items-center justify-between" style={{ gap: 10 }}>
+        <div className="flex items-center" style={{ gap: 10 }}>
+          {!hasTelegramBack() && (
+            <button onClick={onBack} className="fx-tap flex items-center justify-center flex-shrink-0"
+              style={{ width: 34, height: 34, borderRadius: 999, background: T.surface, border: "none", color: T.ice }}>
+              <ChevronLeft size={18} />
+            </button>
+          )}
+          <TokenAvatar size={40} tone={up ? "up" : "down"} src={логотип} />
+          {(token.tx1h || 0) > 0 && (
+            <span className="flex items-center flex-shrink-0" style={{ gap: 4 }}>
+              <span style={{ width: 5, height: 5, borderRadius: 999, background: T.up, animation: "живаяТочка 1.6s ease-in-out infinite" }} />
+              <span style={{ fontFamily: monoFont, fontSize: 10, letterSpacing: "0.06em", color: T.up }}>LIVE</span>
+            </span>
+          )}
+          <ПометкаТест сеть={token.network} size={10.5} />
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           <button onClick={handleShare} className="fx-tap flex items-center justify-center"
-            style={{ width: 32, height: 32, borderRadius: 10, border: `1px solid ${T.line}` }}>
-            <Share2 size={14} color={T.muted} />
+            style={{ width: 34, height: 34, borderRadius: 999, background: T.surface, border: "none" }}>
+            <Share2 size={15} color={T.paper} />
           </button>
           {/* Ссылка и удаление — только у своего токена. Раньше они жили
               кнопкой «Управлять» на карточке в профиле, но карточка ведёт
@@ -14529,89 +14644,62 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           {onManage && (
             <button onClick={() => onManage(token)} className="fx-tap flex items-center justify-center"
               aria-label={tr("manageBtn")}
-              style={{ width: 32, height: 32, borderRadius: 10, border: `1px solid ${T.line}` }}>
-              <Settings size={14} color={T.muted} />
+              style={{ width: 34, height: 34, borderRadius: 999, background: T.surface, border: "none" }}>
+              <Settings size={15} color={T.paper} />
             </button>
           )}
         </div>
       </div>
 
-      {/* Цена — главное число экрана. Раньше её место занимала
-          капитализация, а цена шла подписью снизу: смотрят же в первую
-          очередь на цену, а капитализация — контекст к ней. */}
       <div className="flex flex-col" style={{ gap: 8 }}>
-        <div className="flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-end gap-2 flex-wrap">
-              <span style={{
-                fontFamily: displayFont, fontWeight: 700, fontSize: 34, lineHeight: 1.05,
-                letterSpacing: "-0.02em", wordBreak: "break-all",
-                // Цена залита градиентом своего направления: рост и
-                // падение видно раньше, чем прочитан процент.
-                ...текстГрадиентом(up ? ГРАДИЕНТ_РОСТА : ГРАДИЕНТ_ПАДЕНИЯ),
-              }}>
-                {fmtPrice(token.price)}
-              </span>
-              <div style={{ marginBottom: 3 }}><ChangeBadge value={token.change} size="md" /></div>
-            </div>
+        {/* Имя крупно, тикер — справа от него мелким: имя читают, тикером
+            сверяются. */}
+        <div className="flex items-baseline justify-between" style={{ gap: 12 }}>
+          <div className="flex items-baseline min-w-0" style={{ gap: 6 }}>
+            <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em" }}>
+              {token.name}
+            </span>
+            {token.verified && <ShieldCheck size={15} color={T.electric} style={{ flexShrink: 0, alignSelf: "center" }} />}
           </div>
+          {/* Тикер повторять незачем, если он и есть имя. */}
+          {String(token.ticker || "").toUpperCase() !== String(token.name || "").toUpperCase() && (
+            <span className="flex-shrink-0" style={{ fontFamily: displayFont, color: T.muted, fontSize: 15, fontWeight: 700, letterSpacing: "0.02em" }}>
+              {token.ticker}
+            </span>
+          )}
+        </div>
+
+        {/* Цена и под ней изменение — в деньгах и в процентах разом.
+            Оба числа считаются по видимому участку графика: сдвинул окно
+            — увидел, сколько монета прошла именно там. */}
+        <div>
+          <div style={{
+            fontFamily: displayFont, fontWeight: 800, fontSize: 34, lineHeight: 1.05,
+            letterSpacing: "-0.02em", color: T.ice, wordBreak: "break-all",
+          }}>
+            {fmtPrice(ценаОкна)}
+          </div>
+          <div style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 15, marginTop: 2, color: ростОкна ? T.up : T.down }}>
+            {ростОкна ? "+" : "−"}{fmtPrice(Math.abs(дельтаОкна))} ({ростОкна ? "+" : "−"}{Math.abs(процентОкна).toFixed(2)}%)
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
           {token.tokenAddress ? (
-            <button onClick={copyContract} className="fx-tap flex items-center gap-1.5 flex-shrink-0" style={{ padding: "4px 0" }}>
+            <button onClick={copyContract} className="fx-tap flex items-center gap-1.5 flex-shrink-0" style={{ padding: "2px 0" }}>
               <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 12 }}>{shortAddr(token.tokenAddress)}</span>
               <Copy size={11} color={T.faint} />
             </button>
-          ) : null}
+          ) : <span />}
+          <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12 }}>
+            {fmtAge(token.createdAt) || ""}{token.dexName ? ` · ${token.dexName}` : ""}
+          </span>
         </div>
 
-        {/* Второстепенные числа — одной строкой мелким шрифтом: они
-            нужны для сверки, а не для чтения по слогам. */}
-        <div className="no-scrollbar flex items-center overflow-x-auto" style={{ gap: 14, whiteSpace: "nowrap" }}>
-          {[
-            [t("marketCapLabel"), fmtUSD(token.mcapNum)],
-            [tr("statVolume24h"), `$${token.vol}`],
-            [tr("statLiquidity"), `$${token.liq}`],
-            token.chain === "solana"
-              ? [tr("statTx24h"), (token.tx24h || 0).toLocaleString("ru-RU")]
-              : [tr("statHolders"), holdersCount == null ? "—" : holdersCount.toLocaleString("ru-RU")],
-          ].map(([подпись, значение]) => (
-            <div key={подпись} className="flex items-center flex-shrink-0" style={{ gap: 6 }}>
-              <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12 }}>{подпись}</span>
-              <span style={{ fontFamily: monoFont, color: T.paper, fontSize: 12.5 }}>{значение}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Непроверенный токен — строкой, а не жёлтым щитом во весь
-            экран: предупредить нужно, напугать — нет. */}
-        {!token.verified && (
-          <div className="flex items-center" style={{ gap: 6 }}>
-            <ShieldAlert size={13} color={T.warning} />
-            <span style={{ fontFamily: bodyFont, color: T.warning, fontSize: 12.5 }}>{tr("unverifiedToken")}</span>
-          </div>
-        )}
       </div>
 
       {/* Интервалы графика */}
       <div className="flex flex-col" style={{ gap: 10 }}>
-        <div className="no-scrollbar flex gap-1.5 overflow-x-auto" ref={tfRowRef} style={{ paddingBottom: 2 }}>
-          {TIMEFRAMES.map(f => (
-            <button
-              key={f}
-              data-tf={f}
-              onClick={() => changeTf(f)}
-              className="tf-btn fx-tap rounded-[10px] px-2.5 py-1 flex-shrink-0"
-              style={{
-                fontFamily: monoFont, fontSize: 12,
-                background: tf === f ? T.surfaceHi : "transparent",
-                color: tf === f ? T.ice : T.faint,
-                border: `1px solid ${tf === f ? T.lineHi : "transparent"}`,
-              }}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-
         {/* График идёт во всю ширину страницы, а не лежит в карточке:
             рамка и скругление вокруг него мешали читать свечи у краёв, а
             места под сам график оставалось меньше. */}
@@ -14633,8 +14721,40 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               </button>
             </div>
           ) : (
-            <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} />
+            <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} onОкно={chartMode === "price" ? setОкноГрафика : null} />
           )}
+        </div>
+
+        {/* Периоды — под графиком, как в приложениях, где на график
+            смотрят, а не работают с ним: сначала картинка, потом выбор
+            отрезка. Выбранный лежит в тёмной капсуле. */}
+        <div className="no-scrollbar flex items-center overflow-x-auto" ref={tfRowRef} style={{ gap: 2, paddingBottom: 2 }}>
+          {ПЕРИОДЫ.map((п) => (
+            <button
+              key={п.tf}
+              data-tf={п.tf}
+              onClick={() => changeTf(п.tf)}
+              className="tf-btn fx-tap flex-shrink-0"
+              style={{
+                fontFamily: displayFont, fontSize: 12, fontWeight: 700, letterSpacing: "0.01em",
+                padding: "7px 9px", borderRadius: 999, border: "none", whiteSpace: "nowrap",
+                background: tf === п.tf ? T.surfaceHi : "transparent",
+                color: tf === п.tf ? T.ice : T.faint,
+              }}
+            >
+              {lang === "EN" ? п.en : п.ru}
+            </button>
+          ))}
+          {/* Цена или капитализация — одной кнопкой в конце ряда, как
+              значок вида графика в биржевых приложениях. */}
+          <button
+            onClick={() => setChartMode((м) => (м === "price" ? "mcap" : "price"))}
+            className="fx-tap flex items-center justify-center flex-shrink-0"
+            aria-label={t("chartModeMcap")}
+            style={{ marginLeft: "auto", width: 30, height: 28, borderRadius: 999, border: "none", background: chartMode === "mcap" ? T.surfaceHi : "transparent" }}
+          >
+            <TrendingUp size={16} color={chartMode === "mcap" ? T.ice : T.faint} />
+          </button>
         </div>
       </div>
 
@@ -14744,6 +14864,31 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           targetTon={Number(curve.graduationTon) / 1e9}
         />
       ) : null}
+
+      {/* Числа о токене — карточкой со строками, а не бегущей строкой
+          мелким шрифтом под ценой: то, что читают глазами сверху вниз,
+          и должно лежать строками. */}
+      <КарточкаСтрок
+        заголовок={`${tr("aboutToken")} $${token.ticker}`}
+        строки={[
+          [t("marketCapLabel"), fmtUSD(token.mcapNum)],
+          [tr("statVolume24h"), `$${token.vol}`],
+          [tr("statLiquidity"), `$${token.liq}`],
+          token.chain === "solana"
+            ? [tr("statTx24h"), (token.tx24h || 0).toLocaleString("ru-RU")]
+            : [tr("statHolders"), holdersCount == null ? "—" : holdersCount.toLocaleString("ru-RU")],
+          [tr("statAge"), fmtAge(token.createdAt) || "—"],
+        ]}
+      />
+
+      <КарточкаСтрок
+        заголовок={tr("securityTitle")}
+        строки={[
+          [tr("securityVerified"), token.verified ? tr("yes") : tr("no"), token.verified ? T.up : T.warning],
+          [tr("securityNetwork"), token.chain === "solana" ? "Solana" : "TON"],
+          [tr("securityCurve"), token.curveAddress ? tr("yes") : tr("no")],
+        ]}
+      />
 
       {/* Вкладки: держатели, лента, о токене. График выше — он больше не
           прячется за вкладкой, а лежит на виду. */}
