@@ -184,6 +184,7 @@ const STR = {
     needAccountShort: "Нужен вход в аккаунт",
     navProfileItem: "Профиль",
     searchPlaceholder: "Поиск",
+    draftFromChat: "Монета из сообщения — проверь и запускай",
     templatesTitle: "С чего начать",
     templateApplied: "Заготовка подставлена — правь как хочешь",
     mechTitle: "Механики запуска",
@@ -699,6 +700,7 @@ const STR = {
     needAccountShort: "Sign in first",
     navProfileItem: "Profile",
     searchPlaceholder: "Search",
+    draftFromChat: "Coin from the message — check and launch",
     templatesTitle: "Start from",
     templateApplied: "Template applied — edit as you like",
     mechTitle: "Launch mechanics",
@@ -15800,7 +15802,7 @@ function ПереключательМеханики({ item, включено, on
   );
 }
 
-function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCreateProfile, onOpenConnectModal, onLaunch, solДоступен = false }) {
+function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCreateProfile, onOpenConnectModal, onLaunch, solДоступен = false, черновик = null, onЧерновикПринят = () => {} }) {
   const [form, setForm] = useState({ name: "", ticker: "", buyAmount: "", desc: "", tg: "", x: "", site: "" });
   // В какой сети запускать. Пока программа кривой в Solana не
   // развёрнута, выбора нет вовсе — предлагать действие, которое всё
@@ -15843,6 +15845,22 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   // запуска успевают доехать, и нажатие «Запустить» не упирается в
   // ожидание загрузки.
   useEffect(() => { загрузитьЗапуск(); }, []);
+
+  /* Черновик из чата. Человек ответил боту на мем командой /mint —
+     форма открывается уже заполненной: имя, тикер, описание и картинка
+     из того самого сообщения. */
+  useEffect(() => {
+    if (!черновик) return;
+    setForm((f) => ({
+      ...f,
+      name: черновик.name || f.name,
+      ticker: String(черновик.ticker || f.ticker).toUpperCase(),
+      desc: черновик.description || f.desc,
+    }));
+    if (черновик.logo_url) { setLogoUrl(черновик.logo_url); setLogoFile(null); }
+    showToast(t("draftFromChat"));
+    onЧерновикПринят();
+  }, [черновик]);
 
   function set(key) { return (e) => setForm(f => ({ ...f, [key]: e.target.value })); }
   // Разделитель допускается ровно один: без этого в поле набиралось
@@ -17271,6 +17289,10 @@ async function probeTelegramAccount() {
    ссылке приглашения. Значение только передаём — доверять ему нельзя,
    сервер сам проверит, что такой пользователь есть, что это не сам
    приглашённый, и запишет связь единожды. */
+// Черновик приходит идентификатором строки в базе — проверяем его вид
+// до запроса: чужая строка в параметре не должна доходить до базы.
+const UUID_RE_APP = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function telegramStartParam() {
   const tg = typeof window !== "undefined" ? window.Telegram && window.Telegram.WebApp : null;
   return (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
@@ -20391,6 +20413,30 @@ function mapTokenRow(row) {
   // убран, поэтому tab не трогаем — подсветка остаётся на том разделе,
   // откуда пришли, и «назад» возвращает туда же.
   function openCreate() { setView("create"); }
+
+  /* Черновик из чата. Бот кладёт его в базу и приводит человека сюда
+     ссылкой t.me/<бот>/<приложение>?startapp=draft_<id>. Открываем
+     форму сразу: он пришёл запускать монету, а не смотреть ленту. */
+  const [черновикЗапуска, setЧерновикЗапуска] = useState(null);
+  useEffect(() => {
+    const параметр = telegramStartParam();
+    if (!параметр.startsWith("draft_")) return;
+    const id = параметр.slice(6);
+    if (!UUID_RE_APP.test(id)) return;
+    let брошено = false;
+    supabase
+      .from("launch_drafts")
+      .select("name, ticker, description, logo_url")
+      .eq("id", id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (брошено || error || !data) return;
+        setЧерновикЗапуска(data);
+        goTab("mempad");
+        setView("create");
+      });
+    return () => { брошено = true; };
+  }, []);
   function backFromToken() { setView(tab); }
 
   // Открытый токен — из своих? Тогда на его экране появляется управление
@@ -21095,6 +21141,8 @@ function mapTokenRow(row) {
           {view === "token" && <TokenDetail t={token} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} unlocked={accountCreated && (connected || (token && token.chain === "solana"))} connected={connected} onConnectWallet={() => setConnectModalOpen(true)} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} />}
           {view === "create" && (
             <CreateView
+              черновик={черновикЗапуска}
+              onЧерновикПринят={() => setЧерновикЗапуска(null)}
               showToast={showToast}
               unlocked={accountCreated && connected}
               accountCreated={accountCreated}

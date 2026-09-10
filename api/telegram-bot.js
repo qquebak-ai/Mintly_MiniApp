@@ -42,6 +42,7 @@
  *   4. Положить это число в переменную окружения SUPPORT_CHAT_ID.
  */
 
+import crypto from "node:crypto";
 import { SUPPORT_CHAT_ID, adminClient, deliverAnswer } from "./_support.js";
 import { searchAll, cardFor, cardByRef, свежийГрафик, findTokens, trendingExternal, looksLikeAddress, NETWORK } from "./_market.js";
 import { оценкаПокупки, оценкаПокупкиВПуле, БЫСТРЫЕ_СУММЫ } from "./_trade.js";
@@ -84,6 +85,9 @@ const ЗНАЧОК = `${APP_URL}/icon.PNG`;
 // приложение, а в личку с ботом — web_app-кнопки Telegram пускает только
 // туда.
 const TG_BOT = String(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "").trim();
+// Имя мини-приложения в ссылке t.me/<бот>/<приложение>: по нему Telegram
+// открывает именно приложение, а не переписку с ботом.
+const TG_APP = String(process.env.TG_APP || "Mintly").trim();
 
 // В тестовой сети бирж нет, поэтому виден только Mintly. Без этой
 // строки пустой ответ выглядел бы поломкой.
@@ -1244,6 +1248,115 @@ async function handleInline(query) {
 const результатовНет = (r) => !r || !r.length;
 
 /* Команда в чате или в личке: /token PRSM, /p EQ…, /top. */
+/* Монета из сообщения.
+ *
+ * Реплай на любой мем в чате командой /mint — и бот собирает из него
+ * черновик запуска: имя из первых слов, тикер из них же, описание —
+ * текст целиком, картинка — фотография сообщения. Дальше человек
+ * открывает приложение по кнопке, видит форму уже заполненной и
+ * правит, что хочет.
+ *
+ * Черновик живёт в базе, а не в ссылке: подпись к фото бывает длиннее,
+ * чем весь допустимый startapp, да и картинку в параметр не положишь.
+ */
+const СТОП_СЛОВА = new Set(["это", "как", "что", "the", "and", "for", "его", "она", "они", "мне", "нас", "вот", "так"]);
+
+function тикерИзТекста(текст) {
+  const слова = String(текст || "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((с) => с.length > 2 && !СТОП_СЛОВА.has(с.toLowerCase()));
+  const основа = (слова[0] || "MEME").toUpperCase();
+  // Кириллицу переводим в латиницу: тикер должен читаться в любом
+  // кошельке и на любой бирже.
+  const карта = { А: "A", Б: "B", В: "V", Г: "G", Д: "D", Е: "E", Ё: "E", Ж: "J", З: "Z", И: "I", Й: "Y", К: "K", Л: "L", М: "M", Н: "N", О: "O", П: "P", Р: "R", С: "S", Т: "T", У: "U", Ф: "F", Х: "H", Ц: "C", Ч: "CH", Ш: "SH", Щ: "SCH", Ъ: "", Ы: "Y", Ь: "", Э: "E", Ю: "YU", Я: "YA" };
+  const латиницей = [...основа].map((б) => (карта[б] !== undefined ? карта[б] : б)).join("");
+  return латиницей.replace(/[^A-Z0-9]/g, "").slice(0, 8) || "MEME";
+}
+
+function имяИзТекста(текст) {
+  const строка = String(текст || "").replace(/\s+/g, " ").trim();
+  if (!строка) return "Мем из чата";
+  const слова = строка.split(" ").slice(0, 4).join(" ");
+  return слова.slice(0, 32);
+}
+
+/* Картинку кладём к себе: ссылка Telegram на файл живёт час и несёт в
+   себе токен бота — отдавать её наружу нельзя. */
+async function картинкуВХранилище(fileId) {
+  const db = adminClient();
+  if (!fileId || !db) return null;
+  try {
+    const файл = await tgCall("getFile", { file_id: fileId });
+    const путьTG = файл && файл.result && файл.result.file_path;
+    if (!путьTG) return null;
+    const ответ = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${путьTG}`);
+    if (!ответ.ok) return null;
+    const байты = Buffer.from(await ответ.arrayBuffer());
+    const имя = `drafts/${crypto.randomUUID()}.jpg`;
+    const { error } = await db.storage.from("avatars").upload(имя, байты, { contentType: "image/jpeg", upsert: true });
+    if (error) return null;
+    const { data } = db.storage.from("avatars").getPublicUrl(имя);
+    return (data && data.publicUrl) || null;
+  } catch {
+    return null;
+  }
+}
+
+async function handleMintCommand(message, хвост) {
+  const chatId = message.chat.id;
+  const исходное = message.reply_to_message;
+  const текст = (хвост && хвост.trim())
+    || (исходное && (исходное.text || исходное.caption))
+    || "";
+
+  if (!исходное && !текст) {
+    await tg("sendMessage", {
+      chat_id: chatId,
+      text: "Ответь этой командой на любое сообщение — соберу из него монету. Или напиши: /mint название монеты.",
+    });
+    return;
+  }
+
+  const фото = исходное && Array.isArray(исходное.photo) && исходное.photo.length
+    ? исходное.photo[исходное.photo.length - 1].file_id
+    : null;
+  const лого = await картинкуВХранилище(фото);
+
+  const черновик = {
+    name: имяИзТекста(текст),
+    ticker: тикерИзТекста(текст),
+    description: String(текст || "").slice(0, 400),
+    logo_url: лого,
+    author_tg: String(message.from.id),
+    chat_id: String(chatId),
+    source_message_id: исходное ? исходное.message_id : message.message_id,
+  };
+
+  const db = adminClient();
+  let ссылка = `https://t.me/${TG_BOT}/${TG_APP}`;
+  if (db) {
+    const { data, error } = await db.from("launch_drafts").insert(черновик).select("id").single();
+    if (!error && data && data.id) ссылка += `?startapp=draft_${data.id}`;
+  }
+
+  await tg("sendMessage", {
+    chat_id: chatId,
+    reply_to_message_id: исходное ? исходное.message_id : undefined,
+    parse_mode: "HTML",
+    text: [
+      "<b>Монета из этого сообщения</b>",
+      "",
+      `Название: <b>${экранHTML(черновик.name)}</b>`,
+      `Тикер: <b>$${экранHTML(черновик.ticker)}</b>`,
+      лого ? "Картинка: из сообщения" : "Картинку добавишь в приложении",
+      "",
+      "Открой Mintly — форма уже заполнена, останется нажать «Запустить».",
+    ].join("\n"),
+    reply_markup: { inline_keyboard: [[{ text: "Запустить монету", url: ссылка }]] },
+  });
+}
+
 async function handleTokenCommand(message, запрос) {
   const chat = message.chat || {};
   // Личка с ботом — единственное место, где Telegram пускает кнопку,
@@ -1809,6 +1922,10 @@ export default async function handler(req, res) {
       if (имя === "wallet" || имя === "w") {
         if (хвост.trim()) await handleWalletSet(message, хвост.trim());
         else await handleWallet(chat.id, from.id);
+        return res.status(200).json({ ok: true });
+      }
+      if (имя === "mint" || имя === "монета" || имя === "m") {
+        await handleMintCommand(message, команда[3] || "");
         return res.status(200).json({ ok: true });
       }
       if (имя === "top") {
