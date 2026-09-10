@@ -3478,6 +3478,12 @@ async function fetchPoolTrades(poolAddress, limit = 300, priority = GT_PRIORITY.
     try {
       json = await своё("trades", { pool: poolAddress, network });
     } catch (e) {
+      /* К бирже напрямую — только когда свой сервер и правда сломался.
+         Если он ответил «занято», значит биржа не отвечает и ему: лента
+         запрашивает сделки по десяткам пулов сразу, и телефон,
+         отправившись туда сам, выбирает свой лимит за секунды — а с ним
+         теряется и график, который куда важнее ленты сделок. */
+      if (String(e && e.message) === "свой сервер занят") return cachedPoolTrades(poolAddress, network);
       const res = await gtFetch(`${GT_BASE}/networks/${network}/pools/${poolAddress}/trades`, { priority });
       if (!res.ok) throw new Error(`GeckoTerminal ${res.status}`);
       json = await res.json();
@@ -3656,7 +3662,9 @@ async function своё(что, параметры, signal) {
   // двенадцать функций, и отдельная ради трёх запросов туда не влезала.
   const res = await fetch(апи(`/api/chart?${строка}`), { signal });
   if (res.status === 503) {
-    серверЗанятДо = Date.now() + 2 * 60 * 1000;
+    // Короткая передышка, а не отлучение: свой сервер держит ответы в
+    // памяти и через полминуты обычно снова отдаёт свежие.
+    серверЗанятДо = Date.now() + 25000;
     throw new Error("свой сервер занят");
   }
   if (!res.ok) throw new Error(`данные рынка ${res.status}`);
