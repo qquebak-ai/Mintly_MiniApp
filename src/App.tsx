@@ -10542,7 +10542,7 @@ function NetworkSlider({ value, onChange, ширина = 168, высота = 38 
           transition: сдвиг == null ? `transform 220ms cubic-bezier(0.32,1.2,0.5,1)` : "none",
         }}
       />
-      {[["ton", "TON"], ["sol", "SOL"]].map(([id, подпись], i) => {
+      {[["ton", "TON", "#31A6F5"], ["sol", "SOL", "#9945FF"]].map(([id, подпись, цвет], i) => {
         // Подпись светлеет по мере подхода ползунка, а не скачком в
         // момент отпускания: иначе при перетаскивании ничего не
         // происходит до самого конца.
@@ -10554,8 +10554,17 @@ function NetworkSlider({ value, onChange, ширина = 168, высота = 38 
               position: "absolute", top: 0, bottom: 0, left: пад + i * шаг, width: шаг,
               boxSizing: "border-box",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontFamily: displayFont, fontSize: 13.5, fontWeight: 600,
-              color: близость > 0.5 ? T.ice : T.faint,
+              fontFamily: displayFont, fontSize: 13.5, fontWeight: близость > 0.5 ? 800 : 600,
+              /* Выбранная сеть подписана своим цветом и светится им же:
+                 голубой у TON, фиолетовый у Solana — те самые, что на их
+                 собственных значках. Сила свечения растёт вместе с
+                 близостью ползунка, поэтому при перетаскивании цвет
+                 переходит плавно, а не вспыхивает в конце. */
+              color: близость > 0.5 ? цвет : T.faint,
+              textShadow: близость > 0.5
+                ? `0 0 ${8 * близость}px ${hexA(цвет, 0.85 * близость)}, 0 0 ${18 * близость}px ${hexA(цвет, 0.45 * близость)}`
+                : "none",
+              transition: сдвиг == null ? `color 220ms ease-out, text-shadow 220ms ease-out` : "none",
               pointerEvents: "none",
             }}
           >
