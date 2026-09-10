@@ -13505,10 +13505,13 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <div
         ref={низ}
         style={{
-          // Ширину берём от самого окна, а не вычитаем отступы родителя:
-          // так страница ложится в край экрана при любой вложенности и
-          // на любом запасе по бокам.
-          marginTop: 22, width: "100vw", marginLeft: "calc(50% - 50vw)", marginRight: "calc(50% - 50vw)",
+          /* Ширину берём от самого окна и с запасом в двадцать точек по
+             каждой стороне: страница должна упираться в край экрана при
+             любой вложенности, любом запасе по бокам и любом округлении
+             ширины. Лишнее срезает контейнер списка — он и так не даёт
+             прокручивать вбок. */
+          marginTop: 22, width: "calc(100vw + 40px)",
+          marginLeft: "calc(50% - 50vw - 20px)", marginRight: "calc(50% - 50vw - 20px)",
           marginBottom: -(96 + 40),
           borderTopLeftRadius: 26, borderTopRightRadius: 26,
           background: КОШ_СТРАНИЦА, padding: "18px 16px 120px", minHeight: 420,
