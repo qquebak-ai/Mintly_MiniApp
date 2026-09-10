@@ -30,6 +30,9 @@ const ПАУЗА_ПОСЛЕ_ОТКАЗА_МС = 15000;
 // растёт: первый отказ пятнадцать секунд, дальше вдвое, до пяти минут.
 // Возвращается к обычной, как только он снова ответил.
 const ПАУЗА_ПРЕДЕЛ_МС = 5 * 60 * 1000;
+// Сколько ждём ответа. Дольше и не надо: на том конце человек смотрит в
+// экран, а молчание источника ничем не лучше отказа.
+const ТЕРПЕНИЕ_МС = 6000;
 
 const выпущено = [];      // времена последних запросов
 const вПути = new Map();  // url -> Promise, чтобы не спрашивать дважды
@@ -73,14 +76,27 @@ export async function gtЗапрос(url, { ждать = ЖДАТЬ_МС } = {})
   const работа = (async () => {
     if (!(await очередь(ждать))) return { ok: false, status: 0, json: null };
     try {
-      const res = await fetch(url, {
-        headers: {
-          accept: "application/json",
-          // Без имени клиента запрос выглядит роботом — а робота с
-          // серверного адреса источник встречает отказом охотнее.
-          "user-agent": "Mintly/1.0 (+https://mintly.company)",
-        },
-      });
+      /* Со сроком. Без него запрос к источнику мог висеть вечно:
+         соединение он принимает, а отвечать не спешит — так себя ведёт
+         защита от роботов. Такие висяки копились в списке «в пути», и
+         следующий такой же запрос ждал их ответа, которого не будет
+         никогда. Со стороны это и есть «график просто не грузится». */
+      const стоп = new AbortController();
+      const срок = setTimeout(() => стоп.abort(), ТЕРПЕНИЕ_МС);
+      let res;
+      try {
+        res = await fetch(url, {
+          signal: стоп.signal,
+          headers: {
+            accept: "application/json",
+            // Без имени клиента запрос выглядит роботом — а робота с
+            // серверного адреса источник встречает отказом охотнее.
+            "user-agent": "Mintly/1.0 (+https://mintly.company)",
+          },
+        });
+      } finally {
+        clearTimeout(срок);
+      }
       if (res.status === 429 || res.status === 418) {
         подряд += 1;
         сердится = Date.now() + Math.min(ПАУЗА_ПРЕДЕЛ_МС, ПАУЗА_ПОСЛЕ_ОТКАЗА_МС * 2 ** (подряд - 1));
@@ -90,7 +106,12 @@ export async function gtЗапрос(url, { ждать = ЖДАТЬ_МС } = {})
       подряд = 0;
       return { ok: true, status: res.status, json: await res.json() };
     } catch (err) {
-      return { ok: false, status: -1, json: null, error: (err && err.message) || String(err) };
+      const молчание = err && (err.name === "AbortError" || /aborted|timeout/i.test(String(err.message)));
+      if (молчание) {
+        подряд += 1;
+        сердится = Date.now() + Math.min(ПАУЗА_ПРЕДЕЛ_МС, ПАУЗА_ПОСЛЕ_ОТКАЗА_МС * 2 ** (подряд - 1));
+      }
+      return { ok: false, status: молчание ? 0 : -1, json: null, error: (err && err.message) || String(err) };
     } finally {
       вПути.delete(url);
     }
