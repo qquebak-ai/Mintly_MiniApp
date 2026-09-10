@@ -73,7 +73,14 @@ export async function gtЗапрос(url, { ждать = ЖДАТЬ_МС } = {})
   const работа = (async () => {
     if (!(await очередь(ждать))) return { ok: false, status: 0, json: null };
     try {
-      const res = await fetch(url, { headers: { accept: "application/json" } });
+      const res = await fetch(url, {
+        headers: {
+          accept: "application/json",
+          // Без имени клиента запрос выглядит роботом — а робота с
+          // серверного адреса источник встречает отказом охотнее.
+          "user-agent": "Mintly/1.0 (+https://mintly.company)",
+        },
+      });
       if (res.status === 429 || res.status === 418) {
         подряд += 1;
         сердится = Date.now() + Math.min(ПАУЗА_ПРЕДЕЛ_МС, ПАУЗА_ПОСЛЕ_ОТКАЗА_МС * 2 ** (подряд - 1));
