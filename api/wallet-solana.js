@@ -564,6 +564,58 @@ async function свести(db, набор) {
   return сделано;
 }
 
+/* Правила запуска: честный старт и замок доли создателя.
+ *
+ * Обещания создателя не должны жить одной строкой в описании — сервер
+ * их и исполняет. Честный старт: первую минуту кривая открыта только
+ * тем, кто пришёл из Telegram, — снайпер-бот, торгующий напрямую по
+ * адресу, до приложения не доходит и покупает уже после. Замок:
+ * создатель не может продать свою долю раньше, чем кривая наберёт
+ * оговорённое.
+ */
+const ЧЕСТНЫЙ_СТАРТ_СЕК = 60;
+
+async function правилаТокена(db, mint) {
+  if (!db || !mint) return null;
+  const { data } = await db
+    .from("tokens")
+    // Сколько кривая собрала, лежит в её кеше, а не в самом токене.
+    .select("id, owner_id, created_at, fair_start, creator_lock, curve_cache(real_ton, graduation_ton, graduated)")
+    .eq("address", String(mint))
+    .maybeSingle();
+  return data || null;
+}
+
+/* Что мешает этой сделке. null — ничего. */
+async function запретСделки(db, { mint, user, продажа, telegramПривязан }) {
+  const т = await правилаТокена(db, mint);
+  if (!т) return null;
+
+  if (!продажа && т.fair_start) {
+    const прошло = (Date.now() - new Date(т.created_at).getTime()) / 1000;
+    // Условие простое: в первую минуту нужен Telegram-аккаунт. Всё, что
+    // ходит мимо приложения, его не предъявит.
+    if (прошло < ЧЕСТНЫЙ_СТАРТ_СЕК && !telegramПривязан) {
+      return { error: "fair_start", left: Math.ceil(ЧЕСТНЫЙ_СТАРТ_СЕК - прошло) };
+    }
+  }
+
+  if (продажа && т.creator_lock && т.creator_lock !== "none" && user && String(т.owner_id) === String(user.id)) {
+    const кривая = Array.isArray(т.curve_cache) ? т.curve_cache[0] : т.curve_cache;
+    const собрано = Number(кривая && кривая.real_ton) || 0;
+    const цель = Number(кривая && кривая.graduation_ton) || 0;
+    if (кривая && кривая.graduated) return null;   // кривая закрыта — замок снят
+    // «До биржи» — доля открывается только после закрытия кривой,
+    // «по вехам» — после половины пути.
+    const порог = т.creator_lock === "graduation" ? цель : цель * 0.5;
+    if (цель > 0 && собрано < порог) {
+      return { error: "creator_locked", need: порог, have: собрано };
+    }
+  }
+
+  return null;
+}
+
 export default async function handler(req, res) {
   const db = admin();
   const набор = ключи();
@@ -743,6 +795,16 @@ export default async function handler(req, res) {
       const продажа = !!тело.sell;
       const сумма = Math.max(0, Number(тело.amount) || 0);
       if (!адресОк(String(тело.mint || "")) || !(сумма > 0)) return res.status(400).json({ error: "bad_request" });
+
+      /* Обещания создателя проверяются до денег, а не после: отказ
+         должен приходить раньше, чем что-то ушло в сеть. */
+      const запрет = await запретСделки(db, {
+        mint: String(тело.mint), user, продажа,
+        // Кошелёк заводится вместе с аккаунтом, а аккаунт — по Telegram:
+        // раз строка есть, человек пришёл из приложения, а не мимо него.
+        telegramПривязан: !!строка,
+      });
+      if (запрет) return res.status(403).json(запрет);
 
       const оп = await начать(db, user, { дело: "trade", сумма: продажа ? 0 : сумма, ключЗапроса, ip });
       if (оп.повтор) return res.status(200).json({ signature: оп.signature, repeat: true });

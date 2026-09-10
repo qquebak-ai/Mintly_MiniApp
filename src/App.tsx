@@ -13719,7 +13719,23 @@ function useТезис(tokenId) {
  * нет, значит спорить с самим собой. Замок доли создателя стоит там же:
  * это тоже обещание, только с тремя вариантами вместо да/нет.
  */
-function ОбещанияТокена({ механики, замок }) {
+function ОбещанияТокена({ механики, замок, tokenId }) {
+  const [фонд, setФонд] = useState(null);
+
+  // Сколько уже накоплено на выкуп. Показываем цифрой: обещание без
+  // счётчика — это просто строка в описании.
+  useEffect(() => {
+    if (!tokenId || !(механики && механики.buyback)) return;
+    let брошено = false;
+    supabase
+      .from("token_buyback")
+      .select("pool_ton")
+      .eq("token_id", tokenId)
+      .maybeSingle()
+      .then(({ data, error }) => { if (!брошено && !error && data) setФонд(Number(data.pool_ton) || 0); });
+    return () => { брошено = true; };
+  }, [tokenId, механики && механики.buyback]);
+
   const включённые = МЕХАНИКИ_ЗАПУСКА.filter((м) => механики && механики[м.key]);
   const естьЗамок = замок && замок !== "none";
   if (!включённые.length && !естьЗамок) return null;
@@ -13731,7 +13747,12 @@ function ОбещанияТокена({ механики, замок }) {
           <div key={м.key} className="flex items-start" style={{ gap: 10 }}>
             <м.icon size={16} color="#C79BFF" style={{ marginTop: 1, flexShrink: 0 }} />
             <span className="flex-1 min-w-0">
-              <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>{t(м.tKey)}</span>
+              <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>
+                {t(м.tKey)}
+                {м.key === "buyback" && фонд != null && (
+                  <span style={{ fontFamily: monoFont, color: "#C79BFF", fontSize: 13, fontWeight: 700 }}> · {фонд.toFixed(3)}</span>
+                )}
+              </span>
               <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 2 }}>{t(м.описание)}</span>
             </span>
           </div>
@@ -14525,7 +14546,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           {/* Обещания создателя — первым делом. Механика ценна не тем,
               что она включена в базе, а тем, что покупатель видит её до
               покупки, а не после. */}
-          <ОбещанияТокена механики={token.механики} замок={token.замок} />
+          <ОбещанияТокена механики={token.механики} замок={token.замок} tokenId={token.id} />
           {infoLoading && !info ? (
             <div className="flex flex-col gap-2">
               <div className="fx-skeleton" style={{ width: "100%", height: 12, borderRadius: 4 }} />

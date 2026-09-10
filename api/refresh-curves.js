@@ -20,10 +20,16 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { обновитьЖивойГрафик } from "./_livechart.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const CRON_SECRET = process.env.CRON_SECRET;
+
+/* Какая часть комиссии площадки идёт в фонд выкупа у токенов, где
+   создатель включил обратный выкуп. Половина: остальное — работа
+   площадки, и обещать больше, чем можешь отдать, нельзя. */
+const BUYBACK_ДОЛЯ = 0.5;
 
 // Боевая сеть по умолчанию. Тестовая включается явно: TON_TESTNET=1.
 const TESTNET = process.env.TON_TESTNET === "1";
@@ -495,5 +501,41 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ updated: строки.length, tokens: tokens.length, silent: молчат, logos: безЛоготипа.length, listed: залистили });
+  /* Механики, включённые при запуске.
+     Живой график правится в чате на каждом обходе, фонд выкупа
+     пересчитывается по обороту — обе вещи обещаны покупателю на
+     странице токена, и держать их обещанием на словах нельзя. */
+  let графиков = 0;
+  let фондов = 0;
+  {
+    const { data: свойства } = await admin
+      .from("tokens")
+      .select("id, name, ticker, chain, live_chart, buyback, chat_id")
+      .in("id", строки.map((с) => с.token_id));
+    for (const токен of свойства || []) {
+      const кеш = строки.find((с) => с.token_id === токен.id);
+      if (!кеш) continue;
+
+      if (токен.live_chart) {
+        const вышло = await обновитьЖивойГрафик(admin, { токен, кеш }).catch(() => false);
+        if (вышло) графиков += 1;
+      }
+
+      if (токен.buyback) {
+        // Фонд — доля площадки с оборота этого токена. Считаем от того
+        // же оборота, что показан на витрине: другой цифры у нас нет, а
+        // выдумывать её нельзя.
+        const оборот = Number(кеш.vol24_ton) || 0;
+        const комиссия = оборот * (Number(кеш.fee_bps || 100) / 10000);
+        const { error } = await admin.from("token_buyback").upsert({
+          token_id: токен.id,
+          pool_ton: комиссия * BUYBACK_ДОЛЯ,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "token_id" });
+        if (!error) фондов += 1;
+      }
+    }
+  }
+
+  return res.status(200).json({ updated: строки.length, tokens: tokens.length, silent: молчат, logos: безЛоготипа.length, listed: залистили, charts: графиков, buyback: фондов });
 }
