@@ -15117,10 +15117,25 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
     if (!tradeModal || !token || token.chain !== "solana") { setSolБаланс(null); return; }
     let cancelled = false;
     (async () => {
-      const { сохранённаяСессия } = await import("./phantom");
-      const сессия = сохранённаяСессия();
-      if (!сессия || cancelled) return;
-      const параметры = new URLSearchParams({ wallet: сессия.wallet });
+      /* Чей кошелёк спрашивать. Сначала Phantom, если он подключён, а
+         иначе — свой кошелёк Mintly: им и платят внутри приложения, и
+         без него в поле «Доступно» стояло «кошелёк не подключён» у
+         человека, у которого кошелёк как раз есть. */
+      let адрес = null;
+      try {
+        const { сохранённаяСессия } = await import("./phantom");
+        const сессия = сохранённаяСессия();
+        адрес = сессия && сессия.wallet;
+      } catch { /* нет модуля — идём дальше */ }
+      if (!адрес) {
+        try {
+          const { состояниеВнутреннего } = await import("./appWallet");
+          const св = await состояниеВнутреннего();
+          адрес = св && св.address;
+        } catch { /* без входа внутреннего кошелька нет */ }
+      }
+      if (!адрес || cancelled) return;
+      const параметры = new URLSearchParams({ wallet: адрес });
       if (token.tokenAddress) параметры.set("mint", token.tokenAddress);
       const b = await fetch(апи(`/api/solana?action=balances&${параметры}`)).then((r) => r.json()).catch(() => null);
       if (!cancelled && b && !b.error) setSolБаланс({ sol: Number(b.sol) || 0, token: Number(b.token) || 0 });
@@ -15205,12 +15220,17 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
       estimate = (Number(net) / 1e9) * tonPriceUsd;
     }
   } else if (соло) {
-    // Точный маршрут посчитает Jupiter при подтверждении; здесь — грубая
-    // прикидка по цене из ленты, чтобы поле не было пустым.
-    const solUsd = solPriceUsd > 0 ? solPriceUsd : 0;
+    /* Считаем в самой монете, а не через доллары: у токена на кривой
+       цена и так хранится в SOL за штуку. Прежний путь шёл через курс
+       SOL с чужого сайта — не ответил он, и в поле стоял ноль, будто
+       покупка ничего не даёт. */
+    const курсSol = solPriceUsd > 0 ? solPriceUsd : (solUsd() || 0);
+    const ценаSol = Number(token.priceTon) > 0
+      ? Number(token.priceTon)
+      : (priceUsd > 0 && курсSol > 0 ? priceUsd / курсSol : 0);
     estimate = isBuy
-      ? (priceUsd > 0 && solUsd > 0 ? (amount * solUsd) / priceUsd : 0)
-      : amount * priceUsd;
+      ? (ценаSol > 0 ? amount / ценаSol : 0)
+      : amount * ценаSol * (курсSol > 0 ? курсSol : 0);
   } else {
     estimate = isBuy
       ? (priceUsd > 0 ? (amount * tonPriceUsd) / priceUsd : 0)
