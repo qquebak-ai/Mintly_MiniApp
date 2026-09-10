@@ -14696,11 +14696,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               // Ровно до середины круга: аватарка стоит поверх, и по её
               // середине размытие обрывается.
               height: отступСверху + ВЫСОТА_ПОЛОСЫ / 2,
-              backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
-              // Заливка почти прозрачная: она нужна только чтобы белый
-              // текст под полосой не спорил с белым текстом на ней.
-              // Работу делает размытие, а не темнота.
-              background: "linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.16) 60%, rgba(0,0,0,0) 100%)",
+              /* Размытие с приглушением, а не тёмная плёнка поверх.
+                 Белый текст, проезжающий под полосой, при одном лишь
+                 размытии превращается в яркое пятно — оно светилось
+                 сквозь неё и спорило с именем токена. brightness гасит
+                 его прямо в подложке, поэтому сама полоса может
+                 оставаться почти прозрачной. */
+              backdropFilter: "blur(14px) brightness(0.45)",
+              WebkitBackdropFilter: "blur(14px) brightness(0.45)",
+              background: "linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.06) 60%, rgba(0,0,0,0) 100%)",
               // Держится до самого низа и тает у последних точек: иначе
               // размытие пропадает задолго до края и полоса кажется
               // короче, чем она есть.
@@ -21773,8 +21777,9 @@ function mapTokenRow(row) {
           // капсулы разделов выезжает текст, и узкая полоска его не
           // прятала — строка обрывалась на полуслове резким краем.
           position: "absolute", left: 0, right: 0, bottom: 0, height: 56, zIndex: 4, pointerEvents: "none",
-          backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-          background: "linear-gradient(0deg, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0) 100%)",
+          backdropFilter: "blur(14px) brightness(0.45)",
+          WebkitBackdropFilter: "blur(14px) brightness(0.45)",
+          background: "linear-gradient(0deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0) 100%)",
           WebkitMaskImage: "linear-gradient(0deg, #000 55%, transparent 100%)",
           maskImage: "linear-gradient(0deg, #000 55%, transparent 100%)",
         }} />
