@@ -2432,12 +2432,12 @@ const TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1", "MN1"];
    мемкоин; «1 сут.» говорит всё. Под каждым словом — тот же интервал
    свечей, что и раньше, менять данные не понадобилось. */
 const ПЕРИОДЫ = [
-  { tf: "M1", ru: "СЕЙЧАС", en: "LIVE" },
-  { tf: "M15", ru: "1 СУТ.", en: "1D" },
-  { tf: "H1", ru: "1 НЕД.", en: "1W" },
-  { tf: "H4", ru: "1 МЕС.", en: "1M" },
-  { tf: "D1", ru: "1 Г.", en: "1Y" },
-  { tf: "W1", ru: "ВСЕ", en: "ALL" },
+  { tf: "M1", ru: "1м", en: "1m" },
+  { tf: "M15", ru: "15м", en: "15m" },
+  { tf: "H1", ru: "1ч", en: "1h" },
+  { tf: "H4", ru: "4ч", en: "4h" },
+  { tf: "D1", ru: "1д", en: "1D" },
+  { tf: "W1", ru: "7д", en: "7D" },
 ];
 const TF_SECONDS = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400, D1: 86400, W1: 604800, MN1: 2592000 };
 
@@ -4210,7 +4210,13 @@ async function fetchSparkCloses(poolAddress, n = 24, jettonAddress = null) {
 // mount-local state in a ref — the caller resets it by changing this
 // component's `key` (TokenDetail keys it on token+timeframe), so a live
 // data refresh (same key, new candle values) never snaps the view back.
-const CHART_MIN_VISIBLE = 12;
+/* Пределы щипка.
+   Ближе двадцати свечей смотреть не на что: экран занимают три столбика
+   шириной с палец. Дальше полутора сотен — наоборот, свечи становятся
+   волосками, между которыми не разобрать ни тела, ни фитиля. Поэтому у
+   масштаба есть оба края, и он в них упирается мягко. */
+const CHART_MIN_VISIBLE = 20;
+const CHART_MAX_VISIBLE = 150;
 const CHART_DEFAULT_VISIBLE = 60;
 // Width reserved on the right for the price-axis gutter (labels + the
 // live current-price pill) — candles are plotted to the left of this,
@@ -4384,12 +4390,12 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
     if (!конец || !Number.isFinite(конец.time)) return null;
     let i = n - 1;
     while (i > 0 && Number.isFinite(candles[i - 1].time) && конец.time - candles[i - 1].time <= размах) i--;
-    return Math.max(CHART_MIN_VISIBLE, Math.min(n, n - i));
+    return Math.max(CHART_MIN_VISIBLE, Math.min(CHART_MAX_VISIBLE, n, n - i));
   }
 
   function clampView(ручной = false) {
     const v = viewRef.current;
-    v.count = Math.max(CHART_MIN_VISIBLE, Math.min(nВид, v.count || CHART_DEFAULT_VISIBLE));
+    v.count = Math.max(CHART_MIN_VISIBLE, Math.min(CHART_MAX_VISIBLE, nВид, v.count || CHART_DEFAULT_VISIBLE));
     /* Вправо дальше последней свечи — только на одну свечу.
        Раньше поле справа было бесконечным: палец уводил график в пустоту
        и там его отпускал, а вернуться к свечам приходилось вслепую.
@@ -4794,7 +4800,7 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
       // Пока масштаб не трогали руками, окно не сжимается до длины
       // истории: иначе три свечи снова растянулись бы во всю ширину.
       if (!зумРукой.current) хочу = Math.max(хочу, CHART_DEFAULT_VISIBLE);
-      v.count = Math.max(CHART_MIN_VISIBLE, Math.min(nВид, хочу));
+      v.count = Math.max(CHART_MIN_VISIBLE, Math.min(CHART_MAX_VISIBLE, nВид, хочу));
       v.start = n + хвостСправа(v.count) - v.count;
     } else if (anchorTimeRef.current != null) {
       // Ряд мог пересобраться с другим шагом: у свечей другие номера и
@@ -4918,7 +4924,7 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
       const d = dist(e.touches);
       const scale = d / (pinchRef.current.startDist || 1);
       let newCount = pinchRef.current.startCount / scale;
-      newCount = Math.max(CHART_MIN_VISIBLE, Math.min(nВид, newCount));
+      newCount = Math.max(CHART_MIN_VISIBLE, Math.min(CHART_MAX_VISIBLE, nВид, newCount));
       зумРукой.current = true;
       const mx = midX(e.touches);
       const newSlot = chartWidth() / newCount;
@@ -4996,7 +5002,7 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
     const mx = xFromEvent(e.clientX);
     const anchorIdx = viewRef.current.start + mx / layout.slot;
     const factor = e.deltaY > 0 ? 1.1 : 0.9;
-    let newCount = Math.max(CHART_MIN_VISIBLE, Math.min(n, viewRef.current.count * factor));
+    let newCount = Math.max(CHART_MIN_VISIBLE, Math.min(CHART_MAX_VISIBLE, nВид, viewRef.current.count * factor));
     const newSlot = chartWidth() / newCount;
     viewRef.current = { start: anchorIdx - mx / newSlot, count: newCount };
     clampView(true);
