@@ -14671,13 +14671,16 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           и к моменту их исчезновения копия уже стоит на месте.
           В потоке полоса ничего не занимает: высота ноль, содержимое
           лежит поверх, а страница отступает от верха на её высоту. */}
-      <div style={{ position: "sticky", top: -отступСверху, height: 0, zIndex: 6, marginLeft: -16, marginRight: -16, marginBottom: -18 }}>
+      {/* Прилипает не к самому верху прокрутки, а к началу содержимого:
+          верхние точки экрана занимает шапка Telegram, и полоса, севшая
+          под неё, была бы наполовину не видна. Размытие при этом уходит
+          и выше — под шапку, чтобы между ними не было щели. */}
+      <div style={{ position: "sticky", top: отступСверху, height: 0, zIndex: 6, marginLeft: -16, marginRight: -16, marginBottom: -18 }}>
         <div
           style={{
-            position: "absolute", top: 0, left: 0, right: 0,
+            position: "absolute", top: -отступСверху, left: 0, right: 0,
             height: ВЫСОТА_ПОЛОСЫ + отступСверху,
-            paddingTop: отступСверху,
-            display: "flex", alignItems: "center", padding: `${отступСверху}px 14px 0`,
+            display: "flex", alignItems: "flex-end", padding: `0 14px ${(ВЫСОТА_ПОЛОСЫ - 40) / 2}px`,
             backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
             background: "linear-gradient(180deg, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.52) 58%, rgba(0,0,0,0) 100%)",
             // Размытие тает к низу вместе с заливкой — иначе под полосой
@@ -14703,7 +14706,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           <div
             className="flex flex-col items-center"
             style={{
-              position: "absolute", left: 64, right: 64, top: отступСверху, height: ВЫСОТА_ПОЛОСЫ,
+              position: "absolute", left: 64, right: 64, bottom: 0, height: ВЫСОТА_ПОЛОСЫ,
               justifyContent: "center", gap: 0,
               opacity: шапкаДоля.текст,
               transform: `translateY(${(1 - шапкаДоля.текст) * 10}px)`,
