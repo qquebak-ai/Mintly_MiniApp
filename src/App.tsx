@@ -4271,8 +4271,9 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
      масштаб сам собой: только что был виден час, стало двадцать минут.
      Длительность окна от плотности ряда не зависит. */
   const spanRef = useRef(null);
-  // Трогали ли шкалу цены руками. Пока нет — она подгоняется под данные
-  // сама при каждом обновлении.
+  // Шкалу цены руками не трогают вовсе: она всегда считается по видимым
+  // свечам. Ref оставлен как признак «человек задал сам» на случай, если
+  // ручной масштаб когда-нибудь вернётся.
   const yUserRef = useRef(false);
   // Vertical (price) window — { min, max } in price units. Unlike before,
   // this is NOT recomputed from whatever candles happen to be visible;
@@ -4288,7 +4289,6 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
   const окноRef = useRef({ от: 0, до: 0, ts: 0 });
   const dragRef = useRef(null);     // { lastX, lastY, lastT, vx, vy, moved, startX, startY }
   const pinchRef = useRef(null);    // { startDist, startCount, anchorIdx }
-  const yScaleRef = useRef(null);   // { startY, startMin, startMax } — right-edge scale handle
   const inertiaRaf = useRef(null);
   const hoverIdxRef = useRef(null);
   // Ширина шкалы цен. Живёт в ref, а не в состоянии: её читают и расчёт
@@ -4747,10 +4747,15 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
        в секунду обновлять незачем: глаз столько не читает, а каждое
        обновление — перерисовка всей шапки. */
     if (onОкно) {
+      /* Считаем по длине окна, а не по его положению.
+         Цена в шапке — всегда последняя, а изменение — за столько
+         времени, сколько сейчас показывает график. Поэтому прокрутка в
+         прошлое числа не трогает (человек листает историю, а не меняет
+         период), а щипок — меняет: он и есть выбор периода. */
       const v3 = viewRef.current;
-      const iЛ = Math.max(0, Math.ceil(v3.start));
-      const iП = Math.min(n - 1, Math.max(iЛ, Math.floor(v3.start + v3.count) - 1));
-      const слева = candles[iЛ], справа = candles[iП];
+      const шаг = Math.max(1, Math.round(v3.count));
+      const справа = candles[n - 1];
+      const слева = candles[Math.max(0, n - шаг)];
       if (слева && справа && Number.isFinite(слева.open) && Number.isFinite(справа.close)) {
         const было = окноRef.current;
         const пора = Date.now() - было.ts > 90;
@@ -4858,16 +4863,13 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
     запомнитьРазмахОкна();
     draw();
   }
-  // Вертикальный сдвиг: окно цены едет за пальцем так же, как время по
-  // горизонтали. График должен двигаться свободно во все стороны.
-  function panYByPixels(dyScreen) {
-    const layout = computeLayout();
-    if (!layout) return;
-    yUserRef.current = true;
-    const delta = (dyScreen / layout.drawHeight) * layout.range;
-    yViewRef.current = { min: layout.min + delta, max: layout.max + delta };
-    draw();
-  }
+  /* Вертикальный сдвиг убран нарочно.
+   *
+   * Цена — не свободное поле, а шкала: у неё есть верх и низ, и они
+   * заданы тем, что сейчас на экране. Пока её можно было утащить пальцем,
+   * свечи уезжали за край, и вернуть их обратно человек мог только
+   * наугад. Теперь шкала всегда сама садится по видимым свечам, а палец
+   * двигает только время. */
   // Инерция — только по горизонтали. По вертикали она после отпускания
   // продолжала везти окно цены сама, и это читалось как «шкала стоит,
   // пока держишь, и разъезжается, как только отпустил». Пока палец на
@@ -4944,7 +4946,6 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
       dragRef.current.vy = dy / dt;
       dragRef.current.lastX = x; dragRef.current.lastY = y; dragRef.current.lastT = now;
       panByPixels(dx);
-      panYByPixels(dy);
     }
   }
   function onTouchEnd(e) {
@@ -4979,7 +4980,6 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
       dragRef.current.vy = dy / dt;
       dragRef.current.lastX = e.clientX; dragRef.current.lastY = e.clientY; dragRef.current.lastT = now;
       panByPixels(dx);
-      panYByPixels(dy);
     }
   }
   function onMouseUp() {
@@ -5004,54 +5004,16 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
     draw();
   }
 
-  // Right-edge price-scale handle — drag it up/down to zoom the (now
-  // manual) vertical price window, same as the scale gutter on a real
-  // trading chart. Kept as its own gesture, separate from panning the
-  // chart body, so the two don't fight each other.
-  function scaleStart(clientY) {
-    cancelInertia();
-    const layout = computeLayout();
-    if (!layout) return;
-    yScaleRef.current = { startY: clientY, startMin: layout.min, startMax: layout.max };
-  }
-  function scaleMove(clientY) {
-    if (!yScaleRef.current) return;
-    yUserRef.current = true;
-    const { startY, startMin, startMax } = yScaleRef.current;
-    const dy = clientY - startY;
-    const center = (startMin + startMax) / 2;
-    const halfRange = (startMax - startMin) / 2 || 1;
-    // Drag down -> zoom out (wider range); drag up -> zoom in (tighter).
-    const factor = Math.pow(1.0045, dy);
-    const newHalf = Math.max(halfRange * 0.06, halfRange * factor);
-    yViewRef.current = { min: center - newHalf, max: center + newHalf };
-    draw();
-  }
-  function scaleEnd() { yScaleRef.current = null; }
-  function onScaleTouchStart(e) { e.stopPropagation(); scaleStart(e.touches[0].clientY); }
-  function onScaleTouchMove(e) { if (!yScaleRef.current) return; e.preventDefault(); e.stopPropagation(); scaleMove(e.touches[0].clientY); }
-  function onScaleMouseDown(e) { e.stopPropagation(); scaleStart(e.clientY); }
-  function onScaleMouseMove(e) { if (!yScaleRef.current || e.buttons !== 1) return; e.stopPropagation(); scaleMove(e.clientY); }
+  /* Ручку шкалы убрали вместе с вертикальным сдвигом: шкала цены
+     считается по видимым свечам и вручную не задаётся. Тянуть её было
+     нечем и незачем — свечи всё равно должны помещаться. */
 
   if (!n) return null;
-  // Полоса захвата шкалы по ширине совпадает с самой шкалой: иначе
-  // тянуть приходится мимо подписей.
-  const layoutNow = computeLayout();
-  const scaleGutter = gutterRef.current || CHART_GUTTER;
   return (
     <div ref={wrapRef} data-chart="1" style={{ width: "100%", height, position: "relative", touchAction: "none" }}
       onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}
       onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp} onWheel={onWheel}>
       <canvas ref={canvasRef} style={{ display: "block", width: "100%", height }} />
-      {/* Invisible drag zone over the price axis: drag up/down to zoom the
-          (now manual) vertical scale. The axis itself — labels + the live
-          price pill — is drawn on the canvas, so there's no separate
-          decorative handle here, just the touch/mouse target for it. */}
-      <div
-        onTouchStart={onScaleTouchStart} onTouchMove={onScaleTouchMove} onTouchEnd={scaleEnd} onTouchCancel={scaleEnd}
-        onMouseDown={onScaleMouseDown} onMouseMove={onScaleMouseMove} onMouseUp={scaleEnd} onMouseLeave={scaleEnd}
-        style={{ position: "absolute", right: 0, top: 0, width: scaleGutter, height: "100%", touchAction: "none", cursor: "ns-resize" }}
-      />
     </div>
   );
 }
