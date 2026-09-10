@@ -438,6 +438,9 @@ const STR = {
     nothingToSell: "Нечего продавать",
     enterAmount: "Введите сумму",
     logoUploaded: "Логотип загружен",
+    logoUploadFailed: "Логотип не загрузился — токен выйдет без картинки",
+    changeLogo: "Заменить картинку",
+    logoUploading: "Загружаю…",
     bannerUploaded: "Баннер загружен",
     cropImageTitle: "Обрежь изображение",
     cropConfirm: "Применить",
@@ -963,6 +966,9 @@ const STR = {
     nothingToSell: "Nothing to sell",
     enterAmount: "Enter amount",
     logoUploaded: "Logo uploaded",
+    logoUploadFailed: "The logo didn't upload — the token launches without a picture",
+    changeLogo: "Change picture",
+    logoUploading: "Uploading…",
     bannerUploaded: "Banner uploaded",
     cropImageTitle: "Crop image",
     cropConfirm: "Apply",
@@ -3752,7 +3758,7 @@ async function loadCurveTrades(curveAddress, testnet, feeBps, priority = TON_PRI
 // Свечи из истории сделок. Пустые промежутки заполняются плоскими
 // свечами по последней цене: на кривой цена между сделками действительно
 // не меняется, поэтому это не выдумка, а честное отображение.
-function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL, rate = tonUsd()) {
+function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL, rate = tonUsd(), запущен = 0) {
   const params = curveParamsOf(state);
   const now = Math.floor(Date.now() / 1000);
 
@@ -3824,6 +3830,10 @@ function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL,
     bucketOf(firstTime) - step * Math.min(limit - 1, 12),
     lastBucket - step * (limit - 1),
   );
+  // До запуска токена не существовало, и рисовать там цену нельзя: те
+  // двенадцать свечей запаса слева выглядели как ровная торговля,
+  // которой не было. Начало графика — та свеча, в которой токен вышел.
+  if (запущен > 0) bucket = Math.max(bucket, bucketOf(запущен));
   const candles = [];
   const volume = [];
   let price = startPrice;
@@ -3959,14 +3969,18 @@ async function fetchCurveSparkCloses(curveAddress, n = 24) {
 // приехала: у токена на кривой цена всё равно между сделками не
 // меняется, так что прямая линия — это правда, а случайный график —
 // нет.
-function flatCandles(price, timeframe, limit = CHART_TOTAL) {
+function flatCandles(price, timeframe, limit = CHART_TOTAL, запущен = 0) {
   if (!(price > 0)) return null;
   const step = TF_SECONDS[timeframe] || 3600;
   const last = Math.floor(Date.now() / 1000 / step) * step;
   const candles = [];
   const volume = [];
+  // Прямая линия честна ровно там, где токен уже существовал: левее
+  // запуска рисовать нечего.
+  const первая = запущен > 0 ? Math.floor(запущен / step) * step : -Infinity;
   for (let i = limit - 1; i >= 0; i--) {
     const time = last - i * step;
+    if (time < первая) continue;
     candles.push({ time, open: price, high: price, low: price, close: price });
     volume.push({ time, value: 0, color: hexA(T.up, 0.32) });
   }
@@ -4041,7 +4055,7 @@ async function сделкиSolИзКеша(tokenId) {
  * тысячу: после этого «цена» из формулы выходит сразу в SOL за штуку, и
  * курс к доллару подставляется как есть, без второго множителя, который
  * пришлось бы протаскивать через всю сборку. */
-async function свечиКривойSol(mint, tokenId, timeframe, курсSolUsd, limit = CHART_TOTAL) {
+async function свечиКривойSol(mint, tokenId, timeframe, курсSolUsd, запущен = 0, limit = CHART_TOTAL) {
   if (!mint || !(курсSolUsd > 0)) return null;
   const { состояниеКривойSol } = await import("./solLaunch");
   const st = await состояниеКривойSol(mint);
@@ -4065,10 +4079,10 @@ async function свечиКривойSol(mint, tokenId, timeframe, курсSolUs
       kind: с.дельта < 0 ? "sell" : "buy",
     };
   });
-  return buildCurveCandles(ряд, timeframe, состояние, limit, курсSolUsd);
+  return buildCurveCandles(ряд, timeframe, состояние, limit, курсSolUsd, запущен);
 }
 
-async function fetchCurveOHLCV(curveAddress, timeframe, testnet, rate = tonUsd(), tokenId = null) {
+async function fetchCurveOHLCV(curveAddress, timeframe, testnet, rate = tonUsd(), tokenId = null, запущен = 0) {
   if (!(rate > 0)) return null;
   // Состояние нужно не только ради последней точки: в нём лежат
   // параметры, с которыми развёрнута именно эта кривая. Без него
@@ -4086,7 +4100,7 @@ async function fetchCurveOHLCV(curveAddress, timeframe, testnet, rate = tonUsd()
   const trades = (await сделкиИзКеша(tokenId))
     || (await fetchCurveTrades(curveAddress, testnet, curveParamsOf(state).feeBps, TON_PRIORITY.chart));
   if (trades == null) return null;
-  return buildCurveCandles(trades, timeframe, state, CHART_TOTAL, rate);
+  return buildCurveCandles(trades, timeframe, state, CHART_TOTAL, rate, запущен);
 }
 
 // Lightweight REAL-price feed for the small sparkline previews (feed
@@ -14116,6 +14130,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   // ответила» у токена, который отлично торгуется.
   const curveSol = curveChart && token.chain === "solana";
   const курсSolДляГрафика = useSolUsd();
+  // Момент выпуска: левее него у графика ничего нет и быть не может.
+  const запущенВ = useMemo(() => {
+    const t = token.createdAt ? new Date(token.createdAt).getTime() : 0;
+    return t > 0 ? Math.floor(t / 1000) : 0;
+  }, [token.createdAt]);
   // Какой интервал выбран прямо сейчас. Ответы приходят не в том
   // порядке, в каком их спрашивали: пока идёт запрос на пять минут,
   // человек успевает нажать час, и медленный ответ на пятиминутку
@@ -14144,11 +14163,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       // токена, вышедшего на биржу, есть оба адреса, и раньше свежий
       // биржевой график тут же затирался историей кривой.
       if (!result && curveSol) {
-        result = await свечиКривойSol(token.tokenAddress, token.id, tf, курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd());
+        result = await свечиКривойSol(token.tokenAddress, token.id, tf, курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd(), запущенВ);
         if (result) src = "curve";
       }
       if (!result && !curveSol && token.curveAddress) {
-        result = await fetchCurveOHLCV(token.curveAddress, tf, TON_TESTNET_NETWORK, tonPriceUsd > 0 ? tonPriceUsd : tonUsd(), token.id);
+        result = await fetchCurveOHLCV(token.curveAddress, tf, TON_TESTNET_NETWORK, tonPriceUsd > 0 ? tonPriceUsd : tonUsd(), token.id, запущенВ);
         if (result) src = "curve";
       }
       // Запасной истории курса от tonapi здесь больше нет. Это другой
@@ -14165,7 +14184,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       // либо пришли, либо нет: во втором случае показываем «нет
       // данных», а не случайное движение.
       let flat = false;
-      if (!result && allowFlat && curveChart) { result = flatCandles(token.price, tf, CHART_TOTAL); src = "curve"; flat = true; }
+      if (!result && allowFlat && curveChart) { result = flatCandles(token.price, tf, CHART_TOTAL, запущенВ); src = "curve"; flat = true; }
       if (cancelled || reqTf !== tfRef.current) return false;
       // Источник запоминается: обновлять график надо из того же места.
       // Иначе свечи биржи и точки tonapi сменяли друг друга — сетка
@@ -14206,7 +14225,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     // линию строить не из чего, и попытку нужно повторить.
     // tonPriceUsd в зависимостях: график считается в долларах, и при
     // смене курса его нужно пересобрать, иначе он повиснет на старом.
-  }, [tf, token.id, token.poolAddress, token.curveAddress, token.price > 0, tonPriceUsd, курсSolДляГрафика, curveSol, chartReload]);
+  }, [tf, token.id, token.poolAddress, token.curveAddress, token.price > 0, tonPriceUsd, курсSolДляГрафика, curveSol, запущенВ, chartReload]);
 
   // Обновление открытого графика. Крутится и тогда, когда данных ещё
   // нет: первый запрос мог не пройти из-за лимита, и без повторов на
@@ -14221,9 +14240,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     async function refresh() {
       let fresh = null;
       if (curveSol) {
-        fresh = await свечиКривойSol(token.tokenAddress, token.id, tf, курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd());
+        fresh = await свечиКривойSol(token.tokenAddress, token.id, tf, курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd(), запущенВ);
       } else if (curveChart) {
-        fresh = await fetchCurveOHLCV(token.curveAddress, tf, TON_TESTNET_NETWORK, tonPriceUsd > 0 ? tonPriceUsd : tonUsd(), token.id);
+        fresh = await fetchCurveOHLCV(token.curveAddress, tf, TON_TESTNET_NETWORK, tonPriceUsd > 0 ? tonPriceUsd : tonUsd(), token.id, запущенВ);
       } else {
         // Только биржа. Если она не ответила — на экране остаётся то, что
         // уже нарисовано, и следующий круг спросит снова.
@@ -14238,7 +14257,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     }
     const iv = setInterval(refresh, 15000);
     return () => { cancelled = true; clearInterval(iv); if (abort) abort.abort(); };
-  }, [token.id, token.poolAddress, token.curveAddress, curveChart, curveSol, tf, tonPriceUsd, курсSolДляГрафика]);
+  }, [token.id, token.poolAddress, token.curveAddress, curveChart, curveSol, tf, tonPriceUsd, курсSolДляГрафика, запущенВ]);
 
   // Real supply estimate (mcap / price) derived from the same live data —
   // used only to scale the chart between "price" and "market cap" display,
@@ -17424,10 +17443,32 @@ function SettingsPanel({
 /* TokenManageSheet — the "Manage" action on a token you created:
    surfaces real controls (copy link, verify, edit info) rather than
    a dead button. */
-function TokenManageSheet({ token: tokenProp, onClose, showToast, onDelete }) {
+function TokenManageSheet({ token: tokenProp, onClose, showToast, onDelete, загрузитьКартинку = null, onLogoChanged = null }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [token, closing] = useClosing(tokenProp);
+  const [меняем, setМеняем] = useState(false);
+  const полеКартинки = useRef(null);
   useEffect(() => { if (token) setConfirmingDelete(false); }, [token]);
+  /* Замена картинки. Логотип уезжает в хранилище при запуске, и если тот
+     раз не удался, токен так и остаётся с эмодзи вместо лица — а
+     перевыпустить его нельзя. Поэтому картинку можно поставить и
+     после. */
+  async function выбратьКартинку(e) {
+    const файл = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!файл || !загрузитьКартинку || !token) return;
+    setМеняем(true);
+    try {
+      const ссылка = await загрузитьКартинку(файл);
+      if (!ссылка) { showToast(t("logoUploadFailed")); return; }
+      const { error } = await supabase.from("tokens").update({ logo_url: ссылка }).eq("id", token.id);
+      if (error) { showToast(t("logoUploadFailed")); return; }
+      if (onLogoChanged) onLogoChanged(token.id, ссылка);
+      showToast(t("logoUploaded"));
+    } finally {
+      setМеняем(false);
+    }
+  }
   if (!token) return null;
   function copyLink() {
     const url = `https://mintly.app/token/${token.id}`;
@@ -17449,6 +17490,20 @@ function TokenManageSheet({ token: tokenProp, onClose, showToast, onDelete }) {
           <button onClick={copyLink} className="fx-tap w-full flex items-center gap-2 rounded-[20px] py-3 px-3.5" style={{ background: T.surfaceHi, border: "none" }}>
             <Copy size={15} color={T.muted} /><span style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>{t("copyLink")}</span>
           </button>
+          {загрузитьКартинку && (
+            <>
+              <input ref={полеКартинки} type="file" accept="image/*" className="hidden" onChange={выбратьКартинку} />
+              <button
+                onClick={() => полеКартинки.current && полеКартинки.current.click()}
+                disabled={меняем}
+                className="fx-tap w-full flex items-center gap-2 rounded-[20px] py-3 px-3.5"
+                style={{ background: T.surfaceHi, border: "none", opacity: меняем ? 0.6 : 1 }}
+              >
+                <ImageIcon size={15} color={T.muted} />
+                <span style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>{меняем ? t("logoUploading") : t("changeLogo")}</span>
+              </button>
+            </>
+          )}
           {/* Список приходит из базы и содержит только свои токены,
              поэтому удаление здесь безопасно. */}
           {onDelete && (
@@ -20351,22 +20406,11 @@ function mapTokenRow(row) {
       // случай, если запуск её почему-то не отдал.
       let persistentLogoUrl = chainResult.logoUrl || null;
       if (!persistentLogoUrl && req.logoFile && userId) {
-        try {
-          // Путь обязан начинаться с id пользователя: политика хранилища
-          // сверяет первую папку с auth.uid(). Раньше здесь был префикс
-          // `tokens/`, из-за него загрузка отклонялась, и в базу уезжала
-          // мёртвая blob-ссылка — логотипы не открывались ни у кого.
-          const path = `${userId}/token-${Date.now()}.${safeImageExt(req.logoFile)}`;
-          const { error: logoUploadError } = await supabase.storage
-            .from("avatars")
-            .upload(path, req.logoFile, { upsert: true });
-          if (!logoUploadError) {
-            const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-            if (pub && pub.publicUrl) persistentLogoUrl = pub.publicUrl;
-          } else {
-            console.error("[mintly] token logo upload failed:", logoUploadError);
-          }
-        } catch (e) { console.error("[mintly] token logo upload threw:", e); }
+        // Путь обязан начинаться с id пользователя: политика хранилища
+        // сверяет первую папку с auth.uid(). Раньше здесь был префикс
+        // `tokens/`, из-за него загрузка отклонялась, и в базу уезжала
+        // мёртвая blob-ссылка — логотипы не открывались ни у кого.
+        persistentLogoUrl = (await загрузитьЛоготип(req.logoFile)).url;
       }
       // Если загрузка не прошла — сохраняем пустоту, а не blob-ссылку:
       // она живёт только в этой вкладке, у всех остальных это битая
@@ -20431,6 +20475,35 @@ function mapTokenRow(row) {
   /* Баннер токена в хранилище. Он необязателен и ни на что в цепочке не
      влияет — это обложка, которой карточка встаёт на витрине, поэтому
      неудача загрузки запуск не рушит: токен выйдет без обложки. */
+  /* Логотип токена в хранилище.
+   *
+   * Одной попытки мало: сессия живёт час, и у того, кто держал форму
+   * открытой дольше, загрузка отбивалась политикой — токен выходил без
+   * картинки, а узнать об этом было неоткуда. Поэтому: попытка,
+   * обновление сессии, вторая попытка, и запасной склад token-assets —
+   * тот же, куда кладёт логотипы запуск в TON.
+   *
+   * Возвращает ссылку или null, а вместе с ней — причину, чтобы экран
+   * мог сказать о неудаче вслух, а не молча выпустить безымянный токен. */
+  async function загрузитьЛоготип(файл) {
+    if (!файл || !userId) return { url: null, ошибка: null };
+    const имя = `${userId}/token-${Date.now()}.${safeImageExt(файл)}`;
+    let последняя = null;
+    for (const [склад, освежить] of [["avatars", false], ["avatars", true], ["token-assets", false]]) {
+      try {
+        if (освежить) await supabase.auth.refreshSession().catch(() => {});
+        const { error } = await supabase.storage.from(склад).upload(имя, файл, { upsert: true });
+        if (error) { последняя = error; console.error(`[mintly] логотип не загрузился (${склад}):`, error); continue; }
+        const { data: pub } = supabase.storage.from(склад).getPublicUrl(имя);
+        if (pub && pub.publicUrl) return { url: pub.publicUrl, ошибка: null };
+      } catch (e) {
+        последняя = e;
+        console.error("[mintly] логотип не загрузился:", e);
+      }
+    }
+    return { url: null, ошибка: (последняя && последняя.message) || "хранилище отказало" };
+  }
+
   async function загрузитьБаннер(файл) {
     if (!файл || !userId) return null;
     try {
@@ -20452,18 +20525,12 @@ function mapTokenRow(row) {
     try {
       // Логотип уезжает в хранилище до запуска: на него ссылаются
       // метаданные токена, которые пишутся той же транзакцией.
-      let logo = null;
-      if (req.logoFile && userId) {
-        try {
-          const path = `${userId}/token-${Date.now()}.${safeImageExt(req.logoFile)}`;
-          const { error: ошибка } = await supabase.storage.from("avatars").upload(path, req.logoFile, { upsert: true });
-          if (!ошибка) {
-            const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-            if (pub && pub.publicUrl) logo = pub.publicUrl;
-          }
-        } catch (e) { console.error("[mintly] логотип не загрузился:", e); }
-      }
+      const загрузка = await загрузитьЛоготип(req.logoFile);
+      let logo = загрузка.url;
       if (!logo && req.logoUrl && !String(req.logoUrl).startsWith("blob:")) logo = req.logoUrl;
+      // Молчаливая неудача здесь дороже всего: токен уже не переделать, а
+      // картинка у него так и останется пустой.
+      if (!logo && req.logoFile) showToast(t("logoUploadFailed"));
       const баннер = await загрузитьБаннер(req.bannerFile);
 
       setLaunchProgress((p) => ({ ...p, stepIndex: 1 }));
@@ -21321,7 +21388,19 @@ function mapTokenRow(row) {
         showToast={showToast}
       />
       <ChestReveal prize={chestPrize} onClose={() => setChestPrize(null)} />
-      <TokenManageSheet token={manageToken_} onClose={() => setManageToken_(null)} showToast={showToast} onDelete={deleteMyToken} />
+      <TokenManageSheet
+        token={manageToken_}
+        onClose={() => setManageToken_(null)}
+        showToast={showToast}
+        onDelete={deleteMyToken}
+        загрузитьКартинку={userId ? (async (файл) => (await загрузитьЛоготип(файл)).url) : null}
+        onLogoChanged={(id, url) => {
+          const подставить = (prev) => prev.map((tok) => (tok.id === id ? { ...tok, logoUrl: url } : tok));
+          setMyTokens(подставить);
+          setCommunityTokens(подставить);
+          setManageToken_((prev) => (prev && prev.id === id ? { ...prev, logoUrl: url } : prev));
+        }}
+      />
       <TradeModal t={token} tradeModal={tradeModal} onClose={() => setTradeModal(null)} onConfirm={confirmTrade} walletTonBalance={tonBalance} tonPriceUsd={tonPriceUsd} heldAmount={chainHolding} curveState={tradeCurveState} />
       <TokenLaunchOverlay
         open={!!launchRequest}
