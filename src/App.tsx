@@ -14680,7 +14680,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           style={{
             position: "absolute", top: -отступСверху, left: 0, right: 0,
             height: ВЫСОТА_ПОЛОСЫ + отступСверху,
-            display: "flex", alignItems: "flex-end", padding: `0 14px ${(ВЫСОТА_ПОЛОСЫ - 40) / 2}px`,
+            display: "flex", alignItems: "flex-end", padding: `0 14px ${(ВЫСОТА_ПОЛОСЫ - 44) / 2}px`,
           }}
         >
           {/* Размытие — отдельным слоем под содержимым. Пока маска висела
@@ -14689,7 +14689,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           <div
             aria-hidden
             style={{
-              position: "absolute", inset: 0,
+              // Кончается на середине аватарки: она стоит поверх и сама
+              // не размывается — размытие действует только на то, что
+              // проезжает под ней.
+              position: "absolute", top: 0, left: 0, right: 0,
+              height: отступСверху + ВЫСОТА_ПОЛОСЫ / 2 + 12,
               backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
               background: "linear-gradient(180deg, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.52) 58%, rgba(0,0,0,0) 100%)",
               // Размытие тает к низу вместе с заливкой — иначе под
@@ -14706,7 +14710,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
                 <ChevronLeft size={17} />
               </button>
             )}
-            <TokenAvatar size={36} tone={up ? "up" : "down"} src={логотип} />
+            <TokenAvatar size={44} tone={up ? "up" : "down"} src={логотип} />
             <span style={{ opacity: 1 - шапкаДоля.текст }}><ПометкаТест сеть={token.network} size={10.5} /></span>
           </div>
 
@@ -14716,7 +14720,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           <div
             className="flex flex-col items-center"
             style={{
-              position: "absolute", left: 64, right: 64, bottom: 0, height: ВЫСОТА_ПОЛОСЫ,
+              position: "absolute", left: 78, right: 78, bottom: 0, height: ВЫСОТА_ПОЛОСЫ,
               justifyContent: "center", gap: 0,
               opacity: шапкаДоля.текст,
               transform: `translateY(${(1 - шапкаДоля.текст) * 10}px)`,
