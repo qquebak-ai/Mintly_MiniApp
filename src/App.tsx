@@ -17739,42 +17739,9 @@ function ProfileView({
           </div>
         </div>
 
-        <div className="mt-5">
-          <SectionTitle>{t("settings")}</SectionTitle>
-          {/* Каждый пункт — своя плашка, а не строка внутри общей.
-              Раньше список лежал в одной карточке, и нажатие вдавливало
-              её целиком: в CSS состояние «нажато» достаётся не только
-              самой кнопке, но и всем блокам вокруг неё. Теперь вдавливается
-              ровно то, на что нажали. */}
-          <div className="flex flex-col gap-2">
-            {SETTINGS_ITEMS.map((s, i) => (
-              <button
-                key={s.key}
-                onClick={() => openSettingItem(s)}
-                className="fx-card fx-tap w-full flex items-center gap-3 rounded-[20px]"
-                style={{
-                  background: T.surface, border: "none",
-                  padding: "13px 16px", animationDelay: `${i * 40}ms`,
-                }}
-              >
-                <s.icon size={16} color={T.muted} />
-                <span style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.ice, flex: 1, textAlign: "left" }}>{t(s.tKey)}</span>
-                {/* Ответ поддержки ждёт прочтения. Без метки о нём знает
-                    только личка в Telegram, а её человек мог отключить. */}
-                {s.key === "support" && supportUnread > 0 && (
-                  <span style={{
-                    minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
-                    background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT,
-                    fontFamily: monoFont, fontSize: 12, fontWeight: 700,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    {supportUnread > 9 ? "9+" : supportUnread}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Настроек здесь больше нет: они живут отдельным экраном и
+            открываются из бокового меню по аватарке. Дублировать их
+            списком в профиле значит держать два входа в одно и то же. */}
 
         </div>
       </div>
