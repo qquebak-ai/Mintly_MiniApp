@@ -443,7 +443,7 @@ const STR = {
     descRequiredWarning: "Опиши токен — после запуска описание изменить будет нельзя",
     buyAmountRequired: "Укажи сумму для запуска — на неё будут выкуплены первые токены",
     initialBuyHint: "На эту сумму ты выкупишь первые токены в той же транзакции — размер покупки и задаёт стартовую цену.",
-    buyAmountTooLow: "Минимальная сумма запуска — ${min} (≈{tons} TON)",
+    buyAmountTooLow: "Минимальная сумма запуска — ${min} (≈{tons} {unit})",
     deleteToken: "Удалить токен из списка",
     confirmDelete: "Точно удалить?",
     deleteFailedToast: "Не удалось удалить — попробуйте ещё раз",
@@ -465,7 +465,7 @@ const STR = {
     descPlaceholder: "О чём этот токен и почему он появился",
     descRequiredShort: "Описание обязательно — после запуска изменить его будет нельзя",
     siteLabel: "Сайт",
-    launchAmountLabel: "Сумма для запуска (TON)",
+    launchAmountLabel: "Сумма для запуска",
     launchAmountNote: "На эту сумму сразу после запуска будут выкуплены первые токены — это стартовая ликвидность и первая цена токена.",
     youWillGet: "Ты получишь ≈",
     supplyShare: "выпуска",
@@ -965,7 +965,7 @@ const STR = {
     descRequiredWarning: "Describe the token — the description can't be changed after launch",
     buyAmountRequired: "Enter an amount for the launch — it buys the first tokens",
     initialBuyHint: "Buys the first tokens in the same transaction — the size of this buy sets the starting price.",
-    buyAmountTooLow: "Minimum launch amount is ${min} (≈{tons} TON)",
+    buyAmountTooLow: "Minimum launch amount is ${min} (≈{tons} {unit})",
     deleteToken: "Delete token from list",
     confirmDelete: "Delete for sure?",
     deleteFailedToast: "Couldn't delete — try again",
@@ -987,7 +987,7 @@ const STR = {
     descPlaceholder: "What this token is about and why it exists",
     descRequiredShort: "Description is required — it can't be changed after launch",
     siteLabel: "Website",
-    launchAmountLabel: "Launch amount (TON)",
+    launchAmountLabel: "Launch amount",
     launchAmountNote: "This amount buys the first tokens right after launch — it's the starting liquidity and initial price.",
     youWillGet: "You'll get ≈",
     supplyShare: "of supply",
@@ -14751,7 +14751,11 @@ function solUsd() {
 // Минимальная стартовая покупка. В тестнете её нет: там TON ничего не
 // стоят, порог в долларах не имеет смысла и только мешает проверять.
 const MIN_LAUNCH_USD = 5;
+/* Минимальная сумма запуска — правило боевой сети. В тестовой монеты
+   раздают бесплатно, и требовать там «не меньше пяти долларов» просто
+   бессмысленно: это не защита от мусора, а препятствие проверке. */
 const MIN_LAUNCH_ENFORCED = !TON_TESTNET_NETWORK;
+const МИНИМУМ_В_SOLANA = SOL_NETWORK === "mainnet";
 const NETWORK_FEE_TON = 0.05;
 const SLIPPAGE_OPTIONS = [0.5, 1, 3];
 
@@ -16083,10 +16087,11 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
     // сети, в которой идёт запуск, — иначе доллары считались бы по чужой
     // монете.
     const rate = вSolana ? solUsd() : tonUsd();
-    if (MIN_LAUNCH_ENFORCED && rate > 0) {
+    const минимумНужен = вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED;
+    if (минимумНужен && rate > 0) {
       const минимум = MIN_LAUNCH_USD / rate;
       if (buyNum * rate < MIN_LAUNCH_USD) {
-        showToast(trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: минимум.toFixed(вSolana ? 3 : 2) }));
+        showToast(trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: минимум.toFixed(вSolana ? 3 : 2), unit: вSolana ? "SOL" : "TON" }));
         return;
       }
     }
@@ -16201,8 +16206,10 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("launchAmountLabel")}</span>
-        <div className="flex items-center gap-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surface, border: `1px solid ${touched && MIN_LAUNCH_ENFORCED && (вSolana ? solUsd() : tonUsd()) > 0 && !(parseFloat(form.buyAmount.replace(",", ".")) * (вSolana ? solUsd() : tonUsd()) >= MIN_LAUNCH_USD) ? T.down : T.line}` }}>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
+          {t("launchAmountLabel")} ({вSolana ? "SOL" : "TON"})
+        </span>
+        <div className="flex items-center gap-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surface, border: `1px solid ${touched && (вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED) && (вSolana ? solUsd() : tonUsd()) > 0 && !(parseFloat(form.buyAmount.replace(",", ".")) * (вSolana ? solUsd() : tonUsd()) >= MIN_LAUNCH_USD) ? T.down : T.line}` }}>
           <input
             value={form.buyAmount}
             onChange={setBuyAmount}
@@ -16233,10 +16240,11 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
               </p>
             );
           }
-          if (MIN_LAUNCH_ENFORCED && rate > 0 && buyNum * rate < MIN_LAUNCH_USD) {
+          const минимумНужен = вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED;
+          if (минимумНужен && rate > 0 && buyNum * rate < MIN_LAUNCH_USD) {
             return (
               <p style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, lineHeight: 1.5 }}>
-                {trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: minBuyTon.toFixed(вSolana ? 3 : 2) })}
+                {trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: minBuyTon.toFixed(вSolana ? 3 : 2), unit: вSolana ? "SOL" : "TON" })}
               </p>
             );
           }
@@ -16328,7 +16336,10 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         </div>
       )}
 
-      <button onClick={handleLaunch} className="cta-launch fx-tap rounded-[22px]" style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17.5, color: PRISM_TEXT, background: ЦВЕТ_КНОПКИ, position: "sticky", bottom: 12, padding: "18px 0" }}>
+      {/* Кнопка стоит в конце формы, а не липнет к низу экрана: липкой
+          она ложилась поверх переключателей механик, и половина списка
+          читалась из-под неё. */}
+      <button onClick={handleLaunch} className="cta-launch fx-tap rounded-[22px]" style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17.5, color: PRISM_TEXT, background: ЦВЕТ_КНОПКИ, padding: "18px 0", marginTop: 4 }}>
         {t("launchTokenCta")}
       </button>
 
