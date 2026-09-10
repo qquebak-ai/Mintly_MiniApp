@@ -4387,9 +4387,17 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
     return Math.max(CHART_MIN_VISIBLE, Math.min(n, n - i));
   }
 
-  function clampView() {
+  function clampView(ручной = false) {
     const v = viewRef.current;
     v.count = Math.max(CHART_MIN_VISIBLE, Math.min(nВид, v.count || CHART_DEFAULT_VISIBLE));
+    /* Вправо дальше последней свечи — только на одну свечу.
+       Раньше поле справа было бесконечным: палец уводил график в пустоту
+       и там его отпускал, а вернуться к свечам приходилось вслепую.
+       Запас в одну свечу оставлен нарочно — чтобы последняя не липла к
+       краю и её плашка с ценой не наезжала на шкалу.
+       Ограничение только для руки: начальное положение график
+       выставляет себе сам, и у молодой монеты оно с запасом. */
+    if (ручной && n > 0) v.start = Math.min(v.start, n + 1 - v.count);
     // Пустое место есть с обеих сторон. Справа за последней свечой — как
     // в любом терминале; слева до первой — потому что палец упирался в
     // невидимую стену ровно там, где у молодого токена всего десяток
@@ -4793,7 +4801,7 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
         if (d < bestD) { bestD = d; best = i; }
       }
       v.start = Math.max(0, Math.min(best, Math.max(0, n - 1)));
-      clampView();
+      clampView(true);
     }
     // Окно цены подгоняется заново. Оно задавалось один раз при первой
     // отрисовке и дальше не менялось: приезжали новые свечи с другим
@@ -4841,7 +4849,7 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
     const layout = computeLayout();
     if (!layout) return;
     viewRef.current.start -= dxScreen / layout.slot;
-    clampView();
+    clampView(true);
     // Отпустили у самого правого края — снова держимся за него.
     const v = viewRef.current;
     pinnedRef.current = v.start + v.count >= n - 0.75;
@@ -4913,7 +4921,7 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
       const mx = midX(e.touches);
       const newSlot = chartWidth() / newCount;
       viewRef.current = { start: pinchRef.current.anchorIdx - mx / newSlot, count: newCount };
-      clampView();
+      clampView(true);
       запомнитьРазмахОкна();
       draw();
       return;
@@ -4991,7 +4999,7 @@ function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt,
     let newCount = Math.max(CHART_MIN_VISIBLE, Math.min(n, viewRef.current.count * factor));
     const newSlot = chartWidth() / newCount;
     viewRef.current = { start: anchorIdx - mx / newSlot, count: newCount };
-    clampView();
+    clampView(true);
     запомнитьРазмахОкна();
     draw();
   }
