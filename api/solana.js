@@ -21,7 +21,27 @@
  */
 
 const JUP = "https://lite-api.jup.ag/swap/v1";
+/* Узел сети — обязательно боевой.
+ *
+ * SOLANA_RPC на сервере указывает на devnet: там живут своя кривая и
+ * кошелёк приложения, пока идёт обкатка. А здесь речь о токенах с
+ * биржи — они в боевой сети, и спрашивать про них у devnet бессмысленно:
+ * держателей «не видно», балансы нули, а публичный devnet ещё и
+ * отбивается отказом. Поэтому боевой адрес берётся отдельно, а devnet в
+ * эту дверь не проходит.
+ *
+ * Запасной узел — на случай, когда публичный отвечает отказом по
+ * лимиту: список держателей на карточке важнее, чем то, чьим узлом он
+ * прочитан. */
 const RPC = process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com";
+// Узлы для рыночных вопросов — только боевые: сколько бы ни стоял
+// SOLANA_RPC на devnet, токен с биржи живёт не там.
+const УЗЛЫ = [...new Set([
+  (process.env.SOLANA_RPC_MAINNET || "").trim(),
+  /devnet|testnet/i.test(RPC) ? "" : RPC,
+  "https://solana-rpc.publicnode.com",
+  "https://api.mainnet-beta.solana.com",
+].filter(Boolean))];
 const FEE_ACCOUNT = (process.env.SOLANA_FEE_ACCOUNT || "").trim();
 const FEE_BPS = Number(process.env.SOLANA_FEE_BPS || 100);
 
@@ -92,16 +112,27 @@ export async function сделка({ quote, wallet }) {
 
 /* Баланс кошелька: сколько SOL и сколько единиц конкретного токена.
    Оба вопроса — обычные вызовы узла сети, своей библиотеки не нужно. */
-async function rpc(method, params) {
-  const res = await fetch(RPC, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
-  if (!res.ok) throw new Error(`rpc ${res.status}`);
-  const json = await res.json();
-  if (json.error) throw new Error(`rpc: ${json.error.message}`);
-  return json.result;
+async function rpc(method, params, узлы = [RPC]) {
+  let последняя = null;
+  for (const узел of узлы) {
+    try {
+      const res = await fetch(узел, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      });
+      // Отказ по лимиту — повод спросить у соседнего узла, а не сдаться:
+      // у публичных он наступает быстро и проходит так же быстро.
+      if (res.status === 429 || res.status >= 500) { последняя = new Error(`rpc ${res.status}`); continue; }
+      if (!res.ok) throw new Error(`rpc ${res.status}`);
+      const json = await res.json();
+      if (json.error) throw new Error(`rpc: ${json.error.message}`);
+      return json.result;
+    } catch (err) {
+      последняя = err;
+    }
+  }
+  throw последняя || new Error("rpc недоступен");
 }
 
 export async function балансы({ wallet, mint }) {
@@ -134,11 +165,18 @@ export async function балансы({ wallet, mint }) {
 /* Крупнейшие держатели токена. Сеть отдаёт двадцать самых больших
    счетов и общую эмиссию — этого хватает, чтобы показать, кому
    принадлежит монета и не собрана ли она в одних руках. */
+// Список держателей меняется медленно, а стоит дорого: держим ответ
+// пять минут, иначе каждое открытие карточки — два запроса к узлу.
+const держателиКеш = new Map();
+const ДЕРЖАТЕЛИ_МС = 5 * 60 * 1000;
+
 export async function держатели({ mint }) {
   if (!адресОк(mint)) return null;
+  const было = держателиКеш.get(mint);
+  if (было && Date.now() - было.ts < ДЕРЖАТЕЛИ_МС) return было.тело;
   const [крупные, запас] = await Promise.all([
-    rpc("getTokenLargestAccounts", [mint]),
-    rpc("getTokenSupply", [mint]).catch(() => null),
+    rpc("getTokenLargestAccounts", [mint], УЗЛЫ),
+    rpc("getTokenSupply", [mint], УЗЛЫ).catch(() => null),
   ]);
   const всего = Number(запас && запас.value && запас.value.uiAmount) || 0;
   const счета = ((крупные && крупные.value) || []).map((с) => ({
@@ -146,7 +184,12 @@ export async function держатели({ mint }) {
     количество: Number(с.uiAmount) || 0,
     доля: всего > 0 ? ((Number(с.uiAmount) || 0) / всего) * 100 : 0,
   }));
-  return { всего, счета };
+  const тело = { всего, счета };
+  держателиКеш.set(mint, { ts: Date.now(), тело });
+  if (держателиКеш.size > 300) {
+    for (const [k, v] of держателиКеш) if (Date.now() - v.ts > ДЕРЖАТЕЛИ_МС) держателиКеш.delete(k);
+  }
+  return тело;
 }
 
 /* Отправка подписанной сделки в сеть.
