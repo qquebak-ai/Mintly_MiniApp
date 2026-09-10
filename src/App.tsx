@@ -13508,10 +13508,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <div
         ref={низ}
         style={{
-          // Просто вся ширина раздела: поля живут в блоках выше, и
-          // вычитать их отсюда больше не нужно — страница и так стоит
-          // ровно по краям приложения.
-          marginTop: 22, width: "100%",
+          /* Ширина — ровно окно, а не колонка списка: у колонки правый
+             край бывает уже на ширину полосы прокрутки, и страница
+             прижималась влево, оставляя полоску справа. Отрицательный
+             отступ возвращает её на середину. */
+          marginTop: 22, width: "100vw", marginLeft: "calc(50% - 50vw)",
           marginBottom: -(96 + 40),
           borderTopLeftRadius: 26, borderTopRightRadius: 26,
           background: КОШ_СТРАНИЦА, padding: "18px 16px 120px", minHeight: 420,
