@@ -14813,9 +14813,47 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       if (!e || !e.detail || e.detail.tokenId === token.id) refresh();
     };
     if (typeof window !== "undefined") window.addEventListener("mintly:сделка", своя);
+
+    /* Чужая сделка — тоже сразу. Сервер держит открытое соединение и
+       шлёт цену кривой, как только она изменилась: ждать своего круга
+       опроса не нужно вовсе. Последнюю свечу правим прямо из события —
+       это один кадр, — а полный ряд подтягиваем следом, но не чаще
+       раза в полторы секунды. */
+    let поток = null;
+    let последнийРяд = 0;
+    if (curveSol && token.tokenAddress && typeof EventSource !== "undefined") {
+      try {
+        поток = new EventSource(апи(`/api/curve-stream?mint=${encodeURIComponent(token.tokenAddress)}`));
+        поток.onmessage = (e) => {
+          if (cancelled) return;
+          let весть = null;
+          try { весть = JSON.parse(e.data); } catch { return; }
+          if (!весть || !(весть.price > 0)) return;
+          const курс = курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd();
+          const цена = весть.price * курс;
+          if (!(цена > 0)) return;
+          setChartData((prev) => {
+            if (!prev || !prev.candles || !prev.candles.length) return prev;
+            const свечи = prev.candles.slice();
+            const последняя = { ...свечи[свечи.length - 1] };
+            последняя.close = цена;
+            последняя.high = Math.max(последняя.high, цена);
+            последняя.low = Math.min(последняя.low, цена);
+            свечи[свечи.length - 1] = последняя;
+            return { ...prev, candles: свечи };
+          });
+          if (Date.now() - последнийРяд > 1500) {
+            последнийРяд = Date.now();
+            refresh();
+          }
+        };
+      } catch { поток = null; }
+    }
+
     return () => {
       cancelled = true;
       clearInterval(iv);
+      if (поток) { try { поток.close(); } catch { /* уже закрыт */ } }
       if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", своя);
       if (abort) abort.abort();
     };
