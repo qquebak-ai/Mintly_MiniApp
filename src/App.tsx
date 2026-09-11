@@ -21777,10 +21777,14 @@ function mapTokenRow(row) {
             узкие полосы размывают и растворяют то, что уходит за край:
             сверху под самой кромкой, снизу над панелью разделов. */}
         <div aria-hidden style={{
-          position: "absolute", left: 0, right: 0, top: 0, height: 18, zIndex: 4, pointerEvents: "none",
-          backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
-          WebkitMaskImage: "linear-gradient(180deg, #000 0%, transparent 100%)",
-          maskImage: "linear-gradient(180deg, #000 0%, transparent 100%)",
+          // Верхняя кромка размывается заметнее: узкой полоски в
+          // восемнадцать точек не хватало — строка успевала обрезаться
+          // резким краем раньше, чем растворялась.
+          position: "absolute", left: 0, right: 0, top: 0, height: 34, zIndex: 4, pointerEvents: "none",
+          backdropFilter: "blur(14px) brightness(0.6)",
+          WebkitBackdropFilter: "blur(14px) brightness(0.6)",
+          WebkitMaskImage: "linear-gradient(180deg, #000 45%, transparent 100%)",
+          maskImage: "linear-gradient(180deg, #000 45%, transparent 100%)",
         }} />
         <div aria-hidden style={{
           // Нижний край размывается сильнее и выше верхнего: там из-под
