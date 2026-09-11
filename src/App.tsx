@@ -12230,7 +12230,10 @@ function МояАктивность({ userId }) {
       .limit(5)
       .then(({ data, error }) => { if (!брошено) setРяд(error ? [] : (data || [])); });
     return () => { брошено = true; };
-  }, [userId]);
+    // Тик меняется после каждой сделки и обмена: без него список
+    // читался один раз за всё время жизни экрана, и после покупки в нём
+    // ничего не менялось до перезапуска приложения.
+  }, [userId, тик]);
 
   if (!ряд) return null;
   return (
@@ -13535,7 +13538,7 @@ function ДействиеКошелька({ icon: Icon, label, onClick }) {
 
 /* Операции по счёту. Берутся оттуда же, откуда активность на главной, —
    из сделок человека; здесь их больше и с суммой в TON. */
-function ИсторияКошелька({ userId }) {
+function ИсторияКошелька({ userId, тик = 0 }) {
   const [ряд, setРяд] = useState(null);
 
   useEffect(() => {
@@ -13606,7 +13609,7 @@ function ИсторияКошелька({ userId }) {
   );
 }
 
-function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onConnect, onDisconnect, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0 }) {
+function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onConnect, onDisconnect, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0 }) {
   const [copied, setCopied] = useState(false);
   const низ = useRef(null);
 
@@ -13644,13 +13647,18 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
 
   useEffect(() => {
     let жив = true;
-    const тик = () => { if (жив) обновитьВнутренний(); };
-    тик();
+    const шаг = () => { if (жив) обновитьВнутренний(); };
+    шаг();
     // Пополнение приходит мимо приложения — заметить его можно только
     // переспросив сеть.
-    const id = setInterval(тик, 15000);
+    const id = setInterval(шаг, 15000);
     return () => { жив = false; clearInterval(id); };
   }, [обновитьВнутренний]);
+
+  /* Свой счётчик обновлений. Корень поднимает свой после покупки и
+     продажи, но обмен идёт целиком здесь, и о нём он не знает: без этого
+     история после обмена оставалась вчерашней. */
+  const [своиОбновления, setСвоиОбновления] = useState(0);
 
   const курсSol = useSolUsd();
   const солНаКошельке = внутр && !внутр.нуженВход && !внутр.ошибка ? Number(внутр.sol) || 0 : 0;
@@ -13898,7 +13906,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           </div>
         )}
 
-        <ИсторияКошелька userId={userId} />
+        <ИсторияКошелька userId={userId} тик={тик + своиОбновления} />
 
       </div>
 
@@ -13929,7 +13937,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         onClose={() => setОбменОткрыт(false)}
         солНаКошельке={солНаКошельке}
         showToast={showToast}
-        onГотово={обновитьВнутренний}
+        onГотово={() => { обновитьВнутренний(); setСвоиОбновления((н) => н + 1); }}
         insetTop={insetTop}
         insetBottom={insetBottom}
       />
@@ -20357,7 +20365,10 @@ function mapTokenRow(row) {
   useEffect(() => {
     if (!connected || !walletAddress || !communityTokens.length) {
       setWalletHoldings([]);
-      setHoldingsReady(!!walletAddress ? true : false);
+      // Готово — значит «спрашивать больше нечего», а не «нашли». Без
+      // кошелька список пуст навсегда, и держать на его месте мерцающую
+      // плашку — врать, что что-то грузится.
+      setHoldingsReady(true);
       return;
     }
     let cancelled = false;
@@ -22117,6 +22128,7 @@ function mapTokenRow(row) {
               }}
               holdings={walletHoldings}
               holdingsReady={holdingsReady}
+              тик={balanceRefreshTick}
               showToast={showToast}
               userId={userId}
               onGoTab={goTab}
