@@ -14932,20 +14932,12 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               // ещё восемнадцать точек уходит на растворение: круг стоит
               // поверх стекла и сам не мылится.
               height: отступСверху + ВЫСОТА_ПОЛОСЫ / 2 + 18,
-              /* Размытие с приглушением, а не тёмная плёнка поверх.
-                 Белый текст, проезжающий под полосой, при одном лишь
-                 размытии превращается в яркое пятно — оно светилось
-                 сквозь неё и спорило с именем токена. brightness гасит
-                 его прямо в подложке, поэтому сама полоса может
-                 оставаться почти прозрачной. */
-              backdropFilter: "blur(30px) brightness(0.55) saturate(1.15)",
-              WebkitBackdropFilter: "blur(30px) brightness(0.55) saturate(1.15)",
-              background: "linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.06) 60%, rgba(0,0,0,0) 100%)",
-              // Держится до самого низа и тает у последних точек: иначе
-              // размытие пропадает задолго до края и полоса кажется
-              // короче, чем она есть.
-              WebkitMaskImage: "linear-gradient(180deg, #000 calc(100% - 18px), transparent 100%)",
-              maskImage: "linear-gradient(180deg, #000 calc(100% - 18px), transparent 100%)",
+              /* Заливка вместо стекла. Под размытием белый текст не
+                 гас, а разгорался: буква становилась шире и ярче самой
+                 себя, и это пятно спорило с именем токена. Градиент
+                 цвета страницы уводит проезжающую строку в фон —
+                 сплошной до середины аватарки, дальше растворяется. */
+              background: `linear-gradient(180deg, ${T.bg} 0%, ${T.bg} calc(100% - 26px), ${hexA(T.bg, 0)} 100%)`,
               pointerEvents: "none",
             }}
           />
@@ -22112,12 +22104,11 @@ function mapTokenRow(row) {
           // восемнадцать точек не хватало — строка успевала обрезаться
           // резким краем раньше, чем растворялась.
           position: "absolute", left: 0, right: 0, top: 0, height: 34, zIndex: 4, pointerEvents: "none",
-          // Почти прозрачная: гасим подложку чуть-чуть, только чтобы
-          // белый текст не разгорался под размытием.
-          backdropFilter: "blur(14px) brightness(0.88)",
-          WebkitBackdropFilter: "blur(14px) brightness(0.88)",
-          WebkitMaskImage: "linear-gradient(180deg, #000 45%, transparent 100%)",
-          maskImage: "linear-gradient(180deg, #000 45%, transparent 100%)",
+          /* Заливка, а не размытие. Под стеклом белый текст не исчезал,
+             а расплывался в светящееся пятно: размытие делает букву
+             шире и ярче, а не тише. Градиент цвета подложки просто
+             уводит строку в фон. */
+          background: `linear-gradient(180deg, ${T.bg} 0%, ${hexA(T.bg, 0.92)} 45%, ${hexA(T.bg, 0)} 100%)`,
         }} />
         <div aria-hidden style={{
           // Нижний край размывается выше верхнего: там из-под капсулы
@@ -22126,11 +22117,7 @@ function mapTokenRow(row) {
           // высокая полоса лишняя: она заметно мылила то, что ещё не
           // дошло до капсулы.
           position: "absolute", left: 0, right: 0, bottom: 0, height: 44, zIndex: 4, pointerEvents: "none",
-          backdropFilter: "blur(14px) brightness(0.88)",
-          WebkitBackdropFilter: "blur(14px) brightness(0.88)",
-          background: "linear-gradient(0deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 100%)",
-          WebkitMaskImage: "linear-gradient(0deg, #000 55%, transparent 100%)",
-          maskImage: "linear-gradient(0deg, #000 55%, transparent 100%)",
+          background: `linear-gradient(0deg, ${T.bg} 0%, ${hexA(T.bg, 0.9)} 48%, ${hexA(T.bg, 0)} 100%)`,
         }} />
         {/* header with logo/wallet removed — content now starts right at the top.
             The bottom nav is an absolutely-positioned overlay (not a flex
