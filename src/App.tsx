@@ -18200,14 +18200,14 @@ function SettingsPanel({
         <div className="no-scrollbar" style={{ padding: "0 22px", paddingBottom: 22, overflowY: "auto", flex: 1, minHeight: 0 }}>
           {body}
         </div>
-        {/* Нижняя кромка растворяется: строка, уходящая за край панели,
-            обрывалась резко и читалась как обрезанная. */}
+        {/* Нижняя кромка растворяется заливкой, а не размытием.
+            Размытие здесь не работало: белый текст под ним не исчезал,
+            а расплывался в светящееся пятно — стекло поверх букв всегда
+            ярче самих букв. Градиент цвета панели просто уводит строку в
+            фон, и край выглядит концом страницы, а не грязью. */}
         <div aria-hidden style={{
-          position: "absolute", left: 0, right: 0, bottom: 0, height: 26, pointerEvents: "none",
-          backdropFilter: "blur(10px) brightness(0.9)",
-          WebkitBackdropFilter: "blur(10px) brightness(0.9)",
-          WebkitMaskImage: "linear-gradient(0deg, #000 45%, transparent 100%)",
-          maskImage: "linear-gradient(0deg, #000 45%, transparent 100%)",
+          position: "absolute", left: 0, right: 0, bottom: 0, height: 44, pointerEvents: "none",
+          background: `linear-gradient(180deg, ${hexA(T.surface, 0)} 0%, ${hexA(T.surface, 0.65)} 38%, ${hexA(T.surface, 0.94)} 72%, ${T.surface} 100%)`,
           borderBottomLeftRadius: 26, borderBottomRightRadius: 26,
         }} />
       </div>
