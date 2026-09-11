@@ -17942,7 +17942,11 @@ function SettingsPanel({
   const [тяга, setТяга] = useState(0);
   const [уходит, setУходит] = useState(false);
   const жест = useRef(null);
-  useEffect(() => { if (!itemProp) { setТяга(0); setУходит(false); } }, [itemProp]);
+  /* Сбрасываем на открытии, а не на закрытии. Панель живёт на экране
+     ещё четверть секунды после onClose (доигрывает уход), и сброс в тот
+     же миг возвращал её на место — она успевала мигнуть обратно и уйти
+     во второй раз. */
+  useLayoutEffect(() => { if (itemProp) { setТяга(0); setУходит(false); } }, [itemProp]);
 
   // Пока раздел открыт, вертикальный жест наш: иначе потягивание вниз
   // сворачивает всё окно Telegram вместо того, чтобы закрыть панель.
@@ -17955,7 +17959,7 @@ function SettingsPanel({
 
   const закрытьПанель = useCallback(() => {
     setУходит(true);
-    setTimeout(() => { setУходит(false); setТяга(0); onClose(); }, 220);
+    setTimeout(() => onClose(), 220);
   }, [onClose]);
 
   function прокрученныйПредокП(эл) {
