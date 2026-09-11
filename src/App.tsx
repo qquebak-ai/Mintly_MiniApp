@@ -3870,6 +3870,11 @@ async function loadCurveTrades(curveAddress, testnet, feeBps, priority = TON_PRI
 // Свечи из истории сделок. Пустые промежутки заполняются плоскими
 // свечами по последней цене: на кривой цена между сделками действительно
 // не меняется, поэтому это не выдумка, а честное отображение.
+/* Сколько свечей без единой сделки показываем подряд, прежде чем
+   выбросить остальные. Две: одной пауза не читается, а десяток — это
+   уже пустой экран вместо графика. */
+const ПУСТЫХ_СВЕЧЕЙ_ПОДРЯД = 2;
+
 function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL, rate = tonUsd(), запущен = 0) {
   const params = curveParamsOf(state);
   const now = Math.floor(Date.now() / 1000);
@@ -3988,7 +3993,31 @@ function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL,
     bucket += step;
   }
   if (!candles.length) return null;
-  return { candles: candles.slice(-limit), volume: volume.slice(-limit) };
+
+  /* Пустые промежутки сжимаем. У токена на кривой сделки редкие, а шаг
+     графика минутный: между двумя покупками набегают сотни свечей, в
+     которых не происходило ничего, и весь экран занимает прямая линия,
+     а сами сделки жмутся в одну точку у края. Из каждой такой череды
+     оставляем две свечи — паузу видно, — а остальные выбрасываем.
+     Последнюю оставляем всегда: это текущая цена. */
+  const сжатые = [];
+  const сжатыйОбъём = [];
+  let пустыхПодряд = 0;
+  for (let k = 0; k < candles.length; k++) {
+    const c = candles[k];
+    const v = volume[k];
+    const пусто = !(v.value > 0) && c.open === c.close && c.high === c.low;
+    if (пусто && k !== candles.length - 1) {
+      пустыхПодряд += 1;
+      if (пустыхПодряд > ПУСТЫХ_СВЕЧЕЙ_ПОДРЯД) continue;
+    } else {
+      пустыхПодряд = 0;
+    }
+    сжатые.push(c);
+    сжатыйОбъём.push(v);
+  }
+
+  return { candles: сжатые.slice(-limit), volume: сжатыйОбъём.slice(-limit) };
 }
 
 // Рыночные показатели токена на кривой — все из цепочки, ничего
