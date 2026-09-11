@@ -262,7 +262,7 @@ const STR = {
     tgAuthFailed: "Не удалось войти через Telegram. Попробуй ещё раз.",
     tgAuthNotConfigured: "Вход через Telegram пока не настроен на сервере.",
     bootStepAuth: "Вход в аккаунт", bootStepFeed: "Лента покупок",
-    bootStepTokens: "Токены сообщества", bootStepRate: "Курс TON",
+    bootStepTokens: "Токены сообщества", bootStepRate: "Курс GRAM",
     shopTabFrames: "Рамки", shopTabCards: "Карточки",
     shopEquip: "Надеть", shopEquipped: "Надето", shopOwned: "Куплено",
     editLookTitle: "Внешний вид", editLookHint: "Надень купленную рамку и карточку. Остальное — в магазине.",
@@ -350,7 +350,7 @@ const STR = {
     homeWelcomeSub: "Ты часть площадки. Создавай, торгуй, расти.",
     homeLive: "Онлайн",
     homeEcoTitle: "Площадка растёт",
-    homeEcoRaised: "TON в токенах",
+    homeEcoRaised: "GRAM в токенах",
     homeEcoDex: "на бирже",
     homeDoNow: "Что сделать сейчас",
     homeDoLaunchNote: "Свой токен за пару минут",
@@ -367,21 +367,21 @@ const STR = {
     sinceSec: "с", sinceMin: "м", sinceHour: "ч", mempadFilterNew: "Новые", mempadFilterTrend: "Трендовые", mempadFilterHot: "Горячие", mempadFilterSoon: "Скоро на бирже", mempadFilterVol: "По обороту", mempadFilterBluming: "В росте", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Создать токен", homeActionMempad: "Мемпад", homeActionProfile: "Профиль",
     feedTitle: "Прямо сейчас",
     feedSub: "Что происходит на площадке",
-    feedTrade: "{who} купил ${ticker} на {ton} TON",
+    feedTrade: "{who} купил ${ticker} на {ton} GRAM",
     feedLaunch: "{who} запустил ${ticker}",
     topTitle: "Топ",
     topTokens: "Токены",
     topCreators: "Создатели",
-    topRaised: "собрано {ton} TON",
+    topRaised: "собрано {ton} GRAM",
     topOnDex: "свободный рынок",
     topClosing: "торговля закрыта, переезд в пул",
-    topLaunched: "{n} токенов · {ton} TON",
+    topLaunched: "{n} токенов · {ton} GRAM",
     statLaunched24: "запусков за сутки",
-    statRaised: "TON в токенах",
+    statRaised: "GRAM в токенах",
     statGraduated: "вышли на биржу",
     homeAlmostTitle: "Почти на бирже",
     homeAlmostSub: "Ближе всех к выходу на DEX",
-    homeAlmostLeft: "осталось {left} TON",
+    homeAlmostLeft: "осталось {left} GRAM",
     homeAlmostEmpty: "Пока никто не набрал заметную часть пути. Запусти токен — будешь первым.",
     emptyFilter: "По этому фильтру пока пусто — попробуй другой или загляни позже.", catMemes: "Мемы", catUtility: "Утилиты", catGames: "Игры", catAI: "AI", catSocial: "Соц",
     linkCopied: "Ссылка скопирована",
@@ -399,11 +399,11 @@ const STR = {
     trustUnknown: "Нет данных: токен запущен до этой проверки",
     trustOfSupply: "% выпуска",
     gradTitle: "До листинга на бирже",
-    gradLeft: "осталось {left} TON",
+    gradLeft: "осталось {left} GRAM",
     gradDone: "Токен закрыта — токен уходит на биржу",
-    gradNote: "Когда в токене наберётся {target} TON, торговля здесь закроется. Собранные TON и оставшийся выпуск уйдут на кошелёк площадки — из них заводится пара на бирже.",
+    gradNote: "Когда в токене наберётся {target} GRAM, торговля здесь закроется. Собранные GRAM и оставшийся выпуск уйдут на кошелёк площадки — из них заводится пара на бирже.",
     gradClosedTitle: "Токен закрыта",
-    gradClosedBody: "Токен набрал {target} TON. Токен отработала, и всё собранное вместе с остатком выпуска переезжает в пул токена. Как только переезд закончится, торговля откроется снова — здесь же.",
+    gradClosedBody: "Токен набрал {target} GRAM. Токен отработала, и всё собранное вместе с остатком выпуска переезжает в пул токена. Как только переезд закончится, торговля откроется снова — здесь же.",
     gradListedTitle: "Свободный рынок",
     gradListedBody: "Токен отработала: теперь цена ходит вверх и вниз по резервам пула. Ликвидность заперта в контракте — вынуть её не может никто, поэтому продать можно в любой момент.",
     tabChart: "График", tabInfo: "Инфо", tabTx: "Транзакции", chartModePrice: "Цена", chartModeMcap: "Капитализация",
@@ -521,7 +521,7 @@ const STR = {
     refPerFriend: "За каждого друга",
     refEarned: "Заработано монет",
     refVolume: "Оборот друзей",
-    refShareNote: "С каждого TON, который наторговали приглашённые, тебе идёт 10 монет — доля с комиссии площадки. Монетами, не в TON: комиссию удерживает контракт в цепочке, и поделить её там нельзя.",
+    refShareNote: "С каждого GRAM, который наторговали приглашённые, тебе идёт 10 монет — доля с комиссии площадки. Монетами, не в TON: комиссию удерживает контракт в цепочке, и поделить её там нельзя.",
     refPayoutCta: "Забрать долю",
     refPayoutGot: "Начислено {n} монет",
     shareCardTitle: "Карточка токена",
@@ -675,8 +675,8 @@ const STR = {
     solDone: "Сделка ушла в сеть",
     solSent: "Отправлено",
     solFailed: "Не вышло",
-    rateLoadingRetry: "Курс TON ещё загружается, попробуй через секунду",
-    insufficientTon: "Не хватает TON: на кошельке {have}, нужно {need} с газом",
+    rateLoadingRetry: "Курс GRAM ещё загружается, попробуй через секунду",
+    insufficientTon: "Не хватает GRAM: на кошельке {have}, нужно {need} с газом",
     tokenSaveFailed: "Токен создан в сети, но не сохранился: {reason}. Попробуем ещё раз при следующем запуске.",
     tokenSaveRecovered: "Токен ${ticker} дописан в приложение",
     openingWallet: "Открываем кошелёк…",
@@ -916,21 +916,21 @@ const STR = {
     sinceSec: "s", sinceMin: "m", sinceHour: "h", mempadFilterNew: "New", mempadFilterTrend: "Trending", mempadFilterHot: "Hot", mempadFilterSoon: "Almost listed", mempadFilterVol: "By volume", mempadFilterBluming: "Bluming", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Launch token", homeActionMempad: "Mempad", homeActionProfile: "Profile",
     feedTitle: "Right now",
     feedSub: "What's happening here",
-    feedTrade: "{who} bought ${ticker} for {ton} TON",
+    feedTrade: "{who} bought ${ticker} for {ton} GRAM",
     feedLaunch: "{who} launched ${ticker}",
     topTitle: "Top",
     topTokens: "Tokens",
     topCreators: "Creators",
-    topRaised: "{ton} TON raised",
+    topRaised: "{ton} GRAM raised",
     topOnDex: "free market",
     topClosing: "curve closed, moving to the pool",
-    topLaunched: "{n} tokens · {ton} TON",
+    topLaunched: "{n} tokens · {ton} GRAM",
     statLaunched24: "launches today",
     statRaised: "TON in tokens",
     statGraduated: "reached a DEX",
     homeAlmostTitle: "Almost listed",
     homeAlmostSub: "Closest to hitting a DEX",
-    homeAlmostLeft: "{left} TON to go",
+    homeAlmostLeft: "{left} GRAM to go",
     homeAlmostEmpty: "Nobody is far along yet. Launch a token and be the first.",
     emptyFilter: "Nothing here for this filter yet — try another or check back later.", catMemes: "Memes", catUtility: "Utility", catGames: "Games", catAI: "AI", catSocial: "Social",
     linkCopied: "Link copied",
@@ -948,11 +948,11 @@ const STR = {
     trustUnknown: "No data: launched before this check existed",
     trustOfSupply: "% of supply",
     gradTitle: "Until the exchange listing",
-    gradLeft: "{left} TON to go",
+    gradLeft: "{left} GRAM to go",
     gradDone: "Curve closed — the token is heading to an exchange",
-    gradNote: "Once the curve holds {target} TON, trading here closes. The collected TON and the remaining supply go to the platform wallet — the exchange pair is created from them.",
+    gradNote: "Once the curve holds {target} GRAM, trading here closes. The collected GRAM and the remaining supply go to the platform wallet — the exchange pair is created from them.",
     gradClosedTitle: "Curve closed",
-    gradClosedBody: "The token reached {target} TON. The curve is done, and everything it collected — plus the unsold supply — is moving into the token's own pool. Trading reopens right here once it lands.",
+    gradClosedBody: "The token reached {target} GRAM. The curve is done, and everything it collected — plus the unsold supply — is moving into the token's own pool. Trading reopens right here once it lands.",
     gradListedTitle: "Free market",
     gradListedBody: "The curve is done: the price now moves both ways with the pool's reserves. The liquidity is locked in the contract and nobody can pull it out, so you can always sell.",
     tabChart: "Chart", tabInfo: "Info", tabTx: "Transactions", chartModePrice: "Price", chartModeMcap: "Market cap",
@@ -4285,6 +4285,11 @@ async function fetchSparkCloses(poolAddress, n = 24, jettonAddress = null) {
    человек ищет глазами знакомый голубой, а не очередную фиолетовую
    кнопку приложения. Тот же цвет носит и кнопка кошелька Solana —
    обе про одно и то же действие, и разными их делает только подпись. */
+/* Как монета сети TON называется в интерфейсе. Toncoin переименован в
+   Gram (голосование сообщества, лето 2026), тикер сменился с TON на
+   GRAM — числа и балансы подписываем им, а сама сеть по-прежнему TON и
+   в текстах о ней остаётся собой. */
+const ТИКЕР_TON = "GRAM";
 const ЦВЕТ_TON = "#0098EA";
 // Фиолетовый Solana — та же мысль, что и с голубым TON: кнопка носит
 // цвет своей сети.
@@ -5447,7 +5452,7 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
             // SOL стоит сотни долларов, поэтому обычная сделка на доллар —
             // это тысячные доли монеты. Прежние три знака округляли их в
             // ноль, и лента писала «купил 0 SOL».
-            return `${fmtCoin(сумма)} ${соло ? "SOL" : "TON"}`;
+            return `${fmtCoin(сумма)} ${соло ? "SOL" : ТИКЕР_TON}`;
           })()}
         </span>
         <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700, flex: 1 }}>${b.token.ticker}</span>
@@ -7555,7 +7560,7 @@ function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false }) {
       </div>
       <div className="flex items-center justify-between" style={{ marginTop: 7 }}>
         <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 12 }}>
-          {fmtTon(raisedTon)} / {fmtTon(targetTon)} TON
+          {fmtTon(raisedTon)} / {fmtTon(targetTon)} {ТИКЕР_TON}
         </span>
         {!done && (
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>{trf("gradLeft", { left: fmtTon(left) })}</span>
@@ -9271,7 +9276,7 @@ function ЗнакSOL({ size = 26, color }) {
 
 function ВступлениеСети({ активен }) {
   const монеты = [
-    { подпись: "TON", цвет: T.electric, сдвиг: -48, Знак: ЗнакTON },
+    { подпись: ТИКЕР_TON, цвет: T.electric, сдвиг: -48, Знак: ЗнакTON },
     { подпись: "SOL", цвет: T.up, сдвиг: 48, Знак: ЗнакSOL },
   ];
   return (
@@ -10869,7 +10874,7 @@ function NetworkSlider({ value, onChange, ширина = 168, высота = 38 
           transition: сдвиг == null ? `transform 220ms cubic-bezier(0.32,1.2,0.5,1)` : "none",
         }}
       />
-      {[["ton", "TON", "#31A6F5"], ["sol", "SOL", "#9945FF"]].map(([id, подпись, цвет], i) => {
+      {[["ton", ТИКЕР_TON, "#31A6F5"], ["sol", "SOL", "#9945FF"]].map(([id, подпись, цвет], i) => {
         // Подпись светлеет по мере подхода ползунка, а не скачком в
         // момент отпускания: иначе при перетаскивании ничего не
         // происходит до самого конца.
@@ -11451,7 +11456,7 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
                 Пока его нет, капитализация равна нулю — показываем то,
                 что известно и без него: собранное кривой. */}
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
-              {tok.mcapNum > 0 ? fmtUSD(tok.mcapNum) : `${fmtTon(tok.raisedTon || 0)} TON`}
+              {tok.mcapNum > 0 ? fmtUSD(tok.mcapNum) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`}
             </div>
             <div style={{ fontFamily: monoFont, color: растёт ? T.up : T.down, fontSize: 12.5, marginTop: 2 }}>
               {растёт ? "+" : ""}{(tok.change || 0).toFixed(1)}%
@@ -11586,7 +11591,7 @@ function ВДвижении({ tokens = [], onOpen, onAll }) {
               <div className="flex-1 min-w-0">
                 <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>${tok.ticker}</div>
                 <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 12, marginTop: 2 }}>
-                  {tok.mcapNum > 0 ? fmtUSD(tok.mcapNum) : `${fmtTon(tok.raisedTon || 0)} TON`}
+                  {tok.mcapNum > 0 ? fmtUSD(tok.mcapNum) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`}
                 </div>
               </div>
               <MiniChart
@@ -12240,7 +12245,7 @@ function МояАктивность({ userId, тик = 0 }) {
                   {покупка ? t("tickerBought") : t("tickerSold")} ${String(с.ticker || "?").toUpperCase()}
                 </span>
                 <span style={{ fontFamily: monoFont, fontSize: 12.5, color: покупка ? T.up : T.down, whiteSpace: "nowrap" }}>
-                  {fmtCoin(Number(с.ton_amount) || 0)} TON
+                  {fmtCoin(Number(с.ton_amount) || 0)} {ТИКЕР_TON}
                 </span>
                 <span style={{ fontFamily: monoFont, fontSize: 11.5, color: T.faint, whiteSpace: "nowrap" }}>
                   {fmtSince(с.created_at)}
@@ -12859,7 +12864,16 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
                 background: T.surfaceHi, border: `4px solid ${T.surfaceHi}`,
               }}
             >
-              <img src="/coins/sol.png" alt="" width={44} height={44} style={{ width: 44, height: 44, borderRadius: 12, display: "block" }} />
+              {/* Значок именно той сети, чей адрес в коде. Раньше здесь
+                  стоял Solana всегда, и над адресом TON висел чужой
+                  знак — самая дорогая ошибка из возможных. */}
+              <img
+                src={сеть === "Solana" ? "/coins/sol.png" : "/coins/gram.svg"}
+                alt=""
+                width={44}
+                height={44}
+                style={{ width: 44, height: 44, borderRadius: 12, display: "block" }}
+              />
             </span>
           )}
         </div>
@@ -13576,7 +13590,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const солНаКошельке = внутр && !внутр.нуженВход && !внутр.ошибка ? Number(внутр.sol) || 0 : 0;
   const наКошельке = вTON ? (годен ? Number(текущий.ton) || 0 : 0) : солНаКошельке;
   const курсСети = вTON ? tonPriceUsd : курсSol;
-  const единица = вTON ? "TON" : "SOL";
+  const единица = вTON ? ТИКЕР_TON : "SOL";
   const адресВнутри = текущий && текущий.address ? текущий.address : "";
   const balance = useCountUp(наКошельке, 900, !!адресВнутри);
   const usd = useCountUp(наКошельке * курсСети, 900, !!адресВнутри);
@@ -13682,7 +13696,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
               нём две, и держать их на разных экранах — значит заставлять
               человека помнить, где что лежит. */}
           <span className="flex items-center" style={{ gap: 2, padding: 3, borderRadius: 999, background: hexA("#000000", 0.22) }}>
-            {[["sol", "SOL"], ["ton", "TON"]].map(([id, подпись]) => (
+            {[["sol", "SOL"], ["ton", ТИКЕР_TON]].map(([id, подпись]) => (
               <button
                 key={id}
                 onClick={(e) => { e.stopPropagation(); setСетьКошелька(id); haptic("light"); }}
@@ -13823,7 +13837,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         открыт={получитьОткрыт}
         onClose={() => setПолучитьОткрыт(false)}
         адрес={адресВнутри}
-        сеть={вTON ? "TON" : "Solana"}
+        сеть={вTON ? ТИКЕР_TON : "Solana"}
         showToast={showToast}
         insetTop={insetTop}
         insetBottom={insetBottom}
@@ -15705,7 +15719,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // прямо ввести человека в заблуждение. Объявлено до первого
   // использования — ниже на него смотрят и предел суммы, и подписи.
   const соло = token.chain === "solana";
-  const монета = соло ? "SOL" : "TON";
+  const монета = соло ? "SOL" : ТИКЕР_TON;
 
   // Покупка теперь считается в TON, а не в долларах: пользователь вводит
   // сумму в TON, и она напрямую ограничена доступным балансом кошелька.
@@ -15821,7 +15835,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
                   ? `${(solДоступно || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} SOL`
                   : `${solБаланс.token.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${token.ticker}`)
               : isBuy
-                ? `${spendableTon.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} TON`
+                ? `${spendableTon.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${ТИКЕР_TON}`
                 : balanceKnown ? `${holdingTokens.toLocaleString("ru-RU")} ${token.ticker}` : "…"}
           </span>
         </div>
@@ -16264,7 +16278,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
             <div className="flex items-center justify-between rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: "none" }}>
               <span style={{ fontFamily: bodyFont, fontSize: 12, color: T.muted }}>{t("initialBuy")}</span>
               <span style={{ fontFamily: monoFont, fontSize: 13, color: T.ice, textAlign: "right" }}>
-                {result.buyAmount} {result.chain === "solana" ? "SOL" : "TON"}<br />
+                {result.buyAmount} {result.chain === "solana" ? "SOL" : ТИКЕР_TON}<br />
                 <span style={{ fontSize: 11.5, color: T.muted }}>
                   {(Number(result.buyTokens) || 0).toLocaleString("ru-RU")} ${result.ticker} · {(Number(result.buyPct) || 0).toFixed((Number(result.buyPct) || 0) < 1 ? 3 : 1)}%
                 </span>
@@ -16575,7 +16589,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
     if (минимумНужен && rate > 0) {
       const минимум = MIN_LAUNCH_USD / rate;
       if (buyNum * rate < MIN_LAUNCH_USD) {
-        showToast(trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: минимум.toFixed(вSolana ? 3 : 2), unit: вSolana ? "SOL" : "TON" }));
+        showToast(trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: минимум.toFixed(вSolana ? 3 : 2), unit: вSolana ? "SOL" : ТИКЕР_TON }));
         return;
       }
     }
@@ -16700,7 +16714,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
 
       <div className="flex flex-col gap-1.5">
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
-          {t("launchAmountLabel")} ({вSolana ? "SOL" : "TON"})
+          {t("launchAmountLabel")} ({вSolana ? "SOL" : ТИКЕР_TON})
         </span>
         <div className="flex items-center gap-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surface, border: `1px solid ${touched && (вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED) && (вSolana ? solUsd() : tonUsd()) > 0 && !(parseFloat(form.buyAmount.replace(",", ".")) * (вSolana ? solUsd() : tonUsd()) >= MIN_LAUNCH_USD) ? T.down : T.line}` }}>
           <input
@@ -16717,7 +16731,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             // текста.
             style={{ fontFamily: displayFont, fontWeight: 700, color: T.ice, fontSize: 17.5, lineHeight: "20px", height: 20, background: "transparent", border: "none", outline: "none", flex: 1, minWidth: 0, padding: 0 }}
           />
-          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 14.5 }}>{вSolana ? "SOL" : "TON"}</span>
+          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 14.5 }}>{вSolana ? "SOL" : ТИКЕР_TON}</span>
         </div>
         <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.5, marginTop: 6 }}>
           {t("initialBuyHint")}
@@ -16737,7 +16751,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           if (минимумНужен && rate > 0 && buyNum * rate < MIN_LAUNCH_USD) {
             return (
               <p style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, lineHeight: 1.5 }}>
-                {trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: minBuyTon.toFixed(вSolana ? 3 : 2), unit: вSolana ? "SOL" : "TON" })}
+                {trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: minBuyTon.toFixed(вSolana ? 3 : 2), unit: вSolana ? "SOL" : ТИКЕР_TON })}
               </p>
             );
           }
@@ -21495,7 +21509,7 @@ function mapTokenRow(row) {
     // равно решит кривая в момент исполнения.
     const оценка = (tokensForTon(сумма) || {}).tokens || 0;
     try {
-      await confirmTrade("buy", String(сумма), String(оценка), "TON", сумма, оценка);
+      await confirmTrade("buy", String(сумма), String(оценка), ТИКЕР_TON, сумма, оценка);
     } finally {
       setСразуВКошелёк(false);
       // Пришли из чата ровно за подписью — делать в приложении больше

@@ -1,0 +1,23 @@
+import { chromium } from "playwright-core";
+const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+const p = await b.newPage({ viewport: { width: 420, height: 860 }, deviceScaleFactor: 2 });
+const errs = []; p.on("pageerror", e => errs.push(String(e)));
+await p.route("**tonapi.io/**", r => r.fulfill({ status:200, contentType:"application/json", headers:{"access-control-allow-origin":"*"}, body:"{}" }));
+await p.route("**supabase.co/**", r => r.fulfill({ status:200, contentType:"application/json", headers:{"access-control-allow-origin":"*"}, body:"[]" }));
+await p.addInitScript(() => { window.Telegram = { WebApp: { initData:"", initDataUnsafe:{user:{id:1,first_name:"T"}}, ready(){}, expand(){}, colorScheme:"dark", themeParams:{}, onEvent(){}, offEvent(){}, HapticFeedback:{impactOccurred(){},notificationOccurred(){},selectionChanged(){}}, MainButton:{show(){},hide(){},setParams(){},onClick(){}}, BackButton:{show(){},hide(){},onClick(){},offClick(){}} } }; });
+await p.goto("http://localhost:4180/", { waitUntil: "domcontentloaded" });
+await p.waitForTimeout(7000);
+await p.getByText("Продолжить без входа").first().click({ force: true }).catch(()=>{});
+await p.waitForTimeout(3000);
+await p.getByRole("button", { name: /Кошелёк/ }).last().click({ force: true });
+await p.waitForTimeout(2500);
+// переключить сеть на TON и открыть «Получить»
+await p.evaluate(() => { const b=[...document.querySelectorAll("button")].find(x=>x.innerText.trim()==="GRAM"); if(b) b.click(); });
+await p.waitForTimeout(800);
+await p.getByText("Получить", { exact: true }).first().click({ force: true }).catch(()=>console.log("нет Получить"));
+await p.waitForTimeout(2500);
+console.log("экран:", (await p.evaluate(() => document.body.innerText.slice(0, 200))).replace(/\n/g, " | "));
+console.log("значок:", await p.evaluate(() => [...document.querySelectorAll("img")].map(i=>i.getAttribute("src")).filter(s=>s&&s.includes("coins")).join(",")));
+await p.screenshot({ path: "/tmp/claude-0/-home-user-Facet-MiniApp/fac25f77-d2c0-52a4-9022-6fae6c8df13b/scratchpad/recv.png" });
+console.log("ERRORS:", errs.slice(0,3));
+await b.close();
