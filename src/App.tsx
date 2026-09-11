@@ -410,8 +410,15 @@ const STR = {
     tabHolders: "Держатели", tabFeed: "Лента", tabAbout: "О токене", tabStats: "Статистика", statMcap: "Капитализация", statLiq: "Ликвидность", statVol24: "Объём за сутки", statTrades24: "Сделок за сутки", statAge: "Возраст", statCurve: "Токен собрана", statDex: "Биржа",
     positionTitle: "Ваша позиция", positionValue: "Стоимость", positionAmount: "Количество",
     positionChange24: "За 24 часа", positionEmpty: "Токенов пока нет",
-    thesisAdd: "Добавить тезис", thesisHint: "Зачем взял и когда выйдешь — заметка видна только тебе",
-    thesisSave: "Сохранить", thesisPlaceholder: "Например: держу до листинга на бирже",
+    chatTitle: "Чат токена",
+    chatModeAll: "Всем", chatModeHolders: "Держателям",
+    chatOnlyHolders: "только держателям",
+    chatOnlyHoldersWrite: "Пишут только держатели",
+    chatLockedBody: "Создатель открыл чат только держателям. Купи токен — и заходи.",
+    chatEmpty: "Пока тихо. Скажи первое слово.",
+    chatPlaceholder: "Написать…",
+    chatSomeone: "Без имени",
+    chatModeFailed: "Не вышло сменить доступ",
     unverifiedToken: "Токен не проверен",
     holdersEmpty: "Держателей пока не видно", holdersTop: "Крупнейшие",
     holdersShare: "доля",
@@ -969,8 +976,15 @@ const STR = {
     tabHolders: "Holders", tabFeed: "Feed", tabAbout: "About",
     positionTitle: "Your position", positionValue: "Value", positionAmount: "Amount",
     positionChange24: "24h change", positionEmpty: "No tokens yet",
-    thesisAdd: "Add thesis", thesisHint: "Why you bought and when you exit — only you see this note",
-    thesisSave: "Save", thesisPlaceholder: "E.g. holding until it lists on a DEX",
+    chatTitle: "Token chat",
+    chatModeAll: "Everyone", chatModeHolders: "Holders",
+    chatOnlyHolders: "holders only",
+    chatOnlyHoldersWrite: "Holders only can write",
+    chatLockedBody: "The creator opened this chat to holders only. Buy the token to join.",
+    chatEmpty: "Quiet here. Say the first word.",
+    chatPlaceholder: "Message…",
+    chatSomeone: "No name",
+    chatModeFailed: "Could not change access",
     unverifiedToken: "Unverified token",
     holdersEmpty: "No holders visible yet", holdersTop: "Largest",
     holdersShare: "share",
@@ -14141,24 +14155,192 @@ function useТопДержателей(token, открыто) {
   return список;
 }
 
-/* Заметка о токене («тезис»). Живёт в телефоне: это личная мысль о
-   сделке, а не публичные данные — отправлять её на сервер незачем. */
-function useТезис(tokenId) {
-  const ключ = `mintly.thesis.${tokenId || ""}`;
-  const [текст, setТекст] = useState("");
-  useEffect(() => {
-    try { setТекст((typeof window !== "undefined" && window.localStorage.getItem(ключ)) || ""); }
-    catch { setТекст(""); }
-  }, [ключ]);
-  const сохранить = useCallback((значение) => {
-    setТекст(значение);
+/* Чат токена.
+ *
+ * Кто в нём говорит, решает создатель: «всем» или «только держателям».
+ * Проверку владения делает сервер (api/token-chat.js) — баланс лежит в
+ * цепочке, и ответ браузера «я держатель» ничего не стоит; отсюда и все
+ * запросы идут туда, а не прямо в базу.
+ *
+ * Обновление опросом раз в пять секунд. Живое подключение здесь лишнее:
+ * карточка открыта недолго, а сообщений в минуту — единицы.
+ */
+function ЧатТокена({ tokenId, свой = false, currentUserId, onNeedAuth, showToast }) {
+  const [состояние, setСостояние] = useState(null);
+  const [сообщения, setСообщения] = useState([]);
+  const [черновик, setЧерновик] = useState("");
+  const [шлём, setШлём] = useState(false);
+  const лента = useRef(null);
+
+  const загрузить = useCallback(async () => {
+    if (!tokenId) return;
     try {
-      if (typeof window === "undefined") return;
-      if (значение.trim()) window.localStorage.setItem(ключ, значение);
-      else window.localStorage.removeItem(ключ);
-    } catch { /* приватный режим */ }
-  }, [ключ]);
-  return [текст, сохранить];
+      const { данные } = await запросЧата(`/api/token-chat?action=list&token=${tokenId}`);
+      if (!данные) return;
+      setСостояние({ mode: данные.mode, canWrite: данные.canWrite, canRead: данные.canRead });
+      setСообщения(данные.messages || []);
+    } catch { /* сеть моргнула — покажем, что было */ }
+  }, [tokenId]);
+
+  useEffect(() => {
+    let жив = true;
+    const шаг = () => { if (жив) загрузить(); };
+    шаг();
+    const id = setInterval(шаг, 5000);
+    return () => { жив = false; clearInterval(id); };
+  }, [загрузить, currentUserId]);
+
+  // Новое сообщение — вниз, к последнему: так чат и читают.
+  useEffect(() => {
+    const эл = лента.current;
+    if (эл) эл.scrollTop = эл.scrollHeight;
+  }, [сообщения.length]);
+
+  async function отправить() {
+    const текст = черновик.trim();
+    if (!текст || шлём) return;
+    if (!currentUserId) { onNeedAuth && onNeedAuth(); return; }
+    setШлём(true);
+    try {
+      const { данные, ошибка } = await запросЧата("/api/token-chat?action=send", { token: tokenId, body: текст });
+      if (!данные) throw new Error(ошибка || "не отправилось");
+      setЧерновик("");
+      await загрузить();
+    } catch (e) {
+      showToast && showToast(String((e && e.message) || e).slice(0, 90));
+    } finally {
+      setШлём(false);
+    }
+  }
+
+  async function сменитьРежим(режим) {
+    try {
+      const { данные } = await запросЧата("/api/token-chat?action=mode", { token: tokenId, mode: режим });
+      if (данные) { setСостояние((с) => ({ ...(с || {}), mode: данные.mode, canWrite: true })); загрузить(); }
+    } catch { showToast && showToast(t("chatModeFailed")); }
+  }
+
+  if (!состояние) return null;
+  const толькоДержателям = состояние.mode === "holders";
+
+  return (
+    <section style={{ borderRadius: 16, background: T.surface, padding: 14 }}>
+      <div className="flex items-center justify-between" style={{ gap: 10, marginBottom: 10 }}>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
+          {t("chatTitle")}
+        </span>
+        {свой ? (
+          /* Переключатель видит только создатель: это его решение, кому
+             открыт разговор под его токеном. */
+          <span className="flex items-center" style={{ gap: 2, padding: 3, borderRadius: 999, background: T.bg }}>
+            {[["all", t("chatModeAll")], ["holders", t("chatModeHolders")]].map(([ключ, подпись]) => (
+              <button
+                key={ключ}
+                onClick={() => сменитьРежим(ключ)}
+                className="fx-tap"
+                style={{
+                  padding: "5px 10px", borderRadius: 999, border: "none",
+                  background: состояние.mode === ключ ? T.surfaceHi : "transparent",
+                  color: состояние.mode === ключ ? T.ice : T.muted,
+                  fontFamily: displayFont, fontSize: 12, fontWeight: 700,
+                }}
+              >
+                {подпись}
+              </button>
+            ))}
+          </span>
+        ) : (
+          толькоДержателям && (
+            <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 11.5 }}>{t("chatOnlyHolders")}</span>
+          )
+        )}
+      </div>
+
+      {!состояние.canRead ? (
+        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
+          {t("chatLockedBody")}
+        </div>
+      ) : (
+        <>
+          <div
+            ref={лента}
+            className="no-scrollbar flex flex-col"
+            style={{ gap: 8, maxHeight: 240, overflowY: "auto", paddingRight: 2 }}
+          >
+            {sсообщенийНет(сообщения) ? (
+              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{t("chatEmpty")}</span>
+            ) : сообщения.map((м) => (
+              <div key={м.id} className="flex" style={{ gap: 8, flexDirection: м.mine ? "row-reverse" : "row" }}>
+                <span style={{
+                  width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                  background: м.avatarUrl ? `center/cover no-repeat url(${м.avatarUrl})` : T.surfaceHi,
+                }} />
+                <div style={{
+                  maxWidth: "78%", padding: "8px 11px", borderRadius: 14,
+                  background: м.mine ? hexA("#8E2DE2", 0.28) : T.surfaceHi,
+                }}>
+                  <div style={{ fontFamily: displayFont, color: T.faint, fontSize: 11, marginBottom: 2 }}>
+                    {м.nickname ? `@${м.nickname}` : t("chatSomeone")} · {fmtSince(м.createdAt)}
+                  </div>
+                  <div style={{ fontFamily: bodyFont, color: T.ice, fontSize: 13.5, lineHeight: 1.4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                    {м.body}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center" style={{ gap: 8, marginTop: 10 }}>
+            <input
+              value={черновик}
+              onChange={(e) => setЧерновик(e.target.value.slice(0, 400))}
+              onKeyDown={(e) => { if (e.key === "Enter") отправить(); }}
+              placeholder={состояние.canWrite ? t("chatPlaceholder") : t("chatOnlyHoldersWrite")}
+              disabled={!состояние.canWrite}
+              style={{
+                flex: 1, minWidth: 0, padding: "10px 12px", borderRadius: 14,
+                background: T.bg, border: "none", outline: "none",
+                fontFamily: bodyFont, fontSize: 15, color: T.ice,
+                opacity: состояние.canWrite ? 1 : 0.6,
+              }}
+            />
+            <button
+              onClick={отправить}
+              disabled={!состояние.canWrite || !черновик.trim() || шлём}
+              className={`fx-tap flex items-center justify-center${шлём ? " fx-busy" : ""}`}
+              style={{
+                width: 40, height: 40, borderRadius: "50%", flexShrink: 0, border: "none",
+                background: состояние.canWrite && черновик.trim() ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+                opacity: состояние.canWrite ? 1 : 0.6,
+              }}
+            >
+              <Send size={15} color={состояние.canWrite && черновик.trim() ? PRISM_TEXT : T.muted} />
+            </button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+const sсообщенийНет = (ряд) => !ряд || !ряд.length;
+
+/* Запрос к чату: подпись сессии в заголовке, разбор ответа — здесь же,
+   чтобы наверху остались только слова. */
+async function запросЧата(путь, тело) {
+  const { data } = await supabase.auth.getSession();
+  const токен = data && data.session ? data.session.access_token : null;
+  const res = await fetch(апи(путь), {
+    method: тело ? "POST" : "GET",
+    headers: {
+      ...(токен ? { Authorization: `Bearer ${токен}` } : {}),
+      ...(тело ? { "Content-Type": "application/json" } : {}),
+    },
+    body: тело ? JSON.stringify(тело) : undefined,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) return { данные: null, ошибка: (json && (json.error || json.detail)) || `ошибка ${res.status}` };
+  return { данные: json, ошибка: null };
 }
 
 /* Что создатель обещал при запуске.
@@ -14305,9 +14487,6 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   // считается стоимость позиции и её движение за сутки.
   const позиция = useПозиция(token, walletAddress);
   const топДержателей = useТопДержателей(token, tab === "holders");
-  const [тезис, сохранитьТезис] = useТезис(token.id);
-  const [тезисОткрыт, setТезисОткрыт] = useState(false);
-  const [черновикТезиса, setЧерновикТезиса] = useState("");
   // У токена на кривой жетон живёт в той же сети, что и приложение.
   // У токена на своей кривой один из жетонных кошельков — её
   // собственный, человеком он не является.
@@ -14999,43 +15178,16 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         )}
       </div>
 
-      {/* Тезис — личная заметка о сделке. Строка, а не карточка: пока
-          она пустая, ей незачем занимать место. */}
-      {тезисОткрыт ? (
-        <div className="fx-reveal flex flex-col" style={{ gap: 8 }}>
-          <textarea
-            value={черновикТезиса}
-            onChange={(e) => setЧерновикТезиса(e.target.value.slice(0, 280))}
-            placeholder={tr("thesisPlaceholder")}
-            rows={3}
-            style={{
-              width: "100%", resize: "none", padding: "10px 12px", borderRadius: 12,
-              background: T.surface, border: "none", outline: "none",
-              fontFamily: bodyFont, fontSize: 14, color: T.ice, lineHeight: 1.45,
-            }}
-          />
-          <div className="flex items-center justify-between">
-            <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 11.5 }}>{tr("thesisHint")}</span>
-            <button
-              onClick={() => { сохранитьТезис(черновикТезиса); setТезисОткрыт(false); }}
-              className="fx-tap rounded-[12px] px-3.5 py-1.5 flex-shrink-0"
-              style={{ background: T.surfaceHi, border: "none", fontFamily: displayFont, fontSize: 13, color: T.ice }}
-            >
-              {tr("thesisSave")}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => { setЧерновикТезиса(тезис); setТезисОткрыт(true); }}
-          className="fx-tap w-full flex items-center justify-between text-left"
-          style={{ gap: 10, padding: "11px 14px", borderRadius: 14, border: `1px dashed ${T.line}` }}
-        >
-          <span className="truncate" style={{ fontFamily: bodyFont, fontSize: 13.5, color: тезис ? T.paper : T.muted }}>
-            {тезис || tr("thesisAdd")}
-          </span>
-          <PlusCircle size={15} color={T.faint} style={{ flexShrink: 0 }} />
-        </button>
+      {/* Чат тех, кто в токене. Стоит сразу под позицией: разговор о
+          монете и есть то, ради чего в карточку возвращаются. */}
+      {token.id && (
+        <ЧатТокена
+          tokenId={token.id}
+          свой={!!onManage}
+          currentUserId={currentUserId}
+          onNeedAuth={onNeedAuth}
+          showToast={showToast}
+        />
       )}
 
       {/* Путь до биржи и её итог: у токенов на своей кривой это главное
