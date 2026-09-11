@@ -17935,6 +17935,70 @@ function SettingsPanel({
   // содержимое берём последнее — иначе на кадр уходило бы пустое.
   const [item, closing] = useClosing(itemProp);
 
+  /* Потягивание вниз закрывает раздел — тем же движением, что и
+     «Обмен» с «Получить». Жест берём только с нетронутой прокрутки:
+     если список внутри уже прокручен, палец листает его, а не тащит
+     панель. */
+  const [тяга, setТяга] = useState(0);
+  const [уходит, setУходит] = useState(false);
+  const жест = useRef(null);
+  useEffect(() => { if (!itemProp) { setТяга(0); setУходит(false); } }, [itemProp]);
+
+  // Пока раздел открыт, вертикальный жест наш: иначе потягивание вниз
+  // сворачивает всё окно Telegram вместо того, чтобы закрыть панель.
+  useEffect(() => {
+    if (!itemProp) return;
+    const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    if (!tg || !tg.disableVerticalSwipes) return;
+    try { tg.disableVerticalSwipes(); } catch { /* старый клиент */ }
+  }, [itemProp]);
+
+  const закрытьПанель = useCallback(() => {
+    setУходит(true);
+    setTimeout(() => { setУходит(false); setТяга(0); onClose(); }, 220);
+  }, [onClose]);
+
+  function прокрученныйПредокП(эл) {
+    for (let у = эл; у && у !== document.body; у = у.parentElement) {
+      const с = getComputedStyle(у);
+      if (/(auto|scroll)/.test(с.overflowY) && у.scrollTop > 2) return true;
+    }
+    return false;
+  }
+  function началоЖестаП(e) {
+    const т = e.touches && e.touches[0];
+    if (!т) return;
+    if (e.target instanceof Element && прокрученныйПредокП(e.target)) return;
+    жест.current = { y0: т.clientY, тянем: false };
+  }
+  function ходЖестаП(e) {
+    const ж = жест.current;
+    const т = e.touches && e.touches[0];
+    if (!ж || !т) return;
+    const dy = т.clientY - ж.y0;
+    if (!ж.тянем && dy < 8) return;
+    ж.тянем = true;
+    const ход = Math.max(0, dy);
+    setТяга(ход);
+    ж.путь = ход;
+    const т1 = performance.now();
+    if (ж.т0) ж.скорость = (ход - (ж.прошлый || 0)) / Math.max(1, т1 - ж.т0);
+    ж.т0 = т1;
+    ж.прошлый = ход;
+  }
+  function конецЖестаП() {
+    const ж = жест.current;
+    жест.current = null;
+    if (!ж || !ж.тянем) return;
+    const высота = typeof window !== "undefined" ? window.innerHeight : 800;
+    if ((ж.путь || 0) > высота * 0.18 || ((ж.скорость || 0) > 0.55 && (ж.путь || 0) > 40)) {
+      haptic("light");
+      закрытьПанель();
+      return;
+    }
+    setТяга(0);
+  }
+
   if (!item) return null;
   const Icon = item.icon;
 
@@ -18164,8 +18228,16 @@ function SettingsPanel({
     <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "fixed", inset: 0, zIndex: 460, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: `0 12px ${insetBottom + 14}px` }} onClick={onClose}>
       <div
         className="fx-modal-card"
+        data-sheet="1"
         onClick={(e) => e.stopPropagation()}
+        onTouchStart={началоЖестаП}
+        onTouchMove={ходЖестаП}
+        onTouchEnd={конецЖестаП}
+        onTouchCancel={конецЖестаП}
         style={{
+          transform: уходит ? "translateY(110%)" : `translateY(${тяга}px)`,
+          transition: жест.current ? "none" : "transform 240ms cubic-bezier(0.22, 1, 0.36, 1)",
+          touchAction: "pan-y",
           width: "100%", maxWidth: 440, background: T.surface, border: "none", borderRadius: 26,
           // Считаем от окна приложения, а не от vh: внутри Telegram высота
           // окна меньше высоты браузерного экрана, и 88vh вылезали за край.
