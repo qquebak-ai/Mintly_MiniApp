@@ -4215,7 +4215,10 @@ const сделкиSolКеш = new Map(); // tokenId -> { ряд, ts }
 async function сделкиSolИзКеша(tokenId) {
   if (!tokenId) return null;
   const было = сделкиSolКеш.get(tokenId);
-  if (было && Date.now() - было.ts < 20000) return было.ряд;
+  // Пять секунд, а не двадцать: график открытой карточки обновляется
+  // каждые две с половиной, и держать ряд сделок дольше — значит
+  // рисовать цену из состояния поверх вчерашних свечей.
+  if (было && Date.now() - было.ts < 5000) return было.ряд;
   const { data, error } = await supabase
     .from("curve_cache")
     .select("trades, updated_at")
@@ -14796,8 +14799,26 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         : { ...fresh, tf: reqTf, isLive: true }));
       setChartLoading(false);
     }
-    const iv = setInterval(refresh, 15000);
-    return () => { cancelled = true; clearInterval(iv); if (abort) abort.abort(); };
+    /* Своя кривая — свой темп. Её состояние читается у сети напрямую и
+       стоит один запрос, поэтому график живёт почти в реальном времени:
+       цена дышит через пару секунд после чужой сделки, а не через
+       четверть минуты. Биржевые свечи так часто спрашивать нельзя —
+       там общий лимит на всех. */
+    const шаг = (curveSol || curveChart) ? 2500 : 15000;
+    const iv = setInterval(refresh, шаг);
+    /* Своя сделка не ждёт круга вовсе: приложение говорит о ней сразу,
+       и график перерисовывается тем же движением, каким закрылось окно
+       покупки. */
+    const своя = (e) => {
+      if (!e || !e.detail || e.detail.tokenId === token.id) refresh();
+    };
+    if (typeof window !== "undefined") window.addEventListener("mintly:сделка", своя);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+      if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", своя);
+      if (abort) abort.abort();
+    };
   }, [token.id, token.poolAddress, token.curveAddress, curveChart, curveSol, tf, tonPriceUsd, курсSolДляГрафика, запущенВ]);
 
   // Real supply estimate (mcap / price) derived from the same live data —
@@ -20186,6 +20207,15 @@ function цепочкаПоАдресу(chain, address) {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(адрес) && !/^(EQ|UQ|kQ|0Q)/.test(адрес) ? "solana" : "ton";
 }
 
+/* Своя сделка прошла — сказать об этом всему приложению. Открытый
+   график ловит это событие и перерисовывается сразу, не дожидаясь
+   своего круга опроса. */
+function сообщитьОСделке(tokenId) {
+  if (typeof window === "undefined") return;
+  try { window.dispatchEvent(new CustomEvent("mintly:сделка", { detail: { tokenId } })); }
+  catch { /* старый движок — обойдёмся кругом опроса */ }
+}
+
 function mapTokenRow(row) {
     return {
       id: row.id,
@@ -22005,6 +22035,7 @@ function mapTokenRow(row) {
           mode === "buy" ? Number(rawEstimate) || 0 : rawAmount,
         );
         adjustHolding(token.id, mode === "buy" ? (Number(rawEstimate) || 0) : -rawAmount);
+        сообщитьОСделке(token.id);
         setTradeModal(null);
         showToast(подпись ? t("solDone") : t("solSent"));
         if (mode === "buy") отпраздновать();
@@ -22041,6 +22072,7 @@ function mapTokenRow(row) {
         await купитьВнутреннимTON({ tokenId: token.id, сумма: totalTon });
         adjustHolding(token.id, rawEstimate);
         recordTrade("buy", totalTon, rawEstimate);
+        сообщитьОСделке(token.id);
         setTradeModal(null);
         showToast(tf("boughtToast", { receive: receiveAmount, ticker: token.ticker, pay: payAmount, unit }));
         отпраздновать();
@@ -22071,6 +22103,7 @@ function mapTokenRow(row) {
         // Сколько TON вернулось — это оценка из окна, точную сумму знает
         // только сеть, а ждать её здесь нельзя.
         recordTrade("sell", tonPriceUsd > 0 ? (rawAmount * (token.price > 0 ? token.price : 0)) / tonPriceUsd : 0, rawAmount);
+        сообщитьОСделке(token.id);
         setTradeModal(null);
         showToast(tf("soldToast", { pay: payAmount, ticker: token.ticker, receive: receiveAmount, unit }));
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
