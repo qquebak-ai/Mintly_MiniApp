@@ -665,6 +665,7 @@ const STR = {
     solWalletTitle: "Кошелёк Solana",
     solWalletNote: "Нужен для мемкоинов Solana. TON-кошелёк остаётся на месте.",
     solWalletConnect: "Подключить",
+    solWalletConnectFull: "Подключить SOL-кошелёк",
     solWalletConnectFirst: "кошелёк не подключён",
     solWalletOpening: "Открываю…",
     solWalletLoading: "Считаю баланс…",
@@ -1213,6 +1214,7 @@ const STR = {
     solWalletTitle: "Solana wallet",
     solWalletNote: "For Solana memecoins. Your TON wallet stays as it is.",
     solWalletConnect: "Connect",
+    solWalletConnectFull: "Connect SOL wallet",
     solWalletConnectFirst: "wallet not connected",
     solWalletOpening: "Opening…",
     solWalletLoading: "Reading balance…",
@@ -4262,6 +4264,11 @@ async function fetchSparkCloses(poolAddress, n = 24, jettonAddress = null) {
    маленькая заливка на чёрном, и приглушённый тон на ней читается серым.
    Родство с палитрой сохранено: это те же мятный и розовый, только
    выведенные на полную яркость. */
+/* Голубой TON. Кнопка подключения кошелька красится в цвет самой сети:
+   человек ищет глазами знакомый голубой, а не очередную фиолетовую
+   кнопку приложения. Тот же цвет носит и кнопка кошелька Solana —
+   обе про одно и то же действие, и разными их делает только подпись. */
+const ЦВЕТ_TON = "#0098EA";
 const СВЕЧА_РОСТ = "#00E96B";
 const СВЕЧА_ПАДЕНИЕ = "#FF3B47";
 
@@ -12655,13 +12662,12 @@ function SolanaWalletCard({ showToast, insetTop = 0, insetBottom = 0 }) {
             disabled={идёт}
             className={`fx-tap flex items-center gap-1.5 rounded-full flex-shrink-0${идёт ? " fx-busy" : ""}`}
             style={{
-              padding: "8px 14px", background: hexA(T.electric, 0.14),
-              border: `1px solid ${hexA(T.electric, 0.4)}`,
-              fontFamily: bodyFont, color: T.electric, fontSize: 13.5, fontWeight: 700,
+              padding: "9px 14px", background: ЦВЕТ_TON, border: "none",
+              fontFamily: displayFont, color: "#FFFFFF", fontSize: 13.5, fontWeight: 700,
               opacity: идёт ? 0.6 : 1,
             }}
           >
-            <Wallet size={13} /> {идёт ? t("solWalletOpening") : t("solWalletConnect")}
+            <Wallet size={13} /> {идёт ? t("solWalletOpening") : t("solWalletConnectFull")}
           </button>
         )}
       </div>
@@ -12733,21 +12739,31 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
     const т = e.touches && e.touches[0];
     if (!ж || !т) return;
     const dy = т.clientY - ж.y0;
-    if (!ж.тянем && dy < 12) return;
+    if (!ж.тянем && dy < 8) return;
     ж.тянем = true;
-    /* Лист идёт за пальцем с сопротивлением и недалеко: если тянуть его
-       один к одному, из-под него открывается полоса экрана, которой там
-       быть не должно — обрезанная карточка и пустота под ней. */
+    /* Лист идёт за пальцем один к одному. Раньше ход душился степенью и
+       упирался в девяносто шесть точек: страница чуть вздрагивала и
+       вставала, а закрытие всё равно решал порог — со стороны это и был
+       «свайпа нет». Полоски экрана под листом бояться нечего: за ним
+       лежит ровная подложка во весь экран. */
     const ход = Math.max(0, dy);
-    setТяга(Math.min(96, Math.pow(ход, 0.86)));
+    setТяга(ход);
     ж.путь = ход;
+    // Скорость нужна на отпускании: короткий быстрый смах закрывает так
+    // же, как долгое протягивание до половины экрана.
+    const т1 = performance.now();
+    if (ж.т0) ж.скорость = (ход - (ж.прошлый || 0)) / Math.max(1, т1 - ж.т0);
+    ж.т0 = т1;
+    ж.прошлый = ход;
   }
   function конецЖеста() {
     const ж = жест.current;
     жест.current = null;
     if (!ж || !ж.тянем) return;
-    const порог = typeof window !== "undefined" ? window.innerHeight * 0.18 : 140;
-    if ((ж.путь || 0) > порог) { haptic("light"); закрыть(); return; }
+    const высота = typeof window !== "undefined" ? window.innerHeight : 800;
+    const далеко = (ж.путь || 0) > высота * 0.22;
+    const быстро = (ж.скорость || 0) > 0.55 && (ж.путь || 0) > 40;
+    if (далеко || быстро) { haptic("light"); закрыть(); return; }
     setТяга(0);
   }
 
@@ -12784,6 +12800,9 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
         transform: уходит ? "translateY(100%)" : `translateY(${тяга}px)`,
         transition: жест.current ? "none" : "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
         borderTopLeftRadius: тяга > 0 ? 22 : 0, borderTopRightRadius: тяга > 0 ? 22 : 0,
+        // Пока лист тянут, уходящая из-под него подложка слегка гаснет —
+        // так видно, что страница закрывается, а не просто ездит.
+        opacity: тяга > 0 ? Math.max(0.75, 1 - тяга / 900) : 1,
         animation: уходит ? "none" : "обменВъезжает 300ms cubic-bezier(0.22, 1, 0.36, 1)",
         touchAction: "pan-y",
       }}
@@ -13857,7 +13876,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
               <button
                 onClick={onConnect}
                 className="fx-tap w-full flex items-center justify-center"
-                style={{ gap: 7, marginTop: 12, padding: "11px 14px", borderRadius: 14, background: ЦВЕТ_КНОПКИ, border: "none", color: PRISM_TEXT, fontFamily: displayFont, fontSize: 14, fontWeight: 700 }}
+                style={{ gap: 7, marginTop: 12, padding: "11px 14px", borderRadius: 14, background: ЦВЕТ_TON, border: "none", color: "#FFFFFF", fontFamily: displayFont, fontSize: 14, fontWeight: 700 }}
               >
                 <Wallet size={14} /> {t("connectWallet")}
               </button>
