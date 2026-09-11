@@ -4421,6 +4421,11 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     return count * 0.08;
   }
   const viewRef = useRef({ start: n - CHART_DEFAULT_VISIBLE * 0.5, count: CHART_DEFAULT_VISIBLE });
+  /* Текущее состояние живой свечи: куда дошло тело и как далеко успели
+     уйти тени. Держим в ref, а не в состоянии: это кадры, а не данные,
+     и перерисовка идёт через canvas. */
+  const живаяСвеча = useRef({ time: null, cur: null, hi: null, lo: null });
+  const кадрЖивой = useRef(null);
   // Трогали ли масштаб пальцами. Пока нет — окно держит свою длину даже
   // на короткой истории; после щипка длину выбирает человек.
   const зумРукой = useRef(false);
@@ -4660,6 +4665,32 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
   function draw() {
     const canvas = canvasRef.current;
     if (!canvas || !n || !widthPx) return;
+
+    /* Живая свеча растёт и падает на глазах, а не перепрыгивает.
+       Цена приходит скачком — сделка есть или её нет, — но свеча при
+       этом тянется к новому значению за несколько кадров и по дороге
+       раздвигает тени: пройденное остаётся фитилём, как на настоящем
+       графике. Свеча сменилась — отсчёт начинается заново. */
+    const посл = candles[n - 1];
+    const ж = живаяСвеча.current;
+    if (посл && Number.isFinite(посл.close)) {
+      if (ж.time !== посл.time || ж.cur == null) {
+        ж.time = посл.time;
+        ж.cur = посл.close;
+        ж.hi = посл.high;
+        ж.lo = посл.low;
+      } else {
+        const цель = посл.close;
+        const шаг = (цель - ж.cur) * 0.22;
+        ж.cur += шаг;
+        // Порог — доля от самой цены: у мемкоина она бывает в
+        // миллиардных долях, и абсолютный «почти ноль» не сработал бы
+        // никогда.
+        if (Math.abs(цель - ж.cur) <= Math.abs(цель) * 0.0008) ж.cur = цель;
+        ж.hi = Math.max(посл.high, ж.hi == null ? посл.high : ж.hi, ж.cur);
+        ж.lo = Math.min(посл.low, ж.lo == null ? посл.low : ж.lo, ж.cur);
+      }
+    }
     clampView();
     // Первый кадр задаёт размах окна: дальше от него и пляшем при
     // обновлениях, даже если человек ничего не трогал.
@@ -4737,7 +4768,12 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     // width so they stay readable at any zoom level. Plotted only within
     // plotW, so nothing ever draws underneath the price-axis gutter.
     for (let i = startI; i < endI; i++) {
-      const c = candles[i];
+      const сырая = candles[i];
+      // Последняя свеча рисуется по живому значению: телом она тянется
+      // к новой цене, а тени остаются там, докуда дошла.
+      const c = (i === n - 1 && ж.cur != null && сырая)
+        ? { ...сырая, close: ж.cur, high: ж.hi, low: ж.lo }
+        : сырая;
       if (!c) continue;
       if (![c.open, c.high, c.low, c.close].every(Number.isFinite)) continue;
       const x = xFor(i);
@@ -4776,7 +4812,9 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       ctx.lineCap = "butt";
     }
 
-    const lastCandle = Number.isFinite(candles[n - 1]?.close) ? candles[n - 1] : null;
+    const lastCandle = Number.isFinite(candles[n - 1]?.close)
+      ? (ж.cur != null ? { ...candles[n - 1], close: ж.cur, high: ж.hi, low: ж.lo } : candles[n - 1])
+      : null;
     let pillTop = null, pillBottom = null; // reserved zone so grid labels don't collide with the pill
 
     if (lastCandle) {
@@ -4937,6 +4975,12 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       if (кадрШкалы.current) cancelAnimationFrame(кадрШкалы.current);
       кадрШкалы.current = requestAnimationFrame(() => { кадрШкалы.current = null; draw(); });
     }
+
+    // То же и для свечи: пока тело не дошло до новой цены, просим кадр.
+    if (посл && ж.cur != null && ж.cur !== посл.close) {
+      if (кадрЖивой.current) cancelAnimationFrame(кадрЖивой.current);
+      кадрЖивой.current = requestAnimationFrame(() => { кадрЖивой.current = null; draw(); });
+    }
   }
 
   // Redraw on data refresh (live tick), resize, or theme swap — but this
@@ -4992,7 +5036,10 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
   }, [n, candles]);
 
   useEffect(() => { draw(); });
-  useEffect(() => () => { if (кадрШкалы.current) cancelAnimationFrame(кадрШкалы.current); }, []);
+  useEffect(() => () => {
+    if (кадрШкалы.current) cancelAnimationFrame(кадрШкалы.current);
+    if (кадрЖивой.current) cancelAnimationFrame(кадрЖивой.current);
+  }, []);
 
   // The bar-close countdown needs a redraw every second even when nothing
   // else about the data has changed, or it would just sit frozen.
