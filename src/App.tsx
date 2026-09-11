@@ -12170,7 +12170,7 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
  *
  * В профиле они лежали за лишним переходом, и человек, запустивший
  * токен, не видел его до тех пор, пока не вспомнит, где смотреть. */
-function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, onOpenToken, onOpenAchievements }) {
+function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, onOpenToken, onOpenAchievements, тик = 0 }) {
   const закрыто = achievements.filter((a) => a.done).length;
   return (
     <>
@@ -12193,7 +12193,7 @@ function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, 
         )}
       </section>
 
-      <МояАктивность userId={userId} />
+      <МояАктивность userId={userId} тик={тик} />
 
       <section>
         <SectionTitle>{t("achievementsTitle")}</SectionTitle>
@@ -12223,7 +12223,7 @@ function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, 
 
 /* Свои сделки. В профиле на этом месте стояла надпись «пока пусто» —
    она стояла там всегда, потому что данные никто не читал. */
-function МояАктивность({ userId }) {
+function МояАктивность({ userId, тик = 0 }) {
   const [ряд, setРяд] = useState(null);
 
   useEffect(() => {
@@ -12529,7 +12529,7 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
 function HomeView({
   onGoTab, onGoCreate, curveTokens = [], onOpenToken, onOpenProfile,
   profile = null, accountCreated = false, myTokens = [], achievements = [], userId = null,
-  onOpenMyProfile, onOpenAchievements, профильГрузится = false,
+  onOpenMyProfile, onOpenAchievements, профильГрузится = false, тик = 0,
 }) {
   // Главная — витрина площадки: сводка, токен дня, движение, топ. Монетам
   // из пробной сети там не место — их цена ничего не значит, а сводка по
@@ -12551,6 +12551,7 @@ function HomeView({
         onGoCreate={onGoCreate}
         onOpenToken={onOpenToken}
         onOpenAchievements={onOpenAchievements}
+        тик={тик}
       />
       <ГлавныйТокен tokens={боевые} onOpen={onOpenToken} />
       <ВДвижении tokens={боевые} onOpen={onOpenToken} onAll={() => onGoTab("mempad")} />
@@ -22160,6 +22161,7 @@ function mapTokenRow(row) {
               profile={profile}
               accountCreated={accountCreated}
               профильГрузится={!authChecked}
+              тик={balanceRefreshTick}
               myTokens={myTokens}
               achievements={achievements}
               userId={userId}
