@@ -12395,10 +12395,33 @@ function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, 
 /* В какой монете считалась сделка. Отдельного поля для сети в записи
    нет, но адрес токена сам о ней говорит: в TON он начинается с EQ или
    UQ, в Solana это base58 без такого начала. */
-function монетаСделки(адрес) {
-  const s = String(адрес || "");
-  if (!s) return ТИКЕР_TON;
-  return /^(EQ|UQ|kQ|0Q)/.test(s) ? ТИКЕР_TON : "SOL";
+function монетаСделки(с) {
+  const сеть = с && с.tokens && (Array.isArray(с.tokens) ? с.tokens[0] : с.tokens);
+  if (сеть && сеть.chain) return сеть.chain === "solana" ? "SOL" : ТИКЕР_TON;
+  const адрес = String((с && с.token_address) || "");
+  if (!адрес) return ТИКЕР_TON;
+  return /^(EQ|UQ|kQ|0Q)/.test(адрес) ? ТИКЕР_TON : "SOL";
+}
+
+/* Сделки с сетью токена. Сеть спрашиваем у самой записи о токене: у
+   старых сделок адрес не сохранялся, и по нему сеть было не узнать.
+   Если связь читать нельзя — берём без неё, лишь бы список не пропал. */
+async function сделкиСсетью(userId, предел) {
+  const поля = "id, ticker, side, ton_amount, token_amount, created_at, token_address";
+  const сЖивой = await supabase
+    .from("trades")
+    .select(`${поля}, tokens ( chain )`)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(предел);
+  if (!сЖивой.error) return сЖивой.data || [];
+  const без = await supabase
+    .from("trades")
+    .select(поля)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(предел);
+  return без.error ? [] : (без.data || []);
 }
 
 function МояАктивность({ userId, тик = 0 }) {
@@ -12407,13 +12430,7 @@ function МояАктивность({ userId, тик = 0 }) {
   useEffect(() => {
     if (!userId) { setРяд([]); return; }
     let брошено = false;
-    supabase
-      .from("trades")
-      .select("id, ticker, side, ton_amount, token_amount, created_at, token_address")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(5)
-      .then(({ data, error }) => { if (!брошено) setРяд(error ? [] : (data || [])); });
+    сделкиСсетью(userId, 5).then((ряд) => { if (!брошено) setРяд(ряд); });
     return () => { брошено = true; };
     // Тик меняется после каждой сделки и обмена: без него список
     // читался один раз за всё время жизни экрана, и после покупки в нём
@@ -12437,7 +12454,7 @@ function МояАктивность({ userId, тик = 0 }) {
                   {покупка ? t("tickerBought") : t("tickerSold")} ${String(с.ticker || "?").toUpperCase()}
                 </span>
                 <span style={{ fontFamily: monoFont, fontSize: 12.5, color: покупка ? T.up : T.down, whiteSpace: "nowrap" }}>
-                  {fmtCoin(Number(с.ton_amount) || 0)} {монетаСделки(с.token_address)}
+                  {fmtCoin(Number(с.ton_amount) || 0)} {монетаСделки(с)}
                 </span>
                 <span style={{ fontFamily: monoFont, fontSize: 11.5, color: T.faint, whiteSpace: "nowrap" }}>
                   {fmtSince(с.created_at)}
@@ -13649,13 +13666,7 @@ function ИсторияКошелька({ userId, тик = 0 }) {
   useEffect(() => {
     if (!userId) { setРяд([]); return; }
     let брошено = false;
-    supabase
-      .from("trades")
-      .select("id, ticker, side, ton_amount, token_amount, created_at, token_address")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(12)
-      .then(({ data, error }) => { if (!брошено) setРяд(error ? [] : (data || [])); });
+    сделкиСсетью(userId, 12).then((ряд) => { if (!брошено) setРяд(ряд); });
     return () => { брошено = true; };
   }, [userId]);
 
@@ -13704,7 +13715,7 @@ function ИсторияКошелька({ userId, тик = 0 }) {
                 </div>
                 <div style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>
                   {обмен ? "" : покупка ? "−" : "+"}{fmtCoin(Number(с.ton_amount) || 0)}
-                  {обмен ? "" : ` ${монетаСделки(с.token_address)}`}
+                  {обмен ? "" : ` ${монетаСделки(с)}`}
                 </div>
               </div>
             );
@@ -22022,7 +22033,10 @@ function mapTokenRow(row) {
     supabase.from("trades").insert({
       user_id: userId,
       token_id: token && token.id ? token.id : null,
-      token_address: token ? token.address : null,
+      // У токена из ленты адрес лежит в tokenAddress, у своего — в
+      // address. Раньше брали только второе, и у сделок в Solana адрес
+      // оставался пустым: история потом считала их сделками в TON.
+      token_address: token ? (token.tokenAddress || token.address || null) : null,
       ticker: token ? token.ticker : null,
       side,
       ton_amount: Number(tonAmount) || 0,
