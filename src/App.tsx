@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   Search, Flame, TrendingUp, Clock, Sparkles, ArrowUpRight, ArrowDownRight,
@@ -21306,6 +21306,23 @@ function mapTokenRow(row) {
   }, []);
 
   function goTab(name) { setTab(name); setView(name); }
+
+  /* Прокрутка у всего приложения одна, и при переходе она оставалась
+     там, где её бросили: открытый из середины главной токен показывался
+     сразу с середины — имя и цена уезжали под закреплённую полосу.
+     Теперь карточка токена всегда открывается сверху, а разделы
+     запоминают своё место и возвращаются на него. */
+  const прокруткаРазделов = useRef(new Map());
+  const прошлоеМесто = useRef(null);
+  useLayoutEffect(() => {
+    const к = typeof document !== "undefined" ? document.querySelector(".подложка") : null;
+    if (!к) return;
+    const ключ = view === "token" ? `token:${token ? token.id : ""}` : `${view}:${tab}`;
+    if (прошлоеМесто.current === ключ) return;
+    if (прошлоеМесто.current) прокруткаРазделов.current.set(прошлоеМесто.current, к.scrollTop);
+    к.scrollTop = view === "token" ? 0 : (прокруткаРазделов.current.get(ключ) || 0);
+    прошлоеМесто.current = ключ;
+  }, [view, tab, token && token.id]);
   // Создание — отдельная страница, а не вкладка: пункт из нижнего меню
   // убран, поэтому tab не трогаем — подсветка остаётся на том разделе,
   // откуда пришли, и «назад» возвращает туда же.
