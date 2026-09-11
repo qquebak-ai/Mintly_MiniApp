@@ -176,7 +176,10 @@ const ПОЛЯ = "user_id, address, secret_enc, key_id, payout_address, payout_p
    здесь и здесь же шифруется — в открытом виде он не покидает память
    обработчика. */
 async function кошелёк(db, user, набор) {
-  const { data } = await db.from("app_wallets").select(ПОЛЯ).eq("user_id", user.id).maybeSingle();
+  // Кошельков у человека теперь два — по одному на сеть, — поэтому
+  // всюду спрашиваем строку вместе с сетью: без этого запрос находил
+  // сразу обе и падал на «ожидалась одна строка».
+  const { data } = await db.from("app_wallets").select(ПОЛЯ).eq("user_id", user.id).eq("chain", "solana").maybeSingle();
   if (data) {
     if (читается(data, набор, user.id)) return data;
     // Ключ площадки сменили, а прежнего в APP_WALLET_KEY_OLD нет: строку
@@ -186,7 +189,7 @@ async function кошелёк(db, user, набор) {
     // такой кошелёк оставляем как есть, пусть ошибка будет громкой.
     const баланс = await rpc("getBalance", [data.address]).then((r) => Number(r && r.value)).catch(() => null);
     if (баланс !== 0) return data;
-    await db.from("app_wallets").delete().eq("user_id", user.id);
+    await db.from("app_wallets").delete().eq("user_id", user.id).eq("chain", "solana");
   }
 
   const { Keypair } = await библиотеки();
@@ -201,7 +204,7 @@ async function кошелёк(db, user, набор) {
   const { error } = await db.from("app_wallets").insert(строка);
   if (error) {
     // Уже завели параллельным запросом — читаем, что получилось.
-    const { data: снова } = await db.from("app_wallets").select(ПОЛЯ).eq("user_id", user.id).maybeSingle();
+    const { data: снова } = await db.from("app_wallets").select(ПОЛЯ).eq("user_id", user.id).eq("chain", "solana").maybeSingle();
     if (снова) return снова;
     throw new Error(error.message);
   }
@@ -307,7 +310,7 @@ async function подписатьТут(строка, base64, набор, user_i
   if (!свежий && db) {
     await db.from("app_wallets")
       .update({ secret_enc: зашифровать(Buffer.from(байты), набор.текущий, user_id), key_id: набор.метка })
-      .eq("user_id", user_id);
+      .eq("user_id", user_id).eq("chain", "solana");
   }
 
   const сырые = Buffer.from(base64, "base64");
@@ -391,7 +394,7 @@ async function закрытьКривые(db, набор) {
       if (!st || st.закрыта || st.solСобрано < st.solЦель) continue;
 
       const { data: строкаКошелька } = await db
-        .from("app_wallets").select(ПОЛЯ).eq("user_id", tok.owner_id).maybeSingle();
+        .from("app_wallets").select(ПОЛЯ).eq("user_id", tok.owner_id).eq("chain", "solana").maybeSingle();
       if (!строкаКошелька) continue;
       // На комиссию нужно совсем немного, но если и её нет — ждём: тот,
       // кто следующим будет торговать этим токеном, закроет кривую сам.
@@ -528,7 +531,7 @@ async function освежитьПривязку(db, строка) {
   if (!зрелый) return строка;
   await db.from("app_wallets")
     .update({ payout_address: зрелый, payout_pending: null, payout_pending_at: null })
-    .eq("user_id", строка.user_id);
+    .eq("user_id", строка.user_id).eq("chain", "solana");
   return { ...строка, payout_address: зрелый, payout_pending: null, payout_pending_at: null };
 }
 
@@ -554,6 +557,7 @@ async function свести(db, набор) {
   const { data } = await db
     .from("app_wallets")
     .select(ПОЛЯ)
+    .eq("chain", "solana")
     .not("sweep_above", "is", null)
     .not("payout_address", "is", null)
     .limit(50);

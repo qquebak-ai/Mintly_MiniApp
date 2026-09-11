@@ -83,6 +83,34 @@ export async function состояниеВнутреннего() {
   }
 }
 
+/* --- Тот же кошелёк, только в TON -------------------------------------
+ *
+ * Устроен так же: ключ рождается и живёт на сервере, браузер называет
+ * намерение. Отдельная пара функций, а не флаг у прежних, потому что
+ * сети ничего общего не имеют — ни адреса, ни единицы, ни обработчик.
+ */
+let включёнTON = null;
+export async function внутреннийTONДоступен() {
+  if (включёнTON !== null) return включёнTON;
+  try {
+    const j = await fetch(апи("/api/wallet-ton?action=enabled")).then((r) => r.json());
+    включёнTON = !!(j && j.enabled);
+  } catch {
+    включёнTON = false;
+  }
+  return включёнTON;
+}
+
+export async function состояниеВнутреннегоTON() {
+  if (!(await внутреннийTONДоступен())) return null;
+  if (!(await токен())) return { нуженВход: true };
+  try {
+    return await запрос("/api/wallet-ton?action=state");
+  } catch (e) {
+    return { ошибка: String((e && e.message) || e).slice(0, 120) };
+  }
+}
+
 /* --- Действия, которые тратят монеты ---------------------------------
    Все они называют серверу намерение, а не транзакцию. */
 

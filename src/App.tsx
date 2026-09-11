@@ -12880,7 +12880,7 @@ function черезПоле(текст) {
  * адрес кошелька — не то, что стоит отправлять чужому серверу ради
  * картинки.
  */
-function ЭкранПолучить({ открыт, onClose, адрес = "", showToast = () => {}, insetTop = 0, insetBottom = 0 }) {
+function ЭкранПолучить({ открыт, onClose, адрес = "", сеть = "Solana", showToast = () => {}, insetTop = 0, insetBottom = 0 }) {
   const [код, setКод] = useState(null);
   // Кнопка отвечает сама: подтверждение прямо на ней надёжнее всплывающей
   // подсказки — та живёт наверху экрана, а палец в этот момент внизу.
@@ -12975,7 +12975,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", sh
           style={{ gap: 8, background: "transparent", border: "none", padding: 0, maxWidth: "100%" }}
         >
           <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
-            Solana · <span style={{ color: T.muted }}>{короткий}</span>
+            {сеть} · <span style={{ color: T.muted }}>{короткий}</span>
           </span>
           <ChevronDown size={16} color={T.muted} />
         </button>
@@ -13639,10 +13639,18 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     setTimeout(() => setВолны((было) => было.filter((в) => в.id !== id)), 900);
   }
 
+  const [внутрTON, setВнутрTON] = useState(null);
+  /* Кошелёк у человека один, но живёт он в двух сетях сразу: у каждой
+     свой адрес, свои единицы и свой обработчик на сервере. Спрашиваем
+     оба разом и показываем тот, что выбран переключателем. */
   const обновитьВнутренний = useCallback(async () => {
-    const { состояниеВнутреннего } = await import("./appWallet");
-    const s = await состояниеВнутреннего();
+    const { состояниеВнутреннего, состояниеВнутреннегоTON } = await import("./appWallet");
+    const [s, t] = await Promise.all([
+      состояниеВнутреннего().catch(() => null),
+      состояниеВнутреннегоTON().catch(() => null),
+    ]);
     if (s) setВнутр(s);
+    if (t) setВнутрTON(t);
   }, []);
 
   useEffect(() => {
@@ -13661,10 +13669,17 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const [своиОбновления, setСвоиОбновления] = useState(0);
 
   const курсSol = useSolUsd();
+  const [сетьКошелька, setСетьКошелька] = useState("sol");
+  const вTON = сетьКошелька === "ton";
+  const текущий = вTON ? внутрTON : внутр;
+  const годен = текущий && !текущий.нуженВход && !текущий.ошибка;
   const солНаКошельке = внутр && !внутр.нуженВход && !внутр.ошибка ? Number(внутр.sol) || 0 : 0;
-  const адресВнутри = внутр && внутр.address ? внутр.address : "";
-  const balance = useCountUp(солНаКошельке, 900, !!адресВнутри);
-  const usd = useCountUp(солНаКошельке * курсSol, 900, !!адресВнутри);
+  const наКошельке = вTON ? (годен ? Number(текущий.ton) || 0 : 0) : солНаКошельке;
+  const курсСети = вTON ? tonPriceUsd : курсSol;
+  const единица = вTON ? "TON" : "SOL";
+  const адресВнутри = текущий && текущий.address ? текущий.address : "";
+  const balance = useCountUp(наКошельке, 900, !!адресВнутри);
+  const usd = useCountUp(наКошельке * курсСети, 900, !!адресВнутри);
   const short = адресВнутри ? `${адресВнутри.slice(0, 4)}…${адресВнутри.slice(-4)}` : "";
 
   function скопироватьАдрес() {
@@ -13746,11 +13761,33 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
         }} />
 
-        <div style={{ position: "relative", fontFamily: bodyFont, color: hexA("#FFFFFF", 0.72), fontSize: 13 }}>
-          {t("walletBalanceLabel")}
+        <div className="flex items-center justify-between" style={{ position: "relative", gap: 10 }}>
+          <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.72), fontSize: 13 }}>
+            {t("walletBalanceLabel")}
+          </span>
+          {/* Переключатель сети прямо на карте: кошелёк один, а монет на
+              нём две, и держать их на разных экранах — значит заставлять
+              человека помнить, где что лежит. */}
+          <span className="flex items-center" style={{ gap: 2, padding: 3, borderRadius: 999, background: hexA("#000000", 0.22) }}>
+            {[["sol", "SOL"], ["ton", "TON"]].map(([id, подпись]) => (
+              <button
+                key={id}
+                onClick={(e) => { e.stopPropagation(); setСетьКошелька(id); haptic("light"); }}
+                className="fx-tap"
+                style={{
+                  padding: "4px 10px", borderRadius: 999, border: "none",
+                  background: сетьКошелька === id ? hexA("#FFFFFF", 0.9) : "transparent",
+                  color: сетьКошелька === id ? "#2C0A78" : hexA("#FFFFFF", 0.8),
+                  fontFamily: displayFont, fontSize: 11.5, fontWeight: 800, letterSpacing: "0.02em",
+                }}
+              >
+                {подпись}
+              </button>
+            ))}
+          </span>
         </div>
         <div className="flex items-baseline" style={{ gap: 7, marginTop: 6, position: "relative" }}>
-          {внутр == null ? (
+          {текущий == null ? (
             <ПлашкаЧисла width={150} height={34} radius={10} style={{ background: hexA("#FFFFFF", 0.18) }} />
           ) : (
             <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#FFFFFF" }}>
@@ -13758,7 +13795,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
               <span style={{ color: hexA("#FFFFFF", 0.55) }}>{(balance % 1).toFixed(2).slice(1)}</span>
             </span>
           )}
-          <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.7), fontSize: 14 }}>SOL</span>
+          <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.7), fontSize: 14 }}>{единица}</span>
         </div>
         <span
           className="inline-flex items-center"
@@ -13769,7 +13806,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             minHeight: 24,
           }}
         >
-          {внутр == null || курсSol <= 0
+          {текущий == null || курсСети <= 0
             ? <ПлашкаЧисла width={56} height={12} radius={6} style={{ background: hexA("#FFFFFF", 0.25) }} />
             : `≈ $${usd.toFixed(2)}`}
         </span>
@@ -13927,6 +13964,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         открыт={получитьОткрыт}
         onClose={() => setПолучитьОткрыт(false)}
         адрес={адресВнутри}
+        сеть={вTON ? "TON" : "Solana"}
         showToast={showToast}
         insetTop={insetTop}
         insetBottom={insetBottom}
