@@ -3936,9 +3936,13 @@ function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL,
   let shift = 0n;
   if (state?.realTon != null && list.length) {
     const разница = state.realTon - list[list.length - 1].realTon;
-    const порог = state.realTon / 3n;   // треть собранного — это уже не «одна сделка»
-    const велика = разница > порог || -разница > порог;
-    if (велика) shift = разница;
+    // Только вверх и только заметную. Обрезанная история всегда «ниже»
+    // настоящего резерва, и это единственный случай, когда ряд нужно
+    // поднимать. Разница вниз бывает после продажи, которая ещё не
+    // доехала до истории: опустить по ней весь график — значит уронить
+    // его и вернуть обратно через пару секунд.
+    const порог = state.realTon / 3n;
+    if (разница > порог) shift = разница;
   }
   const reserveAt = (v) => {
     const r = v + shift;
@@ -4235,9 +4239,12 @@ async function сделкиSolИзКеша(tokenId) {
     .select("trades, updated_at")
     .eq("token_id", tokenId)
     .maybeSingle();
-  if (error || !data || !Array.isArray(data.trades)) return null;
+  if (error || !data || !Array.isArray(data.trades)) return было ? было.ряд : null;
   const свежесть = data.updated_at ? new Date(data.updated_at).getTime() : 0;
-  if (Date.now() - свежесть > СДЕЛКИ_SOL_МС) return null;
+  /* Протухший кеш — не повод строить график заново «от нуля»: без ряда
+     сделок он собирается от пустой кривой и падает на весь экран, а на
+     следующем круге возвращается. Отдаём последнее, что знали. */
+  if (Date.now() - свежесть > СДЕЛКИ_SOL_МС) return было ? было.ряд : null;
   const ряд = data.trades
     .map((п) => ({ time: Number(п.t != null ? п.t : п.time) || 0, дельта: Number(п.d) || 0 }))
     .filter((с) => с.time > 0)
