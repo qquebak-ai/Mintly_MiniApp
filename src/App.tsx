@@ -12392,6 +12392,15 @@ function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, 
 
 /* Свои сделки. В профиле на этом месте стояла надпись «пока пусто» —
    она стояла там всегда, потому что данные никто не читал. */
+/* В какой монете считалась сделка. Отдельного поля для сети в записи
+   нет, но адрес токена сам о ней говорит: в TON он начинается с EQ или
+   UQ, в Solana это base58 без такого начала. */
+function монетаСделки(адрес) {
+  const s = String(адрес || "");
+  if (!s) return ТИКЕР_TON;
+  return /^(EQ|UQ|kQ|0Q)/.test(s) ? ТИКЕР_TON : "SOL";
+}
+
 function МояАктивность({ userId, тик = 0 }) {
   const [ряд, setРяд] = useState(null);
 
@@ -12400,7 +12409,7 @@ function МояАктивность({ userId, тик = 0 }) {
     let брошено = false;
     supabase
       .from("trades")
-      .select("id, ticker, side, ton_amount, token_amount, created_at")
+      .select("id, ticker, side, ton_amount, token_amount, created_at, token_address")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(5)
@@ -12428,7 +12437,7 @@ function МояАктивность({ userId, тик = 0 }) {
                   {покупка ? t("tickerBought") : t("tickerSold")} ${String(с.ticker || "?").toUpperCase()}
                 </span>
                 <span style={{ fontFamily: monoFont, fontSize: 12.5, color: покупка ? T.up : T.down, whiteSpace: "nowrap" }}>
-                  {fmtCoin(Number(с.ton_amount) || 0)} {ТИКЕР_TON}
+                  {fmtCoin(Number(с.ton_amount) || 0)} {монетаСделки(с.token_address)}
                 </span>
                 <span style={{ fontFamily: monoFont, fontSize: 11.5, color: T.faint, whiteSpace: "nowrap" }}>
                   {fmtSince(с.created_at)}
@@ -13642,7 +13651,7 @@ function ИсторияКошелька({ userId, тик = 0 }) {
     let брошено = false;
     supabase
       .from("trades")
-      .select("id, ticker, side, ton_amount, token_amount, created_at")
+      .select("id, ticker, side, ton_amount, token_amount, created_at, token_address")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(12)
@@ -13695,6 +13704,7 @@ function ИсторияКошелька({ userId, тик = 0 }) {
                 </div>
                 <div style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>
                   {обмен ? "" : покупка ? "−" : "+"}{fmtCoin(Number(с.ton_amount) || 0)}
+                  {обмен ? "" : ` ${монетаСделки(с.token_address)}`}
                 </div>
               </div>
             );
@@ -16128,7 +16138,9 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
     } else {
       const gross = tonOutFor(curveState, toNano(amount.toFixed(9)));
       const net = gross - gross * feeBps / 10000n;
-      estimate = (Number(net) / 1e9) * tonPriceUsd;
+      // В самой монете: продал за GRAM — получил GRAM, и в окне стоит
+      // то же число, что придёт на кошелёк.
+      estimate = Number(net) / 1e9;
     }
   } else if (соло) {
     /* Считаем в самой монете, а не через доллары: у токена на кривой
@@ -16141,11 +16153,11 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
       : (priceUsd > 0 && курсSol > 0 ? priceUsd / курсSol : 0);
     estimate = isBuy
       ? (ценаSol > 0 ? amount / ценаSol : 0)
-      : amount * ценаSol * (курсSol > 0 ? курсSol : 0);
+      : amount * ценаSol;
   } else {
     estimate = isBuy
       ? (priceUsd > 0 ? (amount * tonPriceUsd) / priceUsd : 0)
-      : amount * priceUsd;
+      : (tonPriceUsd > 0 ? (amount * priceUsd) / tonPriceUsd : 0);
   }
   const feeUsd = NETWORK_FEE_TON * tonPriceUsd;
   // В Solana точную сумму покажет сам кошелёк, поэтому курс TON здесь
@@ -16161,7 +16173,9 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   function handleConfirm() {
     if (!canConfirm) return;
     const payAmount = isBuy ? `${amount.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}` : `${amount.toLocaleString("ru-RU")}`;
-    const receiveAmount = isBuy ? estimate.toLocaleString("ru-RU", { maximumFractionDigits: 0 }) : `$${estimate.toFixed(2)}`;
+    const receiveAmount = isBuy
+      ? estimate.toLocaleString("ru-RU", { maximumFractionDigits: 0 })
+      : `${estimate.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`;
     const unit = isBuy ? "" : "";
     onConfirm(mode, payAmount, receiveAmount, unit, amount, estimate);
   }
@@ -16254,7 +16268,11 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           <div className="flex items-center justify-between">
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("youReceive")}</span>
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>
-              {amount > 0 ? (isBuy ? `≈ ${estimate.toLocaleString("ru-RU", { maximumFractionDigits: 0 })} ${token.ticker}` : `≈ $${estimate.toFixed(2)}`) : "—"}
+              {amount > 0
+                ? (isBuy
+                  ? `≈ ${estimate.toLocaleString("ru-RU", { maximumFractionDigits: 0 })} ${token.ticker}`
+                  : `≈ ${estimate.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`)
+                : "—"}
             </span>
           </div>
         </div>
@@ -16280,7 +16298,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
               ? `≈0.003 SOL${solPriceUsd > 0 ? ` ($${(0.003 * solPriceUsd).toFixed(2)})` : ""}`
               : `${NETWORK_FEE_TON} TON ($${feeUsd.toFixed(2)})`}
           </span></div>
-          <div className="flex justify-between"><span>{t("minReceive")}</span><span style={{ color: T.ice }}>{amount > 0 ? (isBuy ? `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 0 })} ${token.ticker}` : `$${(estimate * (1 - slippage / 100)).toFixed(2)}`) : "—"}</span></div>
+          <div className="flex justify-between"><span>{t("minReceive")}</span><span style={{ color: T.ice }}>{amount > 0 ? (isBuy ? `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 0 })} ${token.ticker}` : `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`) : "—"}</span></div>
         </div>
 
         <button onClick={handleConfirm} disabled={!canConfirm} className="fx-tap w-full rounded-[20px] py-3 mt-5" style={{
@@ -22241,7 +22259,9 @@ function mapTokenRow(row) {
           кошелёк, а не знакомство с приложением. */}
       {/* Приветствие ждёт, пока догрузится приложение: показывать его
           поверх заставки — значит перебивать одно ожидание другим. */}
-      {приветствие && !accountCreated && !сразуВКошелёк && (
+      {/* Пока сессия не проверена, неизвестно, новичок ли это: у
+          вернувшегося человека приветствие успевало мигнуть и пропасть. */}
+      {приветствие && authChecked && !accountCreated && !сразуВКошелёк && (
         <WelcomeScreen
           insetTop={insetTop}
           onCreate={() => { закрытьПриветствие(); openCreateProfile(); }}
