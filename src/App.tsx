@@ -3925,9 +3925,20 @@ function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL,
   // тогда последняя точка совпадает с состоянием, а прошлые становятся
   // на своё место относительно неё.
   const list = trades || [];
+  /* Сдвиг ряда под текущий резерв — только когда история и правда
+     обрезана. Она читается кусками, и у долгоживущего токена начало
+     теряется: без сдвига весь график уезжает вниз. Но стоит пройти одной
+     свежей сделке, которой ещё нет в прочитанном ряду, как тот же сдвиг
+     поднимал всю историю целиком — график прыгал вверх, а через
+     несколько секунд, когда сделка доезжала, падал обратно. Поэтому
+     маленькую разницу не трогаем вовсе: её покажет последняя свеча,
+     закрытая ценой из состояния. */
   let shift = 0n;
   if (state?.realTon != null && list.length) {
-    shift = state.realTon - list[list.length - 1].realTon;
+    const разница = state.realTon - list[list.length - 1].realTon;
+    const порог = state.realTon / 3n;   // треть собранного — это уже не «одна сделка»
+    const велика = разница > порог || -разница > порог;
+    if (велика) shift = разница;
   }
   const reserveAt = (v) => {
     const r = v + shift;
@@ -4687,8 +4698,11 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         // миллиардных долях, и абсолютный «почти ноль» не сработал бы
         // никогда.
         if (Math.abs(цель - ж.cur) <= Math.abs(цель) * 0.0008) ж.cur = цель;
-        ж.hi = Math.max(посл.high, ж.hi == null ? посл.high : ж.hi, ж.cur);
-        ж.lo = Math.min(посл.low, ж.lo == null ? посл.low : ж.lo, ж.cur);
+        // Тени — только настоящие: их ставят сделки, а не то, где
+        // пробегало тело по дороге к новой цене. Дорисованный фитиль —
+        // это выдуманное движение, которого не было.
+        ж.hi = посл.high;
+        ж.lo = посл.low;
       }
     }
     clampView();
@@ -5063,9 +5077,10 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     inertiaRaf.current = null;
   }
   function panByPixels(dxScreen) {
-    // В стартовом масштабе график стоит на месте: двигать его можно
-    // только после того, как приблизили.
-    if (viewRef.current.count >= стартовыйСчёт.current - 0.5) return;
+    // В стартовом масштабе двигать нечего: график и так показывает всё,
+    // что есть. Как только масштаб тронули — хоть в плюс, хоть в
+    // минус, — движение разрешено.
+    if (!зумРукой.current && viewRef.current.count >= стартовыйСчёт.current - 0.5) return;
     const layout = computeLayout();
     if (!layout) return;
     viewRef.current.start -= dxScreen / layout.slot;
@@ -5137,15 +5152,9 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       зумРукой.current = true;
       const mx = midX(e.touches);
       const newSlot = chartWidth() / newCount;
-      if (newCount >= стартовыйСчёт.current - 0.5) {
-        // Отдалили до исходного — возвращаем ровно то окно, с которым
-        // карточка открылась, а не «почти такое же».
-        const счёт = стартовыйСчёт.current;
-        viewRef.current = { start: n + хвостСправа(счёт) - счёт, count: счёт };
-        pinnedRef.current = true;
-      } else {
-        viewRef.current = { start: pinchRef.current.anchorIdx - mx / newSlot, count: newCount };
-      }
+      // Отдалять можно и дальше исходного окна: раньше график на нём
+      // залипал — отдаляешь, а он возвращается в прежнее приближение.
+      viewRef.current = { start: pinchRef.current.anchorIdx - mx / newSlot, count: newCount };
       clampView(true);
       запомнитьРазмахОкна();
       draw();
@@ -5221,13 +5230,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     const factor = e.deltaY > 0 ? 1.1 : 0.9;
     let newCount = Math.max(CHART_MIN_VISIBLE, Math.min(CHART_MAX_VISIBLE, nВид, viewRef.current.count * factor));
     const newSlot = chartWidth() / newCount;
-    if (newCount >= стартовыйСчёт.current - 0.5) {
-      const счёт = стартовыйСчёт.current;
-      viewRef.current = { start: n + хвостСправа(счёт) - счёт, count: счёт };
-      pinnedRef.current = true;
-    } else {
-      viewRef.current = { start: anchorIdx - mx / newSlot, count: newCount };
-    }
+    viewRef.current = { start: anchorIdx - mx / newSlot, count: newCount };
     clampView(true);
     запомнитьРазмахОкна();
     draw();
