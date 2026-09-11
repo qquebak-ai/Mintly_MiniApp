@@ -6088,6 +6088,79 @@ function цветИзТикера(тикер) {
   return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
 }
 
+/* Обложка токена для витрины.
+ *
+ * Порядок такой: у токена, который уже торгуется на бирже, берём его
+ * биржевую шапку — ту самую, что рисуют на DexScreener; она есть почти у
+ * каждого живого токена и выглядит как его лицо. У токена, который ещё
+ * идёт по нашей кривой, биржи нет вовсе, и тогда показываем картинку,
+ * которую автор поставил при запуске. Нет ни той, ни другой — остаётся
+ * аура по цвету логотипа.
+ *
+ * Есть ли шапка на бирже, заранее неизвестно: проверяем загрузкой и
+ * молча откатываемся. Ответы помним — витрина перерисовывается часто, а
+ * картинка у токена не меняется. */
+const обложкаКеш = new Map(); // url -> true | false
+
+function шапкаБиржи(chain, address) {
+  if (!address) return null;
+  const сеть = chain === "solana" ? "solana" : "ton";
+  return `https://dd.dexscreener.com/ds-data/tokens/${сеть}/${address}/header.png`;
+}
+
+function ОбложкаСпотлайта({ token }) {
+  const своя = token.bannerUrl || null;
+  // На кривой биржи ещё нет — там только своя картинка.
+  const сБиржи = token.poolAddress ? шапкаБиржи(token.chain, token.tokenAddress) : null;
+  const кандидат = сБиржи || своя;
+  const [готова, setГотова] = useState(() => (кандидат ? обложкаКеш.get(кандидат) === true : false));
+  const [url, setUrl] = useState(() => (кандидат && обложкаКеш.get(кандидат) === true ? кандидат : null));
+
+  useEffect(() => {
+    let брошено = false;
+    const очередь = [сБиржи, своя].filter(Boolean);
+    setГотова(false);
+    setUrl(null);
+    (async () => {
+      for (const адрес of очередь) {
+        if (обложкаКеш.get(адрес) === false) continue;
+        if (обложкаКеш.get(адрес) === true) {
+          if (!брошено) { setUrl(адрес); setГотова(true); }
+          return;
+        }
+        const ок = await new Promise((готово) => {
+          const img = new Image();
+          img.onload = () => готово(img.naturalWidth > 0);
+          img.onerror = () => готово(false);
+          img.src = адрес;
+        });
+        обложкаКеш.set(адрес, ок);
+        if (ок) {
+          if (!брошено) { setUrl(адрес); setГотова(true); }
+          return;
+        }
+      }
+    })();
+    return () => { брошено = true; };
+  }, [сБиржи, своя]);
+
+  if (!готова || !url) return <SpotlightAura src={token.logoUrl} ticker={token.ticker} />;
+  return (
+    <>
+      <div aria-hidden style={{ position: "absolute", inset: 0, background: `center/cover no-repeat url(${url})` }} />
+      {/* Затемнение обязательно: по светлой картинке белый тикер не
+          читается. */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute", inset: 0,
+          background: `linear-gradient(90deg, ${hexA(T.bg, 0.92)} 0%, ${hexA(T.bg, 0.72)} 45%, ${hexA(T.bg, 0.45)} 100%)`,
+        }}
+      />
+    </>
+  );
+}
+
 function SpotlightAura({ src, ticker }) {
   const [цвет, setЦвет] = useState(() => (src && аураКеш.get(src)) || null);
 
@@ -11231,26 +11304,7 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
                 подкрашивать её усреднённым цветом логотипа незачем.
                 Затемнение сверху обязательно — по светлой картинке белый
                 тикер не читается. */}
-            {spotlight.bannerUrl ? (
-              <>
-                <div
-                  aria-hidden
-                  style={{
-                    position: "absolute", inset: 0,
-                    background: `center/cover no-repeat url(${spotlight.bannerUrl})`,
-                  }}
-                />
-                <div
-                  aria-hidden
-                  style={{
-                    position: "absolute", inset: 0,
-                    background: `linear-gradient(90deg, ${hexA(T.bg, 0.92)} 0%, ${hexA(T.bg, 0.72)} 45%, ${hexA(T.bg, 0.45)} 100%)`,
-                  }}
-                />
-              </>
-            ) : (
-              <SpotlightAura src={spotlight.logoUrl} ticker={spotlight.ticker} />
-            )}
+            <ОбложкаСпотлайта token={spotlight} />
             <div style={{ position: "relative", zIndex: 1 }}>
               <TokenAvatar size={44} tone={spotlight.change >= 0 ? "up" : "down"} src={spotlight.logoUrl} />
             </div>
