@@ -1695,6 +1695,23 @@ function GlobalStyle() {
         18%  { opacity: 0.75; }
         100% { inset: -14px; border-radius: 40px; opacity: 0; }
       }
+      /* Отклик кнопок сделки. Нажал «купить» — кнопка коротко наливается
+         зелёным цветом роста, «продать» — красным падения: решение
+         подтверждается цветом ещё до того, как откроется окно суммы.
+         Цвет задан в анимации, а она сильнее inline-стиля, поэтому
+         обычная заливка кнопки возвращается сама. */
+      .fx-flash-up { animation: вспышкаРоста 620ms cubic-bezier(0.22, 1, 0.36, 1); }
+      .fx-flash-down { animation: вспышкаПадения 620ms cubic-bezier(0.22, 1, 0.36, 1); }
+      @keyframes вспышкаРоста {
+        0%   { background: ${СВЕЧА_РОСТ}; color: #06210F; box-shadow: 0 0 0 0 ${СВЕЧА_РОСТ}88; }
+        35%  { background: ${СВЕЧА_РОСТ}; color: #06210F; box-shadow: 0 0 22px 4px ${СВЕЧА_РОСТ}55; }
+        100% { box-shadow: 0 0 0 0 ${СВЕЧА_РОСТ}00; }
+      }
+      @keyframes вспышкаПадения {
+        0%   { background: ${СВЕЧА_ПАДЕНИЕ}; color: #FFFFFF; border-color: ${СВЕЧА_ПАДЕНИЕ}; box-shadow: 0 0 0 0 ${СВЕЧА_ПАДЕНИЕ}88; }
+        35%  { background: ${СВЕЧА_ПАДЕНИЕ}; color: #FFFFFF; border-color: ${СВЕЧА_ПАДЕНИЕ}; box-shadow: 0 0 22px 4px ${СВЕЧА_ПАДЕНИЕ}55; }
+        100% { box-shadow: 0 0 0 0 ${СВЕЧА_ПАДЕНИЕ}00; }
+      }
       /* Волна от нажатия: расходится из точки касания и гаснет. */
       @keyframes волнаОтНажатия {
         from { transform: translate(-50%, -50%) scale(0); opacity: 0.34; }
@@ -11804,45 +11821,6 @@ function ПолзунокОтключения({ подпись, готовоПо
 }
 
 /* Страница кошелька: что это за кошелёк и как его отключить. */
-function ЭкранКошелька({ открыт, onClose, название, строки = [], onОтключить, insetTop = 0, insetBottom = 0 }) {
-  return (
-    <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={название} insetTop={insetTop} insetBottom={insetBottom}>
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 18px" }}>
-        <div style={{ borderRadius: 22, background: T.surfaceHi, padding: "16px 18px" }}>
-          {строки.map((с, i) => (
-            <div key={i} className="flex items-center justify-between" style={{ gap: 12, padding: "7px 0" }}>
-              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{с.имя}</span>
-              <span className="truncate" style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, maxWidth: "62%" }}>{с.значение}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ padding: "16px 18px 22px", flexShrink: 0 }}>
-        <ПолзунокОтключения
-          подпись={t("slideToDisconnect")}
-          готовоПодпись={t("disconnected")}
-          onГотово={() => { onОтключить(); onClose(); }}
-        />
-      </div>
-    </ЭкранСнизу>
-  );
-}
-
-/* Настройки отдельным экраном.
- *
- * Сложены группами, как это принято в системных настройках: несколько
- * строк в одной карточке, между ними тонкая линия, справа — значение
- * или стрелка. Раньше каждый пункт был своей плашкой, и десяток
- * одинаковых прямоугольников читался как список кнопок, а не как
- * разделы.
- */
-const ГРУППЫ_НАСТРОЕК = [
-  ["x", "security", "notify", "language"],
-  ["referral", "support"],
-  ["architecture", "privacy"],
-];
-
 function СтрокаНастройки({ item, значение, метка, последняя, onClick }) {
   return (
     <button
@@ -12588,118 +12566,6 @@ function HomeView({
 /* WalletView — кошелёк отдельным разделом. Раньше он лежал карточкой
    посреди профиля, между аватаркой и своими токенами: чтобы посмотреть
    баланс, приходилось идти в личные настройки. */
-/* Второй кошелёк — в сети Solana.
-
-   TON-кошелёк подключается через TonConnect и живёт своей жизнью; здесь
-   Phantom, и связь с ним хранится в браузере. Один человек спокойно
-   держит оба: TON-кошелёк платит за свои токены, Solana-кошелёк — за
-   мемкоины из ленты Solana. Ни один из них не заменяет другой, поэтому
-   и подключаются они по отдельности. */
-function SolanaWalletCard({ showToast, insetTop = 0, insetBottom = 0 }) {
-  const [страница, setСтраница] = useState(false);
-  const [сессия, setСессия] = useState(null);
-  const [баланс, setБаланс] = useState(null);
-  const [идёт, setИдёт] = useState(false);
-  const [скопировано, setСкопировано] = useState(false);
-
-  // Связь могла остаться с прошлого раза: тогда подключать заново
-  // незачем, достаточно вспомнить адрес.
-  useEffect(() => {
-    let cancelled = false;
-    import("./phantom").then(({ сохранённаяСессия }) => {
-      if (!cancelled) setСессия(сохранённаяСессия());
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    if (!сессия) { setБаланс(null); return; }
-    let cancelled = false;
-    fetch(апи(`/api/solana?action=balances&wallet=${сессия.wallet}`))
-      .then((r) => r.json())
-      .then((b) => { if (!cancelled && b && !b.error) setБаланс(Number(b.sol) || 0); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [сессия]);
-
-  async function подключиться() {
-    setИдёт(true);
-    try {
-      const { подключить } = await import("./phantom");
-      showToast(t("solConnecting"));
-      setСессия(await подключить());
-    } catch (e) {
-      showToast(`${t("solFailed")}: ${String((e && e.message) || e).slice(0, 60)}`);
-    } finally {
-      setИдёт(false);
-    }
-  }
-
-  async function отключиться() {
-    const { забыть } = await import("./phantom");
-    забыть();
-    setСессия(null);
-    showToast(t("solDisconnected"));
-  }
-
-  return (
-    <div className="w-full rounded-[22px] p-4" style={{ marginTop: 20, background: T.surface, border: `1px solid ${T.line}` }}>
-      <div className="flex items-center justify-between gap-3">
-        <button
-          onClick={() => сессия && setСтраница(true)}
-          className={сессия ? "fx-tap min-w-0 text-left" : "min-w-0 text-left"}
-          style={{ background: "transparent", border: "none", padding: 0, flex: 1 }}
-        >
-          <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{t("solWalletTitle")}</span>
-          <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 3, lineHeight: 1.4 }}>
-            {сессия
-              ? (баланс == null ? <ПлашкаЧисла width={82} height={12} radius={6} /> : `${баланс.toFixed(4)} SOL`)
-              : t("solWalletNote")}
-          </span>
-        </button>
-        {сессия && <ChevronRight size={17} color={T.faint} />}
-        {/* Адреса рядом с кошельком нет: он есть на «Получить» целиком и
-            кодом, а обрубок в углу карточки ничего не добавлял. */}
-      </div>
-
-      {/* Кнопка стоит там же, где у TON-кошелька: во всю ширину под
-          пояснением. Сбоку она ужимала текст в узкий столбик и читалась
-          как второстепенная, хотя это единственное действие карточки.
-          Цвет — фиолетовый Solana, как голубой у TON. */}
-      {сессия ? null : (
-        <button
-          onClick={подключиться}
-          disabled={идёт}
-          className={`fx-tap w-full flex items-center justify-center${идёт ? " fx-busy" : ""}`}
-          style={{
-            gap: 7, marginTop: 12, padding: "11px 14px", borderRadius: 14,
-            background: ЦВЕТ_SOL, border: "none", color: "#FFFFFF",
-            fontFamily: displayFont, fontSize: 14, fontWeight: 700,
-            opacity: идёт ? 0.6 : 1,
-          }}
-        >
-          <Wallet size={14} /> {идёт ? t("solWalletOpening") : t("solWalletConnectFull")}
-        </button>
-      )}
-
-      {/* Отключение переехало на страницу кошелька: она открывается по
-          нажатию на саму карточку, и там его надо провести ползунком. */}
-      <ЭкранКошелька
-        открыт={страница}
-        onClose={() => setСтраница(false)}
-        название={t("solWalletTitle")}
-        строки={[
-          { имя: t("walletBalanceRow"), значение: баланс == null ? "…" : `${баланс.toFixed(4)} SOL` },
-          { имя: t("walletAddressLabel"), значение: сессия ? `${сессия.wallet.slice(0, 6)}…${сессия.wallet.slice(-6)}` : "—" },
-        ]}
-        onОтключить={отключиться}
-        insetTop={insetTop}
-        insetBottom={insetBottom}
-      />
-    </div>
-  );
-}
-
 function ЭкранСнизу({ открыт, onClose, заголовок = "", insetTop = 0, insetBottom = 0, жестВыключен = false, children }) {
   const [уходит, setУходит] = useState(false);
   const [тяга, setТяга] = useState(0);
@@ -13644,7 +13510,7 @@ function ИсторияКошелька({ userId, тик = 0 }) {
 const ГРАДИЕНТ_КАРТЫ =
   "linear-gradient(115deg, #E44BC8 0%, #C13AE6 18%, #8E2DE2 36%, #6A17E8 54%, #4A00E0 70%, #7B1FE0 84%, #2C0A78 100%)";
 
-function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onConnect, onDisconnect, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0 }) {
+function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0 }) {
   const [copied, setCopied] = useState(false);
   const низ = useRef(null);
 
@@ -13655,7 +13521,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const [внутр, setВнутр] = useState(null);
   const [обменОткрыт, setОбменОткрыт] = useState(false);
   const [получитьОткрыт, setПолучитьОткрыт] = useState(false);
-  const [страницаTON, setСтраницаTON] = useState(false);
   /* Волны от касаний карты. Каждая живёт своё время и убирается сама —
      иначе их накапливались бы десятки за один сеанс. */
   const [волны, setВолны] = useState([]);
@@ -13873,48 +13738,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         />
       </div>
 
-      {/* Свои кошельки — на тёмном верху, рядом с балансом: они про
-          «сколько и где лежит», а не про историю операций. */}
-      <div className="flex flex-col" style={{ gap: 14, marginTop: 20, padding: "0 16px" }}>
-        {/* TON-кошелёк. Он внешний: им подписывают покупки на кривой TON,
-            но менять на нём нечего — обмен живёт только внутри. */}
-        <div className="w-full rounded-[22px] p-4" style={{ background: T.surface, border: `1px solid ${T.line}` }}>
-          {connected ? (
-            /* Карточка целиком — вход на страницу кошелька: там же и
-               отключение, ползунком. Кнопка рядом с балансом слишком
-               легко ловила палец. */
-            <button
-              onClick={() => setСтраницаTON(true)}
-              className="fx-tap w-full flex items-center justify-between"
-              style={{ gap: 12, background: "transparent", border: "none", padding: 0 }}
-            >
-              <span className="min-w-0 text-left">
-                <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>TON-кошелёк</span>
-                <span style={{ display: "block", fontFamily: monoFont, color: T.muted, fontSize: 12.5, marginTop: 5 }}>
-                  {tonBalance.toFixed(2)} TON · {tonPriceUsd > 0
-                    ? `≈ $${(tonBalance * tonPriceUsd).toFixed(2)}`
-                    : <ПлашкаЧисла width={44} height={10} radius={5} />}
-                </span>
-              </span>
-              <ChevronRight size={17} color={T.faint} />
-            </button>
-          ) : (
-            <>
-              <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>TON-кошелёк</div>
-              <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 5, lineHeight: 1.45 }}>{t("walletEmptyBody")}</p>
-              <button
-                onClick={onConnect}
-                className="fx-tap w-full flex items-center justify-center"
-                style={{ gap: 7, marginTop: 12, padding: "11px 14px", borderRadius: 14, background: ЦВЕТ_TON, border: "none", color: "#FFFFFF", fontFamily: displayFont, fontSize: 14, fontWeight: 700 }}
-              >
-                <Wallet size={14} /> {t("connectWallet")}
-              </button>
-            </>
-          )}
-        </div>
 
-        <SolanaWalletCard showToast={showToast} insetTop={insetTop} insetBottom={insetBottom} />
-      </div>
 
       {/* Светлая страница. Уходит за края прокрутки и вниз за экран:
           так видно, что она лежит поверх тёмного верха, а не является
@@ -13994,19 +13818,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         <ИсторияКошелька userId={userId} тик={тик + своиОбновления} />
 
       </div>
-
-      <ЭкранКошелька
-        открыт={страницаTON}
-        onClose={() => setСтраницаTON(false)}
-        название="TON-кошелёк"
-        строки={[
-          { имя: t("walletBalanceRow"), значение: `${tonBalance.toFixed(2)} TON` },
-          { имя: t("walletAddressLabel"), значение: walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-6)}` : "—" },
-        ]}
-        onОтключить={onDisconnect}
-        insetTop={insetTop}
-        insetBottom={insetBottom}
-      />
 
       <ЭкранПолучить
         открыт={получитьОткрыт}
@@ -14197,10 +14008,12 @@ function useПозиция(token, walletAddress) {
       if (!адрес) { if (жив) setКоличество(0); return; }
       try {
         if (token.chain === "solana") {
-          const { сохранённаяСессия } = await import("./phantom");
-          const сессия = сохранённаяСессия();
-          if (!сессия) { if (жив) setКоличество(0); return; }
-          const r = await fetch(апи(`/api/solana?action=balances&wallet=${сессия.wallet}&mint=${адрес}`))
+          // Кошелёк один — тот, что внутри приложения: жетоны покупаются
+          // на него, на нём же и лежат.
+          const { состояниеВнутреннего } = await import("./appWallet");
+          const св = await состояниеВнутреннего();
+          if (!св || !св.address) { if (жив) setКоличество(0); return; }
+          const r = await fetch(апи(`/api/solana?action=balances&wallet=${св.address}&mint=${адрес}`))
             .then((x) => x.json());
           if (жив) setКоличество(Number(r && r.token) || 0);
           return;
@@ -14371,12 +14184,14 @@ function КарточкаСтрок({ заголовок, строки }) {
   );
 }
 
-function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = true, connected = true, onConnectWallet, themeKey, currentUserId = null, onNeedAuth, onOpenProfile, tonPriceUsd = 0, walletAddress = null, onManage = null }) {
+function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = true, connected = true, themeKey, currentUserId = null, onNeedAuth, onOpenProfile, tonPriceUsd = 0, walletAddress = null, onManage = null }) {
   // График вынесен из вкладок наверх, поэтому здесь остались только
   // разделы под ним: держатели, лента, о токене.
   // Экран открывается на статистике: цифры рынка важнее ленты чужих
   // сделок, за ними сюда и заходят.
   const [tab, setTab] = useState("stats"); // stats | holders | feed | about
+  // Какая из кнопок сделки сейчас отыгрывает цветовой отклик.
+  const [вспышка, setВспышка] = useState(null);
   /* Что рисует график: цену или капитализацию.
      По умолчанию — цена: то же число, что крупно стоит в шапке, и то,
      на что смотрят в первую очередь. Капитализация остаётся рядом, но
@@ -15093,15 +14908,23 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
 
         {/* Кнопки сделки живут здесь же: решение принимается по позиции,
             а не по отдельному блоку внизу страницы. */}
-        {curve && curve.graduated && !рынокОткрыт ? null : (connected || token.chain === "solana") ? (
+        {curve && curve.graduated && !рынокОткрыт ? null : (
           <div className="flex gap-2">
-            <button onClick={onBuy} className="fx-tap flex-1 rounded-[14px] py-2.5 flex items-center justify-center gap-1.5" style={{ fontFamily: displayFont, fontWeight: 600, fontSize: 14.5, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, opacity: unlocked ? 1 : 0.55 }}>{!unlocked && <Lock size={13} />}{tr("buy")}</button>
-            <button onClick={onSell} className="fx-tap flex-1 rounded-[14px] py-2.5 flex items-center justify-center gap-1.5" style={{ fontFamily: displayFont, fontWeight: 600, fontSize: 14.5, background: "transparent", color: T.ice, border: `1px solid ${T.lineHi}`, opacity: unlocked ? 1 : 0.55 }}>{!unlocked && <Lock size={13} />}{tr("sell")}</button>
+            <button
+              onClick={() => { setВспышка("buy"); onBuy(); }}
+              onAnimationEnd={() => setВспышка(null)}
+              className={`fx-tap flex-1 rounded-[14px] py-2.5 flex items-center justify-center gap-1.5${вспышка === "buy" ? " fx-flash-up" : ""}`}
+              style={{ fontFamily: displayFont, fontWeight: 600, fontSize: 14.5, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, opacity: unlocked ? 1 : 0.55 }}>
+              {!unlocked && <Lock size={13} />}{tr("buy")}
+            </button>
+            <button
+              onClick={() => { setВспышка("sell"); onSell(); }}
+              onAnimationEnd={() => setВспышка(null)}
+              className={`fx-tap flex-1 rounded-[14px] py-2.5 flex items-center justify-center gap-1.5${вспышка === "sell" ? " fx-flash-down" : ""}`}
+              style={{ fontFamily: displayFont, fontWeight: 600, fontSize: 14.5, background: "transparent", color: T.ice, border: `1px solid ${T.lineHi}`, opacity: unlocked ? 1 : 0.55 }}>
+              {!unlocked && <Lock size={13} />}{tr("sell")}
+            </button>
           </div>
-        ) : (
-          <button onClick={onConnectWallet} className="fx-tap w-full rounded-[14px] py-2.5 flex items-center justify-center gap-2" style={{ fontFamily: displayFont, fontWeight: 600, fontSize: 14.5, background: T.ice, color: T.bg }}>
-            <Wallet size={15} /> {tr("connectWalletCta")}
-          </button>
         )}
       </div>
 
@@ -15813,6 +15636,9 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // значит обратиться к нему до создания.
   const [tradeModal, closing] = useClosing(tradeModalProp);
   const [mode, setMode] = useState(tradeModal ? tradeModal.mode : "buy");
+  // Цветовой отклик переключателя: нажал «купить» — зелёная вспышка,
+  // «продать» — красная.
+  const [вспышка, setВспышка] = useState(null);
   // Сумму можно подставить снаружи — так после запуска токена открывается
   // готовая покупка ровно на то, что человек ввёл в форме создания.
   const [amountStr, setAmountStr] = useState(tradeModal?.prefill ? String(tradeModal.prefill) : "");
@@ -15822,23 +15648,14 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
     if (!tradeModal || !token || token.chain !== "solana") { setSolБаланс(null); return; }
     let cancelled = false;
     (async () => {
-      /* Чей кошелёк спрашивать. Сначала Phantom, если он подключён, а
-         иначе — свой кошелёк Mintly: им и платят внутри приложения, и
-         без него в поле «Доступно» стояло «кошелёк не подключён» у
-         человека, у которого кошелёк как раз есть. */
+      /* Кошелёк один — свой, внутри приложения: им и платят, и на нём
+         лежат купленные жетоны. */
       let адрес = null;
       try {
-        const { сохранённаяСессия } = await import("./phantom");
-        const сессия = сохранённаяСессия();
-        адрес = сессия && сессия.wallet;
-      } catch { /* нет модуля — идём дальше */ }
-      if (!адрес) {
-        try {
-          const { состояниеВнутреннего } = await import("./appWallet");
-          const св = await состояниеВнутреннего();
-          адрес = св && св.address;
-        } catch { /* без входа внутреннего кошелька нет */ }
-      }
+        const { состояниеВнутреннего } = await import("./appWallet");
+        const св = await состояниеВнутреннего();
+        адрес = св && св.address;
+      } catch { /* без входа внутреннего кошелька нет */ }
       if (!адрес || cancelled) return;
       const параметры = new URLSearchParams({ wallet: адрес });
       if (token.tokenAddress) параметры.set("mint", token.tokenAddress);
@@ -15978,7 +15795,10 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           {[{ id: "buy", label: t("buy") }, { id: "sell", label: t("sell") }].map(o => {
             const active = mode === o.id;
             return (
-              <button key={o.id} onClick={() => { setMode(o.id); setAmountStr(""); }} className="fx-tap flex-1 rounded-[16px] py-2"
+              <button key={o.id}
+                onClick={() => { setMode(o.id); setAmountStr(""); setВспышка(o.id); }}
+                onAnimationEnd={() => setВспышка(null)}
+                className={`fx-tap flex-1 rounded-[16px] py-2${вспышка === o.id ? (o.id === "buy" ? " fx-flash-up" : " fx-flash-down") : ""}`}
                 style={{
                   fontFamily: displayFont, fontWeight: 700, fontSize: 14.5,
                   background: active ? (o.id === "buy" ? T.turquoise : T.rose) : "transparent",
@@ -15994,10 +15814,9 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{isBuy ? t("youPay") : t("youSell")}</span>
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>
             {t("available")}: {соло
-              // Пока кошелёк Solana не подключён, спрашивать баланс не у
-              // кого — тогда и предела нет.
+              // Пока баланс кошелька приложения не приехал, предела нет.
               ? (solБаланс == null
-                ? t("solWalletConnectFirst")
+                ? "…"
                 : isBuy
                   ? `${(solДоступно || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} SOL`
                   : `${solБаланс.token.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${token.ticker}`)
@@ -16631,7 +16450,7 @@ function ПереключательМеханики({ item, включено, on
   );
 }
 
-function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCreateProfile, onOpenConnectModal, onLaunch, solДоступен = false, черновик = null, onЧерновикПринят = () => {} }) {
+function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCreateProfile, onLaunch, solДоступен = false, черновик = null, onЧерновикПринят = () => {} }) {
   const [form, setForm] = useState({ name: "", ticker: "", buyAmount: "", desc: "", tg: "", x: "", site: "" });
   // В какой сети запускать. Пока программа кривой в Solana не
   // развёрнута, выбора нет вовсе — предлагать действие, которое всё
@@ -16801,11 +16620,6 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           {!accountCreated && (
             <button onClick={onOpenCreateProfile} className="fx-tap w-full rounded-[20px] py-3" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>
               {t("createAccount")}
-            </button>
-          )}
-          {!connected && (
-            <button onClick={onOpenConnectModal} className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3" style={{ background: accountCreated ? PRISM : T.surfaceHi, color: accountCreated ? PRISM_TEXT : T.ice, border: accountCreated ? "none" : `1px solid ${T.line}`, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>
-              <Wallet size={15} /> {t("connectWalletCta")}
             </button>
           )}
         </div>
@@ -17263,27 +17077,19 @@ function PinLockScreen({ pin, profile, onUnlock, onForgot }) {
   );
 }
 
-function ConnectModal({ open, onClose, onConnect }) {
-  // Окно держится на экране, пока идёт анимация ухода: раньше оно
-  // пропадало кадром, и казалось, что нажатие сломало экран.
-  const [видно, closing] = useClosing(open);
-  if (!видно) return null;
-  return (
-    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ ...SHEET_BACK, zIndex: 60 }} onClick={onClose}>
-      <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={sheetCard(22)}>
-        <div className="flex justify-end"><button onClick={onClose} className="fx-tap fx-close"><X size={16} color={T.muted} /></button></div>
-        <div className="flex flex-col items-center text-center gap-2" style={{ marginTop: -8 }}>
-          <MintlyFrame size={56} glow={`${T.electric}55`}><Wallet size={22} color={T.electric} /></MintlyFrame>
-          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700, marginTop: 6 }}>{t("connectWalletModalTitle")}</div>
-          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5 }}>{t("walletRequiredNote")}</div>
-        </div>
-        <button onClick={() => { onConnect(); onClose(); }} className="fx-tap w-full rounded-[20px] py-3 mt-5" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
-          {t("connectWalletCta")}
-        </button>
-      </div>
-    </div>
-  );
-}
+/* Настройки отдельным экраном.
+ *
+ * Сложены группами, как это принято в системных настройках: несколько
+ * строк в одной карточке, между ними тонкая линия, справа — значение
+ * или стрелка. Раньше каждый пункт был своей плашкой, и десяток
+ * одинаковых прямоугольников читался как список кнопок, а не как
+ * разделы.
+ */
+const ГРУППЫ_НАСТРОЕК = [
+  ["x", "security", "notify", "language"],
+  ["referral", "support"],
+  ["architecture", "privacy"],
+];
 
 /* Small reusable on/off switch used inside settings rows. */
 function ToggleSwitch({ on, onChange }) {
@@ -18986,7 +18792,7 @@ async function uploadAvatarIfNeeded(userId) {
 }
 
 function ProfileView({
-  connected, onOpenConnectModal, showToast,
+  connected, showToast,
   accountCreated, profile, onOpenCreateProfile, onOpenLogin, onOpenEditProfile, onLogOut,
   onOpenSetting, onGoCreate, onOpenToken, myTokens = [],
   cosmetics: cosmeticsProp = { frame: "none", card: "none" }, onGoShop, onOpenAchievements, insetTop = 0, userId = null,
@@ -19006,10 +18812,9 @@ function ProfileView({
   // Прошлый выбор хранится и вернётся сам, как только человек войдёт.
   const cosmetics = accountCreated ? cosmeticsProp : { frame: "none", card: "none" };
 
-  const unlocked = accountCreated && connected;
+  const unlocked = accountCreated;
   function requireUnlock(missingMsg) {
     if (!accountCreated) { onOpenCreateProfile(); showToast(t("firstAccountFirst")); return false; }
-    if (!connected) { onOpenConnectModal(); showToast(t("connectWalletContinue")); return false; }
     return true;
   }
   function startVerify() {
@@ -19501,7 +19306,6 @@ const FEE_PERCENT = 0.01; // 1% комиссии
   const [view, setView] = useState("home");
   const [tab, setTab] = useState("home");
   const [token, setToken] = useState(null);
-  const [connectModalOpen, setConnectModalOpen] = useState(false);
   const { height, insetBottom, insetTop } = useTelegramViewport();
   const device = useDevice();
   const rocketVariant = typeof window !== "undefined" && /[?&]rocket=outline/.test(window.location.search) ? "outline" : "default";
@@ -19597,10 +19401,17 @@ const FEE_PERCENT = 0.01; // 1% комиссии
   // Настоящее подключение кошелька через TonConnect. `wallet` — null,
   // пока пользователь не подключил кошелёк; после подключения содержит
   // реальные данные (адрес и т.д.), которые прилетают от Tonkeeper/др.
+  /* Внешний кошелёк остался ровно в одном месте — в запуске токена на
+     TON: там подпись ставит сам человек, потому что деньги уходят с его
+     кошелька, а не с кошелька приложения. Везде остальное — покупки,
+     продажи, балансы, история — работает кошелёк приложения, поэтому
+     ниже «кошелёк» значит именно его. */
   const wallet = useTonWallet();
   const [tonConnectUI] = useTonConnectUI();
-  const connected = !!wallet;
-  const walletAddress = wallet ? Address.parse(wallet.account.address).toString({ bounceable: false }) : "";
+
+  const [внутрTON, setВнутрTON] = useState(null);
+  const walletAddress = внутрTON && внутрTON.address ? внутрTON.address : "";
+  const connected = !!walletAddress;
   const walletAddressShort = walletAddress ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` : "";
 
   // Реальный баланс TON — подтягиваем с публичного API tonapi.io по
@@ -19636,62 +19447,25 @@ const FEE_PERCENT = 0.01; // 1% комиссии
     return () => { cancelled = true; clearInterval(iv); };
   }, [token?.curveAddress, token?.tokenAddress, tonPriceUsd]);
 
-  // Диагностика запроса баланса — больше не рисуется на экране, но
-  // остаётся в консоли (console.log/console.error) на случай отладки.
-  const [tonDebug, setTonDebug] = useState(null);
-  // Раньше баланс перезапрашивался только при смене адреса кошелька —
-  // после успешной покупки/продажи он так и оставался старым значением
-  // (в вашем случае — 0, потому что первый запрос ни разу не прошёл
-  // из-за 429). Инкрементируем этот счётчик из confirmTrade, чтобы
-  // эффект ниже перезапустился и подтянул баланс заново.
+  /* Счётчик обновлений баланса: сеть подтверждает сделку не мгновенно,
+     поэтому после неё баланс перезапрашивается отдельно. */
   const [balanceRefreshTick, setBalanceRefreshTick] = useState(0);
+  /* Баланс кошелька приложения. Опрашиваем сами: пополнение приходит
+     мимо приложения, а после сделки сеть подтверждает её не мгновенно —
+     поэтому и по кругу, и по счётчику обновлений. */
   useEffect(() => {
-    if (!walletAddress) { setTonBalance(0); return; }
-    // wallet.account.chain — это то, в какой сети реально сидит
-    // подключённый кошелёк ("-239" = mainnet, "-3" = testnet). Если он
-    // не равен "-3", кошелёк подключён не в testnet, и никакой запрос
-    // к testnet.tonapi.io не покажет ваши тестовые TON, потому что
-    // TonConnectUIProvider (в index/main файле) настроен на mainnet-
-    // манифест.
-    const chain = wallet?.account?.chain;
-    let cancelled = false;
-    // Бесплатный tonapi.io без ключа отдаёт 429 "rate limit: free tier"
-    // при частых запросах (типично во время разработки с HMR/перезагрузками).
-    // Ретраим с нарастающей паузой вместо того, чтобы сразу сдаваться и
-    // показывать баланс 0, будто на кошельке правда пусто.
-    async function fetchBalance(attempt = 0) {
-      try {
-        const headers = TONAPI_KEY ? { Authorization: `Bearer ${TONAPI_KEY}` } : {};
-        const r = await fetch(`https://${TONAPI_HOST}/v2/accounts/${walletAddress}`, { headers });
-        const body = await r.json().catch(() => null);
-        if (cancelled) return;
-        if (r.status === 429 && attempt < 3) {
-          const delay = 1200 * (attempt + 1);
-          console.warn(`[ton-debug] tonapi 429, retry in ${delay}ms (attempt ${attempt + 1}/3)`);
-          setTonDebug({ chain, host: TONAPI_HOST, status: r.status, error: `rate limited, retrying (${attempt + 1}/3)` });
-          setTimeout(() => fetchBalance(attempt + 1), delay);
-          return;
-        }
-        if (!r.ok) {
-          console.error("[ton-debug] tonapi error", r.status, body);
-          setTonBalance(0);
-          setTonDebug({ chain, host: TONAPI_HOST, status: r.status, error: JSON.stringify(body).slice(0, 160) });
-          return;
-        }
-        console.log("[ton-debug] tonapi response:", body);
-        setTonBalance(body && body.balance ? Number(body.balance) / 1e9 : 0);
-        setTonDebug({ chain, host: TONAPI_HOST, status: r.status, balanceRaw: body?.balance });
-      } catch (err) {
-        if (cancelled) return;
-        console.error("[ton-debug] tonapi fetch failed:", err);
-        setTonBalance(0);
-        setTonDebug({ chain, host: TONAPI_HOST, error: String(err).slice(0, 160) });
-      }
-    }
-    console.log("[ton-debug] wallet.account.chain:", chain, "address:", walletAddress);
-    fetchBalance();
-    return () => { cancelled = true; };
-  }, [walletAddress, balanceRefreshTick]);
+    let жив = true;
+    const шаг = async () => {
+      const { состояниеВнутреннегоTON } = await import("./appWallet");
+      const с = await состояниеВнутреннегоTON().catch(() => null);
+      if (!жив) return;
+      if (с && с.address) { setВнутрTON(с); setTonBalance(Number(с.ton) || 0); }
+      else if (с && с.нуженВход) { setВнутрTON(null); setTonBalance(0); }
+    };
+    шаг();
+    const id = setInterval(шаг, 15000);
+    return () => { жив = false; clearInterval(id); };
+  }, [balanceRefreshTick]);
   const [tonPriceChecked, setTonPriceChecked] = useState(false);
   useEffect(() => {
     // Два источника: если один недоступен (у CoinGecko бывает лимит на
@@ -21585,13 +21359,12 @@ function mapTokenRow(row) {
     if (settingsItem) return () => setSettingsItem(null);
     if (tradeModal) return () => setTradeModal(null);
     if (manageToken_) return () => setManageToken_(null);
-    if (connectModalOpen) return () => setConnectModalOpen(false);
     if (view === "user") return backFromUserProfile;
     if (view === "token") return backFromToken;
     if (view === "create") return () => setView(tab);
     if (view === "achievements") return () => setView("profile");
     return null;
-  }, [pinLocked, pinModal, launchRequest, profileModalOpen, settingsItem, tradeModal, manageToken_, connectModalOpen, view, tab, token]);
+  }, [pinLocked, pinModal, launchRequest, profileModalOpen, settingsItem, tradeModal, manageToken_, view, tab, token]);
 
   useEffect(() => {
     const tg = typeof window !== "undefined" ? window.Telegram && window.Telegram.WebApp : null;
@@ -21607,10 +21380,7 @@ function mapTokenRow(row) {
     };
   }, [backAction]);
 
-  function handleHeaderWalletClick() {
-    if (connected) { goTab("profile"); }
-    else { setConnectModalOpen(true); }
-  }
+  function handleHeaderWalletClick() { goTab("profile"); }
 
   function openCreateProfile() { setProfileModalMode("create"); setProfileModalOpen(true); }
   function openEditProfile() { setLookFocus(null); setProfileModalMode("edit"); setProfileModalOpen(true); }
@@ -21628,7 +21398,7 @@ function mapTokenRow(row) {
     setAccountCreated(false);
     setProfile(EMPTY_PROFILE);
     вернутьПриветствие();
-    if (connected) tonConnectUI.disconnect();
+    if (wallet) tonConnectUI.disconnect();
     showToast(t("loggedOut"));
   }
   async function deleteAccountForever() {
@@ -21659,17 +21429,14 @@ function mapTokenRow(row) {
     setAccountCreated(false);
     setProfile(EMPTY_PROFILE);
     вернутьПриветствие();
-    if (connected) tonConnectUI.disconnect();
+    if (wallet) tonConnectUI.disconnect();
     showToast(t("accountDeleted"));
   }
   function openLoginProfile() { setProfileModalMode("login"); setProfileModalOpen(true); }
   function requireUnlockRoot() {
     if (!accountCreated) { setProfileModalMode("create"); setProfileModalOpen(true); showToast(t("firstAccountFirst")); return false; }
-    // TonConnect нужен только токенам TON: сделка в Solana уходит
-    // кошельком приложения, и требовать здесь TON-кошелёк — тупик, из
-    // которого человек не выйдет, сколько его ни подключай.
-    if (token && token.chain === "solana") return true;
-    if (!connected) { setConnectModalOpen(true); showToast(t("connectWalletTrade")); return false; }
+    // Внешний кошелёк спрашивать не у кого: сделки в обеих сетях идут
+    // кошельком приложения, он заводится вместе с аккаунтом.
     return true;
   }
   function handleBuy() { if (requireUnlockRoot()) setTradeModal({ mode: "buy" }); }
@@ -21739,118 +21506,53 @@ function mapTokenRow(row) {
     }
   }
 
-  /* Сделка в Solana. Кошелёк там свой (Phantom), маршрут считает
-     Jupiter, а подпись человек ставит в самом кошельке — приложение
-     только собирает и показывает. Ключей мы, как и в TON, не касаемся.
+  /* Сделка в Solana — кошельком приложения и только им. Наружу уходит
+     намерение: какой токен, сколько и в какую сторону; маршрут, сборку,
+     проверку и подпись делает сервер.
 
-     Модули грузятся по требованию: шифрование сессии и разбор base58
-     нужны единицам, а весят прилично — тащить их в общий пакет ради
-     раздела, куда заходят не все, незачем. */
+     Модули грузятся по требованию: внутренний кошелёк нужен не на
+     каждом экране, а весит прилично. */
   async function свопSolana({ token, amountSol, продажа = false, количество = 0 }) {
     /* eslint-disable-next-line no-param-reassign */
-    const { подключить, сохранённаяСессия, подписать } = await import("./phantom");
     const { состояниеВнутреннего, свопВнутренним, сделкаВнутренним } = await import("./appWallet");
 
     const SOL = "So11111111111111111111111111111111111111112";
 
-    /* Сначала внутренний кошелёк: на нём хватило — сделка уходит в сеть
-       сразу, без похода в Phantom. Именно этот поход и съедает время, за
-       которое цена успевает уехать.
-
-       Через внутренний кошелёк наружу уходит только намерение: какие
-       токены и на сколько менять. Собирает маршрут, проверяет и
-       подписывает сервер — готовых транзакций браузер больше не
-       касается вовсе. */
     // Пока пары на бирже нет, весь оборот идёт через кривую площадки.
     const наКривойСети = !token.poolAddress && !!token.curveAddress;
-    const нужно = продажа ? 0.003 : Number(amountSol || 0) + 0.003;
     const внутренний = await состояниеВнутреннего();
-    const черезВнутренний = !!(внутренний && внутренний.address && (внутренний.sol || 0) >= нужно);
-    let сессия = черезВнутренний ? { wallet: внутренний.address } : сохранённаяСессия();
-    if (!сессия) {
-      showToast(t("solConnecting"));
-      сессия = await подключить();
-    }
+    if (!внутренний || !внутренний.address) throw new Error(t("needAccountShort"));
+
     // Точность токена у каждого своя, и ошибка здесь — это ошибка в
     // тысячу раз по сумме. Поэтому не угадываем: спрашиваем сеть вместе
     // с балансом, там она приходит вместе со счётом.
     let десятичные = 6;
     if (продажа) {
-      const b = await fetch(апи(`/api/solana?action=balances&wallet=${сессия.wallet}&mint=${token.tokenAddress}`))
+      const b = await fetch(апи(`/api/solana?action=balances&wallet=${внутренний.address}&mint=${token.tokenAddress}`))
         .then((r) => r.json())
         .catch(() => null);
       if (b && b.decimals > 0) десятичные = b.decimals;
       if (b && b.token > 0 && количество > b.token) количество = b.token;
     }
+
+    /* Токен, который ещё на нашей кривой, торгуется только кривой:
+       маршрутизатор биржи о нём не знает (а в тестовой сети — ни о
+       каком вовсе), поэтому идти к нему бессмысленно. Заодно этой же
+       ручкой проверяются обещания создателя и пишется история. */
+    if (наКривойСети) {
+      return await сделкаВнутренним({
+        mint: token.tokenAddress,
+        продажа,
+        amount: продажа ? количество : Number(amountSol || 0),
+      });
+    }
+
     const вход = продажа ? token.tokenAddress : SOL;
     const выход = продажа ? SOL : token.tokenAddress;
     const сумма = продажа
       ? String(Math.round(количество * 10 ** десятичные))
       : String(Math.round(amountSol * 1e9));
-
-    /* Токен, который ещё на нашей кривой, торгуется только кривой:
-       маршрутизатор биржи о нём не знает (а в тестовой сети — ни о
-       каком вовсе), поэтому идти к нему бессмысленно — раньше это и
-       было «маршрут не найден». Внутренним кошельком сделка уходит
-       одной ручкой, ей же проверяются обещания создателя и пишется
-       история; со Phantom — сервер собирает, кошелёк подписывает. */
-    if (наКривойСети) {
-      if (черезВнутренний) {
-        return await сделкаВнутренним({
-          mint: token.tokenAddress,
-          продажа,
-          amount: продажа ? количество : Number(amountSol || 0),
-        });
-      }
-      const собрано = await fetch(апи("/api/solana-launch?action=trade"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          wallet: сессия.wallet,
-          mint: token.tokenAddress,
-          sell: продажа,
-          amount: продажа ? количество : Number(amountSol || 0),
-          minOut: 0,
-        }),
-      }).then((r) => r.json());
-      if (!собрано || собрано.error || !собрано.transaction) throw new Error("сделка не собралась");
-      showToast(t("solSignInWallet"));
-      const подписанная = await подписать(собрано.transaction, сессия);
-      const итог = await fetch(апи("/api/solana?action=send"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transaction: подписанная }),
-      }).then((r) => r.json());
-      if (!итог || итог.error) throw new Error("сеть не приняла сделку");
-      return итог.signature;
-    }
-
-    // Внутренним кошельком — одним запросом: маршрут, сборка, подпись и
-    // отправка целиком на сервере.
-    if (черезВнутренний) return await свопВнутренним({ вход, выход, сумма });
-
-    const параметры = new URLSearchParams({ input: вход, output: выход, amount: сумма, slippage: "150" });
-    const кот = await fetch(апи(`/api/solana?action=quote&${параметры}`)).then((r) => r.json());
-    if (!кот || кот.error || !кот.quote) throw new Error("маршрут не найден");
-
-    const собранная = await fetch(апи("/api/solana?action=swap"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ quote: кот.quote, wallet: сессия.wallet }),
-    }).then((r) => r.json());
-    if (!собранная || собранная.error || !собранная.transaction) throw new Error("сделка не собралась");
-
-    showToast(t("solSignInWallet"));
-    // Кошелёк только подписывает: отправку в сеть Phantom больше не
-    // делает, поэтому подписанную сделку доводим до узла сами.
-    const подписанная = await подписать(собранная.transaction, сессия);
-    const итог = await fetch(апи("/api/solana?action=send"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transaction: подписанная }),
-    }).then((r) => r.json());
-    if (!итог || итог.error) throw new Error("сеть не приняла сделку");
-    return итог.signature;
+    return await свопВнутренним({ вход, выход, сумма });
   }
 
   async function confirmTrade(mode, payAmount, receiveAmount, unit, rawAmount, rawEstimate) {
@@ -21889,41 +21591,13 @@ function mapTokenRow(row) {
         }));
         return;
       }
-      const feeTon = totalTon * FEE_PERCENT;
-      const mainTon = totalTon - feeTon;
-
       try {
-        // У токенов, запущенных в приложении, есть своя бондинг-кривая —
-        // покупка идёт сообщением на неё, и жетоны реально приходят на
-        // кошелёк. У токенов из внешней ленты кривой нет: там остаётся
-        // прежний перевод, потому что торговать на чужом пуле отсюда
-        // пока нечем.
-        // Куда идёт сделка: пока кривая торгует — в неё, после закрытия
-        // — в собственный пул токена. Оба контракта наши, удерживают
-        // одинаковый газ и берут ту же комиссию, отличается только тело
-        // сообщения.
-        const рынокПул = !!(token.graduated && token.dexPoolAddress);
-        const рынок = рынокПул ? token.dexPoolAddress : token.curveAddress;
-        const messages = рынок
-          ? [{
-              address: рынок,
-              // Контракт удерживает фиксированную сумму на газ, поэтому
-              // отправляем её сверх суммы покупки — иначе на рынок
-              // попадёт меньше, чем человек ввёл.
-              amount: (toNano(totalTon.toFixed(9)) + CURVE_GAS_BUY_OVERHEAD).toString(),
-              payload: (рынокПул
-                ? buildPoolBuyBody({ queryId: 0n, minTokensOut: 0n })
-                : buildBuyBody({ queryId: 0n, minTokensOut: 0n })).toBoc().toString("base64"),
-            }]
-          : [
-              { address: TREASURY_ADDRESS, amount: toNano(mainTon.toFixed(9)).toString() },
-              { address: FEE_ADDRESS, amount: toNano(feeTon.toFixed(9)).toString() },
-            ];
-        await tonConnectUI.sendTransaction({
-          validUntil: Math.floor(Date.now() / 1000) + 300,
-          network: TON_TESTNET ? "-3" : "-239",
-          messages,
-        });
+        /* Покупку отправляет кошелёк приложения: наружу уходит только
+           «этот токен, столько-то TON», а сообщение на кривую собирает
+           и подписывает сервер. Внешнего кошелька в сделках больше нет —
+           ни подтверждения в Tonkeeper, ни ухода из приложения. */
+        const { купитьВнутреннимTON } = await import("./appWallet");
+        await купитьВнутреннимTON({ tokenId: token.id, сумма: totalTon });
         adjustHolding(token.id, rawEstimate);
         recordTrade("buy", totalTon, rawEstimate);
         setTradeModal(null);
@@ -21933,7 +21607,8 @@ function mapTokenRow(row) {
         // пару секунд на подтверждение, потом перезапрашиваем его.
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
       } catch (err) {
-        showToast(t("txCancelled"));
+        const detail = (err && (err.message || String(err))) || "";
+        showToast(detail ? `${t("txCancelled")} — ${detail.slice(0, 140)}` : t("txCancelled"));
       }
     } else {
       // Can't sell more than is actually held — re-checked here too, not
@@ -21944,64 +21619,13 @@ function mapTokenRow(row) {
       const held = chainHolding;
       if (held == null) { showToast(t("balanceLoading")); return; }
       if (rawAmount > held) { showToast(t("insufficientSellAmount")); return; }
-      if (!connected) { showToast(t("connectWalletSell")); return; }
-      // Продажа на кривой — это перевод жетонов на её кошелёк: кривая
-      // получает уведомление и присылает TON обратно. Нужен свой кошелёк
-      // жетона продавца, поэтому адрес спрашиваем у мастера жетона.
       try {
-        let messages;
-        // Тот же выбор рынка, что и при покупке: закрытая кривая
-        // означает, что жетоны нужно переводить уже в пул.
-        const рынокПродажи = token.graduated && token.dexPoolAddress
-          ? token.dexPoolAddress
-          : token.curveAddress;
-        if (рынокПродажи && token.tokenAddress && chainJettonWallet) {
-          // Адрес уже известен — между нажатием и открытием кошелька не
-          // должно быть ни одного await, иначе окно кошелька закроется.
-          // tonapi отдаёт адрес в сыром виде (0:abc…), а кошельки ждут
-          // привычный EQ…-формат: на сыром часть из них молча отклоняет
-          // запрос, и окно подтверждения закрывается само.
-          const sellerWallet = Address.parse(chainJettonWallet).toString();
-          const wanted = toNano(rawAmount.toFixed(9));
-          const sellRaw = chainHoldingRaw != null && wanted > chainHoldingRaw ? chainHoldingRaw : wanted;
-          const body = beginCell()
-            .storeUint(0xf8a7ea5, 32)
-            .storeUint(0, 64)
-            // Продаём не больше того, что реально на кошельке: при продаже
-            // всего берём точное значение из сети, а не пересчитанное из
-            // округлённого числа токенов.
-            .storeCoins(sellRaw)
-            .storeAddress(Address.parse(рынокПродажи))
-            .storeAddress(Address.parse(walletAddress))
-            .storeBit(false)
-            .storeCoins(CURVE_SELL_FORWARD_TON)
-            .storeBit(true)
-            .storeRef(buildSellPayload(0n))
-            .endCell();
-          messages = [{
-            address: sellerWallet,
-            amount: CURVE_SELL_VALUE.toString(),
-            payload: body.toBoc().toString("base64"),
-          }];
-        } else {
-          // У токенов из внешней ленты кривой нет: настоящей продажи
-          // здесь не происходит, но комиссия площадки берётся с любой
-          // сделки — те же 1%, что удерживает кривая. Считаем их от
-          // суммы продажи в TON; совсем маленькая сумма упирается в
-          // минимум, иначе сообщение не покрыло бы даже пересылку.
-          const usdValue = rawAmount * (token.price > 0 ? token.price : 0);
-          const tonValue = tonPriceUsd > 0 ? usdValue / tonPriceUsd : 0;
-          const feeTon = Math.max(0.01, tonValue * FEE_PERCENT);
-          messages = [{
-            address: FEE_ADDRESS,
-            amount: toNano(feeTon.toFixed(9)).toString(),
-          }];
-        }
-        await tonConnectUI.sendTransaction({
-          validUntil: Math.floor(Date.now() / 1000) + 300,
-          network: TON_TESTNET ? "-3" : "-239",
-          messages,
-        });
+        /* Продажа на кривой — перевод жетонов на неё с пометкой
+           «продажа»: кривая присылает TON обратно. Жетоны лежат на
+           кошельке приложения, поэтому и перевод делает он — адрес
+           жетонного кошелька сервер спрашивает у сети сам. */
+        const { продатьВнутреннимTON } = await import("./appWallet");
+        await продатьВнутреннимTON({ tokenId: token.id, количество: rawAmount });
         adjustHolding(token.id, -rawAmount);
         // Сколько TON вернулось — это оценка из окна, точную сумму знает
         // только сеть, а ждать её здесь нельзя.
@@ -22106,7 +21730,6 @@ function mapTokenRow(row) {
         <PinLockScreen pin={pinCode} profile={profile} onUnlock={() => setPinLocked(false)} onForgot={forgotPin} />
       )}
 
-      <ConnectModal open={connectModalOpen} onClose={() => setConnectModalOpen(false)} onConnect={() => tonConnectUI.openModal()} />
       <AuthModal open={profileModalOpen} onClose={() => { setProfileModalOpen(false); setLookFocus(null); }} onSubmit={submitProfile} initial={profile} mode={profileModalMode} walletAddress={walletAddress} onChangeNickname={changeNickname} cosmetics={cosmetics} owned={owned} onEquip={equipCosmetic} lookFocus={lookFocus} />
       <SettingsPanel
         item={settingsItem}
@@ -22249,8 +21872,6 @@ function mapTokenRow(row) {
               walletAddress={walletAddress}
               tonBalance={tonBalance}
               tonPriceUsd={tonPriceUsd}
-              onConnect={() => { tonConnectUI.openModal(); }}
-              onDisconnect={() => { tonConnectUI.disconnect(); }}
               onCopy={() => {
                 if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(walletAddress).catch(() => {});
                 showToast(t("addressCopied"));
@@ -22295,7 +21916,7 @@ function mapTokenRow(row) {
               insetTop={insetTop}
             />
           )}
-          {view === "token" && <TokenDetail t={token} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} unlocked={accountCreated && (connected || (token && token.chain === "solana"))} connected={connected} onConnectWallet={() => setConnectModalOpen(true)} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} />}
+          {view === "token" && <TokenDetail t={token} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} unlocked={accountCreated} connected={connected} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} />}
           {view === "create" && (
             <CreateView
               черновик={черновикЗапуска}
@@ -22305,7 +21926,6 @@ function mapTokenRow(row) {
               accountCreated={accountCreated}
               connected={connected}
               onOpenCreateProfile={openCreateProfile}
-              onOpenConnectModal={() => setConnectModalOpen(true)}
               onLaunch={handleLaunchRequest}
               solДоступен={solЗапуск}
             />
@@ -22348,7 +21968,6 @@ function mapTokenRow(row) {
         <СтраницаПрофиля открыт={view === "profile"} insetTop={insetTop}>
             <ProfileView
               connected={connected}
-              onOpenConnectModal={() => setConnectModalOpen(true)}
               showToast={showToast}
               accountCreated={accountCreated}
               profile={profile}

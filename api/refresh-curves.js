@@ -291,11 +291,20 @@ async function ветвьSolana(tok, прошлое) {
     const st = await состояниеSol(tok.address);
     if (!st) return null;
 
-    // История дорогая, поэтому читаем её не каждый заход, а прошлую
-    // держим при себе: цифры за сутки от одной минуты не меняются.
-    const свежая = прошлое && прошлое.updated_at
-      && Date.now() - new Date(прошлое.updated_at).getTime() < SOL_ИСТОРИЯ_МС
-      && Array.isArray(прошлое.trades);
+    /* История дорогая, поэтому читаем её не каждый заход. Признак того,
+       что читать пора, — изменившееся собранное: через кривую деньги
+       ходят только сделками, и другого способа сдвинуть эту цифру нет.
+       По времени сверяться было нельзя: метку ставит каждый заход, а
+       заходы идут раз в двадцать секунд, поэтому «прошло пять минут» не
+       наступало никогда — история читалась ровно один раз, и после
+       покупки на графике ничего не появлялось. */
+    const собраноБыло = прошлое && прошлое.real_ton != null ? Number(прошлое.real_ton) : null;
+    const свежая = прошлое
+      && Array.isArray(прошлое.trades)
+      && собраноБыло != null
+      && Math.abs(собраноБыло - st.solСобрано) < 1e-9
+      && прошлое.updated_at
+      && Date.now() - new Date(прошлое.updated_at).getTime() < SOL_ИСТОРИЯ_МС * 12;
     let сделки = [];
     if (свежая) {
       сделки = прошлое.trades.map((п) => ({ time: Number(p_время(п)), дельта: Number(п.d || 0) }));
@@ -384,7 +393,7 @@ export default async function handler(req, res) {
   {
     const { data } = await admin
       .from("curve_cache")
-      .select("token_id, trades, updated_at")
+      .select("token_id, trades, updated_at, real_ton")
       .in("token_id", tokens.map((t) => t.id));
     for (const с of data || []) прошлыеКеши.set(с.token_id, с);
   }

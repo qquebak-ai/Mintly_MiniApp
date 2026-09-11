@@ -43,6 +43,12 @@ const ЛИМИТ_В_СУТКИ = Number(process.env.TON_WALLET_DAILY || 100);
 // человек, и покупка отскочит.
 const ГАЗ_ПОКУПКИ = 150000000n;  // 0.15 TON
 const OP_BUY = 1112889633;       // storeBuy из сгенерированного контракта
+// Продажа: те же величины, что в src/curveConfig.js. Пересылка — сколько
+// уходит вместе с жетонами дальше, на саму кривую; газ — сколько стоит
+// всё сообщение целиком.
+const ПЕРЕСЫЛКА_ПРОДАЖИ = 80000000n;   // 0.08 TON
+const ГАЗ_ПРОДАЖИ = 200000000n;        // 0.2 TON
+const SELL_OP = 0x53454c4c;            // «SELL» в пометке к переводу жетонов
 
 function admin() {
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return null;
@@ -163,6 +169,24 @@ async function баланс(адрес) {
   }
 }
 
+/* Жетонный кошелёк владельца для конкретного жетона: адрес и остаток.
+   Спрашиваем у сети — считать его самим значит повторять код мастера
+   жетона, а ошибка здесь отправила бы жетоны в никуда. */
+async function жетонныйКошелёк(владелец, мастер) {
+  try {
+    const res = await fetch(`${TONAPI}/v2/accounts/${владелец}/jettons/${мастер}`, {
+      headers: TONAPI_KEY ? { Authorization: `Bearer ${TONAPI_KEY}` } : {},
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const адрес = j && j.wallet_address && j.wallet_address.address;
+    if (!адрес) return null;
+    return { address: адрес, balance: j.balance != null ? String(j.balance) : null };
+  } catch {
+    return null;
+  }
+}
+
 async function выведеноЗаСутки(db, user) {
   const сутки = new Date(Date.now() - 86400000).toISOString();
   const { data } = await db
@@ -258,6 +282,74 @@ export default async function handler(req, res) {
       });
 
       await записать(db, user, "buy", сумма, null);
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).json({ ok: true, seqno });
+    }
+
+    /* Продажа на кривой. Жетоны лежат на кошельке приложения, поэтому и
+       продавать их может только он: внешнего кошелька в приложении
+       больше нет. Уходит одно сообщение — перевод жетонов на кривую с
+       пометкой «продажа»; TON за них кривая возвращает сама.
+
+       Адрес жетонного кошелька спрашиваем у сети, а не у браузера: это
+       единственное место, куда уходят жетоны, и подменять его снаружи
+       нельзя. */
+    if (действие === "sell") {
+      const tokenId = String(тело.tokenId || "");
+      const сколько = Number(тело.amount) || 0;
+      if (!tokenId || !(сколько > 0)) return res.status(400).json({ error: "bad_request" });
+
+      const { data: токен } = await db
+        .from("tokens")
+        .select("id, address, curve_address, dex_pool_address, chain, curve_cache(graduated)")
+        .eq("id", tokenId)
+        .maybeSingle();
+      if (!токен || (токен.chain || "ton") !== "ton") return res.status(404).json({ error: "token_not_found" });
+      const кеш = Array.isArray(токен.curve_cache) ? токен.curve_cache[0] : токен.curve_cache;
+      const рынок = (кеш && кеш.graduated && токен.dex_pool_address) || токен.curve_address;
+      if (!рынок || !токен.address) return res.status(400).json({ error: "no_curve" });
+
+      const мой = await жетонныйКошелёк(строка.address, токен.address);
+      if (!мой) return res.status(400).json({ error: "no_jetton_wallet" });
+      // Больше, чем есть, не продаём: сеть такое сообщение просто
+      // отобьёт, а газ спишется.
+      const хочет = BigInt(Math.round(сколько * 1e9));
+      const сколькоБигом = мой.balance != null && BigInt(мой.balance) < хочет ? BigInt(мой.balance) : хочет;
+      if (!(сколькоБигом > 0n)) return res.status(400).json({ error: "not_enough" });
+
+      const есть = await баланс(строка.address);
+      if (есть < 0.25) return res.status(400).json({ error: "not_enough_gas", have: есть, need: 0.25 });
+
+      const { beginCell, internal, Address, SendMode } = await библиотеки();
+      const { пара, кошелёк: открытый } = await подписант(строка, набор, user);
+
+      const пометка = beginCell().storeBit(false).storeUint(SELL_OP, 32).storeCoins(0n).endCell();
+      const тело_ = beginCell()
+        .storeUint(0xf8a7ea5, 32)
+        .storeUint(0n, 64)
+        .storeCoins(сколькоБигом)
+        .storeAddress(Address.parse(рынок))
+        .storeAddress(Address.parse(строка.address))
+        .storeBit(false)
+        .storeCoins(ПЕРЕСЫЛКА_ПРОДАЖИ)
+        .storeBit(true)
+        .storeRef(пометка)
+        .endCell();
+
+      const seqno = await открытый.getSeqno();
+      await открытый.sendTransfer({
+        seqno,
+        secretKey: пара.secretKey,
+        sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+        messages: [internal({
+          to: Address.parse(мой.address),
+          value: ГАЗ_ПРОДАЖИ,
+          body: тело_,
+          bounce: true,
+        })],
+      });
+
+      await записать(db, user, "sell", сколько, null);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ ok: true, seqno });
     }
