@@ -22037,8 +22037,10 @@ function mapTokenRow(row) {
           // восемнадцать точек не хватало — строка успевала обрезаться
           // резким краем раньше, чем растворялась.
           position: "absolute", left: 0, right: 0, top: 0, height: 34, zIndex: 4, pointerEvents: "none",
-          backdropFilter: "blur(14px) brightness(0.6)",
-          WebkitBackdropFilter: "blur(14px) brightness(0.6)",
+          // Почти прозрачная: гасим подложку чуть-чуть, только чтобы
+          // белый текст не разгорался под размытием.
+          backdropFilter: "blur(14px) brightness(0.88)",
+          WebkitBackdropFilter: "blur(14px) brightness(0.88)",
           WebkitMaskImage: "linear-gradient(180deg, #000 45%, transparent 100%)",
           maskImage: "linear-gradient(180deg, #000 45%, transparent 100%)",
         }} />
@@ -22047,9 +22049,9 @@ function mapTokenRow(row) {
           // капсулы разделов выезжает текст, и узкая полоска его не
           // прятала — строка обрывалась на полуслове резким краем.
           position: "absolute", left: 0, right: 0, bottom: 0, height: 56, zIndex: 4, pointerEvents: "none",
-          backdropFilter: "blur(14px) brightness(0.45)",
-          WebkitBackdropFilter: "blur(14px) brightness(0.45)",
-          background: "linear-gradient(0deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0) 100%)",
+          backdropFilter: "blur(14px) brightness(0.88)",
+          WebkitBackdropFilter: "blur(14px) brightness(0.88)",
+          background: "linear-gradient(0deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 100%)",
           WebkitMaskImage: "linear-gradient(0deg, #000 55%, transparent 100%)",
           maskImage: "linear-gradient(0deg, #000 55%, transparent 100%)",
         }} />
