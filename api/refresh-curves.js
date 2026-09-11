@@ -248,16 +248,18 @@ async function сделкиSolana(curveАдрес) {
   const живые = подписи.filter((п) => п && п.signature && !п.err);
   if (!живые.length) return [];
 
-  // Пачками: узел принимает массив запросов разом, и пятьдесят
-  // отдельных походов превращаются в пять.
+  /* По одной транзакции за запрос, по пять разом. Пачкой было дешевле,
+     но наш узел отвечает на список запросов отказом («batch requests are
+     only available for paid plans»), и вся история молча приходила
+     пустой — на графике не появлялось ни одной сделки. */
   const ряд = [];
-  for (let i = 0; i < живые.length; i += 10) {
-    const кусок = живые.slice(i, i + 10);
-    const ответ = await solRpc(кусок.map((п, k) => ({
-      jsonrpc: "2.0", id: i + k, method: "getTransaction",
+  for (let i = 0; i < живые.length; i += 5) {
+    const кусок = живые.slice(i, i + 5);
+    const ответ = await Promise.all(кусок.map((п) => solRpc({
+      jsonrpc: "2.0", id: 1, method: "getTransaction",
       params: [п.signature, { maxSupportedTransactionVersion: 0, encoding: "jsonParsed" }],
-    })));
-    for (const о of (Array.isArray(ответ) ? ответ : [])) {
+    }).catch(() => null)));
+    for (const о of ответ) {
       const tx = о && о.result;
       const мета = tx && tx.meta;
       const счета = tx && tx.transaction && tx.transaction.message && tx.transaction.message.accountKeys;
