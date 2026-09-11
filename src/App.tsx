@@ -21889,10 +21889,12 @@ function mapTokenRow(row) {
           maskImage: "linear-gradient(180deg, #000 45%, transparent 100%)",
         }} />
         <div aria-hidden style={{
-          // Нижний край размывается сильнее и выше верхнего: там из-под
-          // капсулы разделов выезжает текст, и узкая полоска его не
-          // прятала — строка обрывалась на полуслове резким краем.
-          position: "absolute", left: 0, right: 0, bottom: 0, height: 56, zIndex: 4, pointerEvents: "none",
+          // Нижний край размывается выше верхнего: там из-под капсулы
+          // разделов выезжает текст, и совсем узкая полоска его не
+          // прятала — строка обрывалась на полуслове резким краем. Но и
+          // высокая полоса лишняя: она заметно мылила то, что ещё не
+          // дошло до капсулы.
+          position: "absolute", left: 0, right: 0, bottom: 0, height: 44, zIndex: 4, pointerEvents: "none",
           backdropFilter: "blur(14px) brightness(0.88)",
           WebkitBackdropFilter: "blur(14px) brightness(0.88)",
           background: "linear-gradient(0deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 100%)",
