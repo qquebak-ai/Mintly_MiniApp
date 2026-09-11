@@ -4343,6 +4343,12 @@ const СВЕЧА_ПАДЕНИЕ = "#FF3B47";
 
 // Высота полосы, которая всегда висит у верхней кромки экрана токена.
 const ВЫСОТА_ПОЛОСЫ = 64;
+/* Готовые суммы покупки. У сетей они разные не по прихоти: SOL стоит
+   около двух сотен долларов, GRAM — единицы, и одинаковые числа значили
+   бы совсем разные деньги. */
+const СУММЫ_ПОКУПКИ_SOL = [0.01, 0.1, 0.5];
+const СУММЫ_ПОКУПКИ_GRAM = [1, 5, 25];
+
 const CHART_MIN_VISIBLE = 20;
 const CHART_MAX_VISIBLE = 150;
 const CHART_DEFAULT_VISIBLE = 60;
@@ -15902,12 +15908,28 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
         </div>
         {overMax && <div style={{ fontFamily: bodyFont, color: T.rose, fontSize: 12, marginTop: 4 }}>{t("insufficientFunds")}</div>}
 
+        {/* При покупке — готовые суммы, а не доли кошелька: человек
+            думает «куплю на 0.1», а не «на четверть остатка». Величины
+            у сетей разные: GRAM стоит куда дешевле SOL, и те же 0.01
+            там были бы пылью. При продаже доли остаются: продают часть
+            того, что держат. */}
         <div className="grid grid-cols-4 gap-1.5" style={{ marginTop: 8 }}>
-          {[0.25, 0.5, 0.75, 1].map(pct => (
-            <button key={pct} onClick={() => setPct(pct)} className="fx-tap rounded-[16px] py-1.5" style={{ background: T.surfaceHi, border: "none", fontFamily: monoFont, fontSize: 12.5, color: T.ice }}>
-              {pct === 1 ? t("maxLabel") : `${pct * 100}%`}
-            </button>
-          ))}
+          {isBuy
+            ? [...(соло ? СУММЫ_ПОКУПКИ_SOL : СУММЫ_ПОКУПКИ_GRAM), null].map((сумма, i) => (
+              <button
+                key={сумма == null ? "max" : сумма}
+                onClick={() => (сумма == null ? setPct(1) : setAmountStr(String(сумма)))}
+                className="fx-tap rounded-[16px] py-1.5"
+                style={{ background: T.surfaceHi, border: "none", fontFamily: monoFont, fontSize: 12.5, color: T.ice }}
+              >
+                {сумма == null ? t("maxLabel") : `${сумма} ${монета}`}
+              </button>
+            ))
+            : [0.25, 0.5, 0.75, 1].map(pct => (
+              <button key={pct} onClick={() => setPct(pct)} className="fx-tap rounded-[16px] py-1.5" style={{ background: T.surfaceHi, border: "none", fontFamily: monoFont, fontSize: 12.5, color: T.ice }}>
+                {pct === 1 ? t("maxLabel") : `${pct * 100}%`}
+              </button>
+            ))}
         </div>
 
         <div className="rounded-[20px] p-3.5 mt-3.5" style={{ background: T.bg, border: "none" }}>
