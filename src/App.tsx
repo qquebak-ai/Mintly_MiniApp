@@ -4269,6 +4269,9 @@ async function fetchSparkCloses(poolAddress, n = 24, jettonAddress = null) {
    кнопку приложения. Тот же цвет носит и кнопка кошелька Solana —
    обе про одно и то же действие, и разными их делает только подпись. */
 const ЦВЕТ_TON = "#0098EA";
+// Фиолетовый Solana — та же мысль, что и с голубым TON: кнопка носит
+// цвет своей сети.
+const ЦВЕТ_SOL = "#9945FF";
 const СВЕЧА_РОСТ = "#00E96B";
 const СВЕЧА_ПАДЕНИЕ = "#FF3B47";
 
@@ -12657,21 +12660,27 @@ function SolanaWalletCard({ showToast, insetTop = 0, insetBottom = 0 }) {
         {сессия && <ChevronRight size={17} color={T.faint} />}
         {/* Адреса рядом с кошельком нет: он есть на «Получить» целиком и
             кодом, а обрубок в углу карточки ничего не добавлял. */}
-        {сессия ? null : (
-          <button
-            onClick={подключиться}
-            disabled={идёт}
-            className={`fx-tap flex items-center gap-1.5 rounded-full flex-shrink-0${идёт ? " fx-busy" : ""}`}
-            style={{
-              padding: "9px 14px", background: ЦВЕТ_TON, border: "none",
-              fontFamily: displayFont, color: "#FFFFFF", fontSize: 13.5, fontWeight: 700,
-              opacity: идёт ? 0.6 : 1,
-            }}
-          >
-            <Wallet size={13} /> {идёт ? t("solWalletOpening") : t("solWalletConnectFull")}
-          </button>
-        )}
       </div>
+
+      {/* Кнопка стоит там же, где у TON-кошелька: во всю ширину под
+          пояснением. Сбоку она ужимала текст в узкий столбик и читалась
+          как второстепенная, хотя это единственное действие карточки.
+          Цвет — фиолетовый Solana, как голубой у TON. */}
+      {сессия ? null : (
+        <button
+          onClick={подключиться}
+          disabled={идёт}
+          className={`fx-tap w-full flex items-center justify-center${идёт ? " fx-busy" : ""}`}
+          style={{
+            gap: 7, marginTop: 12, padding: "11px 14px", borderRadius: 14,
+            background: ЦВЕТ_SOL, border: "none", color: "#FFFFFF",
+            fontFamily: displayFont, fontSize: 14, fontWeight: 700,
+            opacity: идёт ? 0.6 : 1,
+          }}
+        >
+          <Wallet size={14} /> {идёт ? t("solWalletOpening") : t("solWalletConnectFull")}
+        </button>
+      )}
 
       {/* Отключение переехало на страницу кошелька: она открывается по
           нажатию на саму карточку, и там его надо провести ползунком. */}
