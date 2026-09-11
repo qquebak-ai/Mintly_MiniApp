@@ -285,6 +285,11 @@ export function ценаSolПо(realSol, st) {
   return резерв / токенов;
 }
 
+/* Когда историю сделок этого токена читали из сети в последний раз.
+   Живёт в процессе: обход идёт в нём же, а после перезапуска первый
+   заход перечитает всё заново — это и нужно. */
+const историяЧитана = new Map();
+
 async function ветвьSolana(tok, прошлое) {
   try {
     const { состояние: состояниеSol } = await import("./solana-launch.js");
@@ -299,17 +304,20 @@ async function ветвьSolana(tok, прошлое) {
        наступало никогда — история читалась ровно один раз, и после
        покупки на графике ничего не появлялось. */
     const собраноБыло = прошлое && прошлое.real_ton != null ? Number(прошлое.real_ton) : null;
+    const читалиКогда = историяЧитана.get(tok.id) || 0;
     const свежая = прошлое
       && Array.isArray(прошлое.trades)
       && собраноБыло != null
       && Math.abs(собраноБыло - st.solСобрано) < 1e-9
-      && прошлое.updated_at
-      && Date.now() - new Date(прошлое.updated_at).getTime() < SOL_ИСТОРИЯ_МС * 12;
+      // Своя метка, а не updated_at строки: её ставит каждый обход, и по
+      // ней «прошло пять минут» не наступало никогда.
+      && Date.now() - читалиКогда < SOL_ИСТОРИЯ_МС;
     let сделки = [];
     if (свежая) {
       сделки = прошлое.trades.map((п) => ({ time: Number(p_время(п)), дельта: Number(п.d || 0) }));
     } else {
       сделки = await сделкиSolana(tok.curve_address).catch(() => []);
+      историяЧитана.set(tok.id, Date.now());
     }
 
     const сутки = Math.floor(Date.now() / 1000) - 86400;
