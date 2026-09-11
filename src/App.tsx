@@ -439,6 +439,25 @@ const STR = {
     nothingToSell: "Нечего продавать",
     enterAmount: "Введите сумму",
     logoUploaded: "Логотип загружен",
+    xTitle: "Аккаунт в X",
+    xHint: "Подтверждённый аккаунт виден всем, кто открывает твои токены: ссылку в профиль может вписать любой, а подтверждение — только владелец.",
+    xStep1: "Опубликуй пост с кодом",
+    xStep2: "Пришли ссылку на этот пост",
+    xPublish: "Открыть X с готовым постом",
+    xPostUrl: "Ссылка на пост",
+    xCheck: "Проверить",
+    xChecking: "Проверяю…",
+    xConnected: "Аккаунт подтверждён",
+    xUnlink: "Отключить",
+    xCodeCopied: "Код скопирован",
+    xErrUrl: "Нужна ссылка на пост в X — вида x.com/имя/status/…",
+    xErrNoCode: "Сначала возьми код",
+    xErrExpired: "Код устарел — возьми новый",
+    xErrSilent: "X не ответил — попробуй ещё раз",
+    xErrAuthor: "Пост опубликован не с того аккаунта",
+    xErrNoCodeInPost: "В посте нет кода",
+    xErrTaken: "Этот аккаунт уже подтверждён другим профилем",
+    xPostText: "Подтверждаю свой аккаунт в Mintly: {code}",
     logoUploadFailed: "Логотип не загрузился — токен выйдет без картинки",
     changeLogo: "Заменить картинку",
     logoUploading: "Загружаю…",
@@ -968,6 +987,25 @@ const STR = {
     nothingToSell: "Nothing to sell",
     enterAmount: "Enter amount",
     logoUploaded: "Logo uploaded",
+    xTitle: "X account",
+    xHint: "A verified account shows up for everyone who opens your tokens: anyone can paste a link, only the owner can verify it.",
+    xStep1: "Post the code on X",
+    xStep2: "Send the link to that post",
+    xPublish: "Open X with the post ready",
+    xPostUrl: "Link to the post",
+    xCheck: "Verify",
+    xChecking: "Checking…",
+    xConnected: "Account verified",
+    xUnlink: "Disconnect",
+    xCodeCopied: "Code copied",
+    xErrUrl: "Needs a link to an X post — like x.com/name/status/…",
+    xErrNoCode: "Get the code first",
+    xErrExpired: "The code expired — get a new one",
+    xErrSilent: "X didn't answer — try again",
+    xErrAuthor: "That post is from a different account",
+    xErrNoCodeInPost: "The post has no code",
+    xErrTaken: "That account is already verified by another profile",
+    xPostText: "Verifying my account on Mintly: {code}",
     logoUploadFailed: "The logo didn't upload — the token launches without a picture",
     changeLogo: "Change picture",
     logoUploading: "Uploading…",
@@ -5768,6 +5806,7 @@ const NOTIFY_THRESHOLDS = [0.05, 0.5, 1, 5, 10, 50];
 // Пункта «Профиль» здесь нет: «Редактировать профиль» и так стоит на
 // самом экране профиля, а удаление аккаунта переехало в «Безопасность».
 const SETTINGS_ITEMS = [
+  { key: "x", icon: Twitter, tKey: "xTitle" },
   { key: "security", icon: Lock, tKey: "security" },
   { key: "notify", icon: Bell, tKey: "notifyTitle" },
   { key: "language", icon: Globe2, tKey: "langTitle" },
@@ -6393,7 +6432,7 @@ async function fetchCreatorProfile(userId) {
   if (creatorCache.has(userId)) return creatorCache.get(userId);
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, nickname, bio, avatar_url, emoji, frame_id, card_id, creator_tier, verified")
+    .select("id, nickname, bio, avatar_url, emoji, frame_id, card_id, creator_tier, verified, x_handle")
     .eq("id", userId)
     .maybeSingle();
   const profile = error ? null : data;
@@ -6448,6 +6487,28 @@ function TokenCreatorCard({ ownerId, currentUserId, onNeedAuth, showToast, onOpe
             <CreatorWreathBadge tier={Number(creator.creator_tier) || 0} size={16} />
             <ChevronRight size={14} color={T.muted} />
           </div>
+          {/* Подтверждённый аккаунт в X — главный довод в пользу автора:
+              ссылку в профиль может вписать любой, а подтверждение
+              означает, что постом с нашим кодом распорядился владелец. */}
+          {creator.x_handle ? (
+            <span
+              role="link"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                const url = `https://x.com/${creator.x_handle}`;
+                const wa = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+                if (wa && wa.openLink) wa.openLink(url);
+                else if (typeof window !== "undefined") window.open(url, "_blank", "noopener,noreferrer");
+              }}
+              className="flex items-center"
+              style={{ gap: 4, marginTop: 2 }}
+            >
+              <Twitter size={12} color={T.electric} />
+              <span className="truncate" style={{ fontFamily: bodyFont, color: T.electric, fontSize: 12.5 }}>@{creator.x_handle}</span>
+              <CheckCircle2 size={12} color={T.up} />
+            </span>
+          ) : null}
         </div>
       </button>
     </div>
@@ -11767,7 +11828,7 @@ function ЭкранКошелька({ открыт, onClose, название, �
  * разделы.
  */
 const ГРУППЫ_НАСТРОЕК = [
-  ["security", "notify", "language"],
+  ["x", "security", "notify", "language"],
   ["referral", "support"],
   ["architecture", "privacy"],
 ];
@@ -17540,6 +17601,189 @@ function ReferralShare({ showToast }) {
   );
 }
 
+/* Подключение аккаунта в X.
+ *
+ * Три шага и ни одного ключа: берём одноразовый код, человек публикует с
+ * ним пост у себя, мы спрашиваем у X, кто автор этого поста. Ссылку в
+ * профиль может вписать кто угодно — подтвердить может только тот, у кого
+ * есть доступ к самому аккаунту.
+ */
+function ПодключениеX({ showToast }) {
+  const [состояние, setСостояние] = useState(null); // { handle } | null
+  const [грузится, setГрузится] = useState(true);
+  const [код, setКод] = useState("");
+  const [ссылка, setСсылка] = useState("");
+  const [проверяю, setПроверяю] = useState(false);
+
+  async function запросX(действие, тело) {
+    const { data } = await supabase.auth.getSession();
+    const токен = data && data.session && data.session.access_token;
+    if (!токен) throw new Error("нет входа");
+    const res = await fetch(апи(`/api/twitter?action=${действие}`), {
+      method: тело ? "POST" : "GET",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${токен}` },
+      body: тело ? JSON.stringify(тело) : undefined,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || `http ${res.status}`);
+    return json;
+  }
+
+  useEffect(() => {
+    let жив = true;
+    запросX("state")
+      .then((о) => { if (жив) setСостояние(о && о.handle ? о : null); })
+      .catch(() => {})
+      .finally(() => { if (жив) setГрузится(false); });
+    return () => { жив = false; };
+  }, []);
+
+  async function взятьКод() {
+    try {
+      const о = await запросX("code", {});
+      setКод(о.code);
+    } catch {
+      showToast(t("xErrSilent"));
+    }
+  }
+
+  function открытьX() {
+    if (typeof window === "undefined") return;
+    const текст = trf("xPostText", { code: код });
+    const url = `https://x.com/intent/tweet?text=${encodeURIComponent(текст)}`;
+    const wa = window.Telegram && window.Telegram.WebApp;
+    if (wa && wa.openLink) wa.openLink(url);
+    else window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  const ОШИБКИ = {
+    bad_url: "xErrUrl", no_code: "xErrNoCode", code_expired: "xErrExpired",
+    x_silent: "xErrSilent", wrong_author: "xErrAuthor",
+    no_code_in_post: "xErrNoCodeInPost", taken: "xErrTaken",
+  };
+
+  async function проверить() {
+    if (проверяю) return;
+    setПроверяю(true);
+    try {
+      const о = await запросX("verify", { url: ссылка.trim() });
+      setСостояние({ handle: о.handle });
+      setКод("");
+      setСсылка("");
+      showToast(t("xConnected"));
+    } catch (e) {
+      showToast(t(ОШИБКИ[String(e && e.message)] || "xErrSilent"));
+    } finally {
+      setПроверяю(false);
+    }
+  }
+
+  async function отключить() {
+    try {
+      await запросX("unlink", {});
+      setСостояние(null);
+    } catch {
+      showToast(t("xErrSilent"));
+    }
+  }
+
+  if (грузится) {
+    return <div className="fx-skeleton mt-2" style={{ height: 96, borderRadius: 18 }} />;
+  }
+
+  if (состояние && состояние.handle) {
+    return (
+      <div className="flex flex-col mt-2" style={{ gap: 12 }}>
+        <div className="flex items-center" style={{ gap: 12, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
+          <Twitter size={18} color={T.ice} />
+          <div className="flex-1 min-w-0">
+            <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>@{состояние.handle}</div>
+            <div style={{ fontFamily: bodyFont, color: T.up, fontSize: 12.5 }}>{t("xConnected")}</div>
+          </div>
+          <CheckCircle2 size={18} color={T.up} />
+        </div>
+        <button
+          onClick={отключить}
+          className="fx-tap w-full rounded-[20px] py-3"
+          style={{ background: "transparent", border: `1px solid ${hexA(T.down, 0.35)}`, fontFamily: bodyFont, fontSize: 14.5, color: T.down }}
+        >
+          {t("xUnlink")}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col mt-2" style={{ gap: 14 }}>
+      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>{t("xHint")}</p>
+
+      <div className="flex flex-col" style={{ gap: 10, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>1. {t("xStep1")}</span>
+        {код ? (
+          <button
+            onClick={() => {
+              if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(код).catch(() => {});
+              showToast(t("xCodeCopied"));
+            }}
+            className="fx-tap flex items-center justify-between"
+            style={{ gap: 10, padding: "10px 12px", borderRadius: 14, background: T.surface, border: "none" }}
+          >
+            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 15 }}>{код}</span>
+            <Copy size={14} color={T.muted} />
+          </button>
+        ) : (
+          <button
+            onClick={взятьКод}
+            className="fx-tap w-full rounded-[16px] py-2.5"
+            style={{ background: ЦВЕТ_КНОПКИ, border: "none", fontFamily: displayFont, fontWeight: 700, fontSize: 14.5, color: PRISM_TEXT }}
+          >
+            {t("xStep1")}
+          </button>
+        )}
+        {код ? (
+          <button
+            onClick={открытьX}
+            className="fx-tap w-full rounded-[16px] py-2.5 flex items-center justify-center"
+            style={{ gap: 8, background: T.surface, border: "none", fontFamily: bodyFont, fontSize: 14, color: T.ice }}
+          >
+            <Twitter size={14} color={T.ice} /> {t("xPublish")}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col" style={{ gap: 10, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>2. {t("xStep2")}</span>
+        <input
+          value={ссылка}
+          onChange={(e) => setСсылка(e.target.value)}
+          placeholder={t("xPostUrl")}
+          inputMode="url"
+          autoCapitalize="off"
+          autoCorrect="off"
+          style={{
+            width: "100%", padding: "11px 12px", borderRadius: 14,
+            background: T.surface, border: "none", color: T.ice,
+            fontFamily: monoFont, fontSize: 13.5, outline: "none",
+          }}
+        />
+        <button
+          onClick={проверить}
+          disabled={проверяю || !ссылка.trim()}
+          className="fx-tap w-full rounded-[16px] py-2.5"
+          style={{
+            background: ссылка.trim() ? ЦВЕТ_КНОПКИ : T.surface, border: "none",
+            fontFamily: displayFont, fontWeight: 700, fontSize: 14.5,
+            color: ссылка.trim() ? PRISM_TEXT : T.faint,
+            opacity: проверяю ? 0.6 : 1,
+          }}
+        >
+          {проверяю ? t("xChecking") : t("xCheck")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SettingsPanel({
   item: itemProp, onClose, appSettings, onUpdateSetting,
   profile, showToast,
@@ -17581,6 +17825,9 @@ function SettingsPanel({
 
   let body = null;
   switch (item.key) {
+    case "x":
+      body = <ПодключениеX showToast={showToast} />;
+      break;
     case "security":
       body = (
         <div className="mt-2">
