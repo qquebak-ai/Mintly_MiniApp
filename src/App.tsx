@@ -21739,6 +21739,8 @@ function mapTokenRow(row) {
        токены и на сколько менять. Собирает маршрут, проверяет и
        подписывает сервер — готовых транзакций браузер больше не
        касается вовсе. */
+    // Пока пары на бирже нет, весь оборот идёт через кривую площадки.
+    const наКривойСети = !token.poolAddress && !!token.curveAddress;
     const нужно = продажа ? 0.003 : Number(amountSol || 0) + 0.003;
     const внутренний = await состояниеВнутреннего();
     const черезВнутренний = !!(внутренний && внутренний.address && (внутренний.sol || 0) >= нужно);
@@ -21764,22 +21766,46 @@ function mapTokenRow(row) {
       ? String(Math.round(количество * 10 ** десятичные))
       : String(Math.round(amountSol * 1e9));
 
-    // Внутренним кошельком — одним запросом: маршрут, сборка, подпись и
-    // отправка целиком на сервере.
-    if (черезВнутренний) {
-      /* Токен, который ещё на нашей кривой, торгуется своей ручкой:
-         биржа о нём не знает, а вместе со сделкой нужно проверить
-         обещания создателя и записать её в историю токена — своп этого
-         не делает. */
-      if (!token.poolAddress && token.curveAddress) {
+    /* Токен, который ещё на нашей кривой, торгуется только кривой:
+       маршрутизатор биржи о нём не знает (а в тестовой сети — ни о
+       каком вовсе), поэтому идти к нему бессмысленно — раньше это и
+       было «маршрут не найден». Внутренним кошельком сделка уходит
+       одной ручкой, ей же проверяются обещания создателя и пишется
+       история; со Phantom — сервер собирает, кошелёк подписывает. */
+    if (наКривойСети) {
+      if (черезВнутренний) {
         return await сделкаВнутренним({
           mint: token.tokenAddress,
           продажа,
           amount: продажа ? количество : Number(amountSol || 0),
         });
       }
-      return await свопВнутренним({ вход, выход, сумма });
+      const собрано = await fetch(апи("/api/solana-launch?action=trade"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: сессия.wallet,
+          mint: token.tokenAddress,
+          sell: продажа,
+          amount: продажа ? количество : Number(amountSol || 0),
+          minOut: 0,
+        }),
+      }).then((r) => r.json());
+      if (!собрано || собрано.error || !собрано.transaction) throw new Error("сделка не собралась");
+      showToast(t("solSignInWallet"));
+      const подписанная = await подписать(собрано.transaction, сессия);
+      const итог = await fetch(апи("/api/solana?action=send"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transaction: подписанная }),
+      }).then((r) => r.json());
+      if (!итог || итог.error) throw new Error("сеть не приняла сделку");
+      return итог.signature;
     }
+
+    // Внутренним кошельком — одним запросом: маршрут, сборка, подпись и
+    // отправка целиком на сервере.
+    if (черезВнутренний) return await свопВнутренним({ вход, выход, сумма });
 
     const параметры = new URLSearchParams({ input: вход, output: выход, amount: сумма, slippage: "150" });
     const кот = await fetch(апи(`/api/solana?action=quote&${параметры}`)).then((r) => r.json());
