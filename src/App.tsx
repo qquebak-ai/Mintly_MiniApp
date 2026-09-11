@@ -14771,7 +14771,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               pointerEvents: "none",
             }}
           >
-            <span className="truncate w-full" style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 800, textAlign: "center" }}>
+            {/* Имя крупнее цены: в полосе оно главное — по нему узнают,
+                чья это страница, а цена рядом уже подпись. */}
+            <span className="truncate w-full" style={{ fontFamily: displayFont, color: T.ice, fontSize: 18.5, fontWeight: 800, textAlign: "center" }}>
               {token.name}
             </span>
             <span style={{ fontFamily: displayFont, color: T.paper, fontSize: 16, fontWeight: 700 }}>
