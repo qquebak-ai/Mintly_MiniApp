@@ -18189,7 +18189,9 @@ function SettingsPanel({
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700, marginTop: 6 }}>{t(item.tKey)}</div>
           </div>
         </div>
-        <div className="no-scrollbar" style={{ padding: "0 22px", paddingBottom: 22, overflowY: "auto", flex: 1, minHeight: 0 }}>
+        {/* Запас снизу — на высоту растворяющейся кромки: без него
+            последняя кнопка упиралась в неё и наполовину уходила в фон. */}
+        <div className="no-scrollbar" style={{ padding: "0 22px", paddingBottom: 62, overflowY: "auto", flex: 1, minHeight: 0 }}>
           {body}
         </div>
         {/* Нижняя кромка растворяется заливкой, а не размытием.
