@@ -21635,8 +21635,21 @@ function mapTokenRow(row) {
           продажа: mode === "sell",
           количество: mode === "sell" ? rawAmount : 0,
         });
+        /* Своя запись о сделке. Цепочка знает о переводе, но не знает,
+           кто его сделал из приложения, — а история кошелька и «мои
+           дела» строятся именно по этой таблице. У сделок в Solana её
+           не писали вовсе, поэтому покупка проходила, а в истории после
+           неё было пусто. */
+        recordTrade(
+          mode === "buy" ? "buy" : "sell",
+          mode === "buy" ? rawAmount : Number(rawEstimate) || 0,
+          mode === "buy" ? Number(rawEstimate) || 0 : rawAmount,
+        );
+        adjustHolding(token.id, mode === "buy" ? (Number(rawEstimate) || 0) : -rawAmount);
         setTradeModal(null);
         showToast(подпись ? t("solDone") : t("solSent"));
+        if (mode === "buy") отпраздновать();
+        setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
       } catch (e) {
         showToast(`${t("solFailed")}: ${String((e && e.message) || e).slice(0, 80)}`);
       }
