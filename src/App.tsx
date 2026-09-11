@@ -675,6 +675,16 @@ const STR = {
     solDone: "Сделка ушла в сеть",
     solSent: "Отправлено",
     solFailed: "Не вышло",
+    // Отказы сделки словами, а не кодом: код на экране человеку ничего
+    // не объясняет, а причина у каждого отказа понятная.
+    errCreatorLocked: "Ты создатель — продажа закрыта до выхода на биржу, так обещано в токене",
+    errFairStart: "Честный старт: первую минуту покупают только из приложения",
+    errNotEnough: "Не хватает монет на кошельке приложения",
+    errNotEnoughGas: "Не хватает на комиссию сети — пополни кошелёк",
+    errNoJettonWallet: "Этих токенов на кошельке нет",
+    errNoCurve: "У токена пока нет рынка",
+    errTokenNotFound: "Токен не найден",
+    errTooOften: "Слишком часто — подожди минуту",
     rateLoadingRetry: "Курс GRAM ещё загружается, попробуй через секунду",
     insufficientTon: "Не хватает GRAM: на кошельке {have}, нужно {need} с газом",
     tokenSaveFailed: "Токен создан в сети, но не сохранился: {reason}. Попробуем ещё раз при следующем запуске.",
@@ -1224,6 +1234,14 @@ const STR = {
     solDone: "Swap sent to the network",
     solSent: "Sent",
     solFailed: "Didn't go through",
+    errCreatorLocked: "You are the creator — selling is locked until the token lists, as promised",
+    errFairStart: "Fair start: the first minute is for app buyers only",
+    errNotEnough: "Not enough coins in the app wallet",
+    errNotEnoughGas: "Not enough for the network fee — top up the wallet",
+    errNoJettonWallet: "You hold none of this token",
+    errNoCurve: "This token has no market yet",
+    errTokenNotFound: "Token not found",
+    errTooOften: "Too often — wait a minute",
     rateLoadingRetry: "TON rate is still loading, try again in a second",
     insufficientTon: "Not enough TON: wallet has {have}, need {need} incl. gas",
     tokenSaveFailed: "Token is live on-chain but wasn't saved: {reason}. We'll retry on next launch.",
@@ -21515,6 +21533,25 @@ function mapTokenRow(row) {
   // посчитать ни портфель, ни прибыль. Пишем после того, как кошелёк
   // подтвердил отправку; ошибку записи глотаем: сделка уже ушла в сеть,
   // и мешать человеку из-за неудачной строки в базе незачем.
+  /* Отказ сервера словами. Приходит он кодом («creator_locked»), и
+     показывать этот код человеку бессмысленно: причина у каждого отказа
+     простая, её и говорим. Чего не знаем — показываем как есть. */
+  function текстОтказа(e) {
+    const сырое = String((e && e.message) || e || "").trim();
+    const словарь = {
+      creator_locked: "errCreatorLocked",
+      fair_start: "errFairStart",
+      not_enough: "errNotEnough",
+      not_enough_gas: "errNotEnoughGas",
+      no_jetton_wallet: "errNoJettonWallet",
+      no_curve: "errNoCurve",
+      token_not_found: "errTokenNotFound",
+      "слишком часто": "errTooOften",
+    };
+    const ключ = словарь[сырое];
+    return ключ ? t(ключ) : сырое.slice(0, 90);
+  }
+
   function recordTrade(side, tonAmount, tokenAmount) {
     if (!userId) return;
     supabase.from("trades").insert({
@@ -21651,7 +21688,7 @@ function mapTokenRow(row) {
         if (mode === "buy") отпраздновать();
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
       } catch (e) {
-        showToast(`${t("solFailed")}: ${String((e && e.message) || e).slice(0, 80)}`);
+        showToast(`${t("solFailed")}: ${текстОтказа(e)}`);
       }
       return;
     }
@@ -21689,8 +21726,8 @@ function mapTokenRow(row) {
         // пару секунд на подтверждение, потом перезапрашиваем его.
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
       } catch (err) {
-        const detail = (err && (err.message || String(err))) || "";
-        showToast(detail ? `${t("txCancelled")} — ${detail.slice(0, 140)}` : t("txCancelled"));
+        const detail = текстОтказа(err);
+        showToast(detail ? `${t("txCancelled")} — ${detail}` : t("txCancelled"));
       }
     } else {
       // Can't sell more than is actually held — re-checked here too, not
@@ -21719,9 +21756,9 @@ function mapTokenRow(row) {
         // Текст ошибки показываем целиком: консоли внутри Telegram нет, а
         // отличить отказ пользователя от отклонённого запроса иначе
         // невозможно.
-        const detail = (err && (err.message || String(err))) || "";
+        const detail = текстОтказа(err);
         console.error("[mintly] продажа не прошла:", err);
-        showToast(detail ? `${t("txCancelled")} — ${detail.slice(0, 140)}` : t("txCancelled"));
+        showToast(detail ? `${t("txCancelled")} — ${detail}` : t("txCancelled"));
       }
     }
   }
