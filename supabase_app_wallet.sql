@@ -83,3 +83,16 @@ revoke all on public.wallet_ops from anon, authenticated;
 --     from public.app_wallets limit 5;
 --   select kind, amount, address, created_at
 --     from public.wallet_ops order by id desc limit 20;
+
+-- ------------------------------------------------------------------
+-- Два кошелька на человека: по одному на сеть.
+--
+-- Раньше ключом строки был сам человек — значит, кошелёк мог быть
+-- только один, и второй (в TON) просто не вставлялся. Ключ теперь
+-- составной: человек и сеть.
+alter table public.app_wallets drop constraint if exists app_wallets_pkey;
+alter table public.app_wallets add primary key (user_id, chain);
+
+-- Сеть операции: тот же журнал обслуживает обе.
+alter table public.wallet_ops add column if not exists chain text not null default 'solana';
+create index if not exists wallet_ops_chain_idx on public.wallet_ops (user_id, chain, created_at desc);

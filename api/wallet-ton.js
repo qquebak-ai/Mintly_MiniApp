@@ -166,7 +166,9 @@ async function баланс(адрес) {
 async function выведеноЗаСутки(db, user) {
   const сутки = new Date(Date.now() - 86400000).toISOString();
   const { data } = await db
-    .from("app_wallet_ops")
+    // Журнал один на обе сети (см. supabase_app_wallet.sql): таблица
+    // называется wallet_ops, а сеть различается колонкой chain.
+    .from("wallet_ops")
     .select("amount")
     .eq("user_id", user.id).eq("chain", "ton").eq("kind", "withdraw")
     .gte("created_at", сутки);
@@ -174,9 +176,9 @@ async function выведеноЗаСутки(db, user) {
 }
 
 async function записать(db, user, kind, amount, hash) {
-  await db.from("app_wallet_ops").insert({
-    user_id: user.id, chain: "ton", kind, amount, tx_hash: hash || null,
-  }).catch(() => {});
+  await db.from("wallet_ops").insert({
+    user_id: user.id, chain: "ton", kind, amount, signature: hash || null,
+  }).then(() => {}, () => {});
 }
 
 export default async function handler(req, res) {
