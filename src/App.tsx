@@ -21727,7 +21727,7 @@ function mapTokenRow(row) {
   async function свопSolana({ token, amountSol, продажа = false, количество = 0 }) {
     /* eslint-disable-next-line no-param-reassign */
     const { подключить, сохранённаяСессия, подписать } = await import("./phantom");
-    const { состояниеВнутреннего, свопВнутренним } = await import("./appWallet");
+    const { состояниеВнутреннего, свопВнутренним, сделкаВнутренним } = await import("./appWallet");
 
     const SOL = "So11111111111111111111111111111111111111112";
 
@@ -21766,7 +21766,20 @@ function mapTokenRow(row) {
 
     // Внутренним кошельком — одним запросом: маршрут, сборка, подпись и
     // отправка целиком на сервере.
-    if (черезВнутренний) return await свопВнутренним({ вход, выход, сумма });
+    if (черезВнутренний) {
+      /* Токен, который ещё на нашей кривой, торгуется своей ручкой:
+         биржа о нём не знает, а вместе со сделкой нужно проверить
+         обещания создателя и записать её в историю токена — своп этого
+         не делает. */
+      if (!token.poolAddress && token.curveAddress) {
+        return await сделкаВнутренним({
+          mint: token.tokenAddress,
+          продажа,
+          amount: продажа ? количество : Number(amountSol || 0),
+        });
+      }
+      return await свопВнутренним({ вход, выход, сумма });
+    }
 
     const параметры = new URLSearchParams({ input: вход, output: выход, amount: сумма, slippage: "150" });
     const кот = await fetch(апи(`/api/solana?action=quote&${параметры}`)).then((r) => r.json());
