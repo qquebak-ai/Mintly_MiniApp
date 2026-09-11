@@ -1644,9 +1644,6 @@ function GlobalStyle() {
       @keyframes листКачается { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(7deg); } }
       @keyframes ракетаВзлетает { 0%, 100% { transform: translateY(4px); } 50% { transform: translateY(-8px); } }
       @keyframes пламяДышит { from { transform: scaleY(0.75); opacity: 0.8; } to { transform: scaleY(1.15); opacity: 1; } }
-      /* Точка «живого» токена: дышит, а не мигает — мигание в списке из
-         сорока строк превращается в рябь. */
-      @keyframes живаяТочка { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }
       /* Блик по карте баланса: проходит редко и медленно — карта
          выглядит из материала, а не мигает. */
       @keyframes картаБлик { 0%, 70%, 100% { transform: translateX(-40px) rotate(18deg); opacity: 0; } 12% { opacity: 1; } 35% { transform: translateX(420px) rotate(18deg); opacity: 0; } }
@@ -6145,13 +6142,6 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center" style={{ gap: 6 }}>
             <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 600 }}>${tok.ticker}</span>
-            {/* «Живой» — не украшение: точка стоит только там, где за
-                последний час были сделки. Без сделок она врала бы.
-                Подписи рядом больше нет: слово повторяло то, что и так
-                говорит мигающая точка, и забивало строку. */}
-            {(tok.tx1h || 0) > 0 && (
-              <span style={{ width: 5, height: 5, borderRadius: 999, background: T.up, animation: "живаяТочка 1.6s ease-in-out infinite", flexShrink: 0 }} />
-            )}
             <ПометкаТест сеть={tok.network} />
           </div>
           <div className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2 }}>
@@ -12868,7 +12858,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
                   стоял Solana всегда, и над адресом TON висел чужой
                   знак — самая дорогая ошибка из возможных. */}
               <img
-                src={сеть === "Solana" ? "/coins/sol.png" : "/coins/gram.svg"}
+                src={сеть === "Solana" ? "/coins/sol.png" : "/coins/gram.png"}
                 alt=""
                 width={44}
                 height={44}
