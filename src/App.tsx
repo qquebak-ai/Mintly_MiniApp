@@ -17929,8 +17929,12 @@ function SettingsPanel({
       body = null;
   }
 
-  return (
-    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "absolute", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: `0 12px ${insetBottom + 14}px` }} onClick={onClose}>
+  /* Порталом и поверх всего: пункт открывают с листа настроек, а тот
+     сам лежит поверх приложения. Пока эта панель рисовалась внутри
+     страницы, она оказывалась под листом — нажатие как будто открывало
+     что-то «на странице за настройками». */
+  return createPortal(
+    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "fixed", inset: 0, zIndex: 460, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: `0 12px ${insetBottom + 14}px` }} onClick={onClose}>
       <div
         className="fx-modal-card"
         onClick={(e) => e.stopPropagation()}
@@ -17956,7 +17960,8 @@ function SettingsPanel({
           {body}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
