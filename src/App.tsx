@@ -2201,6 +2201,10 @@ function GlobalStyle() {
          кажется неотпускающим. */
       .fx-out.fx-modal-back { animation: backdropOut ${CLOSE_MS}ms ease-in both; }
       .fx-out .fx-modal-card, .fx-out.fx-modal-card { animation: sheetOut ${CLOSE_MS}ms cubic-bezier(0.4, 0, 0.9, 0.5) both; }
+      /* Лист, уехавший из-под пальца, доигрывает уход сам. Общая
+         анимация закрытия перебила бы его собственный сдвиг — она
+         начинается с «на месте», и лист на кадр возвращался обратно. */
+      .fx-no-anim, .fx-out .fx-no-anim { animation: none !important; }
       @keyframes backdropOut { to { opacity: 0; } }
       @keyframes sheetOut { to { opacity: 0; transform: translateY(16px) scale(0.985); } }
       /* Появление вещей в примерке: одна за другой слева направо. */
@@ -18231,7 +18235,7 @@ function SettingsPanel({
   return createPortal(
     <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "fixed", inset: 0, zIndex: 460, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: `0 12px ${insetBottom + 14}px` }} onClick={onClose}>
       <div
-        className="fx-modal-card"
+        className={`fx-modal-card${уходит ? " fx-no-anim" : ""}`}
         data-sheet="1"
         onClick={(e) => e.stopPropagation()}
         onTouchStart={началоЖестаП}
