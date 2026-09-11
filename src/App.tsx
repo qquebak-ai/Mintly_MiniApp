@@ -13638,6 +13638,12 @@ function ИсторияКошелька({ userId, тик = 0 }) {
   );
 }
 
+/* Заливка карты баланса. Вынесена из разметки, потому что теми же
+   цветами светятся волны вокруг карты: держать два одинаковых списка
+   оттенков — значит однажды поменять один и забыть другой. */
+const ГРАДИЕНТ_КАРТЫ =
+  "linear-gradient(115deg, #E44BC8 0%, #C13AE6 18%, #8E2DE2 36%, #6A17E8 54%, #4A00E0 70%, #7B1FE0 84%, #2C0A78 100%)";
+
 function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onConnect, onDisconnect, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0 }) {
   const [copied, setCopied] = useState(false);
   const низ = useRef(null);
@@ -13745,16 +13751,29 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       {/* Три волны вдогонку друг другу: пока одна растворяется, следующая
           только отходит от края — получается непрерывное дыхание, а не
           мигание. */}
+      {/* Цвет волны — не отдельный сиреневый, а сама заливка карты: тот
+          же градиент, тот же перелив, а видна из него только рамка
+          (маской вырезана середина). Поэтому у каждого края волна
+          ровно того оттенка, что у карты рядом, и меняется вместе с
+          ней. Свечение даёт filter, а не box-shadow: тень box-shadow
+          маска срезала бы вместе с серединой. */}
       {[0, 1.4, 2.8].map((задержка) => (
         <span
           key={задержка}
           aria-hidden
           style={{
             position: "absolute", inset: 0, borderRadius: 24,
-            border: `2px solid ${hexA("#B15CFF", 0.9)}`,
-            boxShadow: `0 0 18px ${hexA("#8E2DE2", 0.55)}`,
+            padding: 2,
+            background: ГРАДИЕНТ_КАРТЫ,
+            backgroundSize: "320% 320%",
+            WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+            WebkitMaskComposite: "xor",
+            mask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+            maskComposite: "exclude",
+            filter: `drop-shadow(0 0 9px ${hexA("#B15CFF", 0.5)})`,
             pointerEvents: "none",
-            animation: `ореолКарты 4.2s ease-out ${задержка}s infinite`,
+            animation: `картаПереливается ${перелив.длительность}s ease-in-out ${перелив.сдвиг}s infinite,`
+              + ` ореолКарты 4.2s ease-out ${задержка}s infinite`,
           }}
         />
       ))}
@@ -13765,7 +13784,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // Оттенков больше, чем нужно для простого градиента: розовый,
           // сиреневый, синий и почти чёрный ходят друг за другом, и
           // поверхность не повторяет один и тот же переход.
-          background: "linear-gradient(115deg, #E44BC8 0%, #C13AE6 18%, #8E2DE2 36%, #6A17E8 54%, #4A00E0 70%, #7B1FE0 84%, #2C0A78 100%)",
+          background: ГРАДИЕНТ_КАРТЫ,
           backgroundSize: "320% 320%",
           animation: `картаПереливается ${перелив.длительность}s ease-in-out ${перелив.сдвиг}s infinite`,
           border: "none",
