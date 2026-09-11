@@ -2919,6 +2919,10 @@ async function fetchTokenInfo(tokenAddress, network = GT_NETWORK) {
       telegram: a.telegram_handle ? `https://t.me/${a.telegram_handle}` : null,
       twitter: a.twitter_handle ? `https://x.com/${a.twitter_handle}` : null,
       imageUrl: a.image_url && !a.image_url.includes("missing_small") ? a.image_url : null,
+      /* Число держателей приходит здесь же. Раньше его брали только у
+         tonapi, и у токена Solana в статистике стоял прочерк: tonapi про
+         чужую сеть ничего не знает, а другого источника не было. */
+      holders: Number(a.holders && a.holders.count) || null,
     };
     tokenInfoCache.set(ключ, info);
     return info;
@@ -14583,6 +14587,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   // on file for this token, in which case the About card is simply
   // omitted instead of showing an invented bio.
   const [info, setInfo] = useState(null);
+  /* Сколько у токена держателей.
+     У своих токенов и у всего, что живёт в TON, число считает tonapi по
+     жетонным кошелькам. У токена Solana он молчит — там берём число из
+     справочника биржи, которое приезжает вместе с описанием. */
+  const держателейВсего = holdersCount != null ? holdersCount : (info && info.holders) || null;
   useEffect(() => {
     let cancelled = false;
     setInfo(null);
@@ -14775,7 +14784,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       <TokenShareSheet
         token={shareOpen ? { ...token, logoUrl: логотип } : null}
         curve={curve}
-        holders={holdersCount}
+        holders={держателейВсего}
         userId={currentUserId}
         onClose={() => setShareOpen(false)}
         showToast={showToast}
@@ -15011,7 +15020,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           [tr("statLiquidity"), `$${token.liq}`],
           token.chain === "solana"
             ? [tr("statTx24h"), (token.tx24h || 0).toLocaleString("ru-RU")]
-            : [tr("statHolders"), holdersCount == null ? "—" : holdersCount.toLocaleString("ru-RU")],
+            : [tr("statHolders"), держателейВсего == null ? "—" : держателейВсего.toLocaleString("ru-RU")],
           [tr("statAge"), fmtAge(token.createdAt) || "—"],
         ]}
       />
@@ -15048,7 +15057,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             [tr("statLiq"), `$${token.liq ?? "—"}`],
             [tr("statVol24"), `$${token.vol ?? "—"}`],
             [tr("statTrades24"), (token.tx24h || 0).toLocaleString("ru-RU")],
-            [tr("statHolders"), holdersCount == null ? "—" : holdersCount.toLocaleString("ru-RU")],
+            [tr("statHolders"), держателейВсего == null ? "—" : держателейВсего.toLocaleString("ru-RU")],
             [tr("statAge"), fmtAge(token.createdAt) || "—"],
             ...(token.graduationTon > 0
               ? [[tr("statCurve"), `${Math.round(Math.min(1, (Number(token.raisedTon) || 0) / token.graduationTon) * 100)}%`]]
@@ -15071,7 +15080,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         <div className="fx-swap flex flex-col" style={{ gap: 14 }}>
           <div className="flex items-baseline" style={{ gap: 8 }}>
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 600 }}>
-              {holdersCount == null ? "—" : holdersCount.toLocaleString("ru-RU")}
+              {держателейВсего == null ? "—" : держателейВсего.toLocaleString("ru-RU")}
             </span>
             <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 13 }}>{tr("statHolders")}</span>
           </div>
@@ -15197,7 +15206,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           />
 
           {token.curveAddress && (
-            <TrustPanel token={token} testnet={TON_TESTNET_NETWORK} holders={holdersCount} />
+            <TrustPanel token={token} testnet={TON_TESTNET_NETWORK} holders={держателейВсего} />
           )}
         </div>
       )}
