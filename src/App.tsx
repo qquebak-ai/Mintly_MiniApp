@@ -364,7 +364,7 @@ const STR = {
     mempadSpotlight: "В центре внимания",
     mempadLaunchToken: "Запустить токен",
     tickerBought: "купил", tickerSold: "продал",
-    sinceSec: "с", sinceMin: "м", sinceHour: "ч", mempadFilterNew: "Новые", mempadFilterTrend: "Трендовые", mempadFilterHot: "Горячие", mempadFilterSoon: "Скоро на бирже", mempadFilterVol: "По обороту", mempadFilterBluming: "В росте", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Создать токен", homeActionMempad: "Мемпад", homeActionProfile: "Профиль",
+    sinceJustNow: "только что", sinceMin: "м", sinceHour: "ч", mempadFilterNew: "Новые", mempadFilterTrend: "Трендовые", mempadFilterHot: "Горячие", mempadFilterSoon: "Скоро на бирже", mempadFilterVol: "По обороту", mempadFilterBluming: "В росте", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Создать токен", homeActionMempad: "Мемпад", homeActionProfile: "Профиль",
     feedTitle: "Прямо сейчас",
     feedSub: "Что происходит на площадке",
     feedTrade: "{who} купил ${ticker} на {ton} GRAM",
@@ -933,7 +933,7 @@ const STR = {
     mempadSpotlight: "Spotlight",
     mempadLaunchToken: "Launch token",
     tickerBought: "bought", tickerSold: "sold",
-    sinceSec: "s", sinceMin: "m", sinceHour: "h", mempadFilterNew: "New", mempadFilterTrend: "Trending", mempadFilterHot: "Hot", mempadFilterSoon: "Almost listed", mempadFilterVol: "By volume", mempadFilterBluming: "Bluming", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Launch token", homeActionMempad: "Mempad", homeActionProfile: "Profile",
+    sinceJustNow: "just now", sinceMin: "m", sinceHour: "h", mempadFilterNew: "New", mempadFilterTrend: "Trending", mempadFilterHot: "Hot", mempadFilterSoon: "Almost listed", mempadFilterVol: "By volume", mempadFilterBluming: "Bluming", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Launch token", homeActionMempad: "Mempad", homeActionProfile: "Profile",
     feedTitle: "Right now",
     feedSub: "What's happening here",
     feedTrade: "{who} bought ${ticker} for {ton} GRAM",
@@ -5489,7 +5489,9 @@ function fmtSince(iso) {
   const at = new Date(iso).getTime();
   if (!Number.isFinite(at)) return "";
   const sec = Math.max(0, Math.floor((Date.now() - at) / 1000));
-  if (sec < 60) return `${sec}${t("sinceSec")}`;
+  // До минуты — «только что»: секунды тикали на глазах и читались как
+  // отсчёт, хотя ничего не происходит.
+  if (sec < 60) return t("sinceJustNow");
   if (sec < 3600) return `${Math.floor(sec / 60)}${t("sinceMin")}`;
   return `${Math.floor(sec / 3600)}${t("sinceHour")}`;
 }
