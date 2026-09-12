@@ -12800,12 +12800,15 @@ function МояАктивность({ userId, тик = 0 }) {
             const покупка = с.side !== "sell";
             return (
               <div key={с.id} className="flex items-center" style={{ gap: 10 }}>
-                {покупка ? <ArrowUpRight size={15} color={T.up} /> : <ArrowDownRight size={15} color={T.down} />}
+                {/* Стрелка о деньгах, а не о направлении сделки: покупка —
+                    деньги ушли, вниз и красным; продажа — пришли, вверх и
+                    зелёным. */}
+                {покупка ? <ArrowDownRight size={15} color={T.down} /> : <ArrowUpRight size={15} color={T.up} />}
                 <span className="flex-1 truncate" style={{ fontFamily: bodyFont, fontSize: 13.5, color: T.paper }}>
                   {покупка ? t("tickerBought") : t("tickerSold")} ${String(с.ticker || "?").toUpperCase()}
                 </span>
-                <span style={{ fontFamily: monoFont, fontSize: 12.5, color: покупка ? T.up : T.down, whiteSpace: "nowrap" }}>
-                  {fmtCoin(Number(с.ton_amount) || 0)} {монетаСделки(с)}
+                <span style={{ fontFamily: monoFont, fontSize: 12.5, color: покупка ? T.down : T.up, whiteSpace: "nowrap" }}>
+                  {покупка ? "−" : "+"}{fmtCoin(Number(с.ton_amount) || 0)} {монетаСделки(с)}
                 </span>
                 <span style={{ fontFamily: monoFont, fontSize: 11.5, color: T.faint, whiteSpace: "nowrap" }}>
                   {fmtSince(с.created_at)}
@@ -14088,14 +14091,17 @@ function ИсторияКошелька({ userId, тик = 0 }) {
                   className="flex items-center justify-center"
                   style={{
                     width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-                    background: обмен ? hexA("#8E2DE2", 0.22) : покупка ? КОШ_РОСТ_ФОН : КОШ_ПАДЕНИЕ_ФОН,
+                    // Покупка — расход, и кружок у неё красный; продажа —
+                    // приход, зелёный. До этого цвета шли по сделке, а не
+                    // по деньгам, и списание светилось зелёным.
+                    background: обмен ? hexA("#8E2DE2", 0.22) : покупка ? КОШ_ПАДЕНИЕ_ФОН : КОШ_РОСТ_ФОН,
                   }}
                 >
                   {обмен
                     ? <Repeat size={16} strokeWidth={2.2} color="#C79BFF" />
                     : покупка
-                      ? <ArrowDownLeft size={16} strokeWidth={2.2} color={КОШ_РОСТ_ТЕКСТ} />
-                      : <ArrowUpRight size={16} strokeWidth={2.2} color={КОШ_ПАДЕНИЕ_ТЕКСТ} />}
+                      ? <ArrowDownRight size={16} strokeWidth={2.2} color={КОШ_ПАДЕНИЕ_ТЕКСТ} />
+                      : <ArrowUpRight size={16} strokeWidth={2.2} color={КОШ_РОСТ_ТЕКСТ} />}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
@@ -19069,7 +19075,10 @@ function SettingsPanel({
             ярче самих букв. Градиент цвета панели просто уводит строку в
             фон, и край выглядит концом страницы, а не грязью. */}
         <div aria-hidden style={{
-          position: "absolute", left: 0, right: 0, bottom: 0, height: 44, pointerEvents: "none",
+          // Тридцать две точки вместо сорока четырёх: край страницы всё
+          // так же уходит в фон, но растворение начинается ниже и меньше
+          // съедает последнюю строку.
+          position: "absolute", left: 0, right: 0, bottom: 0, height: 32, pointerEvents: "none",
           background: `linear-gradient(180deg, ${hexA(T.surface, 0)} 0%, ${hexA(T.surface, 0.65)} 38%, ${hexA(T.surface, 0.94)} 72%, ${T.surface} 100%)`,
           borderBottomLeftRadius: 26, borderBottomRightRadius: 26,
         }} />
@@ -23079,7 +23088,7 @@ function mapTokenRow(row) {
           // прятала — строка обрывалась на полуслове резким краем. Но и
           // высокая полоса лишняя: она заметно мылила то, что ещё не
           // дошло до капсулы.
-          position: "absolute", left: 0, right: 0, bottom: 0, height: 44, zIndex: 4, pointerEvents: "none",
+          position: "absolute", left: 0, right: 0, bottom: 0, height: 32, zIndex: 4, pointerEvents: "none",
           background: `linear-gradient(0deg, ${T.bg} 0%, ${hexA(T.bg, 0.9)} 48%, ${hexA(T.bg, 0)} 100%)`,
         }} />
         {/* header with logo/wallet removed — content now starts right at the top.
