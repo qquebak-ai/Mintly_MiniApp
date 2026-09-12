@@ -14132,22 +14132,19 @@ function ИсторияКошелька({ userId, тик = 0 }) {
                 className="flex items-center"
                 style={{ gap: 12, padding: "13px 2px" }}
               >
-                {/* Кружок пустой, только обводка: заливка возвращала в строку
-                    то самое цветное пятно, вместо которого всё и затевалось.
-                    Цвет несёт сама стрелка. */}
+                {/* Одна стрелка, без кружка и обводки вокруг: любая рамка в
+                    строке без подложки снова читается как плитка. Место под
+                    иконку фиксируем шириной, чтобы заголовки стояли в
+                    колонку. */}
                 <span
                   className="flex items-center justify-center"
-                  style={{
-                    width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
-                    background: "transparent",
-                    border: `1px solid ${обмен ? hexA("#8E2DE2", 0.45) : T.lineHi}`,
-                  }}
+                  style={{ width: 20, flexShrink: 0 }}
                 >
                   {обмен
-                    ? <Repeat size={15} strokeWidth={2.4} color="#C79BFF" />
+                    ? <Repeat size={17} strokeWidth={2.4} color="#C79BFF" />
                     : покупка
-                      ? <ArrowDownRight size={15} strokeWidth={2.4} color={КОШ_ПАДЕНИЕ_ТЕКСТ} />
-                      : <ArrowUpRight size={15} strokeWidth={2.4} color={КОШ_ПРИХОД_ТЕКСТ} />}
+                      ? <ArrowDownRight size={17} strokeWidth={2.4} color={КОШ_ПАДЕНИЕ_ТЕКСТ} />
+                      : <ArrowUpRight size={17} strokeWidth={2.4} color={КОШ_ПРИХОД_ТЕКСТ} />}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, letterSpacing: "-0.01em" }}>
