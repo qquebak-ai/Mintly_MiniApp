@@ -21624,21 +21624,50 @@ function mapTokenRow(row) {
   // как запасной вариант, пока ответ не пришёл.
   useEffect(() => {
     const jetton = token?.tokenAddress;
-    if (!tradeModal || !jetton || !walletAddress) { setChainHolding(null); setChainJettonWallet(null); setTradeCurveState(null); return; }
+    if (!tradeModal || !jetton) { setChainHolding(null); setChainJettonWallet(null); setTradeCurveState(null); return; }
+    let cancelled = false;
+
+    /* Токен Solana лежит на внутреннем кошельке, и спрашивать про него
+       tonapi бессмысленно — раньше позиция там всегда была пустой, а
+       окно продажи показывало ноль сразу после покупки. */
+    if (token?.chain === "solana") {
+      (async () => {
+        try {
+          const { состояниеВнутреннего } = await import("./appWallet");
+          const св = await состояниеВнутреннего();
+          const адрес = св && !св.нуженВход ? св.address : null;
+          if (!адрес || cancelled) return;
+          const п = new URLSearchParams({ wallet: адрес, mint: jetton });
+          const b = await fetch(апи(`/api/solana?action=balances&${п}`)).then((r) => r.json());
+          if (!cancelled && b && !b.error) setChainHolding(Number(b.token) || 0);
+        } catch { /* сеть промолчала — останется запасной счётчик */ }
+      })();
+      return () => { cancelled = true; };
+    }
+
     if (token?.curveAddress) {
       fetchCurveState(token.curveAddress, TON_TESTNET, TON_PRIORITY.token).then((state) => {
         if (!cancelled && state) setTradeCurveState(state);
       });
     }
-    let cancelled = false;
-    fetchJettonAccount(jetton, walletAddress, TON_TESTNET).then((info) => {
+    (async () => {
+      /* Адрес — внутреннего кошелька, а внешний только как запасной:
+         сделки давно идут внутренним, и жетоны лежат на нём. */
+      let адрес = walletAddress || null;
+      try {
+        const { состояниеВнутреннегоTON } = await import("./appWallet");
+        const св = await состояниеВнутреннегоTON();
+        if (св && св.address && !св.нуженВход) адрес = св.address;
+      } catch { /* без входа — остаётся внешний */ }
+      if (!адрес || cancelled) return;
+      const info = await fetchJettonAccount(jetton, адрес, TON_TESTNET);
       if (cancelled || !info) return;
       if (info.balance != null) setChainHolding(info.balance);
       if (info.raw != null) setChainHoldingRaw(info.raw);
       if (info.wallet) setChainJettonWallet(info.wallet);
-    });
+    })();
     return () => { cancelled = true; };
-  }, [tradeModal, token?.tokenAddress, walletAddress, balanceRefreshTick]);
+  }, [tradeModal, token?.tokenAddress, token?.chain, walletAddress, balanceRefreshTick]);
   /* Что лежит на кошельке из запущенного здесь же. Спрашиваем у сети, а
      не у локального счётчика: человек мог купить с другого устройства
      или продать вне приложения. Раньше этого списка не было вовсе —
@@ -21646,16 +21675,34 @@ function mapTokenRow(row) {
   const [walletHoldings, setWalletHoldings] = useState([]);
   const [holdingsReady, setHoldingsReady] = useState(false);
   useEffect(() => {
-    if (!connected || !walletAddress || !communityTokens.length) {
+    if (!communityTokens.length) {
       setWalletHoldings([]);
       // Готово — значит «спрашивать больше нечего», а не «нашли». Без
-      // кошелька список пуст навсегда, и держать на его месте мерцающую
-      // плашку — врать, что что-то грузится.
+      // токенов список пуст, и держать на его месте мерцающую плашку —
+      // врать, что что-то грузится.
       setHoldingsReady(true);
       return;
     }
     let cancelled = false;
     (async () => {
+      /* Кошельки приложения — оба. Раньше здесь спрашивали только
+         внешний TON-кошелёк, и купленное внутренним (а тем более всё,
+         что в Solana) в список не попадало вовсе: раздел «твои токены»
+         оставался пустым, хотя монеты лежали на счету. */
+      let солАдрес = null;
+      let тонАдрес = walletAddress || null;
+      try {
+        const кошелёк = await import("./appWallet");
+        const [sol, ton] = await Promise.all([
+          кошелёк.состояниеВнутреннего().catch(() => null),
+          кошелёк.состояниеВнутреннегоTON().catch(() => null),
+        ]);
+        if (sol && sol.address && !sol.нуженВход) солАдрес = sol.address;
+        if (ton && ton.address && !ton.нуженВход) тонАдрес = ton.address;
+      } catch { /* без входа кошельков нет — останется внешний адрес */ }
+      if (cancelled) return;
+      if (!солАдрес && !тонАдрес) { setWalletHoldings([]); setHoldingsReady(true); return; }
+
       // Больше десятка за раз не спрашиваем: у tonapi без ключа
       // считанные запросы в секунду, а список может быть длинным.
       const list = communityTokens.filter((tok) => tok.address).slice(0, 14);
@@ -21663,7 +21710,16 @@ function mapTokenRow(row) {
       for (const tok of list) {
         if (cancelled) return;
         try {
-          const info = await fetchJettonAccount(tok.address, walletAddress, TON_TESTNET);
+          if (tok.chain === "solana") {
+            if (!солАдрес) continue;
+            const п = new URLSearchParams({ wallet: солАдрес, mint: tok.address });
+            const b = await fetch(апи(`/api/solana?action=balances&${п}`)).then((r) => r.json()).catch(() => null);
+            const сколько = b && !b.error ? Number(b.token) || 0 : 0;
+            if (сколько > 0) found.push({ tok, amount: сколько });
+            continue;
+          }
+          if (!тонАдрес) continue;
+          const info = await fetchJettonAccount(tok.address, тонАдрес, TON_TESTNET);
           if (info && info.balance > 0) found.push({ tok, amount: info.balance });
         } catch (e) { /* один не ответил — остальные всё равно нужны */ }
       }
