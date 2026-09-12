@@ -115,11 +115,13 @@ export async function состояниеВнутреннегоTON() {
    Наружу уходит только «этот токен, столько-то»: адрес кривой сервер
    берёт из базы по токену, и подсунуть чужой контракт нельзя. */
 export async function купитьВнутреннимTON({ tokenId, сумма }) {
-  return await запрос("/api/wallet-ton?action=buy", { tokenId, amount: сумма });
+  // Ключ запроса — от повторов: двойное нажатие не должно превращаться
+  // во вторую покупку, сервер по нему вернёт исход первой.
+  return await запрос("/api/wallet-ton?action=buy", { tokenId, amount: сумма, requestKey: ключЗапроса() });
 }
 
 export async function продатьВнутреннимTON({ tokenId, количество }) {
-  return await запрос("/api/wallet-ton?action=sell", { tokenId, amount: количество });
+  return await запрос("/api/wallet-ton?action=sell", { tokenId, amount: количество, requestKey: ключЗапроса() });
 }
 
 /* --- Действия, которые тратят монеты ---------------------------------

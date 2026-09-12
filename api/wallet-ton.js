@@ -199,6 +199,49 @@ async function выведеноЗаСутки(db, user) {
   return (data || []).reduce((с, о) => с + (Number(о.amount) || 0), 0);
 }
 
+/* Начало денежной операции: отметка в журнале, она же защита от двух
+   бед сразу. Первая — двойное нажатие: тот же ключ запроса не создаёт
+   вторую строку, и вместо повторного перевода возвращается исход
+   первого. Вторая — шквал: больше нескольких операций в минуту от одного
+   человека не пропускаем. В Solana это давно так; в TON вывода это не
+   было, и повторное нажатие отправляло деньги ещё раз. */
+const ОПЕРАЦИЙ_В_МИНУТУ = Number(process.env.TON_WALLET_RATE || 6);
+
+async function начать(db, user, { дело, сумма = 0, адрес = null, ключЗапроса = null, ip = null }) {
+  const минуту = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await db
+    .from("wallet_ops")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .gt("created_at", минуту);
+  if ((count || 0) >= ОПЕРАЦИЙ_В_МИНУТУ) throw Object.assign(new Error("слишком часто"), { код: 429 });
+
+  const { data, error } = await db
+    .from("wallet_ops")
+    .insert({ user_id: user.id, chain: "ton", kind: дело, amount: сумма, address: адрес, request_key: ключЗапроса, ip })
+    .select("id")
+    .single();
+
+  if (error) {
+    if (ключЗапроса) {
+      const { data: прошлая } = await db
+        .from("wallet_ops")
+        .select("id, signature")
+        .eq("user_id", user.id)
+        .eq("request_key", ключЗапроса)
+        .maybeSingle();
+      if (прошлая) return { повтор: true, id: прошлая.id, signature: прошлая.signature };
+    }
+    throw new Error(error.message);
+  }
+  return { повтор: false, id: data.id };
+}
+
+async function завершить(db, id, signature) {
+  if (!id) return;
+  await db.from("wallet_ops").update({ signature: signature || null }).eq("id", id);
+}
+
 async function записать(db, user, kind, amount, hash) {
   await db.from("wallet_ops").insert({
     user_id: user.id, chain: "ton", kind, amount, signature: hash || null,
@@ -259,6 +302,15 @@ export default async function handler(req, res) {
       const нужно = сумма + 0.2;   // покупка плюс газ контракта и сети
       if (есть < нужно) return res.status(400).json({ error: "not_enough", have: есть, need: нужно });
 
+      /* Двойное нажатие не должно превращаться во вторую покупку: тот
+         же ключ запроса возвращает исход первой. */
+      const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || null;
+      const оп = await начать(db, user, {
+        дело: "buy", сумма, адрес: адресРынка,
+        ключЗапроса: String(тело.requestKey || "").slice(0, 64) || null, ip,
+      });
+      if (оп.повтор) return res.status(200).json({ ok: true, repeat: true });
+
       const { beginCell, internal, toNano, Address, SendMode } = await библиотеки();
       const { пара, кошелёк: открытый } = await подписант(строка, набор, user);
 
@@ -281,7 +333,7 @@ export default async function handler(req, res) {
         })],
       });
 
-      await записать(db, user, "buy", сумма, null);
+      await завершить(db, оп.id, `seqno:${seqno}`);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ ok: true, seqno });
     }
@@ -320,6 +372,15 @@ export default async function handler(req, res) {
       const есть = await баланс(строка.address);
       if (есть < 0.25) return res.status(400).json({ error: "not_enough_gas", have: есть, need: 0.25 });
 
+      /* Та же отметка, что и у покупки: повтор запроса не продаёт
+         жетоны второй раз. */
+      const опПродажи = await начать(db, user, {
+        дело: "sell", сумма: сколько, адрес: мой.address,
+        ключЗапроса: String(тело.requestKey || "").slice(0, 64) || null,
+        ip: String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || null,
+      });
+      if (опПродажи.повтор) return res.status(200).json({ ok: true, repeat: true });
+
       const { beginCell, internal, Address, SendMode } = await библиотеки();
       const { пара, кошелёк: открытый } = await подписант(строка, набор, user);
 
@@ -349,7 +410,7 @@ export default async function handler(req, res) {
         })],
       });
 
-      await записать(db, user, "sell", сколько, null);
+      await завершить(db, опПродажи.id, `seqno:${seqno}`);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ ok: true, seqno });
     }
@@ -375,6 +436,15 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "daily_limit", left: Math.max(0, ЛИМИТ_В_СУТКИ - выведено) });
       }
 
+      /* Отметка в журнале до перевода: по ней повтор того же запроса
+         вернёт исход первого, а не отправит деньги ещё раз. */
+      const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || null;
+      const оп = await начать(db, user, {
+        дело: "withdraw", сумма, адрес: строка.payout_address,
+        ключЗапроса: String(тело.requestKey || "").slice(0, 64) || null, ip,
+      });
+      if (оп.повтор) return res.status(200).json({ ok: true, sent: сумма, repeat: true });
+
       const { internal, toNano, Address, SendMode } = await библиотеки();
       const { пара, кошелёк: открытый } = await подписант(строка, набор, user);
       const seqno = await открытый.getSeqno();
@@ -389,7 +459,7 @@ export default async function handler(req, res) {
         })],
       });
 
-      await записать(db, user, "withdraw", сумма, null);
+      await завершить(db, оп.id, `seqno:${seqno}`);
       return res.status(200).json({ ok: true, sent: сумма });
     }
 

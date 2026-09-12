@@ -150,10 +150,22 @@ function отдатьФайл(res, файл, кеш) {
 
 function отдатьСайт(res, путь) {
   if (!fs.existsSync(САЙТ)) return false;
-  // Путь из запроса нормализуем и держим внутри dist: «..» в адресе не
-  // должно выводить за пределы каталога сайта.
-  const внутри = path.normalize(path.join(САЙТ, decodeURIComponent(путь)));
-  if (внутри.startsWith(САЙТ) && fs.existsSync(внутри) && fs.statSync(внутри).isFile()) {
+  /* Путь из запроса нормализуем и держим внутри dist: «..» в адресе не
+     должно выводить за пределы каталога сайта.
+
+     Сравниваем не по началу строки, а по границе каталога: «начинается
+     с /srv/app/dist» верно и для соседней папки /srv/app/dist-old, и
+     через неё читались бы чужие файлы. Разбор адреса тоже в try: на
+     «%ZZ» decodeURIComponent бросает, и запрос ронял обработчик вместо
+     честного отказа. */
+  let внутри;
+  try {
+    внутри = path.normalize(path.join(САЙТ, decodeURIComponent(путь)));
+  } catch {
+    return отдатьФайл(res, path.join(САЙТ, "index.html"), "no-cache, no-store, must-revalidate");
+  }
+  const своё = внутри === САЙТ || внутри.startsWith(САЙТ + path.sep);
+  if (своё && fs.existsSync(внутри) && fs.statSync(внутри).isFile()) {
     // Файлы с отпечатком в имени (assets/index-XXXX.js) не меняются
     // никогда — их можно держать в кеше браузера год. Всё остальное
     // перепроверяем.

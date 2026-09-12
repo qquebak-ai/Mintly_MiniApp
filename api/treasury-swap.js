@@ -262,7 +262,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const { data: обмен } = await db.from("treasury_swaps").insert({
+    const { data: обмен, error: ошибкаЗаписи } = await db.from("treasury_swaps").insert({
       user_id: user.id,
       request_key: ключЗапроса,
       from_chain: цепочкаВхода,
@@ -272,6 +272,13 @@ export default async function handler(req, res) {
       fee_bps: счёт.feeBps,
       status: "started",
     }).select("id").single();
+
+    /* Запись не прошла — значит тот же ключ запроса уже занят (двойное
+       нажатие) или база недоступна. В обоих случаях обмен начинать
+       нельзя: без строки некуда записать, что деньги ушли в казну. */
+    if (ошибкаЗаписи || !обмен) {
+      return res.status(409).json({ error: "not_started", detail: (ошибкаЗаписи && ошибкаЗаписи.message) || "no_row" });
+    }
 
     let входнаяПодпись = null;
     try {
