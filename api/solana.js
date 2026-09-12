@@ -170,22 +170,48 @@ export async function балансы({ wallet, mint }) {
 const держателиКеш = new Map();
 const ДЕРЖАТЕЛИ_МС = 5 * 60 * 1000;
 
+/* Сколько всего кошельков держит токен. Крупнейшие счета сеть отдаёт
+   готовым списком, а общего числа среди них нет: его приходится считать
+   по всем счетам этого mint. Запрос тяжёлый, поэтому живёт в том же
+   кеше, что и список, и молча возвращает null, когда узел его не
+   разрешает (публичные часто отказывают). */
+async function числоДержателей(mint, узлы) {
+  const ответ = await rpc("getProgramAccounts", [
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    {
+      encoding: "jsonParsed",
+      filters: [{ dataSize: 165 }, { memcmp: { offset: 0, bytes: mint } }],
+    },
+  ], узлы).catch(() => null);
+  if (!Array.isArray(ответ)) return null;
+  let счёт = 0;
+  for (const с of ответ) {
+    const сумма = с?.account?.data?.parsed?.info?.tokenAmount;
+    if (Number((сумма && сумма.uiAmount) || 0) > 0) счёт += 1;
+  }
+  return счёт;
+}
+
 export async function держатели({ mint }) {
   if (!адресОк(mint)) return null;
   const было = держателиКеш.get(mint);
   if (было && Date.now() - было.ts < ДЕРЖАТЕЛИ_МС) return было.тело;
+  /* Токены площадки живут там же, где её кривая, — в devnet, пока идёт
+     обкатка. Боевые узлы про них не знают вовсе, поэтому спрашиваем
+     сначала свой узел, а уже потом боевые: у токена с биржи наоборот. */
+  const свои = /devnet|testnet/i.test(RPC) ? [RPC, ...УЗЛЫ] : УЗЛЫ;
   let крупные = null, запас = null;
   try {
     [крупные, запас] = await Promise.all([
-      rpc("getTokenLargestAccounts", [mint], УЗЛЫ),
-      rpc("getTokenSupply", [mint], УЗЛЫ).catch(() => null),
+      rpc("getTokenLargestAccounts", [mint], свои),
+      rpc("getTokenSupply", [mint], свои).catch(() => null),
     ]);
   } catch (err) {
     // Публичные узлы отбиваются по лимиту, и спрашивать их снова прямо
     // сейчас — только тратить время карточки. Помним отказ полминуты и
     // отдаём пустой список: «держателей не видно» честнее ошибки.
-    держателиКеш.set(mint, { ts: Date.now() - ДЕРЖАТЕЛИ_МС + 30000, тело: { всего: 0, счета: [] } });
-    return { всего: 0, счета: [] };
+    держателиКеш.set(mint, { ts: Date.now() - ДЕРЖАТЕЛИ_МС + 30000, тело: { всего: 0, счета: [], держателей: null } });
+    return { всего: 0, счета: [], держателей: null };
   }
   const всего = Number(запас && запас.value && запас.value.uiAmount) || 0;
   const счета = ((крупные && крупные.value) || []).map((с) => ({
@@ -193,7 +219,8 @@ export async function держатели({ mint }) {
     количество: Number(с.uiAmount) || 0,
     доля: всего > 0 ? ((Number(с.uiAmount) || 0) / всего) * 100 : 0,
   }));
-  const тело = { всего, счета };
+  const держателей = await числоДержателей(mint, свои);
+  const тело = { всего, счета, держателей };
   держателиКеш.set(mint, { ts: Date.now(), тело });
   if (держателиКеш.size > 300) {
     for (const [k, v] of держателиКеш) if (Date.now() - v.ts > ДЕРЖАТЕЛИ_МС) держателиКеш.delete(k);

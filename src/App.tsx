@@ -3489,15 +3489,34 @@ function безСлужебных(holders, служебных = 0) {
   return Math.max(0, holders - служебных);
 }
 
-function useJettonHolders(tokenAddress, testnet = false, служебных = 0) {
+/* Держатели. У TON их считает tonapi, у Solana — своя ручка: там другая
+   цепочка, и запрос к tonapi возвращал пустоту, из-за чего у токена
+   Solana в характеристиках всегда стоял прочерк. Число приходит вместе
+   со списком крупнейших счетов, одним запросом на карточку. */
+function useJettonHolders(tokenAddress, testnet = false, служебных = 0, chain = "ton") {
   const [count, setCount] = useState(undefined);
   useEffect(() => {
     setCount(undefined);
     if (!tokenAddress) return;
     let cancelled = false;
+    if (chain === "solana") {
+      fetch(апи(`/api/solana?action=holders&mint=${encodeURIComponent(tokenAddress)}`))
+        .then((r) => r.json())
+        .then((j) => {
+          if (cancelled) return;
+          const всего = j && j.держателей != null ? Number(j.держателей) : null;
+          // Узел не дал полного счёта — показываем хотя бы тех, кого
+          // видно в списке крупнейших: это честнее прочерка.
+          const видимых = j && Array.isArray(j.счета) ? j.счета.filter((с) => Number(с.количество) > 0).length : 0;
+          const число = всего != null && всего > 0 ? всего : видимых;
+          setCount(безСлужебных(число, служебных));
+        })
+        .catch(() => { if (!cancelled) setCount(null); });
+      return () => { cancelled = true; };
+    }
     fetchJettonHolders(tokenAddress, testnet).then((c) => { if (!cancelled) setCount(безСлужебных(c, служебных)); });
     return () => { cancelled = true; };
-  }, [tokenAddress, testnet, служебных]);
+  }, [tokenAddress, testnet, служебных, chain]);
   return count;
 }
 
@@ -15143,7 +15162,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   // У токена на кривой жетон живёт в той же сети, что и приложение.
   // У токена на своей кривой один из жетонных кошельков — её
   // собственный, человеком он не является.
-  const holdersCount = useJettonHolders(token.tokenAddress, !!token.curveAddress && TON_TESTNET_NETWORK, token.curveAddress ? 1 : 0);
+  const holdersCount = useJettonHolders(token.tokenAddress, !!token.curveAddress && TON_TESTNET_NETWORK, token.curveAddress ? 1 : 0, token.chain === "solana" ? "solana" : "ton");
   // Владелец заодно чинит запись в базе, поэтому передаём, он это или нет.
   const логотип = useTokenLogo(
     token.logoUrl,
@@ -17985,7 +18004,7 @@ function MyTokenCard({ t, onOpen }) {
   // Свои токены живут в той же сети, что и приложение, а один из
   // жетонных кошельков — кошелёк кривой. Раньше здесь спрашивали
   // mainnet и получали прочерк вместо числа.
-  const holdersCount = useJettonHolders(t.address, TON_TESTNET_NETWORK, t.curveAddress ? 1 : 0);
+  const holdersCount = useJettonHolders(t.address, TON_TESTNET_NETWORK, t.curveAddress ? 1 : 0, t.chain === "solana" ? "solana" : "ton");
   // Вся карточка ведёт на экран токена: за своим токеном заходят
   // смотреть график и сделки, а не в служебное окно. Отдельной кнопки
   // рядом больше нет — она перехватывала касание там, где его ждали от
