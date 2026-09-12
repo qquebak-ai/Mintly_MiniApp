@@ -746,7 +746,12 @@ async function запретСделки(db, { mint, user, продажа, telegr
     }
   }
 
-  if (продажа && т.creator_lock && т.creator_lock !== "none" && user && String(т.owner_id) === String(user.id)) {
+  /* В тестовой сети замок не держим. Там всё существует ради проверки:
+     монеты ничего не стоят, а обещание «не продам раньше биржи» мешает
+     как раз тому, ради чего сеть и заведена — пройти сделку до конца и
+     посмотреть, что получилось. В боевой сети замок работает как прежде. */
+  const тестовая = /devnet|testnet/i.test(RPC);
+  if (!тестовая && продажа && т.creator_lock && т.creator_lock !== "none" && user && String(т.owner_id) === String(user.id)) {
     const кривая = Array.isArray(т.curve_cache) ? т.curve_cache[0] : т.curve_cache;
     const собрано = Number(кривая && кривая.real_ton) || 0;
     const цель = Number(кривая && кривая.graduation_ton) || 0;
