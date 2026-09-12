@@ -413,6 +413,7 @@ const STR = {
     tabHolders: "Держатели", tabFeed: "Лента", tabAbout: "О токене", tabStats: "Статистика", statMcap: "Капитализация", statLiq: "Ликвидность", statVol24: "Объём за сутки", statTrades24: "Сделок за сутки", statAge: "Возраст", statCurve: "Токен собрана", statDex: "Биржа",
     positionTitle: "Ваша позиция", positionValue: "Стоимость", positionAmount: "Количество",
     positionChange24: "За 24 часа", positionEmpty: "Токенов пока нет",
+    positionSinceBuy: "с покупки",
     chatTitle: "Чат токена",
     chatModeAll: "Всем", chatModeHolders: "Держателям",
     chatOnlyHolders: "только держателям",
@@ -984,6 +985,7 @@ const STR = {
     tabChart: "Chart", tabInfo: "Info", tabTx: "Transactions", chartModePrice: "Price", chartModeMcap: "Market cap",
     tabHolders: "Holders", tabFeed: "Feed", tabAbout: "About",
     positionTitle: "Your position", positionValue: "Value", positionAmount: "Amount",
+    positionSinceBuy: "since your buy",
     positionChange24: "24h change", positionEmpty: "No tokens yet",
     chatTitle: "Token chat",
     chatModeAll: "Everyone", chatModeHolders: "Holders",
@@ -5514,6 +5516,29 @@ function SpotlightFX({ up, seedKey = 1 }) {
 }
 
 // "12с" / "4м" / "2ч" — насколько давно прошла сделка.
+/* Сколько человек вложил в этот токен и сколько вынул — по его же
+   сделкам. Нужно для строки над позицией: раньше там стояло суточное
+   изменение цены, и у только что запущенного токена оно показывало
+   «+$2» — цена и правда выросла со стартовой, но эти два доллара
+   заработаны у самого себя, а не рынком. */
+async function вложеноВТокен(userId, адресТокена) {
+  if (!userId || !адресТокена) return null;
+  const { data, error } = await supabase
+    .from("trades")
+    .select("side, ton_amount")
+    .eq("user_id", userId)
+    .eq("token_address", адресТокена)
+    .limit(200);
+  if (error || !data) return null;
+  let вложено = 0;
+  for (const с of data) {
+    const сумма = Number(с.ton_amount) || 0;
+    if (с.side === "sell") вложено -= сумма;
+    else if (с.side === "buy") вложено += сумма;
+  }
+  return { вложено, сделок: data.length };
+}
+
 function fmtSince(iso) {
   const at = new Date(iso).getTime();
   if (!Number.isFinite(at)) return "";
@@ -15407,6 +15432,25 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     : (token.change || 0);
   const ростОкна = процентОкна >= 0;
 
+  /* Вложенное в этот токен — по своим же сделкам. По нему считается
+     строка над позицией: прибыль от собственной цены входа, а не
+     суточное движение цены. */
+  const [вложено, setВложено] = useState(null);
+  useEffect(() => {
+    let брошено = false;
+    setВложено(null);
+    const адрес = token.tokenAddress || token.address;
+    if (!currentUserId || !адрес) return;
+    const читать = () => вложеноВТокен(currentUserId, адрес).then((и) => { if (!брошено && и) setВложено(и); });
+    читать();
+    const своя = () => setTimeout(читать, 1500);
+    if (typeof window !== "undefined") window.addEventListener("mintly:сделка", своя);
+    return () => {
+      брошено = true;
+      if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", своя);
+    };
+  }, [currentUserId, token.tokenAddress, token.address]);
+
   /* Сколько ждём, прежде чем показать страницу как есть: у токена с
      биржи истории может не быть вовсе, и плашки иначе остались бы
      навсегда. */
@@ -16063,11 +16107,24 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       <div className="flex flex-col" style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface, border: "none" }}>
         <div className="flex items-center justify-between">
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 600 }}>{tr("positionTitle")}</span>
-          {позиция != null && позиция > 0 && (
-            <span style={{ fontFamily: monoFont, fontSize: 12.5, color: up ? T.up : T.down }}>
-              {up ? "+" : ""}{fmtUSD(Math.abs(позиция * token.price * (token.change || 0) / 100) * (up ? 1 : -1))} · {tr("positionChange24")}
-            </span>
-          )}
+          {/* Прибыль считается от своей цены входа, а не от движения цены
+              за сутки. У только что запущенного токена суточное движение —
+              это его собственная стартовая покупка: строка показывала
+              «+$2», будто рынок что-то принёс, хотя эти деньги человек
+              заплатил сам. Нет своих сделок — нет и строки. */}
+          {(() => {
+            if (!(позиция != null && позиция > 0)) return null;
+            const курсМонеты = token.chain === "solana" ? solUsd() : tonUsd();
+            const вложеноUSD = вложено && курсМонеты > 0 ? вложено.вложено * курсМонеты : 0;
+            if (!(вложеноUSD > 0)) return null;
+            const итог = позиция * token.price - вложеноUSD;
+            const плюс = итог >= 0;
+            return (
+              <span style={{ fontFamily: monoFont, fontSize: 12.5, color: плюс ? T.up : T.down }}>
+                {плюс ? "+" : "−"}{fmtUSD(Math.abs(итог))} · {tr("positionSinceBuy")}
+              </span>
+            );
+          })()}
         </div>
         {позиция == null ? (
           <div className="flex flex-col gap-2">
