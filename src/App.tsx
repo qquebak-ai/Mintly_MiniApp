@@ -22513,21 +22513,9 @@ function mapTokenRow(row) {
         adjustHolding(token.id, mode === "buy" ? (Number(rawEstimate) || 0) : -rawAmount);
         сообщитьОСделке(token.id);
         setTradeModal(null);
-        /* Говорим, что именно случилось, а не «сделка ушла в сеть»:
-           это была строчка про технику, из которой человек не узнавал
-           ни сколько купил, ни за сколько. */
-        if (подпись) {
-          // Оценки может не быть вовсе — тогда говорим без количества,
-          // а не «≈ 0».
-          const есть = String(receiveAmount || "").trim().length > 0;
-          showToast(mode === "buy"
-            ? (есть
-              ? tf("boughtToast", { receive: receiveAmount, ticker: token.ticker, pay: payAmount, unit })
-              : tf("boughtToastShort", { ticker: token.ticker, pay: payAmount, unit }))
-            : (есть
-              ? tf("soldToast", { pay: payAmount, ticker: token.ticker, receive: receiveAmount, unit })
-              : tf("soldToastShort", { pay: payAmount, ticker: token.ticker })));
-        }
+        /* Об удачной сделке молчим: результат виден сразу — позиция,
+           график и история меняются на глазах, а всплывающая карточка
+           поверх всего этого только мешала. Говорим только об отказе. */
         if (mode === "buy") отпраздновать();
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
       } catch (e) {
@@ -22564,7 +22552,6 @@ function mapTokenRow(row) {
         recordTrade("buy", totalTon, rawEstimate);
         сообщитьОСделке(token.id);
         setTradeModal(null);
-        showToast(tf("boughtToast", { receive: receiveAmount, ticker: token.ticker, pay: payAmount, unit }));
         отпраздновать();
         // Баланс на цепочке обновится не мгновенно — даём блокчейну
         // пару секунд на подтверждение, потом перезапрашиваем его.
@@ -22595,7 +22582,6 @@ function mapTokenRow(row) {
         recordTrade("sell", tonPriceUsd > 0 ? (rawAmount * (token.price > 0 ? token.price : 0)) / tonPriceUsd : 0, rawAmount);
         сообщитьОСделке(token.id);
         setTradeModal(null);
-        showToast(tf("soldToast", { pay: payAmount, ticker: token.ticker, receive: receiveAmount, unit }));
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
       } catch (err) {
         // Текст ошибки показываем целиком: консоли внутри Telegram нет, а
