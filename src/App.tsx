@@ -16744,22 +16744,40 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   useEffect(() => {
     if (!tradeModal || !token || token.chain !== "solana") { setSolБаланс(null); return; }
     let cancelled = false;
-    (async () => {
+    let адресКошелька = null;
+
+    async function прочитать() {
       /* Кошелёк один — свой, внутри приложения: им и платят, и на нём
-         лежат купленные жетоны. */
-      let адрес = null;
-      try {
-        const { состояниеВнутреннего } = await import("./appWallet");
-        const св = await состояниеВнутреннего();
-        адрес = св && св.address;
-      } catch { /* без входа внутреннего кошелька нет */ }
-      if (!адрес || cancelled) return;
-      const параметры = new URLSearchParams({ wallet: адрес });
+         лежат купленные жетоны. Адрес спрашиваем один раз, а остаток —
+         столько раз, сколько понадобится. */
+      if (!адресКошелька) {
+        try {
+          const { состояниеВнутреннего } = await import("./appWallet");
+          const св = await состояниеВнутреннего();
+          адресКошелька = св && св.address;
+        } catch { /* без входа внутреннего кошелька нет */ }
+      }
+      if (!адресКошелька || cancelled) return;
+      const параметры = new URLSearchParams({ wallet: адресКошелька });
       if (token.tokenAddress) параметры.set("mint", token.tokenAddress);
       const b = await fetch(апи(`/api/solana?action=balances&${параметры}`)).then((r) => r.json()).catch(() => null);
       if (!cancelled && b && !b.error) setSolБаланс({ sol: Number(b.sol) || 0, token: Number(b.token) || 0 });
-    })();
-    return () => { cancelled = true; };
+    }
+
+    прочитать();
+    /* Купленное приходит на кошелёк не мгновенно: сеть подтверждает
+       перевод секунду-другую, и окно продажи, открытое сразу после
+       покупки, показывало ноль — приходилось закрывать и открывать
+       заново. Пока окно открыто, перечитываем остаток сами, а на свою
+       сделку отзываемся тут же. */
+    const круг = setInterval(прочитать, 4000);
+    const своя = () => { setTimeout(прочитать, 1200); setTimeout(прочитать, 4000); };
+    if (typeof window !== "undefined") window.addEventListener("mintly:сделка", своя);
+    return () => {
+      cancelled = true;
+      clearInterval(круг);
+      if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", своя);
+    };
   }, [tradeModal, token && token.chain, token && token.tokenAddress]);
 
   useEffect(() => {
@@ -16996,10 +17014,15 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           <div className="flex items-center justify-between">
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("youReceive")}</span>
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>
+              {/* Крошечный выход не округляем в ноль: «≈ 0 SOL» читается
+                  как «ничего не дадут», хотя монеты придут — просто их
+                  меньше, чем показывают четыре знака. */}
               {amount > 0
                 ? (isBuy
                   ? `≈ ${estimate.toLocaleString("ru-RU", { maximumFractionDigits: 0 })} ${token.ticker}`
-                  : `≈ ${estimate.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`)
+                  : (estimate > 0 && estimate < 0.0001
+                    ? `< 0,0001 ${монета}`
+                    : `≈ ${estimate.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`))
                 : "—"}
             </span>
           </div>
