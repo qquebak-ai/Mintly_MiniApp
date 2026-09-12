@@ -22495,10 +22495,14 @@ function mapTokenRow(row) {
         adjustHolding(token.id, mode === "buy" ? (Number(rawEstimate) || 0) : -rawAmount);
         сообщитьОСделке(token.id);
         setTradeModal(null);
-        // Отдельного «ушла в сеть» больше нет: человек и так видит, что
-        // сделка прошла — по позиции и по графику, — а второе сообщение
-        // висело поверх экрана и ничего не добавляло.
-        if (подпись) showToast(t("solDone"));
+        /* Говорим, что именно случилось, а не «сделка ушла в сеть»:
+           это была строчка про технику, из которой человек не узнавал
+           ни сколько купил, ни за сколько. */
+        if (подпись) {
+          showToast(mode === "buy"
+            ? tf("boughtToast", { receive: receiveAmount, ticker: token.ticker, pay: payAmount, unit })
+            : tf("soldToast", { pay: payAmount, ticker: token.ticker, receive: receiveAmount, unit }));
+        }
         if (mode === "buy") отпраздновать();
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
       } catch (e) {
