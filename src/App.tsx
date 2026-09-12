@@ -4866,7 +4866,8 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       ctx.stroke();
       ctx.setLineDash([]);
 
-      const pillH = 32;
+      // Плашка стала ниже: в ней осталась одна строка — цена.
+      const pillH = 20;
       pillTop = Math.max(0, Math.min(height - pillH, y - pillH / 2));
       pillBottom = pillTop + pillH;
     }
@@ -4936,26 +4937,19 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       ctx.textAlign = "left";
     }
 
-    // Live current-price pill — the highlighted price + a live countdown
-    // to when the current (rightmost) bar closes and the next candle
-    // starts — e.g. counts down from 60s on the 1-minute timeframe. Ticks
-    // every second via the redraw interval below.
+    /* Плашка текущей цены. Обратного отсчёта до следующей свечи в ней
+       больше нет: он не говорит ни о цене, ни о сделках — просто
+       тикающие цифры, за которыми человек следит вместо графика. */
     if (lastCandle && pillTop != null) {
       const lastUp = lastCandle.close >= lastCandle.open;
       const lastColor = lastUp ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
       const priceLabel = fmt(lastCandle.close);
-      const barSec = TF_SECONDS[tf] || 3600;
-      const leftMs = (lastCandle.time + barSec) * 1000 - Date.now();
-      // Отсчёт показывается, только пока свеча и правда открыта. Когда
-      // график показывает прошлый участок (сделок в текущем окне не
-      // было), вечный «0:00» под ценой выглядел бы как зависший таймер.
-      const live = leftMs > 0;
       // Плашка не во всю ширину шкалы и не впритык к краю: раньше она
       // упиралась в границу экрана, и её цифры обрезались вместе с ним.
       const отступ = 6;
       const плашкаX = plotW + 2;
       const плашкаШ = Math.max(24, chartWidth() - отступ - плашкаX);
-      const плашкаВ = live ? 32 : 20;
+      const плашкаВ = 20;
       ctx.fillStyle = lastColor;
       ctx.beginPath();
       // roundRect есть не во всех встроенных браузерах — там просто угол.
@@ -4965,11 +4959,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       ctx.fillStyle = T.bg;
       ctx.textAlign = "center";
       ctx.font = "700 11px " + monoFont;
-      ctx.fillText(priceLabel, плашкаX + плашкаШ / 2, pillTop + (live ? 13 : 10));
-      if (live) {
-        ctx.font = "9px " + monoFont;
-        ctx.fillText(fmtCountdown(leftMs), плашкаX + плашкаШ / 2, pillTop + 26);
-      }
+      ctx.fillText(priceLabel, плашкаX + плашкаШ / 2, pillTop + 14);
       ctx.textAlign = "left";
     }
 
@@ -5082,12 +5072,9 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     if (кадрЖивой.current) cancelAnimationFrame(кадрЖивой.current);
   }, []);
 
-  // The bar-close countdown needs a redraw every second even when nothing
-  // else about the data has changed, or it would just sit frozen.
-  useEffect(() => {
-    const iv = setInterval(() => draw(), 1000);
-    return () => clearInterval(iv);
-  }, [tf, n]);
+  /* Перерисовки по таймеру больше нет: она нужна была только тикающему
+     отсчёту. График двигают данные — новая цена из потока и новые
+     свечи, — и каждая из них рисует кадр сама. */
 
   function xFromEvent(clientX) {
     const rect = wrapRef.current?.getBoundingClientRect();
