@@ -15823,7 +15823,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       <КарточкаСтрок
         заголовок={`${tr("aboutToken")} $${token.ticker}`}
         строки={[
-          [t("marketCapLabel"), капаТекст(token.mcapNum)],
+          [t("marketCapLabel"), капаТекст(token.mcapNum || капОкна)],
           [tr("statVolume24h"), `$${token.vol}`],
           [tr("statLiquidity"), `$${token.liq}`],
           token.chain === "solana"
@@ -15861,7 +15861,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       {tab === "stats" && (
         <div className="fx-swap flex flex-col" style={{ gap: 0 }}>
           {[
-            [tr("statMcap"), капаТекст(token.mcapNum)],
+            [tr("statMcap"), капаТекст(token.mcapNum || капОкна)],
             [tr("statLiq"), `$${token.liq ?? "—"}`],
             [tr("statVol24"), `$${token.vol ?? "—"}`],
             [tr("statTrades24"), (token.tx24h || 0).toLocaleString("ru-RU")],
