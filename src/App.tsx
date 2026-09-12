@@ -15026,9 +15026,21 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         if (fresh) chartSrcRef.current = "pool";
       }
       if (cancelled || reqTf !== tfRef.current || !fresh?.candles?.length) return;
-      setChartData((prev) => (prev
-        ? { ...prev, candles: fresh.candles, volume: fresh.volume, tf: reqTf }
-        : { ...fresh, tf: reqTf, isLive: true }));
+      setChartData((prev) => {
+        if (!prev) return { ...fresh, tf: reqTf, isLive: true };
+        /* Ничего не изменилось — не трогаем данные вовсе. Каждая замена
+           массива перерисовывает график и сбивает живую свечу на
+           середине её хода: со стороны это и есть дёрганье. */
+        const было = prev.candles;
+        const стало = fresh.candles;
+        const тоЖе = prev.tf === reqTf
+          && было.length === стало.length
+          && было[было.length - 1].time === стало[стало.length - 1].time
+          && Math.abs(было[было.length - 1].close - стало[стало.length - 1].close) <= Math.abs(стало[стало.length - 1].close) * 1e-9
+          && было[0].time === стало[0].time;
+        if (тоЖе) return prev;
+        return { ...prev, candles: стало, volume: fresh.volume, tf: reqTf };
+      });
       setChartLoading(false);
     }
     /* Своя кривая — свой темп. Её состояние читается у сети напрямую и
