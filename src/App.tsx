@@ -441,7 +441,7 @@ const STR = {
     rate: "Курс",
     networkFee: "Комиссия сети",
     minReceive: "Мин. получите (с учётом slippage)",
-    buyFor: "Купить за", sellFor: "Продать",
+    buyFor: "Купить за", sellFor: "Продать", sellConfirmAgain: "Нажми ещё раз — продажа",
     rateLoading: "Загрузка курса…",
     nothingToSell: "Нечего продавать",
     enterAmount: "Введите сумму",
@@ -1010,7 +1010,7 @@ const STR = {
     rate: "Rate",
     networkFee: "Network fee",
     minReceive: "Min. received (incl. slippage)",
-    buyFor: "Buy for", sellFor: "Sell",
+    buyFor: "Buy for", sellFor: "Sell", sellConfirmAgain: "Tap again to sell",
     rateLoading: "Loading rate…",
     nothingToSell: "Nothing to sell",
     enterAmount: "Enter amount",
@@ -16723,8 +16723,23 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
     setAmountStr(isBuy ? v.toFixed(v < 10 ? 4 : 2) : v.toFixed(v < 10 ? 4 : 0));
   }
 
+  /* Продажа — в два касания. Покупка добавляет позицию, продажа её
+     закрывает: одно случайное касание по большой кнопке внизу уносило
+     весь остаток, и вернуть его можно только новой покупкой по уже
+     другой цене. Второе касание подтверждает, а через пару секунд
+     ожидание снимается само — чтобы кнопка не осталась «взведённой».
+     У покупки шага нет: там сумма ограничена тем, что ввели. */
+  const [ждуПродажу, setЖдуПродажу] = useState(false);
+  useEffect(() => { setЖдуПродажу(false); }, [mode, amountStr]);
+  useEffect(() => {
+    if (!ждуПродажу) return;
+    const id = setTimeout(() => setЖдуПродажу(false), 4000);
+    return () => clearTimeout(id);
+  }, [ждуПродажу]);
+
   function handleConfirm() {
     if (!canConfirm) return;
+    if (!isBuy && !ждуПродажу) { setЖдуПродажу(true); haptic("light"); return; }
     const payAmount = isBuy ? `${amount.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}` : `${amount.toLocaleString("ru-RU")}`;
     /* Оценка бывает нулевой — например, курс монеты ещё не приехал. В
        сообщении «куплено ≈ 0» нет смысла: лучше промолчать о количестве,
@@ -16870,7 +16885,11 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           opacity: canConfirm ? 1 : 0.6,
           boxShadow: canConfirm ? `0 10px 26px ${isBuy ? hexA(T.electric, 0.35) : hexA(T.down, 0.28)}` : "none",
         }}>
-          {amount > 0 ? (isBuy ? `${t("buyFor")} ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}` : `${t("sellFor")} ${amount.toLocaleString("ru-RU")} ${token.ticker}`) : (isBuy && tonPriceUsd <= 0 ? t("rateLoading") : !isBuy && holdingTokens <= 0 ? t("nothingToSell") : t("enterAmount"))}
+          {amount > 0
+            ? (isBuy
+              ? `${t("buyFor")} ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`
+              : (ждуПродажу ? t("sellConfirmAgain") : `${t("sellFor")} ${amount.toLocaleString("ru-RU")} ${token.ticker}`))
+            : (isBuy && tonPriceUsd <= 0 ? t("rateLoading") : !isBuy && holdingTokens <= 0 ? t("nothingToSell") : t("enterAmount"))}
         </button>
       </div>
     </div>
