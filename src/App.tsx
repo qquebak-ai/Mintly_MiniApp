@@ -5908,15 +5908,39 @@ function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
     setТяга(0);
   }
 
+  /* То же мышью и пером: в отладке и на настольном браузере касаний нет
+     вовсе, а проверять жест где-то надо. */
+  function началоУк(e) {
+    if (e.pointerType === "touch") return;
+    жест.current = { y0: e.clientY };
+  }
+  function ходУк(e) {
+    if (e.pointerType === "touch" || !жест.current) return;
+    const dy = e.clientY - жест.current.y0;
+    setТяга(dy < 0 ? dy : dy * 0.18);
+  }
+  function конецУк(e) {
+    if (e.pointerType === "touch") return;
+    конец();
+  }
+
   /* Порталом и выше всего: карточку показывают и поверх листов —
      «Получить», настроек, окна сделки. Пока она жила внутри страницы,
      лист её просто накрывал, и человек не видел ни удачи, ни отказа. */
   return createPortal(
     <div
+      /* Та же пометка, что у листов: без неё main.tsx отдаёт
+         вертикальный жест Telegram — карточка висит у верхней кромки, а
+         там окно забирает движение себе, и смахнуть её было нельзя. */
+      data-sheet="1"
       onTouchStart={начало}
       onTouchMove={ход}
       onTouchEnd={конец}
       onTouchCancel={конец}
+      onPointerDown={началоУк}
+      onPointerMove={ходУк}
+      onPointerUp={конецУк}
+      onPointerCancel={конецУк}
       style={{
         position: "fixed", top: insetTop + 14, left: "50%", zIndex: 620,
         width: "calc(100% - 28px)", maxWidth: 420,
@@ -5972,17 +5996,9 @@ function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
             </span>
           )}
         </span>
-        {/* Закрываем по первому касанию, а не по click: карточка ловит
-            жест целиком, и до клика на крестике дело не доходило. */}
-        <button
-          onPointerDown={(e) => { e.stopPropagation(); onClose(); }}
-          onTouchStart={(e) => { e.stopPropagation(); onClose(); }}
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
-          className="fx-tap flex items-center justify-center flex-shrink-0"
-          style={{ width: 30, height: 30, borderRadius: 999, background: "rgba(255,255,255,0.07)", border: "none" }}
-        >
-          <X size={14} color="rgba(243,243,246,0.75)" />
-        </button>
+        {/* Крестика нет: карточка уходит смахиванием вверх и сама через
+            четыре секунды. Кнопка на её месте только отнимала ширину у
+            текста и ловила случайные нажатия. */}
       </div>
     </div>,
     document.body,
