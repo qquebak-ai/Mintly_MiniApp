@@ -15133,6 +15133,16 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     : (token.change || 0);
   const ростОкна = процентОкна >= 0;
 
+  /* Сколько ждём, прежде чем показать страницу как есть: у токена с
+     биржи истории может не быть вовсе, и плашки иначе остались бы
+     навсегда. */
+  const [ждёмДольше, setЖдёмДольше] = useState(false);
+  useEffect(() => {
+    setЖдёмДольше(false);
+    const id = setTimeout(() => setЖдёмДольше(true), 6000);
+    return () => clearTimeout(id);
+  }, [token.id]);
+
   const запущенВ = useMemo(() => {
     const t = token.createdAt ? new Date(token.createdAt).getTime() : 0;
     return t > 0 ? Math.floor(t / 1000) : 0;
@@ -15508,6 +15518,41 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
     window.open(parsed.href, "_blank", "noopener,noreferrer");
+  }
+
+  /* Пока цифры и график не приехали, страница стоит плашками целиком —
+     той же раскладкой, что и главная. Раньше карточка открывалась сразу:
+     имя на месте, а капитализация «$0» и на месте графика надпись про
+     молчащую биржу. Через секунду всё это сменялось настоящими числами —
+     то есть экран дважды перестраивался на глазах.
+
+     Страховка по времени обязательна: у токена с биржи история может и
+     правда не прийти, и держать человека перед плашками бесконечно
+     нельзя — тогда показываем страницу как есть, с честным сообщением
+     вместо графика. */
+  const числаЕсть = token.mcapNum > 0 || ценаТокена > 0;
+  const страницаГотова = ждёмДольше || (числаЕсть && chartReady);
+
+  if (!страницаГотова) {
+    return (
+      <div className="fx-view flex flex-col pb-4" style={{ position: "relative", gap: 18, paddingTop: 8 }}>
+        <div className="flex items-center" style={{ gap: 12 }}>
+          <div aria-hidden className="fx-skeleton" style={{ width: 56, height: 56, borderRadius: "50%" }} />
+          <div className="flex flex-col" style={{ gap: 8, flex: 1 }}>
+            <ПлашкаБлока h={18} radius={6} />
+            <ПлашкаБлока h={12} radius={6} />
+          </div>
+        </div>
+        <div className="flex flex-col" style={{ gap: 10 }}>
+          <ПлашкаЧисла width={168} height={38} radius={10} />
+          <ПлашкаЧисла width={124} height={16} radius={8} />
+        </div>
+        <ПлашкаБлока h={360} radius={16} />
+        <ПлашкаБлока h={34} radius={999} />
+        <ПлашкаБлока h={96} radius={20} />
+        <ПлашкаБлока h={148} radius={20} />
+      </div>
+    );
   }
 
   return (
