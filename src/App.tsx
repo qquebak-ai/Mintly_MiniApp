@@ -5881,52 +5881,42 @@ function разобратьТост(сообщение) {
   return { вид, заголовок: отказ ? t("toastFail") : подсказка ? t("toastNote") : t("toastDone"), текст: строка };
 }
 
-function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
+function Toast({ toast, insetTop = 0, onClose = () => {} }) {
   const [тяга, setТяга] = useState(0);
+  const [уходит, setУходит] = useState(false);
   /* Появление — это CSS-анимация, а она перекрывает inline-стиль: пока
-     она висела на элементе (а с fill-mode она висит и после конца),
-     наш сдвиг за пальцем просто не применялся — карточка не двигалась
-     вовсе. Поэтому по её окончании анимацию снимаем. */
+     она висит на элементе (а с fill-mode висит и после конца), сдвиг за
+     пальцем не применяется — карточка не двигается вовсе. */
   const [появилась, setПоявилась] = useState(false);
   const жест = useRef(null);
-  useEffect(() => { setТяга(0); setПоявилась(false); }, [toast]);
-  /* Анимацию снимаем и по таймеру: событие о её конце иногда не
-     приходит вовсе — например, когда карточку пересоздали в тот же
-     кадр, — и тогда она навсегда перекрывала наш сдвиг, а карточка
-     переставала смахиваться. */
-  useEffect(() => {
-    if (!toast || leaving) return;
-    const id = setTimeout(() => setПоявилась(true), 500);
-    return () => clearTimeout(id);
-  }, [toast, leaving]);
-  /* Срок жизни карточка держит сама — и не таймером, а часами.
-   *
-   * Цепочка внешних таймеров оказалась хрупкой: их сбрасывал каждый
-   * новый вызов, а один из них зависел от функции, которая
-   * пересоздаётся на каждом рендере приложения — карточка оставалась
-   * висеть до перезагрузки. Здесь простая проверка четыре раза в
-   * секунду: прошло четыре секунды с появления — уходим. Такая проверка
-   * переживает и подмену обработчиков, и заморозку вкладки: вернувшись
-   * на экран, она увидит, что время давно вышло.
-   *
-   * onClose держим в ref: брать его в зависимости нельзя ровно по той
-   * же причине. */
+
+  /* Всё время жизни карточка считает сама, по часам, и никакие внешние
+     таймеры в этом не участвуют: раньше их сбрасывал каждый следующий
+     вызов, и карточка то исчезала мгновенно, то висела вдвое дольше
+     срока, то оставалась до перезагрузки. */
   const закрытьRef = useRef(onClose);
   useEffect(() => { закрытьRef.current = onClose; }, [onClose]);
   useEffect(() => {
-    if (!toast || leaving) return;
+    if (!toast) return;
+    setТяга(0);
+    setУходит(false);
+    setПоявилась(false);
     const показано = Date.now();
     const id = setInterval(() => {
-      if (Date.now() - показано >= ЖИЗНЬ_ТОСТА) {
+      const прошло = Date.now() - показано;
+      if (прошло > 520) setПоявилась(true);
+      if (прошло >= ЖИЗНЬ_ТОСТА) setУходит(true);
+      if (прошло >= ЖИЗНЬ_ТОСТА + TOAST_OUT_MS) {
         clearInterval(id);
         закрытьRef.current();
       }
-    }, 250);
+    }, 120);
     return () => clearInterval(id);
-  }, [toast, leaving]);
+  }, [toast]);
+
   if (!toast) return null;
 
-  const { вид, заголовок, текст } = разобратьТост(toast);
+  const { вид, заголовок, текст } = разобратьТост(toast.текст);
   const цвет = вид === "отказ" ? "#FF5C6B" : вид === "подсказка" ? "#C79BFF" : "#31D07B";
   const Значок = вид === "отказ" ? AlertTriangle : вид === "подсказка" ? Info : CheckCircle2;
 
@@ -5940,19 +5930,19 @@ function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
     // Вверх тянется свободно, вниз — почти нет: карточка живёт у верхней
     // кромки, и тащить её вглубь экрана некуда.
     const dy = т.clientY - жест.current.y0;
+    // Путь держим в самом жесте, а не в состоянии: состояние приезжает
+    // следующим кадром, и при быстром смахивании в конце жеста оно ещё
+    // нулевое — карточка оставалась на месте.
+    жест.current.путь = dy;
     setТяга(dy < 0 ? dy : dy * 0.18);
   }
   function конец() {
-    const ушло = тяга;
+    const ушло = жест.current && жест.current.путь != null ? жест.current.путь : тяга;
     жест.current = null;
-    // Порог мягкий: короткого движения вверх достаточно, тянуть
-    // карточку до половины экрана незачем.
-    if (ушло < -24) { onClose(); return; }
+    // Порог мягкий: короткого движения вверх достаточно.
+    if (ушло < -24) { setУходит(true); setTimeout(() => закрытьRef.current(), TOAST_OUT_MS); return; }
     setТяга(0);
   }
-
-  /* То же мышью и пером: в отладке и на настольном браузере касаний нет
-     вовсе, а проверять жест где-то надо. */
   function началоУк(e) {
     if (e.pointerType === "touch") return;
     жест.current = { y0: e.clientY };
@@ -5960,6 +5950,7 @@ function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
   function ходУк(e) {
     if (e.pointerType === "touch" || !жест.current) return;
     const dy = e.clientY - жест.current.y0;
+    жест.current.путь = dy;
     setТяга(dy < 0 ? dy : dy * 0.18);
   }
   function конецУк(e) {
@@ -5984,12 +5975,12 @@ function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
       onPointerMove={ходУк}
       onPointerUp={конецУк}
       onPointerCancel={конецУк}
-      onAnimationEnd={() => { if (!leaving) setПоявилась(true); }}
+      onAnimationEnd={() => { if (!уходит) setПоявилась(true); }}
       style={{
         position: "fixed", top: insetTop + 14, left: "50%", zIndex: 620,
         width: "calc(100% - 28px)", maxWidth: 420,
         willChange: "transform, opacity",
-        animation: leaving
+        animation: уходит
           ? `toastOut ${TOAST_OUT_MS}ms cubic-bezier(0.4,0,1,1) both`
           : (появилась ? "none" : "toastCardIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both"),
         transform: `translateX(-50%) translateY(${тяга}px)`,
@@ -20416,80 +20407,33 @@ const FEE_PERCENT = 0.01; // 1% комиссии
     // висел в разметке до конца сессии.
     setTimeout(() => setПраздник(0), 2200);
   }, []);
-  // Отдельный признак ухода: сама подсказка ещё в разметке, но уже
-  // проигрывает анимацию вверх. Без него она исчезала мгновенно.
-  const [toastLeaving, setToastLeaving] = useState(false);
-  // Номер показа: по нему подсказка пересоздаётся, и анимация появления
-  // проигрывается заново даже если текст совпал с предыдущим.
-  const [toastSeq, setToastSeq] = useState(0);
-  const toastTimer = useRef(null);
+  // Последнее показанное — чтобы одно и то же сообщение не всплывало
+  // дважды подряд.
   const последнийToast = useRef({ текст: "", когда: 0 });
-  const очередьToast = useRef([]);
-  const показаноВ = useRef(0);
-  const toastRef = useRef(null);
-  const toastHideTimer = useRef(null);
-  // Закрыть руками — крестиком или смахнув вверх: та же анимация ухода,
-  // что и по времени.
-  function скрытьToast() {
-    clearTimeout(toastTimer.current);
-    clearTimeout(toastHideTimer.current);
-    setToastLeaving(true);
-    toastHideTimer.current = setTimeout(() => {
-      setToast(null);
-      setToastLeaving(false);
-      const следующее = очередьToast.current.shift();
-      if (следующее) показатьToast(следующее);
-    }, TOAST_OUT_MS);
-  }
-  /* Показ одной карточки. Всё остальное — очередь ниже. */
-  function показатьToast(текст) {
-    clearTimeout(toastTimer.current);
-    clearTimeout(toastHideTimer.current);
-    setToast(текст);
-    setToastLeaving(false);
-    setToastSeq((n) => n + 1);
-    haptic();
-    показаноВ.current = Date.now();
-    /* Четыре секунды. Уход запускает и сама карточка (см. Toast) —
-       здесь он лишь дублируется, чтобы анимация началась ровно в срок
-       даже на медленном устройстве. */
-    toastTimer.current = setTimeout(() => setToastLeaving(true), ЖИЗНЬ_ТОСТА);
-    toastHideTimer.current = setTimeout(() => {
-      setToast(null);
-      setToastLeaving(false);
-      const следующее = очередьToast.current.shift();
-      if (следующее) показатьToast(следующее);
-    }, ЖИЗНЬ_ТОСТА + TOAST_OUT_MS);
-  }
+  // Номер показа: по нему карточка пересоздаётся, и появление
+  // проигрывается заново даже если текст совпал с предыдущим.
+  const номерToast = useRef(0);
+  /* Показ сообщения. Здесь только «что показать»: когда убрать —
+     решает сама карточка по часам (см. Toast). Раньше этим занимались
+     три таймера в связке, и они сбивали друг друга: сообщение то
+     мелькало, то висело вдвое дольше срока, то оставалось до
+     перезагрузки.
 
-  /* Одно действие — одно сообщение, и по очереди.
-     На покупку их прилетало три: каждое перебивало предыдущее, два
-     мигали и пропадали, а таймеры успевали перепутаться между собой.
-     Теперь повтор того же текста в пределах трёх секунд отбрасывается,
-     а сообщение, пришедшее поверх свежего, ждёт своей очереди. */
+     Новое сообщение вытесняет старое: очередь из уведомлений — это
+     очередь новостей, которых человек уже не ждёт. */
   function showToast(msg) {
     const текст = String(msg == null ? "" : msg);
     if (!текст) return;
     const теперь = Date.now();
     const своё = последнийToast.current;
-    if (своё.текст === текст && теперь - своё.когда < 3000) return;
-    if (очередьToast.current.includes(текст)) return;
+    // Тот же текст дважды подряд — одно сообщение, а не два.
+    if (своё.текст === текст && теперь - своё.когда < 2000) return;
     последнийToast.current = { текст, когда: теперь };
-
-    const живётСейчас = toastRef.current && теперь - показаноВ.current < ЖИЗНЬ_ТОСТА;
-    if (живётСейчас) {
-      // Больше двух в очереди держать незачем: к третьему человек уже
-      // не помнит, о чём было первое.
-      if (очередьToast.current.length < 2) очередьToast.current.push(текст);
-      return;
-    }
-    показатьToast(текст);
+    setToast({ текст, номер: ++номерToast.current });
+    haptic();
   }
-  useEffect(() => { toastRef.current = toast; }, [toast]);
-  useEffect(() => () => {
-    clearTimeout(toastTimer.current);
-    clearTimeout(toastHideTimer.current);
-  }, []);
+
+
 
   // Profile / account state lives here (not inside ProfileView) so the
   // AuthModal bottom sheet can be rendered as a direct child of
@@ -22694,11 +22638,10 @@ function mapTokenRow(row) {
           то, что ещё не приехало, стоит серыми плашками на своих местах.
           Ждать чёрный экран с котом ради тех же двух секунд незачем. */}
       <Toast
-        key={toastSeq}
+        key={toast ? toast.номер : 0}
         toast={toast}
         insetTop={insetTop}
-        leaving={toastLeaving}
-        onClose={скрытьToast}
+        onClose={() => setToast(null)}
       />
 
       {/* Проход в кошелёк из чата. Приложение здесь — только мостик к
