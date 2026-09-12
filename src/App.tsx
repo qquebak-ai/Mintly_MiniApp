@@ -657,6 +657,7 @@ const STR = {
     deleteShort: "Удалить",
     themeChangedWhite: "Тема изменена: Белая",
     themeChangedDark: "Тема изменена: Тёмная",
+    launchNotEnough: "На кошельке {have} — для запуска нужно {need} вместе с комиссией сети",
     launchFailedTitle: "Не удалось запустить токен",
     retry: "Повторить",
     viewOnExplorer: "Открыть в обозревателе",
@@ -1226,6 +1227,7 @@ const STR = {
     deleteShort: "Delete",
     themeChangedWhite: "Theme changed: White",
     themeChangedDark: "Theme changed: Dark",
+    launchNotEnough: "Wallet holds {have} — the launch needs {need} including the network fee",
     launchFailedTitle: "Couldn't launch the token",
     retry: "Retry",
     viewOnExplorer: "View on explorer",
@@ -17652,6 +17654,35 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
      недоступность сказано прямо. */
   const вSolana = сетьЗапуска === "sol";
   const solЗакрыт = вSolana && !solДоступен;
+
+  /* Остаток кошелька приложения в той сети, где запускают. Без него
+     форма пропускала запуск на сумму, которой нет: человек доходил до
+     подписи и получал отказ сети — уже после того, как логотип уехал в
+     хранилище, а имя занято. */
+  const [остатокСети, setОстатокСети] = useState(null);
+  useEffect(() => {
+    let брошено = false;
+    setОстатокСети(null);
+    (async () => {
+      try {
+        const кошелёк = await import("./appWallet");
+        const св = вSolana
+          ? await кошелёк.состояниеВнутреннего()
+          : await кошелёк.состояниеВнутреннегоTON();
+        if (брошено || !св || св.нуженВход || св.ошибка) return;
+        setОстатокСети(Number(вSolana ? св.sol : св.ton) || 0);
+      } catch { /* без входа кошелька нет — тогда и проверять нечего */ }
+    })();
+    return () => { брошено = true; };
+  }, [вSolana, accountCreated]);
+
+  /* Запас на комиссию сети и аренду счёта токена. В Solana запуск платит
+     за создание счёта и метаданные, в TON — за газ контракта. */
+  const ЗАПАС_ЗАПУСКА = вSolana ? 0.02 : 0.3;
+  const суммаПокупки = parseFloat(String(form.buyAmount).replace(",", "."));
+  const нехватка = остатокСети != null
+    && Number.isFinite(суммаПокупки) && суммаПокупки > 0
+    && суммаПокупки + ЗАПАС_ЗАПУСКА > остатокСети;
   // Подпись обязательна: сама транзакция запуска эту сумму не тратит —
   // покупка идёт отдельным шагом сразу после создания. Без пояснения
   // человек ждёт токены на кошельке и не понимает, почему их нет.
@@ -17756,6 +17787,13 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         showToast(trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: минимум.toFixed(вSolana ? 3 : 2), unit: вSolana ? "SOL" : ТИКЕР_TON }));
         return;
       }
+    }
+    if (нехватка) {
+      showToast(trf("launchNotEnough", {
+        have: `${(остатокСети || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${вSolana ? "SOL" : ТИКЕР_TON}`,
+        need: `${(buyNum + ЗАПАС_ЗАПУСКА).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${вSolana ? "SOL" : ТИКЕР_TON}`,
+      }));
+      return;
     }
     // Real launch: hands off to the root app, which deploys an actual
     // jetton on-chain via TonConnect and seeds a STON.fi pool with the
@@ -17919,6 +17957,16 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
               </p>
             );
           }
+          if (нехватка) {
+            return (
+              <p style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, lineHeight: 1.5 }}>
+                {trf("launchNotEnough", {
+                  have: `${(остатокСети || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${вSolana ? "SOL" : ТИКЕР_TON}`,
+                  need: `${(buyNum + ЗАПАС_ЗАПУСКА).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${вSolana ? "SOL" : ТИКЕР_TON}`,
+                })}
+              </p>
+            );
+          }
           const { tokens, pct } = tokensForTon(buyNum);
           return (
             <div className="flex items-center justify-between rounded-[20px] px-3.5 py-2.5" style={{ background: ink(0.06), border: `1px solid ${ink(0.2)}` }}>
@@ -18010,7 +18058,20 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
       {/* Кнопка стоит в конце формы, а не липнет к низу экрана: липкой
           она ложилась поверх переключателей механик, и половина списка
           читалась из-под неё. */}
-      <button onClick={handleLaunch} className="cta-launch fx-tap rounded-[22px]" style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17.5, color: PRISM_TEXT, background: ЦВЕТ_КНОПКИ, padding: "18px 0", marginTop: 4 }}>
+      {/* Нечем платить — кнопка серая и не нажимается: доводить до
+          отказа сети незачем, деньги на комиссию всё равно спишутся. */}
+      <button
+        onClick={handleLaunch}
+        disabled={нехватка}
+        className="cta-launch fx-tap rounded-[22px]"
+        style={{
+          fontFamily: displayFont, fontWeight: 700, fontSize: 17.5,
+          color: нехватка ? T.muted : PRISM_TEXT,
+          background: нехватка ? T.surfaceHi : ЦВЕТ_КНОПКИ,
+          opacity: нехватка ? 0.7 : 1,
+          padding: "18px 0", marginTop: 4,
+        }}
+      >
         {t("launchTokenCta")}
       </button>
 
