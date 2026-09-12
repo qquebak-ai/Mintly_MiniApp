@@ -15065,7 +15065,24 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           // сюда другой — значит двигать одну свечу в своей системе
           // координат, и она запрыгает относительно остальных.
           const курс = курсSolДляГрафика > 0 ? курсSolДляГрафика : 0;
-          const цена = весть.price * курс;
+          /* И цену считаем той же формулой, что и весь график — через
+             произведение резервов. Готовое число из состояния считается
+             иначе (по фактически проданным штукам), и свеча металась
+             между двумя значениями: одно приходило потоком, другое —
+             пересчётом ряда. */
+          let цена = 0;
+          if (весть.vSol > 0 && весть.vTokens > 0 && весть.realSol != null) {
+            цена = curvePriceFromReserve(
+              BigInt(Math.max(0, Math.round(весть.realSol))),
+              {
+                virtualTon: BigInt(Math.round(весть.vSol)),
+                virtualTokens: BigInt(Math.round(весть.vTokens)) * 1000n,
+                feeBps: 0n,
+              },
+            ) * курс;
+          } else {
+            цена = весть.price * курс;
+          }
           if (!(цена > 0)) return;
           setChartData((prev) => {
             if (!prev || !prev.candles || !prev.candles.length) return prev;
@@ -22329,7 +22346,10 @@ function mapTokenRow(row) {
         adjustHolding(token.id, mode === "buy" ? (Number(rawEstimate) || 0) : -rawAmount);
         сообщитьОСделке(token.id);
         setTradeModal(null);
-        showToast(подпись ? t("solDone") : t("solSent"));
+        // Отдельного «ушла в сеть» больше нет: человек и так видит, что
+        // сделка прошла — по позиции и по графику, — а второе сообщение
+        // висело поверх экрана и ничего не добавляло.
+        if (подпись) showToast(t("solDone"));
         if (mode === "buy") отпраздновать();
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
       } catch (e) {

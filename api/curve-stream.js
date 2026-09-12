@@ -56,11 +56,18 @@ function следить(mint) {
     }
     const st = await состояниеКривой(mint);
     if (!st) return;
+    /* Отдаём не только цену, но и сами резервы: график считает цену
+       своей формулой (через произведение резервов), и если прислать
+       готовое число, посчитанное иначе, свеча начнёт прыгать между
+       двумя значениями — одно от потока, другое от пересчёта. */
     const сейчас = {
       price: st.ценаSol,
       raised: st.solСобрано,
       sold: st.продано,
       graduated: !!st.закрыта,
+      vSol: st.virtualSol,
+      vTokens: st.virtualTokens,
+      realSol: Math.round((st.solСобрано || 0) * 1e9),
       at: Math.floor(Date.now() / 1000),
     };
     const изменилось = !запись.прошлое
