@@ -702,6 +702,8 @@ const STR = {
     openWalletCta: "Открыть кошелёк",
     changeAmountCta: "Изменить сумму",
     boughtToast: "Куплено ≈ {receive} ${ticker} за {pay} {unit}",
+    boughtToastShort: "Куплено ${ticker} за {pay} {unit}",
+    soldToastShort: "Продано {pay} ${ticker}",
     txCancelled: "Транзакция отменена или не прошла",
     insufficientSellAmount: "Недостаточно токенов для продажи этой суммы",
     connectWalletSell: "Подключи TON-кошелёк, чтобы продать",
@@ -1267,6 +1269,8 @@ const STR = {
     openWalletCta: "Open wallet",
     changeAmountCta: "Change amount",
     boughtToast: "Bought ≈ {receive} ${ticker} for {pay} {unit}",
+    boughtToastShort: "Bought ${ticker} for {pay} {unit}",
+    soldToastShort: "Sold {pay} ${ticker}",
     txCancelled: "Transaction cancelled or failed",
     insufficientSellAmount: "Not enough tokens to sell this amount",
     connectWalletSell: "Connect a TON wallet to sell",
@@ -5897,12 +5901,19 @@ function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
   }, [toast, leaving]);
   /* И свой срок жизни — на случай, если таймеры снаружи перебили друг
      друга: карточка не должна висеть вечно ни при каком стечении
-     обстоятельств. */
+     обстоятельств.
+
+     onClose держим в ref и в зависимости не берём: наверху это обычная
+     функция, она пересоздаётся на каждом рендере приложения, а рендеров
+     там десятки в минуту — таймер сбрасывался снова и снова и не
+     досчитывал никогда. Это и была «вечная» карточка. */
+  const закрытьRef = useRef(onClose);
+  useEffect(() => { закрытьRef.current = onClose; }, [onClose]);
   useEffect(() => {
     if (!toast || leaving) return;
-    const id = setTimeout(() => onClose(), ЖИЗНЬ_ТОСТА + 400);
+    const id = setTimeout(() => закрытьRef.current(), ЖИЗНЬ_ТОСТА + 400);
     return () => clearTimeout(id);
-  }, [toast, leaving, onClose]);
+  }, [toast, leaving]);
   if (!toast) return null;
 
   const { вид, заголовок, текст } = разобратьТост(toast);
@@ -16325,6 +16336,12 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // токенов — чтобы было что продавать. Оба числа живут в сети, и без
   // них поле «Доступно» показывало прочерк.
   const [solБаланс, setSolБаланс] = useState(null);
+  /* Состояние своей кривой в Solana. По нему считается, сколько штук
+     придёт: у молодого токена цены в ленте ещё нет, а курс монеты может
+     не приехать вовсе — и тогда в окне стояло «≈ 0», хотя покупка
+     проходила нормально. Кривая знает точно: она и есть вторая сторона
+     сделки. */
+  const [кривscolana, setКривSolana] = useState(null);
   // Первым делом: остальные хуки читают tradeModal, и объявить его ниже
   // значит обратиться к нему до создания.
   const [tradeModal, closing] = useClosing(tradeModalProp);
@@ -16336,6 +16353,19 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // готовая покупка ровно на то, что человек ввёл в форме создания.
   const [amountStr, setAmountStr] = useState(tradeModal?.prefill ? String(tradeModal.prefill) : "");
   const [slippage, setSlippage] = useState(1);
+
+  useEffect(() => {
+    if (!tradeModal || !token || token.chain !== "solana" || !token.curveAddress) { setКривSolana(null); return; }
+    let брошено = false;
+    (async () => {
+      try {
+        const { состояниеКривойSol } = await import("./solLaunch");
+        const st = await состояниеКривойSol(token.tokenAddress);
+        if (!брошено && st && st.virtualSol > 0) setКривSolana(st);
+      } catch { /* нет состояния — посчитаем по цене, как раньше */ }
+    })();
+    return () => { брошено = true; };
+  }, [tradeModal, token && token.chain, token && token.tokenAddress, token && token.curveAddress]);
 
   useEffect(() => {
     if (!tradeModal || !token || token.chain !== "solana") { setSolБаланс(null); return; }
@@ -16436,6 +16466,24 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
       // то же число, что придёт на кошелёк.
       estimate = Number(net) / 1e9;
     }
+  } else if (соло && кривscolana && кривscolana.virtualSol > 0) {
+    /* По самой кривой — той же формулой, что применит программа.
+       Резервы виртуальные, поэтому цена зависит только от собранного:
+       произведение резервов постоянно, и сколько уйдёт штук, считается
+       точно, без курса монеты и без цены из ленты. */
+    const st = кривscolana;
+    const комиссия = (st.feeBps || 0) / 10000;
+    const резервSol = st.virtualSol + st.realSol;
+    const резервШтук = st.virtualTokens - st.tokensSold;
+    if (isBuy) {
+      const вошло = amount * 1e9 * (1 - комиссия);
+      const стало = (резервSol * резервШтук) / (резервSol + вошло);
+      estimate = Math.max(0, (резервШтук - стало) / 1e6);
+    } else {
+      const отдал = amount * 1e6;
+      const стало = (резервSol * резервШтук) / (резервШтук + отдал);
+      estimate = Math.max(0, ((резервSol - стало) * (1 - комиссия)) / 1e9);
+    }
   } else if (соло) {
     /* Считаем в самой монете, а не через доллары: у токена на кривой
        цена и так хранится в SOL за штуку. Прежний путь шёл через курс
@@ -16467,9 +16515,12 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   function handleConfirm() {
     if (!canConfirm) return;
     const payAmount = isBuy ? `${amount.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}` : `${amount.toLocaleString("ru-RU")}`;
+    /* Оценка бывает нулевой — например, курс монеты ещё не приехал. В
+       сообщении «куплено ≈ 0» нет смысла: лучше промолчать о количестве,
+       чем назвать неверное. */
     const receiveAmount = isBuy
-      ? estimate.toLocaleString("ru-RU", { maximumFractionDigits: 0 })
-      : `${estimate.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`;
+      ? (estimate > 0 ? estimate.toLocaleString("ru-RU", { maximumFractionDigits: 0 }) : "")
+      : (estimate > 0 ? `${estimate.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}` : "");
     const unit = isBuy ? "" : "";
     onConfirm(mode, payAmount, receiveAmount, unit, amount, estimate);
   }
@@ -22499,9 +22550,16 @@ function mapTokenRow(row) {
            это была строчка про технику, из которой человек не узнавал
            ни сколько купил, ни за сколько. */
         if (подпись) {
+          // Оценки может не быть вовсе — тогда говорим без количества,
+          // а не «≈ 0».
+          const есть = String(receiveAmount || "").trim().length > 0;
           showToast(mode === "buy"
-            ? tf("boughtToast", { receive: receiveAmount, ticker: token.ticker, pay: payAmount, unit })
-            : tf("soldToast", { pay: payAmount, ticker: token.ticker, receive: receiveAmount, unit }));
+            ? (есть
+              ? tf("boughtToast", { receive: receiveAmount, ticker: token.ticker, pay: payAmount, unit })
+              : tf("boughtToastShort", { ticker: token.ticker, pay: payAmount, unit }))
+            : (есть
+              ? tf("soldToast", { pay: payAmount, ticker: token.ticker, receive: receiveAmount, unit })
+              : tf("soldToastShort", { pay: payAmount, ticker: token.ticker })));
         }
         if (mode === "buy") отпраздновать();
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
