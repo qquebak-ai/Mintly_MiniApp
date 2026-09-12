@@ -12721,10 +12721,18 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
   );
 }
 
+/* Плашка на месте целого блока. Пока данные едут, главная показывает не
+   полупустые карточки с прочерками вместо чисел, а ровные серые
+   прямоугольники той же формы: так видно раскладку и видно, что она
+   сейчас оживёт. */
+function ПлашкаБлока({ h, radius = 20 }) {
+  return <div aria-hidden className="fx-skeleton" style={{ width: "100%", height: h, borderRadius: radius }} />;
+}
+
 function HomeView({
   onGoTab, onGoCreate, curveTokens = [], onOpenToken, onOpenProfile,
   profile = null, accountCreated = false, myTokens = [], achievements = [], userId = null,
-  onOpenMyProfile, onOpenAchievements, профильГрузится = false, тик = 0,
+  onOpenMyProfile, onOpenAchievements, профильГрузится = false, тик = 0, грузится = false,
 }) {
   // Главная — витрина площадки: сводка, токен дня, движение, топ. Монетам
   // из пробной сети там не место — их цена ничего не значит, а сводка по
@@ -12737,20 +12745,33 @@ function HomeView({
     <div className="flex flex-col" style={{ gap: 26, paddingTop: 8, paddingBottom: 96 }}>
       <ШапкаГлавной profile={profile} accountCreated={accountCreated} onOpenMyProfile={onOpenMyProfile} грузится={профильГрузится} />
       <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
-      <ГлавнаяСводка live={боевые} />
-      <БегущаяЛента />
-      <МоиДела
-        myTokens={myTokens}
-        achievements={achievements}
-        userId={userId}
-        onGoCreate={onGoCreate}
-        onOpenToken={onOpenToken}
-        onOpenAchievements={onOpenAchievements}
-        тик={тик}
-      />
-      <ГлавныйТокен tokens={боевые} onOpen={onOpenToken} />
-      <ВДвижении tokens={боевые} onOpen={onOpenToken} onAll={() => onGoTab("mempad")} />
-      <ТопСтрока onOpenToken={onOpenToken} onOpenProfile={onOpenProfile} live={боевые} />
+      {грузится ? (
+        <>
+          <ПлашкаБлока h={96} />
+          <ПлашкаБлока h={46} radius={999} />
+          <ПлашкаБлока h={168} />
+          <ПлашкаБлока h={196} radius={24} />
+          <ПлашкаБлока h={150} />
+          <ПлашкаБлока h={190} />
+        </>
+      ) : (
+        <>
+          <ГлавнаяСводка live={боевые} />
+          <БегущаяЛента />
+          <МоиДела
+            myTokens={myTokens}
+            achievements={achievements}
+            userId={userId}
+            onGoCreate={onGoCreate}
+            onOpenToken={onOpenToken}
+            onOpenAchievements={onOpenAchievements}
+            тик={тик}
+          />
+          <ГлавныйТокен tokens={боевые} onOpen={onOpenToken} />
+          <ВДвижении tokens={боевые} onOpen={onOpenToken} onAll={() => onGoTab("mempad")} />
+          <ТопСтрока onOpenToken={onOpenToken} onOpenProfile={onOpenProfile} live={боевые} />
+        </>
+      )}
 
       {/* Запуск — главное действие экрана, и оно стоит в его конце.
           Раньше кнопка прилипала к низу и висела поверх прокрутки: пока
@@ -22454,6 +22475,7 @@ function mapTokenRow(row) {
               profile={profile}
               accountCreated={accountCreated}
               профильГрузится={!authChecked}
+              грузится={!communityLoaded || tokensLoading}
               тик={balanceRefreshTick}
               myTokens={myTokens}
               achievements={achievements}
