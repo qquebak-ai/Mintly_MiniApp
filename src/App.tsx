@@ -4285,6 +4285,31 @@ function flatCandles(price, timeframe, limit = CHART_TOTAL, запущен = 0) 
  *
  * Возвращает null, когда состояние прочитать не удалось, — чтобы было
  * видно разницу между «сделок не было» и «сеть не ответила». */
+/* Сколько монет вернёт продажа всей позиции прямо сейчас.
+ *
+ * Стоимость позиции считалась как «количество × цена», и сразу после
+ * покупки выходил плюс из воздуха: кривая по ходу сделки поднимается,
+ * человек платит среднюю цену, а его токены оцениваются по последней —
+ * на покупке в 1 SOL это плюс пятнадцать долларов, которых нет. Продать
+ * по последней цене нельзя: продажа идёт по той же кривой вниз.
+ *
+ * Считаем по инварианту кривой: k = (vМонеты + собрано) × (vТокены −
+ * продано), и выплата равна (vМонеты + собрано) − k / (vТокены − продано
+ * + количество). Ровно так же считает и сама программа. */
+function выручкаПоКривой(резервы, количество) {
+  if (!резервы || !(количество > 0)) return null;
+  const { vМонеты, vТокены, собрано, продано } = резервы;
+  if (!(vМонеты > 0) || !(vТокены > 0)) return null;
+  // Больше проданного кривая не выкупит: остальное пришло не с неё.
+  const сколько = Math.min(количество, продано);
+  if (!(сколько > 0)) return null;
+  const монеты = vМонеты + собрано;
+  const токены = vТокены - продано;
+  if (!(токены > 0)) return null;
+  const выплата = монеты - (монеты * токены) / (токены + сколько);
+  return выплата > 0 ? выплата : 0;
+}
+
 async function рынокКривойСразу(token) {
   if (!token) return null;
   try {
@@ -4302,6 +4327,14 @@ async function рынокКривойСразу(token) {
         цель: st.solЦель,
         продано: st.продано,
         graduated: !!st.закрыта,
+        // Резервы — чтобы посчитать, сколько монет вернёт продажа: по
+        // одной цене позицию не оценить, кривая по ходу сделки опускается.
+        резервы: {
+          vМонеты: st.virtualSol / 1e9,
+          vТокены: st.virtualTokens / 1e6,
+          собрано: st.solСобрано,
+          продано: st.продано,
+        },
       };
     }
     if (!token.curveAddress) return null;
@@ -4315,6 +4348,12 @@ async function рынокКривойСразу(token) {
       цель: Number(m.state.graduationTon) / 1e9,
       продано: Number(m.state.tokensSold) / 1e9,
       graduated: !!m.state.graduated,
+      резервы: {
+        vМонеты: Number(m.state.virtualTon) / 1e9,
+        vТокены: Number(m.state.virtualTokens) / 1e9,
+        собрано: Number(m.state.realTon) / 1e9,
+        продано: Number(m.state.tokensSold) / 1e9,
+      },
     };
   } catch {
     return null;
@@ -15584,6 +15623,18 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     };
   }, [currentUserId, token.tokenAddress, token.address]);
 
+  /* Сколько стоит позиция. Не «количество × цена», а сколько монет
+     вернёт продажа прямо сейчас: кривая по ходу сделки опускается, и
+     оценка по последней цене завышала позицию — у человека, который сам
+     же и купил минуту назад, висел плюс, которого нет. У биржевого
+     токена кривой нет, там оценка по цене и есть правильная. */
+  const стоимостьПозиции = useMemo(() => {
+    const поЦене = (позиция || 0) * (живаяЦена > 0 ? живаяЦена : token.price);
+    const курс = token.chain === "solana" ? solUsd() : tonUsd();
+    const выручка = выручкаПоКривой(своя && своя.резервы, позиция || 0);
+    return выручка != null && курс > 0 ? выручка * курс : поЦене;
+  }, [позиция, живаяЦена, token.price, token.chain, своя]);
+
   /* Сколько ждём, прежде чем показать страницу как есть: у токена с
      биржи истории может не быть вовсе, и плашки иначе остались бы
      навсегда. */
@@ -16251,7 +16302,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             const курсМонеты = token.chain === "solana" ? solUsd() : tonUsd();
             const вложеноUSD = вложено && курсМонеты > 0 ? вложено.вложено * курсМонеты : 0;
             if (!(вложеноUSD > 0)) return null;
-            const итог = позиция * (живаяЦена > 0 ? живаяЦена : token.price) - вложеноUSD;
+            const итог = стоимостьПозиции - вложеноUSD;
             const плюс = итог >= 0;
             return (
               <span style={{ fontFamily: monoFont, fontSize: 12.5, color: плюс ? T.up : T.down }}>
@@ -16269,7 +16320,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           <div className="flex items-end justify-between gap-3">
             <div>
               <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, letterSpacing: "-0.01em" }}>
-                {fmtUSD(позиция * (живаяЦена > 0 ? живаяЦена : token.price))}
+                {fmtUSD(стоимостьПозиции)}
               </div>
               <div style={{ fontFamily: monoFont, color: T.faint, fontSize: 12.5, marginTop: 2 }}>
                 {fmtCoin(позиция)} ${token.ticker}
