@@ -323,14 +323,14 @@ const STR = {
     swapRouteNote: "Курс биржи, с запасом на проскальзывание",
     swapOnlyInApp: "Меняется только то, что лежит на кошельке Mintly",
     walletSeeAll: "Все",
-    walletActBuy: "Вывести",
+    walletActBuy: "Отправить",
     walletActReceive: "Получить",
-    withdrawTitle: "Вывести",
+    withdrawTitle: "Отправить",
     withdrawTo: "Адрес получателя",
     withdrawAmount: "Сумма",
     withdrawAll: "Всё",
     withdrawAvailable: "Доступно",
-    withdrawDo: "Вывести",
+    withdrawDo: "Отправить",
     withdrawGoing: "Отправляем…",
     withdrawSent: "Отправлено {sum}",
     withdrawFailed: "Вывод не прошёл",
@@ -675,7 +675,7 @@ const STR = {
     themeChangedWhite: "Тема изменена: Белая",
     themeChangedDark: "Тема изменена: Тёмная",
     launchNotEnough: "На кошельке {have} — для запуска нужно {need} вместе с комиссией сети",
-    opLaunch: "запуск токена", opWithdraw: "вывод", opSweep: "перевод на свой адрес",
+    opLaunch: "запуск токена", opWithdraw: "Отправлено", opDeposit: "Пополнено", opSweep: "перевод на свой адрес",
     opGraduate: "выход на биржу", opBind: "привязка адреса", opOther: "операция",
     launchFailedTitle: "Не удалось запустить токен",
     retry: "Повторить",
@@ -912,14 +912,14 @@ const STR = {
     swapRouteNote: "Exchange rate, slippage included",
     swapOnlyInApp: "Only what sits on the Mintly wallet can be swapped",
     walletSeeAll: "See all",
-    walletActBuy: "Withdraw",
+    walletActBuy: "Send",
     walletActReceive: "Receive",
-    withdrawTitle: "Withdraw",
+    withdrawTitle: "Send",
     withdrawTo: "Recipient address",
     withdrawAmount: "Amount",
     withdrawAll: "Max",
     withdrawAvailable: "Available",
-    withdrawDo: "Withdraw",
+    withdrawDo: "Send",
     withdrawGoing: "Sending…",
     withdrawSent: "Sent {sum}",
     withdrawFailed: "Withdrawal failed",
@@ -1264,7 +1264,7 @@ const STR = {
     themeChangedWhite: "Theme changed: White",
     themeChangedDark: "Theme changed: Dark",
     launchNotEnough: "Wallet holds {have} — the launch needs {need} including the network fee",
-    opLaunch: "token launch", opWithdraw: "withdrawal", opSweep: "sent to your address",
+    opLaunch: "token launch", opWithdraw: "Sent", opDeposit: "Received", opSweep: "sent to your address",
     opGraduate: "listing", opBind: "address link", opOther: "operation",
     launchFailedTitle: "Couldn't launch the token",
     retry: "Retry",
@@ -13009,7 +13009,7 @@ function useСделки(userId, предел, тик = 0) {
           .filter((о) => !ОПЕРАЦИИ_СДЕЛОК.has(о.kind) && о.amount >= 0)
           .map((о) => ({
             id: о.id,
-            side: о.kind,               // launch | withdraw | sweep | graduate | payout_bind
+            side: о.kind,               // launch | withdraw | deposit | sweep | graduate | payout_bind
             ticker: null,
             ton_amount: о.amount,
             token_amount: null,
@@ -13048,6 +13048,7 @@ function названиеОперации(с) {
   switch (с && с.side) {
     case "launch": return t("opLaunch");
     case "withdraw": return t("opWithdraw");
+    case "deposit": return t("opDeposit");
     case "sweep": return t("opSweep");
     case "graduate": return t("opGraduate");
     case "payout_bind": return t("opBind");
@@ -13058,8 +13059,9 @@ function названиеОперации(с) {
 // Сделка это или прочая операция кошелька: у сделки есть тикер, у
 // операции — только вид и сумма.
 const этоСделка = (с) => с && (с.side === "buy" || с.side === "sell" || с.side === "swap");
-// Приход бывает только у продажи: всё остальное в списке — трата.
-const этоПриход = (с) => с && с.side === "sell";
+// Приход — продажа и пополнение кошелька снаружи; всё остальное в
+// списке уходит с кошелька.
+const этоПриход = (с) => с && (с.side === "sell" || с.side === "deposit");
 
 function МояАктивность({ userId, тик = 0 }) {
   const ряд = useСделки(userId, 5, тик);
