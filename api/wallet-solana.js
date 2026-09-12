@@ -192,8 +192,22 @@ async function кошелёк(db, user, набор) {
     await db.from("app_wallets").delete().eq("user_id", user.id).eq("chain", "solana");
   }
 
+  /* Ключ выводим из общей фразы человека, а не из случайности: одна
+     запись из двадцати четырёх слов даёт и этот кошелёк, и TON-овский —
+     каждый по своему пути, как в Phantom. Путь Solana тот же, что у
+     Phantom, так что фраза открывает кошелёк и во внешнем приложении.
+     Не получилось (нет таблицы фраз, не читается ключ) — заводим пару
+     случайно, как раньше: остаться без кошелька хуже. */
   const { Keypair } = await библиотеки();
-  const пара = Keypair.generate();
+  let пара = null;
+  try {
+    const { фразаПользователя, ключПути, ПУТЬ_SOLANA } = await import("./_seed.js");
+    const фраза = await фразаПользователя(db, user, набор);
+    пара = Keypair.fromSeed(ключПути(фраза, ПУТЬ_SOLANA));
+  } catch (e) {
+    console.warn("[wallet-solana] общая фраза недоступна:", e && e.message);
+    пара = Keypair.generate();
+  }
   const строка = {
     user_id: user.id,
     chain: "solana",

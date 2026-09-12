@@ -118,15 +118,34 @@ async function кошелёк(db, user, набор) {
   if (data) return data;
 
   const { mnemonicNew, mnemonicToPrivateKey, WalletContractV4 } = await библиотеки();
-  const слова = await mnemonicNew(24);
-  const пара = await mnemonicToPrivateKey(слова);
+
+  /* Ключ — из общей фразы человека, по своему пути монеты TON: та же
+     запись из двадцати четырёх слов открывает и кошелёк Solana. Храним
+     готовую пару, а не слова: фраза лежит отдельно, одна на оба
+     кошелька. Если общий корень недоступен, заводим собственную
+     TON-мнемонику, как было раньше. */
+  let секрет = null;
+  let пара = null;
+  try {
+    const nacl = (await import("tweetnacl")).default;
+    const { фразаПользователя, ключПути, ПУТЬ_TON } = await import("./_seed.js");
+    const фраза = await фразаПользователя(db, user, набор);
+    const из = nacl.sign.keyPair.fromSeed(ключПути(фраза, ПУТЬ_TON));
+    пара = { publicKey: Buffer.from(из.publicKey), secretKey: Buffer.from(из.secretKey) };
+    секрет = Buffer.from(`hex:${пара.secretKey.toString("hex")}`);
+  } catch (e) {
+    console.warn("[wallet-ton] общая фраза недоступна:", e && e.message);
+    const слова = await mnemonicNew(24);
+    пара = await mnemonicToPrivateKey(слова);
+    секрет = Buffer.from(слова.join(" "));
+  }
   const контракт = WalletContractV4.create({ workchain: 0, publicKey: пара.publicKey });
 
   const строка = {
     user_id: user.id,
     chain: "ton",
     address: контракт.address.toString({ bounceable: false, testOnly: TESTNET }),
-    secret_enc: зашифровать(Buffer.from(слова.join(" ")), набор.текущий, user.id),
+    secret_enc: зашифровать(секрет, набор.текущий, user.id),
     key_id: набор.метка,
   };
   const { error } = await db.from("app_wallets").insert(строка);
@@ -143,8 +162,17 @@ async function кошелёк(db, user, набор) {
 /* Ключи для подписи — только на время одной операции. */
 async function подписант(строка, набор, user) {
   const { mnemonicToPrivateKey, WalletContractV4, TonClient } = await библиотеки();
-  const слова = расшифровать(строка.secret_enc, набор.текущий, user.id).toString("utf8").split(" ");
-  const пара = await mnemonicToPrivateKey(слова);
+  const тайна = расшифровать(строка.secret_enc, набор.текущий, user.id).toString("utf8");
+  /* Два вида записи. Кошельки, выведенные из общей фразы, хранят готовую
+     пару: «hex:» и шестьдесят четыре байта ключа. Заведённые раньше —
+     собственную мнемонику из двадцати четырёх слов. */
+  let пара;
+  if (тайна.startsWith("hex:")) {
+    const байты = Buffer.from(тайна.slice(4), "hex");
+    пара = { publicKey: байты.subarray(32), secretKey: байты };
+  } else {
+    пара = await mnemonicToPrivateKey(тайна.split(" "));
+  }
   const контракт = WalletContractV4.create({ workchain: 0, publicKey: пара.publicKey });
   // Отправляет транзакции toncenter: у tonapi для этого свой протокол,
   // а клиент библиотеки умеет именно этот.
