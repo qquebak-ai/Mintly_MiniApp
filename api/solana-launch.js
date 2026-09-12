@@ -591,6 +591,10 @@ function пропустить(ключ) {
   return было.счёт <= СБОРОК_В_МИНУТУ;
 }
 
+// Общая память на состояние кривой — ровно на секунду (см. ниже).
+const состояниеКеш = new Map();
+const СОСТОЯНИЕ_МС = 1000;
+
 export default async function handler(req, res) {
   const действие = String((req.query && req.query.action) || "");
   try {
@@ -602,8 +606,20 @@ export default async function handler(req, res) {
     }
 
     if (действие === "state") {
-      const s = await состояние(String(req.query.mint || ""));
+      const mint = String(req.query.mint || "");
+      /* Карточка спрашивает состояние каждые пару секунд, и зрителей у
+         токена может быть много. Секунда общей памяти убирает лишние
+         походы в сеть и при этом не заметна: свою сделку человек видит
+         в следующем же круге. */
+      const было = состояниеКеш.get(mint);
+      const s = было && Date.now() - было.ts < СОСТОЯНИЕ_МС
+        ? было.тело
+        : await состояние(mint);
       if (!s) return res.status(404).json({ error: "not_found" });
+      состояниеКеш.set(mint, { ts: Date.now(), тело: s });
+      if (состояниеКеш.size > 300) {
+        for (const [к, з] of состояниеКеш) if (Date.now() - з.ts > СОСТОЯНИЕ_МС) состояниеКеш.delete(к);
+      }
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json(s);
     }

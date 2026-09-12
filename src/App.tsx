@@ -3512,30 +3512,49 @@ function безСлужебных(holders, служебных = 0) {
    цепочка, и запрос к tonapi возвращал пустоту, из-за чего у токена
    Solana в характеристиках всегда стоял прочерк. Число приходит вместе
    со списком крупнейших счетов, одним запросом на карточку. */
-function useJettonHolders(tokenAddress, testnet = false, служебных = 0, chain = "ton") {
+function useJettonHolders(tokenAddress, testnet = false, служебных = 0, chain = "ton", живо = false) {
   const [count, setCount] = useState(undefined);
   useEffect(() => {
     setCount(undefined);
     if (!tokenAddress) return;
     let cancelled = false;
-    if (chain === "solana") {
-      fetch(апи(`/api/solana?action=holders&mint=${encodeURIComponent(tokenAddress)}`))
-        .then((r) => r.json())
-        .then((j) => {
-          if (cancelled) return;
-          const всего = j && j.держателей != null ? Number(j.держателей) : null;
-          // Узел не дал полного счёта — показываем хотя бы тех, кого
-          // видно в списке крупнейших: это честнее прочерка.
-          const видимых = j && Array.isArray(j.счета) ? j.счета.filter((с) => Number(с.количество) > 0).length : 0;
-          const число = всего != null && всего > 0 ? всего : видимых;
-          setCount(безСлужебных(число, служебных));
-        })
-        .catch(() => { if (!cancelled) setCount(null); });
-      return () => { cancelled = true; };
-    }
-    fetchJettonHolders(tokenAddress, testnet).then((c) => { if (!cancelled) setCount(безСлужебных(c, служебных)); });
-    return () => { cancelled = true; };
-  }, [tokenAddress, testnet, служебных, chain]);
+
+    const прочитать = () => {
+      if (chain === "solana") {
+        return fetch(апи(`/api/solana?action=holders&mint=${encodeURIComponent(tokenAddress)}`))
+          .then((r) => r.json())
+          .then((j) => {
+            if (cancelled) return;
+            const всего = j && j.держателей != null ? Number(j.держателей) : null;
+            // Узел не дал полного счёта — показываем хотя бы тех, кого
+            // видно в списке крупнейших: это честнее прочерка.
+            const видимых = j && Array.isArray(j.счета) ? j.счета.filter((с) => Number(с.количество) > 0).length : 0;
+            const число = всего != null && всего > 0 ? всего : видимых;
+            setCount(безСлужебных(число, служебных));
+          })
+          .catch(() => { if (!cancelled) setCount(null); });
+      }
+      return fetchJettonHolders(tokenAddress, testnet)
+        .then((c) => { if (!cancelled) setCount(безСлужебных(c, служебных)); });
+    };
+
+    прочитать();
+    /* На открытой карточке число держателей идёт следом за сделками:
+       свою ловим событием, чужую — коротким опросом. В списках токенов
+       (карточка «моего токена») этого не нужно: там цифра справочная,
+       а карточек на экране десяток. */
+    if (!живо) return () => { cancelled = true; };
+    const шаг = setInterval(() => {
+      if (typeof document === "undefined" || document.visibilityState === "visible") прочитать();
+    }, 4000);
+    const поСделке = () => { прочитать(); setTimeout(прочитать, 1500); };
+    if (typeof window !== "undefined") window.addEventListener("mintly:сделка", поСделке);
+    return () => {
+      cancelled = true;
+      clearInterval(шаг);
+      if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", поСделке);
+    };
+  }, [tokenAddress, testnet, служебных, chain, живо]);
   return count;
 }
 
@@ -14960,8 +14979,23 @@ function useТопДержателей(token, открыто) {
         if (жив) setСписок([]);
       }
     }
+    /* Список живой, пока вкладка открыта. Покупка с другого телефона
+       ничем о себе не сообщает, поэтому спрашиваем сеть сами — раз в
+       три секунды, и сразу после своей сделки. Прежде список читался
+       один раз на открытие: новый держатель появлялся в нём, только
+       если уйти с экрана и вернуться. */
     загрузить();
-    return () => { жив = false; };
+    const шаг = setInterval(() => {
+      if (typeof document === "undefined" || document.visibilityState === "visible") загрузить();
+    }, 3000);
+    // Своя сделка доходит до сети чуть позже ответа: читаем дважды.
+    const поСделке = () => { загрузить(); setTimeout(загрузить, 1500); };
+    if (typeof window !== "undefined") window.addEventListener("mintly:сделка", поСделке);
+    return () => {
+      жив = false;
+      clearInterval(шаг);
+      if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", поСделке);
+    };
   }, [открыто, token && token.id, token && token.tokenAddress, token && token.chain]);
   return список;
 }
@@ -15309,6 +15343,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     !!token.curveAddress && TON_TESTNET_NETWORK,
     token.chain === "solana" ? 0 : (token.curveAddress ? 1 : 0),
     token.chain === "solana" ? "solana" : "ton",
+    true,
   );
   // Владелец заодно чинит запись в базе, поэтому передаём, он это или нет.
   const логотип = useTokenLogo(
@@ -15453,8 +15488,10 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     const читать = () => рынокКривойСразу(token).then((м) => { if (!брошено && м) setСвоя(м); });
     читать();
     // Свой круг: кривая отвечает быстрее обхода. На свою сделку
-    // отзываемся сразу, не дожидаясь круга.
-    const id = setInterval(читать, 5000);
+    // отзываемся сразу, не дожидаясь круга. Круг короткий — чужая
+    // покупка должна двигать цифру в шапке почти сразу, а не через
+    // пять секунд.
+    const id = setInterval(читать, 2500);
     const своя = () => { setTimeout(читать, 900); setTimeout(читать, 3000); };
     if (typeof window !== "undefined") window.addEventListener("mintly:сделка", своя);
     return () => {
