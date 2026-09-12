@@ -441,7 +441,7 @@ const STR = {
     rate: "Курс",
     networkFee: "Комиссия сети",
     minReceive: "Мин. получите (с учётом slippage)",
-    buyFor: "Купить за", sellFor: "Продать", sellConfirmAgain: "Нажми ещё раз — продажа",
+    buyFor: "Купить за", sellFor: "Продать",
     rateLoading: "Загрузка курса…",
     nothingToSell: "Нечего продавать",
     enterAmount: "Введите сумму",
@@ -1010,7 +1010,7 @@ const STR = {
     rate: "Rate",
     networkFee: "Network fee",
     minReceive: "Min. received (incl. slippage)",
-    buyFor: "Buy for", sellFor: "Sell", sellConfirmAgain: "Tap again to sell",
+    buyFor: "Buy for", sellFor: "Sell",
     rateLoading: "Loading rate…",
     nothingToSell: "Nothing to sell",
     enterAmount: "Enter amount",
@@ -16701,6 +16701,9 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // готовая покупка ровно на то, что человек ввёл в форме создания.
   const [amountStr, setAmountStr] = useState(tradeModal?.prefill ? String(tradeModal.prefill) : "");
   const [slippage, setSlippage] = useState(1);
+  /* Одно нажатие — одна сделка. Второго подтверждения нет: окно
+     закрывается в тот же миг, и нажать ещё раз уже некуда. */
+  const отправлено = useRef(false);
 
   useEffect(() => {
     if (!tradeModal || !token || token.chain !== "solana" || !token.curveAddress) { setКривSolana(null); return; }
@@ -16754,26 +16757,11 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
       setMode(tradeModal.mode);
       setAmountStr(tradeModal.prefill ? String(tradeModal.prefill) : "");
       setSlippage(1);
+      // Замок снимается при каждом открытии: окно не размонтируется, а
+      // прячется, и без сброса вторая сделка в том же сеансе не ушла бы.
+      отправлено.current = false;
     }
   }, [tradeModal]);
-
-  /* Продажа — в два касания. Покупка добавляет позицию, продажа её
-     закрывает: одно случайное касание по большой кнопке внизу уносило
-     весь остаток, и вернуть его можно только новой покупкой по уже
-     другой цене. Второе касание подтверждает, а через пару секунд
-     ожидание снимается само — чтобы кнопка не осталась «взведённой».
-     У покупки шага нет: там сумма ограничена тем, что ввели.
-
-     Хуки стоят до выхода «окна нет»: ниже него их вызывать нельзя — при
-     закрытом окне их стало бы меньше, и React валит всё приложение
-     ошибкой о разном числе хуков между отрисовками. */
-  const [ждуПродажу, setЖдуПродажу] = useState(false);
-  useEffect(() => { setЖдуПродажу(false); }, [mode, amountStr]);
-  useEffect(() => {
-    if (!ждуПродажу) return;
-    const id = setTimeout(() => setЖдуПродажу(false), 4000);
-    return () => clearTimeout(id);
-  }, [ждуПродажу]);
 
   if (!tradeModal) return null;
 
@@ -16879,8 +16867,8 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   }
 
   function handleConfirm() {
-    if (!canConfirm) return;
-    if (!isBuy && !ждуПродажу) { setЖдуПродажу(true); haptic("light"); return; }
+    if (!canConfirm || отправлено.current) return;
+    отправлено.current = true;
     const payAmount = isBuy ? `${amount.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}` : `${amount.toLocaleString("ru-RU")}`;
     /* Оценка бывает нулевой — например, курс монеты ещё не приехал. В
        сообщении «куплено ≈ 0» нет смысла: лучше промолчать о количестве,
@@ -17031,7 +17019,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           {amount > 0
             ? (isBuy
               ? `${t("buyFor")} ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`
-              : (ждуПродажу ? t("sellConfirmAgain") : `${t("sellFor")} ${amount.toLocaleString("ru-RU")} ${token.ticker}`))
+              : `${t("sellFor")} ${amount.toLocaleString("ru-RU")} ${token.ticker}`)
             : (isBuy && tonPriceUsd <= 0 ? t("rateLoading") : !isBuy && holdingTokens <= 0 ? t("nothingToSell") : t("enterAmount"))}
         </button>
       </div>
@@ -22923,7 +22911,27 @@ function mapTokenRow(row) {
     return await свопВнутренним({ вход, выход, сумма });
   }
 
+  /* Замок на время сделки. Сеть подтверждает перевод не мгновенно, и
+     пока она думает, позиция в приложении ещё прежняя: раньше это
+     позволяло продать одни и те же токены несколько раз подряд — в
+     истории набиралась пачка одинаковых продаж, а до сети доезжала
+     одна. Теперь вторая отправка не проходит, пока не ответила первая. */
+  const сделкаИдёт = useRef(false);
+
   async function confirmTrade(mode, payAmount, receiveAmount, unit, rawAmount, rawEstimate) {
+    if (сделкаИдёт.current) return;
+    сделкаИдёт.current = true;
+    /* Окно закрываем сразу, не дожидаясь сети: ждать было не только
+       долго, но и опасно — открытая кнопка принимала второе нажатие. */
+    setTradeModal(null);
+    try {
+      await провестиСделку(mode, payAmount, receiveAmount, unit, rawAmount, rawEstimate);
+    } finally {
+      сделкаИдёт.current = false;
+    }
+  }
+
+  async function провестиСделку(mode, payAmount, receiveAmount, unit, rawAmount, rawEstimate) {
     // Токен из ленты Solana торгуется в своей сети и своим кошельком:
     // ни кривой, ни TonConnect тут нет.
     if (token && token.chain === "solana") {
