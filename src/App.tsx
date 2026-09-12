@@ -6280,9 +6280,10 @@ const HoldersBadge = React.memo(function HoldersBadge({ tokenAddress, testnet = 
   return (
     <span ref={elRef} className="flex items-center gap-1" style={{ fontFamily: monoFont, fontSize: 11.5, color: T.muted }}>
       <Icon size={11} color={T.muted} />
-      {count == null
-        ? <span className="fx-skeleton" style={{ width: 26, height: 9, borderRadius: 3, display: "inline-block" }} />
-        : count.toLocaleString("ru-RU")}
+      {/* Прочерк, а не мерцающая плашка: карточка к этому времени уже на
+          экране, и второй слой загрузки поверх готовой строки читается
+          как рябь. Счётчик дописывается на месте прочерка. */}
+      {count == null ? "—" : count.toLocaleString("ru-RU")}
     </span>
   );
 });
@@ -11785,6 +11786,13 @@ function ГлавнаяСводка({ live = [] }) {
     { число: String(наБирже), подпись: t("homeEcoDex") },
   ];
 
+  /* Пока счётчиков площадки нет — на месте блока та же плашка, что и у
+     остальных, а не карта с мерцающими прямоугольниками внутри. Иначе
+     загрузка шла в два приёма: сперва серые блоки вместо виджетов,
+     потом виджеты с серыми пятнами вместо цифр — второе мельтешение на
+     том же месте. */
+  if (stats == null) return <ПлашкаБлока h={168} radius={22} />;
+
   /* Карта, а не строка чисел.
      По дизайн-плану баланс площадки оформлен как банковская карта: он
      приподнят над фоном и читается как предмет, а не как заголовок
@@ -11817,24 +11825,16 @@ function ГлавнаяСводка({ live = [] }) {
       {/* Единственное крупное число на экране. Всё остальное — мельче,
           и потому взгляд начинает отсюда. */}
       <div className="flex items-baseline" style={{ gap: 8, marginTop: 10, position: "relative" }}>
-        {/* Пока счётчики площадки не пришли, на месте суммы стоит плашка:
-            ноль здесь читался бы как «в токенах пусто». */}
-        {stats == null && !живые ? (
-          <ПлашкаЧисла width={140} height={38} radius={10} />
-        ) : (
-          <span style={{ fontFamily: displayFont, fontSize: 42, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.03em", ...текстГрадиентом(ГРАДИЕНТ_БРЕНДА) }}>
-            {fmtTon(плавно).replace(" TON", "")}
-          </span>
-        )}
+        <span style={{ fontFamily: displayFont, fontSize: 42, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.03em", ...текстГрадиентом(ГРАДИЕНТ_БРЕНДА) }}>
+          {fmtTon(плавно).replace(" TON", "")}
+        </span>
         <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 15 }}>TON</span>
       </div>
 
       <div className="flex items-center" style={{ gap: 18, marginTop: 14, position: "relative" }}>
         {показатели.map((п, i) => (
           <div key={i} className="flex items-baseline" style={{ gap: 5 }}>
-            {stats == null
-              ? <ПлашкаЧисла width={22} height={12} radius={5} />
-              : <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14, fontWeight: 600 }}>{п.число}</span>}
+            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14, fontWeight: 600 }}>{п.число}</span>
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{п.подпись}</span>
           </div>
         ))}
