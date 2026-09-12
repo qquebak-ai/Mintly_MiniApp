@@ -262,7 +262,11 @@ async function свежийБлок(connection) {
    были взяты с запасом под загруженную сеть; на деле сделка проходит и с
    двадцатью, а платит за надбавку человек. Двадцать тысяч на двести
    двадцать тысяч единиц — это четыре тысячных цента. */
-const ЦЕНА_ЕДИНИЦЫ = Number(process.env.SOLANA_PRIORITY_FEE || 20000); // микролямпорты
+/* Надбавка за место в блоке. При 220 тысячах единиц сотня микролямпортов
+   за единицу — это 0,00002 SOL, сотая доля цента: платить меньше ради
+   такой экономии не стоит, а разница во времени включения в блок на
+   загруженной сети — секунды. */
+const ЦЕНА_ЕДИНИЦЫ = Number(process.env.SOLANA_PRIORITY_FEE || 100000); // микролямпорты
 const ЕДИНИЦ_НА_СДЕЛКУ = 220000;
 
 function приоритет(tx, единиц = ЕДИНИЦ_НА_СДЕЛКУ) {
@@ -396,12 +400,22 @@ function поляКривой(d) {
  * сколько ≤ k / порог − (vТокены − продано). Разница с «продать всё» —
  * единицы шестого знака, человеку её не видно.
  */
+// Аренда зависит только от размера счёта и меняется раз в эпоху сети —
+// спрашивать её на каждую продажу значит добавлять круг к узлу впустую.
+const арендаКеш = new Map();
+async function арендаЗа(connection, размер) {
+  if (арендаКеш.has(размер)) return арендаКеш.get(размер);
+  const сумма = await connection.getMinimumBalanceForRentExemption(размер);
+  арендаКеш.set(размер, сумма);
+  return сумма;
+}
+
 async function пределПродажи(connection, curve) {
   const info = await connection.getAccountInfo(curve);
   const с = info && поляКривой(info.data);
   if (!с) return null;
 
-  const аренда = await connection.getMinimumBalanceForRentExemption(info.data.length);
+  const аренда = await арендаЗа(connection, info.data.length);
   const свободно = Math.max(0, info.lamports - аренда);
   const запас = BigInt(Math.min(с.realSol, свободно));
 
@@ -434,17 +448,25 @@ export async function собратьСделку({ wallet, mint, продажа,
   const feeWallet = new PublicKey(FEE_ACCOUNT);
   const ata = getAssociatedTokenAddressSync(mintKey, payer);
 
+  /* Блок берём сразу, вместе с остальным: он нужен в любом случае, а
+     ждать его после всех проверок — лишний круг к узлу на каждой сделке. */
+  const блок = свежийБлок(connection);
+
   let единиц = Math.round(Number(amount) * ЕДИНИЦА);
   if (продажа) {
     /* Сколько на счету на самом деле — в тех же мельчайших единицах, что
        уйдут в инструкцию. Число штук приходит дробным, и «продать всё»
        после умножения давало единицу-другую сверх остатка: сжигание
-       отбивалось, а человек видел закрытое окно и запись в истории. */
-    const остаток = await connection.getTokenAccountBalance(ata).catch(() => null);
+       отбивалось, а человек видел закрытое окно и запись в истории.
+
+       Оба вопроса — остаток счёта и предел кривой — идут разом: они друг
+       от друга не зависят, а по очереди это два круга к узлу подряд. */
+    const [остаток, предел] = await Promise.all([
+      connection.getTokenAccountBalance(ata).catch(() => null),
+      пределПродажи(connection, curve),
+    ]);
     const есть = остаток && остаток.value ? Number(остаток.value.amount) : null;
     if (есть != null && единиц > есть) единиц = есть;
-
-    const предел = await пределПродажи(connection, curve);
     if (предел != null && единиц > предел) единиц = предел;
     if (!(единиц > 0)) throw new Error("продавать нечего");
   }
@@ -471,7 +493,7 @@ export async function собратьСделку({ wallet, mint, продажа,
   }));
 
   tx.feePayer = payer;
-  tx.recentBlockhash = await свежийБлок(connection);
+  tx.recentBlockhash = await блок;
   return { transaction: вBase64(tx), curve: curve.toBase58() };
 }
 

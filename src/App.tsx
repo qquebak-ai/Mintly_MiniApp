@@ -15563,7 +15563,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     // покупка должна двигать цифру в шапке почти сразу, а не через
     // пять секунд.
     const id = setInterval(читать, 2500);
-    const своя = () => { setTimeout(читать, 900); setTimeout(читать, 3000); };
+    // Сервер отвечает уже после того, как сеть приняла сделку, поэтому
+    // читаем сразу: ждать почти секунду, глядя на старую цену, незачем.
+    const своя = () => { читать(); setTimeout(читать, 2000); };
     if (typeof window !== "undefined") window.addEventListener("mintly:сделка", своя);
     return () => {
       брошено = true;
@@ -17127,7 +17129,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
        заново. Пока окно открыто, перечитываем остаток сами, а на свою
        сделку отзываемся тут же. */
     const круг = setInterval(прочитать, 4000);
-    const своя = () => { setTimeout(прочитать, 1200); setTimeout(прочитать, 4000); };
+    const своя = () => { прочитать(); setTimeout(прочитать, 2000); };
     if (typeof window !== "undefined") window.addEventListener("mintly:сделка", своя);
     return () => {
       cancelled = true;
@@ -23604,7 +23606,8 @@ function mapTokenRow(row) {
            график и история меняются на глазах, а всплывающая карточка
            поверх всего этого только мешала. Говорим только об отказе. */
         if (mode === "buy") отпраздновать();
-        setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
+        setBalanceRefreshTick((n) => n + 1);
+        setTimeout(() => setBalanceRefreshTick((n) => n + 1), 2500);
       } catch (e) {
         showToast(`${t("solFailed")}: ${текстОтказа(e)}`);
       }
@@ -23642,7 +23645,8 @@ function mapTokenRow(row) {
         отпраздновать();
         // Баланс на цепочке обновится не мгновенно — даём блокчейну
         // пару секунд на подтверждение, потом перезапрашиваем его.
-        setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
+        setBalanceRefreshTick((n) => n + 1);
+        setTimeout(() => setBalanceRefreshTick((n) => n + 1), 2500);
       } catch (err) {
         const detail = текстОтказа(err);
         showToast(detail ? `${t("txCancelled")} — ${detail}` : t("txCancelled"));
@@ -23669,7 +23673,8 @@ function mapTokenRow(row) {
         recordTrade("sell", tonPriceUsd > 0 ? (rawAmount * (token.price > 0 ? token.price : 0)) / tonPriceUsd : 0, rawAmount);
         сообщитьОСделке(token.id);
         setTradeModal(null);
-        setTimeout(() => setBalanceRefreshTick((n) => n + 1), 4000);
+        setBalanceRefreshTick((n) => n + 1);
+        setTimeout(() => setBalanceRefreshTick((n) => n + 1), 2500);
       } catch (err) {
         // Текст ошибки показываем целиком: консоли внутри Telegram нет, а
         // отличить отказ пользователя от отклонённого запроса иначе
