@@ -1747,6 +1747,19 @@ function GlobalStyle() {
         35%  { background: ${СВЕЧА_ПАДЕНИЕ}; color: #FFFFFF; border-color: ${СВЕЧА_ПАДЕНИЕ}; box-shadow: 0 0 22px 4px ${СВЕЧА_ПАДЕНИЕ}55; }
         100% { box-shadow: 0 0 0 0 ${СВЕЧА_ПАДЕНИЕ}00; }
       }
+      /* Смена числа: цифры не подменяются молча, а коротко вспыхивают
+         цветом движения и подскакивают. Так видно, что цена только что
+         изменилась, даже если смотришь не туда. */
+      @keyframes числоВверх {
+        0%   { color: ${СВЕЧА_РОСТ}; transform: translateY(4px); }
+        45%  { color: ${СВЕЧА_РОСТ}; transform: translateY(-1px); }
+        100% { color: inherit; transform: none; }
+      }
+      @keyframes числоВниз {
+        0%   { color: ${СВЕЧА_ПАДЕНИЕ}; transform: translateY(-4px); }
+        45%  { color: ${СВЕЧА_ПАДЕНИЕ}; transform: translateY(1px); }
+        100% { color: inherit; transform: none; }
+      }
       /* Волна от нажатия: расходится из точки касания и гаснет. */
       @keyframes волнаОтНажатия {
         from { transform: translate(-50%, -50%) scale(0); opacity: 0.34; }
@@ -5879,6 +5892,29 @@ function разобратьТост(сообщение) {
   if (части) return { вид, заголовок: части[1], текст: части[2] };
   if (строка.length <= 36) return { вид, заголовок: строка, текст: "" };
   return { вид, заголовок: отказ ? t("toastFail") : подсказка ? t("toastNote") : t("toastDone"), текст: строка };
+}
+
+/* Число, которое меняется на глазах.
+ *
+ * Ключ — само значение: React пересоздаёт узел, и анимация проигрывается
+ * заново на каждой смене. Направление берём по прошлому значению —
+ * подорожало или подешевело, — и от него зависит цвет вспышки. */
+function ЖивоеЧисло({ значение, текст, className = "", style = {} }) {
+  const прошлое = useRef(значение);
+  const вверх = useRef(true);
+  if (Number.isFinite(значение) && Number.isFinite(прошлое.current) && значение !== прошлое.current) {
+    вверх.current = значение > прошлое.current;
+  }
+  useEffect(() => { прошлое.current = значение; }, [значение]);
+  return (
+    <span
+      key={текст}
+      className={className}
+      style={{ display: "inline-block", animation: `${вверх.current ? "числоВверх" : "числоВниз"} 460ms cubic-bezier(0.22, 1, 0.36, 1)`, ...style }}
+    >
+      {текст}
+    </span>
+  );
 }
 
 function Toast({ toast, insetTop = 0, onClose = () => {} }) {
@@ -15011,9 +15047,18 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const [окноГрафика, setОкноГрафика] = useState(null);
   useEffect(() => { setОкноГрафика(null); }, [token.id, tf]);
   const ценаОкна = окноГрафика ? окноГрафика.до : token.price;
-  const дельтаОкна = окноГрафика
+  /* Показываем капитализацию, а не цену за штуку. У мемкоина цена —
+     это шесть нулей после запятой, по которым ничего не понять, а
+     капитализация сразу говорит, насколько токен большой. Множитель —
+     сам выпуск: берём его из пары «цена и капитализация», которые уже
+     посчитаны, иначе миллиард штук по умолчанию. */
+  const выпускТокена = (token.mcapNum > 0 && token.price > 0)
+    ? token.mcapNum / token.price
+    : 1_000_000_000;
+  const капОкна = ценаОкна * выпускТокена;
+  const дельтаОкна = (окноГрафика
     ? окноГрафика.до - окноГрафика.от
-    : (token.price * (token.change || 0)) / 100;
+    : (token.price * (token.change || 0)) / 100) * выпускТокена;
   const процентОкна = окноГрафика
     ? (окноГрафика.от > 0 ? ((окноГрафика.до - окноГрафика.от) / окноГрафика.от) * 100 : 0)
     : (token.change || 0);
@@ -15465,7 +15510,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               {token.name}
             </span>
             <span style={{ fontFamily: displayFont, color: T.paper, fontSize: 16, fontWeight: 700 }}>
-              {fmtPrice(ценаОкна)}
+              <ЖивоеЧисло значение={капОкна} текст={fmtUSD(капОкна)} />
             </span>
           </div>
 
@@ -15529,10 +15574,13 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             fontFamily: displayFont, fontWeight: 800, fontSize: 34, lineHeight: 1.05,
             letterSpacing: "-0.02em", color: T.ice, wordBreak: "break-all",
           }}>
-            {fmtPrice(ценаОкна)}
+            <ЖивоеЧисло значение={капОкна} текст={fmtUSD(капОкна)} />
           </div>
           <div style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 15, marginTop: 2, color: ростОкна ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ }}>
-            {ростОкна ? "+" : "−"}{fmtPrice(Math.abs(дельтаОкна))} ({ростОкна ? "+" : "−"}{Math.abs(процентОкна).toFixed(2)}%)
+            <ЖивоеЧисло
+              значение={процентОкна}
+              текст={`${ростОкна ? "+" : "−"}${fmtUSD(Math.abs(дельтаОкна))} (${ростОкна ? "+" : "−"}${Math.abs(процентОкна).toFixed(2)}%)`}
+            />
           </div>
         </div>
 
@@ -16537,7 +16585,10 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
             <TokenAvatar size={34} src={token.logoUrl} />
             <div>
               <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>{token.name}</div>
-              <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 11.5 }}>${token.ticker} · {fmtPrice(token.price)}</div>
+              {/* Под тикером — капитализация: она понятнее шести нулей
+                  после запятой. Курс за штуку остался ниже, в строке
+                  «курс», — там он и нужен, при расчёте суммы. */}
+              <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 11.5 }}>${token.ticker} · {fmtUSD(token.mcapNum || 0)}</div>
             </div>
           </div>
           <button onClick={onClose} className="fx-tap fx-close"><X size={16} color={T.muted} /></button>
