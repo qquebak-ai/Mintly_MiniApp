@@ -14039,41 +14039,38 @@ function ЭкранВывода({
       {/* Сумма — во весь экран по высоте: она здесь главное, всё
           остальное лишь помогает её набрать. */}
       <div className="flex flex-col justify-center" style={{ flex: 1, minHeight: 0, padding: "0 18px" }}>
-        <span style={{
-          fontFamily: displayFont, fontWeight: 800, fontSize: 64, lineHeight: 1.05,
-          letterSpacing: "-0.03em", color: набрано > 0 ? (многовато ? T.down : T.ice) : T.muted,
-          wordBreak: "break-all",
-        }}>
-          {вДолларах ? `$${ввод || "0"}` : `${ввод || "0"} ${единица}`}
-        </span>
+        {/* Сама сумма и есть переключатель: нажал на «0 SOL» — считаешь в
+            долларах, нажал ещё раз — снова в монете. Прятать это в
+            стрелку сбоку значит просить искать то, на что и так
+            смотришь. */}
         <button
           onClick={() => { setВДолларах((б) => !б); setВвод(""); setВсё(false); haptic("light"); }}
           className="fx-tap"
           style={{
-            alignSelf: "flex-start", marginTop: 10, padding: 0, border: "none", background: "transparent",
-            fontFamily: monoFont, color: T.faint, fontSize: 14,
+            alignSelf: "flex-start", textAlign: "left", padding: 0, border: "none", background: "transparent",
+            fontFamily: displayFont, fontWeight: 800, fontSize: 64, lineHeight: 1.05,
+            letterSpacing: "-0.03em", color: набрано > 0 ? (многовато ? T.down : T.ice) : T.muted,
+            wordBreak: "break-all",
           }}
         >
+          {вДолларах ? `$${ввод || "0"}` : `${ввод || "0"} ${единица}`}
+        </button>
+        <span style={{ marginTop: 10, fontFamily: monoFont, color: T.faint, fontSize: 14 }}>
           {вДолларах
             ? `${fmtСумма(курс > 0 ? набрано / курс : 0)} ${единица}`
             : `$${вДеньгах.toFixed(2)}`}
-        </button>
+        </span>
       </div>
 
       {/* Что тратим и сколько этого есть — строкой над долями. */}
-      {/* Строка монеты. Стрелка не украшение: нажатие переводит счёт из
-          монеты в доллары и обратно — то же, что и тап по подписи под
-          суммой. */}
-      <button
-        onClick={() => { setВДолларах((б) => !б); setВвод(""); setВсё(false); haptic("light"); }}
-        className="fx-tap flex items-center justify-between w-full"
-        style={{ padding: "0 18px 12px", flexShrink: 0, background: "transparent", border: "none" }}
-      >
+      {/* Что тратим и сколько этого есть. Без стрелки: переключение
+          счёта живёт на самой сумме, а вторая точка входа в то же
+          действие только путала. */}
+      <div className="flex items-center" style={{ padding: "0 18px 12px", flexShrink: 0 }}>
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
           {единица} <span style={{ color: T.muted, fontWeight: 500 }}>· {fmtСумма(свободно)} ({`$${(свободно * курс).toFixed(2)}`})</span>
         </span>
-        <ChevronDown size={18} color={T.muted} style={{ transform: вДолларах ? "rotate(180deg)" : "none", transition: "transform 200ms ease" }} />
-      </button>
+      </div>
 
       <div className="flex" style={{ gap: 10, padding: "0 18px 10px", flexShrink: 0 }}>
         {[0.25, 0.5, 1].map((ч) => (
