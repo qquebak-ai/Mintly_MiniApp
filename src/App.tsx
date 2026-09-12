@@ -12987,6 +12987,11 @@ function HomeView({
 /* WalletView — кошелёк отдельным разделом. Раньше он лежал карточкой
    посреди профиля, между аватаркой и своими токенами: чтобы посмотреть
    баланс, приходилось идти в личные настройки. */
+/* Сколько едет лист, отпущенный пальцем. Четыре десятых секунды: за
+   меньшее движение не читается как движение, за большее — начинает
+   раздражать. */
+const УХОД_ЛИСТА = 400;
+
 function ЭкранСнизу({ открыт, onClose, заголовок = "", insetTop = 0, insetBottom = 0, жестВыключен = false, children }) {
   const [уходит, setУходит] = useState(false);
   const [тяга, setТяга] = useState(0);
@@ -13012,8 +13017,10 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
 
   const закрыть = useCallback(() => {
     setУходит(true);
-    // Столько же длится и въезд — экран уходит тем же ходом, каким пришёл.
-    setTimeout(() => { setУходит(false); setТяга(0); onClose(); }, 260);
+    /* Уход длиннее въезда. Лист, отпущенный из-под пальца, должен
+       доехать вниз, а не мигнуть: быстрая анимация читается как сбой —
+       страница будто пропала, а не закрылась. */
+    setTimeout(() => { setУходит(false); setТяга(0); onClose(); }, УХОД_ЛИСТА);
   }, [onClose]);
 
   function прокрученныйПредок(эл) {
@@ -13078,7 +13085,7 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
       style={{
         position: "fixed", inset: 0, zIndex: 399, background: "#000000",
         opacity: уходит ? 0 : Math.max(0, 0.62 - тяга / 900),
-        transition: жест.current ? "none" : "opacity 260ms ease-out",
+        transition: жест.current ? "none" : `opacity ${УХОД_ЛИСТА}ms ease-out`,
         pointerEvents: "none",
       }}
     />
@@ -13099,7 +13106,7 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
         paddingTop: insetTop, paddingBottom: insetBottom,
         overflow: "hidden",
         transform: уходит ? "translateY(100%)" : `translateY(${тяга}px)`,
-        transition: жест.current ? "none" : "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+        transition: жест.current ? "none" : `transform ${УХОД_ЛИСТА}ms cubic-bezier(0.22, 0.85, 0.25, 1)`,
         borderTopLeftRadius: тяга > 0 ? 22 : 0, borderTopRightRadius: тяга > 0 ? 22 : 0,
         /* Сам лист не полупрозрачный: сквозь него не должно просвечивать
            ничего — страница позади показывается там, где лист уже уехал,
@@ -18397,7 +18404,7 @@ function SettingsPanel({
 
   const закрытьПанель = useCallback(() => {
     setУходит(true);
-    setTimeout(() => onClose(), 220);
+    setTimeout(() => onClose(), УХОД_ЛИСТА);
   }, [onClose]);
 
   function прокрученныйПредокП(эл) {
@@ -18678,7 +18685,7 @@ function SettingsPanel({
         onTouchCancel={конецЖестаП}
         style={{
           transform: уходит ? "translateY(110%)" : `translateY(${тяга}px)`,
-          transition: жест.current ? "none" : "transform 240ms cubic-bezier(0.22, 1, 0.36, 1)",
+          transition: жест.current ? "none" : `transform ${УХОД_ЛИСТА}ms cubic-bezier(0.22, 0.85, 0.25, 1)`,
           touchAction: "pan-y",
           width: "100%", maxWidth: 440, background: T.surface, border: "none", borderRadius: 26,
           // Считаем от окна приложения, а не от vh: внутри Telegram высота
