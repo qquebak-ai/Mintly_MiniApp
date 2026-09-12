@@ -497,6 +497,25 @@ async function метаданные(mint) {
   };
 }
 
+/* Потолок сборок с одного адреса. Окно — минута, память — процесса:
+   перезапуск обнуляет, и это нормально, цель скромная. */
+const СБОРОК_В_МИНУТУ = Number(process.env.SOLANA_BUILD_RATE || 30);
+const сборки = new Map();
+function пропустить(ключ) {
+  const сейчас = Date.now();
+  const было = сборки.get(ключ);
+  if (!было || сейчас - было.начало > 60_000) {
+    сборки.set(ключ, { начало: сейчас, счёт: 1 });
+    // Карта не должна расти бесконечно: раз в минуту чистим остывшие.
+    if (сборки.size > 5000) {
+      for (const [к, з] of сборки) if (сейчас - з.начало > 60_000) сборки.delete(к);
+    }
+    return true;
+  }
+  было.счёт += 1;
+  return было.счёт <= СБОРОК_В_МИНУТУ;
+}
+
 export default async function handler(req, res) {
   const действие = String((req.query && req.query.action) || "");
   try {
@@ -524,6 +543,13 @@ export default async function handler(req, res) {
     }
 
     if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
+    /* Сборка транзакции никого не авторизует — она и не тратит ничего,
+       подписывает потом сам человек. Но каждая сборка — это несколько
+       запросов к узлу сети, и без потолка один скрипт занял бы собой
+       весь лимит узла. Считаем по адресу обратившегося, в памяти
+       процесса: точный учёт здесь не нужен, нужна отсечка. */
+    const откуда = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "?";
+    if (!пропустить(откуда)) return res.status(429).json({ error: "too_often" });
     const тело = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
 
     if (действие === "launch") {

@@ -32,6 +32,7 @@ const КОМИССИЯ_BPS = Number(process.env.TREASURY_FEE_BPS || 100);
 const ПРЕДЕЛ_SOL = Number(process.env.TREASURY_MAX_SOL || 5);
 const ПРЕДЕЛ_GRAM = Number(process.env.TREASURY_MAX_GRAM || 500);
 const МИНИМУМ_USD = Number(process.env.TREASURY_MIN_USD || 0.2);
+const ОБМЕНОВ_В_МИНУТУ = Number(process.env.TREASURY_RATE || 3);
 
 // Запас, который остаётся на кошельке человека под комиссию сети: без
 // него перевод «на весь остаток» просто не проходит.
@@ -210,6 +211,17 @@ export default async function handler(req, res) {
 
     const предел = откуда === "SOL" ? ПРЕДЕЛ_SOL : ПРЕДЕЛ_GRAM;
     if (сумма > предел) return res.status(400).json({ error: "too_much", limit: предел });
+
+    /* Потолок частоты. Каждый обмен — две настоящие транзакции и две
+       комиссии сети: без предела десяток нажатий подряд осушил бы казну
+       на одних комиссиях, даже не выходя за предел суммы. */
+    const минуту = new Date(Date.now() - 60_000).toISOString();
+    const { count: недавних } = await db
+      .from("treasury_swaps")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gt("created_at", минуту);
+    if ((недавних || 0) >= ОБМЕНОВ_В_МИНУТУ) return res.status(429).json({ error: "too_often" });
 
     const { sol, ton } = await курсы();
     const счёт = расчёт({ откуда, сумма, sol, ton });
