@@ -1759,6 +1759,17 @@ function GlobalStyle() {
         35%  { background: ${СВЕЧА_ПАДЕНИЕ}; color: #FFFFFF; border-color: ${СВЕЧА_ПАДЕНИЕ}; box-shadow: 0 0 22px 4px ${СВЕЧА_ПАДЕНИЕ}55; }
         100% { box-shadow: 0 0 0 0 ${СВЕЧА_ПАДЕНИЕ}00; }
       }
+      /* Перелив на кнопке сделки: та же медленная волна, что на карточке
+         баланса. Кнопка выглядит живой, но не мигает и не отвлекает —
+         полный круг занимает пять с половиной секунд. */
+      @keyframes кнопкаПереливается {
+        0%   { background-position: 0% 50%; }
+        50%  { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        @keyframes кнопкаПереливается { from { background-position: 0% 50%; } to { background-position: 0% 50%; } }
+      }
       /* Смена числа: цифры не подменяются молча, а коротко вспыхивают
          цветом движения и подскакивают. Так видно, что цена только что
          изменилась, даже если смотришь не туда. */
@@ -16172,14 +16183,26 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               onClick={() => { setВспышка("buy"); onBuy(); }}
               onAnimationEnd={() => setВспышка(null)}
               className={`fx-tap flex-1 rounded-[14px] py-2.5 flex items-center justify-center gap-1.5${вспышка === "buy" ? " fx-flash-up" : ""}`}
-              style={{ fontFamily: displayFont, fontWeight: 600, fontSize: 14.5, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, opacity: unlocked ? 1 : 0.55 }}>
+              /* Те же два цвета, что и в окне сделки: покупка зелёная,
+                 продажа красная, и обе с тем же медленным переливом. */
+              style={{
+                fontFamily: displayFont, fontWeight: 600, fontSize: 14.5,
+                background: ГРАДИЕНТ_РОСТА, backgroundSize: "220% 220%",
+                animation: "кнопкаПереливается 5.5s ease-in-out infinite",
+                color: "#06210F", opacity: unlocked ? 1 : 0.55,
+              }}>
               {!unlocked && <Lock size={13} />}{tr("buy")}
             </button>
             <button
               onClick={() => { setВспышка("sell"); onSell(); }}
               onAnimationEnd={() => setВспышка(null)}
               className={`fx-tap flex-1 rounded-[14px] py-2.5 flex items-center justify-center gap-1.5${вспышка === "sell" ? " fx-flash-down" : ""}`}
-              style={{ fontFamily: displayFont, fontWeight: 600, fontSize: 14.5, background: "transparent", color: T.ice, border: `1px solid ${T.lineHi}`, opacity: unlocked ? 1 : 0.55 }}>
+              style={{
+                fontFamily: displayFont, fontWeight: 600, fontSize: 14.5,
+                background: ГРАДИЕНТ_ПАДЕНИЯ, backgroundSize: "220% 220%",
+                animation: "кнопкаПереливается 5.5s ease-in-out infinite",
+                color: "#FFFFFF", opacity: unlocked ? 1 : 0.55,
+              }}>
               {!unlocked && <Lock size={13} />}{tr("sell")}
             </button>
           </div>
@@ -17119,8 +17142,12 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
                 className={`fx-tap flex-1 rounded-[16px] py-2${вспышка === o.id ? (o.id === "buy" ? " fx-flash-up" : " fx-flash-down") : ""}`}
                 style={{
                   fontFamily: displayFont, fontWeight: 700, fontSize: 14.5,
-                  background: active ? (o.id === "buy" ? T.turquoise : T.rose) : "transparent",
-                  color: active ? PRISM_TEXT : T.muted,
+                  /* Выбранная сторона носит свой цвет: покупка — зелёный
+                     свечи, продажа — красный. Фиолетовый с серым читались
+                     как «кнопка и выключенная кнопка», а не как два
+                     противоположных действия. */
+                  background: active ? (o.id === "buy" ? T.up : T.down) : "transparent",
+                  color: active ? (o.id === "buy" ? "#06210F" : "#FFFFFF") : T.muted,
                 }}>
                 {o.label}
               </button>
@@ -17228,10 +17255,16 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           // Покупка — фирменным градиентом, продажа — цветом падения:
           // два действия не должны выглядеть одинаково, и по цвету видно,
           // что сейчас нажимаешь.
-          background: canConfirm ? (isBuy ? ЦВЕТ_КНОПКИ : T.down) : T.surfaceHi,
-          color: canConfirm ? PRISM_TEXT : T.muted,
+          /* Цвет не стоит на месте, а медленно переливается — тем же
+             движением, что и карточка баланса. Покупка греется зелёным,
+             продажа красным: ещё до прочтения надписи видно, что сейчас
+             произойдёт. */
+          background: canConfirm ? (isBuy ? ГРАДИЕНТ_РОСТА : ГРАДИЕНТ_ПАДЕНИЯ) : T.surfaceHi,
+          backgroundSize: canConfirm ? "220% 220%" : undefined,
+          animation: canConfirm ? "кнопкаПереливается 5.5s ease-in-out infinite" : undefined,
+          color: canConfirm ? (isBuy ? "#06210F" : "#FFFFFF") : T.muted,
           opacity: canConfirm ? 1 : 0.6,
-          boxShadow: canConfirm ? `0 10px 26px ${isBuy ? hexA(T.electric, 0.35) : hexA(T.down, 0.28)}` : "none",
+          boxShadow: canConfirm ? `0 10px 26px ${isBuy ? hexA(T.up, 0.32) : hexA(T.down, 0.28)}` : "none",
         }}>
           {amount > 0
             ? (isBuy
