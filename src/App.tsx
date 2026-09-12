@@ -335,7 +335,8 @@ const STR = {
     withdrawSent: "Отправлено {sum}",
     withdrawFailed: "Вывод не прошёл",
     withdrawNotEnough: "На кошельке столько нет",
-    withdrawBadAddress: "Проверь адрес",
+    withdrawBadAddress: "Проверь адрес — он не похож на адрес этой сети",
+    withdrawSelfAddress: "Это адрес твоего же кошелька",
     withdrawLocked: "Вывод идёт на привязанный адрес",
     withdrawNote: "Уходит из кошелька Mintly в сеть. Комиссия сети уже учтена в «100%».",
     withdrawPaste: "Вставить",
@@ -924,7 +925,8 @@ const STR = {
     withdrawSent: "Sent {sum}",
     withdrawFailed: "Withdrawal failed",
     withdrawNotEnough: "Not enough on the wallet",
-    withdrawBadAddress: "Check the address",
+    withdrawBadAddress: "Check the address — it doesn't look like this network",
+    withdrawSelfAddress: "That's your own wallet address",
     withdrawLocked: "Withdrawals go to the linked address",
     withdrawNote: "Leaves your Mintly wallet for the network. The network fee is already counted in 100%.",
     withdrawPaste: "Paste",
@@ -1830,6 +1832,13 @@ function GlobalStyle() {
         100% { transform: scale(1); }
       }
       @keyframes меткаПришла { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+      /* Галочка на правильном адресе: выскакивает с перелётом, как
+         печать, — так видно, что проверка прошла именно сейчас. */
+      @keyframes галочкаВстала {
+        0%   { opacity: 0; transform: scale(0.4) rotate(-18deg); }
+        60%  { opacity: 1; transform: scale(1.12) rotate(4deg); }
+        100% { opacity: 1; transform: scale(1) rotate(0deg); }
+      }
       /* Блик пробегает по кнопке слева направо — вслед за заливкой. */
       @keyframes бликПоКнопке { from { transform: translateX(-120%); } to { transform: translateX(220%); } }
       @keyframes менюВъезжает { from { transform: translateX(-100%); } to { transform: translateX(0); } }
@@ -13855,8 +13864,63 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
  * Комиссию сети «Всё» учитывает само — иначе перевод остатка до копейки
  * просто не прошёл бы.
  */
+/* Проверка адреса — честная, а не по длине строки.
+ *
+ * Solana: base58 без нуля и похожих букв, ровно тридцать два байта после
+ * разбора. Опечатка в одном знаке почти всегда меняет длину или даёт
+ * чужой символ, и такой адрес отсекается здесь, а не в сети, где деньги
+ * уже ушли.
+ */
+const БАЗА58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+function байтыБазы58(строка) {
+  const s = String(строка || "");
+  if (!s) return null;
+  let число = [0];
+  for (const знак of s) {
+    const место = БАЗА58.indexOf(знак);
+    if (место < 0) return null;
+    let перенос = место;
+    for (let i = 0; i < число.length; i += 1) {
+      const п = число[i] * 58 + перенос;
+      число[i] = п & 0xff;
+      перенос = п >> 8;
+    }
+    while (перенос > 0) { число.push(перенос & 0xff); перенос >>= 8; }
+  }
+  // Ведущие единицы base58 — это нулевые байты.
+  for (const знак of s) { if (знак !== "1") break; число.push(0); }
+  return число.reverse();
+}
+
+function адресSolanaОк(строка) {
+  const байты = байтыБазы58(String(строка || "").trim());
+  return !!байты && байты.length === 32;
+}
+
+/* TON: сорок восемь знаков base64url, из них тридцать шесть байт — метка,
+   рабочая цепочка, сам счёт и два байта контрольной суммы CRC16. Её и
+   проверяем: без неё «похожий» адрес с одной перепутанной буквой
+   выглядел бы правильным. */
+function адресTonОк(строка) {
+  const s = String(строка || "").trim();
+  if (!/^[A-Za-z0-9_-]{48}$/.test(s)) return false;
+  let байты;
+  try {
+    const обычный = s.replace(/-/g, "+").replace(/_/g, "/");
+    const сырое = typeof atob === "function" ? atob(обычный) : "";
+    байты = Uint8Array.from(сырое, (з) => з.charCodeAt(0));
+  } catch { return false; }
+  if (байты.length !== 36) return false;
+  let сумма = 0;
+  for (let i = 0; i < 34; i += 1) {
+    сумма ^= байты[i] << 8;
+    for (let б = 0; б < 8; б += 1) сумма = (сумма & 0x8000) ? ((сумма << 1) ^ 0x1021) & 0xffff : (сумма << 1) & 0xffff;
+  }
+  return байты[34] === (сумма >> 8) && байты[35] === (сумма & 0xff);
+}
+
 function ЭкранВывода({
-  открыт, onClose, сеть = "sol", остаток = 0, курс = 0, единица = "SOL",
+  открыт, onClose, сеть = "sol", остаток = 0, курс = 0, единица = "SOL", свой = "",
   showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0,
 }) {
   // Два шага, как в кошельках: сначала «кому», потом «сколько». Один
@@ -13887,8 +13951,19 @@ function ЭкранВывода({
   const монет = вДолларах ? (курс > 0 ? набрано / курс : 0) : набрано;
   const вДеньгах = вДолларах ? набрано : набрано * курс;
   const многовато = монет > свободно + 1e-9;
-  const адресОкей = адрес.trim().length >= 32;
-  const можно = адресОкей && монет > 0 && !многовато && !идёт;
+  /* Разбор адреса. Пока человек набирает первые знаки, молчим: красная
+     строка под наполовину введённым адресом ругается на то, что ещё не
+     дописано. */
+  const чистый = адрес.trim();
+  const адресОкей = сеть === "ton" ? адресTonОк(чистый) : адресSolanaОк(чистый);
+  const беда = (() => {
+    if (!чистый || (!адресОкей && чистый.length < (сеть === "ton" ? 48 : 32))) return null;
+    if (!адресОкей) return t("withdrawBadAddress");
+    if (свой && чистый === свой) return t("withdrawSelfAddress");
+    return null;
+  })();
+  const адресГоден = адресОкей && !беда;
+  const можно = адресГоден && монет > 0 && !многовато && !идёт;
   const короткий = адрес ? `${адрес.trim().slice(0, 4)}…${адрес.trim().slice(-4)}` : "";
 
   function клавиша(к) {
@@ -13952,18 +14027,37 @@ function ЭкранВывода({
         <div className="flex flex-col" style={{ flex: 1, minHeight: 0, padding: "0 18px", gap: 12 }}>
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("withdrawTo")}</span>
           <div className="flex items-center" style={{ gap: 8 }}>
-            <input
-              value={адрес}
-              onChange={(e) => setАдрес(e.target.value)}
-              placeholder={сеть === "ton" ? "UQ…" : "5x…"}
-              spellCheck={false}
-              autoCapitalize="off"
-              autoCorrect="off"
-              style={{
-                flex: 1, padding: "15px 14px", borderRadius: 16, border: `1px solid ${T.line}`,
-                background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 13.5, outline: "none",
-              }}
-            />
+            <div style={{ flex: 1, position: "relative", display: "flex" }}>
+              <input
+                value={адрес}
+                onChange={(e) => setАдрес(e.target.value)}
+                placeholder={сеть === "ton" ? "UQ…" : "5x…"}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+                style={{
+                  flex: 1, padding: "15px 44px 15px 14px", borderRadius: 16,
+                  border: `1px solid ${беда ? T.down : (адресГоден ? T.up : T.line)}`,
+                  background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 13.5, outline: "none",
+                  transition: "border-color 200ms ease",
+                }}
+              />
+              {/* Галочка вместо слов: адрес разобран и сходится по
+                  контрольной сумме — значит, дальше можно. */}
+              {адресГоден && (
+                <span
+                  key={чистый}
+                  className="flex items-center justify-center"
+                  style={{
+                    position: "absolute", right: 12, top: "50%", marginTop: -11,
+                    width: 22, height: 22, borderRadius: 999, background: hexA(T.up, 0.16), color: T.up,
+                    animation: "галочкаВстала 340ms cubic-bezier(0.22, 1, 0.36, 1) both",
+                  }}
+                >
+                  <Check size={14} strokeWidth={3} />
+                </span>
+              )}
+            </div>
             <button
               onClick={вставить}
               className="fx-tap"
@@ -13975,18 +14069,22 @@ function ЭкранВывода({
               {t("withdrawPaste")}
             </button>
           </div>
-          <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, lineHeight: 1.45 }}>{t("withdrawNote")}</span>
+          {/* Отказ — строкой под полем и красным: сообщение поверх экрана
+              человек закроет и не поймёт, к чему оно относилось. */}
+          {беда
+            ? <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5, animation: "меткаПришла 200ms ease-out both" }}>{беда}</span>
+            : <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, lineHeight: 1.45 }}>{t("withdrawNote")}</span>}
         </div>
 
         <div style={{ padding: "14px 18px 22px", flexShrink: 0 }}>
           <button
-            onClick={() => { if (адресОкей) { setШаг("сумма"); haptic("light"); } }}
-            disabled={!адресОкей}
+            onClick={() => { if (адресГоден) { setШаг("сумма"); haptic("light"); } }}
+            disabled={!адресГоден}
             className="fx-tap w-full"
             style={{
               padding: "16px 0", borderRadius: 999, border: "none",
-              background: адресОкей ? ЦВЕТ_КНОПКИ : T.surfaceHi,
-              color: адресОкей ? PRISM_TEXT : T.muted,
+              background: адресГоден ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+              color: адресГоден ? PRISM_TEXT : T.muted,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             }}
           >
@@ -15116,6 +15214,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         открыт={выводОткрыт}
         onClose={() => setВыводОткрыт(false)}
         сеть={вTON ? "ton" : "sol"}
+        свой={адресВнутри}
         остаток={наКошельке}
         курс={курсСети}
         единица={единица}
