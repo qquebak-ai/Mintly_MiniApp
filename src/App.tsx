@@ -337,7 +337,10 @@ const STR = {
     withdrawNotEnough: "На кошельке столько нет",
     withdrawBadAddress: "Проверь адрес",
     withdrawLocked: "Вывод идёт на привязанный адрес",
-    withdrawNote: "Уходит из кошелька Mintly в сеть. Комиссия сети уже учтена в «Всё».",
+    withdrawNote: "Уходит из кошелька Mintly в сеть. Комиссия сети уже учтена в «100%».",
+    withdrawPaste: "Вставить",
+    withdrawNext: "Далее",
+    withdrawSendTitle: "Отправить",
     walletActSwap: "Обменять",
     walletActHistory: "История",
     walletHoldingsEmpty: "Пока пусто. Купи токен в мемпаде — он появится здесь.",
@@ -923,7 +926,10 @@ const STR = {
     withdrawNotEnough: "Not enough on the wallet",
     withdrawBadAddress: "Check the address",
     withdrawLocked: "Withdrawals go to the linked address",
-    withdrawNote: "Leaves your Mintly wallet for the network. The network fee is already counted in Max.",
+    withdrawNote: "Leaves your Mintly wallet for the network. The network fee is already counted in 100%.",
+    withdrawPaste: "Paste",
+    withdrawNext: "Next",
+    withdrawSendTitle: "Send",
     walletActSwap: "Swap",
     walletActHistory: "History",
     walletHoldingsEmpty: "Nothing yet. Buy a token in the mempad and it shows up here.",
@@ -13849,33 +13855,66 @@ function ЭкранВывода({
   открыт, onClose, сеть = "sol", остаток = 0, курс = 0, единица = "SOL",
   showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0,
 }) {
+  // Два шага, как в кошельках: сначала «кому», потом «сколько». Один
+  // экран с обоими полями заставлял держать в голове и адрес, и сумму,
+  // а промах в адресе — это потерянные деньги, и его стоит подтвердить
+  // отдельно.
+  const [шаг, setШаг] = useState("адрес");
   const [адрес, setАдрес] = useState("");
-  const [сумма, setСумма] = useState("");
+  const [ввод, setВвод] = useState("");
+  // В чём считаем: доллары привычнее, монета точнее. Переключается
+  // нажатием на строку под суммой.
+  const [вДолларах, setВДолларах] = useState(true);
   const [всё, setВсё] = useState(false);
   const [идёт, setИдёт] = useState(false);
 
   useEffect(() => {
-    if (!открыт) { setСумма(""); setВсё(false); setИдёт(false); }
+    if (!открыт) { setШаг("адрес"); setВвод(""); setВсё(false); setИдёт(false); }
   }, [открыт]);
 
   // Запас на комиссию сети: в TON перевод стоит заметно дороже, чем в
   // Solana, и остаток «под ноль» там не уходит вовсе.
   const запас = сеть === "ton" ? 0.05 : 0.0001;
   const свободно = Math.max(0, Number(остаток) - запас);
-  const число = Number(String(сумма).replace(",", ".")) || 0;
-  const многовато = число > свободно + 1e-9;
+  const набрано = Number(String(ввод).replace(",", ".")) || 0;
+  // Сколько монет уйдёт на самом деле.
+  const монет = вДолларах ? (курс > 0 ? набрано / курс : 0) : набрано;
+  const вДеньгах = вДолларах ? набрано : набрано * курс;
+  const многовато = монет > свободно + 1e-9;
   const адресОкей = адрес.trim().length >= 32;
-  const можно = адресОкей && число > 0 && !многовато && !идёт;
+  const можно = адресОкей && монет > 0 && !многовато && !идёт;
+  const короткий = адрес ? `${адрес.trim().slice(0, 4)}…${адрес.trim().slice(-4)}` : "";
 
-  async function вывести() {
+  function клавиша(к) {
+    setВсё(false);
+    setВвод((было) => {
+      if (к === "⌫") return было.slice(0, -1);
+      if (к === ".") return было.includes(".") ? было : (было === "" ? "0." : было + ".");
+      const новое = было === "0" ? к : было + к;
+      return новое.length > 12 ? было : новое;
+    });
+    haptic("light");
+  }
+
+  function доля(часть) {
+    if (!(свободно > 0)) return;
+    const монеты = свободно * часть;
+    setВсё(часть === 1);
+    setВвод(вДолларах
+      ? (курс > 0 ? (монеты * курс).toFixed(2) : "0")
+      : String(Number(монеты.toFixed(9))));
+    haptic("light");
+  }
+
+  async function отправить() {
     if (!можно) return;
     setИдёт(true);
     haptic("medium");
     try {
       const кошелёк = await import("./appWallet");
-      const отправить = сеть === "ton" ? кошелёк.вывестиСВнутреннегоTON : кошелёк.вывестиСВнутреннего;
-      const ответ = await отправить({ amount: число, all: всё, адрес: адрес.trim() });
-      const ушло = ответ && ответ.sent != null ? Number(ответ.sent) : (ответ && ответ.amount != null ? Number(ответ.amount) : число);
+      const шлём = сеть === "ton" ? кошелёк.вывестиСВнутреннегоTON : кошелёк.вывестиСВнутреннего;
+      const ответ = await шлём({ amount: монет, all: всё, адрес: адрес.trim() });
+      const ушло = ответ && ответ.sent != null ? Number(ответ.sent) : (ответ && ответ.amount != null ? Number(ответ.amount) : монет);
       showToast(tf("withdrawSent", { sum: `${fmtСумма(ушло)} ${единица}` }));
       haptic("success");
       onГотово();
@@ -13893,78 +13932,172 @@ function ЭкранВывода({
     }
   }
 
-  return (
-    <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={t("withdrawTitle")} insetTop={insetTop} insetBottom={insetBottom}>
-      <div className="flex flex-col" style={{ flex: 1, minHeight: 0, padding: "0 18px", gap: 14 }}>
-        <label className="flex flex-col" style={{ gap: 8 }}>
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("withdrawTo")}</span>
-          <input
-            value={адрес}
-            onChange={(e) => setАдрес(e.target.value)}
-            placeholder={сеть === "ton" ? "UQ…" : "5x…"}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            style={{
-              width: "100%", padding: "14px 14px", borderRadius: 16, border: `1px solid ${T.line}`,
-              background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 13.5, outline: "none",
-            }}
-          />
-        </label>
+  async function вставить() {
+    try {
+      const текст = await navigator.clipboard.readText();
+      if (текст) { setАдрес(текст.trim()); haptic("light"); }
+    } catch { /* доступа к буферу нет — человек введёт руками */ }
+  }
 
-        <label className="flex flex-col" style={{ gap: 8 }}>
-          <div className="flex items-center justify-between">
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("withdrawAmount")}</span>
-            <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 12 }}>
-              {t("withdrawAvailable")}: {fmtСумма(свободно)} {единица}
-            </span>
-          </div>
+  /* Шаг «кому». Ничего лишнего: поле, кнопка вставки и переход дальше. */
+  if (шаг === "адрес") {
+    return (
+      <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={t("withdrawTitle")} insetTop={insetTop} insetBottom={insetBottom}>
+        <div className="flex flex-col" style={{ flex: 1, minHeight: 0, padding: "0 18px", gap: 12 }}>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("withdrawTo")}</span>
           <div className="flex items-center" style={{ gap: 8 }}>
             <input
-              value={сумма}
-              onChange={(e) => { setСумма(e.target.value.replace(/[^\d.,]/g, "")); setВсё(false); }}
-              inputMode="decimal"
-              placeholder="0"
+              value={адрес}
+              onChange={(e) => setАдрес(e.target.value)}
+              placeholder={сеть === "ton" ? "UQ…" : "5x…"}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
               style={{
-                flex: 1, padding: "14px 14px", borderRadius: 16,
-                border: `1px solid ${многовато ? T.down : T.line}`,
-                background: T.surface, color: многовато ? T.down : T.ice,
-                fontFamily: displayFont, fontSize: 18, fontWeight: 700, outline: "none",
+                flex: 1, padding: "15px 14px", borderRadius: 16, border: `1px solid ${T.line}`,
+                background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 13.5, outline: "none",
               }}
             />
             <button
-              onClick={() => { setСумма(String(свободно)); setВсё(true); haptic("light"); }}
+              onClick={вставить}
               className="fx-tap"
               style={{
-                padding: "14px 16px", borderRadius: 16, border: "none", background: T.surfaceHi,
+                padding: "15px 14px", borderRadius: 16, border: "none", background: T.surfaceHi,
                 color: T.ice, fontFamily: displayFont, fontSize: 14, fontWeight: 700,
               }}
             >
-              {t("withdrawAll")}
+              {t("withdrawPaste")}
             </button>
           </div>
-          {курс > 0 && число > 0 && (
-            <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 12 }}>≈ ${(число * курс).toFixed(2)}</span>
-          )}
-        </label>
+          <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, lineHeight: 1.45 }}>{t("withdrawNote")}</span>
+        </div>
 
-        <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, lineHeight: 1.45 }}>{t("withdrawNote")}</span>
+        <div style={{ padding: "14px 18px 22px", flexShrink: 0 }}>
+          <button
+            onClick={() => { if (адресОкей) { setШаг("сумма"); haptic("light"); } }}
+            disabled={!адресОкей}
+            className="fx-tap w-full"
+            style={{
+              padding: "16px 0", borderRadius: 999, border: "none",
+              background: адресОкей ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+              color: адресОкей ? PRISM_TEXT : T.muted,
+              fontFamily: displayFont, fontSize: 16, fontWeight: 800,
+            }}
+          >
+            {t("withdrawNext")}
+          </button>
+        </div>
+      </ЭкранСнизу>
+    );
+  }
+
+  /* Шаг «сколько». Сумма крупно, доли остатка пилюлями и своя
+     клавиатура: системная на телефоне закрывает пол-экрана и приносит с
+     собой чужие кнопки вроде «Готово». */
+  const ряды = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], [".", "0", "⌫"]];
+
+  return (
+    <ЭкранСнизу открыт={открыт} onClose={onClose} insetTop={insetTop} insetBottom={insetBottom} жестВыключен>
+      <div className="flex items-center" style={{ gap: 12, padding: "2px 18px 0", flexShrink: 0 }}>
+        <button
+          onClick={() => { setШаг("адрес"); haptic("light"); }}
+          className="fx-tap flex items-center justify-center flex-shrink-0"
+          style={{ width: 44, height: 44, borderRadius: 999, background: T.surface, border: "none", color: T.ice }}
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <div className="flex flex-col" style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
+            {t("withdrawSendTitle")}
+          </span>
+          <span className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{короткий}</span>
+        </div>
+        {/* Кнопка отправки живёт здесь же, наверху: сумма набирается
+            внизу, и тянуться пальцем через весь экран не нужно. Пока
+            сумма не набрана, её нет вовсе — нажимать нечего. */}
+        {монет > 0 && (
+          <button
+            onClick={отправить}
+            disabled={!можно}
+            className="fx-tap flex-shrink-0"
+            style={{
+              padding: "11px 16px", borderRadius: 999, border: "none",
+              background: можно ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+              color: можно ? PRISM_TEXT : T.muted,
+              fontFamily: displayFont, fontSize: 14.5, fontWeight: 800,
+            }}
+          >
+            {идёт ? t("withdrawGoing") : t("withdrawDo")}
+          </button>
+        )}
       </div>
 
-      <div className="flex flex-col" style={{ gap: 10, padding: "14px 18px 22px", flexShrink: 0 }}>
+      {/* Сумма — во весь экран по высоте: она здесь главное, всё
+          остальное лишь помогает её набрать. */}
+      <div className="flex flex-col justify-center" style={{ flex: 1, minHeight: 0, padding: "0 18px" }}>
+        <span style={{
+          fontFamily: displayFont, fontWeight: 800, fontSize: 64, lineHeight: 1.05,
+          letterSpacing: "-0.03em", color: набрано > 0 ? (многовато ? T.down : T.ice) : T.muted,
+          wordBreak: "break-all",
+        }}>
+          {вДолларах ? `$${ввод || "0"}` : `${ввод || "0"}`}
+        </span>
         <button
-          onClick={вывести}
-          disabled={!можно}
-          className="fx-tap w-full"
+          onClick={() => { setВДолларах((б) => !б); setВвод(""); setВсё(false); haptic("light"); }}
+          className="fx-tap"
           style={{
-            padding: "16px 0", borderRadius: 999, border: "none",
-            background: можно ? ЦВЕТ_КНОПКИ : T.surfaceHi,
-            color: можно ? PRISM_TEXT : T.muted,
-            fontFamily: displayFont, fontSize: 16, fontWeight: 800,
+            alignSelf: "flex-start", marginTop: 10, padding: 0, border: "none", background: "transparent",
+            fontFamily: monoFont, color: T.faint, fontSize: 14,
           }}
         >
-          {идёт ? t("withdrawGoing") : t("withdrawDo")}
+          {вДолларах
+            ? `${fmtСумма(курс > 0 ? набрано / курс : 0)} ${единица}`
+            : `$${вДеньгах.toFixed(2)}`}
         </button>
+      </div>
+
+      {/* Что тратим и сколько этого есть — строкой над долями. */}
+      <div className="flex items-center justify-between" style={{ padding: "0 18px 12px", flexShrink: 0 }}>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
+          {единица} <span style={{ color: T.muted, fontWeight: 500 }}>· {fmtСумма(свободно)} ({`$${(свободно * курс).toFixed(2)}`})</span>
+        </span>
+        <ChevronDown size={18} color={T.muted} />
+      </div>
+
+      <div className="flex" style={{ gap: 10, padding: "0 18px 10px", flexShrink: 0 }}>
+        {[0.25, 0.5, 1].map((ч) => (
+          <button
+            key={ч}
+            onClick={() => доля(ч)}
+            className="fx-tap"
+            style={{
+              flex: 1, padding: "14px 0", borderRadius: 999, border: "none",
+              background: T.surface, color: T.ice, fontFamily: displayFont, fontSize: 15.5, fontWeight: 700,
+            }}
+          >
+            {Math.round(ч * 100)}%
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: "0 8px 14px", flexShrink: 0 }}>
+        {ряды.map((ряд, i) => (
+          <div key={i} className="flex">
+            {ряд.map((к) => (
+              <button
+                key={к}
+                onClick={() => клавиша(к)}
+                className="fx-tap flex items-center justify-center"
+                style={{
+                  flex: 1, padding: "14px 0", border: "none", background: "transparent",
+                  color: T.ice, fontFamily: displayFont, fontSize: 26, fontWeight: 600,
+                }}
+              >
+                {к === "⌫" ? <ChevronLeft size={24} /> : к}
+              </button>
+            ))}
+          </div>
+        ))}
       </div>
     </ЭкранСнизу>
   );
