@@ -2655,6 +2655,21 @@ function fmtCoin(n) {
   return "<0.00001";
 }
 
+/* Сумма операции в истории — без округления до копеек.
+   fmtCoin режет всё, что крупнее монеты, до двух знаков: продажа за
+   9,9812 SOL выглядела как 9,98, а запуск за десять — ровно десяткой,
+   и сходилось это только на глаз. Здесь остаются четыре знака у крупных
+   сумм и шесть у мелких; лишние нули убираются. */
+function fmtСумма(n) {
+  const v = Number(n) || 0;
+  if (!(v > 0)) return "0";
+  if (v >= 1000) return fmtCompact(v);
+  if (v >= 1) return v.toFixed(4).replace(/\.?0+$/, "");
+  if (v >= 0.001) return v.toFixed(5).replace(/\.?0+$/, "");
+  if (v >= 0.000001) return v.toFixed(6).replace(/\.?0+$/, "");
+  return "<0.000001";
+}
+
 function fmtCompact(n) {
   const v = Number(n) || 0;
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`;
@@ -13041,7 +13056,7 @@ function МояАктивность({ userId, тик = 0 }) {
                     : названиеОперации(с)}
                 </span>
                 <span style={{ fontFamily: monoFont, fontSize: 12.5, color: приход ? T.up : T.down, whiteSpace: "nowrap" }}>
-                  {приход ? "+" : "−"}{fmtCoin(Number(с.ton_amount) || 0)} {монетаСделки(с)}
+                  {приход ? "+" : "−"}{fmtСумма(Number(с.ton_amount) || 0)} {монетаСделки(с)}
                 </span>
                 <span style={{ fontFamily: monoFont, fontSize: 11.5, color: T.faint, whiteSpace: "nowrap" }}>
                   {fmtSince(с.created_at)}
@@ -14406,7 +14421,7 @@ function ИсторияКошелька({ userId, тик = 0 }) {
                   fontVariantNumeric: "tabular-nums",
                   color: обмен ? T.ice : покупка ? КОШ_ПАДЕНИЕ_ТЕКСТ : КОШ_ПРИХОД_ТЕКСТ,
                 }}>
-                  {обмен ? "" : покупка ? "−" : "+"}{fmtCoin(Number(с.ton_amount) || 0)}
+                  {обмен ? "" : покупка ? "−" : "+"}{fmtСумма(Number(с.ton_amount) || 0)}
                   {обмен ? "" : ` ${монетаСделки(с)}`}
                 </div>
               </div>
@@ -23583,7 +23598,7 @@ function mapTokenRow(row) {
     // ни кривой, ни TonConnect тут нет.
     if (token && token.chain === "solana") {
       try {
-        const подпись = await свопSolana({
+        const итог = await свопSolana({
           token,
           amountSol: mode === "buy" ? rawAmount : 0,
           продажа: mode === "sell",
@@ -23593,13 +23608,20 @@ function mapTokenRow(row) {
            кто его сделал из приложения, — а история кошелька и «мои
            дела» строятся именно по этой таблице. У сделок в Solana её
            не писали вовсе, поэтому покупка проходила, а в истории после
-           неё было пусто. */
-        recordTrade(
-          mode === "buy" ? "buy" : "sell",
-          mode === "buy" ? rawAmount : Number(rawEstimate) || 0,
-          mode === "buy" ? Number(rawEstimate) || 0 : rawAmount,
-        );
-        adjustHolding(token.id, mode === "buy" ? (Number(rawEstimate) || 0) : -rawAmount);
+           неё было пусто.
+
+           Числа берём те, что вернула кривая, а не оценку из окна: она
+           не знает ни комиссии, ни подрезки под остаток, и продажа
+           купленного за 10 SOL значилась в истории ровно десяткой, хотя
+           вернулось 9,9. */
+        const проданоТокенов = mode === "sell"
+          ? (Number(итог && итог.tokens) > 0 ? Number(итог.tokens) : rawAmount)
+          : (Number(rawEstimate) || 0);
+        const монет = mode === "buy"
+          ? rawAmount
+          : (Number(итог && итог.solOut) > 0 ? Number(итог.solOut) : (Number(rawEstimate) || 0));
+        recordTrade(mode === "buy" ? "buy" : "sell", монет, проданоТокенов);
+        adjustHolding(token.id, mode === "buy" ? проданоТокенов : -проданоТокенов);
         сообщитьОСделке(token.id);
         setTradeModal(null);
         /* Об удачной сделке молчим: результат виден сразу — позиция,

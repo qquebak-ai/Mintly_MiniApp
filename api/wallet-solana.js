@@ -1020,7 +1020,14 @@ export default async function handler(req, res) {
         });
         await завершить(db, оп.id, подпись);
         res.setHeader("Cache-Control", "no-store");
-        return res.status(200).json({ signature: подпись, curve: собрано.curve });
+        return res.status(200).json({
+          signature: подпись,
+          curve: собрано.curve,
+          // Сколько токенов ушло и сколько монет за них пришло — по
+          // расчёту самой кривой, а не по оценке из окна.
+          tokens: собрано.tokens,
+          solOut: собрано.solOut,
+        });
       } catch (e) {
         // Сделки не было — значит и записи о ней быть не должно.
         await отменить(db, оп.id);
