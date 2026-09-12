@@ -443,6 +443,39 @@ export async function кошелёкДляБота(user_id) {
   return { address: строка.address, sol: await баланс(строка.address) };
 }
 
+/* Сколько токена на адресе. Спрашиваем сеть: свой счёт в приложении
+   отстаёт от неё ровно на время подтверждения, и продажа «всего» по
+   этому счёту уходила повторно, пока сеть думала. */
+async function балансТокена(адрес, mint) {
+  const ответ = await rpc("getTokenAccountsByOwner", [
+    адрес, { mint: String(mint) }, { encoding: "jsonParsed" },
+  ]).catch(() => null);
+  const счета = (ответ && ответ.value) || [];
+  let всего = 0;
+  for (const с of счета) {
+    const сумма = с?.account?.data?.parsed?.info?.tokenAmount;
+    всего += Number((сумма && сумма.uiAmount) || 0);
+  }
+  return всего;
+}
+
+/* Идёт ли прямо сейчас сделка этого человека. Операция без подписи
+   моложе полуминуты — это отправленная, но ещё не подтверждённая
+   сделка: пока она в полёте, вторую начинать нельзя, иначе одни и те же
+   токены продаются дважды. */
+async function сделкаВПолёте(db, user) {
+  const порог = new Date(Date.now() - 30_000).toISOString();
+  const { data } = await db
+    .from("wallet_ops")
+    .select("id, created_at, signature")
+    .eq("user_id", user.id)
+    .eq("kind", "trade")
+    .is("signature", null)
+    .gt("created_at", порог)
+    .limit(1);
+  return !!(data && data.length);
+}
+
 /* Сколько этого токена лежит на внутреннем кошельке. Нужно боту, чтобы
    предложить продать долю, а не спрашивать число штук: «продать
    половину» человек понимает, «продать 4 173 902» — нет. */
@@ -882,6 +915,20 @@ export default async function handler(req, res) {
         telegramПривязан: !!строка,
       });
       if (запрет) return res.status(403).json(запрет);
+
+      /* Замок на время полёта: предыдущая сделка ещё не подтверждена —
+         вторую не начинаем. Без него частые нажатия уходили в сеть
+         пачкой, а списание происходило один раз. */
+      if (await сделкаВПолёте(db, user)) return res.status(409).json({ error: "trade_in_flight" });
+
+      /* Продаём не больше, чем на кошельке есть на самом деле. Счётчик
+         в приложении обновляется после подтверждения, и «продать всё»,
+         нажатое дважды, дважды просило одно и то же количество. */
+      if (продажа) {
+        const естьТокена = await балансТокена(строка.address, String(тело.mint));
+        if (!(естьТокена > 0)) return res.status(400).json({ error: "nothing_to_sell" });
+        if (сумма > естьТокена * 1.0001) return res.status(400).json({ error: "not_enough_tokens", have: естьТокена });
+      }
 
       const оп = await начать(db, user, { дело: "trade", сумма: продажа ? 0 : сумма, ключЗапроса, ip });
       if (оп.повтор) return res.status(200).json({ signature: оп.signature, repeat: true });
