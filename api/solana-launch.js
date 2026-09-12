@@ -539,6 +539,20 @@ export default async function handler(req, res) {
         program: PROGRAM || null,
         fee: адресОк(FEE_ACCOUNT),
         cluster: /devnet/.test(RPC) ? "devnet" : /testnet/.test(RPC) ? "testnet" : "mainnet-beta",
+        /* Параметры кривой отдаём наружу: по ним форма запуска считает,
+           сколько токенов достанется за стартовую покупку. Держать их
+           второй копией в приложении нельзя — там стояли числа кривой
+           TON, и обещанное в форме расходилось с тем, что показывал
+           итог запуска. */
+        curve: {
+          virtualSol: КРИВАЯ.virtualSol,
+          virtualTokens: КРИВАЯ.virtualTokens,
+          tokensForSale: КРИВАЯ.tokensForSale,
+          graduationSol: КРИВАЯ.graduationSol,
+          liquidityTokens: КРИВАЯ.liquidityTokens,
+          feeBps: КРИВАЯ.feeBps,
+          decimals: DECIMALS,
+        },
       });
     }
 

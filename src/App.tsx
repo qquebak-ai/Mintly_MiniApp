@@ -17312,6 +17312,23 @@ function tokensForTon(tonAmount) {
   return { tokens, pct };
 }
 
+/* Сколько токенов даст стартовая покупка на кривой Solana. Считается по
+   параметрам самой программы (их отдаёт api/solana-launch?action=enabled),
+   а не по числам кривой TON: у сетей разные виртуальные резервы, и форма
+   обещала втрое меньше того, что потом показывал итог запуска. */
+function токеновЗаSol(сумма, кривая) {
+  const n = Math.max(0, Number(сумма) || 0);
+  if (!(n > 0) || !кривая || !(кривая.virtualSol > 0) || !(кривая.virtualTokens > 0)) return { tokens: 0, pct: 0 };
+  const единица = Math.pow(10, Number(кривая.decimals) || 6);
+  const вошло = n * 1e9 * (1 - (Number(кривая.feeBps) || 0) / 10000);
+  const резервSol = Number(кривая.virtualSol);
+  const резервТокенов = Number(кривая.virtualTokens);
+  const стало = (резервSol * резервТокенов) / (резервSol + вошло);
+  const tokens = Math.max(0, (резервТокенов - стало) / единица);
+  const pct = Math.min(100, (tokens / TOKEN_FIXED_SUPPLY) * 100);
+  return { tokens: Math.floor(tokens), pct };
+}
+
 const LAUNCH_STEPS = [
   { key: "preparing", label: () => t("launchPreparing"), icon: FileText },
   { key: "generating", label: () => t("launchGenerating"), icon: Sparkles },
@@ -17659,6 +17676,21 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
      форма пропускала запуск на сумму, которой нет: человек доходил до
      подписи и получал отказ сети — уже после того, как логотип уехал в
      хранилище, а имя занято. */
+  /* Параметры кривой Solana — из самой программы: по ним считается
+     обещание «вы получите столько-то». */
+  const [кривScolana, setКривScolana] = useState(null);
+  useEffect(() => {
+    if (!вSolana || кривScolana) return;
+    let брошено = false;
+    import("./solLaunch")
+      .then((m) => m.кривойSolПараметры())
+      .then((к) => { if (!брошено && к) setКривScolana(к); })
+      .catch(() => {});
+    return () => { брошено = true; };
+  }, [вSolana, кривScolana]);
+
+  const посчитатьВыход = (сумма) => (вSolana ? токеновЗаSol(сумма, кривScolana) : tokensForTon(сумма));
+
   const [остатокСети, setОстатокСети] = useState(null);
   useEffect(() => {
     let брошено = false;
@@ -17967,7 +17999,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
               </p>
             );
           }
-          const { tokens, pct } = tokensForTon(buyNum);
+          const { tokens, pct } = посчитатьВыход(buyNum);
           return (
             <div className="flex items-center justify-between rounded-[20px] px-3.5 py-2.5" style={{ background: ink(0.06), border: `1px solid ${ink(0.2)}` }}>
               <span style={{ fontFamily: bodyFont, color: T.electric, fontSize: 13 }}>{t("youWillGet")}</span>
