@@ -6513,6 +6513,28 @@ const MEMPAD_FILTERS = [
   { id: "hot", labelKey: "mempadFilterHot" },
 ];
 
+/* Прошла ли по токену первая заметная сделка.
+ *
+ * Запуск сам по себе ничего не говорит: монету заводят за пять долларов,
+ * и витрина забивалась пустыми графиками, где нет ни одной свечи выше
+ * стартовой. Порог — три сотых от сбора: на кривой Solana это около
+ * одного SOL, то есть покупка, которая поднимает капитализацию на треть
+ * и рисует ту самую первую высокую свечу.
+ *
+ * Считаем по собранному, а не по числу сделок: сделок может быть десять
+ * по центу, и толку от них столько же, сколько от нуля. */
+const ДОЛЯ_ДЛЯ_ВИТРИНЫ = 0.03;
+function прошлаПерваяСвеча(tok) {
+  if (!tok) return false;
+  // Токен, уже вышедший на биржу, на витрине нужен в любом случае.
+  if (tok.graduated) return true;
+  const цель = Number(tok.graduationTon) || 0;
+  const собрано = Number(tok.raisedTon) || 0;
+  // Пока состояние кривой не приехало, судить не о чем — не показываем:
+  // лучше подождать круг обхода, чем светить пустую монету.
+  return цель > 0 && собрано >= цель * ДОЛЯ_ДЛЯ_ВИТРИНЫ;
+}
+
 /* Насколько кривая близка к выходу на биржу: 0 — только запустили, 1 —
    собрана. У биржевых пар кривой нет, им здесь делать нечего. */
 function долевКривой(tok) {
@@ -11534,7 +11556,7 @@ function NetworkSlider({ value, onChange, ширина = 168, высота = 38 
   );
 }
 
-function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen, onLaunch, solДоступен = false }) {
+function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen, onLaunch, solДоступен = false, currentUserId = null }) {
   const [filter, setFilter] = useState("new");
   // Сеть выбирается сверху, отдельно от фильтров: это не «ещё один
   // способ отсортировать», а другой рынок целиком — свои токены, свои
@@ -11611,10 +11633,16 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
     const нужная = сеть === "sol" ? "solana" : "ton";
     return localTokens
       .filter((tok) => (tok.chain || "ton") === нужная)
+      /* На витрину — только те, по которым уже прошла заметная сделка.
+         Запуск сам по себе ничего не значит: список забивался пустыми
+         монетами со стартовой покупкой в пять долларов, и живые токены
+         тонули среди них. Своё видно всегда — иначе человек решит, что
+         запуск потерялся. */
+      .filter((tok) => прошлаПерваяСвеча(tok) || (currentUserId && tok.ownerId === currentUserId))
       // Сверху — только что запущенные: «Новые» читаются как хроника, а
       // не как список в порядке, в котором база их вернула.
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-  }, [localTokens, сеть]);
+  }, [localTokens, сеть, currentUserId]);
 
   const spotlightTop = useMemo(() => {
     // Биржевой ленты может не быть вовсе — в тестовой сети её нет по
@@ -11627,7 +11655,11 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
     // не список всего подряд, и рекламировать монету, которая ничего не
     // стоит, площадка не должна. В самом списке ниже она остаётся, с
     // пометкой.
-    const свои = localTokens.filter((tok) => (tok.chain || "ton") === (сеть === "sol" ? "solana" : "ton") && !пробнаяСеть(tok.network));
+    const свои = localTokens.filter((tok) => (tok.chain || "ton") === (сеть === "sol" ? "solana" : "ton")
+      && !пробнаяСеть(tok.network)
+      // В центр внимания — тем более только с прошедшей сделкой: это
+      // витрина витрины.
+      && прошлаПерваяСвеча(tok));
     const источник = сеть === "sol"
       ? (свои.length ? свои : (solTokens || []))
       : (tokens.length ? tokens : свои);
@@ -23822,7 +23854,7 @@ function mapTokenRow(row) {
             />
           </KeepAlive>
           <KeepAlive show={view === "mempad"}>
-            <MempadView tokens={tokens} loading={tokensLoading} myTokensLoading={!communityLoaded} myTokens={communityTokens} onOpen={openToken} onLaunch={openCreate} solДоступен={solЗапуск} />
+            <MempadView tokens={tokens} loading={tokensLoading} myTokensLoading={!communityLoaded} myTokens={communityTokens} onOpen={openToken} onLaunch={openCreate} solДоступен={solЗапуск} currentUserId={userId} />
           </KeepAlive>
           </div>
           <KeepAlive show={view === "wallet"}>
