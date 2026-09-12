@@ -13778,7 +13778,9 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
           <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
             {сеть} · <span style={{ color: T.muted }}>{короткий}</span>
           </span>
-          <ChevronDown size={16} color={T.muted} />
+          {/* Значок по делу: строка копирует адрес, а стрелка вниз обещала
+              список, которого нет. */}
+          <Copy size={15} color={T.muted} />
         </button>
       </div>
 
@@ -13862,9 +13864,11 @@ function ЭкранВывода({
   const [шаг, setШаг] = useState("адрес");
   const [адрес, setАдрес] = useState("");
   const [ввод, setВвод] = useState("");
-  // В чём считаем: доллары привычнее, монета точнее. Переключается
-  // нажатием на строку под суммой.
-  const [вДолларах, setВДолларах] = useState(true);
+  /* В чём считаем. По умолчанию — в самой монете: выводят SOL и GRAM, а
+     не доллары, и пересчёт по курсу в такой сумме только мешает — на
+     кошелёк уходит ровно то число, которое человек и набрал. Доллары
+     остаются вторым видом, для прикидки. */
+  const [вДолларах, setВДолларах] = useState(false);
   const [всё, setВсё] = useState(false);
   const [идёт, setИдёт] = useState(false);
 
@@ -14040,7 +14044,7 @@ function ЭкранВывода({
           letterSpacing: "-0.03em", color: набрано > 0 ? (многовато ? T.down : T.ice) : T.muted,
           wordBreak: "break-all",
         }}>
-          {вДолларах ? `$${ввод || "0"}` : `${ввод || "0"}`}
+          {вДолларах ? `$${ввод || "0"}` : `${ввод || "0"} ${единица}`}
         </span>
         <button
           onClick={() => { setВДолларах((б) => !б); setВвод(""); setВсё(false); haptic("light"); }}
@@ -14057,12 +14061,19 @@ function ЭкранВывода({
       </div>
 
       {/* Что тратим и сколько этого есть — строкой над долями. */}
-      <div className="flex items-center justify-between" style={{ padding: "0 18px 12px", flexShrink: 0 }}>
+      {/* Строка монеты. Стрелка не украшение: нажатие переводит счёт из
+          монеты в доллары и обратно — то же, что и тап по подписи под
+          суммой. */}
+      <button
+        onClick={() => { setВДолларах((б) => !б); setВвод(""); setВсё(false); haptic("light"); }}
+        className="fx-tap flex items-center justify-between w-full"
+        style={{ padding: "0 18px 12px", flexShrink: 0, background: "transparent", border: "none" }}
+      >
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
           {единица} <span style={{ color: T.muted, fontWeight: 500 }}>· {fmtСумма(свободно)} ({`$${(свободно * курс).toFixed(2)}`})</span>
         </span>
-        <ChevronDown size={18} color={T.muted} />
-      </div>
+        <ChevronDown size={18} color={T.muted} style={{ transform: вДолларах ? "rotate(180deg)" : "none", transition: "transform 200ms ease" }} />
+      </button>
 
       <div className="flex" style={{ gap: 10, padding: "0 18px 10px", flexShrink: 0 }}>
         {[0.25, 0.5, 1].map((ч) => (
