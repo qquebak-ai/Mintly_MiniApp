@@ -14117,15 +14117,20 @@ function ИсторияКошелька({ userId, тик = 0 }) {
           {t("noActivityYet")}
         </div>
       ) : (
-        <div className="flex flex-col" style={{ gap: 8 }}>
+        <div className="flex flex-col" style={{ gap: 2 }}>
           {ряд.map((с) => {
             const обмен = с.side === "swap";
             const покупка = с.side !== "sell";
             return (
+              /* Ни подложки, ни разделителей: серая плитка под каждой
+                 строкой спорила с чёрным фоном, а линия резала список на
+                 куски. Строки разводит один зазор — как в ленте мемпада.
+                 Цвет остался там, где он что-то значит: в кружке и в
+                 сумме. */
               <div
                 key={с.id}
                 className="flex items-center"
-                style={{ gap: 12, padding: "12px 14px", borderRadius: 18, background: КОШ_КАРТОЧКА }}
+                style={{ gap: 12, padding: "11px 2px" }}
               >
                 <span
                   className="flex items-center justify-center"
@@ -14481,20 +14486,20 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             </div>
           </div>
         ) : !holdings.length ? (
-          <div style={{ padding: "16px 16px", borderRadius: 20, background: КОШ_КАРТОЧКА }}>
+          <div style={{ padding: "4px 2px 8px" }}>
             <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.45 }}>
               {t("walletHoldingsEmpty")}
             </div>
           </div>
         ) : (
-          <div className="flex flex-col" style={{ gap: 10 }}>
+          <div className="flex flex-col" style={{ gap: 2 }}>
             {holdings.map(({ tok, amount }) => {
               const изм = Number(tok.change24 ?? tok.change ?? 0);
               return (
                 <div
                   key={tok.id}
                   className="flex items-center"
-                  style={{ gap: 12, padding: "13px 14px", borderRadius: 20, background: КОШ_КАРТОЧКА }}
+                  style={{ gap: 12, padding: "12px 2px" }}
                 >
                   <TokenAvatar size={38} src={tok.logoUrl} />
                   <div className="min-w-0" style={{ flex: 1 }}>
