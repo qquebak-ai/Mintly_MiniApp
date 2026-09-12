@@ -14403,10 +14403,22 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           </span>
         </div>
         <div className="flex items-baseline" style={{ gap: 7, marginTop: 6, position: "relative" }}>
-          <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#FFFFFF" }}>
-            {Math.floor(balance).toLocaleString("ru-RU")}
-            <span style={{ color: hexA("#FFFFFF", 0.55) }}>{(balance % 1).toFixed(2).slice(1)}</span>
-          </span>
+          {/* Целую и дробную части режем из одного округлённого числа, а не
+              считаем порознь. Раньше целая бралась как floor, а дробная
+              округлялась отдельно: на 1,999 выходило «1» и «,00» — то
+              есть «1,00» вместо двух, и счётчик на глазах откатывался
+              назад под конец анимации. */}
+          {(() => {
+            // Вниз, а не по правилам округления: баланс не должен обещать
+            // больше, чем на кошельке есть.
+            const [цел, дроб] = (Math.floor(Math.max(0, balance) * 100) / 100).toFixed(2).split(".");
+            return (
+              <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#FFFFFF" }}>
+                {Number(цел).toLocaleString("ru-RU")}
+                <span style={{ color: hexA("#FFFFFF", 0.55) }}>{`,${дроб}`}</span>
+              </span>
+            );
+          })()}
           <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.7), fontSize: 14 }}>{единица}</span>
         </div>
         <span
