@@ -27,7 +27,7 @@ import { createClient } from "@supabase/supabase-js";
    Так функция отвечает на «включён ли запуск» и на метаданные, не
    разворачивая мегабайт кода, а если какая-то из библиотек не встала —
    ошибка приходит в ответе, а не роняет вызов целиком. */
-let PublicKey, Connection, Keypair, SystemProgram, Transaction, TransactionInstruction;
+let PublicKey, Connection, Keypair, SystemProgram, Transaction, TransactionInstruction, ComputeBudgetProgram;
 let MINT_SIZE, TOKEN_PROGRAM_ID, AuthorityType;
 let createAssociatedTokenAccountIdempotentInstruction, createInitializeMint2Instruction;
 let createSetAuthorityInstruction, getAssociatedTokenAddressSync, getMinimumBalanceForRentExemptMint;
@@ -38,7 +38,7 @@ async function библиотеки() {
     import("@solana/web3.js"),
     import("@solana/spl-token"),
   ]);
-  ({ PublicKey, Connection, Keypair, SystemProgram, Transaction, TransactionInstruction } = web3);
+  ({ PublicKey, Connection, Keypair, SystemProgram, Transaction, TransactionInstruction, ComputeBudgetProgram } = web3);
   ({
     MINT_SIZE, TOKEN_PROGRAM_ID, AuthorityType,
     createAssociatedTokenAccountIdempotentInstruction,
@@ -191,9 +191,45 @@ function инструкцияМетаданных({ mint, payer, name, symbol, u
 
 /* --- Сборка транзакций ---------------------------------------------- */
 
+/* Свежий блок — с памятью.
+ *
+ * Раньше каждая сделка начиналась с похода к узлу за блоком, да ещё за
+ * окончательным: тот отстаёт секунд на десять, а ответ стоил полного
+ * круга по сети. Здесь блок берётся подтверждённый и живёт две секунды:
+ * за это время он не устаревает, а сделки, идущие одна за другой, уходят
+ * в сеть без лишнего ожидания. Пока ответ в пути, все ждут его один, а
+ * не заводят по своему запросу. */
+let блокПамять = { hash: null, ts: 0, вПути: null };
+const БЛОК_ЖИВЁТ_МС = 2000;
+
 async function свежийБлок(connection) {
-  const { blockhash } = await connection.getLatestBlockhash("finalized");
-  return blockhash;
+  if (блокПамять.hash && Date.now() - блокПамять.ts < БЛОК_ЖИВЁТ_МС) return блокПамять.hash;
+  if (!блокПамять.вПути) {
+    блокПамять.вПути = connection.getLatestBlockhash("confirmed")
+      .then(({ blockhash }) => {
+        блокПамять = { hash: blockhash, ts: Date.now(), вПути: null };
+        return blockhash;
+      })
+      .catch((err) => {
+        блокПамять.вПути = null;
+        // Прошлый блок ещё может быть жив — лучше он, чем отказ.
+        if (блокПамять.hash) return блокПамять.hash;
+        throw err;
+      });
+  }
+  return блокПамять.вПути;
+}
+
+/* Плата за очередь. В Solana сделки разбираются по цене за единицу
+   вычислений: без неё транзакция ждёт общей очереди, с ней — уходит в
+   ближайший блок. Считаные доли цента за сделку. */
+const ЦЕНА_ЕДИНИЦЫ = Number(process.env.SOLANA_PRIORITY_FEE || 60000); // микролямпорты
+const ЕДИНИЦ_НА_СДЕЛКУ = 220000;
+
+function приоритет(tx, единиц = ЕДИНИЦ_НА_СДЕЛКУ) {
+  if (!ComputeBudgetProgram) return;
+  tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: единиц }));
+  if (ЦЕНА_ЕДИНИЦЫ > 0) tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: ЦЕНА_ЕДИНИЦЫ }));
 }
 
 function вBase64(tx) {
@@ -303,6 +339,7 @@ export async function собратьСделку({ wallet, mint, продажа,
   const ata = getAssociatedTokenAddressSync(mintKey, payer);
 
   const tx = new Transaction();
+  приоритет(tx);
   if (!продажа) {
     tx.add(createAssociatedTokenAccountIdempotentInstruction(payer, ata, payer, mintKey));
   }

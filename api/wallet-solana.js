@@ -357,9 +357,14 @@ async function подписатьИОтправить({ db, user, строка, 
   const подписанная = SIGNER_URL
     ? await подписатьСлужбой(строка, base64, Math.round(максПеревода))
     : await подписатьТут(строка, base64, набор, user.id, db);
+  /* Без предварительной прогонки. Узел по умолчанию сначала проигрывает
+     транзакцию у себя и только потом пускает в сеть — это лишний круг
+     ожидания на каждую сделку. Проверку мы уже сделали сами и строже:
+     что подписывается, разобрано по инструкциям выше. Ретраи оставляем
+     узлу: если блок занят, он повторит сам. */
   return await rpc("sendTransaction", [
     подписанная,
-    { encoding: "base64", skipPreflight: false, preflightCommitment: "processed", maxRetries: 3 },
+    { encoding: "base64", skipPreflight: true, preflightCommitment: "processed", maxRetries: 5 },
   ]);
 }
 
