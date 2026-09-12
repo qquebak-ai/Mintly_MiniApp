@@ -15397,15 +15397,25 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const [своя, setСвоя] = useState(null);
   useEffect(() => { setСвоя(null); }, [token.id]);
   useEffect(() => {
-    const своиЧисла = token.mcapNum > 0 && token.price > 0;
+    /* Читаем всегда, пока карточка открыта, а не только пока лента
+       молчит: цена в ленте обновляется обходом раз в минуту, и после
+       своей покупки свечи уже поднялись, а капитализация в шапке ещё
+       стояла прежняя. Кривая отвечает сразу. */
     const кривая = token.chain === "solana" ? !!token.tokenAddress : !!token.curveAddress;
-    if (своиЧисла || !кривая) return;
+    if (!кривая) return;
     let брошено = false;
     const читать = () => рынокКривойСразу(token).then((м) => { if (!брошено && м) setСвоя(м); });
     читать();
-    // Пока лента молчит — свой круг: кривая отвечает быстрее обхода.
-    const id = setInterval(читать, 6000);
-    return () => { брошено = true; clearInterval(id); };
+    // Свой круг: кривая отвечает быстрее обхода. На свою сделку
+    // отзываемся сразу, не дожидаясь круга.
+    const id = setInterval(читать, 5000);
+    const своя = () => { setTimeout(читать, 900); setTimeout(читать, 3000); };
+    if (typeof window !== "undefined") window.addEventListener("mintly:сделка", своя);
+    return () => {
+      брошено = true;
+      clearInterval(id);
+      if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", своя);
+    };
   }, [token.id, token.chain, token.tokenAddress, token.curveAddress, token.mcapNum, token.price]);
 
   const ценаТокена = token.price > 0 ? token.price : ((своя && своя.priceUsd) || 0);
@@ -15423,7 +15433,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
      ней — своя же. Теперь берём цену токена: из ленты, если она есть, и
      с кривой, пока лента молчит. Окно остаётся тем, чем и было, —
      участком, за который считается изменение. */
-  const капОкна = (token.mcapNum > 0 ? token.mcapNum : ценаТокена * выпускТокена);
+  /* У своей кривой капитализация считается по её живой цене: лента
+     отстаёт на круг обхода, и после покупки число в шапке стояло
+     прежним, хотя свеча уже выросла. У биржевого токена живой цены нет —
+     там лента и есть источник. */
+  const своя_кривая = !!(token.curveAddress || (token.chain === "solana" && token.tokenAddress));
+  const живаяЦена = (своя && своя.priceUsd > 0) ? своя.priceUsd : ценаТокена;
+  const капОкна = своя_кривая
+    ? живаяЦена * выпускТокена
+    : (token.mcapNum > 0 ? token.mcapNum : ценаТокена * выпускТокена);
   const дельтаОкна = (окноГрафика
     ? окноГрафика.до - окноГрафика.от
     : (ценаТокена * (token.change || 0)) / 100) * выпускТокена;
@@ -16117,11 +16135,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             const курсМонеты = token.chain === "solana" ? solUsd() : tonUsd();
             const вложеноUSD = вложено && курсМонеты > 0 ? вложено.вложено * курсМонеты : 0;
             if (!(вложеноUSD > 0)) return null;
-            const итог = позиция * token.price - вложеноUSD;
+            const итог = позиция * (живаяЦена > 0 ? живаяЦена : token.price) - вложеноUSD;
             const плюс = итог >= 0;
             return (
               <span style={{ fontFamily: monoFont, fontSize: 12.5, color: плюс ? T.up : T.down }}>
-                {плюс ? "+" : "−"}{fmtUSD(Math.abs(итог))} · {tr("positionSinceBuy")}
+                {плюс ? "+" : "−"}{fmtUSD(Math.abs(итог))}
               </span>
             );
           })()}
@@ -16135,7 +16153,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           <div className="flex items-end justify-between gap-3">
             <div>
               <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, letterSpacing: "-0.01em" }}>
-                {fmtUSD(позиция * token.price)}
+                {fmtUSD(позиция * (живаяЦена > 0 ? живаяЦена : token.price))}
               </div>
               <div style={{ fontFamily: monoFont, color: T.faint, fontSize: 12.5, marginTop: 2 }}>
                 {fmtCoin(позиция)} ${token.ticker}
@@ -22430,6 +22448,27 @@ function mapTokenRow(row) {
     };
     setMyTokens((prev) => [entry, ...prev]);
     setCommunityTokens((prev) => [entry, ...prev]);
+
+    /* Стартовая покупка — такая же покупка, как любая другая: те же
+       деньги ушли, те же токены пришли. Без этой записи она не попадала
+       ни в историю, ни в подсчёт вложенного — и позиция, купленная на
+       запуске, выглядела доставшейся даром. */
+    const стартоваяСумма = parseFloat(String(result.buyAmount || "").replace(",", "."));
+    if (userId && Number.isFinite(стартоваяСумма) && стартоваяСумма > 0) {
+      supabase.from("trades").insert({
+        user_id: userId,
+        token_id: row.id,
+        token_address: row.address || null,
+        ticker: row.ticker || null,
+        side: "buy",
+        ton_amount: стартоваяСумма,
+        token_amount: Number(result.buyTokens) || 0,
+        ton_price_usd: tonPriceUsd || 0,
+      }).then(({ error }) => {
+        if (error) console.warn("[mintly] стартовая покупка не записалась:", error.message);
+      });
+    }
+
     /* Запуск — такой же расход кошелька, как покупка, и он уже записан в
        журнале операций. Тем же событием говорим об этом истории: иначе
        новая строка появлялась там только через круг опроса. */
