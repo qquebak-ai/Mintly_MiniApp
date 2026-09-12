@@ -172,7 +172,17 @@ function отдатьСайт(res, путь) {
     const навсегда = /\/assets\//.test(путь) || /\.(woff2|png|jpg|jpeg|webp|svg|ico)$/.test(путь);
     return отдатьФайл(res, внутри, навсегда ? "public, max-age=31536000, immutable" : "no-cache");
   }
-  // Не файл — значит адрес внутри приложения.
+  /* Файла нет. Если просили ресурс сборки — отвечаем «нет», а не
+     страницей приложения: браузер, получив HTML вместо кода, ругается
+     «text/html не годится в JavaScript» и встаёт намертво. Честный 404
+     страница ловит сама и перечитывает себя заново (см. index.html).
+
+     Всё остальное — адрес внутри приложения, его разбирает сам сайт. */
+  if (/\.(js|mjs|css|json|map|woff2?|png|jpe?g|webp|svg|ico)$/i.test(путь)) {
+    res.setHeader("Cache-Control", "no-store");
+    res.status(404).end("not found");
+    return true;
+  }
   return отдатьФайл(res, path.join(САЙТ, "index.html"), "no-cache, no-store, must-revalidate");
 }
 

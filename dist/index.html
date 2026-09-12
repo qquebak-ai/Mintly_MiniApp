@@ -74,8 +74,28 @@
         } catch (e) { /* даже отправка сообщения об ошибке не должна падать */ }
       }
 
+      /* Старый кеш страницы. Telegram держит index.html у себя, и после
+         выкладки он продолжает просить файл сборки, которого на сервере
+         уже нет: вместо кода приезжает страница, и браузер честно
+         ругается на «text/html вместо JavaScript». Человеку показывать
+         тут нечего — надо просто перечитать страницу заново. Один раз:
+         метка в хранилище не даёт зациклиться, если дело не в кеше. */
+      function этоСтарыйКеш(текст) {
+        var т = String(текст || "");
+        return /не является допустимым MIME|is not a valid JavaScript MIME|Failed to fetch dynamically imported|error loading dynamically imported|Importing a module script failed/i.test(т);
+      }
+      function перечитать() {
+        try {
+          if (sessionStorage.getItem("mintly:перечитано")) return false;
+          sessionStorage.setItem("mintly:перечитано", "1");
+        } catch (e) { /* приватный режим — пробуем один раз без метки */ }
+        location.reload();
+        return true;
+      }
+
       window.addEventListener("error", function (e) {
         var msg = (e.error && (e.error.stack || e.error.message)) || e.message || "неизвестная ошибка";
+        if (этоСтарыйКеш(msg) && перечитать()) return;
         сообщить("browser", msg);
         var el = document.createElement("pre");
         el.style.cssText = "background:#1a0000;color:#ff8080;padding:16px;font-size:12px;white-space:pre-wrap;word-break:break-word;position:fixed;inset:0;overflow:auto;z-index:99999;margin:0;";
@@ -99,5 +119,14 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Приложение поднялось — метку перечитывания снимаем, иначе
+      // следующая выкладка не сможет перезагрузить страницу.
+      window.addEventListener("load", function () {
+        setTimeout(function () {
+          try { sessionStorage.removeItem("mintly:перечитано"); } catch (e) { /* не беда */ }
+        }, 4000);
+      });
+    </script>
   </body>
 </html>

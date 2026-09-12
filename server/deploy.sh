@@ -13,6 +13,17 @@ DIR=${DIR:-/srv/mintly}
 USR=${USR:-mintly}
 
 echo "== код =="
+# Прежние файлы сборки придерживаем. У открытых приложений index.html
+# лежит в кеше и продолжает просить именно их: после подмены dist такой
+# файл исчезал, вместо кода приезжала страница, и приложение вставало с
+# «text/html не годится в JavaScript». Складываем их рядом и возвращаем
+# в новый dist — так старые вкладки доживают до перезагрузки.
+KEEP="$DIR/assets.keep"
+if [ -d "$DIR/dist/assets" ]; then
+  sudo -u "$USR" mkdir -p "$KEEP"
+  sudo -u "$USR" cp -r "$DIR/dist/assets/." "$KEEP/" || true
+fi
+
 sudo -u "$USR" git -C "$DIR" fetch --quiet origin main
 sudo -u "$USR" git -C "$DIR" reset --hard --quiet origin/main
 sudo -u "$USR" git -C "$DIR" log -1 --oneline
@@ -60,6 +71,14 @@ else
   sudo -u "$USR" mv "$DIR/dist.new" "$DIR/dist"
   sudo -u "$USR" rm -rf "$DIR/dist.old"
 fi
+# Возвращаем прежние файлы сборки: -n не даёт затереть свежие, так что
+# в dist оказываются и новые, и те, что ещё просят открытые вкладки.
+if [ -d "$KEEP" ] && [ -d "$DIR/dist/assets" ]; then
+  sudo -u "$USR" cp -rn "$KEEP/." "$DIR/dist/assets/" || true
+  # Старьё дальше недели не держим: каталог иначе растёт без конца.
+  sudo -u "$USR" find "$KEEP" -type f -mtime +7 -delete || true
+fi
+
 echo "собрано: $(ls "$DIR/dist" | wc -l) файлов в корне dist"
 
 echo "== перезапуск =="
