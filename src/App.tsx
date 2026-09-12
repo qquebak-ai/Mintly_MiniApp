@@ -6707,21 +6707,10 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
           )}
         </div>
 
-        {/* Спарклайн между названием и ценой: форма движения читается
-            быстрее, чем проценты, и ради неё карточку и открывают. */}
-        <div className="flex-shrink-0" style={{ width: 74 }}>
-          <MiniChart
-            id={`лента-${tok.id}`}
-            base={tok.mcapNum || tok.raisedTon || 0}
-            seed={tok.id}
-            poolAddress={tok.dexPoolAddress}
-            curveAddress={tok.curveAddress}
-            tokenAddress={tok.tokenAddress}
-            positive={рост}
-            width={74}
-            height={30}
-          />
-        </div>
+        {/* Спарклайна в строке нет. У свежего токена сделок одна-две, и
+            линия выходила ровной чертой через всю карточку — она ничего
+            не сообщала, но забирала место и внимание. Форму движения
+            показывает сам график на странице токена. */}
 
         <div className="text-right flex-shrink-0">
           <div style={{ fontFamily: monoFont, fontSize: 15, fontWeight: 700, ...текстГрадиентом(рост ? ГРАДИЕНТ_РОСТА : ГРАДИЕНТ_ПАДЕНИЯ) }}>{fmtUSD(tok.mcapNum)}</div>
@@ -9617,6 +9606,27 @@ function снятьАнимацию(анимация) {
  * решает, что кошелёк пуст. Серая плашка того же размера говорит
  * правду: считаем.
  */
+/* Сумма, которой ещё нет. Многоточие на её месте ничего не говорит —
+   непонятно, будет там число или прочерк. Размытые цифры того же
+   размера читаются как «сейчас появится», а прочесть их нельзя: блюр
+   съедает начертание, и подставное число ни с чем не спутать. */
+function РазмытаяСумма({ образец = "0,0000", style = null }) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        filter: "blur(4px)",
+        opacity: 0.7,
+        userSelect: "none",
+        pointerEvents: "none",
+        ...(style || {}),
+      }}
+    >
+      {образец}
+    </span>
+  );
+}
+
 function ПлашкаЧисла({ width = 90, height = 22, radius = 8, style = null }) {
   return (
     <span
@@ -13913,7 +13923,9 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
                 letterSpacing: "-0.02em", animation: "значениеПришло 260ms ease-out both",
               }}
             >
-              {считаем ? "…" : выход != null ? изДолей(выход, беру.знаки) : "0"}
+              {/* Пока курс считается — размытая цифра того же кегля, а не
+                  многоточие: строка не прыгает, и видно, что ответ идёт. */}
+              {считаем ? <РазмытаяСумма образец="0,000" /> : выход != null ? изДолей(выход, беру.знаки) : "0"}
             </span>
             <button onClick={() => setВыбор("взять")} className="fx-tap flex items-center"
               style={{ gap: 7, padding: "7px 12px 7px 8px", borderRadius: 999, background: T.surface, border: "none", flexShrink: 0 }}>
@@ -16920,13 +16932,15 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
             {t("available")}: {соло
               // Пока баланс кошелька приложения не приехал, предела нет.
               ? (solБаланс == null
-                ? "…"
+                ? <РазмытаяСумма образец={isBuy ? "0,0000 SOL" : `0 000 ${token.ticker}`} />
                 : isBuy
                   ? `${(solДоступно || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} SOL`
                   : `${solБаланс.token.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${token.ticker}`)
               : isBuy
                 ? `${spendableTon.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${ТИКЕР_TON}`
-                : balanceKnown ? `${holdingTokens.toLocaleString("ru-RU")} ${token.ticker}` : "…"}
+                : balanceKnown
+                  ? `${holdingTokens.toLocaleString("ru-RU")} ${token.ticker}`
+                  : <РазмытаяСумма образец={`0 000 ${token.ticker}`} />}
           </span>
         </div>
         <div className="flex items-center gap-2 rounded-[20px] px-3.5 py-3 mt-1.5" style={{ background: T.bg, border: `1px solid ${overMax ? T.rose : T.line}` }}>
