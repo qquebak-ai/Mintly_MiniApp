@@ -14910,25 +14910,46 @@ function useТопДержателей(token, открыто) {
     const адрес = token && (token.tokenAddress || token.address);
     if (!адрес) { setСписок([]); return; }
 
+    /* Кошельки, заведённые в приложении, показываем лицом: ник и
+       аватарка говорят о держателе больше, чем строка base58. Профили
+       спрашиваем одним запросом на весь список — по строке было бы
+       двадцать запросов на открытие вкладки. */
+    async function сПрофилями(строки, сеть) {
+      const адреса = строки.map((с) => с.адрес).filter(Boolean).slice(0, 24);
+      if (!адреса.length) return строки;
+      try {
+        const r = await fetch(апи(`/api/wallet-owners?chain=${сеть}&addresses=${адреса.map(encodeURIComponent).join(",")}`))
+          .then((x) => x.json());
+        const карта = (r && r.owners) || {};
+        return строки.map((с) => ({ ...с, профиль: карта[с.адрес] || null }));
+      } catch {
+        // Профилей не добыли — список от этого не пропадает.
+        return строки;
+      }
+    }
+
     async function загрузить() {
       try {
         if (token.chain === "solana") {
           const r = await fetch(апи(`/api/solana?action=holders&mint=${адрес}`)).then((x) => x.json());
           const счета = (r && r.счета) || [];
-          if (жив) setСписок(счета.map((с) => ({ адрес: с.адрес, доля: с.доля, количество: с.количество })));
+          const строки = await сПрофилями(
+            счета.map((с) => ({ адрес: с.адрес, доля: с.доля, количество: с.количество })),
+            "solana",
+          );
+          if (жив) setСписок(строки);
           return;
         }
         const хост = (!!token.curveAddress && TON_TESTNET_NETWORK) ? "https://testnet.tonapi.io" : TONAPI_MAINNET_BASE;
         const r = await fetch(`${хост}/v2/jettons/${адрес}/holders?limit=12`).then((x) => x.json());
         const всего = (r && r.addresses) || [];
         const сумма = всего.reduce((acc, x) => acc + Number(x.balance || 0), 0);
-        if (жив) {
-          setСписок(всего.map((x) => ({
-            адрес: (x.owner && x.owner.address) || x.address,
-            доля: сумма > 0 ? (Number(x.balance || 0) / сумма) * 100 : 0,
-            количество: null,
-          })));
-        }
+        const строки = await сПрофилями(всего.map((x) => ({
+          адрес: (x.owner && x.owner.address) || x.address,
+          доля: сумма > 0 ? (Number(x.balance || 0) / сумма) * 100 : 0,
+          количество: null,
+        })), "ton");
+        if (жив) setСписок(строки);
       } catch {
         if (жив) setСписок([]);
       }
@@ -15274,7 +15295,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   // У токена на кривой жетон живёт в той же сети, что и приложение.
   // У токена на своей кривой один из жетонных кошельков — её
   // собственный, человеком он не является.
-  const holdersCount = useJettonHolders(token.tokenAddress, !!token.curveAddress && TON_TESTNET_NETWORK, token.curveAddress ? 1 : 0, token.chain === "solana" ? "solana" : "ton");
+  // У Solana вычитать нечего: кривая там не держит токены на счету, а
+  // печатает их сразу покупателю. Единственного покупателя из-за этого
+  // вычитали как «служебный кошелёк», и держателей выходило ноль.
+  const holdersCount = useJettonHolders(
+    token.tokenAddress,
+    !!token.curveAddress && TON_TESTNET_NETWORK,
+    token.chain === "solana" ? 0 : (token.curveAddress ? 1 : 0),
+    token.chain === "solana" ? "solana" : "ton",
+  );
   // Владелец заодно чинит запись в базе, поэтому передаём, он это или нет.
   const логотип = useTokenLogo(
     token.logoUrl,
@@ -16331,7 +16360,28 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               {топДержателей.map((h, i) => (
                 <div key={`${h.адрес}-${i}`} className="flex items-center" style={{ gap: 10 }}>
                   <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 12, width: 18, flexShrink: 0 }}>{i + 1}</span>
-                  <span className="truncate" style={{ fontFamily: monoFont, color: T.paper, fontSize: 13, flex: 1 }}>{shortAddr(h.адрес)}</span>
+                  {/* Свой человек — с лицом и именем, адрес при нём
+                      остаётся подписью. Чужой кошелёк так и остаётся
+                      адресом: приписывать ему имя нечего. */}
+                  {h.профиль ? (
+                    <div className="flex items-center" style={{ gap: 8, flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
+                        background: h.профиль.avatarUrl ? `center/cover no-repeat url(${h.профиль.avatarUrl})` : T.surfaceHi,
+                      }}>
+                        {!h.профиль.avatarUrl && (h.профиль.emoji || "🙂")}
+                      </div>
+                      <div className="flex flex-col" style={{ minWidth: 0, gap: 1 }}>
+                        <span className="truncate" style={{ fontFamily: bodyFont, color: T.paper, fontSize: 13, fontWeight: 600 }}>
+                          {h.профиль.nickname || shortAddr(h.адрес)}
+                        </span>
+                        <span className="truncate" style={{ fontFamily: monoFont, color: T.faint, fontSize: 11 }}>{shortAddr(h.адрес)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="truncate" style={{ fontFamily: monoFont, color: T.paper, fontSize: 13, flex: 1 }}>{shortAddr(h.адрес)}</span>
+                  )}
                   {/* Доля — полоской и числом: так видно, собран ли токен
                       в одних руках, без чтения процентов подряд. */}
                   <div style={{ width: 64, height: 4, borderRadius: 2, background: T.surfaceHi, overflow: "hidden", flexShrink: 0 }}>
@@ -18322,7 +18372,12 @@ function MyTokenCard({ t, onOpen }) {
   // Свои токены живут в той же сети, что и приложение, а один из
   // жетонных кошельков — кошелёк кривой. Раньше здесь спрашивали
   // mainnet и получали прочерк вместо числа.
-  const holdersCount = useJettonHolders(t.address, TON_TESTNET_NETWORK, t.curveAddress ? 1 : 0, t.chain === "solana" ? "solana" : "ton");
+  const holdersCount = useJettonHolders(
+    t.address,
+    TON_TESTNET_NETWORK,
+    t.chain === "solana" ? 0 : (t.curveAddress ? 1 : 0),
+    t.chain === "solana" ? "solana" : "ton",
+  );
   // Вся карточка ведёт на экран токена: за своим токеном заходят
   // смотреть график и сделки, а не в служебное окно. Отдельной кнопки
   // рядом больше нет — она перехватывала касание там, где его ждали от
