@@ -1,20 +1,21 @@
 import { chromium } from "playwright-core";
 const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
-const p = await b.newPage({ viewport: { width: 420, height: 860 } });
-const errs = []; p.on("pageerror", e => errs.push(String(e)));
-const gt = [];
-p.on("response", r => { const u = r.url(); if (u.includes("geckoterminal")) gt.push(r.status() + " " + u.split("/networks/")[1].slice(0, 40)); });
-await p.route("**tonapi.io/**", r => r.fulfill({ status:200, contentType:"application/json", headers:{"access-control-allow-origin":"*"}, body:"{}" }));
-await p.route("**supabase.co/**", r => r.fulfill({ status:200, contentType:"application/json", headers:{"access-control-allow-origin":"*"}, body:"[]" }));
-await p.addInitScript(() => { window.Telegram = { WebApp: { initData:"", initDataUnsafe:{user:{id:1,first_name:"T"}}, ready(){}, expand(){}, colorScheme:"dark", themeParams:{}, onEvent(){}, offEvent(){}, HapticFeedback:{impactOccurred(){},notificationOccurred(){},selectionChanged(){}}, MainButton:{show(){},hide(){},setParams(){},onClick(){}}, BackButton:{show(){},hide(){},onClick(){},offClick(){}} } }; });
-await p.goto("http://localhost:4180/", { waitUntil: "domcontentloaded" });
-await p.waitForTimeout(12000);
-await p.getByRole("button", { name: /Мемпад/ }).last().click();
-await p.waitForTimeout(1500);
-await p.getByRole("button", { name: "SOL", exact: true }).click();
+const p = await b.newPage({ viewport: { width: 390, height: 844 } });
+const плохо = [];
+p.on("pageerror", (e) => плохо.push("pageerror: " + e.message));
+await p.route("**/*", async (route) => {
+  const url = route.request().url();
+  try {
+    const r = await fetch(url, { method: route.request().method(), headers: route.request().headers(), body: route.request().postData() || undefined });
+    const тело = Buffer.from(await r.arrayBuffer());
+    return route.fulfill({ status: r.status, headers: { "content-type": r.headers.get("content-type") || "text/html", "access-control-allow-origin": "*" }, body: тело });
+  } catch { return route.abort(); }
+});
+await p.goto("https://mintly.company/?token=cb68ac56-6af0-4810-96e9-276a726f7d00", { waitUntil: "domcontentloaded" });
+await p.waitForTimeout(3000);
+const k = p.locator("text=Продолжить без входа").first();
+if (await k.count()) await k.click();
 await p.waitForTimeout(14000);
-console.log("всего GT:", gt.length, gt.slice(0, 6));
-console.log("сеть в кнопке:", await p.evaluate(() => [...document.querySelectorAll("button")].filter(b=>b.innerText==="SOL"||b.innerText==="TON").map(b=>b.innerText+":"+getComputedStyle(b).backgroundColor)));
-console.log("текст:", (await p.evaluate(() => document.body.innerText.slice(0,180))).replace(/\n/g," | "));
-console.log("ERRORS:", errs.slice(0,3));
+console.log((await p.evaluate(() => document.body.innerText)).slice(0, 500));
+console.log("--- ошибки:", плохо.slice(0, 3));
 await b.close();
