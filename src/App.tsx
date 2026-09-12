@@ -4214,6 +4214,52 @@ function flatCandles(price, timeframe, limit = CHART_TOTAL, запущен = 0) 
   return { candles, volume };
 }
 
+/* Рынок токена прямо из его кривой, без кеша и без ленты.
+ *
+ * Обход складывает цифры в curve_cache раз в минуту, и у токена, которому
+ * минута ещё не исполнилась, строки там просто нет: карточка показывала
+ * «$0», пустой график и «биржа не ответила» — у монеты, которая уже
+ * торгуется. Кривая знает о себе всё с первой секунды, поэтому спрашиваем
+ * её саму. Обе цепочки разом: считать, где какая, вызывающему незачем.
+ *
+ * Возвращает null, когда состояние прочитать не удалось, — чтобы было
+ * видно разницу между «сделок не было» и «сеть не ответила». */
+async function рынокКривойСразу(token) {
+  if (!token) return null;
+  try {
+    if (token.chain === "solana") {
+      if (!token.tokenAddress && !token.address) return null;
+      const { состояниеКривойSol } = await import("./solLaunch");
+      const st = await состояниеКривойSol(token.tokenAddress || token.address);
+      if (!st || !(st.virtualSol > 0)) return null;
+      const курс = solUsd();
+      return {
+        priceCoin: st.ценаSol,
+        priceUsd: курс > 0 ? st.ценаSol * курс : 0,
+        mcapUsd: курс > 0 ? st.ценаSol * курс * 1_000_000_000 : 0,
+        raised: st.solСобрано,
+        цель: st.solЦель,
+        продано: st.продано,
+        graduated: !!st.закрыта,
+      };
+    }
+    if (!token.curveAddress) return null;
+    const m = await fetchCurveMarket(token.curveAddress, token.tokenAddress || token.address, TON_TESTNET_NETWORK);
+    if (!m) return null;
+    return {
+      priceCoin: m.priceTon,
+      priceUsd: m.priceUsd,
+      mcapUsd: m.mcapUsd,
+      raised: Number(m.state.realTon) / 1e9,
+      цель: Number(m.state.graduationTon) / 1e9,
+      продано: Number(m.state.tokensSold) / 1e9,
+      graduated: !!m.state.graduated,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /* История сделок кривой из базы.
  *
  * Её складывает серверный обход (api/refresh-curves.js) — те же самые
@@ -15048,7 +15094,28 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
      то же, что и в ленте. */
   const [окноГрафика, setОкноГрафика] = useState(null);
   useEffect(() => { setОкноГрафика(null); }, [token.id, tf]);
-  const ценаОкна = окноГрафика ? окноГрафика.до : token.price;
+  /* Свой рынок с первой секунды. Обход кеша ходит по кривым раз в
+     минуту, и только что запущенный токен попадал на витрину с нулями:
+     «$0» вместо капитализации и пустой график. Читаем кривую напрямую,
+     пока цифры из ленты не приехали, и держим прочитанное, даже если
+     потом снова опустеет: в обратную сторону — от числа к нулю — цифра
+     прыгать не должна. */
+  const [своя, setСвоя] = useState(null);
+  useEffect(() => { setСвоя(null); }, [token.id]);
+  useEffect(() => {
+    const своиЧисла = token.mcapNum > 0 && token.price > 0;
+    const кривая = token.chain === "solana" ? !!token.tokenAddress : !!token.curveAddress;
+    if (своиЧисла || !кривая) return;
+    let брошено = false;
+    const читать = () => рынокКривойСразу(token).then((м) => { if (!брошено && м) setСвоя(м); });
+    читать();
+    // Пока лента молчит — свой круг: кривая отвечает быстрее обхода.
+    const id = setInterval(читать, 6000);
+    return () => { брошено = true; clearInterval(id); };
+  }, [token.id, token.chain, token.tokenAddress, token.curveAddress, token.mcapNum, token.price]);
+
+  const ценаТокена = token.price > 0 ? token.price : ((своя && своя.priceUsd) || 0);
+  const ценаОкна = окноГрафика ? окноГрафика.до : ценаТокена;
   /* Показываем капитализацию, а не цену за штуку. У мемкоина цена —
      это шесть нулей после запятой, по которым ничего не понять, а
      капитализация сразу говорит, насколько токен большой. Множитель —
@@ -15060,7 +15127,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const капОкна = ценаОкна * выпускТокена;
   const дельтаОкна = (окноГрафика
     ? окноГрафика.до - окноГрафика.от
-    : (token.price * (token.change || 0)) / 100) * выпускТокена;
+    : (ценаТокена * (token.change || 0)) / 100) * выпускТокена;
   const процентОкна = окноГрафика
     ? (окноГрафика.от > 0 ? ((окноГрафика.до - окноГрафика.от) / окноГрафика.от) * 100 : 0)
     : (token.change || 0);
@@ -15296,24 +15363,36 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   if (!supplyRef.current.value && token.price > 0 && token.mcapNum > 0) {
     supplyRef.current.value = token.mcapNum / token.price;
   }
-  const supplyEst = supplyRef.current.value;
+  const supplyEst = supplyRef.current.value || 1_000_000_000;
+  /* Пока обход не собрал историю, у свежего токена свечей нет вовсе, а
+     цена у него уже есть — кривая её знает. Рисуем по ней прямую: цена
+     между сделками и правда стоит на месте, так что это не выдумка, а
+     единственное, что о токене известно. Ничего не выдумываем и сверх
+     того: тени и объём остаются нулевыми. */
+  const графДанные = useMemo(() => {
+    if (chartData && chartData.candles && chartData.candles.length) return chartData;
+    const цена = (своя && своя.priceUsd > 0) ? своя.priceUsd : 0;
+    if (!(цена > 0)) return null;
+    const ряд = flatCandles(цена, tf, CHART_TOTAL, запущенВ);
+    return ряд ? { ...ряд, tf, isLive: false } : null;
+  }, [chartData, своя, tf, запущенВ]);
   const scaledCandles = useMemo(() => {
-    if (!chartData?.candles) return null;
+    if (!графДанные?.candles) return null;
     // Без множителя рисовать нечего: раньше в этот момент график молча
     // показывал цену вместо капитализации — все числа менялись в
     // тридцать миллионов раз, шкала перестраивалась, и это и был тот
     // самый рывок. Лучше подождать, пока множитель приедет.
-    if (chartMode === "price") return chartData.candles;
+    if (chartMode === "price") return графДанные.candles;
     if (!supplyEst) return null;
-    return chartData.candles.map(c => ({ ...c, open: c.open * supplyEst, high: c.high * supplyEst, low: c.low * supplyEst, close: c.close * supplyEst }));
-  }, [chartData, chartMode, supplyEst]);
+    return графДанные.candles.map(c => ({ ...c, open: c.open * supplyEst, high: c.high * supplyEst, low: c.low * supplyEst, close: c.close * supplyEst }));
+  }, [графДанные, chartMode, supplyEst]);
   // Свечи годятся к показу, только если они за выбранный сейчас интервал.
   // Пока их нет — крутится загрузка; «нет данных» пишем лишь тогда, когда
   // запрос отработал и не принёс ничего.
-  const chartReady = !!(chartData && chartData.tf === tf && scaledCandles && scaledCandles.length);
+  const chartReady = !!(графДанные && графДанные.tf === tf && scaledCandles && scaledCandles.length);
   // Множитель «цена → капитализация» приезжает отдельно от свечей: пока
   // его нет, показывать нечего, но и «нет данных» неправда.
-  const chartPending = chartLoading || (!!chartData && chartData.tf === tf && !scaledCandles);
+  const chartPending = chartLoading || (!!графДанные && графДанные.tf === tf && !scaledCandles);
 
   // Кнопка «поделиться» открывает карточку картинкой: голая ссылка в
   // чате не показывает ни цифр, ни лого — превью мини-приложения
@@ -15754,7 +15833,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       <КарточкаСтрок
         заголовок={`${tr("aboutToken")} $${token.ticker}`}
         строки={[
-          [t("marketCapLabel"), fmtUSD(token.mcapNum)],
+          [t("marketCapLabel"), fmtUSD(token.mcapNum > 0 ? token.mcapNum : капОкна)],
           [tr("statVolume24h"), `$${token.vol}`],
           [tr("statLiquidity"), `$${token.liq}`],
           token.chain === "solana"
@@ -15792,7 +15871,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       {tab === "stats" && (
         <div className="fx-swap flex flex-col" style={{ gap: 0 }}>
           {[
-            [tr("statMcap"), fmtUSD(token.mcapNum)],
+            [tr("statMcap"), fmtUSD(token.mcapNum > 0 ? token.mcapNum : капОкна)],
             [tr("statLiq"), `$${token.liq ?? "—"}`],
             [tr("statVol24"), `$${token.vol ?? "—"}`],
             [tr("statTrades24"), (token.tx24h || 0).toLocaleString("ru-RU")],
@@ -21707,10 +21786,41 @@ function mapTokenRow(row) {
       // Обложка: ею подкладывается карточка «в центре внимания».
       bannerUrl: row.banner_url || null,
       network: row.network || "mainnet",
+      // Цепочка — в самой записи: без неё свежий токен Solana считался
+      // TON-овским, пока не перезапустишь приложение и список не придёт
+      // из базы.
+      chain: цепочкаПоАдресу(row.chain, row.address),
       createdAt: new Date(row.created_at).getTime(),
     };
     setMyTokens((prev) => [entry, ...prev]);
     setCommunityTokens((prev) => [entry, ...prev]);
+
+    /* Цифры новорождённому — сразу с его кривой. Серверный обход дойдёт
+       до него в течение минуты, и всё это время токен висел на витрине с
+       «$0» — у всех на виду, хотя стартовая покупка уже прошла. */
+    (async () => {
+      for (let попытка = 0; попытка < 5; попытка++) {
+        const м = await рынокКривойСразу({
+          chain: entry.chain,
+          tokenAddress: entry.address,
+          curveAddress: entry.curveAddress,
+        });
+        if (м && м.priceUsd > 0) {
+          const свежее = {
+            price: м.priceUsd,
+            mcapNum: м.mcapUsd,
+            raisedTon: м.raised,
+            graduationTon: м.цель,
+            graduated: м.graduated,
+          };
+          const подставить = (prev) => prev.map((tok) => (tok.id === entry.id ? { ...tok, ...свежее } : tok));
+          setMyTokens(подставить);
+          setCommunityTokens(подставить);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    })();
     // The premint transaction sends the token's initial buy allocation
     // straight to the creator's own wallet on-chain — but the app's
     // own "how much of this do I hold" number (`holdings`, used by
