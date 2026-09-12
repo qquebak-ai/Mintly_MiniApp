@@ -21350,7 +21350,47 @@ function mapTokenRow(row) {
       return применитьКеш(mapTokenRow(row), кеш, tonPriceUsd);
     });
     setMyTokens(rows);
+    дополнитьSolanaРынком(rows);
     дополнитьЛоготипы(rows);
+  }
+
+  /* Рынок токенов Solana, которых ещё нет в кеше обхода.
+   *
+   * Обход ходит по кривым раз в минуту, и всё это время свежий токен
+   * висел в ленте с «$0» — ценой и капитализацией, которых у него уже
+   * нет. Своя кривая отвечает сразу, поэтому дочитываем её сами: цену
+   * кладём в той же монете, в какой её кладёт обход, а доллары
+   * досчитает пересчёт по курсу. */
+  async function дополнитьSolanaРынком(rows) {
+    const нужны = (rows || [])
+      .filter((tok) => tok.chain === "solana" && tok.address && !(tok.mcapNum > 0))
+      .slice(0, 8);
+    if (!нужны.length) return;
+    const рынки = await Promise.all(нужны.map((tok) => рынокКривойСразу({
+      chain: "solana", tokenAddress: tok.address, curveAddress: tok.curveAddress,
+    })));
+    const найдено = new Map();
+    нужны.forEach((tok, i) => {
+      const м = рынки[i];
+      if (м && м.priceCoin > 0) найдено.set(tok.id, м);
+    });
+    if (!найдено.size) return;
+    const курс = solUsd();
+    const подставить = (prev) => prev.map((tok) => {
+      const м = найдено.get(tok.id);
+      if (!м) return tok;
+      return {
+        ...tok,
+        priceTon: м.priceCoin,
+        price: курс > 0 ? м.priceUsd : tok.price,
+        mcapNum: курс > 0 ? м.mcapUsd : tok.mcapNum,
+        raisedTon: м.raised,
+        graduationTon: м.цель,
+        graduated: м.graduated,
+      };
+    });
+    setCommunityTokens(подставить);
+    setMyTokens(подставить);
   }
 
   /* Логотипы, которых нет в базе.
@@ -21425,6 +21465,7 @@ function mapTokenRow(row) {
     });
     setCommunityTokens(rows);
     setCommunityLoaded(true);
+    дополнитьSolanaРынком(rows);
 
     // Кеш свежий — цепочку не трогаем совсем: всё уже посчитано на
     // сервере, и лента показана целиком с первого кадра. Дочитываем
@@ -22317,6 +22358,10 @@ function mapTokenRow(row) {
     };
     setMyTokens((prev) => [entry, ...prev]);
     setCommunityTokens((prev) => [entry, ...prev]);
+    /* Запуск — такой же расход кошелька, как покупка, и он уже записан в
+       журнале операций. Тем же событием говорим об этом истории: иначе
+       новая строка появлялась там только через круг опроса. */
+    сообщитьОСделке(entry.id);
 
     /* Цифры новорождённому — сразу с его кривой. Серверный обход дойдёт
        до него в течение минуты, и всё это время токен висел на витрине с
