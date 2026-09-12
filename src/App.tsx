@@ -5879,8 +5879,13 @@ function разобратьТост(сообщение) {
 
 function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
   const [тяга, setТяга] = useState(0);
+  /* Появление — это CSS-анимация, а она перекрывает inline-стиль: пока
+     она висела на элементе (а с fill-mode она висит и после конца),
+     наш сдвиг за пальцем просто не применялся — карточка не двигалась
+     вовсе. Поэтому по её окончании анимацию снимаем. */
+  const [появилась, setПоявилась] = useState(false);
   const жест = useRef(null);
-  useEffect(() => { setТяга(0); }, [toast]);
+  useEffect(() => { setТяга(0); setПоявилась(false); }, [toast]);
   if (!toast) return null;
 
   const { вид, заголовок, текст } = разобратьТост(toast);
@@ -5941,16 +5946,19 @@ function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
       onPointerMove={ходУк}
       onPointerUp={конецУк}
       onPointerCancel={конецУк}
+      onAnimationEnd={() => { if (!leaving) setПоявилась(true); }}
       style={{
         position: "fixed", top: insetTop + 14, left: "50%", zIndex: 620,
         width: "calc(100% - 28px)", maxWidth: 420,
         willChange: "transform, opacity",
         animation: leaving
           ? `toastOut ${TOAST_OUT_MS}ms cubic-bezier(0.4,0,1,1) both`
-          : "toastCardIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
-        transform: тяга ? `translateX(-50%) translateY(${тяга}px)` : undefined,
-        transition: жест.current ? "none" : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
-        touchAction: "pan-y",
+          : (появилась ? "none" : "toastCardIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both"),
+        transform: `translateX(-50%) translateY(${тяга}px)`,
+        transition: жест.current ? "none" : "transform 260ms cubic-bezier(0.22, 0.85, 0.25, 1)",
+        // Жест целиком наш: при pan-y браузер забирал вертикальное
+        // движение себе.
+        touchAction: "none",
       }}
     >
       {/* Карточка не следует теме приложения: как и системные
