@@ -204,9 +204,17 @@ export async function обменМеждуСетями({ откуда, сумм�
 /* Вывод. Адрес не передаётся: сервер отправит только на привязанный —
    тот, владение которым доказано подписью. all — «всё, что есть»:
    сервер оставит запас на комиссию, иначе перевод не пройдёт вовсе. */
-export async function вывестиСВнутреннего({ amount, all = false }) {
+export async function вывестиСВнутреннего({ amount, all = false, адрес = "" }) {
   return await запрос("/api/wallet-solana?action=withdraw", {
-    amount, all, requestKey: ключЗапроса(),
+    amount, all, address: адрес || undefined, requestKey: ключЗапроса(),
+  });
+}
+
+/* Вывод в TON — та же дорога, только другая ручка. Адрес, как и в
+   Solana, нужен лишь пока не привязан постоянный. */
+export async function вывестиСВнутреннегоTON({ amount, all = false, адрес = "" }) {
+  return await запрос("/api/wallet-ton?action=withdraw", {
+    amount, all, address: адрес || undefined, requestKey: ключЗапроса(),
   });
 }
 

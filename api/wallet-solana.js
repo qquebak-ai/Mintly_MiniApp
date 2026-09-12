@@ -1118,7 +1118,21 @@ export default async function handler(req, res) {
     }
 
     if (действие === "withdraw") {
-      if (!строка.payout_address) return res.status(400).json({ error: "no_payout" });
+      /* Куда выводим. Привязанный адрес — тот, владение которым доказано
+         подписью: если он есть, деньги уходят только на него, и присланный
+         в запросе адрес должен с ним совпадать — иначе привязка не значила
+         бы ничего. Пока привязки нет, адрес можно назвать прямо здесь:
+         кошелёк заведён внутри приложения, и без этого вывести деньги
+         человеку было бы просто нечем. */
+      const названный = String(тело.address || "").trim();
+      if (названный && !адресОк(названный)) return res.status(400).json({ error: "bad_address" });
+      if (строка.payout_address && названный && названный !== строка.payout_address) {
+        return res.status(400).json({ error: "payout_locked", payout: строка.payout_address });
+      }
+      const куда = строка.payout_address || названный;
+      if (!куда) return res.status(400).json({ error: "no_payout" });
+      if (куда === строка.address) return res.status(400).json({ error: "same_address" });
+
       const есть = await баланс(строка.address);
       const сумма = тело.all ? Math.max(0, есть - ЗАПАС_НА_КОМИССИЮ) : Number(тело.amount) || 0;
       if (!(сумма > 0) || сумма > есть) return res.status(400).json({ error: "bad_amount" });
@@ -1129,13 +1143,13 @@ export default async function handler(req, res) {
       }
 
       const оп = await начать(db, user, {
-        дело: "withdraw", сумма, адрес: строка.payout_address, ключЗапроса, ip,
+        дело: "withdraw", сумма, адрес: куда, ключЗапроса, ip,
       });
       if (оп.повтор) return res.status(200).json({ signature: оп.signature, amount: сумма, repeat: true });
 
       const лямпорты = Math.floor(сумма * LAMPORTS);
       const base64 = await собратьВывод({
-        откуда: строка.address, куда: строка.payout_address, лямпорты,
+        откуда: строка.address, куда, лямпорты,
       });
       let подпись;
       try {
@@ -1148,7 +1162,7 @@ export default async function handler(req, res) {
       }
       await завершить(db, оп.id, подпись);
       await сообщить(db, user.id,
-        `💸 Вывод ${сумма.toFixed(4)} SOL на <code>${строка.payout_address}</code>.`);
+        `💸 Вывод ${сумма.toFixed(4)} SOL на <code>${куда}</code>.`);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ signature: подпись, amount: сумма });
     }

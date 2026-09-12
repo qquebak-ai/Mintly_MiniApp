@@ -454,7 +454,21 @@ export default async function handler(req, res) {
     }
 
     if (действие === "withdraw") {
-      if (!строка.payout_address) return res.status(400).json({ error: "no_payout" });
+      /* Куда выводим — как в Solana: привязанный адрес главнее, а пока
+         его нет, адрес можно назвать прямо в запросе. Иначе деньги с
+         внутреннего кошелька просто некуда забрать. */
+      const { Address: АдресTON } = await библиотеки();
+      const названный = String(тело.address || "").trim();
+      if (названный) {
+        try { АдресTON.parse(названный); } catch { return res.status(400).json({ error: "bad_address" }); }
+      }
+      if (строка.payout_address && названный && названный !== строка.payout_address) {
+        return res.status(400).json({ error: "payout_locked", payout: строка.payout_address });
+      }
+      const куда = строка.payout_address || названный;
+      if (!куда) return res.status(400).json({ error: "no_payout" });
+      if (куда === строка.address) return res.status(400).json({ error: "same_address" });
+
       const есть = await баланс(строка.address);
       const сумма = тело.all ? Math.max(0, есть - 0.05) : Number(тело.amount) || 0;
       if (!(сумма > 0) || сумма > есть) return res.status(400).json({ error: "bad_amount" });
@@ -468,7 +482,7 @@ export default async function handler(req, res) {
          вернёт исход первого, а не отправит деньги ещё раз. */
       const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || null;
       const оп = await начать(db, user, {
-        дело: "withdraw", сумма, адрес: строка.payout_address,
+        дело: "withdraw", сумма, адрес: куда,
         ключЗапроса: String(тело.requestKey || "").slice(0, 64) || null, ip,
       });
       if (оп.повтор) return res.status(200).json({ ok: true, sent: сумма, repeat: true });
@@ -481,7 +495,7 @@ export default async function handler(req, res) {
         secretKey: пара.secretKey,
         sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
         messages: [internal({
-          to: Address.parse(строка.payout_address),
+          to: Address.parse(куда),
           value: toNano(сумма.toFixed(9)),
           bounce: false,
         })],

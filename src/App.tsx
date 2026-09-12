@@ -323,8 +323,21 @@ const STR = {
     swapRouteNote: "Курс биржи, с запасом на проскальзывание",
     swapOnlyInApp: "Меняется только то, что лежит на кошельке Mintly",
     walletSeeAll: "Все",
-    walletActBuy: "Купить",
+    walletActBuy: "Вывести",
     walletActReceive: "Получить",
+    withdrawTitle: "Вывести",
+    withdrawTo: "Адрес получателя",
+    withdrawAmount: "Сумма",
+    withdrawAll: "Всё",
+    withdrawAvailable: "Доступно",
+    withdrawDo: "Вывести",
+    withdrawGoing: "Отправляем…",
+    withdrawSent: "Отправлено {sum}",
+    withdrawFailed: "Вывод не прошёл",
+    withdrawNotEnough: "На кошельке столько нет",
+    withdrawBadAddress: "Проверь адрес",
+    withdrawLocked: "Вывод идёт на привязанный адрес",
+    withdrawNote: "Уходит из кошелька Mintly в сеть. Комиссия сети уже учтена в «Всё».",
     walletActSwap: "Обменять",
     walletActHistory: "История",
     walletHoldingsEmpty: "Пока пусто. Купи токен в мемпаде — он появится здесь.",
@@ -896,8 +909,21 @@ const STR = {
     swapRouteNote: "Exchange rate, slippage included",
     swapOnlyInApp: "Only what sits on the Mintly wallet can be swapped",
     walletSeeAll: "See all",
-    walletActBuy: "Buy",
+    walletActBuy: "Withdraw",
     walletActReceive: "Receive",
+    withdrawTitle: "Withdraw",
+    withdrawTo: "Recipient address",
+    withdrawAmount: "Amount",
+    withdrawAll: "Max",
+    withdrawAvailable: "Available",
+    withdrawDo: "Withdraw",
+    withdrawGoing: "Sending…",
+    withdrawSent: "Sent {sum}",
+    withdrawFailed: "Withdrawal failed",
+    withdrawNotEnough: "Not enough on the wallet",
+    withdrawBadAddress: "Check the address",
+    withdrawLocked: "Withdrawals go to the linked address",
+    withdrawNote: "Leaves your Mintly wallet for the network. The network fee is already counted in Max.",
     walletActSwap: "Swap",
     walletActHistory: "History",
     walletHoldingsEmpty: "Nothing yet. Buy a token in the mempad and it shows up here.",
@@ -13809,6 +13835,141 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
   );
 }
 
+/* Вывод из кошелька наружу.
+ *
+ * Деньги уходят на любой адрес той же сети: адрес и сумму называет
+ * человек, перевод собирает и подписывает сервер — ключ ему и так
+ * доверен. Если адрес вывода уже привязан подписью, сервер отправит
+ * только на него и чужой адрес отобьёт: в этом и смысл привязки.
+ *
+ * Комиссию сети «Всё» учитывает само — иначе перевод остатка до копейки
+ * просто не прошёл бы.
+ */
+function ЭкранВывода({
+  открыт, onClose, сеть = "sol", остаток = 0, курс = 0, единица = "SOL",
+  showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0,
+}) {
+  const [адрес, setАдрес] = useState("");
+  const [сумма, setСумма] = useState("");
+  const [всё, setВсё] = useState(false);
+  const [идёт, setИдёт] = useState(false);
+
+  useEffect(() => {
+    if (!открыт) { setСумма(""); setВсё(false); setИдёт(false); }
+  }, [открыт]);
+
+  // Запас на комиссию сети: в TON перевод стоит заметно дороже, чем в
+  // Solana, и остаток «под ноль» там не уходит вовсе.
+  const запас = сеть === "ton" ? 0.05 : 0.0001;
+  const свободно = Math.max(0, Number(остаток) - запас);
+  const число = Number(String(сумма).replace(",", ".")) || 0;
+  const многовато = число > свободно + 1e-9;
+  const адресОкей = адрес.trim().length >= 32;
+  const можно = адресОкей && число > 0 && !многовато && !идёт;
+
+  async function вывести() {
+    if (!можно) return;
+    setИдёт(true);
+    haptic("medium");
+    try {
+      const кошелёк = await import("./appWallet");
+      const отправить = сеть === "ton" ? кошелёк.вывестиСВнутреннегоTON : кошелёк.вывестиСВнутреннего;
+      const ответ = await отправить({ amount: число, all: всё, адрес: адрес.trim() });
+      const ушло = ответ && ответ.sent != null ? Number(ответ.sent) : (ответ && ответ.amount != null ? Number(ответ.amount) : число);
+      showToast(tf("withdrawSent", { sum: `${fmtСумма(ушло)} ${единица}` }));
+      haptic("success");
+      onГотово();
+      onClose();
+    } catch (e) {
+      const текст = String((e && e.message) || "");
+      // Сервер отвечает короткими метками — переводим их в человеческие.
+      if (текст.includes("payout_locked")) showToast(t("withdrawLocked"));
+      else if (текст.includes("bad_address") || текст.includes("same_address")) showToast(t("withdrawBadAddress"));
+      else if (текст.includes("bad_amount") || текст.includes("daily_limit")) showToast(t("withdrawNotEnough"));
+      else showToast(`${t("withdrawFailed")}: ${текст.slice(0, 90)}`);
+      haptic("error");
+    } finally {
+      setИдёт(false);
+    }
+  }
+
+  return (
+    <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={t("withdrawTitle")} insetTop={insetTop} insetBottom={insetBottom}>
+      <div className="flex flex-col" style={{ flex: 1, minHeight: 0, padding: "0 18px", gap: 14 }}>
+        <label className="flex flex-col" style={{ gap: 8 }}>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("withdrawTo")}</span>
+          <input
+            value={адрес}
+            onChange={(e) => setАдрес(e.target.value)}
+            placeholder={сеть === "ton" ? "UQ…" : "5x…"}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            style={{
+              width: "100%", padding: "14px 14px", borderRadius: 16, border: `1px solid ${T.line}`,
+              background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 13.5, outline: "none",
+            }}
+          />
+        </label>
+
+        <label className="flex flex-col" style={{ gap: 8 }}>
+          <div className="flex items-center justify-between">
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("withdrawAmount")}</span>
+            <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 12 }}>
+              {t("withdrawAvailable")}: {fmtСумма(свободно)} {единица}
+            </span>
+          </div>
+          <div className="flex items-center" style={{ gap: 8 }}>
+            <input
+              value={сумма}
+              onChange={(e) => { setСумма(e.target.value.replace(/[^\d.,]/g, "")); setВсё(false); }}
+              inputMode="decimal"
+              placeholder="0"
+              style={{
+                flex: 1, padding: "14px 14px", borderRadius: 16,
+                border: `1px solid ${многовато ? T.down : T.line}`,
+                background: T.surface, color: многовато ? T.down : T.ice,
+                fontFamily: displayFont, fontSize: 18, fontWeight: 700, outline: "none",
+              }}
+            />
+            <button
+              onClick={() => { setСумма(String(свободно)); setВсё(true); haptic("light"); }}
+              className="fx-tap"
+              style={{
+                padding: "14px 16px", borderRadius: 16, border: "none", background: T.surfaceHi,
+                color: T.ice, fontFamily: displayFont, fontSize: 14, fontWeight: 700,
+              }}
+            >
+              {t("withdrawAll")}
+            </button>
+          </div>
+          {курс > 0 && число > 0 && (
+            <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 12 }}>≈ ${(число * курс).toFixed(2)}</span>
+          )}
+        </label>
+
+        <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, lineHeight: 1.45 }}>{t("withdrawNote")}</span>
+      </div>
+
+      <div className="flex flex-col" style={{ gap: 10, padding: "14px 18px 22px", flexShrink: 0 }}>
+        <button
+          onClick={вывести}
+          disabled={!можно}
+          className="fx-tap w-full"
+          style={{
+            padding: "16px 0", borderRadius: 999, border: "none",
+            background: можно ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+            color: можно ? PRISM_TEXT : T.muted,
+            fontFamily: displayFont, fontSize: 16, fontWeight: 800,
+          }}
+        >
+          {идёт ? t("withdrawGoing") : t("withdrawDo")}
+        </button>
+      </div>
+    </ЭкранСнизу>
+  );
+}
+
 /* Обмен внутри приложения.
  *
  * Меняется только то, что лежит на кошельке Mintly: своими ключами
@@ -14450,6 +14611,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const [внутр, setВнутр] = useState(null);
   const [обменОткрыт, setОбменОткрыт] = useState(false);
   const [получитьОткрыт, setПолучитьОткрыт] = useState(false);
+  const [выводОткрыт, setВыводОткрыт] = useState(false);
   /* Волны от касаний карты. Каждая живёт своё время и убирается сама —
      иначе их накапливались бы десятки за один сеанс. */
   const [волны, setВолны] = useState([]);
@@ -14706,7 +14868,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
 
       {/* Ряд действий — то, за чем в кошелёк заходят чаще всего. */}
       <div className="flex items-start" style={{ gap: 10, marginTop: 16, padding: "0 16px" }}>
-        <ДействиеКошелька icon={Plus} label={t("walletActBuy")} onClick={() => onGoTab("mempad")} />
+        <ДействиеКошелька icon={ArrowUpRight} label={t("walletActBuy")} onClick={() => setВыводОткрыт(true)} />
         <ДействиеКошелька icon={ArrowDownLeft} label={t("walletActReceive")} onClick={() => setПолучитьОткрыт(true)} />
         <ДействиеКошелька icon={Repeat} label={t("walletActSwap")} onClick={() => setОбменОткрыт(true)} />
         <ДействиеКошелька
@@ -14803,6 +14965,19 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         адрес={адресВнутри}
         сеть={вTON ? ТИКЕР_TON : "Solana"}
         showToast={showToast}
+        insetTop={insetTop}
+        insetBottom={insetBottom}
+      />
+
+      <ЭкранВывода
+        открыт={выводОткрыт}
+        onClose={() => setВыводОткрыт(false)}
+        сеть={вTON ? "ton" : "sol"}
+        остаток={наКошельке}
+        курс={курсСети}
+        единица={единица}
+        showToast={showToast}
+        onГотово={() => { обновитьВнутренний(); setСвоиОбновления((н) => н + 1); }}
         insetTop={insetTop}
         insetBottom={insetBottom}
       />
