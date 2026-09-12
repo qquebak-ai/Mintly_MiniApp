@@ -5886,6 +5886,23 @@ function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
   const [появилась, setПоявилась] = useState(false);
   const жест = useRef(null);
   useEffect(() => { setТяга(0); setПоявилась(false); }, [toast]);
+  /* Анимацию снимаем и по таймеру: событие о её конце иногда не
+     приходит вовсе — например, когда карточку пересоздали в тот же
+     кадр, — и тогда она навсегда перекрывала наш сдвиг, а карточка
+     переставала смахиваться. */
+  useEffect(() => {
+    if (!toast || leaving) return;
+    const id = setTimeout(() => setПоявилась(true), 500);
+    return () => clearTimeout(id);
+  }, [toast, leaving]);
+  /* И свой срок жизни — на случай, если таймеры снаружи перебили друг
+     друга: карточка не должна висеть вечно ни при каком стечении
+     обстоятельств. */
+  useEffect(() => {
+    if (!toast || leaving) return;
+    const id = setTimeout(() => onClose(), ЖИЗНЬ_ТОСТА + 400);
+    return () => clearTimeout(id);
+  }, [toast, leaving, onClose]);
   if (!toast) return null;
 
   const { вид, заголовок, текст } = разобратьТост(toast);
@@ -20345,6 +20362,10 @@ const FEE_PERCENT = 0.01; // 1% комиссии
   // проигрывается заново даже если текст совпал с предыдущим.
   const [toastSeq, setToastSeq] = useState(0);
   const toastTimer = useRef(null);
+  const последнийToast = useRef({ текст: "", когда: 0 });
+  const очередьToast = useRef([]);
+  const показаноВ = useRef(0);
+  const toastRef = useRef(null);
   const toastHideTimer = useRef(null);
   // Закрыть руками — крестиком или смахнув вверх: та же анимация ухода,
   // что и по времени.
@@ -20352,23 +20373,57 @@ const FEE_PERCENT = 0.01; // 1% комиссии
     clearTimeout(toastTimer.current);
     clearTimeout(toastHideTimer.current);
     setToastLeaving(true);
-    toastHideTimer.current = setTimeout(() => { setToast(null); setToastLeaving(false); }, TOAST_OUT_MS);
+    toastHideTimer.current = setTimeout(() => {
+      setToast(null);
+      setToastLeaving(false);
+      const следующее = очередьToast.current.shift();
+      if (следующее) показатьToast(следующее);
+    }, TOAST_OUT_MS);
   }
-  function showToast(msg) {
+  /* Показ одной карточки. Всё остальное — очередь ниже. */
+  function показатьToast(текст) {
     clearTimeout(toastTimer.current);
     clearTimeout(toastHideTimer.current);
-    setToast(msg);
+    setToast(текст);
     setToastLeaving(false);
     setToastSeq((n) => n + 1);
     haptic();
+    показаноВ.current = Date.now();
     // Четыре секунды: столько нужно, чтобы прочитать две строки и не
     // почувствовать, что сообщение висит.
     toastTimer.current = setTimeout(() => setToastLeaving(true), ЖИЗНЬ_ТОСТА);
     toastHideTimer.current = setTimeout(() => {
       setToast(null);
       setToastLeaving(false);
+      const следующее = очередьToast.current.shift();
+      if (следующее) показатьToast(следующее);
     }, ЖИЗНЬ_ТОСТА + TOAST_OUT_MS);
   }
+
+  /* Одно действие — одно сообщение, и по очереди.
+     На покупку их прилетало три: каждое перебивало предыдущее, два
+     мигали и пропадали, а таймеры успевали перепутаться между собой.
+     Теперь повтор того же текста в пределах трёх секунд отбрасывается,
+     а сообщение, пришедшее поверх свежего, ждёт своей очереди. */
+  function showToast(msg) {
+    const текст = String(msg == null ? "" : msg);
+    if (!текст) return;
+    const теперь = Date.now();
+    const своё = последнийToast.current;
+    if (своё.текст === текст && теперь - своё.когда < 3000) return;
+    if (очередьToast.current.includes(текст)) return;
+    последнийToast.current = { текст, когда: теперь };
+
+    const живётСейчас = toastRef.current && теперь - показаноВ.current < ЖИЗНЬ_ТОСТА;
+    if (живётСейчас) {
+      // Больше двух в очереди держать незачем: к третьему человек уже
+      // не помнит, о чём было первое.
+      if (очередьToast.current.length < 2) очередьToast.current.push(текст);
+      return;
+    }
+    показатьToast(текст);
+  }
+  useEffect(() => { toastRef.current = toast; }, [toast]);
   useEffect(() => () => {
     clearTimeout(toastTimer.current);
     clearTimeout(toastHideTimer.current);
