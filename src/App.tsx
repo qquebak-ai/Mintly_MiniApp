@@ -574,7 +574,7 @@ const STR = {
     archCurveTitle: "Токен",
     archCurveBody: "Рынок токена — контракт, а не стакан заявок: он сам вторая сторона сделки. Цена считается по формуле от того, сколько уже выкуплено, поэтому торговать можно с первой секунды и не ждать, пока кто-то нальёт ликвидность. В TON это контракт на Tact, в Solana — программа на Rust; математика одна и та же.",
     archSupplyTitle: "Эмиссия и листинг",
-    archSupplyBody: "Выпуск фиксированный — миллиард токенов, чеканится целиком и целиком уходит в продажу. В TON продаётся 900 миллионов, остаток держится до листинга, порог — 1500 TON. В Solana продаётся 800 миллионов, 200 остаются под пару, порог — 85 SOL, и на нём капитализация выходит около 25 тысяч долларов. Когда порог взят, торговля в приложении закрывается, а собранная монета вместе с остатком выпуска уходит в пул на бирже.",
+    archSupplyBody: "Выпуск фиксированный — миллиард токенов, чеканится целиком и целиком уходит в продажу. В TON продаётся 900 миллионов, остаток держится до листинга, порог — 1500 TON. В Solana продаётся 800 миллионов, 200 остаются под пару, порог — 85 SOL, и на нём капитализация выходит около 25 тысяч долларов. Считается она по тому, что в обороте — по выкупленному у кривой, — поэтому у только что запущенного токена она начинается с минимальной покупки, а не с готовой цифры. Когда порог взят, торговля в приложении закрывается, а собранная монета вместе с остатком выпуска уходит в пул на бирже.",
     archFeeTitle: "Комиссия",
     archFeeBody: "1% с покупки и продажи удерживает сам контракт и сразу отправляет площадке — приложение между вами и деньгами не стоит. Ставка зашита в контракт при создании и задним числом не меняется. Запуск бесплатный: платите только за первую покупку и комиссию сети, она идёт валидаторам.",
     archKeysTitle: "Ключи и подпись",
@@ -1143,7 +1143,7 @@ const STR = {
     archCurveTitle: "Bonding curve",
     archCurveBody: "A token's market is a contract, not an order book — the contract itself is the counterparty. Price comes from a formula over how much has been bought, so trading works from the first second without waiting for anyone to seed liquidity. On TON it is a Tact contract, on Solana a Rust program; the math is the same.",
     archSupplyTitle: "Supply and listing",
-    archSupplyBody: "Supply is fixed at one billion, minted in full and handed to the curve in full. On TON it sells 900 million and holds the rest until listing, with a 1500 TON threshold. On Solana 800 million are sold, 200 million wait for the pair, threshold 85 SOL, which puts the market cap around 25 thousand dollars. Once the threshold is met the curve closes, and the collected coin plus the remaining supply move into a pool on a DEX.",
+    archSupplyBody: "Supply is fixed at one billion, minted in full and handed to the curve in full. On TON it sells 900 million and holds the rest until listing, with a 1500 TON threshold. On Solana 800 million are sold, 200 million wait for the pair, threshold 85 SOL, which puts the market cap around 25 thousand dollars. The cap counts what is in circulation — the tokens bought from the curve — so a fresh launch starts from its first buy, not from a preset number. Once the threshold is met the curve closes, and the collected coin plus the remaining supply move into a pool on a DEX.",
     archFeeTitle: "Fees",
     archFeeBody: "The 1% on every buy and sell is withheld by the contract itself and sent straight to the platform — the app never stands between you and the money. The rate is baked into the curve at creation and never changes retroactively. Launching is free: you pay only for your first buy and the network fee, which goes to validators.",
     archKeysTitle: "Keys and signing",
@@ -3874,6 +3874,43 @@ function curvePriceFromReserve(realTon, params) {
   return Number(tonReserve) / Number(tokenReserve);
 }
 
+/* Капитализация токена на кривой — цена за то, что в обороте, то есть за
+   проданное кривой. Считать за весь выпуск («полностью размытая») здесь
+   нельзя: виртуальный резерв задаёт цену ещё до первой сделки, и у
+   токена, куда не вложили ни копейки, выходила капитализация в тысячи
+   долларов — одна и та же у всех. По обороту она начинается с нуля и
+   целиком складывается из того, что в кривую принесли.
+
+   Ниже этого показывать нечего: минимальная стартовая покупка как раз и
+   даёт минимальную капитализацию, и пустой токен показывает именно её, а
+   не ноль. */
+const МИН_КАПА_USD = 5;
+
+// Ноль здесь значит «числа ещё не приехали», а не «капитализация нулевая»:
+// у токена, где хоть что-то куплено, она не бывает меньше пола. Поэтому
+// прочерк, а не «$0» — иначе живой токен выглядел бы пустым.
+const капаТекст = (mcap) => (Number(mcap) > 0 ? fmtUSD(mcap) : "—");
+
+function капаОборотаUSD(ценаUSD, проданоШтук) {
+  const капа = Math.max(0, Number(ценаUSD) || 0) * Math.max(0, Number(проданоШтук) || 0);
+  return капа > МИН_КАПА_USD ? капа : МИН_КАПА_USD;
+}
+
+/* То же, но от одной цены — для графика и для числа над ним.
+ *
+ * Свеча несёт только цену, а оборот к ней восстанавливается из резервов:
+ * продано = vTokens − vSol × vTokens / (vSol + собрано), а собрано
+ * однозначно выводится из цены. В итоге капитализация по цене равна
+ * цена × vTokens − √(цена × vSol × vTokens). Без этого график
+ * капитализации умножал цену на нынешний оборот, и старые свечи
+ * оказывались завышены: тогда в обороте было меньше токенов. */
+function капаПоЦене(ценаМонеты, vМонеты, vТокенов) {
+  const p = Number(ценаМонеты) || 0;
+  if (!(p > 0) || !(vМонеты > 0) || !(vТокенов > 0)) return 0;
+  const капа = p * vТокенов - Math.sqrt(p * vМонеты * vТокенов);
+  return капа > 0 ? капа : 0;
+}
+
 // Сделки кривой по возрастанию времени. У покупки берём приложенную
 // сумму за вычетом газа, у продажи — сколько TON ушло продавцу: обе
 // величины видны в транзакции и не требуют разбора тела сообщения.
@@ -4095,7 +4132,19 @@ function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL,
     сжатыйОбъём.push(v);
   }
 
-  return { candles: сжатые.slice(-limit), volume: сжатыйОбъём.slice(-limit) };
+  /* Параметры кривой отдаём вместе со свечами: по ним цена переводится в
+     капитализацию по обороту (см. капаПоЦене). Виртуальный запас токенов
+     в обеих сетях приведён к одной разрядности — девять знаков, — поэтому
+     делится одинаково. */
+  return {
+    candles: сжатые.slice(-limit),
+    volume: сжатыйОбъём.slice(-limit),
+    кривая: {
+      vМонеты: Number(params.virtualTon) / 1e9,
+      vТокенов: Number(params.virtualTokens) / 1e9,
+      курс: rate,
+    },
+  };
 }
 
 // Рыночные показатели токена на кривой — все из цепочки, ничего
@@ -4129,6 +4178,9 @@ async function fetchCurveMarket(curveAddress, jettonMaster, testnet, rateArg = 0
   if (!(rate > 0)) return null;
   const priceTon = curvePriceFromReserve(state.realTon, params);
   const supply = meta && meta.supply ? meta.supply : Number(CURVE_TOTAL_SUPPLY) / 1e9;
+  // В обороте — проданное кривой: капитализация считается по нему, а
+  // выпуск остаётся выпуском и показывается отдельно, в характеристиках.
+  const вОбороте = Number(state.tokensSold || 0n) / 1e9;
 
   const list = trades || [];
   const dayAgo = Math.floor(Date.now() / 1000) - 86400;
@@ -4147,7 +4199,8 @@ async function fetchCurveMarket(curveAddress, jettonMaster, testnet, rateArg = 0
     priceTon,
     priceUsd: priceTon * rate,
     supply,
-    mcapUsd: priceTon * rate * supply,
+    вОбороте,
+    mcapUsd: капаОборотаUSD(priceTon * rate, вОбороте),
     // Ликвидность — то, что реально лежит в кривой: именно эти TON
     // выплачиваются продающим.
     liqUsd: (Number(state.realTon) / 1e9) * rate,
@@ -6858,9 +6911,10 @@ function localTokenToFeedShape(entry) {
   // Курс — монеты той цепочки, в которой считается кривая: цена токена
   // Solana выражена в SOL, и пересчёт по TON давал число втрое мимо.
   const курс = entry.chain === "solana" ? solUsd() : tonUsd();
-  const price = entry.priceTon != null
-    ? entry.priceTon * курс
-    : (entry.mcapNum ? entry.mcapNum / 1_000_000_000 : 0);
+  // Цены нет — ноль. Выводить её из капитализации больше нельзя: та
+  // считается по обороту, и делить на миллиард значило бы показать цену,
+  // которой у токена нет.
+  const price = entry.priceTon != null ? entry.priceTon * курс : 0;
   return {
     id: entry.id,
     tokenAddress: entry.address,
@@ -6872,6 +6926,9 @@ function localTokenToFeedShape(entry) {
     price,
     change: entry.change || 0,
     mcapNum: entry.mcapNum,
+    // Оборот тащим дальше: по нему капитализация пересчитывается, когда
+    // приезжает курс.
+    вОбороте: entry.вОбороте || 0,
     liq: entry.liq,
     vol: entry.vol,
     tx24h: entry.tx24h || 0,
@@ -15047,18 +15104,6 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const [окноГрафика, setОкноГрафика] = useState(null);
   useEffect(() => { setОкноГрафика(null); }, [token.id, tf]);
   const ценаОкна = окноГрафика ? окноГрафика.до : token.price;
-  /* Показываем капитализацию, а не цену за штуку. У мемкоина цена —
-     это шесть нулей после запятой, по которым ничего не понять, а
-     капитализация сразу говорит, насколько токен большой. Множитель —
-     сам выпуск: берём его из пары «цена и капитализация», которые уже
-     посчитаны, иначе миллиард штук по умолчанию. */
-  const выпускТокена = (token.mcapNum > 0 && token.price > 0)
-    ? token.mcapNum / token.price
-    : 1_000_000_000;
-  const капОкна = ценаОкна * выпускТокена;
-  const дельтаОкна = (окноГрафика
-    ? окноГрафика.до - окноГрафика.от
-    : (token.price * (token.change || 0)) / 100) * выпускТокена;
   const процентОкна = окноГрафика
     ? (окноГрафика.от > 0 ? ((окноГрафика.до - окноГрафика.от) / окноГрафика.от) * 100 : 0)
     : (token.change || 0);
@@ -15196,7 +15241,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           && Math.abs(было[было.length - 1].close - стало[стало.length - 1].close) <= Math.abs(стало[стало.length - 1].close) * 1e-9
           && было[0].time === стало[0].time;
         if (тоЖе) return prev;
-        return { ...prev, candles: стало, volume: fresh.volume, tf: reqTf };
+        return { ...prev, candles: стало, volume: fresh.volume, кривая: fresh.кривая || prev.кривая, tf: reqTf };
       });
       setChartLoading(false);
     }
@@ -15295,16 +15340,38 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     supplyRef.current.value = token.mcapNum / token.price;
   }
   const supplyEst = supplyRef.current.value;
+  /* Цена → капитализация. У токена на кривой пересчёт не линейный:
+     капитализация считается по обороту, а оборот у каждой свечи был свой
+     — восстанавливаем его из цены по резервам кривой (капаПоЦене). У
+     биржевого токена оборота не знаем, там остаётся множитель. */
+  const вКапу = useMemo(() => {
+    const к = chartData && chartData.кривая;
+    if (к && к.vМонеты > 0 && к.vТокенов > 0 && к.курс > 0) {
+      return (ценаUSD) => капаПоЦене(ценаUSD / к.курс, к.vМонеты, к.vТокенов) * к.курс;
+    }
+    if (supplyEst > 0) return (ценаUSD) => ценаUSD * supplyEst;
+    return null;
+  }, [chartData, supplyEst]);
+  /* Что показываем крупно: капитализацию, а не цену за штуку. У мемкоина
+     цена — это шесть нулей после запятой, по которым ничего не понять, а
+     капитализация сразу говорит, насколько токен большой. Считается тем
+     же пересчётом, что и график, — иначе число над графиком и сам график
+     жили бы каждый по своей шкале. */
+  const пересчётКапы = вКапу || ((ценаUSD) => ценаUSD * (supplyEst || 1_000_000_000));
+  const капОкна = Math.max(пересчётКапы(ценаОкна), МИН_КАПА_USD);
+  const дельтаОкна = окноГрафика
+    ? пересчётКапы(окноГрафика.до) - пересчётКапы(окноГрафика.от)
+    : (капОкна * (token.change || 0)) / 100;
   const scaledCandles = useMemo(() => {
     if (!chartData?.candles) return null;
-    // Без множителя рисовать нечего: раньше в этот момент график молча
+    // Без пересчёта рисовать нечего: раньше в этот момент график молча
     // показывал цену вместо капитализации — все числа менялись в
     // тридцать миллионов раз, шкала перестраивалась, и это и был тот
-    // самый рывок. Лучше подождать, пока множитель приедет.
+    // самый рывок. Лучше подождать, пока пересчёт приедет.
     if (chartMode === "price") return chartData.candles;
-    if (!supplyEst) return null;
-    return chartData.candles.map(c => ({ ...c, open: c.open * supplyEst, high: c.high * supplyEst, low: c.low * supplyEst, close: c.close * supplyEst }));
-  }, [chartData, chartMode, supplyEst]);
+    if (!вКапу) return null;
+    return chartData.candles.map(c => ({ ...c, open: вКапу(c.open), high: вКапу(c.high), low: вКапу(c.low), close: вКапу(c.close) }));
+  }, [chartData, chartMode, вКапу]);
   // Свечи годятся к показу, только если они за выбранный сейчас интервал.
   // Пока их нет — крутится загрузка; «нет данных» пишем лишь тогда, когда
   // запрос отработал и не принёс ничего.
@@ -15752,7 +15819,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       <КарточкаСтрок
         заголовок={`${tr("aboutToken")} $${token.ticker}`}
         строки={[
-          [t("marketCapLabel"), fmtUSD(token.mcapNum)],
+          [t("marketCapLabel"), капаТекст(token.mcapNum)],
           [tr("statVolume24h"), `$${token.vol}`],
           [tr("statLiquidity"), `$${token.liq}`],
           token.chain === "solana"
@@ -15790,7 +15857,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       {tab === "stats" && (
         <div className="fx-swap flex flex-col" style={{ gap: 0 }}>
           {[
-            [tr("statMcap"), fmtUSD(token.mcapNum)],
+            [tr("statMcap"), капаТекст(token.mcapNum)],
             [tr("statLiq"), `$${token.liq ?? "—"}`],
             [tr("statVol24"), `$${token.vol ?? "—"}`],
             [tr("statTrades24"), (token.tx24h || 0).toLocaleString("ru-RU")],
@@ -16144,7 +16211,7 @@ async function drawTokenShareCard(canvas, { token, curve, link, holders }) {
   ctx.fillText(t("shareCardMcap"), M, 626);
   ctx.fillStyle = ink;
   ctx.font = "700 112px 'Jost', sans-serif";
-  const mcap = fmtUSD(token.mcapNum);
+  const mcap = капаТекст(token.mcapNum);
   ctx.fillText(mcap, M, 728);
 
   const change = Number(token.change);
@@ -20707,8 +20774,11 @@ const FEE_PERCENT = 0.01; // 1% комиссии
       ...tok,
       priceTon: c.price_ton,
       vol24Ton: c.vol24_ton,
-      // Капитализация — цена за весь выпуск, как и на прочих площадках.
-      mcapNum: c.price_ton * курс * (c.supply || 1000000000),
+      // Капитализация — цена за то, что в обороте, то есть за проданное
+      // кривой: она складывается из самих покупок, а не из виртуального
+      // резерва (см. капаОборотаUSD).
+      mcapNum: капаОборотаUSD(c.price_ton * курс, c.tokens_sold),
+      вОбороте: c.tokens_sold,
       vol: fmtCompact(c.vol24_ton * курс),
       liq: fmtCompact(c.real_ton * курс),
       change: c.change24,
@@ -20909,11 +20979,14 @@ function mapTokenRow(row) {
     const пересчитать = (prev) => {
       let менялось = false;
       const ряд = prev.map((tok) => {
-        if (tok.priceTon == null || tok.mcapNum > 0) return tok;
+        // Порог, а не ноль: без курса капитализация садится на пол
+        // (МИН_КАПА_USD), и по «> 0» пересчёт уже не срабатывал — цифра
+        // так и оставалась минимальной до перезапуска.
+        if (tok.priceTon == null || tok.mcapNum > МИН_КАПА_USD) return tok;
         менялось = true;
         return {
           ...tok,
-          mcapNum: tok.priceTon * курс * 1000000000,
+          mcapNum: капаОборотаUSD(tok.priceTon * курс, tok.вОбороте),
           vol: fmtCompact((tok.vol24Ton || 0) * курс),
           liq: fmtCompact((tok.raisedTon || 0) * курс),
         };
