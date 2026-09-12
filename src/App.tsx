@@ -5846,6 +5846,8 @@ function SectionTitle({ children, action }) {
 // Сколько длится уход подсказки вверх. Ровно на это время её показ
 // продлевается после срока жизни, иначе она пропала бы мгновенно.
 const TOAST_OUT_MS = 280;
+// Сколько карточка висит сама по себе.
+const ЖИЗНЬ_ТОСТА = 4000;
 
 /* Всплывающая карточка.
  *
@@ -5900,7 +5902,9 @@ function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
   function конец() {
     const ушло = тяга;
     жест.current = null;
-    if (ушло < -34) { onClose(); return; }
+    // Порог мягкий: короткого движения вверх достаточно, тянуть
+    // карточку до половины экрана незачем.
+    if (ушло < -24) { onClose(); return; }
     setТяга(0);
   }
 
@@ -5968,12 +5972,16 @@ function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
             </span>
           )}
         </span>
+        {/* Закрываем по первому касанию, а не по click: карточка ловит
+            жест целиком, и до клика на крестике дело не доходило. */}
         <button
-          onClick={onClose}
+          onPointerDown={(e) => { e.stopPropagation(); onClose(); }}
+          onTouchStart={(e) => { e.stopPropagation(); onClose(); }}
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
           className="fx-tap flex items-center justify-center flex-shrink-0"
-          style={{ width: 26, height: 26, borderRadius: 999, background: "rgba(255,255,255,0.07)", border: "none" }}
+          style={{ width: 30, height: 30, borderRadius: 999, background: "rgba(255,255,255,0.07)", border: "none" }}
         >
-          <X size={13} color="rgba(243,243,246,0.6)" />
+          <X size={14} color="rgba(243,243,246,0.75)" />
         </button>
       </div>
     </div>,
@@ -20301,11 +20309,13 @@ const FEE_PERCENT = 0.01; // 1% комиссии
     setToastLeaving(false);
     setToastSeq((n) => n + 1);
     haptic();
-    toastTimer.current = setTimeout(() => setToastLeaving(true), 2400);
+    // Четыре секунды: столько нужно, чтобы прочитать две строки и не
+    // почувствовать, что сообщение висит.
+    toastTimer.current = setTimeout(() => setToastLeaving(true), ЖИЗНЬ_ТОСТА);
     toastHideTimer.current = setTimeout(() => {
       setToast(null);
       setToastLeaving(false);
-    }, 2400 + TOAST_OUT_MS);
+    }, ЖИЗНЬ_ТОСТА + TOAST_OUT_MS);
   }
   useEffect(() => () => {
     clearTimeout(toastTimer.current);
