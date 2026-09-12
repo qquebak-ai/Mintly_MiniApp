@@ -48,7 +48,17 @@ else
   # Ключи для страниц берутся из .env: сборщик вшивает их в код, поэтому
   # без файла сайт соберётся, но не найдёт ни базу, ни вход.
   [ -f "$DIR/.env" ] || { echo "нет $DIR/.env — заполни его (см. server/README.md)"; exit 1; }
-  sudo -u "$USR" env HOME="$DIR" npm --prefix "$DIR" run build
+  # Собираем рядом и подменяем одним движением. Сборщик первым делом
+  # очищает свой каталог, и пока он работал, сайта на диске не было
+  # вовсе: главная отвечала 404, а сторож писал тревогу на живом
+  # сервере. Теперь старый dist стоит до последней секунды.
+  sudo -u "$USR" rm -rf "$DIR/dist.new" "$DIR/dist.old"
+  sudo -u "$USR" env HOME="$DIR" npm --prefix "$DIR" run build -- --outDir dist.new --emptyOutDir
+  [ -f "$DIR/dist.new/index.html" ] || { echo "сборка не дала index.html — оставляем прежний сайт"; exit 1; }
+  sudo -u "$USR" cp -r "$DIR/public/." "$DIR/dist.new/"
+  [ -d "$DIR/dist" ] && sudo -u "$USR" mv "$DIR/dist" "$DIR/dist.old"
+  sudo -u "$USR" mv "$DIR/dist.new" "$DIR/dist"
+  sudo -u "$USR" rm -rf "$DIR/dist.old"
 fi
 echo "собрано: $(ls "$DIR/dist" | wc -l) файлов в корне dist"
 
