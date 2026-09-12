@@ -658,6 +658,8 @@ const STR = {
     themeChangedWhite: "Тема изменена: Белая",
     themeChangedDark: "Тема изменена: Тёмная",
     launchNotEnough: "На кошельке {have} — для запуска нужно {need} вместе с комиссией сети",
+    opLaunch: "запуск токена", opWithdraw: "вывод", opSweep: "перевод на свой адрес",
+    opGraduate: "выход на биржу", opBind: "привязка адреса", opOther: "операция",
     launchFailedTitle: "Не удалось запустить токен",
     retry: "Повторить",
     viewOnExplorer: "Открыть в обозревателе",
@@ -1228,6 +1230,8 @@ const STR = {
     themeChangedWhite: "Theme changed: White",
     themeChangedDark: "Theme changed: Dark",
     launchNotEnough: "Wallet holds {have} — the launch needs {need} including the network fee",
+    opLaunch: "token launch", opWithdraw: "withdrawal", opSweep: "sent to your address",
+    opGraduate: "listing", opBind: "address link", opOther: "operation",
     launchFailedTitle: "Couldn't launch the token",
     retry: "Retry",
     viewOnExplorer: "View on explorer",
@@ -12759,6 +12763,9 @@ function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, 
    нет, но адрес токена сам о ней говорит: в TON он начинается с EQ или
    UQ, в Solana это base58 без такого начала. */
 function монетаСделки(с) {
+  // У операций кошелька сеть сказана прямо: там нет ни токена, ни его
+  // адреса, по которому её обычно узнают.
+  if (с && с.chain) return с.chain === "solana" ? "SOL" : ТИКЕР_TON;
   const сеть = с && с.tokens && (Array.isArray(с.tokens) ? с.tokens[0] : с.tokens);
   if (сеть && сеть.chain) return сеть.chain === "solana" ? "SOL" : ТИКЕР_TON;
   const адрес = String((с && с.token_address) || "");
@@ -12794,6 +12801,28 @@ async function сделкиСсетью(userId, предел) {
  * строки, и приходится перезапускать приложение. Поэтому список сам
  * переспрашивает базу и, главное, слушает событие о своей сделке —
  * тогда новая строка появляется сразу, а не через круг опроса. */
+/* Операции кошелька, которых нет среди сделок: запуск токена, вывод на
+   свой адрес, свод излишков, закрытие кривой. Они живут в серверном
+   журнале, и без них история умалчивала о тратах, которые человек видел
+   в балансе, но не находил в списке. */
+async function операцииКошелька() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const токен = data && data.session && data.session.access_token;
+    if (!токен) return [];
+    const r = await fetch(апи("/api/wallet-history"), { headers: { Authorization: `Bearer ${токен}` } });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return Array.isArray(j && j.ops) ? j.ops : [];
+  } catch {
+    return [];
+  }
+}
+
+/* Виды операций, которые уже видны как сделки: показывать их вторым
+   списком значит дублировать каждую покупку. */
+const ОПЕРАЦИИ_СДЕЛОК = new Set(["trade", "buy", "sell", "swap"]);
+
 function useСделки(userId, предел, тик = 0) {
   const [ряд, setРяд] = useState(null);
 
@@ -12801,7 +12830,25 @@ function useСделки(userId, предел, тик = 0) {
     if (!userId) { setРяд([]); return; }
     let брошено = false;
     const прочитать = () => {
-      сделкиСсетью(userId, предел).then((новый) => { if (!брошено) setРяд(новый); });
+      Promise.all([сделкиСсетью(userId, предел), операцииКошелька()]).then(([сделки, операции]) => {
+        if (брошено) return;
+        const прочее = (операции || [])
+          .filter((о) => !ОПЕРАЦИИ_СДЕЛОК.has(о.kind) && о.amount >= 0)
+          .map((о) => ({
+            id: о.id,
+            side: о.kind,               // launch | withdraw | sweep | graduate | payout_bind
+            ticker: null,
+            ton_amount: о.amount,
+            token_amount: null,
+            created_at: о.createdAt,
+            token_address: null,
+            chain: о.chain,
+          }));
+        const всё = [...(сделки || []), ...прочее]
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          .slice(0, предел);
+        setРяд(всё);
+      });
     };
     прочитать();
     // Запись о сделке появляется в базе не мгновенно — вставка уходит
@@ -12822,6 +12869,25 @@ function useСделки(userId, предел, тик = 0) {
   return ряд;
 }
 
+/* Название операции для истории. Сделки подписываются тикером, всё
+   остальное — тем, что это было: запуск, вывод, свод излишков. */
+function названиеОперации(с) {
+  switch (с && с.side) {
+    case "launch": return t("opLaunch");
+    case "withdraw": return t("opWithdraw");
+    case "sweep": return t("opSweep");
+    case "graduate": return t("opGraduate");
+    case "payout_bind": return t("opBind");
+    default: return t("opOther");
+  }
+}
+
+// Сделка это или прочая операция кошелька: у сделки есть тикер, у
+// операции — только вид и сумма.
+const этоСделка = (с) => с && (с.side === "buy" || с.side === "sell" || с.side === "swap");
+// Приход бывает только у продажи: всё остальное в списке — трата.
+const этоПриход = (с) => с && с.side === "sell";
+
 function МояАктивность({ userId, тик = 0 }) {
   const ряд = useСделки(userId, 5, тик);
 
@@ -12834,18 +12900,22 @@ function МояАктивность({ userId, тик = 0 }) {
       ) : (
         <div className="flex flex-col" style={{ gap: 8 }}>
           {ряд.map((с) => {
-            const покупка = с.side !== "sell";
+            const приход = этоПриход(с);
+            const сделка = этоСделка(с);
             return (
               <div key={с.id} className="flex items-center" style={{ gap: 10 }}>
-                {/* Стрелка о деньгах, а не о направлении сделки: покупка —
-                    деньги ушли, вниз и красным; продажа — пришли, вверх и
-                    зелёным. */}
-                {покупка ? <ArrowDownRight size={15} color={T.down} /> : <ArrowUpRight size={15} color={T.up} />}
+                {/* Стрелка о деньгах, а не о направлении сделки: расход —
+                    вниз и красным, приход — вверх и зелёным. Запуск,
+                    вывод и свод излишков — тоже расходы, и рисуются так
+                    же. */}
+                {приход ? <ArrowUpRight size={15} color={T.up} /> : <ArrowDownRight size={15} color={T.down} />}
                 <span className="flex-1 truncate" style={{ fontFamily: bodyFont, fontSize: 13.5, color: T.paper }}>
-                  {покупка ? t("tickerBought") : t("tickerSold")} ${String(с.ticker || "?").toUpperCase()}
+                  {сделка
+                    ? `${приход ? t("tickerSold") : t("tickerBought")} $${String(с.ticker || "?").toUpperCase()}`
+                    : названиеОперации(с)}
                 </span>
-                <span style={{ fontFamily: monoFont, fontSize: 12.5, color: покупка ? T.down : T.up, whiteSpace: "nowrap" }}>
-                  {покупка ? "−" : "+"}{fmtCoin(Number(с.ton_amount) || 0)} {монетаСделки(с)}
+                <span style={{ fontFamily: monoFont, fontSize: 12.5, color: приход ? T.up : T.down, whiteSpace: "nowrap" }}>
+                  {приход ? "+" : "−"}{fmtCoin(Number(с.ton_amount) || 0)} {монетаСделки(с)}
                 </span>
                 <span style={{ fontFamily: monoFont, fontSize: 11.5, color: T.faint, whiteSpace: "nowrap" }}>
                   {fmtSince(с.created_at)}
@@ -14159,7 +14229,9 @@ function ИсторияКошелька({ userId, тик = 0 }) {
         <div className="flex flex-col" style={{ gap: 2 }}>
           {ряд.map((с) => {
             const обмен = с.side === "swap";
-            const покупка = с.side !== "sell";
+            // Расход — всё, кроме продажи: покупка, запуск токена, вывод,
+            // свод излишков. Приход бывает только у продажи.
+            const покупка = !этоПриход(с);
             return (
               /* Ни подложки, ни разделителей: серая плитка под каждой
                  строкой спорила с чёрным фоном, а линия резала список на
@@ -14189,7 +14261,9 @@ function ИсторияКошелька({ userId, тик = 0 }) {
                   <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, letterSpacing: "-0.01em" }}>
                     {обмен
                       ? `${t("swapTitle")} ${String(с.ticker || "").replace("→", " → ")}`
-                      : `${покупка ? t("tickerBought") : t("tickerSold")} $${String(с.ticker || "?").toUpperCase()}`}
+                      : этоСделка(с)
+                        ? `${покупка ? t("tickerBought") : t("tickerSold")} $${String(с.ticker || "?").toUpperCase()}`
+                        : названиеОперации(с)}
                   </div>
                   <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 2 }}>{fmtSince(с.created_at)}</div>
                 </div>
@@ -15310,7 +15384,6 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   }, [token.id, token.chain, token.tokenAddress, token.curveAddress, token.mcapNum, token.price]);
 
   const ценаТокена = token.price > 0 ? token.price : ((своя && своя.priceUsd) || 0);
-  const ценаОкна = окноГрафика ? окноГрафика.до : ценаТокена;
   /* Показываем капитализацию, а не цену за штуку. У мемкоина цена —
      это шесть нулей после запятой, по которым ничего не понять, а
      капитализация сразу говорит, насколько токен большой. Множитель —
@@ -15319,7 +15392,13 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const выпускТокена = (token.mcapNum > 0 && token.price > 0)
     ? token.mcapNum / token.price
     : 1_000_000_000;
-  const капОкна = ценаОкна * выпускТокена;
+  /* Капитализация — величина «сейчас», а не «в конце видимого участка».
+     Раньше она считалась по последней свече окна, и от смены периода
+     число менялось: у часа, дня и недели последняя свеча своя, а цена в
+     ней — своя же. Теперь берём цену токена: из ленты, если она есть, и
+     с кривой, пока лента молчит. Окно остаётся тем, чем и было, —
+     участком, за который считается изменение. */
+  const капОкна = (token.mcapNum > 0 ? token.mcapNum : ценаТокена * выпускТокена);
   const дельтаОкна = (окноГрафика
     ? окноГрафика.до - окноГрафика.от
     : (ценаТокена * (token.change || 0)) / 100) * выпускТокена;
