@@ -28,7 +28,9 @@ const RPC = process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com";
 const TESTNET = process.env.TON_TESTNET === "1";
 const LAMPORTS = 1_000_000_000;
 
-const КОМИССИЯ_BPS = Number(process.env.TREASURY_FEE_BPS || 100);
+// Обмен между сетями идёт по курсу, без надбавки площадки: казна платит
+// только комиссии сетей, а они и так вычитаются из перевода.
+const КОМИССИЯ_BPS = Number(process.env.TREASURY_FEE_BPS || 0);
 const ПРЕДЕЛ_SOL = Number(process.env.TREASURY_MAX_SOL || 5);
 const ПРЕДЕЛ_GRAM = Number(process.env.TREASURY_MAX_GRAM || 500);
 const МИНИМУМ_USD = Number(process.env.TREASURY_MIN_USD || 0.2);

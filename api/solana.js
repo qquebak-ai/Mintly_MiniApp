@@ -43,7 +43,9 @@ const УЗЛЫ = [...new Set([
   "https://api.mainnet-beta.solana.com",
 ].filter(Boolean))];
 const FEE_ACCOUNT = (process.env.SOLANA_FEE_ACCOUNT || "").trim();
-const FEE_BPS = Number(process.env.SOLANA_FEE_BPS || 100);
+// Надбавки площадки к обмену нет: ноль по умолчанию. Переменной её
+// можно вернуть, но пустое значение теперь значит «не брать».
+const FEE_BPS = Number(process.env.SOLANA_FEE_BPS || 0);
 
 // Обёрнутый SOL: в маршрутах Jupiter обычная монета участвует именно в
 // этом виде, разворачивать её обратно он умеет сам.
