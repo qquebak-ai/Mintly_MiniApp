@@ -284,6 +284,17 @@ async function завершить(db, id, signature) {
   await db.from("wallet_ops").update({ signature: signature || null }).eq("id", id);
 }
 
+/* Операция не состоялась — вычёркиваем её из журнала. Строка заводится
+   до отправки, чтобы поймать двойное нажатие; если сеть отказала,
+   оставлять её нельзя: она попадёт в историю кошелька как трата,
+   которой не было, и заодно займёт ключ запроса, не давая повторить. */
+async function отменить(db, id) {
+  if (!id) return;
+  try {
+    await db.from("wallet_ops").delete().eq("id", id);
+  } catch { /* журнал не главнее самой ошибки, о которой сейчас скажут */ }
+}
+
 async function выведеноЗаСутки(db, user) {
   const сутки = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data } = await db
@@ -362,10 +373,48 @@ async function подписатьИОтправить({ db, user, строка, 
      ожидания на каждую сделку. Проверку мы уже сделали сами и строже:
      что подписывается, разобрано по инструкциям выше. Ретраи оставляем
      узлу: если блок занят, он повторит сам. */
-  return await rpc("sendTransaction", [
+  const подпись = await rpc("sendTransaction", [
     подписанная,
     { encoding: "base64", skipPreflight: true, preflightCommitment: "processed", maxRetries: 5 },
   ]);
+  const исход = await дождаться(подпись);
+  if (исход === false) {
+    // Узел принял транзакцию, а сеть её отклонила. Раньше об этом никто
+    // не узнавал: подпись возвращалась как успех, приложение закрывало
+    // окно и записывало сделку, хотя в цепочке ничего не произошло.
+    const причина = await причинаОтказа(подпись);
+    throw Object.assign(new Error(причина || "сделка не прошла в сети"), { код: 400 });
+  }
+  return подпись;
+}
+
+/* Чем кончилась транзакция: true — прошла, false — отклонена сетью,
+   null — за отведённое время ответа нет (тогда считаем, что идёт: сеть
+   иногда подтверждает и через минуту, а держать человека дольше нельзя). */
+async function дождаться(подпись, мс = 20000) {
+  const до = Date.now() + мс;
+  while (Date.now() < до) {
+    await new Promise((r) => setTimeout(r, 900));
+    const ответ = await rpc("getSignatureStatuses", [[подпись], { searchTransactionHistory: false }])
+      .catch(() => null);
+    const с = ответ && ответ.value && ответ.value[0];
+    if (!с) continue;
+    if (с.err) return false;
+    if (с.confirmationStatus === "confirmed" || с.confirmationStatus === "finalized") return true;
+  }
+  return null;
+}
+
+/* Почему сеть отказала — словами самой программы. Её msg! пишутся
+   по-русски, так что человеку достаётся понятная причина, а не
+   «InstructionError [2]». */
+async function причинаОтказа(подпись) {
+  const tx = await rpc("getTransaction", [
+    подпись, { encoding: "json", maxSupportedTransactionVersion: 0 },
+  ]).catch(() => null);
+  const логи = (tx && tx.meta && tx.meta.logMessages) || [];
+  const свои = логи.filter((с) => с.startsWith("Program log: "));
+  return свои.length ? свои[свои.length - 1].slice("Program log: ".length) : null;
 }
 
 /* --- Закрытие кривых по расписанию -----------------------------------
@@ -880,20 +929,26 @@ export default async function handler(req, res) {
       if (оп.повтор) return res.status(200).json({ signature: оп.signature, repeat: true });
 
       const хост = req.headers["x-forwarded-host"] || req.headers.host || "";
-      const собрано = await собратьЗапуск({
-        wallet: строка.address,
-        name: имя,
-        symbol: тикер,
-        base: хост ? `https://${хост}` : "",
-        buySol: взнос,
-      });
-      // Взнос плюс аренда счетов токена и метаданных: дороже запуск не
-      // бывает, а значит и уйти больше не может.
-      const подпись = await подписатьИОтправить({
-        db, user, строка, набор,
-        base64: собрано.transaction, дело: "launch",
-        максПеревода: (взнос + 0.03) * LAMPORTS,
-      });
+      let собрано, подпись;
+      try {
+        собрано = await собратьЗапуск({
+          wallet: строка.address,
+          name: имя,
+          symbol: тикер,
+          base: хост ? `https://${хост}` : "",
+          buySol: взнос,
+        });
+        // Взнос плюс аренда счетов токена и метаданных: дороже запуск не
+        // бывает, а значит и уйти больше не может.
+        подпись = await подписатьИОтправить({
+          db, user, строка, набор,
+          base64: собрано.transaction, дело: "launch",
+          максПеревода: (взнос + 0.03) * LAMPORTS,
+        });
+      } catch (e) {
+        await отменить(db, оп.id);
+        throw e;
+      }
       await завершить(db, оп.id, подпись);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({
@@ -933,22 +988,28 @@ export default async function handler(req, res) {
       const оп = await начать(db, user, { дело: "trade", сумма: продажа ? 0 : сумма, ключЗапроса, ip });
       if (оп.повтор) return res.status(200).json({ signature: оп.signature, repeat: true });
 
-      const собрано = await собратьСделку({
-        wallet: строка.address,
-        mint: String(тело.mint),
-        продажа,
-        amount: сумма,
-        minOut: тело.minOut,
-      });
-      const подпись = await подписатьИОтправить({
-        db, user, строка, набор,
-        base64: собрано.transaction, дело: "trade",
-        // При продаже с кошелька уходит только аренда счёта и комиссия.
-        максПеревода: (продажа ? 0.01 : сумма + 0.01) * LAMPORTS,
-      });
-      await завершить(db, оп.id, подпись);
-      res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ signature: подпись, curve: собрано.curve });
+      try {
+        const собрано = await собратьСделку({
+          wallet: строка.address,
+          mint: String(тело.mint),
+          продажа,
+          amount: сумма,
+          minOut: тело.minOut,
+        });
+        const подпись = await подписатьИОтправить({
+          db, user, строка, набор,
+          base64: собрано.transaction, дело: "trade",
+          // При продаже с кошелька уходит только аренда счёта и комиссия.
+          максПеревода: (продажа ? 0.01 : сумма + 0.01) * LAMPORTS,
+        });
+        await завершить(db, оп.id, подпись);
+        res.setHeader("Cache-Control", "no-store");
+        return res.status(200).json({ signature: подпись, curve: собрано.curve });
+      } catch (e) {
+        // Сделки не было — значит и записи о ней быть не должно.
+        await отменить(db, оп.id);
+        throw e;
+      }
     }
 
     if (действие === "swap") {
@@ -1001,13 +1062,19 @@ export default async function handler(req, res) {
       }
       if (!собранная) throw new Error("сделка не собралась");
 
-      const подпись = await подписатьИОтправить({
-        db, user, строка, набор,
-        base64: собранная, дело: поКривой ? "trade" : "swap",
-        // При покупке уходит сама сумма (она же обёртывается в wSOL) и
-        // аренда счетов; при продаже — только аренда с комиссией.
-        максПеревода: (вSol + 0.02) * LAMPORTS,
-      });
+      let подпись;
+      try {
+        подпись = await подписатьИОтправить({
+          db, user, строка, набор,
+          base64: собранная, дело: поКривой ? "trade" : "swap",
+          // При покупке уходит сама сумма (она же обёртывается в wSOL) и
+          // аренда счетов; при продаже — только аренда с комиссией.
+          максПеревода: (вSol + 0.02) * LAMPORTS,
+        });
+      } catch (e) {
+        await отменить(db, оп.id);
+        throw e;
+      }
       await завершить(db, оп.id, подпись);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ signature: подпись });
@@ -1033,9 +1100,15 @@ export default async function handler(req, res) {
       const base64 = await собратьВывод({
         откуда: строка.address, куда: строка.payout_address, лямпорты,
       });
-      const подпись = await подписатьИОтправить({
-        db, user, строка, набор, base64, дело: "withdraw", максПеревода: лямпорты,
-      });
+      let подпись;
+      try {
+        подпись = await подписатьИОтправить({
+          db, user, строка, набор, base64, дело: "withdraw", максПеревода: лямпорты,
+        });
+      } catch (e) {
+        await отменить(db, оп.id);
+        throw e;
+      }
       await завершить(db, оп.id, подпись);
       await сообщить(db, user.id,
         `💸 Вывод ${сумма.toFixed(4)} SOL на <code>${строка.payout_address}</code>.`);

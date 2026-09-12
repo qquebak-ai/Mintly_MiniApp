@@ -137,7 +137,11 @@ export async function сделкаВнутренним({ mint, продажа = 
   const j = await запрос("/api/wallet-solana?action=trade", {
     mint, sell: продажа, amount, minOut, requestKey: ключЗапроса(),
   });
-  return j && j.signature;
+  // Без подписи сделки не было. Молчать об этом нельзя: приложение
+  // запишет её в историю и уменьшит позицию, а в цепочке ничего не
+  // произошло — ровно то, на что человек и жаловался.
+  if (!j || !j.signature) throw new Error("сделка не прошла");
+  return j.signature;
 }
 
 /* Курс обмена. Спрашивается на каждое изменение суммы, поэтому без

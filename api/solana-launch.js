@@ -354,6 +354,63 @@ export async function собратьЗапуск({ wallet, name, symbol, base, b
   };
 }
 
+/* Поля кривой из её счёта. Раскладка та же, что в программе: читают её
+   и состояние наружу, и расчёт предела продажи. */
+function поляКривой(d) {
+  if (!d || d.length < 160) return null;
+  let p = 0;
+  const версия = d.readUInt8(p); p += 1;
+  p += 1; // bump
+  const закрыта = d.readUInt8(p) === 1; p += 1;
+  p += 32 * 4; // mint, creator, fee_wallet, destination
+  const virtualSol = Number(d.readBigUInt64LE(p)); p += 8;
+  const virtualTokens = Number(d.readBigUInt64LE(p)); p += 8;
+  const tokensForSale = Number(d.readBigUInt64LE(p)); p += 8;
+  const graduationSol = Number(d.readBigUInt64LE(p)); p += 8;
+  const feeBps = d.readUInt16LE(p); p += 2;
+  const realSol = Number(d.readBigUInt64LE(p)); p += 8;
+  const tokensSold = Number(d.readBigUInt64LE(p));
+  return { версия, закрыта, virtualSol, virtualTokens, tokensForSale, graduationSol, feeBps, realSol, tokensSold };
+}
+
+/* Сколько токенов кривая способна выкупить прямо сейчас.
+ *
+ * Программа считает выплату из своего же инварианта и деление округляет
+ * вниз — из-за этого выплата за «все свои токены» выходит на лямпорт-два
+ * больше, чем кривая на самом деле собрала. Проверка «нет столько монет»
+ * в программе строгая, и вся продажа отбивалась: окно закрывалось,
+ * история писала продажу, а в сети ничего не происходило.
+ *
+ * Здесь считается ровно тот же инвариант и находится наибольшее
+ * количество, при котором выплата не превысит запас кривой:
+ * из k / (vТокены − продано + сколько) ≥ vSol + собрано − запас следует
+ * сколько ≤ k / порог − (vТокены − продано). Разница с «продать всё» —
+ * единицы шестого знака, человеку её не видно.
+ */
+async function пределПродажи(connection, curve) {
+  const info = await connection.getAccountInfo(curve);
+  const с = info && поляКривой(info.data);
+  if (!с) return null;
+
+  const аренда = await connection.getMinimumBalanceForRentExemption(info.data.length);
+  const свободно = Math.max(0, info.lamports - аренда);
+  const запас = BigInt(Math.min(с.realSol, свободно));
+
+  const vSol = BigInt(с.virtualSol);
+  const vТокены = BigInt(с.virtualTokens);
+  const собрано = BigInt(с.realSol);
+  const продано = BigInt(с.tokensSold);
+  if (продано <= 0n) return 0;
+
+  const k = (vSol + собрано) * (vТокены - продано);
+  const порог = vSol + собрано - запас;
+  if (порог <= 0n) return Number(продано);
+
+  const предел = k / порог - (vТокены - продано);
+  if (предел <= 0n) return 0;
+  return Number(предел > продано ? продано : предел);
+}
+
 /* Покупка и продажа на уже заведённой кривой. */
 export async function собратьСделку({ wallet, mint, продажа, amount, minOut }) {
   await библиотеки();
@@ -367,6 +424,21 @@ export async function собратьСделку({ wallet, mint, продажа,
   const curve = кривуюДля(mintKey, programId);
   const feeWallet = new PublicKey(FEE_ACCOUNT);
   const ata = getAssociatedTokenAddressSync(mintKey, payer);
+
+  let единиц = Math.round(Number(amount) * ЕДИНИЦА);
+  if (продажа) {
+    /* Сколько на счету на самом деле — в тех же мельчайших единицах, что
+       уйдут в инструкцию. Число штук приходит дробным, и «продать всё»
+       после умножения давало единицу-другую сверх остатка: сжигание
+       отбивалось, а человек видел закрытое окно и запись в истории. */
+    const остаток = await connection.getTokenAccountBalance(ata).catch(() => null);
+    const есть = остаток && остаток.value ? Number(остаток.value.amount) : null;
+    if (есть != null && единиц > есть) единиц = есть;
+
+    const предел = await пределПродажи(connection, curve);
+    if (предел != null && единиц > предел) единиц = предел;
+    if (!(единиц > 0)) throw new Error("продавать нечего");
+  }
 
   const tx = new Transaction();
   приоритет(tx);
@@ -385,7 +457,7 @@ export async function собратьСделку({ wallet, mint, продажа,
       ...(продажа ? [] : [{ pubkey: SystemProgram.programId, isSigner: false, isWritable: false }]),
     ],
     data: продажа
-      ? инструкцияПродажи(Math.round(Number(amount) * ЕДИНИЦА), Math.round(Number(minOut || 0) * LAMPORTS))
+      ? инструкцияПродажи(единиц, Math.round(Number(minOut || 0) * LAMPORTS))
       : инструкцияПокупки(Math.round(Number(amount) * LAMPORTS), Math.round(Number(minOut || 0) * ЕДИНИЦА)),
   }));
 
@@ -449,19 +521,12 @@ export async function состояние(mint) {
   const info = await connection.getAccountInfo(curve);
   if (!info || info.data.length < 160) return null;
 
-  const d = info.data;
-  let p = 0;
-  const версия = d.readUInt8(p); p += 1;
-  p += 1; // bump
-  const закрыта = d.readUInt8(p) === 1; p += 1;
-  p += 32 * 4; // mint, creator, fee_wallet, destination
-  const virtualSol = Number(d.readBigUInt64LE(p)); p += 8;
-  const virtualTokens = Number(d.readBigUInt64LE(p)); p += 8;
-  const tokensForSale = Number(d.readBigUInt64LE(p)); p += 8;
-  const graduationSol = Number(d.readBigUInt64LE(p)); p += 8;
-  const feeBps = d.readUInt16LE(p); p += 2;
-  const realSol = Number(d.readBigUInt64LE(p)); p += 8;
-  const tokensSold = Number(d.readBigUInt64LE(p));
+  const поля = поляКривой(info.data);
+  if (!поля) return null;
+  const {
+    версия, закрыта, virtualSol, virtualTokens,
+    tokensForSale, graduationSol, feeBps, realSol, tokensSold,
+  } = поля;
 
   const цена = (virtualSol + realSol) / (virtualTokens - tokensSold);
   return {
