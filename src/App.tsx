@@ -16972,7 +16972,10 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   const maxAmount = соло
     ? (isBuy ? (solДоступно == null ? Infinity : solДоступно) : (solБаланс ? solБаланс.token : holdingTokens))
     : (isBuy ? spendableTon : holdingTokens);
-  const overMax = amount > maxAmount;
+  /* Небольшой допуск: остаток приходит из сети с точностью до
+     мельчайшей единицы, а в поле стоит округлённое число. Без допуска
+     «продать всё» иногда упиралось в собственную же сумму. */
+  const overMax = amount > maxAmount * 1.0000001;
   // Курс токена (token.price) хранится в USD, поэтому для оценки
   // количества токенов TON всё ещё конвертируется через tonPriceUsd —
   // но это только для отображения "вы получите", сама сделка идёт в TON.
@@ -17039,10 +17042,22 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // ни при чём и ждать его незачем.
   const canConfirm = amount > 0 && !overMax && (соло || (isBuy ? tonPriceUsd > 0 : balanceKnown));
 
+  /* Доля остатка — всегда вниз, никогда вверх. Округление к ближайшему
+     превращало «максимум» в число больше остатка: 14 382 566,586 токена
+     становились 14 382 567, и продать это было нельзя — окно писало
+     «недостаточно средств» на своей же кнопке «МАКС».
+
+     Знаков берём столько, сколько держит сама монета: у токена шесть,
+     у SOL и GRAM — четыре в поле ввода. */
   function setPct(pct) {
     if (!Number.isFinite(maxAmount)) return;
-    const v = maxAmount * pct;
-    setAmountStr(isBuy ? v.toFixed(v < 10 ? 4 : 2) : v.toFixed(v < 10 ? 4 : 0));
+    const знаков = isBuy ? 4 : 6;
+    const множитель = Math.pow(10, знаков);
+    const v = Math.floor(maxAmount * pct * множитель) / множитель;
+    if (!(v > 0)) { setAmountStr(""); return; }
+    // Хвост из нулей в поле ни к чему: «14382566.586» читается, а
+    // «14382566.586000» — нет.
+    setAmountStr(String(Number(v.toFixed(знаков))));
   }
 
   function handleConfirm() {
