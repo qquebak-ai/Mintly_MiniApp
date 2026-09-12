@@ -157,6 +157,39 @@ export async function свопВнутренним({ вход, выход, су�
   return j && j.signature;
 }
 
+/* --- Обмен между сетями ----------------------------------------------
+   SOL и GRAM живут в разных цепочках, и одной сделкой их не поменять:
+   моста у площадки нет. Меняет казначейство — запас обеих монет на своих
+   кошельках: монета человека уходит на казначейский адрес, а казна тем
+   же движением шлёт другую в другой сети (см. api/treasury-swap.js). */
+
+export async function казнаСостояние() {
+  try {
+    const res = await fetch(апи("/api/treasury-swap?action=state"));
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function курсМеждуСетями({ откуда, сумма }) {
+  const res = await fetch(апи("/api/treasury-swap?action=quote"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ from: откуда, amount: сумма }),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error((json && (json.detail || json.error)) || `ошибка ${res.status}`);
+  return json;
+}
+
+export async function обменМеждуСетями({ откуда, сумма }) {
+  return await запрос(апи("/api/treasury-swap?action=swap"), {
+    from: откуда, amount: сумма, requestKey: ключЗапроса(),
+  });
+}
+
 /* Вывод. Адрес не передаётся: сервер отправит только на привязанный —
    тот, владение которым доказано подписью. all — «всё, что есть»:
    сервер оставит запас на комиссию, иначе перевод не пройдёт вовсе. */
