@@ -9967,11 +9967,13 @@ function WelcomeScreen({ onCreate, onLogin, onSkip, insetTop = 0 }) {
 
       {/* Сами страницы. Прилипание по горизонтали, вертикальной прокрутки
           внутри нет — текст на каждой умещается целиком. */}
+      {/* Флага «палец на ленте» тут нет и не нужно: знакомство листают
+          только руками, автолистания на нём не бывает. Раньше внутри
+          тега стояли обработчики из другой карусели — они писали в чужую
+          переменную, и любое касание роняло экран. */}
       <div
         ref={лента}
         onScroll={приПрокрутке}
-        onTouchStart={() => { трогают.current = true; }}
-        onTouchEnd={() => { setTimeout(() => { трогают.current = false; }, 4000); }}
         className="no-scrollbar"
         style={{
           flex: 1, minHeight: 0, display: "flex", overflowX: "auto", overflowY: "hidden",
@@ -19275,6 +19277,26 @@ function LookPicker({ cosmetics, owned, onEquip, focus }) {
   );
 }
 
+/* Расширение файла берём из его типа, а не из имени. Имя приходит от
+   пользователя: «logo.png/../../что-то» превратилось бы в путь, который
+   уезжает из своей папки, а «.svg» — в картинку, умеющую исполнять
+   скрипты у того, кто откроет её напрямую.
+
+   Живёт на уровне модуля, а не внутри окна профиля: тем же способом имя
+   файлу дают и логотип токена, и обложка при запуске. Пока функция
+   стояла внутри окна, запуск падал на «Can't find variable:
+   safeImageExt» — сборка о таком не предупреждает, видно только в
+   работе. */
+const UPLOAD_EXT_BY_TYPE = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+function safeImageExt(file) {
+  return UPLOAD_EXT_BY_TYPE[(file && file.type) || ""] || "png";
+}
+
 function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAddress, onChangeNickname, cosmetics = { frame: "none", card: "none" }, owned, onEquip, lookFocus = null }) {
   const isEdit = mode === "edit";
   // Окно держится на экране, пока идёт анимация ухода: без этого оно
@@ -19470,20 +19492,6 @@ function handleAvatarCropConfirm(croppedFile, croppedUrl) {
   setAvatarUrl(croppedUrl); // только превью, в БД пойдёт после загрузки
   setAvatarFile(croppedFile);
   setAvatarCropFile(null);
-}
-
-// Расширение файла берём из его типа, а не из имени. Имя приходит от
-// пользователя: «logo.png/../../что-то» превратилось бы в путь, который
-// уезжает из своей папки, а «.svg» — в картинку, умеющую исполнять
-// скрипты у того, кто откроет её напрямую.
-const UPLOAD_EXT_BY_TYPE = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-  "image/gif": "gif",
-};
-function safeImageExt(file) {
-  return UPLOAD_EXT_BY_TYPE[(file && file.type) || ""] || "png";
 }
 
 // Загружает файл в Supabase Storage и возвращает публичный URL
@@ -20201,6 +20209,19 @@ function useTelegramViewport() {
    the bottom nav inside the Telegram WebView on any device.
 --------------------------------------------------------- */
 
+/* Своя сделка прошла — сказать об этом всему приложению. Открытый
+   график ловит это событие и перерисовывается сразу, не дожидаясь
+   своего круга опроса.
+
+   На уровне модуля, а не внутри главного компонента: о сделке сообщает и
+   окно обмена, которое живёт отдельно, — оттуда функция была не видна и
+   обмен падал на «Can't find variable». */
+function сообщитьОСделке(tokenId) {
+  if (typeof window === "undefined") return;
+  try { window.dispatchEvent(new CustomEvent("mintly:сделка", { detail: { tokenId } })); }
+  catch { /* старый движок — обойдёмся кругом опроса */ }
+}
+
 export default function TonLaunchApp() {
   const TREASURY_ADDRESS = addressForNetwork("UQD8ipaRIc2X1zJw0C8S9XfsKQOYiNAEPRUpfNidEZ3pIDdo");
 // Кошелёк комиссии площадки. Он зашивается в кривую при запуске токена,
@@ -20729,15 +20750,6 @@ function цепочкаПоАдресу(chain, address) {
   if (chain) return chain === "solana" ? "solana" : "ton";
   const адрес = String(address || "").trim();
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(адрес) && !/^(EQ|UQ|kQ|0Q)/.test(адрес) ? "solana" : "ton";
-}
-
-/* Своя сделка прошла — сказать об этом всему приложению. Открытый
-   график ловит это событие и перерисовывается сразу, не дожидаясь
-   своего круга опроса. */
-function сообщитьОСделке(tokenId) {
-  if (typeof window === "undefined") return;
-  try { window.dispatchEvent(new CustomEvent("mintly:сделка", { detail: { tokenId } })); }
-  catch { /* старый движок — обойдёмся кругом опроса */ }
 }
 
 function mapTokenRow(row) {
