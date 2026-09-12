@@ -4274,7 +4274,11 @@ async function свечиКривойSol(mint, tokenId, timeframe, курсSolUs
     feeBps: BigInt(st.feeBps || 0),
   };
 
-  const сделки = (await сделкиSolИзКеша(tokenId)) || [];
+  const сделки = await сделкиSolИзКеша(tokenId);
+  /* Без истории график строить не из чего: он собрался бы от пустой
+     кривой и показал одну свечу от нуля до текущей цены — вместо всей
+     прошлой торговли. Пусть лучше останется то, что уже нарисовано. */
+  if (!сделки || !сделки.length) return null;
   let собрано = 0;
   const ряд = сделки.map((с) => {
     собрано += с.дельта;
@@ -14928,7 +14932,10 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           let весть = null;
           try { весть = JSON.parse(e.data); } catch { return; }
           if (!весть || !(весть.price > 0)) return;
-          const курс = курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd();
+          // Курс берём тот же, которым построен весь ряд: подставить
+          // сюда другой — значит двигать одну свечу в своей системе
+          // координат, и она запрыгает относительно остальных.
+          const курс = курсSolДляГрафика > 0 ? курсSolДляГрафика : 0;
           const цена = весть.price * курс;
           if (!(цена > 0)) return;
           setChartData((prev) => {
