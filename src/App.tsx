@@ -14130,33 +14130,40 @@ function ИсторияКошелька({ userId, тик = 0 }) {
               <div
                 key={с.id}
                 className="flex items-center"
-                style={{ gap: 12, padding: "11px 2px" }}
+                style={{ gap: 12, padding: "13px 2px" }}
               >
+                {/* Кружок пустой, только обводка: заливка возвращала в строку
+                    то самое цветное пятно, вместо которого всё и затевалось.
+                    Цвет несёт сама стрелка. */}
                 <span
                   className="flex items-center justify-center"
                   style={{
-                    width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-                    // Покупка — расход, и кружок у неё красный; продажа —
-                    // приход, зелёный. До этого цвета шли по сделке, а не
-                    // по деньгам, и списание светилось зелёным.
-                    background: обмен ? hexA("#8E2DE2", 0.22) : покупка ? КОШ_ПАДЕНИЕ_ФОН : КОШ_ПРИХОД_ФОН,
+                    width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
+                    background: "transparent",
+                    border: `1px solid ${обмен ? hexA("#8E2DE2", 0.45) : T.lineHi}`,
                   }}
                 >
                   {обмен
-                    ? <Repeat size={16} strokeWidth={2.2} color="#C79BFF" />
+                    ? <Repeat size={15} strokeWidth={2.4} color="#C79BFF" />
                     : покупка
-                      ? <ArrowDownRight size={16} strokeWidth={2.2} color={КОШ_ПАДЕНИЕ_ТЕКСТ} />
-                      : <ArrowUpRight size={16} strokeWidth={2.2} color={КОШ_ПРИХОД_ТЕКСТ} />}
+                      ? <ArrowDownRight size={15} strokeWidth={2.4} color={КОШ_ПАДЕНИЕ_ТЕКСТ} />
+                      : <ArrowUpRight size={15} strokeWidth={2.4} color={КОШ_ПРИХОД_ТЕКСТ} />}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
+                  <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, letterSpacing: "-0.01em" }}>
                     {обмен
                       ? `${t("swapTitle")} ${String(с.ticker || "").replace("→", " → ")}`
                       : `${покупка ? t("tickerBought") : t("tickerSold")} $${String(с.ticker || "?").toUpperCase()}`}
                   </div>
-                  <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>{fmtSince(с.created_at)}</div>
+                  <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 2 }}>{fmtSince(с.created_at)}</div>
                 </div>
-                <div style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>
+                {/* Сумма тоже цветная: в чёрной строке без подложки это
+                    единственное, что отличает приход от расхода на скорости. */}
+                <div style={{
+                  fontFamily: monoFont, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap",
+                  fontVariantNumeric: "tabular-nums",
+                  color: обмен ? T.ice : покупка ? КОШ_ПАДЕНИЕ_ТЕКСТ : КОШ_ПРИХОД_ТЕКСТ,
+                }}>
                   {обмен ? "" : покупка ? "−" : "+"}{fmtCoin(Number(с.ton_amount) || 0)}
                   {обмен ? "" : ` ${монетаСделки(с)}`}
                 </div>
