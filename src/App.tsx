@@ -14224,6 +14224,13 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
 
   const курсSol = useSolUsd();
   const [сетьКошелька, setСетьКошелька] = useState("sol");
+  /* Сколько ждём кошелёк, прежде чем показать раздел как есть: у гостя
+     его нет вовсе, и плашки иначе остались бы навсегда. */
+  const [ждёмДольше, setЖдёмДольше] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setЖдёмДольше(true), 6000);
+    return () => clearTimeout(id);
+  }, []);
   const вTON = сетьКошелька === "ton";
   const текущий = вTON ? внутрTON : внутр;
   const годен = текущий && !текущий.нуженВход && !текущий.ошибка;
@@ -14243,6 +14250,42 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     setCopied(true);
     haptic("light");
     setTimeout(() => setCopied(false), 1400);
+  }
+
+  /* Раздел ждёт целиком, а не по частям. Раньше карта появлялась сразу и
+     мерцала плашками внутри: сначала на месте суммы, потом на месте
+     долларов — два слоя загрузки на одном экране. Теперь до прихода
+     кошелька стоят плашки той же раскладки, что и сам раздел, и меняется
+     всё разом. Через шесть секунд показываем как есть: кошелька может не
+     быть вовсе — например, у гостя. */
+  if (текущий == null && !ждёмДольше) {
+    return (
+      <div className="flex flex-col" style={{ paddingTop: 4 }}>
+        <div style={{ marginBottom: 14, padding: "0 16px" }}>
+          <ПлашкаЧисла width={132} height={24} radius={8} />
+        </div>
+        <div style={{ margin: "0 16px" }}>
+          <ПлашкаБлока h={168} radius={24} />
+        </div>
+        <div className="flex items-start" style={{ gap: 10, marginTop: 16, padding: "0 16px" }}>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} style={{ flex: 1 }}><ПлашкаБлока h={64} radius={18} /></div>
+          ))}
+        </div>
+        <div style={{
+          marginTop: 22, width: "100vw", marginLeft: "calc(50% - 50vw)",
+          borderTopLeftRadius: 26, borderTopRightRadius: 26,
+          background: КОШ_СТРАНИЦА, padding: "18px 16px 120px", minHeight: 420,
+        }}>
+          <div style={{ marginBottom: 12 }}><ПлашкаЧисла width={104} height={16} radius={6} /></div>
+          <div className="flex flex-col" style={{ gap: 10 }}>
+            <ПлашкаБлока h={64} radius={20} />
+            <ПлашкаБлока h={64} radius={20} />
+            <ПлашкаБлока h={64} radius={20} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   /* Доля в долларах меняется вместе с курсом, и в макете на карте стоит
@@ -14354,14 +14397,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           </span>
         </div>
         <div className="flex items-baseline" style={{ gap: 7, marginTop: 6, position: "relative" }}>
-          {текущий == null ? (
-            <ПлашкаЧисла width={150} height={34} radius={10} style={{ background: hexA("#FFFFFF", 0.18) }} />
-          ) : (
-            <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#FFFFFF" }}>
-              {Math.floor(balance).toLocaleString("ru-RU")}
-              <span style={{ color: hexA("#FFFFFF", 0.55) }}>{(balance % 1).toFixed(2).slice(1)}</span>
-            </span>
-          )}
+          <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#FFFFFF" }}>
+            {Math.floor(balance).toLocaleString("ru-RU")}
+            <span style={{ color: hexA("#FFFFFF", 0.55) }}>{(balance % 1).toFixed(2).slice(1)}</span>
+          </span>
           <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.7), fontSize: 14 }}>{единица}</span>
         </div>
         <span
@@ -14373,9 +14412,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             minHeight: 24,
           }}
         >
-          {текущий == null || курсСети <= 0
-            ? <ПлашкаЧисла width={56} height={12} radius={6} style={{ background: hexA("#FFFFFF", 0.25) }} />
-            : `≈ $${usd.toFixed(2)}`}
+          {курсСети > 0 ? `≈ $${usd.toFixed(2)}` : "—"}
         </span>
       </section>
       </div>
