@@ -6,7 +6,7 @@ import {
   ShieldCheck, ShieldAlert, Globe, Globe2, Send, Twitter, Image as ImageIcon, Upload,
   Copy, ExternalLink, LogOut, ChevronRight, ChevronDown, Rocket, HeartCrack,
   Lock, Gift, LifeBuoy, Plus, ArrowDownLeft, Repeat,
-  FileText, CheckCircle2, RefreshCw, X,
+  FileText, CheckCircle2, AlertTriangle, Info, RefreshCw, X,
   Eye, EyeOff, LogIn, ShoppingBag, Trash2, Crown, Bell, Check, Cpu, Settings
 } from "lucide-react";
 import { useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
@@ -682,6 +682,7 @@ const STR = {
     solDone: "Сделка ушла в сеть",
     solSent: "Отправлено",
     solFailed: "Не вышло",
+    toastDone: "Готово", toastFail: "Не вышло", toastNote: "Обрати внимание",
     // Отказы сделки словами, а не кодом: код на экране человеку ничего
     // не объясняет, а причина у каждого отказа понятная.
     errCreatorLocked: "Ты создатель — продажа закрыта до выхода на биржу, так обещано в токене",
@@ -1248,6 +1249,7 @@ const STR = {
     solDone: "Swap sent to the network",
     solSent: "Sent",
     solFailed: "Didn't go through",
+    toastDone: "Done", toastFail: "Didn't go through", toastNote: "Heads up",
     errCreatorLocked: "You are the creator — selling is locked until the token lists, as promised",
     errFairStart: "Fair start: the first minute is for app buyers only",
     errNotEnough: "Not enough coins in the app wallet",
@@ -2122,6 +2124,14 @@ function GlobalStyle() {
       }
       @keyframes holoShift { from{ background-position: 0% 0; } to{ background-position: 320% 0; } }
       @keyframes toastIn { from{opacity:0; transform:translateX(-50%) scale(0.94);} to{opacity:1; transform:translateX(-50%) scale(1);} }
+      /* Карточка приходит пружиной: чуть проскакивает и садится на
+         место. Ровное движение читается как «всплыло окно», пружина —
+         как «положили сверху». */
+      @keyframes toastCardIn {
+        0%   { opacity: 0; transform: translateX(-50%) translateY(-16px) scale(0.94); }
+        62%  { opacity: 1; transform: translateX(-50%) translateY(3px) scale(1.015); }
+        100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+      }
       @keyframes toastOut { from{opacity:1; transform:translateX(-50%) translateY(0) scale(1);} to{opacity:0; transform:translateX(-50%) translateY(-22px) scale(0.98);} }
       @keyframes rocketUp { 0%{ transform:translateY(0) scale(0.75); opacity:0; } 18%{ opacity:0.9; } 100%{ transform:translateY(-70px) scale(1); opacity:0; } }
       @keyframes emberFall { 0%{ transform:translateY(-4px) scale(0.5); opacity:0; } 15%{ opacity:0.9; } 75%{ opacity:0.55; } 100%{ transform:translateY(60px) scale(1.1); opacity:0; } }
@@ -5811,24 +5821,137 @@ function SectionTitle({ children, action }) {
 // продлевается после срока жизни, иначе она пропала бы мгновенно.
 const TOAST_OUT_MS = 280;
 
-function Toast({ toast, insetTop = 0, leaving = false }) {
+/* Всплывающая карточка.
+ *
+ * Раньше это была капсула в одну строку: длинное сообщение в неё не
+ * помещалось и уезжало за край. Теперь карточка — значок, заголовок и
+ * строка пояснения, — со скруглением и стеклом, как остальные
+ * поверхности приложения.
+ *
+ * Вид определяется по самому тексту: отказ начинается с «не вышло» или
+ * «не удалось», остальное — удача или весть. Так вызывающему коду не
+ * нужно ничего знать о видах: showToast("…") работает как работал.
+ */
+function разобратьТост(сообщение) {
+  const строка = String(сообщение || "").trim();
+  const отказ = /^(не вышло|не удалось|ошибка|нет |сеть не|didn'?t|couldn'?t|failed|error)/i.test(строка);
+  /* Не всякое «не получилось» — поломка. «Нужен вход», «не хватает»,
+     «подожди» — это подсказка, что сделать, и зелёная галочка рядом с
+     ней выглядит издевательством, а красный треугольник — тревогой на
+     ровном месте. */
+  const подсказка = !отказ && /^(нужен|нужна|нужно|сначала|подключи|не хватает|слишком часто|подожди|курс|проверь|открой|войди)/i.test(строка);
+  const вид = отказ ? "отказ" : подсказка ? "подсказка" : "удача";
+  // «Заголовок — пояснение»: если в сообщении есть тире или двоеточие,
+  // первая часть и есть заголовок.
+  const части = строка.match(/^(.{3,40}?)\s*[—:]\s*(.+)$/);
+  if (части) return { вид, заголовок: части[1], текст: части[2] };
+  if (строка.length <= 36) return { вид, заголовок: строка, текст: "" };
+  return { вид, заголовок: отказ ? t("toastFail") : подсказка ? t("toastNote") : t("toastDone"), текст: строка };
+}
+
+function Toast({ toast, insetTop = 0, leaving = false, onClose = () => {} }) {
+  const [тяга, setТяга] = useState(0);
+  const жест = useRef(null);
+  useEffect(() => { setТяга(0); }, [toast]);
   if (!toast) return null;
-  return (
-    <div style={{
-      position: "absolute", top: insetTop + 14, left: "50%", zIndex: 50,
-      willChange: "transform, opacity",
-      animation: leaving
-        ? `toastOut ${TOAST_OUT_MS}ms cubic-bezier(0.4,0,1,1) both`
-        : "toastIn 260ms cubic-bezier(0.16,1,0.3,1) both",
-    }}>
-      {/* toast intentionally ignores the app theme — like a native OS toast it
-          stays a fixed dark pill with light text/icon so it's always legible,
-          instead of flipping to (illegible) dark-on-dark under the White theme */}
-      <div className="flex items-center gap-2 rounded-full px-4 py-2" style={{ background: "rgba(24,24,26,0.95)", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
-        <CheckCircle2 size={14} color="#31D07B" />
-        <span style={{ fontFamily: bodyFont, fontSize: 13, color: "#F3F3F6", whiteSpace: "nowrap" }}>{toast}</span>
+
+  const { вид, заголовок, текст } = разобратьТост(toast);
+  const цвет = вид === "отказ" ? "#FF5C6B" : вид === "подсказка" ? "#C79BFF" : "#31D07B";
+  const Значок = вид === "отказ" ? AlertTriangle : вид === "подсказка" ? Info : CheckCircle2;
+
+  function начало(e) {
+    const т = e.touches && e.touches[0];
+    if (т) жест.current = { y0: т.clientY };
+  }
+  function ход(e) {
+    const т = e.touches && e.touches[0];
+    if (!жест.current || !т) return;
+    // Вверх тянется свободно, вниз — почти нет: карточка живёт у верхней
+    // кромки, и тащить её вглубь экрана некуда.
+    const dy = т.clientY - жест.current.y0;
+    setТяга(dy < 0 ? dy : dy * 0.18);
+  }
+  function конец() {
+    const ушло = тяга;
+    жест.current = null;
+    if (ушло < -34) { onClose(); return; }
+    setТяга(0);
+  }
+
+  /* Порталом и выше всего: карточку показывают и поверх листов —
+     «Получить», настроек, окна сделки. Пока она жила внутри страницы,
+     лист её просто накрывал, и человек не видел ни удачи, ни отказа. */
+  return createPortal(
+    <div
+      onTouchStart={начало}
+      onTouchMove={ход}
+      onTouchEnd={конец}
+      onTouchCancel={конец}
+      style={{
+        position: "fixed", top: insetTop + 14, left: "50%", zIndex: 620,
+        width: "calc(100% - 28px)", maxWidth: 420,
+        willChange: "transform, opacity",
+        animation: leaving
+          ? `toastOut ${TOAST_OUT_MS}ms cubic-bezier(0.4,0,1,1) both`
+          : "toastCardIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        transform: тяга ? `translateX(-50%) translateY(${тяга}px)` : undefined,
+        transition: жест.current ? "none" : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+        touchAction: "pan-y",
+      }}
+    >
+      {/* Карточка не следует теме приложения: как и системные
+          уведомления, она всегда тёмное стекло со светлым текстом —
+          иначе на белой теме белое на белом. */}
+      <div
+        className="flex items-center"
+        style={{
+          position: "relative", overflow: "hidden",
+          gap: 11, padding: "12px 14px", borderRadius: 18,
+          background: "rgba(22,22,26,0.86)",
+          backdropFilter: "blur(18px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(18px) saturate(1.2)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          boxShadow: "0 14px 38px rgba(0,0,0,0.45)",
+        }}
+      >
+        {/* Цвет держит только значок и тонкая кромка слева: заливать
+            цветом всю карточку — кричать там, где достаточно сказать. */}
+        <span aria-hidden style={{
+          position: "absolute", left: 0, top: 12, bottom: 12, width: 3,
+          borderRadius: 999, background: цвет, opacity: 0.9,
+        }} />
+        <span
+          className="flex items-center justify-center flex-shrink-0"
+          style={{ width: 30, height: 30, borderRadius: 12, background: hexA(цвет, 0.16) }}
+        >
+          <Значок size={16} color={цвет} />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span style={{
+            display: "block", fontFamily: displayFont, fontSize: 14.5, fontWeight: 700,
+            color: "#F3F3F6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {заголовок}
+          </span>
+          {текст && (
+            <span style={{
+              display: "block", fontFamily: bodyFont, fontSize: 12.5, lineHeight: 1.35,
+              color: "rgba(243,243,246,0.68)", marginTop: 2,
+            }}>
+              {текст}
+            </span>
+          )}
+        </span>
+        <button
+          onClick={onClose}
+          className="fx-tap flex items-center justify-center flex-shrink-0"
+          style={{ width: 26, height: 26, borderRadius: 999, background: "rgba(255,255,255,0.07)", border: "none" }}
+        >
+          <X size={13} color="rgba(243,243,246,0.6)" />
+        </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -20108,6 +20231,14 @@ const FEE_PERCENT = 0.01; // 1% комиссии
   const [toastSeq, setToastSeq] = useState(0);
   const toastTimer = useRef(null);
   const toastHideTimer = useRef(null);
+  // Закрыть руками — крестиком или смахнув вверх: та же анимация ухода,
+  // что и по времени.
+  function скрытьToast() {
+    clearTimeout(toastTimer.current);
+    clearTimeout(toastHideTimer.current);
+    setToastLeaving(true);
+    toastHideTimer.current = setTimeout(() => { setToast(null); setToastLeaving(false); }, TOAST_OUT_MS);
+  }
   function showToast(msg) {
     clearTimeout(toastTimer.current);
     clearTimeout(toastHideTimer.current);
@@ -22314,7 +22445,13 @@ function mapTokenRow(row) {
       {/* Заставки на входе больше нет: приложение открывается сразу, а
           то, что ещё не приехало, стоит серыми плашками на своих местах.
           Ждать чёрный экран с котом ради тех же двух секунд незачем. */}
-      <Toast key={toastSeq} toast={toast} insetTop={insetTop} leaving={toastLeaving} />
+      <Toast
+        key={toastSeq}
+        toast={toast}
+        insetTop={insetTop}
+        leaving={toastLeaving}
+        onClose={скрытьToast}
+      />
 
       {/* Проход в кошелёк из чата. Приложение здесь — только мостик к
           TonConnect: показывать за эту секунду ленту и графики незачем,
