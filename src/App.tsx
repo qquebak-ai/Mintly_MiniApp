@@ -15075,6 +15075,16 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
    * подпись мигала бы туда-сюда от дрожания пальца. */
   const [шапкаВидна, setШапкаВидна] = useState(false);
   const рядАватарки = useRef(null);
+  /* Узел приходит не сразу: пока цифры и график в пути, на месте
+     страницы стоят плашки, и мерить нечего. Поэтому ref со звонком —
+     он будит замер ровно тогда, когда настоящая шапка встала в дерево.
+     Без этого отступ под шапку клиента оставался нулевым, и вся полоса
+     съезжала на имя токена. */
+  const [якорьГотов, setЯкорьГотов] = useState(false);
+  const ставитьЯкорь = React.useCallback((el) => {
+    рядАватарки.current = el;
+    setЯкорьГотов(!!el);
+  }, []);
   const блокЦены = useRef(null);
   const [отступСверху, setОтступСверху] = useState(0);
   useEffect(() => {
@@ -15103,7 +15113,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       контейнер.removeEventListener("scroll", наПрокрутку);
       if (кадр) cancelAnimationFrame(кадр);
     };
-  }, [token.id]);
+  }, [token.id, якорьГотов]);
 
   /* Что показывает шапка: цена и изменение видимого участка графика.
      Пока график не сказал, что у него в окне, берём привычные сутки —
@@ -15688,7 +15698,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       {/* Распорка ровно под полосу и ещё немного. Она была короче полосы,
           и в стартовом положении имя начиналось под аватаркой: круг
           налезал на первые буквы, а размытие полосы мылило само имя. */}
-      <div ref={рядАватарки} aria-hidden style={{ height: ВЫСОТА_ПОЛОСЫ + 10 }} />
+      <div ref={ставитьЯкорь} aria-hidden style={{ height: ВЫСОТА_ПОЛОСЫ + 10 }} />
 
       <div className="flex flex-col" style={{ gap: 8 }}>
         {/* Имя крупно, тикер — справа от него мелким: имя читают, тикером
