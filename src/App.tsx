@@ -14203,6 +14203,12 @@ const КОШ_ПАДЕНИЕ_ТЕКСТ = "#FF3B47";
 const КОШ_ПРИХОД_ФОН = hexA("#00E96B", 0.18);
 const КОШ_ПРИХОД_ТЕКСТ = "#00E96B";
 
+/* Меньше сотни штук — не позиция, а остаток. Мемкоины считаются
+   миллионами, и после продажи «всего» на счету оседают доли токена:
+   в списке они выглядели как полноценная монета с ценой в ноль
+   долларов. Ниже этого порога токен в «твоих токенах» не показываем. */
+const ПЫЛЬ_ТОКЕНОВ = 100;
+
 /* Пилюля с изменением — как в макете: цветной фон, стрелка, проценты.
    Рост идёт фирменным фиолетовым, а не зелёным: зелёный в этой палитре
    чужой. */
@@ -22013,12 +22019,12 @@ function mapTokenRow(row) {
             const п = new URLSearchParams({ wallet: солАдрес, mint: tok.address });
             const b = await fetch(апи(`/api/solana?action=balances&${п}`)).then((r) => r.json()).catch(() => null);
             const сколько = b && !b.error ? Number(b.token) || 0 : 0;
-            if (сколько > 0) found.push({ tok, amount: сколько });
+            if (сколько >= ПЫЛЬ_ТОКЕНОВ) found.push({ tok, amount: сколько });
             continue;
           }
           if (!тонАдрес) continue;
           const info = await fetchJettonAccount(tok.address, тонАдрес, TON_TESTNET);
-          if (info && info.balance > 0) found.push({ tok, amount: info.balance });
+          if (info && info.balance >= ПЫЛЬ_ТОКЕНОВ) found.push({ tok, amount: info.balance });
         } catch (e) { /* один не ответил — остальные всё равно нужны */ }
       }
       if (!cancelled) { setWalletHoldings(found); setHoldingsReady(true); }
