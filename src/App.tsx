@@ -1852,6 +1852,14 @@ function GlobalStyle() {
          рисунок совпадает сам с собой, поэтому шва не видно и полотно
          кажется бесконечным. Позиции слоёв — те самые смещения, что
          собирают «ёлочку» твила. */
+      /* Свет по металлу: проходит карту насквозь и возвращается не
+         сразу — золото бликует редко, зато ярко. */
+      @keyframes золотоБлеснуло {
+        0%, 10%  { transform: translateX(-180px) rotate(14deg); opacity: 0; }
+        18%      { opacity: 1; }
+        58%      { transform: translateX(460px) rotate(14deg); opacity: 0; }
+        100%     { transform: translateX(460px) rotate(14deg); opacity: 0; }
+      }
       @keyframes карбонЕдет {
         from { background-position: 0 5px, 10px 0px, 0 10px, 10px 5px, 0 0, 0 0; }
         to   { background-position: 0 25px, 10px 20px, 0 30px, 10px 25px, 0 20px, 0 20px; }
@@ -10677,6 +10685,7 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
             padding: "9px 10px", textAlign: "left",
           }}>
             {item.ткань && <СлоиТкани />}
+            {item.гравюра && <СлоиГравюры мелко />}
             <div style={{ fontFamily: bodyFont, fontSize: 8.5, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
             <div style={{ fontFamily: displayFont, fontSize: 15, fontWeight: 700, color: "#FFFFFF", marginTop: 2 }}>
               12,40 <span style={{ fontSize: 9, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
@@ -10858,6 +10867,7 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
               boxShadow: `0 12px 30px ${hexA(item.glow || "#7C3AED", 0.38)}`,
             }}>
               {item.ткань && <СлоиТкани />}
+              {item.гравюра && <СлоиГравюры />}
               <div style={{ fontFamily: bodyFont, fontSize: 11, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
               <div style={{ fontFamily: displayFont, fontSize: 24, fontWeight: 700, color: "#FFFFFF", marginTop: 4 }}>
                 12,40 <span style={{ fontSize: 12, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
@@ -15110,8 +15120,13 @@ const WALLET_SKINS = [
     glow: "#00C853",
   },
   {
+    /* Золото не заливкой, а гравюрой. Та самая парадная карта: тиснёный
+       металл, гильошированная сетка тонких дуг, орёл-эмблема, микротекст
+       по краю и номер. Портрета и государственных знаков здесь нет —
+       эмблема и надписи свои. */
     id: "gold", label: { RU: "Золото", EN: "Gold" }, price: 320,
-    fill: "linear-gradient(120deg, #8A5E06 0%, #F0B429 32%, #FFF0C2 50%, #F0B429 68%, #6A4A08 100%)",
+    fill: "linear-gradient(120deg, #6A4A08 0%, #B8860B 18%, #F0B429 38%, #FFF3CC 52%, #E5A828 66%, #8A5E06 88%, #5A3D05 100%)",
+    гравюра: true,
     glow: "#F0B429",
   },
   {
@@ -15157,6 +15172,114 @@ const WALLET_SKIN_BY_ID = Object.fromEntries(WALLET_SKINS.map((с) => [с.id, с
  * плотной, — подсветка сверху и затемнение к низу; само полотно при
  * этом медленно едет вниз (см. «карбонЕдет»), и этого движения хватает.
  */
+/* Гравюра золотой карты.
+ *
+ * Парадные карты держатся не на блеске, а на мелкой работе: тиснёная
+ * сетка дуг (гильоше), которую подделать труднее всего, микротекст по
+ * краю, звёзды и рельефный номер. Всё нарисовано слоями — картинок нет,
+ * поэтому карта остаётся резкой на любом экране.
+ *
+ * Эмблема — свой орёл: государственных знаков и портретов на карте
+ * приложения быть не должно, а узнаваемость даёт сама манера.
+ */
+function СлоиГравюры({ мелко = false }) {
+  const шаг = мелко ? 5 : 9;
+  return (
+    <>
+      {/* Гильоше: две встречные сетки дуг и поперечные нити — то, что на
+          настоящей карте выдавлено штихелем. */}
+      <span aria-hidden style={{
+        position: "absolute", inset: 0, pointerEvents: "none", mixBlendMode: "overlay", opacity: 0.55,
+        background: [
+          `repeating-radial-gradient(circle at 22% 18%, ${hexA("#FFFFFF", 0.5)} 0 0.6px, transparent 0.6px ${шаг}px)`,
+          `repeating-radial-gradient(circle at 78% 82%, ${hexA("#000000", 0.35)} 0 0.6px, transparent 0.6px ${шаг}px)`,
+          `repeating-linear-gradient(72deg, ${hexA("#FFFFFF", 0.18)} 0 0.5px, transparent 0.5px 6px)`,
+        ].join(", "),
+      }} />
+      {/* Тиснёная рамка с двойным кантом. */}
+      <span aria-hidden style={{
+        position: "absolute", inset: мелко ? 3 : 7, borderRadius: мелко ? 8 : 12, pointerEvents: "none",
+        border: `1px solid ${hexA("#FFF3CC", 0.55)}`,
+        boxShadow: `inset 0 0 0 1px ${hexA("#6A4A08", 0.45)}, inset 0 0 22px ${hexA("#5A3D05", 0.35)}`,
+      }} />
+      {/* Орёл: свой, без государственной символики. */}
+      <svg
+        aria-hidden viewBox="0 0 120 100"
+        style={{
+          // Эмблема — справа по центру: слева живёт сумма, снизу плашка
+          // с долларами, и наезжать на них гравюре нельзя.
+          position: "absolute", right: мелко ? 6 : 16, top: "50%",
+          transform: "translateY(-46%)",
+          width: мелко ? 52 : 104, opacity: 0.34, pointerEvents: "none",
+          filter: `drop-shadow(0 1px 0 ${hexA("#FFF3CC", 0.5)})`,
+        }}
+      >
+        <g fill="none" stroke="#4A3204" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+          {/* Голова с клювом, повёрнутая вбок — как на гербовых печатях. */}
+          <path d="M60 20 C55 20 52 23 52 27 C52 31 55 34 60 34 C64 34 67 31 67 27 C67 23 64 20 60 20 Z" />
+          <path d="M67 26 L75 24 L67 29" />
+          <circle cx="57" cy="26" r="1.1" fill="#4A3204" />
+          {/* Распахнутые крылья: три ряда перьев с каждой стороны. */}
+          <path d="M54 34 C42 28 28 25 12 28 C26 32 36 38 44 46" />
+          <path d="M50 42 C38 38 26 38 16 44 C28 46 38 50 46 56" />
+          <path d="M48 52 C38 50 30 52 24 58 C34 58 42 62 50 66" />
+          <path d="M66 34 C78 28 92 25 108 28 C94 32 84 38 76 46" />
+          <path d="M70 42 C82 38 94 38 104 44 C92 46 82 50 74 56" />
+          <path d="M72 52 C82 50 90 52 96 58 C86 58 78 62 70 66" />
+          {/* Щит с полосами — вместо государственного герба свой. */}
+          <path d="M52 50 L68 50 L68 64 C68 72 60 76 60 76 C60 76 52 72 52 64 Z" />
+          <path d="M56 50 L56 62 M60 50 L60 63 M64 50 L64 62" />
+          {/* Лента внизу. */}
+          <path d="M40 80 C48 76 72 76 80 80 C72 84 48 84 40 80 Z" />
+        </g>
+      </svg>
+      {/* Звёзды по верхнему канту. */}
+      <span aria-hidden style={{
+        position: "absolute", left: мелко ? 8 : 16, right: мелко ? 8 : 16, top: мелко ? 6 : 12, height: 3,
+        pointerEvents: "none", opacity: 0.5,
+        background: `repeating-radial-gradient(circle, ${hexA("#5A3D05", 0.8)} 0 1px, transparent 1px ${мелко ? 7 : 11}px)`,
+      }} />
+      {/* Микротекст — на настоящих картах его читают под лупой. */}
+      {!мелко && (
+        <span aria-hidden style={{
+          position: "absolute", left: 18, right: 18, bottom: 13, pointerEvents: "none",
+          fontFamily: monoFont, fontSize: 4.5, letterSpacing: "0.28em", whiteSpace: "nowrap",
+          overflow: "hidden", color: hexA("#4A3204", 0.6),
+        }}>
+          {"MINTLY · GOLD · MINTLY · GOLD · MINTLY · GOLD · MINTLY · GOLD · MINTLY · GOLD · MINTLY"}
+        </span>
+      )}
+      {/* Рельефный номер и надпись — как выдавленные в металле. */}
+      {!мелко && (
+        <>
+          <span aria-hidden style={{
+            // Номер — справа внизу, над микротекстом: слева его закрывала
+            // бы плашка с долларами.
+            position: "absolute", right: 18, bottom: 26, pointerEvents: "none",
+            fontFamily: monoFont, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.14em",
+            color: hexA("#4A3204", 0.72), textShadow: `0 1px 0 ${hexA("#FFF3CC", 0.75)}`,
+          }}>
+            0001 · MINTLY
+          </span>
+          <span aria-hidden style={{
+            position: "absolute", left: 18, bottom: 44, pointerEvents: "none",
+            fontFamily: displayFont, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.24em",
+            color: hexA("#4A3204", 0.55), textShadow: `0 1px 0 ${hexA("#FFF3CC", 0.6)}`,
+          }}>
+            GOLD
+          </span>
+        </>
+      )}
+      {/* Тонкий проход света по металлу. */}
+      <span aria-hidden style={{
+        position: "absolute", top: -140, bottom: -140, width: мелко ? 40 : 110, pointerEvents: "none",
+        background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.42)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
+        transform: "rotate(14deg)", animation: "золотоБлеснуло 7s ease-in-out infinite",
+      }} />
+    </>
+  );
+}
+
 function СлоиТкани() {
   return (
     <span aria-hidden style={{
@@ -15434,6 +15557,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             сам рисунок неподвижен. Плюс наклонный отблеск сверху —
             углеволокно всегда чуть бликует по краю. */}
         {ткань && <СлоиТкани />}
+        {видКарты.гравюра && <СлоиГравюры />}
 
         <div className="flex items-center justify-between" style={{ position: "relative", gap: 10 }}>
           <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.72), fontSize: 13 }}>
