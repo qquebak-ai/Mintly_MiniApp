@@ -15174,16 +15174,21 @@ const WALLET_SKIN_BY_ID = Object.fromEntries(WALLET_SKINS.map((с) => [с.id, с
  */
 /* Гравюра золотой карты.
  *
- * Парадные карты держатся не на блеске, а на мелкой работе: тиснёная
- * сетка дуг (гильоше), которую подделать труднее всего, микротекст по
- * краю, звёзды и рельефный номер. Всё нарисовано слоями — картинок нет,
- * поэтому карта остаётся резкой на любом экране.
+ * Композиция парадной карты: верхняя надпись вразрядку по всей кромке,
+ * круглая печать, звёзды дугой, крупный гравюрный портрет, росчерк
+ * подписи и микротекст вдоль нижнего края. Всё нарисовано линиями —
+ * картинок нет, поэтому карта остаётся резкой на любом экране.
  *
- * Эмблема — свой орёл: государственных знаков и портретов на карте
- * приложения быть не должно, а узнаваемость даёт сама манера.
+ * Портрет — маскот Mintly, а не человек; печать, флаг и орёл — свои.
+ * Государственные знаки и лица на карте приложения не рисуются: узнаётся
+ * манера гравюры, а не документ.
+ *
+ * Левая половина оставлена пустой: на ней лежит сумма баланса, и
+ * гравюра под цифрами превратилась бы в грязь.
  */
 function СлоиГравюры({ мелко = false }) {
   const шаг = мелко ? 5 : 9;
+  const линия = { fill: "none", stroke: "#4A3204", strokeWidth: 1.7, strokeLinecap: "round", strokeLinejoin: "round" };
   return (
     <>
       {/* Гильоше: две встречные сетки дуг и поперечные нити — то, что на
@@ -15196,80 +15201,95 @@ function СлоиГравюры({ мелко = false }) {
           `repeating-linear-gradient(72deg, ${hexA("#FFFFFF", 0.18)} 0 0.5px, transparent 0.5px 6px)`,
         ].join(", "),
       }} />
+
       {/* Тиснёная рамка с двойным кантом. */}
       <span aria-hidden style={{
         position: "absolute", inset: мелко ? 3 : 7, borderRadius: мелко ? 8 : 12, pointerEvents: "none",
         border: `1px solid ${hexA("#FFF3CC", 0.55)}`,
         boxShadow: `inset 0 0 0 1px ${hexA("#6A4A08", 0.45)}, inset 0 0 22px ${hexA("#5A3D05", 0.35)}`,
       }} />
-      {/* Орёл: свой, без государственной символики. */}
+
+      {/* Правая половина — вся гравюра разом, одним рисунком: так части
+          не разъезжаются на узких экранах. */}
       <svg
-        aria-hidden viewBox="0 0 120 100"
+        aria-hidden viewBox="0 0 200 130" preserveAspectRatio="xMidYMid meet"
         style={{
-          // Эмблема — справа по центру: слева живёт сумма, снизу плашка
-          // с долларами, и наезжать на них гравюре нельзя.
-          position: "absolute", right: мелко ? 6 : 16, top: "50%",
-          transform: "translateY(-46%)",
-          width: мелко ? 52 : 104, opacity: 0.34, pointerEvents: "none",
-          filter: `drop-shadow(0 1px 0 ${hexA("#FFF3CC", 0.5)})`,
+          position: "absolute", right: мелко ? 2 : 6, top: мелко ? 6 : 26, bottom: мелко ? 4 : 10,
+          width: мелко ? "58%" : "54%", opacity: мелко ? 0.4 : 0.42, pointerEvents: "none",
+          filter: `drop-shadow(0 1px 0 ${hexA("#FFF3CC", 0.45)})`,
         }}
       >
-        <g fill="none" stroke="#4A3204" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-          {/* Голова с клювом, повёрнутая вбок — как на гербовых печатях. */}
-          <path d="M60 20 C55 20 52 23 52 27 C52 31 55 34 60 34 C64 34 67 31 67 27 C67 23 64 20 60 20 Z" />
-          <path d="M67 26 L75 24 L67 29" />
-          <circle cx="57" cy="26" r="1.1" fill="#4A3204" />
-          {/* Распахнутые крылья: три ряда перьев с каждой стороны. */}
-          <path d="M54 34 C42 28 28 25 12 28 C26 32 36 38 44 46" />
-          <path d="M50 42 C38 38 26 38 16 44 C28 46 38 50 46 56" />
-          <path d="M48 52 C38 50 30 52 24 58 C34 58 42 62 50 66" />
-          <path d="M66 34 C78 28 92 25 108 28 C94 32 84 38 76 46" />
-          <path d="M70 42 C82 38 94 38 104 44 C92 46 82 50 74 56" />
-          <path d="M72 52 C82 50 90 52 96 58 C86 58 78 62 70 66" />
-          {/* Щит с полосами — вместо государственного герба свой. */}
-          <path d="M52 50 L68 50 L68 64 C68 72 60 76 60 76 C60 76 52 72 52 64 Z" />
-          <path d="M56 50 L56 62 M60 50 L60 63 M64 50 L64 62" />
-          {/* Лента внизу. */}
-          <path d="M40 80 C48 76 72 76 80 80 C72 84 48 84 40 80 Z" />
+        {/* Портрет: маскот в три четверти, как на гравюре. */}
+        <g {...линия} transform="translate(4 12)">
+          <path d="M20 70 C20 44 34 30 52 30 C70 30 84 44 84 70" />
+          <path d="M30 40 L24 18 L44 30" />
+          <path d="M74 40 L80 18 L60 30" />
+          <path d="M40 54 C40 52 42 50 44 50 C46 50 48 52 48 54" />
+          <path d="M56 54 C56 52 58 50 60 50 C62 50 64 52 64 54" />
+          <path d="M48 62 L52 66 L56 62" />
+          <path d="M52 66 L52 72" />
+          <path d="M30 64 L14 60 M30 68 L14 70 M74 64 L90 60 M74 68 L90 70" />
+          {/* Штриховка щеки — гравюрная тень. */}
+          <path d="M34 58 L38 74 M38 56 L42 76 M66 58 L62 74 M70 56 L66 76" strokeWidth="0.8" />
+        </g>
+
+        {/* Звёзды дугой над надписью. */}
+        <g fill="#4A3204">
+          {[0, 1, 2, 3, 4, 5, 6].map((i) => {
+            const угол = (-58 + i * 19) * (Math.PI / 180);
+            const x = 150 + Math.cos(угол) * 44;
+            const y = 46 + Math.sin(угол) * 30;
+            return <circle key={i} cx={x} cy={y} r="1.8" />;
+          })}
+        </g>
+
+        {/* Надпись и росчерк подписи. */}
+        <g {...линия}>
+          <path d="M118 62 L186 62" strokeWidth="0.8" />
+          <path d="M120 84 C126 74 130 92 136 80 C140 72 142 94 148 82 C152 74 156 92 162 80 C166 72 170 90 176 82"
+            strokeWidth="1.4" />
+          <path d="M120 92 L182 92" strokeWidth="0.6" />
+        </g>
+        <text x="152" y="58" textAnchor="middle" fill="#4A3204"
+          style={{ fontFamily: "Georgia, serif", fontSize: 15, letterSpacing: "0.06em" }}>MINTLY</text>
+        <text x="152" y="72" textAnchor="middle" fill="#4A3204"
+          style={{ fontFamily: "Georgia, serif", fontSize: 9, letterSpacing: "0.18em" }}>GOLD CARD</text>
+        <text x="152" y="100" textAnchor="middle" fill="#4A3204"
+          style={{ fontFamily: "Georgia, serif", fontSize: 4.6, letterSpacing: "0.1em" }}>ДЕРЖАТЕЛЬ ЗОЛОТОЙ КАРТЫ</text>
+        <text x="152" y="107" textAnchor="middle" fill="#4A3204"
+          style={{ fontFamily: "Georgia, serif", fontSize: 4.6, letterSpacing: "0.1em" }}>MINTLY · С 2026 ГОДА</text>
+
+        {/* Печать в углу — вместо государственной. */}
+        <g {...линия} transform="translate(178 14)" strokeWidth="1">
+          <circle cx="0" cy="0" r="11" />
+          <circle cx="0" cy="0" r="8.2" strokeWidth="0.6" />
+          <path d="M-4 1 L-1 4 L5 -3" strokeWidth="1.4" />
         </g>
       </svg>
-      {/* Звёзды по верхнему канту. */}
-      <span aria-hidden style={{
-        position: "absolute", left: мелко ? 8 : 16, right: мелко ? 8 : 16, top: мелко ? 6 : 12, height: 3,
-        pointerEvents: "none", opacity: 0.5,
-        background: `repeating-radial-gradient(circle, ${hexA("#5A3D05", 0.8)} 0 1px, transparent 1px ${мелко ? 7 : 11}px)`,
-      }} />
+
+      {/* Верхняя надпись вразрядку — по кромке, как на парадных бланках. */}
+      {!мелко && (
+        <span aria-hidden style={{
+          position: "absolute", left: 20, right: 20, top: 11, pointerEvents: "none",
+          fontFamily: displayFont, fontSize: 7.5, fontWeight: 800, letterSpacing: "0.42em",
+          textAlign: "center", color: hexA("#4A3204", 0.62), textShadow: `0 1px 0 ${hexA("#FFF3CC", 0.6)}`,
+          whiteSpace: "nowrap", overflow: "hidden",
+        }}>
+          MINTLY GOLD CARD
+        </span>
+      )}
+
       {/* Микротекст — на настоящих картах его читают под лупой. */}
       {!мелко && (
         <span aria-hidden style={{
-          position: "absolute", left: 18, right: 18, bottom: 13, pointerEvents: "none",
+          position: "absolute", left: 18, right: 18, bottom: 6, pointerEvents: "none",
           fontFamily: monoFont, fontSize: 4.5, letterSpacing: "0.28em", whiteSpace: "nowrap",
-          overflow: "hidden", color: hexA("#4A3204", 0.6),
+          overflow: "hidden", color: hexA("#4A3204", 0.55),
         }}>
           {"MINTLY · GOLD · MINTLY · GOLD · MINTLY · GOLD · MINTLY · GOLD · MINTLY · GOLD · MINTLY"}
         </span>
       )}
-      {/* Рельефный номер и надпись — как выдавленные в металле. */}
-      {!мелко && (
-        <>
-          <span aria-hidden style={{
-            // Номер — справа внизу, над микротекстом: слева его закрывала
-            // бы плашка с долларами.
-            position: "absolute", right: 18, bottom: 26, pointerEvents: "none",
-            fontFamily: monoFont, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.14em",
-            color: hexA("#4A3204", 0.72), textShadow: `0 1px 0 ${hexA("#FFF3CC", 0.75)}`,
-          }}>
-            0001 · MINTLY
-          </span>
-          <span aria-hidden style={{
-            position: "absolute", left: 18, bottom: 44, pointerEvents: "none",
-            fontFamily: displayFont, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.24em",
-            color: hexA("#4A3204", 0.55), textShadow: `0 1px 0 ${hexA("#FFF3CC", 0.6)}`,
-          }}>
-            GOLD
-          </span>
-        </>
-      )}
+
       {/* Тонкий проход света по металлу. */}
       <span aria-hidden style={{
         position: "absolute", top: -140, bottom: -140, width: мелко ? 40 : 110, pointerEvents: "none",
