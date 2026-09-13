@@ -66,9 +66,11 @@ export default async function handler(req, res) {
      как выдуманная. Идентификатор человека наружу не идёт. */
   const люди = [...new Set((сделки || []).map((с) => с.user_id).filter(Boolean))];
   const { data: кошельки } = люди.length
-    ? await db.from("app_wallets").select("user_id, address").in("user_id", люди)
+    ? await db.from("app_wallets").select("user_id, chain, address").in("user_id", люди)
     : { data: [] };
-  const поЧеловеку = new Map((кошельки || []).map((к) => [к.user_id, к.address]));
+  /* Кошелёк у человека свой на каждую цепочку, поэтому ключ составной:
+     иначе в строке о покупке за SOL стоял адрес из TON. */
+  const поЧеловеку = new Map((кошельки || []).map((к) => [`${к.user_id}:${к.chain}`, к.address]));
 
   const тело = {
     rows: (сделки || []).map((с) => {
@@ -89,7 +91,7 @@ export default async function handler(req, res) {
         // относится к тому мгновению.
         amount: сумма,
         usd: курс > 0 ? сумма * курс : 0,
-        from: поЧеловеку.get(с.user_id) || null,
+        from: поЧеловеку.get(`${с.user_id}:${(т && т.chain) || "ton"}`) || null,
       };
     }),
   };
