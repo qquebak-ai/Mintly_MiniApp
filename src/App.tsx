@@ -6731,24 +6731,26 @@ function шапкаБиржи(chain, address) {
   return `https://dd.dexscreener.com/ds-data/tokens/${сеть}/${address}/header.png`;
 }
 
-function ОбложкаСпотлайта({ token }) {
-  const своя = token.bannerUrl || null;
+/* Ссылка на обложку, уже проверенную загрузкой. Вынесена в свой хук,
+   потому что от неё зависит не только фон, но и вся раскладка витрины:
+   с шапкой биржи карточка разворачивается во весь её рост, без неё
+   остаётся строкой. */
+function useОбложкаТокена(token) {
+  const своя = (token && token.bannerUrl) || null;
   // На кривой биржи ещё нет — там только своя картинка.
-  const сБиржи = token.poolAddress ? шапкаБиржи(token.chain, token.tokenAddress) : null;
+  const сБиржи = token && token.poolAddress ? шапкаБиржи(token.chain, token.tokenAddress) : null;
   const кандидат = сБиржи || своя;
-  const [готова, setГотова] = useState(() => (кандидат ? обложкаКеш.get(кандидат) === true : false));
   const [url, setUrl] = useState(() => (кандидат && обложкаКеш.get(кандидат) === true ? кандидат : null));
 
   useEffect(() => {
     let брошено = false;
     const очередь = [сБиржи, своя].filter(Boolean);
-    setГотова(false);
     setUrl(null);
     (async () => {
       for (const адрес of очередь) {
         if (обложкаКеш.get(адрес) === false) continue;
         if (обложкаКеш.get(адрес) === true) {
-          if (!брошено) { setUrl(адрес); setГотова(true); }
+          if (!брошено) setUrl(адрес);
           return;
         }
         const ок = await new Promise((готово) => {
@@ -6759,7 +6761,7 @@ function ОбложкаСпотлайта({ token }) {
         });
         обложкаКеш.set(адрес, ок);
         if (ок) {
-          if (!брошено) { setUrl(адрес); setГотова(true); }
+          if (!брошено) setUrl(адрес);
           return;
         }
       }
@@ -6767,21 +6769,7 @@ function ОбложкаСпотлайта({ token }) {
     return () => { брошено = true; };
   }, [сБиржи, своя]);
 
-  if (!готова || !url) return <SpotlightAura src={token.logoUrl} ticker={token.ticker} />;
-  return (
-    <>
-      <div aria-hidden style={{ position: "absolute", inset: 0, background: `center/cover no-repeat url(${url})` }} />
-      {/* Затемнение обязательно: по светлой картинке белый тикер не
-          читается. */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute", inset: 0,
-          background: `linear-gradient(90deg, ${hexA(T.bg, 0.92)} 0%, ${hexA(T.bg, 0.72)} 45%, ${hexA(T.bg, 0.45)} 100%)`,
-        }}
-      />
-    </>
-  );
+  return url;
 }
 
 function SpotlightAura({ src, ticker }) {
@@ -11885,6 +11873,108 @@ function NetworkSlider({ value, onChange, ширина = 168, высота = 38 
   );
 }
 
+/* Витрина «в центре внимания».
+ *
+ * У токена с биржи есть своя шапка — та же, что рисуют на DexScreener,
+ * шестьсот на двести. Раньше она лежала фоном под строкой высотой в
+ * семьдесят точек, и от картинки оставалась полоска посередине: надпись,
+ * ради которой её и рисовали, не была видна вовсе. Теперь карточка
+ * держит соотношение самой шапки — три к одному, — и баннер помещается
+ * целиком, а тикер с ценой лежат поверх, на затемнении у нижнего края.
+ *
+ * Без шапки всё по-прежнему: строка с аурой по цвету логотипа —
+ * растягивать на треть экрана нечего. */
+function ВитринаСпотлайта({ token, всего = 1, активная = 0, onТочка, onOpen }) {
+  const обложка = useОбложкаТокена(token);
+  const рост = token.change >= 0;
+
+  const точки = всего > 1 ? (
+    <span className="flex items-center" style={{ gap: 4, position: "relative", zIndex: 1, flexShrink: 0 }}>
+      {Array.from({ length: всего }).map((_, i) => (
+        <span
+          key={i}
+          onClick={(e) => { e.stopPropagation(); if (onТочка) onТочка(i); }}
+          style={{
+            width: 5, height: 5, borderRadius: 999,
+            background: i === активная ? T.electric : T.lineHi,
+            transition: `background ${EASE}`,
+          }}
+        />
+      ))}
+    </span>
+  ) : null;
+
+  const подписи = (
+    <>
+      <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 600 }}>${token.ticker}</span>
+      <span style={{ fontFamily: monoFont, color: рост ? T.up : T.down, fontSize: 13 }}>
+        {рост ? "+" : ""}{(token.change || 0).toFixed(1)}%
+      </span>
+    </>
+  );
+
+  if (обложка) {
+    return (
+      <button
+        onClick={() => onOpen(token)}
+        className="fx-tap w-full text-left"
+        style={{
+          display: "block", width: "100%", padding: 0, border: "none", background: T.surface,
+          borderRadius: 16, overflow: "hidden", position: "relative",
+          // То же соотношение, что у самой шапки: при заполнении по ширине
+          // ничего не обрезается ни сверху, ни снизу.
+          aspectRatio: "3 / 1",
+        }}
+      >
+        <img
+          src={обложка}
+          alt=""
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+        {/* Подписи лежат на баннере, поэтому под ними — затемнение снизу
+            вверх: по светлой картинке белый тикер не читается, а гасить
+            её целиком незачем, её и показываем. */}
+        <span
+          className="flex items-center"
+          style={{
+            position: "absolute", left: 0, right: 0, bottom: 0, gap: 10, padding: "30px 12px 11px",
+            background: `linear-gradient(180deg, ${hexA(T.bg, 0)} 0%, ${hexA(T.bg, 0.72)} 52%, ${hexA(T.bg, 0.95)} 100%)`,
+          }}
+        >
+          <TokenAvatar size={34} tone={рост ? "up" : "down"} src={token.logoUrl} />
+          <span className="flex-1 min-w-0" style={{ display: "block" }}>
+            <span className="flex items-center" style={{ gap: 8 }}>{подписи}</span>
+            <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 1 }}>
+              {fmtUSD(token.mcapNum)} · ${token.vol}
+            </span>
+          </span>
+          {точки}
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => onOpen(token)}
+      className="fx-tap w-full flex items-center text-left"
+      style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface, border: "none", position: "relative", overflow: "hidden" }}
+    >
+      <SpotlightAura src={token.logoUrl} ticker={token.ticker} />
+      <span style={{ position: "relative", zIndex: 1 }}>
+        <TokenAvatar size={44} tone={рост ? "up" : "down"} src={token.logoUrl} />
+      </span>
+      <span className="flex-1 min-w-0" style={{ position: "relative", zIndex: 1, display: "block" }}>
+        <span className="flex items-center" style={{ gap: 8 }}>{подписи}</span>
+        <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 3 }}>
+          {fmtUSD(token.mcapNum)} · ${token.vol}
+        </span>
+      </span>
+      {точки}
+    </button>
+  );
+}
+
 function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen, onLaunch, solДоступен = false, currentUserId = null }) {
   const [filter, setFilter] = useState("new");
   // Сеть выбирается сверху, отдельно от фильтров: это не «ещё один
@@ -12158,50 +12248,14 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
           <div style={{ fontFamily: displayFont, color: T.muted, fontSize: 13, fontWeight: 500, letterSpacing: "0.02em", textTransform: "uppercase", marginBottom: 10 }}>
             {t("mempadSpotlight")}
           </div>
-          {/* Один компактный блок вместо карусели крупных карточек:
-              логотип, тикер, капитализация и движение — всё, что нужно,
-              чтобы решить, открывать ли токен. */}
-          <button
+          <ВитринаСпотлайта
             key={spotlight.id}
-            onClick={() => onOpen(spotlight)}
-            className="fx-tap w-full flex items-center text-left"
-            style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface, border: "none", position: "relative", overflow: "hidden" }}
-          >
-            {/* Своя обложка вытесняет ауру: автор нарисовал её сам, и
-                подкрашивать её усреднённым цветом логотипа незачем.
-                Затемнение сверху обязательно — по светлой картинке белый
-                тикер не читается. */}
-            <ОбложкаСпотлайта token={spotlight} />
-            <div style={{ position: "relative", zIndex: 1 }}>
-              <TokenAvatar size={44} tone={spotlight.change >= 0 ? "up" : "down"} src={spotlight.logoUrl} />
-            </div>
-            <div className="flex-1 min-w-0" style={{ position: "relative", zIndex: 1 }}>
-              <div className="flex items-center" style={{ gap: 8 }}>
-                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 600 }}>${spotlight.ticker}</span>
-                <span style={{ fontFamily: monoFont, color: spotlight.change >= 0 ? T.up : T.down, fontSize: 13 }}>
-                  {spotlight.change >= 0 ? "+" : ""}{(spotlight.change || 0).toFixed(1)}%
-                </span>
-              </div>
-              <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 3 }}>
-                {fmtUSD(spotlight.mcapNum)} · ${spotlight.vol}
-              </div>
-            </div>
-            {spotlightTop.length > 1 && (
-              <div className="flex items-center" style={{ gap: 4, position: "relative", zIndex: 1 }}>
-                {spotlightTop.map((tok, i) => (
-                  <span
-                    key={tok.id}
-                    onClick={(e) => { e.stopPropagation(); setSpotIdx(i); }}
-                    style={{
-                      width: 5, height: 5, borderRadius: 999,
-                      background: i === spotIdx % spotlightTop.length ? T.electric : T.lineHi,
-                      transition: `background ${EASE}`,
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-          </button>
+            token={spotlight}
+            всего={spotlightTop.length}
+            активная={spotIdx % spotlightTop.length}
+            onТочка={setSpotIdx}
+            onOpen={onOpen}
+          />
         </div>
       )}
 
