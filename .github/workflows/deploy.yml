@@ -10,8 +10,9 @@
 # DEPLOY_SECRET с тем же значением, что стоит в /srv/mintly/.env.server.
 # Пока секрета нет, шаг отваливается с внятной строкой, а не молча.
 #
-# Ответ маршрута приходит сразу, сама сборка идёт дальше на сервере
-# примерно минуту — поэтому в конце проверяем, что служба ожила.
+# Имена переменных в скриптах — латиницей: bash считает именем только
+# ASCII, и «код=$(...)» он принимает не за присваивание, а за команду.
+# Сообщения и комментарии это не касается.
 
 name: Выкладка
 
@@ -36,34 +37,34 @@ jobs:
           # По этому числу видно, что служба перезапустилась: после
           # выкладки оно начинается заново. Без него «ok» говорит лишь о
           # том, что старая сборка ещё на месте.
-          echo "БЫЛО=$(curl -sS https://mintly.company/api/health | jq -r '.uptime // 0')" >> "$GITHUB_ENV"
+          echo "WAS_UPTIME=$(curl -sS https://mintly.company/api/health | jq -r '.uptime // 0')" >> "$GITHUB_ENV"
 
       - name: Позвать выкладку
         env:
-          СЕКРЕТ: ${{ secrets.DEPLOY_SECRET }}
+          DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
         run: |
-          if [ -z "$СЕКРЕТ" ]; then
+          if [ -z "$DEPLOY_SECRET" ]; then
             echo "Нет секрета DEPLOY_SECRET в настройках репозитория — выкладывать нечем."
             exit 1
           fi
-          код=$(curl -sS -o /tmp/ответ -w '%{http_code}' -X POST \
+          code=$(curl -sS -o /tmp/deploy-answer -w '%{http_code}' -X POST \
             https://mintly.company/api/deploy \
-            -H "authorization: Bearer $СЕКРЕТ")
-          cat /tmp/ответ; echo
-          [ "$код" = "200" ] || { echo "Маршрут ответил $код"; exit 1; }
+            -H "authorization: Bearer $DEPLOY_SECRET")
+          cat /tmp/deploy-answer; echo
+          [ "$code" = "200" ] || { echo "Маршрут ответил $code"; exit 1; }
 
       - name: Дождаться сборки
         run: |
           # Сборка занимает около минуты. Удачей считаем не «сайт
           # отвечает», а «служба поднялась заново»: счётчик её жизни
           # меньше прежнего.
-          for попытка in $(seq 1 20); do
+          for attempt in $(seq 1 20); do
             sleep 15
-            ответ=$(curl -sS https://mintly.company/api/health || true)
-            echo "$ответ"
-            стало=$(echo "$ответ" | jq -r '.uptime // empty')
-            ок=$(echo "$ответ" | jq -r '.ok // false')
-            if [ "$ок" = "true" ] && [ -n "$стало" ] && [ "$стало" -lt "${БЫЛО:-0}" ]; then
+            answer=$(curl -sS https://mintly.company/api/health || true)
+            echo "$answer"
+            now=$(echo "$answer" | jq -r '.uptime // empty')
+            ok=$(echo "$answer" | jq -r '.ok // false')
+            if [ "$ok" = "true" ] && [ -n "$now" ] && [ "$now" -lt "${WAS_UPTIME:-0}" ]; then
               echo "Служба перезапустилась, выкладка прошла."
               exit 0
             fi
