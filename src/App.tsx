@@ -10832,17 +10832,35 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
       >
         {/* Предмет крупно: покупают глазами, а не по названию. */}
         <div style={{ position: "relative", width: "100%", height: 132, borderRadius: 18, overflow: "hidden", background: T.surfaceHi, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <ProfileCardBg cardId={previewCard} height={132} radius={18} />
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <AvatarFrame frameId={previewFrame} size={84}>
-              <div style={{ width: "100%", height: "100%", background: T.bg }} />
-            </AvatarFrame>
-          </div>
+          {kind === "wallet" ? (
+            /* Вид карты показываем самой картой — с балансом и подписью,
+               ровно как он будет выглядеть в кошельке. */
+            <div style={{
+              width: "84%", height: 96, borderRadius: 16, padding: "12px 14px", textAlign: "left",
+              background: item.fill, backgroundSize: "320% 320%",
+              animation: "картаПереливается 9s ease-in-out infinite",
+              boxShadow: `0 12px 30px ${hexA(item.glow || "#7C3AED", 0.38)}`,
+            }}>
+              <div style={{ fontFamily: bodyFont, fontSize: 11, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
+              <div style={{ fontFamily: displayFont, fontSize: 24, fontWeight: 700, color: "#FFFFFF", marginTop: 4 }}>
+                12,40 <span style={{ fontSize: 12, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <ProfileCardBg cardId={previewCard} height={132} radius={18} />
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <AvatarFrame frameId={previewFrame} size={84}>
+                  <div style={{ width: "100%", height: "100%", background: T.bg }} />
+                </AvatarFrame>
+              </div>
+            </>
+          )}
         </div>
 
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 19.5, fontWeight: 700, marginTop: 14 }}>{pickLabel(item.label)}</span>
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 2 }}>
-          {kind === "frame" ? t("shopTabFrames") : t("shopTabCards")}
+          {kind === "frame" ? t("shopTabFrames") : kind === "card" ? t("shopTabCards") : t("shopTabWallet")}
         </span>
 
         <div className="flex items-center justify-between w-full rounded-[18px] px-4 py-3" style={{ marginTop: 14, background: T.bg, border: "none" }}>
@@ -11692,7 +11710,9 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, onOpenC
 
       {confirming && (
         <BuySheet
-          item={(confirming.kind === "frame" ? FRAME_BY_ID : CARD_BY_ID)[confirming.id]}
+          item={(confirming.kind === "frame" ? FRAME_BY_ID
+            : confirming.kind === "card" ? CARD_BY_ID
+            : WALLET_SKIN_BY_ID)[confirming.id]}
           kind={confirming.kind}
           coins={coins}
           cosmetics={cosmetics}
