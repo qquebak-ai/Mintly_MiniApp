@@ -55,7 +55,20 @@ export default async function handler(req, res) {
     .limit(предел);
   if (error) return res.status(500).json({ error: "db", detail: error.message });
 
-  const адреса = [...new Set((сделки || []).map((с) => с.token_address).filter(Boolean))];
+  /* Запуски — такие же события ленты, как покупки: «$CATS запущен» — это
+     первое, что о токене вообще можно сказать, и пропускать его значит
+     показывать хронику с середины. */
+  const { data: запуски } = await db
+    .from("tokens")
+    .select("id, address, ticker, chain, logo_url, owner_id, created_at")
+    .not("address", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(предел);
+
+  const адреса = [...new Set([
+    ...(сделки || []).map((с) => с.token_address),
+    ...(запуски || []).map((т) => т.address),
+  ].filter(Boolean))];
   const { data: токены } = адреса.length
     ? await db.from("tokens").select("id, address, ticker, chain, logo_url").in("address", адреса)
     : { data: [] };
@@ -64,7 +77,10 @@ export default async function handler(req, res) {
   /* Кошелёк покупателя — тот же, что виден в списке держателей токена:
      новой огласки тут нет, а строка «кто-то купил» без «кто» читается
      как выдуманная. Идентификатор человека наружу не идёт. */
-  const люди = [...new Set((сделки || []).map((с) => с.user_id).filter(Boolean))];
+  const люди = [...new Set([
+    ...(сделки || []).map((с) => с.user_id),
+    ...(запуски || []).map((т) => т.owner_id),
+  ].filter(Boolean))];
   const { data: кошельки } = люди.length
     ? await db.from("app_wallets").select("user_id, chain, address").in("user_id", люди)
     : { data: [] };
@@ -72,8 +88,24 @@ export default async function handler(req, res) {
      иначе в строке о покупке за SOL стоял адрес из TON. */
   const поЧеловеку = new Map((кошельки || []).map((к) => [`${к.user_id}:${к.chain}`, к.address]));
 
+  const строкиЗапусков = (запуски || []).map((т) => ({
+    id: `launch:${т.id}`,
+    kind: "launch",
+    at: т.created_at,
+    tokenId: т.id,
+    address: т.address,
+    ticker: т.ticker || null,
+    chain: т.chain || null,
+    logoUrl: т.logo_url || null,
+    // Сумма запуска здесь не нужна: строка сообщает о самом событии, а
+    // стартовая покупка придёт следом обычной сделкой.
+    amount: 0,
+    usd: 0,
+    from: поЧеловеку.get(`${т.owner_id}:${т.chain || "ton"}`) || null,
+  }));
+
   const тело = {
-    rows: (сделки || []).map((с) => {
+    rows: [...строкиЗапусков, ...(сделки || []).map((с) => {
       const т = поАдресу.get(с.token_address) || null;
       const сумма = Number(с.ton_amount) || 0;
       const курс = Number(с.ton_price_usd) || 0;
@@ -93,7 +125,10 @@ export default async function handler(req, res) {
         usd: курс > 0 ? сумма * курс : 0,
         from: поЧеловеку.get(`${с.user_id}:${(т && т.chain) || "ton"}`) || null,
       };
-    }),
+    })]
+      // Хроника: и запуски, и сделки — по времени, новое сверху.
+      .sort((a, b) => new Date(b.at) - new Date(a.at))
+      .slice(0, предел),
   };
 
   кеш = { до: Date.now() + ПАМЯТЬ_МС, тело };
