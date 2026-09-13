@@ -51,7 +51,12 @@ jobs:
             https://mintly.company/api/deploy \
             -H "authorization: Bearer $DEPLOY_SECRET")
           cat /tmp/deploy-answer; echo
-          [ "$code" = "200" ] || { echo "Маршрут ответил $code"; exit 1; }
+          # 202 — «принято, сборка пошла»: маршрут отвечает сразу, не
+          # дожидаясь её конца, и это как раз удача, а не отказ.
+          case "$code" in
+            200|202) ;;
+            *) echo "Маршрут ответил $code"; exit 1 ;;
+          esac
 
       - name: Дождаться сборки
         run: |
