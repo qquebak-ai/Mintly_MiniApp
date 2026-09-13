@@ -15139,6 +15139,16 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     сдвиг: -Math.round(Math.random() * 30),  // и начинается не с начала
   }), []);
 
+  /* Купленный вид карты живёт тем же ходом, что и на витрине: там он
+     обходит круг за девять секунд, и человек покупает именно это
+     движение. Сорок секунд фирменной карты на нём читались как
+     неподвижная заливка — «в магазине переливалось, а тут нет». Своя
+     карта Mintly ходит по-прежнему неспешно: её перелив согласован с
+     волнами по краю. */
+  const ходКарты = видКарты.id === "none"
+    ? { длительность: перелив.длительность, сдвиг: перелив.сдвиг }
+    : { длительность: 9, сдвиг: 0 };
+
   function волнаОт(e) {
     const блок = e.currentTarget.getBoundingClientRect();
     const т = e.touches && e.touches[0] ? e.touches[0] : e;
@@ -15316,7 +15326,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             maskComposite: "exclude",
             filter: `drop-shadow(0 0 9px ${hexA(видКарты.glow, 0.5)})`,
             pointerEvents: "none",
-            animation: `картаПереливается ${перелив.длительность}s ease-in-out ${перелив.сдвиг}s infinite,`
+            animation: `картаПереливается ${ходКарты.длительность}s ease-in-out ${ходКарты.сдвиг}s infinite,`
               + ` ореолКарты 4.2s ease-out ${задержка}s infinite`,
           }}
         />
@@ -15338,7 +15348,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // поверхность не повторяет один и тот же переход.
           background: видКарты.fill,
           backgroundSize: "320% 320%",
-          animation: `картаПереливается ${перелив.длительность}s ease-in-out ${перелив.сдвиг}s infinite`,
+          animation: `картаПереливается ${ходКарты.длительность}s ease-in-out ${ходКарты.сдвиг}s infinite`,
           border: "none",
         }}
       >
