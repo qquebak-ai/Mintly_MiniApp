@@ -391,7 +391,7 @@ const STR = {
     heroFee: "1% на сделку",
     mempadSpotlight: "В центре внимания",
     mempadLaunchToken: "Запустить токен",
-    tickerBought: "купил", tickerSold: "продал", tickerLaunched: "запустил",
+    tickerBought: "купил", tickerSold: "продал", tickerLaunched: "запущен",
     sinceJustNow: "только что", sinceMin: "м", sinceHour: "ч", mempadFilterNew: "Новые", mempadFilterTrend: "Трендовые", mempadFilterHot: "Горячие", mempadFilterSoon: "Скоро на бирже", mempadFilterVol: "По обороту", mempadFilterBluming: "В росте", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Создать токен", homeActionMempad: "Мемпад", homeActionProfile: "Профиль",
     feedTitle: "Прямо сейчас",
     feedSub: "Что происходит на площадке",
@@ -5992,11 +5992,19 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
           сделке, а не к рамке, и снаружи оставалось от прошлой строки. */}
       <div key={b.id} className="flex items-center gap-2 min-w-0 w-full" style={{ animation: "tickerSwap 380ms ease-out both" }}>
         <TokenAvatar size={20} tone={b.kind === "sell" ? "down" : "up"} src={b.token.logoUrl} />
+        {/* У запуска нет ни кошелька, ни суммы: событие о самом токене, а
+            не о том, кто его завёл, — «$BURN запущен». Стартовая покупка
+            приедет следом обычной строкой. */}
+        {b.kind === "launch" ? (
+          <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700, flex: 1 }}>
+            ${b.token.ticker}{" "}
+            <span style={{ fontFamily: bodyFont, color: цветСобытия, fontWeight: 700 }}>{t("tickerLaunched")}</span>
+          </span>
+        ) : (
+        <>
         <span className="truncate" style={{ fontFamily: monoFont, color: T.muted, fontSize: 12.5 }}>{shortAddr(b.from) || "—"}</span>
         <span style={{ fontFamily: bodyFont, color: цветСобытия, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>
-          {/* У запуска суммы нет: строка сообщает о самом событии, а
-              стартовая покупка приедет следом отдельной сделкой. */}
-          {b.kind === "launch" ? t("tickerLaunched") : <>
+          <>
           {/* Сумма в монете той сети, где прошла сделка: в разделе
               Solana цифры в TON были просто неправдой. */}
           {b.kind === "sell" ? t("tickerSold") : t("tickerBought")} {(() => {
@@ -6012,9 +6020,11 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
             // ноль, и лента писала «купил 0 SOL».
             return `${fmtCoin(сумма)} ${соло ? "SOL" : ТИКЕР_TON}`;
           })()}
-          </>}
+          </>
         </span>
         <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700, flex: 1 }}>${b.token.ticker}</span>
+        </>
+        )}
         <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11.5, whiteSpace: "nowrap" }}>{fmtSince(b.at)}</span>
       </div>
     </button>
