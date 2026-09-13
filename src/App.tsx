@@ -15614,6 +15614,18 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         >
           {курсСети > 0 ? `≈ $${usd.toFixed(2)}` : "—"}
         </span>
+        {/* Мягкая кромка снизу: узкая полоса лёгкого размытия, уходящая в
+            ноль к середине. Она смазывает последние точки рисунка у
+            самого края, и карта кажется сходящей на нет, а не обрезанной
+            по линейке. Размытие нарочно слабое — на глаз оно не читается
+            как эффект, только как аккуратный край. */}
+        <span aria-hidden style={{
+          position: "absolute", left: 0, right: 0, bottom: 0, height: 26,
+          backdropFilter: "blur(1.6px)", WebkitBackdropFilter: "blur(1.6px)",
+          WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 85%)",
+          maskImage: "linear-gradient(180deg, transparent 0%, #000 85%)",
+          pointerEvents: "none",
+        }} />
       </section>
       </div>
 
