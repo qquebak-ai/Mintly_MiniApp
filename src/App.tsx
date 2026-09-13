@@ -333,6 +333,7 @@ const STR = {
     withdrawDo: "Отправить",
     withdrawGoing: "Отправляем…",
     withdrawSent: "Отправлено {sum}",
+    withdrawTestnetHint: "Это тестовая сеть: в кошельке получателя переключи её, иначе перевода не видно",
     withdrawFailed: "Вывод не прошёл",
     withdrawNotEnough: "На кошельке столько нет",
     withdrawBadAddress: "Проверь адрес — он не похож на адрес этой сети",
@@ -923,6 +924,7 @@ const STR = {
     withdrawDo: "Send",
     withdrawGoing: "Sending…",
     withdrawSent: "Sent {sum}",
+    withdrawTestnetHint: "This is a test network: switch it in the recipient wallet or the transfer stays invisible",
     withdrawFailed: "Withdrawal failed",
     withdrawNotEnough: "Not enough on the wallet",
     withdrawBadAddress: "Check the address — it doesn't look like this network",
@@ -13954,6 +13956,8 @@ function ЭкранВывода({
   /* Разбор адреса. Пока человек набирает первые знаки, молчим: красная
      строка под наполовину введённым адресом ругается на то, что ещё не
      дописано. */
+  // Тестовая сеть: SOL живёт в devnet, GRAM — в testnet.
+  const тестовая = сеть === "ton" ? TON_TESTNET_NETWORK : SOL_NETWORK !== "mainnet";
   const чистый = адрес.trim();
   const адресОкей = сеть === "ton" ? адресTonОк(чистый) : адресSolanaОк(чистый);
   const беда = (() => {
@@ -13997,6 +14001,9 @@ function ЭкранВывода({
       const ответ = await шлём({ amount: монет, all: всё, адрес: адрес.trim() });
       const ушло = ответ && ответ.sent != null ? Number(ответ.sent) : (ответ && ответ.amount != null ? Number(ответ.amount) : монет);
       showToast(tf("withdrawSent", { sum: `${fmtСумма(ушло)} ${единица}` }));
+      // В тестовой сети перевод легко счесть пропавшим: кошелёк
+      // получателя по умолчанию смотрит в боевую.
+      if (тестовая) setTimeout(() => showToast(t("withdrawTestnetHint")), 2600);
       haptic("success");
       onГотово(ушло);
       onClose();
@@ -14025,7 +14032,21 @@ function ЭкранВывода({
     return (
       <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={t("withdrawTitle")} insetTop={insetTop} insetBottom={insetBottom}>
         <div className="flex flex-col" style={{ flex: 1, minHeight: 0, padding: "0 18px", gap: 12 }}>
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("withdrawTo")}</span>
+          <div className="flex items-center justify-between" style={{ gap: 8 }}>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("withdrawTo")}</span>
+            {/* Какая это сеть — видно до отправки. Деньги в devnet
+                доходят исправно, но обычный кошелёк их не показывает,
+                пока в нём самом не переключить сеть, и перевод выглядит
+                пропавшим. */}
+            {тестовая && (
+              <span style={{
+                padding: "3px 9px", borderRadius: 999, background: hexA("#F0B429", 0.16),
+                color: "#F0B429", fontFamily: monoFont, fontSize: 11, fontWeight: 700,
+              }}>
+                {сеть === "ton" ? "testnet" : "devnet"}
+              </span>
+            )}
+          </div>
           <div className="flex items-center" style={{ gap: 8 }}>
             <div style={{ flex: 1, position: "relative", display: "flex" }}>
               <input
