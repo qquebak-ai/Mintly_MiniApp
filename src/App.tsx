@@ -12078,34 +12078,56 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
       {/* Шапка раздела: название, поиск и выбор сети — одной строкой и
           двумя. Декоративная графика сети отсюда убрана: она занимала
           треть экрана и ничего не сообщала. */}
+      {/* Раздел ждёт целиком, до последней мелочи: название, кнопка
+          запуска и ползунок сети тоже стоят плашками. Живая шапка над
+          пустым экраном читалась как «здесь всё, а ниже сломалось». */}
       <div className="flex items-center justify-between">
-        <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, letterSpacing: "-0.01em", margin: 0 }}>
-          {t("navMempad")}
-        </h1>
+        {разделГотов ? (
+          <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, letterSpacing: "-0.01em", margin: 0 }}>
+            {t("navMempad")}
+          </h1>
+        ) : <ПлашкаЧисла width={118} height={26} radius={8} />}
         {/* Лупа отсюда убрана: она ничего не делала — поиск по токенам
             живёт в самой ленте. Запуск стоит в обеих сетях: в Solana
             программа развёрнута, и запускать там есть чем. */}
-        <button
-          onClick={onLaunch}
-          className="fx-tap flex items-center gap-1.5"
-          style={{
-            padding: "8px 14px", borderRadius: 10,
-            background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, border: "none",
-            fontFamily: displayFont, fontSize: 13.5, fontWeight: 600,
-          }}
-        >
-          <Rocket size={14} strokeWidth={1.8} /> {t("mempadLaunchToken")}
-        </button>
+        {разделГотов ? (
+          <button
+            onClick={onLaunch}
+            className="fx-tap flex items-center gap-1.5"
+            style={{
+              padding: "8px 14px", borderRadius: 10,
+              background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, border: "none",
+              fontFamily: displayFont, fontSize: 13.5, fontWeight: 600,
+            }}
+          >
+            <Rocket size={14} strokeWidth={1.8} /> {t("mempadLaunchToken")}
+          </button>
+        ) : <ПлашкаЧисла width={148} height={34} radius={10} />}
       </div>
 
       {/* Сеть — ползунком: рынок меняется движением, а не случайным
           касанием по краю экрана. */}
-      <NetworkSlider value={сеть} onChange={setСеть} />
+      {разделГотов ? <NetworkSlider value={сеть} onChange={setСеть} /> : <ПлашкаЧисла width={168} height={38} radius={999} />}
 
       {/* Пока раздел не готов, его содержимое скрыто, но смонтировано:
           лента сама ходит за сделками, и без неё на экране ждать было бы
-          нечего. */}
-      {!разделГотов && <PageLoader minHeight={360} />}
+          нечего. На виду в это время — та же раскладка плашками: бегущая
+          строка, центр внимания, ряд фильтров и первые строки списка. */}
+      {!разделГотов && (
+        <div className="flex flex-col" style={{ gap: 20 }}>
+          <ПлашкаБлока h={38} radius={12} />
+          <div className="flex flex-col" style={{ gap: 10 }}>
+            <ПлашкаЧисла width={146} height={13} radius={6} />
+            <ПлашкаБлока h={72} radius={16} />
+          </div>
+          <div className="flex items-center" style={{ gap: 18 }}>
+            {[54, 84, 108, 86].map((w, i) => <ПлашкаЧисла key={i} width={w} height={13} radius={6} />)}
+          </div>
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 4 }).map((_, i) => <MempadRowSkeleton key={i} index={i} />)}
+          </div>
+        </div>
+      )}
 
       <div
         className="flex flex-col"
@@ -15131,8 +15153,12 @@ const WALLET_SKINS = [
     id: "gold", label: { RU: "Золото", EN: "Gold" }, price: 320,
     fill: "linear-gradient(120deg, #8A5E06 0%, #F0B429 32%, #FFF0C2 50%, #F0B429 68%, #6A4A08 100%)",
     // Подпись в углу — единственная надпись на карте: она говорит, что
-    // это за вид, и не мешает балансу, который лежит слева.
-    подпись: "Gold card",
+    // это за вид, и не мешает балансу, который лежит слева. Написана тем
+    // же золотом, из которого набрана сама карта: белым она читалась как
+    // наклейка поверх, а не как тиснение по металлу. Светлый оттенок
+    // взят с блика — угол, где она стоит, самый тёмный.
+    подпись: "Gold Card",
+    цветПодписи: "#FFF0C2",
     glow: "#F0B429",
   },
   {
@@ -15460,7 +15486,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           <span aria-hidden style={{
             position: "absolute", right: 16, bottom: 14, pointerEvents: "none",
             fontFamily: displayFont, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.12em",
-            color: hexA("#FFFFFF", 0.62), textShadow: `0 1px 0 ${hexA("#000000", 0.18)}`,
+            color: видКарты.цветПодписи || hexA("#FFFFFF", 0.62),
+            // Тень глубже, чем у белой подписи: светлое золото на золоте
+            // держится только за счёт тёмного контура под буквами.
+            textShadow: видКарты.цветПодписи ? `0 1px 1px ${hexA("#3A2703", 0.55)}` : `0 1px 0 ${hexA("#000000", 0.18)}`,
           }}>
             {видКарты.подпись}
           </span>
@@ -15533,6 +15562,22 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           maskImage: "linear-gradient(180deg, transparent 0%, #000 85%)",
           pointerEvents: "none",
         }} />
+        {/* У карбона кромка идёт по всем четырём сторонам: плетение —
+            рисунок мелкий и жёсткий, и обрезанный по линейке он выдаёт
+            прямоугольник. Та же слабая дымка сверху и по бокам — и
+            ткань уходит под край, как настоящая. */}
+        {ткань && [
+          { бок: "top", стиль: { left: 0, right: 0, top: 0, height: 22 }, маска: "linear-gradient(0deg, transparent 0%, #000 85%)" },
+          { бок: "left", стиль: { top: 0, bottom: 0, left: 0, width: 22 }, маска: "linear-gradient(270deg, transparent 0%, #000 85%)" },
+          { бок: "right", стиль: { top: 0, bottom: 0, right: 0, width: 22 }, маска: "linear-gradient(90deg, transparent 0%, #000 85%)" },
+        ].map((к) => (
+          <span key={к.бок} aria-hidden style={{
+            position: "absolute", ...к.стиль,
+            backdropFilter: "blur(1.6px)", WebkitBackdropFilter: "blur(1.6px)",
+            WebkitMaskImage: к.маска, maskImage: к.маска,
+            pointerEvents: "none",
+          }} />
+        ))}
       </section>
       </div>
 
