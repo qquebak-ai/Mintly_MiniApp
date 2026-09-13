@@ -263,6 +263,7 @@ const STR = {
     nicknameLocked: "Никнейм выбирается один раз при создании аккаунта и не меняется.",
     tgAuthOutside: "Открой приложение внутри Telegram, чтобы войти.",
     tgAuthFailed: "Не удалось войти через Telegram. Попробуй ещё раз.",
+    tgAuthStale: "Telegram выдал подпись давно — закрой приложение полностью (смахни из списка) и открой заново.",
     tgAuthNotConfigured: "Вход через Telegram пока не настроен на сервере.",
     bootStepAuth: "Вход в аккаунт", bootStepFeed: "Лента покупок",
     bootStepTokens: "Токены сообщества", bootStepRate: "Курс GRAM",
@@ -860,6 +861,7 @@ const STR = {
     nicknameLocked: "A nickname is chosen once, when the account is created, and can't be changed.",
     tgAuthOutside: "Open the app inside Telegram to sign in.",
     tgAuthFailed: "Telegram sign-in failed. Try again.",
+    tgAuthStale: "Telegram signed this session a while ago — close the app completely and open it again.",
     tgAuthNotConfigured: "Telegram sign-in is not configured on the server yet.",
     bootStepAuth: "Signing in", bootStepFeed: "Buy feed",
     bootStepTokens: "Community tokens", bootStepRate: "TON rate",
@@ -21258,6 +21260,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         if (code === "nickname_required") setTgProbe({ exists: false });
         const detail = (err && err.detail) ? ` — ${String(err.detail).slice(0, 220)}` : "";
         setTgError(code === "no_telegram" ? t("tgAuthOutside")
+          // Подпись Telegram выдаёт один раз, при запуске; у свёрнутого
+          // приложения она стареет вместе с ним, и починить это можно
+          // только полным перезапуском.
+          : code === "stale_init_data" ? t("tgAuthStale")
           : code === "server_not_configured" ? t("tgAuthNotConfigured")
           // Имя увели между проверкой и созданием — человек остаётся на
           // том же экране и выбирает другое.
