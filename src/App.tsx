@@ -15297,7 +15297,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           ровно того оттенка, что у карты рядом, и меняется вместе с
           ней. Свечение даёт filter, а не box-shadow: тень box-shadow
           маска срезала бы вместе с серединой. */}
-      {[0, 1.4, 2.8].map((задержка) => (
+      {/* Бегущие волны по краю — примета своей, фирменной карты: они
+          сделаны из того же фиолетового градиента и с чужой заливкой
+          спорят. У купленных видов вместо волн ровное свечение цветом
+          самой карты — ровно такое, каким вид показан в магазине. */}
+      {видКарты.id === "none" ? [0, 1.4, 2.8].map((задержка) => (
         <span
           key={задержка}
           aria-hidden
@@ -15316,7 +15320,15 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
               + ` ореолКарты 4.2s ease-out ${задержка}s infinite`,
           }}
         />
-      ))}
+      )) : (
+        <span
+          aria-hidden
+          style={{
+            position: "absolute", inset: 0, borderRadius: 24, pointerEvents: "none",
+            boxShadow: `0 14px 38px ${hexA(видКарты.glow, 0.38)}`,
+          }}
+        />
+      )}
       <section
         onPointerDown={волнаОт}
         style={{
