@@ -63,7 +63,10 @@ export default async function handler(req, res) {
      показывать хронику с середины. */
   const { data: запуски } = await db
     .from("tokens")
-    .select("id, address, ticker, chain, logo_url, owner_id, created_at")
+    /* Состояние кривой берём тем же запросом: пока стартовая покупка не
+       прошла, объявлять о запуске нечего — у токена ещё нули во всех
+       числах, и по ссылке из ленты человек попадёт на пустую карточку. */
+    .select("id, address, ticker, chain, logo_url, owner_id, created_at, curve_cache(real_ton)")
     .not("address", "is", null)
     /* Только что запущенные — и никогда больше. «$CATS запущен» через
        сутки после запуска это уже не новость, а строка ленты, которую
@@ -95,7 +98,10 @@ export default async function handler(req, res) {
      иначе в строке о покупке за SOL стоял адрес из TON. */
   const поЧеловеку = new Map((кошельки || []).map((к) => [`${к.user_id}:${к.chain}`, к.address]));
 
-  const строкиЗапусков = (запуски || []).map((т) => ({
+  const строкиЗапусков = (запуски || []).filter((т) => {
+    const к = Array.isArray(т.curve_cache) ? т.curve_cache[0] : т.curve_cache;
+    return к && Number(к.real_ton) > 0;
+  }).map((т) => ({
     id: `launch:${т.id}`,
     kind: "launch",
     at: т.created_at,
