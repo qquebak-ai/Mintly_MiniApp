@@ -2460,17 +2460,27 @@ const LEAF_KINDS = [
 ];
 
 
-/* animated 0 -> value counter, no external deps */
+/* Счётчик: число доезжает до цели само, без сторонних библиотек.
+   Первый раз — от нуля, это появление экрана. Дальше — от того, что уже
+   показано: пополнение кошелька на полсолины отматывало счётчик к нулю и
+   гнало его обратно, и выглядело это так, будто деньги пропали и
+   приехали заново. Теперь видно ровно прибавку. */
 function useCountUp(target, duration = 900, active = true) {
   const [val, setVal] = useState(0);
+  const откуда = useRef(0);
   useEffect(() => {
     if (!active) return;
+    const начало = откуда.current;
+    if (начало === target) return;
     let raf, start;
     function tick(ts) {
       if (!start) start = ts;
       const p = Math.min(1, (ts - start) / duration);
       const eased = 1 - Math.pow(1 - p, 3);
-      setVal(target * eased);
+      // Помним, где счётчик сейчас: следующая цель поедет отсюда, даже
+      // если она сменилась на полпути.
+      откуда.current = p < 1 ? начало + (target - начало) * eased : target;
+      setVal(откуда.current);
       if (p < 1) raf = requestAnimationFrame(tick);
     }
     raf = requestAnimationFrame(tick);
