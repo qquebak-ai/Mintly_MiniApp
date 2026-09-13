@@ -15151,8 +15151,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       </section>
       </div>
 
-      {/* Ряд действий — то, за чем в кошелёк заходят чаще всего. */}
-      <div className="flex items-start" style={{ gap: 10, marginTop: 16, padding: "0 16px" }}>
+      {/* Ряд действий — то, за чем в кошелёк заходят чаще всего.
+          От карты его отделяет заметный отступ: иначе кнопки читались
+          как её нижний край, а это отдельная вещь. */}
+      <div className="flex items-start" style={{ gap: 10, marginTop: 26, padding: "0 16px" }}>
         <ДействиеКошелька icon={ArrowUpRight} label={t("walletActBuy")} onClick={() => setВыводОткрыт(true)} />
         <ДействиеКошелька icon={ArrowDownLeft} label={t("walletActReceive")} onClick={() => setПолучитьОткрыт(true)} />
         <ДействиеКошелька icon={Repeat} label={t("walletActSwap")} onClick={() => setОбменОткрыт(true)} />
