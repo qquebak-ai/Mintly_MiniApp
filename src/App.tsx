@@ -5749,7 +5749,9 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
   const curveCursor = useRef(0);
 
   useEffect(() => {
-    if (!pools.length && !curves.length) { setBuys([]); return; }
+    // Следить не за чем — значит лента уже «загружена»: без этого раздел
+    // ждал бы её до самого предохранителя, хотя ждать нечего.
+    if (!pools.length && !curves.length) { setBuys([]); setLoaded(true); return; }
     let cancelled = false;
 
     function mergeIn(rows, token) {
@@ -6638,7 +6640,8 @@ const MEMPAD_FILTERS = [
   // токен интересен больше всего, а найти его раньше было негде.
   { id: "soon", labelKey: "mempadFilterSoon" },
   { id: "vol", labelKey: "mempadFilterVol" },
-  { id: "dex", labelKey: "mempadFilterDex" },
+  // Вкладки «DEX» здесь больше нет: она отбирала пары с биржи, а мемпад
+  // теперь показывает только запуски площадки.
   { id: "hot", labelKey: "mempadFilterHot" },
 ];
 
@@ -11975,7 +11978,7 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
   );
 }
 
-function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen, onLaunch, solДоступен = false, currentUserId = null }) {
+function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solДоступен = false, currentUserId = null }) {
   const [filter, setFilter] = useState("new");
   // Сеть выбирается сверху, отдельно от фильтров: это не «ещё один
   // способ отсортировать», а другой рынок целиком — свои токены, свои
@@ -11990,52 +11993,6 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
   });
   useEffect(() => {
     try { if (typeof window !== "undefined") window.localStorage.setItem("mintly.network", сеть); } catch { /* приватный режим */ }
-  }, [сеть]);
-
-  // Лента Solana. Тот же источник и тот же разбор, что у основной, но
-  // читается только по требованию: две сети сразу — это вдвое больше
-  // запросов к источнику с общим лимитом на всё приложение.
-  const [solTokens, setSolTokens] = useState(null);
-  const [solLoading, setSolLoading] = useState(false);
-  useEffect(() => {
-    if (сеть !== "sol") return;
-    let cancelled = false;
-    if (!solTokens) setSolLoading(true);
-
-    // Столько же страниц и с тем же обновлением, что у ленты TON: одна
-    // страница давала два десятка токенов, список кончался на середине
-    // экрана, и цифры в нём застывали на момент открытия.
-    // Страницы читаются по очереди, а не разом: у источника общий лимит
-    // на приложение, и пять одновременных запросов он отбивал целиком —
-    // раздел оставался пустым. Сначала первая страница, чтобы список
-    // появился сразу, потом добор остального в фоне.
-    async function загрузить(глубоко) {
-      const rows = (await fetchFeedFromCache(GT_NETWORK_SOL))
-        || (глубоко
-          ? await fetchTonMemePools(FEED_LIMIT, FEED_PAGES, GT_NETWORK_SOL)
-          : await fetchTonMemePools(20, 1, GT_NETWORK_SOL));
-      if (cancelled) return;
-      // null означает, что источник не ответил. Затирать им уже
-      // показанный список нельзя — лучше оставить прежние цифры.
-      if (rows && rows.length) {
-        setSolTokens((prev) => {
-          if (глубоко || !prev || !prev.length) return rows;
-          const свежие = new Map(rows.map((tok) => [tok.id, tok]));
-          const слито = prev.map((tok) => свежие.get(tok.id) || tok);
-          const известные = new Set(prev.map((tok) => tok.id));
-          rows.forEach((tok) => { if (!известные.has(tok.id)) слито.push(tok); });
-          return слито;
-        });
-      }
-      setSolLoading(false);
-    }
-
-    загрузить(false).then(() => { if (!cancelled) загрузить(true); });
-    const iv = setInterval(() => {
-      if (document.visibilityState === "visible") загрузить(false);
-    }, TOKEN_REFRESH_MS);
-    return () => { cancelled = true; clearInterval(iv); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [сеть]);
 
   // «В центре внимания» — пятёрка токенов, по которым прошло больше всего
@@ -12064,24 +12021,15 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
   }, [localTokens, сеть, currentUserId]);
 
   const spotlightTop = useMemo(() => {
-    // Биржевой ленты может не быть вовсе — в тестовой сети её нет по
-    // определению. Тогда в центр внимания идут свои токены: пустая
-    // рамка вместо карточки выглядела поломкой.
-    //
-    // В Solana источник один — её собственная лента: своих запусков там
-    // нет, и подмешивать TON-токены было бы враньём.
-    // Пробные токены сюда не попадают: «в центре внимания» — витрина, а
-    // не список всего подряд, и рекламировать монету, которая ничего не
-    // стоит, площадка не должна. В самом списке ниже она остаётся, с
-    // пометкой.
-    const свои = localTokens.filter((tok) => (tok.chain || "ton") === (сеть === "sol" ? "solana" : "ton")
-      && !пробнаяСеть(tok.network)
-      // В центр внимания — тем более только с прошедшей сделкой: это
-      // витрина витрины.
-      && прошлаПерваяСвеча(tok));
-    const источник = сеть === "sol"
-      ? (свои.length ? свои : (solTokens || []))
-      : (tokens.length ? tokens : свои);
+    /* В центре внимания — только запуски площадки. Раньше сюда попадали
+       пары с биржи, и мемпад показывал чужие монеты вперемешку со
+       своими: человек открывал карточку, а купить там было нечего —
+       кривой нет, торги идут не у нас.
+       Пробные токены не в счёт: витрина не должна рекламировать монету,
+       которая ничего не стоит. В самом списке ниже она остаётся, с
+       пометкой. А сделка должна была пройти хоть одна — запуск сам по
+       себе на витрину не тянет. */
+    const источник = свои.filter((tok) => !пробнаяСеть(tok.network) && прошлаПерваяСвеча(tok));
     if (!источник.length) return [];
     const ranked = (win) =>
       [...источник]
@@ -12090,7 +12038,7 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
     const byActivity = ["tx1h", "tx6h", "tx24h"].map(ranked).find((list) => list.length);
     const list = byActivity || [...источник].sort((a, b) => b.mcapNum - a.mcapNum);
     return list.slice(0, SPOTLIGHT_COUNT);
-  }, [tokens, localTokens, solTokens, сеть]);
+  }, [свои]);
 
   const [spotIdx, setSpotIdx] = useState(0);
   useEffect(() => {
@@ -12103,58 +12051,38 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
   // так смена ленты не сбрасывает позицию на первый токен.
   const spotlight = spotlightTop.length ? spotlightTop[spotIdx % spotlightTop.length] : null;
 
+  /* Весь список — запуски площадки, и только они. Биржевая лента отсюда
+     убрана целиком: мемпад — это витрина того, что запустили здесь, а
+     чужую пару в нём и купить было нечем. */
   const list = useMemo(() => {
-    // "New" now means what it literally says: tokens launched through
-    // this app, not the newest items in the external real-market feed.
-    // В Solana своих запусков нет, поэтому «Новые» там означает не
-    // «запущенные здесь», а самые свежие пары рынка — по возрасту.
     /* «Новые» — те, кто ещё идёт по кривой и на биржу не вышел. Здесь
-       токен ещё можно взять по цене кривой, и раздел ровно об этом.
-       Пары, уже заведённые на DEX, лежат в соседних вкладках: подмешивать
-       их сюда значит смешивать два разных способа купить. */
+       токен ещё можно взять по цене кривой, и раздел ровно об этом. */
     if (filter === "new") {
       return свои
         .filter((tok) => !tok.graduated)
         .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     }
-    /* «Скоро на бирже» — только свои кривые, отсортированные по тому,
-       сколько осталось собрать. Биржевым здесь места нет: они уже
-       пришли туда, куда эти идут. */
+    /* «Скоро на бирже» — кривые, отсортированные по тому, сколько
+       осталось собрать. */
     if (filter === "soon") {
       return свои
         .filter((tok) => !tok.graduated && долевКривой(tok) != null)
         .sort((a, b) => (долевКривой(b) || 0) - (долевКривой(a) || 0));
     }
-    if (сеть === "sol") {
-      const featured = new Set(spotlightTop.map((tok) => tok.id));
-      let arr = (solTokens || []).filter((tok) => !featured.has(tok.id));
-      switch (filter) {
-        case "trend": arr = поТренду(arr); break;
-        case "hot": arr = [...arr].sort((a, b) => b.change - a.change); break;
-        case "vol": arr = [...arr].sort((a, b) => (b.vol24hNum || 0) - (a.vol24hNum || 0)); break;
-        case "dex": arr = arr.filter((tok) => tok.verified); break;
-        default: break;
-      }
-      return arr;
-    }
     const featured = new Set(spotlightTop.map((tok) => tok.id));
-    let arr = tokens.filter((tok) => !featured.has(tok.id));
+    let arr = свои.filter((tok) => !featured.has(tok.id));
     switch (filter) {
       case "trend": arr = поТренду(arr); break;
       case "hot": arr = [...arr].sort((a, b) => b.change - a.change); break;
       case "vol": arr = [...arr].sort((a, b) => (b.vol24hNum || 0) - (a.vol24hNum || 0)); break;
-      case "dex": arr = arr.filter(tok => tok.verified); break;
       default: break;
     }
     return arr;
-  }, [tokens, filter, spotlightTop, свои, solTokens, сеть]);
+  }, [filter, spotlightTop, свои]);
 
-  // Что считать загрузкой, зависит от того, что сейчас на экране:
-  // «Новые» — это свои токены из базы, остальное — биржевая лента.
-  // Раньше здесь всегда стояла биржевая, и раздел успевал сказать
-  // «пусто» до того, как приезжали свои.
-  const рынокГрузится = сеть === "sol" ? (solLoading || !solTokens) : loading;
-  const идётЗагрузка = filter === "new" ? myTokensLoading : рынокГрузится;
+  // Ждать теперь нечего, кроме своих токенов из базы: биржевой ленты в
+  // разделе больше нет.
+  const идётЗагрузка = myTokensLoading;
 
   /* Раздел показывается целиком или не показывается вовсе.
      Раньше он собирался на глазах: сначала пустая лента сделок, следом
@@ -12235,9 +12163,11 @@ function MempadView({ tokens, loading, myTokensLoading = false, myTokens, onOpen
         className="flex flex-col"
         style={{ gap: 20, display: разделГотов ? undefined : "none" }}
       >
+      {/* Бегущая строка — о сделках площадки: чужие пулы с биржи отсюда
+          убраны вместе с остальной чужой лентой. */}
       <RecentBuysTicker
         сеть={сеть}
-        tokens={сеть === "sol" ? (solTokens || []) : tokens}
+        tokens={[]}
         curveTokens={сеть === "sol" ? [] : myTokens}
         onOpen={onOpen}
         onReady={() => setЛентаГотова(true)}
@@ -25072,7 +25002,7 @@ function mapTokenRow(row) {
             />
           </KeepAlive>
           <KeepAlive show={view === "mempad"}>
-            <MempadView tokens={tokens} loading={tokensLoading} myTokensLoading={!communityLoaded} myTokens={communityTokens} onOpen={openToken} onLaunch={openCreate} solДоступен={solЗапуск} currentUserId={userId} />
+            <MempadView myTokensLoading={!communityLoaded} myTokens={communityTokens} onOpen={openToken} onLaunch={openCreate} solДоступен={solЗапуск} currentUserId={userId} />
           </KeepAlive>
           </div>
           <KeepAlive show={view === "wallet"}>
