@@ -17971,6 +17971,75 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
      закрывается в тот же миг, и нажать ещё раз уже некуда. */
   const отправлено = useRef(false);
 
+  /* Закрытие свайпом вниз. Окно сделки открывают с графика и закрывают
+     чаще, чем что-либо другое в приложении: тянуться к крестику в углу
+     после каждой покупки неудобно, а палец и так внизу экрана. */
+  const [тяга, setТяга] = useState(0);
+  const [уходит, setУходит] = useState(false);
+  const жест = useRef(null);
+  // Сбрасываем на открытии: панель ещё доигрывает уход после onClose, и
+  // сброс в тот же миг возвращал её на место — мигала и уезжала дважды.
+  useLayoutEffect(() => { if (tradeModalProp) { setТяга(0); setУходит(false); } }, [tradeModalProp]);
+
+  /* Пока окно открыто, вертикальный жест наш: иначе потягивание вниз
+     сворачивает всё окно Telegram вместо того, чтобы закрыть сделку. */
+  useEffect(() => {
+    if (!tradeModalProp) return;
+    const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    if (!tg || !tg.disableVerticalSwipes) return;
+    try { tg.disableVerticalSwipes(); } catch { /* старый клиент */ }
+  }, [tradeModalProp]);
+
+  const закрытьСвайпом = useCallback(() => {
+    setУходит(true);
+    setTimeout(() => onClose(), УХОД_ЛИСТА);
+  }, [onClose]);
+
+  // Сама панель прокручивается: если внутри уже уехали вниз, жест —
+  // прокрутка, а не закрытие.
+  function прокрученныйПредокС(эл) {
+    for (let у = эл; у && у !== document.body; у = у.parentElement) {
+      const с = getComputedStyle(у);
+      if (/(auto|scroll)/.test(с.overflowY) && у.scrollTop > 2) return true;
+    }
+    return false;
+  }
+  function началоЖестаС(e) {
+    const т = e.touches && e.touches[0];
+    if (!т) return;
+    if (e.target instanceof Element && прокрученныйПредокС(e.target)) return;
+    жест.current = { y0: т.clientY, тянем: false };
+  }
+  function ходЖестаС(e) {
+    const ж = жест.current;
+    const т = e.touches && e.touches[0];
+    if (!ж || !т) return;
+    const dy = т.clientY - ж.y0;
+    if (!ж.тянем && dy < 8) return;
+    ж.тянем = true;
+    const ход = Math.max(0, dy);
+    setТяга(ход);
+    ж.путь = ход;
+    const т1 = performance.now();
+    if (ж.т0) ж.скорость = (ход - (ж.прошлый || 0)) / Math.max(1, т1 - ж.т0);
+    ж.т0 = т1;
+    ж.прошлый = ход;
+  }
+  function конецЖестаС() {
+    const ж = жест.current;
+    жест.current = null;
+    if (!ж || !ж.тянем) return;
+    const высота = typeof window !== "undefined" ? window.innerHeight : 800;
+    // Либо увели далеко, либо бросили вниз рывком: короткий быстрый
+    // сдвиг человек тоже считает закрытием.
+    if ((ж.путь || 0) > высота * 0.16 || ((ж.скорость || 0) > 0.55 && (ж.путь || 0) > 40)) {
+      haptic("light");
+      закрытьСвайпом();
+      return;
+    }
+    setТяга(0);
+  }
+
   useEffect(() => {
     if (!tradeModal || !token || token.chain !== "solana" || !token.curveAddress) { setКривSolana(null); return; }
     let брошено = false;
@@ -18180,8 +18249,31 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   }
 
   return (
-    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ ...SHEET_BACK, zIndex: 60 }} onClick={onClose}>
-      <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={sheetCard(20)}>
+    <div
+      className={`fx-modal-back${closing ? " fx-out" : ""}`}
+      // Затемнение светлеет по мере ухода панели: страница за ней
+      // «просыпается» вместе с жестом, а не рывком в самом конце.
+      style={{ ...SHEET_BACK, zIndex: 60, opacity: уходит ? 0 : 1, transition: жест.current ? "none" : `opacity ${УХОД_ЛИСТА}ms ease-out` }}
+      onClick={onClose}
+    >
+      <div
+        className={`fx-modal-card${уходит || тяга > 0 ? " fx-no-anim" : ""}`}
+        data-sheet="1"
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={началоЖестаС}
+        onTouchMove={ходЖестаС}
+        onTouchEnd={конецЖестаС}
+        onTouchCancel={конецЖестаС}
+        style={sheetCard(20, {
+          transform: уходит ? "translateY(110%)" : `translateY(${тяга}px)`,
+          transition: жест.current ? "none" : `transform ${УХОД_ЛИСТА}ms cubic-bezier(0.22, 0.85, 0.25, 1)`,
+          touchAction: "pan-y",
+        })}
+      >
+        {/* Полоска сверху: она и говорит, что лист тянется вниз. */}
+        <div className="flex justify-center" style={{ marginBottom: 10 }}>
+          <span aria-hidden style={{ width: 40, height: 4, borderRadius: 999, background: hexA("#FFFFFF", 0.22) }} />
+        </div>
         <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
           <div className="flex items-center gap-2">
             <TokenAvatar size={34} src={token.logoUrl} />
