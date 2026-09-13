@@ -1848,25 +1848,13 @@ function GlobalStyle() {
       @keyframes меткаПришла { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
       /* Галочка на правильном адресе: выскакивает с перелётом, как
          печать, — так видно, что проверка прошла именно сейчас. */
-      /* Нити бегут ровно на клетку плетения: рисунок остаётся на месте,
-         а блеск по нему ползёт. */
-      @keyframes нитиБегут { from { background-position: 0 0; } to { background-position: 20px 20px; } }
-      /* И дышат: два набора нитей светятся по очереди, как у настоящей
-         ткани при повороте. */
-      @keyframes нитиБлестят { 0%, 100% { opacity: 0.28; } 50% { opacity: 0.85; } }
-      /* Лак: широкое отражение медленно ходит по поверхности. */
-      @keyframes лакПлывёт {
-        0%   { transform: translate3d(-14%, -8%, 0); }
-        50%  { transform: translate3d(12%, 10%, 0); }
-        100% { transform: translate3d(-14%, -8%, 0); }
-      }
-      /* Свет по углеволокну: широкая полоса проходит карту насквозь и
-         возвращается не сразу — карбон бликует редко, но заметно. */
-      @keyframes волокноБлик {
-        0%, 8%   { transform: translateX(-160px) rotate(16deg); opacity: 0; }
-        16%      { opacity: 1; }
-        52%      { transform: translateX(430px) rotate(16deg); opacity: 0; }
-        100%     { transform: translateX(430px) rotate(16deg); opacity: 0; }
+      /* Углеволокно едет вниз ровно на клетку плетения: в конце круга
+         рисунок совпадает сам с собой, поэтому шва не видно и полотно
+         кажется бесконечным. Позиции слоёв — те самые смещения, что
+         собирают «ёлочку» твила. */
+      @keyframes карбонЕдет {
+        from { background-position: 0 5px, 10px 0px, 0 10px, 10px 5px, 0 0, 0 0; }
+        to   { background-position: 0 25px, 10px 20px, 0 30px, 10px 25px, 0 20px, 0 20px; }
       }
       @keyframes галочкаВстала {
         0%   { opacity: 0; transform: scale(0.4) rotate(-18deg); }
@@ -10684,11 +10672,11 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
             backgroundColor: item.ткань ? "#131319" : undefined,
             backgroundSize: item.size || "320% 320%",
             // Ткань не переливается — по ней ходит блик, как на карте.
-            animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
+            animation: item.ткань ? "карбонЕдет 14s linear infinite" : "картаПереливается 9s ease-in-out infinite",
             boxShadow: `0 8px 22px ${hexA(item.glow || "#7C3AED", 0.35)}`,
             padding: "9px 10px", textAlign: "left",
           }}>
-            {item.ткань && <СлоиТкани размах={70} />}
+            {item.ткань && <СлоиТкани />}
             <div style={{ fontFamily: bodyFont, fontSize: 8.5, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
             <div style={{ fontFamily: displayFont, fontSize: 15, fontWeight: 700, color: "#FFFFFF", marginTop: 2 }}>
               12,40 <span style={{ fontSize: 9, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
@@ -10866,10 +10854,10 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
               background: item.fill,
               backgroundColor: item.ткань ? "#131319" : undefined,
               backgroundSize: item.size || "320% 320%",
-              animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
+              animation: item.ткань ? "карбонЕдет 14s linear infinite" : "картаПереливается 9s ease-in-out infinite",
               boxShadow: `0 12px 30px ${hexA(item.glow || "#7C3AED", 0.38)}`,
             }}>
-              {item.ткань && <СлоиТкани размах={100} />}
+              {item.ткань && <СлоиТкани />}
               <div style={{ fontFamily: bodyFont, fontSize: 11, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
               <div style={{ fontFamily: displayFont, fontSize: 24, fontWeight: 700, color: "#FFFFFF", marginTop: 4 }}>
                 12,40 <span style={{ fontSize: 12, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
@@ -15140,16 +15128,16 @@ const WALLET_SKINS = [
        не половина карты. */
     id: "carbon", label: { RU: "Карбон", EN: "Carbon" }, price: 120,
     fill: [
-      "linear-gradient(27deg, #14141A 5px, transparent 5px) 0 5px",
-      "linear-gradient(207deg, #14141A 5px, transparent 5px) 10px 0",
-      "linear-gradient(27deg, #24242E 5px, transparent 5px) 0 10px",
-      "linear-gradient(207deg, #24242E 5px, transparent 5px) 10px 5px",
+      "linear-gradient(27deg, #14141A 5px, transparent 5px)",
+      "linear-gradient(207deg, #14141A 5px, transparent 5px)",
+      "linear-gradient(27deg, #24242E 5px, transparent 5px)",
+      "linear-gradient(207deg, #24242E 5px, transparent 5px)",
       "linear-gradient(90deg, #1B1B22 10px, transparent 10px)",
       "linear-gradient(180deg, #1E1E26 25%, #1A1A21 25%, #1A1A21 50%, transparent 50%, transparent 75%, #26262F 75%, #26262F)",
     ].join(", "),
-    // Ткань не переливается: у карбона рисунок неподвижен, движется по
-    // нему только свет. Поэтому шаг клетки задан точками, а перелив
-    // выключен — вместо него по волокну ходит блик.
+    /* Шаг плетения. Смещения слоёв друг относительно друга ведёт
+       анимация «карбонЕдет»: она же медленно тянет всю ткань вниз ровно
+       на клетку, так что стык не виден и полотно кажется бесконечным. */
     size: "20px 20px",
     ткань: true,
     glow: "#5A5A6B",
@@ -15162,51 +15150,19 @@ const WALLET_SKINS = [
 ];
 const WALLET_SKIN_BY_ID = Object.fromEntries(WALLET_SKINS.map((с) => [с.id, с]));
 
-/* Блеск углеволокна.
+/* Объём углеволокна.
  *
- * Настоящий карбон светится не весь разом: нити лежат в двух
- * направлениях, и каждая отражает свет только под своим углом — поэтому
- * при малейшем повороте карты по ткани пробегают встречные волны.
- * Здесь это три слоя: два диагональных набора нитей, которые дышат в
- * противофазе и медленно ползут ровно на одну клетку (двадцать точек —
- * шаг плетения, поэтому рисунок не плывёт, а блеск бежит), и мягкое
- * пятно лака поверх, как отражение окна на капоте.
- *
- * Отдельно — широкая полоса света, проходящая карту насквозь: её видно
- * реже, зато именно она читается как «повернул в руках».
+ * Диагональных бликов больше нет: на мелком плетении они читались как
+ * грязь на стекле, а не как свет. Остаётся то, что делает ткань
+ * плотной, — подсветка сверху и затемнение к низу; само полотно при
+ * этом медленно едет вниз (см. «карбонЕдет»), и этого движения хватает.
  */
-function СлоиТкани({ размах = 150 }) {
-  const нить = (угол, шаг) => ({
-    position: "absolute", inset: -20, pointerEvents: "none",
-    background: `repeating-linear-gradient(${угол}deg,`
-      + ` ${hexA("#FFFFFF", 0.07)} 0px, ${hexA("#FFFFFF", 0.07)} 1.5px,`
-      + ` transparent 1.5px, transparent 10px)`,
-    backgroundSize: "20px 20px",
-    animation: `нитиБегут 6s linear ${шаг}s infinite, нитиБлестят 4.6s ease-in-out ${шаг}s infinite`,
-  });
+function СлоиТкани() {
   return (
-    <>
-      <span aria-hidden style={нить(27, 0)} />
-      <span aria-hidden style={нить(207, -2.3)} />
-      {/* Лак: широкое мягкое пятно, которое медленно ходит по карте. */}
-      <span aria-hidden style={{
-        position: "absolute", inset: "-40%", pointerEvents: "none",
-        background: `radial-gradient(60% 45% at 30% 25%, ${hexA("#FFFFFF", 0.16)} 0%, ${hexA("#FFFFFF", 0.04)} 42%, transparent 70%)`,
-        animation: "лакПлывёт 11s ease-in-out infinite",
-      }} />
-      {/* Общая подсветка сверху и затемнение к низу — объём плетения. */}
-      <span aria-hidden style={{
-        position: "absolute", inset: 0, pointerEvents: "none",
-        background: `linear-gradient(160deg, ${hexA("#FFFFFF", 0.14)} 0%, ${hexA("#FFFFFF", 0.03)} 26%, ${hexA("#000000", 0.20)} 62%, ${hexA("#FFFFFF", 0.07)} 100%)`,
-      }} />
-      {/* Полоса света поперёк волокна. */}
-      <span aria-hidden style={{
-        position: "absolute", top: -120, bottom: -120, width: размах,
-        background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.22)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
-        transform: "rotate(16deg)", pointerEvents: "none",
-        animation: "волокноБлик 5.2s ease-in-out infinite",
-      }} />
-    </>
+    <span aria-hidden style={{
+      position: "absolute", inset: 0, pointerEvents: "none",
+      background: `linear-gradient(180deg, ${hexA("#FFFFFF", 0.10)} 0%, ${hexA("#FFFFFF", 0.02)} 22%, ${hexA("#000000", 0.22)} 72%, ${hexA("#000000", 0.30)} 100%)`,
+    }} />
   );
 }
 
@@ -15449,7 +15405,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           background: видКарты.fill,
           backgroundColor: ткань ? "#131319" : undefined,
           backgroundSize: видКарты.size || "320% 320%",
-          animation: ткань ? "none" : `картаПереливается ${ходКарты.длительность}s ease-in-out ${ходКарты.сдвиг}s infinite`,
+          animation: ткань
+            ? "карбонЕдет 14s linear infinite"
+            : `картаПереливается ${ходКарты.длительность}s ease-in-out ${ходКарты.сдвиг}s infinite`,
           border: "none",
         }}
       >
@@ -15475,7 +15433,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             поперёк плетения, как по капоту, и добавляет объёма там, где
             сам рисунок неподвижен. Плюс наклонный отблеск сверху —
             углеволокно всегда чуть бликует по краю. */}
-        {ткань && <СлоиТкани размах={150} />}
+        {ткань && <СлоиТкани />}
 
         <div className="flex items-center justify-between" style={{ position: "relative", gap: 10 }}>
           <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.72), fontSize: 13 }}>
