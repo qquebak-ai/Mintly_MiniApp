@@ -11646,6 +11646,28 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, onOpenC
     );
   }
 
+  /* Пока не посчитаны достижения, неизвестен и баланс: показывать цены,
+     которых человек «не может» себе позволить, — обман. Ждёт при этом
+     весь экран разом, а не одна сетка: живой сундук и таблица лучших
+     посреди плашек читались как поломка остального. */
+  if (!achievementsReady) {
+    return (
+      <div className="flex flex-col gap-4 pt-2">
+        <ПлашкаЧисла width={132} height={26} radius={8} />
+        <ПлашкаБлока h={18} radius={6} />
+        <ПлашкаБлока h={132} radius={26} />
+        <ПлашкаБлока h={22} radius={6} />
+        <div className="flex flex-col" style={{ gap: 8 }}>
+          {[0, 1, 2].map((i) => <ПлашкаБлока key={i} h={56} radius={18} />)}
+        </div>
+        <ПлашкаБлока h={20} radius={6} />
+        <div className="grid grid-cols-2 gap-2.5">
+          {[0, 1, 2, 3].map((i) => <ПлашкаБлока key={i} h={190} radius={16} />)}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 pt-2">
       <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em" }}>{t("shopTitle")}</span>
@@ -11699,11 +11721,6 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, onOpenC
         })}
       </div>
 
-      {!achievementsReady ? (
-        // Пока не посчитаны достижения, неизвестен и баланс: показывать
-        // цены, которых человек «не может» себе позволить, — обман.
-        <PageLoader minHeight={260} />
-      ) : (
       <div className="grid grid-cols-2 gap-2.5" key={tab}>
         {items.map((item) => {
           const price = item.price || 0;
@@ -11724,7 +11741,6 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, onOpenC
           );
         })}
       </div>
-      )}
 
       {chestConfirm && (
         <ChestBuySheet
@@ -13622,7 +13638,9 @@ function HomeView({
     // должна висеть над пустотой, а не над последней строкой топа.
     <div className="flex flex-col" style={{ gap: 26, paddingTop: 8, paddingBottom: 96 }}>
       <ШапкаГлавной profile={profile} accountCreated={accountCreated} onOpenMyProfile={onOpenMyProfile} грузится={профильГрузится} />
-      <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
+      {/* Баннеры ждут вместе со всеми: живая карусель посреди плашек
+          выглядела так, будто остальной экран сломался. */}
+      {вПлашках ? <ПлашкаБлока h={150} radius={20} /> : <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />}
       {вПлашках ? (
         <>
           <ПлашкаБлока h={96} />
