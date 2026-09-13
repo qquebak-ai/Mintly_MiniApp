@@ -1848,6 +1848,14 @@ function GlobalStyle() {
       @keyframes меткаПришла { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
       /* Галочка на правильном адресе: выскакивает с перелётом, как
          печать, — так видно, что проверка прошла именно сейчас. */
+      /* Свет по углеволокну: широкая полоса проходит карту насквозь и
+         возвращается не сразу — карбон бликует редко, но заметно. */
+      @keyframes волокноБлик {
+        0%, 8%   { transform: translateX(-160px) rotate(16deg); opacity: 0; }
+        16%      { opacity: 1; }
+        52%      { transform: translateX(430px) rotate(16deg); opacity: 0; }
+        100%     { transform: translateX(430px) rotate(16deg); opacity: 0; }
+      }
       @keyframes галочкаВстала {
         0%   { opacity: 0; transform: scale(0.4) rotate(-18deg); }
         60%  { opacity: 1; transform: scale(1.12) rotate(4deg); }
@@ -10659,11 +10667,29 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
              ничего не объясняет, а маленькая карта баланса — сразу всё. */
           <div style={{
             position: "relative", zIndex: 1, width: "82%", height: 62, borderRadius: 12,
-            background: item.fill, backgroundSize: "320% 320%",
-            animation: "картаПереливается 9s ease-in-out infinite",
+            overflow: "hidden",
+            background: item.fill,
+            backgroundColor: item.ткань ? "#131319" : undefined,
+            backgroundSize: item.size || "320% 320%",
+            // Ткань не переливается — по ней ходит блик, как на карте.
+            animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
             boxShadow: `0 8px 22px ${hexA(item.glow || "#7C3AED", 0.35)}`,
             padding: "9px 10px", textAlign: "left",
           }}>
+            {item.ткань && (
+              <>
+                <span aria-hidden style={{
+                  position: "absolute", inset: 0, pointerEvents: "none",
+                  background: `linear-gradient(160deg, ${hexA("#FFFFFF", 0.14)} 0%, ${hexA("#FFFFFF", 0.03)} 26%, ${hexA("#000000", 0.18)} 62%, ${hexA("#FFFFFF", 0.06)} 100%)`,
+                }} />
+                <span aria-hidden style={{
+                  position: "absolute", top: -60, bottom: -60, width: 70,
+                  background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.20)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
+                  transform: "rotate(16deg)", pointerEvents: "none",
+                  animation: "волокноБлик 5.2s ease-in-out infinite",
+                }} />
+              </>
+            )}
             <div style={{ fontFamily: bodyFont, fontSize: 8.5, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
             <div style={{ fontFamily: displayFont, fontSize: 15, fontWeight: 700, color: "#FFFFFF", marginTop: 2 }}>
               12,40 <span style={{ fontSize: 9, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
@@ -10837,10 +10863,27 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
                ровно как он будет выглядеть в кошельке. */
             <div style={{
               width: "84%", height: 96, borderRadius: 16, padding: "12px 14px", textAlign: "left",
-              background: item.fill, backgroundSize: "320% 320%",
-              animation: "картаПереливается 9s ease-in-out infinite",
+              position: "relative", overflow: "hidden",
+              background: item.fill,
+              backgroundColor: item.ткань ? "#131319" : undefined,
+              backgroundSize: item.size || "320% 320%",
+              animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
               boxShadow: `0 12px 30px ${hexA(item.glow || "#7C3AED", 0.38)}`,
             }}>
+              {item.ткань && (
+                <>
+                  <span aria-hidden style={{
+                    position: "absolute", inset: 0, pointerEvents: "none",
+                    background: `linear-gradient(160deg, ${hexA("#FFFFFF", 0.14)} 0%, ${hexA("#FFFFFF", 0.03)} 26%, ${hexA("#000000", 0.18)} 62%, ${hexA("#FFFFFF", 0.06)} 100%)`,
+                  }} />
+                  <span aria-hidden style={{
+                    position: "absolute", top: -80, bottom: -80, width: 100,
+                    background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.22)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
+                    transform: "rotate(16deg)", pointerEvents: "none",
+                    animation: "волокноБлик 5.2s ease-in-out infinite",
+                  }} />
+                </>
+              )}
               <div style={{ fontFamily: bodyFont, fontSize: 11, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
               <div style={{ fontFamily: displayFont, fontSize: 24, fontWeight: 700, color: "#FFFFFF", marginTop: 4 }}>
                 12,40 <span style={{ fontSize: 12, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
@@ -15102,9 +15145,28 @@ const WALLET_SKINS = [
     fill: "linear-gradient(120deg, #9945FF 0%, #7A3DF5 35%, #19FB9B 100%)", glow: "#14F195",
   },
   {
+    /* Настоящее плетение углеволокна, а не полоски по диагонали. Ткань
+       набирается шестью слоями: две пары встречных нитей под 27° и 207°
+       (это и есть «ёлочка» твила), поперечная линия шва между
+       квадратами и подложка из четырёх ступеней серого — она даёт
+       объём, будто нить то поднимается, то уходит под соседнюю. Клетка
+       у настоящего карбона мелкая, потому размер шага двадцать точек, а
+       не половина карты. */
     id: "carbon", label: { RU: "Карбон", EN: "Carbon" }, price: 120,
-    fill: "repeating-linear-gradient(135deg, #16161C 0px, #16161C 6px, #1E1E28 6px, #1E1E28 12px)",
-    glow: "#3A3A48",
+    fill: [
+      "linear-gradient(27deg, #14141A 5px, transparent 5px) 0 5px",
+      "linear-gradient(207deg, #14141A 5px, transparent 5px) 10px 0",
+      "linear-gradient(27deg, #24242E 5px, transparent 5px) 0 10px",
+      "linear-gradient(207deg, #24242E 5px, transparent 5px) 10px 5px",
+      "linear-gradient(90deg, #1B1B22 10px, transparent 10px)",
+      "linear-gradient(180deg, #1E1E26 25%, #1A1A21 25%, #1A1A21 50%, transparent 50%, transparent 75%, #26262F 75%, #26262F)",
+    ].join(", "),
+    // Ткань не переливается: у карбона рисунок неподвижен, движется по
+    // нему только свет. Поэтому шаг клетки задан точками, а перелив
+    // выключен — вместо него по волокну ходит блик.
+    size: "20px 20px",
+    ткань: true,
+    glow: "#5A5A6B",
   },
   {
     id: "magma", label: { RU: "Магма", EN: "Magma" }, price: 360,
@@ -15148,6 +15210,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const ходКарты = видКарты.id === "none"
     ? { длительность: перелив.длительность, сдвиг: перелив.сдвиг }
     : { длительность: 9, сдвиг: 0 };
+  // Ткань стоит на месте: у карбона рисунок неподвижен, по нему ходит
+  // только свет — блик ниже. Двигать само плетение значит превращать
+  // его в бегущие обои.
+  const ткань = !!видКарты.ткань;
 
   function волнаОт(e) {
     const блок = e.currentTarget.getBoundingClientRect();
@@ -15319,7 +15385,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             position: "absolute", inset: 0, borderRadius: 24,
             padding: 2,
             background: видКарты.fill,
-            backgroundSize: "320% 320%",
+            backgroundSize: видКарты.size || "320% 320%",
             WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
             WebkitMaskComposite: "xor",
             mask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
@@ -15347,8 +15413,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // сиреневый, синий и почти чёрный ходят друг за другом, и
           // поверхность не повторяет один и тот же переход.
           background: видКарты.fill,
-          backgroundSize: "320% 320%",
-          animation: `картаПереливается ${ходКарты.длительность}s ease-in-out ${ходКарты.сдвиг}s infinite`,
+          backgroundColor: ткань ? "#131319" : undefined,
+          backgroundSize: видКарты.size || "320% 320%",
+          animation: ткань ? "none" : `картаПереливается ${ходКарты.длительность}s ease-in-out ${ходКарты.сдвиг}s infinite`,
           border: "none",
         }}
       >
@@ -15370,6 +15437,24 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.13)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
           transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
         }} />
+        {/* Ткани свет достаётся отдельно: широкая мягкая полоса ходит
+            поперёк плетения, как по капоту, и добавляет объёма там, где
+            сам рисунок неподвижен. Плюс наклонный отблеск сверху —
+            углеволокно всегда чуть бликует по краю. */}
+        {ткань && (
+          <>
+            <span aria-hidden style={{
+              position: "absolute", inset: 0, pointerEvents: "none",
+              background: `linear-gradient(160deg, ${hexA("#FFFFFF", 0.14)} 0%, ${hexA("#FFFFFF", 0.03)} 26%, ${hexA("#000000", 0.18)} 62%, ${hexA("#FFFFFF", 0.06)} 100%)`,
+            }} />
+            <span aria-hidden style={{
+              position: "absolute", top: -120, bottom: -120, width: 150,
+              background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.20)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
+              transform: "rotate(16deg)", pointerEvents: "none",
+              animation: "волокноБлик 5.2s ease-in-out infinite",
+            }} />
+          </>
+        )}
 
         <div className="flex items-center justify-between" style={{ position: "relative", gap: 10 }}>
           <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.72), fontSize: 13 }}>
