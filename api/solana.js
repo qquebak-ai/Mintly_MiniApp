@@ -242,6 +242,19 @@ async function числоИзJupiter(mint) {
    по всем счетам этого mint. Запрос тяжёлый, поэтому живёт в том же
    кеше, что и список, и молча возвращает null, когда узел его не
    разрешает (публичные часто отказывают). */
+const TOKEN_СТАРЫЙ = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+
+/* Чья программа выпустила токен. Их две, и счета у них лежат под разными
+   программами: обход «старой» у токена Token-2022 находит ноль счетов, и
+   число держателей молча падало к двадцати крупнейшим. Спрашиваем у
+   самого mint, кому он принадлежит, и идём именно туда. */
+async function программаТокена(mint, узлы) {
+  const инфо = await rpc("getAccountInfo", [mint, { encoding: "base64", dataSlice: { offset: 0, length: 0 } }], узлы).catch(() => null);
+  const хозяин = инфо && инфо.value && инфо.value.owner;
+  return хозяин === TOKEN_2022 || хозяин === TOKEN_СТАРЫЙ ? хозяин : null;
+}
+
 async function числоДержателей(mint, узлы, минимумЕдиниц = 0) {
   /* Из каждого счёта берём только восемь байт с остатком — поле amount
      лежит по смещению 64. Раньше здесь стоял jsonParsed, и у монеты со
@@ -249,13 +262,18 @@ async function числоДержателей(mint, узлы, минимумЕд
      его либо обрывал, либо отдавал пустоту, и на карточке оставались
      ровно двадцать крупнейших. С вырезкой тот же запрос укладывается в
      пару секунд. */
+  const программа = await программаТокена(mint, узлы);
+  if (!программа) return null;
+  /* Размер счёта проверяем только у старой программы: там он всегда 165
+     байт. У Token-2022 к счёту дописываются расширения, и размер гуляет —
+     жёсткий фильтр отсекал бы как раз такие токены. Отбор по mint в
+     первых тридцати двух байтах остаётся в обоих случаях. */
+  const фильтры = программа === TOKEN_2022
+    ? [{ memcmp: { offset: 0, bytes: mint } }]
+    : [{ dataSize: 165 }, { memcmp: { offset: 0, bytes: mint } }];
   const ответ = await rpc("getProgramAccounts", [
-    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-    {
-      encoding: "base64",
-      dataSlice: { offset: 64, length: 8 },
-      filters: [{ dataSize: 165 }, { memcmp: { offset: 0, bytes: mint } }],
-    },
+    программа,
+    { encoding: "base64", dataSlice: { offset: 64, length: 8 }, filters: фильтры },
   ], узлы).catch(() => null);
   if (!Array.isArray(ответ)) return null;
   let счёт = 0;
