@@ -5740,6 +5740,9 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
   const collectedRef = useRef([]);
   const poolCursor = useRef(0);
   const curveCursor = useRef(0);
+  // Время самого свежего события, которое лента уже знает: по нему
+  // отбираются новые, а старые в очередь не возвращаются.
+  const последнееВремя = useRef(0);
 
   /* Сделки площадки — из своей же базы.
    *
@@ -5791,11 +5794,35 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
           token: tok,
         });
       }
-      if (!брошено) {
-        collectedRef.current = ряд;
-        setBuys(ряд);
-        setLoaded(true);
+      if (брошено) return;
+      setLoaded(true);
+      if (!ряд.length) return;
+
+      /* Лента — хроника, а не карусель. Первый заход показывает одну
+         строку, самую свежую, и она висит, пока не произойдёт что-то
+         новое; дальше в очередь попадают только события, которых при
+         прошлом чтении ещё не было. Раньше строка перебирала полсотни
+         сделок подряд, и человек видел покупки недельной давности как
+         будто они идут прямо сейчас.
+         На первом заходе запуск не берём: «$CATS запущен» должно
+         звучать в момент запуска, а не всякий раз, когда кто-то открыл
+         мемпад. Свежий запуск приедет следующим чтением — как событие. */
+      const времяСтроки = (с) => new Date(с.at).getTime() || 0;
+      if (!последнееВремя.current) {
+        const первая = ряд.find((с) => с.kind !== "launch") || ряд[0];
+        последнееВремя.current = времяСтроки(ряд[0]);
+        collectedRef.current = [первая];
+        setBuys([первая]);
+        return;
       }
+      const новые = ряд.filter((с) => времяСтроки(с) > последнееВремя.current);
+      if (!новые.length) return;
+      последнееВремя.current = времяСтроки(новые[0]);
+      // Новое сверху, и держим недлинный хвост: очередь листается по
+      // одной строке раз в пару секунд, копить сотни незачем.
+      const очередь = [...новые, ...collectedRef.current].slice(0, 60);
+      collectedRef.current = очередь;
+      setBuys(очередь);
     }
 
     прочитать();
@@ -5899,6 +5926,7 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
     collectedRef.current = [];
     poolCursor.current = 0;
     curveCursor.current = 0;
+    последнееВремя.current = 0;
     shownRef.current = new Set();
     setBuys([]);
     setCurrent(null);
@@ -5909,8 +5937,13 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
       const fresh = list.find((x) => !shownRef.current.has(x.id));
       if (fresh) {
         shownRef.current.add(fresh.id);
-        // Множество не должно расти бесконечно за долгую сессию.
-        if (shownRef.current.size > 400) shownRef.current = new Set([fresh.id]);
+        /* Множество не должно расти бесконечно за долгую сессию. Чистим
+           его до того, что сейчас в очереди: прежний сброс оставлял одну
+           строку, и всё, что было показано раньше, шло по второму
+           кругу. */
+        if (shownRef.current.size > 400) {
+          shownRef.current = new Set(list.map((x) => x.id));
+        }
         return fresh;
       }
       return prev && list.some((x) => x.id === prev.id) ? prev : list[0] || null;
