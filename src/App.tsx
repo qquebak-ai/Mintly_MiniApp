@@ -14069,11 +14069,13 @@ function ЭкранВывода({
               {t("withdrawPaste")}
             </button>
           </div>
-          {/* Отказ — строкой под полем и красным: сообщение поверх экрана
-              человек закроет и не поймёт, к чему оно относилось. */}
-          {беда
-            ? <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5, animation: "меткаПришла 200ms ease-out both" }}>{беда}</span>
-            : <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, lineHeight: 1.45 }}>{t("withdrawNote")}</span>}
+          {/* Под полем — только отказ, и только красным: сообщение поверх
+              экрана человек закроет и не поймёт, к чему оно относилось.
+              Пояснения про комиссию тут не нужны — их читают один раз, а
+              место они занимают всегда. */}
+          {беда && (
+            <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5, animation: "меткаПришла 200ms ease-out both" }}>{беда}</span>
+          )}
         </div>
 
         <div style={{ padding: "14px 18px 22px", flexShrink: 0 }}>
