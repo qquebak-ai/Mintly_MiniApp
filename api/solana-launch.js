@@ -369,7 +369,7 @@ export async function собратьЗапуск({ wallet, name, symbol, base, b
 
 /* Поля кривой из её счёта. Раскладка та же, что в программе: читают её
    и состояние наружу, и расчёт предела продажи. */
-function поляКривой(d) {
+export function поляКривой(d) {
   if (!d || d.length < 160) return null;
   let p = 0;
   const версия = d.readUInt8(p); p += 1;
