@@ -266,7 +266,13 @@ const STR = {
     tgAuthNotConfigured: "Вход через Telegram пока не настроен на сервере.",
     bootStepAuth: "Вход в аккаунт", bootStepFeed: "Лента покупок",
     bootStepTokens: "Токены сообщества", bootStepRate: "Курс GRAM",
-    shopTabFrames: "Рамки", shopTabCards: "Карточки",
+    shopTabFrames: "Рамки", shopTabCards: "Карточки", shopTabWallet: "Карта",
+    boardTitle: "Топ трейдеров",
+    boardWeek: "Неделя", boardDay: "Сутки", boardAll: "Всё время",
+    boardVolume: "оборот", boardTrades: "сделок", boardLaunches: "запусков", boardPnl: "прибыль",
+    boardEmpty: "Пока пусто — на этой неделе никто не торговал",
+    boardYou: "ты",
+    boardHint: "Место считается по обороту: сумма покупок и продаж в долларах.",
     shopEquip: "Надеть", shopEquipped: "Надето", shopOwned: "Куплено",
     editLookTitle: "Внешний вид", editLookHint: "Надень купленную рамку и карточку. Остальное — в магазине.",
     editLookEmpty: "Пока нечего надевать — рамки и карточки покупаются в магазине",
@@ -857,7 +863,13 @@ const STR = {
     tgAuthNotConfigured: "Telegram sign-in is not configured on the server yet.",
     bootStepAuth: "Signing in", bootStepFeed: "Buy feed",
     bootStepTokens: "Community tokens", bootStepRate: "TON rate",
-    shopTabFrames: "Frames", shopTabCards: "Cards",
+    shopTabFrames: "Frames", shopTabCards: "Cards", shopTabWallet: "Card",
+    boardTitle: "Top traders",
+    boardWeek: "Week", boardDay: "24h", boardAll: "All time",
+    boardVolume: "volume", boardTrades: "trades", boardLaunches: "launches", boardPnl: "profit",
+    boardEmpty: "Nothing yet — nobody traded this week",
+    boardYou: "you",
+    boardHint: "Ranked by volume: buys and sells in dollars.",
     shopEquip: "Equip", shopEquipped: "Equipped", shopOwned: "Owned",
     editLookTitle: "Look", editLookHint: "Put on a frame and a card you own. Buying happens in the shop.",
     editLookEmpty: "Nothing to put on yet — frames and cards are bought in the shop",
@@ -6436,7 +6448,7 @@ function coinsEarned(achievements) {
 }
 
 function cosmeticPrice(kind, id) {
-  const item = (kind === "frame" ? FRAME_BY_ID : CARD_BY_ID)[id];
+  const item = (kind === "frame" ? FRAME_BY_ID : kind === "card" ? CARD_BY_ID : WALLET_SKIN_BY_ID)[id];
   return (item && item.price) || 0;
 }
 
@@ -10469,9 +10481,135 @@ function BootSplash({ steps, done, уходит = false, insetTop = 0 }) {
 /* Витрина только продаёт. Надеть купленное можно в профиле, кнопкой
    «Редактировать профиль»: примерка — это про себя, а не про кассу, и
    раньше два действия жили на одной плитке и путались между собой. */
+/* Таблица лучших.
+ *
+ * Кто больше наторговал за неделю — деньгами, а не числом нажатий.
+ * Считает сервер (api/leaderboard.js): чужие сделки закрыты политиками,
+ * и свести их может только служебный ключ.
+ *
+ * Своя строка подсвечена и всегда видна: если человек не попал в
+ * двадцатку, смотреть таблицу незачем — он ищет в ней себя.
+ */
+function ТаблицаЛучших({ currentUserId, onOpenProfile }) {
+  const [окно, setОкно] = useState("7d");
+  const [ряд, setРяд] = useState(null);
+
+  useEffect(() => {
+    let брошено = false;
+    setРяд(null);
+    const прочитать = () => fetch(апи(`/api/leaderboard?period=${окно}`))
+      .then((r) => r.json())
+      .then((j) => { if (!брошено) setРяд(Array.isArray(j && j.rows) ? j.rows : []); })
+      .catch(() => { if (!брошено) setРяд([]); });
+    прочитать();
+    // Таблица живая, но не суетливая: места меняются медленнее цен.
+    const шаг = setInterval(() => {
+      if (typeof document === "undefined" || document.visibilityState === "visible") прочитать();
+    }, 30000);
+    return () => { брошено = true; clearInterval(шаг); };
+  }, [окно]);
+
+  const моё = ряд ? ряд.find((с) => с.userId === currentUserId) : null;
+
+  return (
+    <section className="flex flex-col" style={{ gap: 12 }}>
+      <div className="flex items-center justify-between">
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 700 }}>{t("boardTitle")}</span>
+        <div className="flex items-center" style={{ gap: 4, padding: 3, borderRadius: 999, background: T.surface }}>
+          {[["24h", t("boardDay")], ["7d", t("boardWeek")], ["all", t("boardAll")]].map(([id, подпись]) => (
+            <button
+              key={id}
+              onClick={() => { setОкно(id); haptic("light"); }}
+              className="fx-tap"
+              style={{
+                padding: "5px 11px", borderRadius: 999, border: "none",
+                background: окно === id ? T.surfaceHi : "transparent",
+                color: окно === id ? T.ice : T.faint,
+                fontFamily: bodyFont, fontSize: 12.5, fontWeight: 600,
+              }}
+            >
+              {подпись}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {ряд == null ? (
+        <div className="flex flex-col" style={{ gap: 8 }}>
+          {[0, 1, 2, 3].map((i) => <ПлашкаБлока key={i} h={56} radius={18} />)}
+        </div>
+      ) : ряд.length === 0 ? (
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{t("boardEmpty")}</span>
+      ) : (
+        <div className="flex flex-col" style={{ gap: 8 }}>
+          {ряд.map((с) => {
+            const свой = с.userId === currentUserId;
+            /* Первые три места — цветом, остальные числом. Медалей нет:
+               в таблице трейдеров важнее деньги, а не бронза. */
+            const цветМеста = с.place === 1 ? "#F0B429" : с.place === 2 ? "#C9C9D4" : с.place === 3 ? "#CD7F32" : T.faint;
+            return (
+              <button
+                key={с.userId}
+                onClick={() => onOpenProfile && с.userId && onOpenProfile(с.userId)}
+                className="fx-tap flex items-center w-full"
+                style={{
+                  gap: 12, padding: "10px 12px", borderRadius: 18, border: "none",
+                  background: свой ? hexA(T.electric, 0.12) : T.surface,
+                  boxShadow: свой ? `inset 0 0 0 1px ${hexA(T.electric, 0.4)}` : "none",
+                  textAlign: "left",
+                }}
+              >
+                <span style={{
+                  fontFamily: monoFont, fontSize: 13, fontWeight: 700, color: цветМеста,
+                  width: 22, flexShrink: 0, textAlign: "center",
+                }}>
+                  {с.place}
+                </span>
+                <AvatarFrame frameId={с.frameId || "none"} size={34}>
+                  <div style={{
+                    width: "100%", height: "100%", borderRadius: "50%",
+                    background: с.avatarUrl ? `center/cover no-repeat url(${с.avatarUrl})` : T.surfaceHi,
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15,
+                  }}>
+                    {!с.avatarUrl && (с.emoji || "🙂")}
+                  </div>
+                </AvatarFrame>
+                <div className="flex flex-col" style={{ minWidth: 0, flex: 1, gap: 2 }}>
+                  <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 600 }}>
+                    {с.nickname || "аноним"}{свой ? ` · ${t("boardYou")}` : ""}
+                  </span>
+                  <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 11.5 }}>
+                    {с.trades} {t("boardTrades")}
+                    {с.launches > 0 ? ` · ${с.launches} ${t("boardLaunches")}` : ""}
+                  </span>
+                </div>
+                <div className="flex flex-col items-end" style={{ gap: 2, flexShrink: 0 }}>
+                  <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 700 }}>
+                    {fmtUSD(с.volumeUsd)}
+                  </span>
+                  <span style={{
+                    fontFamily: monoFont, fontSize: 11.5,
+                    color: с.pnlUsd >= 0 ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ,
+                  }}>
+                    {с.pnlUsd >= 0 ? "+" : "−"}{fmtUSD(Math.abs(с.pnlUsd))}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+          {/* Не попал в двадцатку — всё равно видно, где стоишь. */}
+          {currentUserId && !моё && (
+            <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 2 }}>{t("boardHint")}</span>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, price, affordable, onOwnedTap, onBuy, onTooPoor }) {
   const handle = useCallback(() => {
-    if (owned) return onOwnedTap && onOwnedTap(kind);
+    if (owned) return onOwnedTap && onOwnedTap(kind, item.id);
     if (!affordable) return onTooPoor && onTooPoor(price);
     return onBuy(kind, item.id);
   }, [owned, affordable, price, onOwnedTap, onBuy, onTooPoor, kind, item.id]);
@@ -10516,13 +10654,30 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
         {kind === "card" && <ProfileCardBg cardId={item.id} height={96} radius={16} showcase />}
-        <div style={{ position: "relative", zIndex: 1 }}>
-          {/* Внутри рамки — просто чёрный кружок: витрина про сам
-              предмет, а своя аватарка тут только отвлекает. */}
-          <AvatarFrame frameId={kind === "frame" ? item.id : "none"} size={62}>
-            <div style={{ width: "100%", height: "100%", background: T.bg }} />
-          </AvatarFrame>
-        </div>
+        {kind === "wallet" ? (
+          /* Скин карты показываем самой картой: кружок аватарки тут
+             ничего не объясняет, а маленькая карта баланса — сразу всё. */
+          <div style={{
+            position: "relative", zIndex: 1, width: "82%", height: 62, borderRadius: 12,
+            background: item.fill, backgroundSize: "320% 320%",
+            animation: "картаПереливается 9s ease-in-out infinite",
+            boxShadow: `0 8px 22px ${hexA(item.glow || "#7C3AED", 0.35)}`,
+            padding: "9px 10px", textAlign: "left",
+          }}>
+            <div style={{ fontFamily: bodyFont, fontSize: 8.5, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
+            <div style={{ fontFamily: displayFont, fontSize: 15, fontWeight: 700, color: "#FFFFFF", marginTop: 2 }}>
+              12,40 <span style={{ fontSize: 9, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
+            </div>
+          </div>
+        ) : (
+          <div style={{ position: "relative", zIndex: 1 }}>
+            {/* Внутри рамки — просто чёрный кружок: витрина про сам
+                предмет, а своя аватарка тут только отвлекает. */}
+            <AvatarFrame frameId={kind === "frame" ? item.id : "none"} size={62}>
+              <div style={{ width: "100%", height: "100%", background: T.bg }} />
+            </AvatarFrame>
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-1.5">
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 600 }}>{pickLabel(item.label)}</span>
@@ -11381,14 +11536,22 @@ function ChestCard({ coins, owned, onOpen }) {
   );
 }
 
-function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onOpenChest, achievementsReady = true, onOpenAchievements, showToast, accountCreated = false, onOpenLogin }) {
+function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, onOpenChest, achievementsReady = true, onOpenAchievements, showToast, accountCreated = false, onOpenLogin, currentUserId = null, onOpenProfile }) {
   const [tab, setTab] = useState("frames");
   // Нажатие на уже купленное открывает примерку в «Редактировать
   // профиль» — сразу на нужной вкладке. Витрина не надевает ничего
   // сама, но и не отвечает бесполезной подсказкой.
   const lookRef = useRef(null);
-  lookRef.current = (kind) => { haptic("light"); if (onOpenLook) onOpenLook(kind); };
-  const ownedTap = useCallback((kind) => lookRef.current(kind), []);
+  /* Купленное надевается по-разному. Рамку и карточку примеряют в
+     «Редактировать профиль» — они про то, каким тебя видят другие. Вид
+     карты баланса видишь только ты, и гонять за ним в настройки профиля
+     незачем: нажал в магазине — надел. */
+  lookRef.current = (kind, id) => {
+    haptic("light");
+    if (kind === "wallet") { if (onEquip) onEquip("wallet", id); return; }
+    if (onOpenLook) onOpenLook(kind);
+  };
+  const ownedTap = useCallback((kind, id) => lookRef.current(kind, id), []);
   // Нажатие на некупленный предмет открывает окно подтверждения, а не
   // списывает монеты сразу.
   const [confirming, setConfirming] = useState(null); // { kind, id }
@@ -11408,8 +11571,8 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onOpenChest, ach
     if (onOpenAchievements) onOpenAchievements();
   };
   const tooPoor = useCallback((price) => tooPoorRef.current(price), []);
-  const items = tab === "frames" ? AVATAR_FRAMES : PROFILE_CARDS;
-  const kind = tab === "frames" ? "frame" : "card";
+  const items = tab === "frames" ? AVATAR_FRAMES : tab === "cards" ? PROFILE_CARDS : WALLET_SKINS;
+  const kind = tab === "frames" ? "frame" : tab === "cards" ? "card" : "wallet";
   const equippedId = cosmetics[kind];
 
   // Без аккаунта магазин закрыт целиком: монеты копятся за достижения,
@@ -11469,8 +11632,12 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onOpenChest, ach
           карточки рано или поздно скупаются все. */}
       <ChestCard coins={coins} owned={owned} onOpen={() => setChestConfirm(true)} />
 
+      {/* Таблица лучших стоит здесь же: монеты зарабатывают делами, и
+          повод посмотреть на чужие дела уместен там, где их тратят. */}
+      <ТаблицаЛучших currentUserId={currentUserId} onOpenProfile={onOpenProfile} />
+
       <div className="flex items-center gap-2">
-        {[["frames", t("shopTabFrames")], ["cards", t("shopTabCards")]].map(([id, label]) => {
+        {[["frames", t("shopTabFrames")], ["cards", t("shopTabCards")], ["wallet", t("shopTabWallet")]].map(([id, label]) => {
           const active = tab === id;
           return (
             <button key={id} onClick={() => setTab(id)} className="fx-tap"
@@ -14882,7 +15049,55 @@ function ИсторияКошелька({ userId, тик = 0, свежие = [] 
 const ГРАДИЕНТ_КАРТЫ =
   "linear-gradient(115deg, #E44BC8 0%, #C13AE6 18%, #8E2DE2 36%, #6A17E8 54%, #4A00E0 70%, #7B1FE0 84%, #2C0A78 100%)";
 
-function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0 }) {
+/* Вид карты баланса — товар магазина.
+ *
+ * Самый дорогой экран приложения — тот, который открывают каждый день, а
+ * это кошелёк. Рамка аватарки живёт на чужих глазах, карта — на своих,
+ * и красят её ровно потому, что видят чаще всего. Каждый вид описан
+ * заливкой и цветом свечения вокруг: волны по краю берут тот же оттенок,
+ * иначе карта и её ореол расходятся. */
+const WALLET_SKINS = [
+  {
+    id: "none", label: { RU: "Mintly", EN: "Mintly" }, price: 0,
+    fill: ГРАДИЕНТ_КАРТЫ, glow: "#7C3AED",
+  },
+  {
+    id: "midnight", label: { RU: "Полночь", EN: "Midnight" }, price: 140,
+    fill: "linear-gradient(140deg, #0F2027 0%, #203A43 45%, #2C5364 100%)", glow: "#2C5364",
+  },
+  {
+    id: "candle", label: { RU: "Свеча", EN: "Candle" }, price: 180,
+    // Зелёный рост слева и красное падение справа — тот самый график,
+    // только на карте.
+    fill: "linear-gradient(115deg, #00A34C 0%, #00E96B 26%, #0B2A1A 58%, #E01E37 86%, #FF3B47 100%)",
+    glow: "#00C853",
+  },
+  {
+    id: "gold", label: { RU: "Золото", EN: "Gold" }, price: 320,
+    fill: "linear-gradient(120deg, #8A5E06 0%, #F0B429 32%, #FFF0C2 50%, #F0B429 68%, #6A4A08 100%)",
+    glow: "#F0B429",
+  },
+  {
+    id: "solana", label: { RU: "Солана", EN: "Solana" }, price: 220,
+    fill: "linear-gradient(120deg, #9945FF 0%, #7A3DF5 35%, #19FB9B 100%)", glow: "#14F195",
+  },
+  {
+    id: "carbon", label: { RU: "Карбон", EN: "Carbon" }, price: 120,
+    fill: "repeating-linear-gradient(135deg, #16161C 0px, #16161C 6px, #1E1E28 6px, #1E1E28 12px)",
+    glow: "#3A3A48",
+  },
+  {
+    id: "magma", label: { RU: "Магма", EN: "Magma" }, price: 360,
+    fill: "linear-gradient(125deg, #2B0A02 0%, #8E1400 30%, #FF3B00 55%, #FFD08A 74%, #7A1B00 100%)",
+    glow: "#FF4D0A",
+  },
+];
+const WALLET_SKIN_BY_ID = Object.fromEntries(WALLET_SKINS.map((с) => [с.id, с]));
+
+function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none" }) {
+  // Вид карты берём из купленного в магазине; неизвестный id — обычная
+  // карта Mintly, а не пустая заливка.
+  const видКарты = WALLET_SKIN_BY_ID[скинКарты] || WALLET_SKIN_BY_ID.none;
   const [copied, setCopied] = useState(false);
   const низ = useRef(null);
 
@@ -15069,13 +15284,13 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           style={{
             position: "absolute", inset: 0, borderRadius: 24,
             padding: 2,
-            background: ГРАДИЕНТ_КАРТЫ,
+            background: видКарты.fill,
             backgroundSize: "320% 320%",
             WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
             WebkitMaskComposite: "xor",
             mask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
             maskComposite: "exclude",
-            filter: `drop-shadow(0 0 9px ${hexA("#B15CFF", 0.5)})`,
+            filter: `drop-shadow(0 0 9px ${hexA(видКарты.glow, 0.5)})`,
             pointerEvents: "none",
             animation: `картаПереливается ${перелив.длительность}s ease-in-out ${перелив.сдвиг}s infinite,`
               + ` ореолКарты 4.2s ease-out ${задержка}s infinite`,
@@ -15089,7 +15304,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // Оттенков больше, чем нужно для простого градиента: розовый,
           // сиреневый, синий и почти чёрный ходят друг за другом, и
           // поверхность не повторяет один и тот же переход.
-          background: ГРАДИЕНТ_КАРТЫ,
+          background: видКарты.fill,
           backgroundSize: "320% 320%",
           animation: `картаПереливается ${перелив.длительность}s ease-in-out ${перелив.сдвиг}s infinite`,
           border: "none",
@@ -22707,18 +22922,22 @@ function mapTokenRow(row) {
   // оформление устройства, серверу о нём знать нечего, поэтому храним в
   // localStorage рядом с темой и языком.
   const [cosmetics, setCosmetics] = useState(() => {
-    const base = { frame: "none", card: "none" };
+    const base = { frame: "none", card: "none", wallet: "none" };
     try {
       if (typeof window !== "undefined") {
         const f = window.localStorage.getItem("mintly_frame");
         const c = window.localStorage.getItem("mintly_card");
+        // Вид карты баланса хранится только на устройстве: её видит один
+        // человек — тот, кто её открыл, и чужому профилю она не показана.
+        const w = window.localStorage.getItem("mintly_wallet_skin");
         if (f && FRAME_BY_ID[f]) base.frame = f;
         if (c && CARD_BY_ID[c]) base.card = c;
+        if (w && WALLET_SKIN_BY_ID[w]) base.wallet = w;
       }
     } catch (e) { /* localStorage unavailable */ }
     return base;
   });
-  const COSMETIC_STORAGE = { frame: "mintly_frame", card: "mintly_card" };
+  const COSMETIC_STORAGE = { frame: "mintly_frame", card: "mintly_card", wallet: "mintly_wallet_skin" };
 
   /* Купленные предметы. Баланс монет отдельно нигде не лежит: он
      считается как «заработано достижениями минус потрачено на покупки».
@@ -22771,7 +22990,7 @@ function mapTokenRow(row) {
     } catch (e) { /* localStorage unavailable */ }
     // localStorage оставляем для мгновенного отклика и гостей, но выбор
     // вошедшего уходит в профиль — иначе его предметы не увидит никто.
-    if (userId) {
+    if (userId && kind !== "wallet") {
       supabase
         .from("profiles")
         .update(kind === "frame" ? { frame_id: id } : { card_id: id })
@@ -22969,7 +23188,7 @@ function mapTokenRow(row) {
     // Надевать сами не лезем: примерка живёт в «Редактировать
     // профиль», и покупка, которая молча меняет вид, — это ровно то
     // разделение, которое здесь и наводится.
-    const item = (kind === "frame" ? FRAME_BY_ID : CARD_BY_ID)[id];
+    const item = (kind === "frame" ? FRAME_BY_ID : kind === "card" ? CARD_BY_ID : WALLET_SKIN_BY_ID)[id];
     showToast(tf("shopBought", { name: pickLabel(item ? item.label : null) || id }));
   }
   // Смена ника за монеты. Занятость проверяет сама база уникальным
@@ -24443,6 +24662,7 @@ function mapTokenRow(row) {
           </div>
           <KeepAlive show={view === "wallet"}>
             <WalletView
+              скинКарты={cosmetics.wallet}
               connected={connected}
               walletAddress={walletAddress}
               tonBalance={tonBalance}
@@ -24469,6 +24689,9 @@ function mapTokenRow(row) {
               coins={coins}
               onBuy={buyCosmetic}
               onOpenLook={openLookFromShop}
+              onEquip={equipCosmetic}
+              currentUserId={userId}
+              onOpenProfile={openUserProfile}
               onOpenChest={openChest}
               achievementsReady={achievementsReady}
               onOpenAchievements={() => setView("achievements")}
