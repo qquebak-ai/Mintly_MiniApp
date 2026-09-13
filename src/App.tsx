@@ -5737,21 +5737,86 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
         .sort((a, b) => (b.tx1h || b.tx24h || 0) - (a.tx1h || a.tx24h || 0)),
     [tokens]
   );
-  // Токены, запущенные в приложении: у них своя кривая вместо пула, и
-  // сделки читаются прямо из контракта.
-  const curves = useMemo(
-    () => (curveTokens || []).filter((tok) => tok.curveAddress),
-    [curveTokens]
-  );
-
   const collectedRef = useRef([]);
   const poolCursor = useRef(0);
   const curveCursor = useRef(0);
 
+  /* Сделки площадки — из своей же базы.
+   *
+   * Пулов у токена на кривой нет, а читать их из контракта умеет только
+   * TON: в Solana лента оставалась пустой. Все сделки и так пишутся в
+   * базу при покупке и продаже, поэтому берём их оттуда — одним запросом
+   * на все токены и обе цепочки.
+   *
+   * Токен для строки ищем среди тех, что уже показаны в разделе: по нему
+   * открывается карточка, и собирать её заново из куска ленты незачем. */
+  const своиПоАдресу = useMemo(() => {
+    const карта = new Map();
+    (curveTokens || []).forEach((tok) => {
+      if (tok.address) карта.set(tok.address, tok);
+      if (tok.tokenAddress) карта.set(tok.tokenAddress, tok);
+    });
+    return карта;
+  }, [curveTokens]);
+
+  useEffect(() => {
+    if (!своиПоАдресу.size) { setLoaded(true); return undefined; }
+    let брошено = false;
+
+    async function прочитать() {
+      let j = null;
+      try {
+        const r = await fetch(апи("/api/trades-feed?limit=50"));
+        if (!r.ok) { if (!брошено) setLoaded(true); return; }
+        j = await r.json();
+      } catch { if (!брошено) setLoaded(true); return; }
+      if (брошено) return;
+      // Даже пустой ответ — это ответ: держать скелет, пока сделок нет,
+      // значит держать весь раздел за ним.
+      if (!j || !Array.isArray(j.rows)) { setLoaded(true); return; }
+      const нужная = сеть === "sol" ? "solana" : "ton";
+      const ряд = [];
+      for (const с of j.rows) {
+        const tok = своиПоАдресу.get(с.address);
+        if (!tok || (tok.chain || "ton") !== нужная) continue;
+        ряд.push({
+          id: `db:${с.id}`,
+          kind: с.kind,
+          at: с.at,
+          from: с.from,
+          volUsd: Number(с.usd) || 0,
+          // В TON сумма сделки и есть сумма в монете; в Solana её
+          // пересчитает сама строка, по курсу.
+          volTon: нужная === "ton" ? Number(с.amount) || 0 : null,
+          token: tok,
+        });
+      }
+      if (!брошено) {
+        collectedRef.current = ряд;
+        setBuys(ряд);
+        setLoaded(true);
+      }
+    }
+
+    прочитать();
+    const iv = setInterval(() => {
+      if (typeof document === "undefined" || document.visibilityState === "visible") прочитать();
+    }, 10000);
+    const поСделке = () => прочитать();
+    if (typeof window !== "undefined") window.addEventListener("mintly:сделка", поСделке);
+    return () => {
+      брошено = true;
+      clearInterval(iv);
+      if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", поСделке);
+    };
+  }, [своиПоАдресу, сеть]);
+
   useEffect(() => {
     // Следить не за чем — значит лента уже «загружена»: без этого раздел
     // ждал бы её до самого предохранителя, хотя ждать нечего.
-    if (!pools.length && !curves.length) { setBuys([]); setLoaded(true); return; }
+    // Сделки площадки приходят из своей базы соседним потоком; здесь
+    // остались только чужие пулы, и без них этому циклу делать нечего.
+    if (!pools.length) return undefined;
     let cancelled = false;
 
     function mergeIn(rows, token) {
@@ -5802,22 +5867,13 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
         })
       );
 
-      // И одна своя кривая за цикл — они читаются из другого источника,
-      // со своим лимитом, поэтому идут отдельным неспешным потоком.
-      if (curves.length) {
-        const tok = curves[curveCursor.current % curves.length];
-        curveCursor.current += 1;
-        const m = await fetchCurveMarket(tok.curveAddress, tok.tokenAddress || tok.address, TON_TESTNET_NETWORK);
-        if (!cancelled && m) mergeIn(curveTradesToFeed(m.trades, curveParamsOf(m.state), 200), tok);
-      }
-
       if (!cancelled) setLoaded(true);
     }
 
     load(true);
     const poll = setInterval(() => load(false), INTERVAL_MS);
     return () => { cancelled = true; clearInterval(poll); };
-  }, [pools, curves]);
+  }, [pools]);
 
   // Раздел ждёт ленту наравне со списком токенов, поэтому о первом
   // ответе нужно сказать наружу — сам компонент про экран ничего не
@@ -12025,11 +12081,13 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
        пары с биржи, и мемпад показывал чужие монеты вперемешку со
        своими: человек открывал карточку, а купить там было нечего —
        кривой нет, торги идут не у нас.
-       Пробные токены не в счёт: витрина не должна рекламировать монету,
-       которая ничего не стоит. В самом списке ниже она остаётся, с
-       пометкой. А сделка должна была пройти хоть одна — запуск сам по
-       себе на витрину не тянет. */
-    const источник = свои.filter((tok) => !пробнаяСеть(tok.network) && прошлаПерваяСвеча(tok));
+       Сначала те, по которым уже прошла сделка: запуск сам по себе на
+       витрину не тянет. Но если таких ещё нет — показываем что есть,
+       иначе витрина пропадает с экрана целиком. Проверку на пробную сеть
+       здесь держать нельзя: пока площадка работает в devnet, она
+       отсеивает вообще всё. */
+    const сТорговлей = свои.filter((tok) => прошлаПерваяСвеча(tok));
+    const источник = сТорговлей.length ? сТорговлей : свои;
     if (!источник.length) return [];
     const ranked = (win) =>
       [...источник]
@@ -12168,7 +12226,9 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
       <RecentBuysTicker
         сеть={сеть}
         tokens={[]}
-        curveTokens={сеть === "sol" ? [] : myTokens}
+        // Обе цепочки сразу: сделки берутся из своей базы, а не из
+        // контракта, и токены Solana в ленте теперь тоже есть.
+        curveTokens={myTokens}
         onOpen={onOpen}
         onReady={() => setЛентаГотова(true)}
       />
