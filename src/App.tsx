@@ -380,6 +380,12 @@ const STR = {
     homeEcoTitle: "Площадка растёт",
     homeEcoRaised: "GRAM в токенах",
     homeEcoDex: "на бирже",
+    funnelTitle: "Путь токенов",
+    funnelHint: "Сколько запусков доходит до каждой ступени",
+    funnelLaunched: "Запущено",
+    funnelTraded: "Прошла первая сделка",
+    funnelHalf: "Собрано половина кривой",
+    funnelListed: "Вышли на биржу",
     homeDoNow: "Что сделать сейчас",
     homeDoLaunchNote: "Свой токен за пару минут",
     homeDoMempadNote: "Смотри, что запускают сейчас",
@@ -978,6 +984,12 @@ const STR = {
     homeEcoTitle: "The platform is growing",
     homeEcoRaised: "TON in tokens",
     homeEcoDex: "on DEX",
+    funnelTitle: "Token journey",
+    funnelHint: "How far launches get, stage by stage",
+    funnelLaunched: "Launched",
+    funnelTraded: "First trade done",
+    funnelHalf: "Half of the curve raised",
+    funnelListed: "Listed on DEX",
     homeDoNow: "What to do now",
     homeDoLaunchNote: "Your token in a couple of minutes",
     homeDoMempadNote: "See what is launching now",
@@ -12438,6 +12450,85 @@ function useСчётчикиПлощадки() {
   return stats;
 }
 
+/* Путь токенов площадки.
+ *
+ * Одно число «запущено столько-то» ничего не говорит: важно, сколько из
+ * запусков дошло до торгов, сколько добралось до середины кривой и
+ * сколько вышло на биржу. Это воронка, и читается она сразу: каждая
+ * следующая полоса короче предыдущей ровно во столько раз, во сколько
+ * меньше токенов её прошло.
+ *
+ * Считается по тем же строкам, что уже загружены для ленты: отдельного
+ * запроса не нужно, а живой поток кривых обновляет полосы сам.
+ */
+function ВоронкаТокенов({ tokens = [] }) {
+  const ступени = useMemo(() => {
+    const собрано = (т) => Number(т.raisedTon) || 0;
+    const цель = (т) => Number(т.graduationTon) || 0;
+    const всего = tokens.length;
+    const торгуются = tokens.filter((т) => т.graduated || собрано(т) > 0).length;
+    const половина = tokens.filter((т) => т.graduated || (цель(т) > 0 && собрано(т) >= цель(т) / 2)).length;
+    const наБирже = tokens.filter((т) => !!т.graduated).length;
+    return [
+      { key: "launched", label: t("funnelLaunched"), value: всего },
+      { key: "traded", label: t("funnelTraded"), value: торгуются },
+      { key: "half", label: t("funnelHalf"), value: половина },
+      { key: "listed", label: t("funnelListed"), value: наБирже },
+    ];
+  }, [tokens]);
+
+  const основание = ступени[0] ? ступени[0].value : 0;
+  if (!основание) return null;
+
+  return (
+    <div className="flex flex-col" style={{ gap: 12 }}>
+      <div>
+        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 600, letterSpacing: "-0.01em" }}>
+          {t("funnelTitle")}
+        </div>
+        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2 }}>{t("funnelHint")}</div>
+      </div>
+      <div className="flex flex-col" style={{ gap: 10 }}>
+        {ступени.map((с, i) => {
+          const доля = основание > 0 ? с.value / основание : 0;
+          /* Цвет гаснет к низу воронки: верхняя ступень — цвет площадки,
+             нижняя — зелёный выхода на биржу, между ними тот же тон,
+             только глуше. Так видно направление, а не четыре разных
+             показателя рядом. */
+          const цвет = i === ступени.length - 1 ? T.up : T.electric;
+          return (
+            <div key={с.key}>
+              <div className="flex items-baseline justify-between" style={{ gap: 10, marginBottom: 5 }}>
+                <span className="truncate" style={{ fontFamily: bodyFont, color: i === 0 ? T.ice : T.muted, fontSize: 13 }}>{с.label}</span>
+                <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap" }}>
+                  {с.value}
+                  {i > 0 && (
+                    <span style={{ color: T.faint, fontSize: 11.5, marginLeft: 6 }}>
+                      {Math.round(доля * 100)}%
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div style={{ height: 10, borderRadius: 999, background: hexA("#FFFFFF", 0.05), overflow: "hidden" }}>
+                <div
+                  style={{
+                    // Пустая ступень остаётся пустой: полоска в один
+                    // пиксель вместо нуля — это враньё в пользу площадки.
+                    width: `${Math.max(0, Math.min(1, доля)) * 100}%`,
+                    height: "100%", borderRadius: 999,
+                    background: `linear-gradient(90deg, ${hexA(цвет, 0.85)} 0%, ${hexA(цвет, 0.45)} 100%)`,
+                    transition: `width ${EASE}`,
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ГлавнаяСводка({ live = [], stats = null }) {
   // Собранное и вышедших на биржу берём из ленты: она читает кривые
   // напрямую, а в базе эти числа от обхода по расписанию и отстают.
@@ -13804,6 +13895,10 @@ function HomeView({
       ) : (
         <>
           <ГлавнаяСводка live={боевые} stats={stats} />
+          {/* Воронка считает все запуски площадки, а не только те, что
+              попали на витрину: её смысл как раз в том, сколько из них
+              дошло дальше первой ступени. */}
+          <ВоронкаТокенов tokens={curveTokens} />
           <БегущаяЛента />
           <МоиДела
             myTokens={myTokens}
