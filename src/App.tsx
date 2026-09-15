@@ -24029,7 +24029,9 @@ function mapTokenRow(row) {
         side: "buy",
         ton_amount: стартоваяСумма,
         token_amount: Number(result.buyTokens) || 0,
-        ton_price_usd: tonPriceUsd || 0,
+        // Курс монеты запуска, а не TON: токены площадки живут в обеих
+        // цепочках, и доллары считаются из этой цифры.
+        ton_price_usd: ((row.chain === "solana" ? solUsd() : tonPriceUsd) || 0),
       }).then(({ error }) => {
         if (error) console.warn("[mintly] стартовая покупка не записалась:", error.message);
       });
@@ -24821,7 +24823,12 @@ function mapTokenRow(row) {
       side,
       ton_amount: Number(tonAmount) || 0,
       token_amount: Number(tokenAmount) || 0,
-      ton_price_usd: tonPriceUsd || 0,
+      /* Курс той монеты, в которой прошла сделка. Колонка называется
+         ton_price_usd с тех пор, как цепочка была одна; у токена Solana
+         сюда клали курс TON, и всё, что считалось из этой цены —
+         доллары в ленте, таблица лучших, прибыль — врало в семьдесят
+         раз. */
+      ton_price_usd: ((token && token.chain === "solana" ? solUsd() : tonPriceUsd) || 0),
     }).then(({ error }) => {
       if (error) console.warn("[mintly] не удалось записать сделку:", error.message);
     });
