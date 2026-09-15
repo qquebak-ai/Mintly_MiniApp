@@ -12700,7 +12700,7 @@ function СценаЗапуска() {
       <img
         src="/banner-rocket3.webp" alt=""
         style={{
-          position: "absolute", right: "2%", bottom: "-6%", width: "52%",
+          position: "absolute", right: "8%", bottom: "-6%", width: "52%",
           /* Ракета неподвижна: движение кадру задают звёзды, идущие ей
              навстречу. */
           filter: `drop-shadow(0 6px 26px ${hexA(ФИОЛЕТ, 0.55)})`,
