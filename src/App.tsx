@@ -456,15 +456,23 @@ const STR = {
     logoUploaded: "Логотип загружен",
     xTitle: "Аккаунт в X",
     xHint: "Подтверждённый аккаунт виден всем, кто открывает твои токены: ссылку в профиль может вписать любой, а подтверждение — только владелец.",
-    xStep1: "Опубликуй пост с кодом",
-    xStep2: "Пришли ссылку на этот пост",
     xPublish: "Открыть X с готовым постом",
     xPostUrl: "Ссылка на пост",
     xCheck: "Проверить",
     xChecking: "Проверяю…",
+    xHandleLabel: "Твой аккаунт в X",
+    xHandlePlaceholder: "имя без @",
+    xHandleBad: "Имя в X — латиница, цифры и подчёркивание, до 15 знаков",
+    xPostCta: "Опубликовать пост",
+    xPostedCta: "Я опубликовал — проверить",
+    xWaitingPost: "Ищу пост в твоей ленте…",
+    xErrNoPostYet: "Поста с кодом пока не видно. X показывает свежие записи не сразу — подожди полминуты и нажми ещё раз.",
+    xErrNoAccount: "Не вижу ленты этого аккаунта — проверь имя; у закрытых профилей лента наружу не отдаётся, им подойдёт ссылка на пост.",
+    xManualToggle: "Пост не находится — вставить ссылку",
+    xManualHint: "Ссылку видно в самом посте: «Поделиться» → «Копировать ссылку».",
+    xAutoNote: "Пост найдём сами — копировать ссылку не нужно.",
     xConnected: "Аккаунт подтверждён",
     xUnlink: "Отключить",
-    xCodeCopied: "Код скопирован",
     xErrUrl: "Нужна ссылка на пост в X — вида x.com/имя/status/…",
     xErrNoCode: "Сначала возьми код",
     xErrExpired: "Код устарел — возьми новый",
@@ -1033,15 +1041,23 @@ const STR = {
     logoUploaded: "Logo uploaded",
     xTitle: "X account",
     xHint: "A verified account shows up for everyone who opens your tokens: anyone can paste a link, only the owner can verify it.",
-    xStep1: "Post the code on X",
-    xStep2: "Send the link to that post",
     xPublish: "Open X with the post ready",
     xPostUrl: "Link to the post",
     xCheck: "Verify",
     xChecking: "Checking…",
+    xHandleLabel: "Your X account",
+    xHandlePlaceholder: "name without @",
+    xHandleBad: "An X name is letters, digits and underscore, up to 15 characters",
+    xPostCta: "Publish the post",
+    xPostedCta: "I posted it — check",
+    xWaitingPost: "Looking for the post in your timeline…",
+    xErrNoPostYet: "No post with the code yet. X takes a moment to show fresh ones — wait half a minute and tap again.",
+    xErrNoAccount: "Can't see that account's timeline — check the name; private profiles don't expose one, so use the post link instead.",
+    xManualToggle: "Post not found — paste the link",
+    xManualHint: "The link is in the post itself: Share → Copy link.",
+    xAutoNote: "We find the post ourselves — no need to copy links.",
     xConnected: "Account verified",
     xUnlink: "Disconnect",
-    xCodeCopied: "Code copied",
     xErrUrl: "Needs a link to an X post — like x.com/name/status/…",
     xErrNoCode: "Get the code first",
     xErrExpired: "The code expired — get a new one",
@@ -19129,9 +19145,18 @@ function ReferralShare({ showToast }) {
 function ПодключениеX({ showToast }) {
   const [состояние, setСостояние] = useState(null); // { handle } | null
   const [грузится, setГрузится] = useState(true);
+  const [ник, setНик] = useState("");
   const [код, setКод] = useState("");
-  const [ссылка, setСсылка] = useState("");
+  const [опубликовал, setОпубликовал] = useState(false);
   const [проверяю, setПроверяю] = useState(false);
+  const [беда, setБеда] = useState("");
+  // Запасной путь — ссылка на пост. Нужен редко: когда лента закрыта
+  // или X показывает свежий пост с задержкой в несколько минут.
+  const [рукойОткрыто, setРукойОткрыто] = useState(false);
+  const [ссылка, setСсылка] = useState("");
+
+  const чистыйНик = ник.trim().replace(/^@/, "");
+  const никОк = /^[A-Za-z0-9_]{1,15}$/.test(чистыйНик);
 
   async function запросX(действие, тело) {
     const { data } = await supabase.auth.getSession();
@@ -19156,50 +19181,78 @@ function ПодключениеX({ showToast }) {
     return () => { жив = false; };
   }, []);
 
-  async function взятьКод() {
-    try {
-      const о = await запросX("code", {});
-      setКод(о.code);
-    } catch {
-      showToast(t("xErrSilent"));
-    }
-  }
-
-  function открытьX() {
-    if (typeof window === "undefined") return;
-    const текст = trf("xPostText", { code: код });
-    const url = `https://x.com/intent/tweet?text=${encodeURIComponent(текст)}`;
-    const wa = window.Telegram && window.Telegram.WebApp;
-    if (wa && wa.openLink) wa.openLink(url);
-    else window.open(url, "_blank", "noopener,noreferrer");
-  }
-
   const ОШИБКИ = {
     bad_url: "xErrUrl", no_code: "xErrNoCode", code_expired: "xErrExpired",
     x_silent: "xErrSilent", wrong_author: "xErrAuthor",
     no_code_in_post: "xErrNoCodeInPost", taken: "xErrTaken",
+    no_post_yet: "xErrNoPostYet", no_account: "xErrNoAccount",
   };
 
-  async function проверить() {
+  /* Один шаг вместо трёх: берём код, открываем X с готовым постом и
+     сразу ждём возвращения. Раньше человек жал «взять код», потом
+     «опубликовать», потом искал свой пост, копировал ссылку и вставлял
+     её к нам — четыре действия и переключение между приложениями. */
+  async function опубликовать() {
+    if (!никОк) { setБеда(t("xHandleBad")); return; }
+    setБеда("");
+    let текущий = код;
+    if (!текущий) {
+      try {
+        const о = await запросX("code", {});
+        текущий = о.code;
+        setКод(текущий);
+      } catch {
+        setБеда(t("xErrSilent"));
+        return;
+      }
+    }
+    setОпубликовал(true);
+    const текст = trf("xPostText", { code: текущий });
+    const url = `https://x.com/intent/tweet?text=${encodeURIComponent(текст)}`;
+    const wa = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    if (wa && wa.openLink) wa.openLink(url);
+    else if (typeof window !== "undefined") window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  async function проверить(способ = "handle") {
     if (проверяю) return;
+    if (способ === "handle" && !никОк) { setБеда(t("xHandleBad")); return; }
     setПроверяю(true);
+    setБеда("");
     try {
-      const о = await запросX("verify", { url: ссылка.trim() });
+      const тело = способ === "handle" ? { handle: чистыйНик } : { url: ссылка.trim() };
+      const о = await запросX("verify", тело);
       setСостояние({ handle: о.handle });
       setКод("");
       setСсылка("");
+      setОпубликовал(false);
       showToast(t("xConnected"));
     } catch (e) {
-      showToast(t(ОШИБКИ[String(e && e.message)] || "xErrSilent"));
+      const ключ = ОШИБКИ[String(e && e.message)] || "xErrSilent";
+      setБеда(t(ключ));
     } finally {
       setПроверяю(false);
     }
   }
 
+  /* Возвращение из X — сам по себе сигнал: человек опубликовал пост и
+     пришёл обратно. Проверяем молча, чтобы ему не пришлось ничего
+     нажимать; не нашли — он увидит обычную кнопку и подсказку. */
+  useEffect(() => {
+    if (!опубликовал || !код || !никОк || состояние) return undefined;
+    if (typeof document === "undefined") return undefined;
+    const вернулся = () => { if (document.visibilityState === "visible") проверить("handle"); };
+    document.addEventListener("visibilitychange", вернулся);
+    return () => document.removeEventListener("visibilitychange", вернулся);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [опубликовал, код, никОк, состояние, чистыйНик]);
+
   async function отключить() {
     try {
       await запросX("unlink", {});
       setСостояние(null);
+      setКод("");
+      setОпубликовал(false);
     } catch {
       showToast(t("xErrSilent"));
     }
@@ -19231,73 +19284,128 @@ function ПодключениеX({ showToast }) {
     );
   }
 
+  const главнаяКнопка = опубликовал ? t("xPostedCta") : t("xPostCta");
+
   return (
     <div className="flex flex-col mt-2" style={{ gap: 14 }}>
       <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>{t("xHint")}</p>
 
       <div className="flex flex-col" style={{ gap: 10, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
-        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>1. {t("xStep1")}</span>
-        {код ? (
-          <button
-            onClick={() => {
-              if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(код).catch(() => {});
-              showToast(t("xCodeCopied"));
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("xHandleLabel")}</span>
+        <div
+          className="flex items-center"
+          style={{ gap: 6, padding: "11px 12px", borderRadius: 14, background: T.surface }}
+        >
+          <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 14.5 }}>@</span>
+          <input
+            value={ник}
+            onChange={(e) => { setНик(e.target.value); setБеда(""); }}
+            placeholder={t("xHandlePlaceholder")}
+            inputMode="text"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            style={{
+              flex: 1, minWidth: 0, background: "transparent", border: "none",
+              color: T.ice, fontFamily: monoFont, fontSize: 14.5, outline: "none",
             }}
-            className="fx-tap flex items-center justify-between"
-            style={{ gap: 10, padding: "10px 12px", borderRadius: 14, background: T.surface, border: "none" }}
-          >
-            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 15 }}>{код}</span>
-            <Copy size={14} color={T.muted} />
-          </button>
-        ) : (
-          <button
-            onClick={взятьКод}
-            className="fx-tap w-full rounded-[16px] py-2.5"
-            style={{ background: ЦВЕТ_КНОПКИ, border: "none", fontFamily: displayFont, fontWeight: 700, fontSize: 14.5, color: PRISM_TEXT }}
-          >
-            {t("xStep1")}
-          </button>
-        )}
-        {код ? (
-          <button
-            onClick={открытьX}
-            className="fx-tap w-full rounded-[16px] py-2.5 flex items-center justify-center"
-            style={{ gap: 8, background: T.surface, border: "none", fontFamily: bodyFont, fontSize: 14, color: T.ice }}
-          >
-            <Twitter size={14} color={T.ice} /> {t("xPublish")}
-          </button>
-        ) : null}
-      </div>
+          />
+          {никОк && <CheckCircle2 size={15} color={T.up} />}
+        </div>
 
-      <div className="flex flex-col" style={{ gap: 10, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
-        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>2. {t("xStep2")}</span>
-        <input
-          value={ссылка}
-          onChange={(e) => setСсылка(e.target.value)}
-          placeholder={t("xPostUrl")}
-          inputMode="url"
-          autoCapitalize="off"
-          autoCorrect="off"
-          style={{
-            width: "100%", padding: "11px 12px", borderRadius: 14,
-            background: T.surface, border: "none", color: T.ice,
-            fontFamily: monoFont, fontSize: 13.5, outline: "none",
-          }}
-        />
         <button
-          onClick={проверить}
-          disabled={проверяю || !ссылка.trim()}
-          className="fx-tap w-full rounded-[16px] py-2.5"
+          onClick={опубликовать}
+          disabled={!никОк}
+          className="fx-tap w-full rounded-[16px] py-2.5 flex items-center justify-center"
           style={{
-            background: ссылка.trim() ? ЦВЕТ_КНОПКИ : T.surface, border: "none",
+            gap: 8,
+            background: никОк ? ЦВЕТ_КНОПКИ : T.surface, border: "none",
             fontFamily: displayFont, fontWeight: 700, fontSize: 14.5,
-            color: ссылка.trim() ? PRISM_TEXT : T.faint,
-            opacity: проверяю ? 0.6 : 1,
+            color: никОк ? PRISM_TEXT : T.faint,
           }}
         >
-          {проверяю ? t("xChecking") : t("xCheck")}
+          <Twitter size={14} color={никОк ? PRISM_TEXT : T.faint} /> {t("xPublish")}
         </button>
+
+        {/* Кнопка появляется после того, как человек ушёл публиковать:
+            до этого проверять нечего. */}
+        {опубликовал && (
+          <button
+            onClick={() => проверить("handle")}
+            disabled={проверяю}
+            className="fx-tap w-full rounded-[16px] py-2.5"
+            style={{
+              background: T.surface, border: "none",
+              fontFamily: displayFont, fontWeight: 700, fontSize: 14.5,
+              color: T.ice, opacity: проверяю ? 0.6 : 1,
+            }}
+          >
+            {проверяю ? t("xWaitingPost") : главнаяКнопка}
+          </button>
+        )}
+
+        <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, lineHeight: 1.45 }}>
+          {код ? `${t("xAutoNote")} · ${код}` : t("xAutoNote")}
+        </span>
       </div>
+
+      {беда && (
+        <div
+          style={{
+            padding: "11px 13px", borderRadius: 14,
+            background: hexA(T.down, 0.1), border: `1px solid ${hexA(T.down, 0.32)}`,
+            fontFamily: bodyFont, color: T.down, fontSize: 13, lineHeight: 1.45,
+          }}
+        >
+          {беда}
+        </div>
+      )}
+
+      {/* Запасной путь — тот самый прежний способ со ссылкой. Он спрятан
+          под строкой: нужен он редко, а раньше занимал половину экрана
+          и читался как обязательный шаг. */}
+      <button
+        onClick={() => setРукойОткрыто((б) => !б)}
+        className="fx-tap"
+        style={{
+          alignSelf: "flex-start", background: "transparent", border: "none", padding: 0,
+          fontFamily: bodyFont, color: T.muted, fontSize: 13, textDecoration: "underline",
+        }}
+      >
+        {t("xManualToggle")}
+      </button>
+
+      {рукойОткрыто && (
+        <div className="flex flex-col" style={{ gap: 10, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45 }}>{t("xManualHint")}</span>
+          <input
+            value={ссылка}
+            onChange={(e) => { setСсылка(e.target.value); setБеда(""); }}
+            placeholder={t("xPostUrl")}
+            inputMode="url"
+            autoCapitalize="off"
+            autoCorrect="off"
+            style={{
+              width: "100%", padding: "11px 12px", borderRadius: 14,
+              background: T.surface, border: "none", color: T.ice,
+              fontFamily: monoFont, fontSize: 13.5, outline: "none",
+            }}
+          />
+          <button
+            onClick={() => проверить("url")}
+            disabled={проверяю || !ссылка.trim()}
+            className="fx-tap w-full rounded-[16px] py-2.5"
+            style={{
+              background: ссылка.trim() ? ЦВЕТ_КНОПКИ : T.surface, border: "none",
+              fontFamily: displayFont, fontWeight: 700, fontSize: 14.5,
+              color: ссылка.trim() ? PRISM_TEXT : T.faint,
+              opacity: проверяю ? 0.6 : 1,
+            }}
+          >
+            {проверяю ? t("xChecking") : t("xCheck")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

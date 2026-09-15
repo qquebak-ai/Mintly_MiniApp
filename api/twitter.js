@@ -88,6 +88,57 @@ async function oembed(url) {
   }
 }
 
+/* Лента профиля без ключей.
+ *
+ * У X есть открытая страница для встраивания ленты — та самая, из
+ * которой сайты делают виджет «последние твиты». Она отдаёт готовый JSON
+ * внутри страницы, и в нём лежат последние сто постов с автором и
+ * текстом. Ключей не просит, входа тоже.
+ *
+ * Ради неё всё и затевалось: человеку больше не нужно искать свой пост,
+ * копировать его адрес и вставлять к нам. Он публикует пост и
+ * возвращается — остальное делаем мы.
+ */
+async function лентаПрофиля(имя) {
+  const стоп = new AbortController();
+  const срок = setTimeout(() => стоп.abort(), 9000);
+  try {
+    const res = await fetch(
+      `https://syndication.twitter.com/srv/timeline-profile/screen-name/${encodeURIComponent(имя)}`,
+      {
+        signal: стоп.signal,
+        redirect: "follow",
+        headers: {
+          // Без внятного клиента страница отдаёт заглушку.
+          "user-agent": "Mozilla/5.0 (compatible; MintlyBot/1.0)",
+          accept: "text/html",
+        },
+      },
+    );
+    if (!res.ok) return null;
+    const html = await res.text();
+    const кусок = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    if (!кусок) return null;
+    const j = JSON.parse(кусок[1]);
+    const записи = (j && j.props && j.props.pageProps && j.props.pageProps.timeline && j.props.pageProps.timeline.entries) || [];
+    const посты = [];
+    for (const з of записи) {
+      const твит = з && з.content && з.content.tweet;
+      if (!твит) continue;
+      посты.push({
+        автор: String((твит.user && твит.user.screen_name) || ""),
+        текст: String(твит.full_text || твит.text || ""),
+        id: String(твит.id_str || твит.id || ""),
+      });
+    }
+    return посты;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(срок);
+  }
+}
+
 export default async function handler(req, res) {
   const db = admin();
   if (!db) return res.status(503).json({ error: "not_configured" });
@@ -120,8 +171,13 @@ export default async function handler(req, res) {
     }
 
     if (действие === "verify") {
-      const пост = разобратьПост(тело.url);
-      if (!пост) return res.status(400).json({ error: "bad_url" });
+      /* Два пути к одному и тому же. Обычный — по нику: человек назвал
+         аккаунт, опубликовал пост, а найти его в ленте уже наша забота.
+         Запасной — по ссылке на пост: он выручает, когда лента закрыта
+         или X отдаёт её с задержкой. */
+      const поНику = !тело.url && имяОк(String(тело.handle || "").replace(/^@/, ""));
+      const пост = поНику ? null : разобратьПост(тело.url);
+      if (!поНику && !пост) return res.status(400).json({ error: "bad_url" });
 
       const { data: строка } = await db
         .from("profiles")
@@ -133,18 +189,35 @@ export default async function handler(req, res) {
       if (!код) return res.status(400).json({ error: "no_code" });
       if (Date.now() - когда > ЖИЗНЬ_КОДА_МС) return res.status(400).json({ error: "code_expired" });
 
-      const ответ = await oembed(пост.url);
-      if (!ответ || !ответ.author_url) return res.status(502).json({ error: "x_silent" });
+      let авторИзОтвета = "";
+      if (поНику) {
+        const имя = String(тело.handle || "").replace(/^@/, "");
+        const посты = await лентаПрофиля(имя);
+        if (!посты) return res.status(502).json({ error: "x_silent" });
+        /* Лента открылась, но она пуста. Чаще всего это опечатка в
+           имени — у живого аккаунта постов хотя бы один есть, — реже
+           закрытый профиль: его лента наружу не отдаётся вовсе. */
+        if (!посты.length) return res.status(404).json({ error: "no_account" });
+        const свой = посты.find((п) => п.автор.toLowerCase() === имя.toLowerCase()
+          && п.текст.toLowerCase().includes(код.toLowerCase()));
+        // Лента открылась, но поста с кодом в ней нет: либо ещё не
+        // опубликован, либо X не успел его показать.
+        if (!свой) return res.status(404).json({ error: "no_post_yet" });
+        авторИзОтвета = свой.автор;
+      } else {
+        const ответ = await oembed(пост.url);
+        if (!ответ || !ответ.author_url) return res.status(502).json({ error: "x_silent" });
 
-      const авторИзОтвета = String(ответ.author_url).split("/").filter(Boolean).pop() || "";
-      if (!имяОк(авторИзОтвета)) return res.status(502).json({ error: "x_silent" });
-      // Автор поста и есть подтверждаемый аккаунт: в адресе одно имя, в
-      // ответе X — другое, значит прислали чужой пост.
-      if (авторИзОтвета.toLowerCase() !== пост.имя.toLowerCase()) {
-        return res.status(400).json({ error: "wrong_author" });
-      }
-      if (!текстБезРазметки(ответ.html).includes(код.toLowerCase())) {
-        return res.status(400).json({ error: "no_code_in_post" });
+        авторИзОтвета = String(ответ.author_url).split("/").filter(Boolean).pop() || "";
+        if (!имяОк(авторИзОтвета)) return res.status(502).json({ error: "x_silent" });
+        // Автор поста и есть подтверждаемый аккаунт: в адресе одно имя, в
+        // ответе X — другое, значит прислали чужой пост.
+        if (авторИзОтвета.toLowerCase() !== пост.имя.toLowerCase()) {
+          return res.status(400).json({ error: "wrong_author" });
+        }
+        if (!текстБезРазметки(ответ.html).includes(код.toLowerCase())) {
+          return res.status(400).json({ error: "no_code_in_post" });
+        }
       }
 
       // Один аккаунт — один человек: иначе подтверждение теряет смысл,
