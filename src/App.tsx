@@ -1772,6 +1772,12 @@ function GlobalStyle() {
          так они идут одной связкой. Качается сама картинка внутри
          обёртки, снос лежит на обёртке — иначе анимации спорили бы за
          transform. */
+      /* Полоска под баннером наливается слева направо ровно за то время,
+         что карточку держат на экране. */
+      @keyframes полоскаНаливается {
+        from { transform: scaleX(0); }
+        to   { transform: scaleX(1); }
+      }
       @keyframes звездаКачается {
         0%, 100% { transform: translateY(3px); }
         50%      { transform: translateY(-6px); }
@@ -12781,11 +12787,17 @@ function ЗнакБаннера({ вид, цвет }) {
   );
 }
 
+/* Сколько баннер держится на экране. Пяти секунд не хватало: пока
+   прочитаешь заголовок, карточка уже уезжает. */
+const ПОКАЗ_БАННЕРА = 9000;
+
 function БаннерыГлавной({ onGoTab, onGoCreate }) {
   // Язык берётся из общей настройки приложения, как и весь остальной текст.
   const язык = lang === "EN" ? "EN" : "RU";
   const лента = useRef(null);
   const [текущий, setТекущий] = useState(0);
+  // Номер круга: растёт на каждой смене и перезапускает наливание полоски.
+  const [круг, setКруг] = useState(0);
   // Палец на ленте останавливает автолистание: уводить карточку из-под
   // руки — худшее, что может сделать карусель.
   const трогают = useRef(false);
@@ -12797,7 +12809,7 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
       const шаг = э.clientWidth + 12;
       const следующий = (Math.round(э.scrollLeft / шаг) + 1) % БАННЕРЫ.length;
       э.scrollTo({ left: следующий * шаг, behavior: "smooth" });
-    }, 5200);
+    }, ПОКАЗ_БАННЕРА);
     return () => clearInterval(iv);
   }, []);
 
@@ -12808,7 +12820,10 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
     if (!э) return;
     const шаг = э.scrollWidth / БАННЕРЫ.length;
     const н = Math.round(э.scrollLeft / шаг);
-    if (н !== текущий) setТекущий(Math.max(0, Math.min(БАННЕРЫ.length - 1, н)));
+    if (н !== текущий) {
+      setТекущий(Math.max(0, Math.min(БАННЕРЫ.length - 1, н)));
+      setКруг((к) => к + 1);
+    }
   }
 
   const открыть = (б) => {
@@ -12928,11 +12943,29 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
 
       <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
         {БАННЕРЫ.map((б, i) => (
+          /* Полоска у текущего баннера не просто длиннее — она
+             наливается белым к моменту, когда карточка сменится. Так
+             видно, сколько её ещё держат, и переключение не застаёт
+             врасплох. Ключ по номеру круга перезапускает наливание
+             заново при каждой смене. */
           <span key={б.id} style={{
-            width: i === текущий ? 18 : 6, height: 6, borderRadius: 999,
-            background: i === текущий ? T.ice : T.line,
+            position: "relative", overflow: "hidden",
+            width: i === текущий ? 22 : 6, height: 6, borderRadius: 999,
+            background: i === текущий ? hexA("#FFFFFF", 0.26) : T.line,
             transition: `width ${EASE}, background ${EASE}`,
-          }} />
+          }}>
+            {i === текущий && (
+              <span
+                key={круг}
+                style={{
+                  position: "absolute", left: 0, top: 0, bottom: 0, width: "100%",
+                  borderRadius: 999, background: T.ice, transformOrigin: "left center",
+                  animation: `полоскаНаливается ${ПОКАЗ_БАННЕРА}ms linear both`,
+                  animationPlayState: трогают.current ? "paused" : "running",
+                }}
+              />
+            )}
+          </span>
         ))}
       </div>
     </div>
