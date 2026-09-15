@@ -12800,20 +12800,30 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
   const [текущий, setТекущий] = useState(0);
   // Номер круга: растёт на каждой смене и перезапускает наливание полоски.
   const [круг, setКруг] = useState(0);
-  // Палец на ленте останавливает автолистание: уводить карточку из-под
-  // руки — худшее, что может сделать карусель.
-  const трогают = useRef(false);
+  /* Палец на ленте останавливает автолистание: уводить карточку из-под
+     руки — худшее, что может сделать карусель. Пауза живёт состоянием, а
+     не только ссылкой: полоска рисуется при отрисовке, и о снятии паузы
+     ей нужно узнать — иначе после свайпа она так и оставалась
+     замороженной до следующей смены. */
+  const [пауза, setПауза] = useState(false);
+  const отпустили = useRef(null);
 
+  /* Отсчёт перезапускается на каждой смене — и от автолистания, и от
+     свайпа. Общий интервал этого не умел: после свайпа полоска начинала
+     наливаться заново, а карточка менялась по старому расписанию. */
   useEffect(() => {
-    const iv = setInterval(() => {
+    if (пауза) return undefined;
+    const t = setTimeout(() => {
       const э = лента.current;
-      if (!э || трогают.current || document.visibilityState !== "visible") return;
+      if (!э || document.visibilityState !== "visible") return;
       const шаг = э.clientWidth + 12;
       const следующий = (Math.round(э.scrollLeft / шаг) + 1) % БАННЕРЫ.length;
       э.scrollTo({ left: следующий * шаг, behavior: "smooth" });
     }, ПОКАЗ_БАННЕРА);
-    return () => clearInterval(iv);
-  }, []);
+    return () => clearTimeout(t);
+  }, [текущий, круг, пауза]);
+
+  useEffect(() => () => { if (отпустили.current) clearTimeout(отпустили.current); }, []);
 
   // Точка подсвечивается по тому, что реально в кадре, а не по счётчику
   // нажатий: листают пальцем, и счётчик разошёлся бы с картинкой.
@@ -12839,8 +12849,13 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
       <div
         ref={лента}
         onScroll={приПрокрутке}
-        onTouchStart={() => { трогают.current = true; }}
-        onTouchEnd={() => { setTimeout(() => { трогают.current = false; }, 4000); }}
+        onTouchStart={() => { if (отпустили.current) clearTimeout(отпустили.current); setПауза(true); }}
+        onTouchEnd={() => {
+          if (отпустили.current) clearTimeout(отпустили.current);
+          // Секунда на инерцию прокрутки: отсчёт начинается, когда лента
+          // уже встала на место, а не пока она доезжает.
+          отпустили.current = setTimeout(() => setПауза(false), 1000);
+        }}
         className="no-scrollbar"
         style={{
           display: "flex", gap: 12, overflowX: "auto",
@@ -12957,13 +12972,15 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
             transition: `width ${EASE}, background ${EASE}`,
           }}>
             {i === текущий && (
+              /* Ключ включает и паузу: снятие паузы должно начать
+                 наливание заново, вместе с новым отсчётом. */
               <span
-                key={круг}
+                key={`${круг}:${пауза ? "стоп" : "идёт"}`}
                 style={{
                   position: "absolute", left: 0, top: 0, bottom: 0, width: "100%",
                   borderRadius: 999, background: T.ice, transformOrigin: "left center",
                   animation: `полоскаНаливается ${ПОКАЗ_БАННЕРА}ms linear both`,
-                  animationPlayState: трогают.current ? "paused" : "running",
+                  animationPlayState: пауза ? "paused" : "running",
                 }}
               />
             )}
