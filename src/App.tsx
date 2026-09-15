@@ -1843,7 +1843,7 @@ function GlobalStyle() {
          было видно. Сдвиг слоя считается дробно и идёт на видеокарте. */
       @keyframes карбонЕдет {
         from { transform: translate3d(0, 0, 0); }
-        to   { transform: translate3d(0, 20px, 0); }
+        to   { transform: translate3d(0, var(--шаг-ткани, 20px), 0); }
       }
       @keyframes галочкаВстала {
         0%   { opacity: 0; transform: scale(0.4) rotate(-18deg); }
@@ -10587,7 +10587,7 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
           <div style={{
             position: "relative", zIndex: 1, width: "82%", height: 62, borderRadius: 12,
             overflow: "hidden",
-            background: item.ткань ? "#131319" : item.fill,
+            background: item.ткань ? "#0A0A0D" : item.fill,
             backgroundSize: item.ткань ? undefined : (item.size || "320% 320%"),
             // Ткань не переливается: плетение едет отдельным слоем.
             animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
@@ -10768,7 +10768,7 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
             <div style={{
               width: "84%", height: 96, borderRadius: 16, padding: "12px 14px", textAlign: "left",
               position: "relative", overflow: "hidden",
-              background: item.ткань ? "#131319" : item.fill,
+              background: item.ткань ? "#0A0A0D" : item.fill,
               backgroundSize: item.ткань ? undefined : (item.size || "320% 320%"),
               animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
               boxShadow: `0 12px 30px ${hexA(item.glow || "#7C3AED", 0.38)}`,
@@ -14297,26 +14297,19 @@ const WALLET_SKINS = [
     fill: "linear-gradient(120deg, #9945FF 0%, #7A3DF5 35%, #19FB9B 100%)", glow: "#14F195",
   },
   {
-    /* Настоящее плетение углеволокна, а не полоски по диагонали. Ткань
-       набирается шестью слоями: две пары встречных нитей под 27° и 207°
-       (это и есть «ёлочка» твила), поперечная линия шва между
-       квадратами и подложка из четырёх ступеней серого — она даёт
-       объём, будто нить то поднимается, то уходит под соседнюю. Клетка
-       у настоящего карбона мелкая, потому размер шага двадцать точек, а
-       не половина карты. */
+    /* Настоящее плетение углеволокна: корзина 2×2, повёрнутая на 45°.
+       Пачками линейных градиентов такое не выходит — они дают ромбы, а
+       не жгуты, которые ныряют друг под друга. Потому рисунок собран
+       одной SVG-плиткой: внутри жгута нити (канавка, тело, блик и
+       гребень), поверх — поперечная растяжка, дающая объём, а весь
+       узор целиком повёрнут на 45°. Период плитки после поворота
+       больше исходного в √2 раз: 32 · √2 = 45.255 — при этом числе
+       CSS-повтор ложится без шва. */
     id: "carbon", label: { RU: "Карбон", EN: "Carbon" }, price: 120,
-    fill: [
-      "linear-gradient(27deg, #14141A 5px, transparent 5px)",
-      "linear-gradient(207deg, #14141A 5px, transparent 5px)",
-      "linear-gradient(27deg, #24242E 5px, transparent 5px)",
-      "linear-gradient(207deg, #24242E 5px, transparent 5px)",
-      "linear-gradient(90deg, #1B1B22 10px, transparent 10px)",
-      "linear-gradient(180deg, #1E1E26 25%, #1A1A21 25%, #1A1A21 50%, transparent 50%, transparent 75%, #26262F 75%, #26262F)",
-    ].join(", "),
-    /* Шаг плетения. Смещения слоёв друг относительно друга ведёт
-       анимация «карбонЕдет»: она же медленно тянет всю ткань вниз ровно
-       на клетку, так что стык не виден и полотно кажется бесконечным. */
-    size: "20px 20px",
+    fill: 'url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2245.255%22%20height%3D%2245.255%22%20viewBox%3D%220%200%2045.255%2045.255%22%3E%3Cdefs%3E%3Cpattern%20id%3D%22a%22%20width%3D%2216%22%20height%3D%222.2%22%20patternUnits%3D%22userSpaceOnUse%22%3E%3Crect%20width%3D%2216%22%20height%3D%222.2%22%20fill%3D%22%23050507%22%2F%3E%3Crect%20width%3D%2216%22%20height%3D%221.10%22%20fill%3D%22%231d1d24%22%2F%3E%3Crect%20y%3D%221.10%22%20width%3D%2216%22%20height%3D%220.48%22%20fill%3D%22%234d4d5a%22%2F%3E%3Crect%20y%3D%221.58%22%20width%3D%2216%22%20height%3D%220.22%22%20fill%3D%22%2378788a%22%2F%3E%3C%2Fpattern%3E%3Cpattern%20id%3D%22b%22%20width%3D%222.2%22%20height%3D%2216%22%20patternUnits%3D%22userSpaceOnUse%22%3E%3Crect%20width%3D%222.2%22%20height%3D%2216%22%20fill%3D%22%23050507%22%2F%3E%3Crect%20width%3D%221.10%22%20height%3D%2216%22%20fill%3D%22%231d1d24%22%2F%3E%3Crect%20x%3D%221.10%22%20width%3D%220.48%22%20height%3D%2216%22%20fill%3D%22%234d4d5a%22%2F%3E%3Crect%20x%3D%221.58%22%20width%3D%220.22%22%20height%3D%2216%22%20fill%3D%22%2378788a%22%2F%3E%3C%2Fpattern%3E%3ClinearGradient%20id%3D%22c%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23000%22%20stop-opacity%3D%220.5%22%2F%3E%3Cstop%20offset%3D%220.5%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220.13%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23000%22%20stop-opacity%3D%220.5%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22d%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23000%22%20stop-opacity%3D%220.5%22%2F%3E%3Cstop%20offset%3D%220.5%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220.13%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23000%22%20stop-opacity%3D%220.5%22%2F%3E%3C%2FlinearGradient%3E%3Cpattern%20id%3D%22t%22%20width%3D%2232%22%20height%3D%2232%22%20patternUnits%3D%22userSpaceOnUse%22%20patternTransform%3D%22rotate(45)%22%3E%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22url(%23a)%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22url(%23c)%22%2F%3E%3Crect%20x%3D%2216%22%20y%3D%2216%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22url(%23a)%22%2F%3E%3Crect%20x%3D%2216%22%20y%3D%2216%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22url(%23c)%22%2F%3E%3Crect%20x%3D%2216%22%20y%3D%220%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22url(%23b)%22%2F%3E%3Crect%20x%3D%2216%22%20y%3D%220%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22url(%23d)%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%2216%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22url(%23b)%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%2216%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22url(%23d)%22%2F%3E%3Cpath%20d%3D%22M0%2016.5%20H32%20M16.5%200%20V32%22%20stroke%3D%22%23000%22%20stroke-opacity%3D%220.55%22%20stroke-width%3D%221%22%2F%3E%3C%2Fpattern%3E%3C%2Fdefs%3E%3Crect%20width%3D%2245.255%22%20height%3D%2245.255%22%20fill%3D%22url(%23t)%22%2F%3E%3C%2Fsvg%3E")',
+    /* Шаг плетения; на него же уезжает вниз анимация «карбонЕдет», так
+       что стык не виден и полотно кажется бесконечным. */
+    size: "45.255px 45.255px",
     ткань: true,
     glow: "#5A5A6B",
   },
@@ -14341,13 +14334,18 @@ const WALLET_SKIN_BY_ID = Object.fromEntries(WALLET_SKINS.map((с) => [с.id, с
  * концу круга рисунок совпадает сам с собой, шва не видно. Держать его
  * отдельно от карточки нужно ради движения — фон карточки браузер
  * двигает рывками, а слой едет плавно. */
-function СлойКарбона({ fill, size = "20px 20px", длительность = 9 }) {
+function СлойКарбона({ fill, size = "20px 20px", длительность = 14 }) {
+  /* Уезжать нужно ровно на клетку плетения, иначе в конце круга рисунок
+     не совпадёт сам с собой и будет виден скачок. Клетку берём из
+     размера плитки и отдаём в анимацию переменной. */
+  const шаг = parseFloat(String(size)) || 20;
   return (
     <span
       aria-hidden
       style={{
-        position: "absolute", left: 0, right: 0, top: -20, height: "calc(100% + 40px)",
-        background: fill, backgroundColor: "#131319", backgroundSize: size,
+        position: "absolute", left: 0, right: 0, top: -шаг, height: `calc(100% + ${шаг * 2}px)`,
+        background: fill, backgroundColor: "#0A0A0D", backgroundSize: size,
+        ["--шаг-ткани" as any]: `${шаг}px`,
         animation: `карбонЕдет ${длительность}s linear infinite`,
         willChange: "transform", pointerEvents: "none",
       }}
@@ -14605,7 +14603,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // поверхность не повторяет один и тот же переход.
           // У ткани сама карта — ровная тёмная подложка: плетение живёт
           // отдельным слоем ниже, иначе его не сдвинуть плавно.
-          background: ткань ? "#131319" : видКарты.fill,
+          background: ткань ? "#0A0A0D" : видКарты.fill,
           backgroundSize: ткань ? undefined : (видКарты.size || "320% 320%"),
           animation: ткань
             ? "none"
