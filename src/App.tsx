@@ -1764,25 +1764,6 @@ function GlobalStyle() {
         50%  { transform: translate3d(4%, 3%, 0) scale(1.24) rotate(6deg); }
         100% { transform: translate3d(-4%, -3%, 0) scale(1.14) rotate(0deg); }
       }
-      /* Перелив полотна крутится целиком: у конического градиента цвета
-         идут по кругу, и вращение гонит их волной, как отсвет по
-         натянутой ткани. */
-      @keyframes переливКрутится {
-        from { transform: rotate(0deg) scale(1.9); }
-        to   { transform: rotate(360deg) scale(1.9); }
-      }
-      /* Свет и тень ходят навстречу друг другу — от этого полотно и
-         читается объёмным: там, где блик ушёл, остаётся провал. */
-      @keyframes светПлывёт {
-        0%   { transform: translate3d(-6%, -4%, 0) scale(1.1); }
-        50%  { transform: translate3d(8%, 5%, 0) scale(1.3); }
-        100% { transform: translate3d(-6%, -4%, 0) scale(1.1); }
-      }
-      @keyframes теньПлывёт {
-        0%   { transform: translate3d(7%, 5%, 0) scale(1.25); }
-        50%  { transform: translate3d(-7%, -5%, 0) scale(1.05); }
-        100% { transform: translate3d(7%, 5%, 0) scale(1.25); }
-      }
       /* Ореол вокруг карты: рамка отходит от её краёв и растворяется.
          Идёт сама по себе, без касания, — карта на экране одна и должна
          быть заметна среди ровных прямоугольников. */
@@ -14119,22 +14100,6 @@ const КОШ_ПОЛОТНО = [
   "radial-gradient(46% 38% at 28% 30%, #38D39F 0%, rgba(56,211,159,0) 60%)",
   "radial-gradient(62% 44% at 54% 16%, #FFB020 0%, rgba(255,176,32,0) 55%)",
 ].join(", ");
-/* Перелив. Пятна сами по себе плоские: они смешиваются, но не дают
-   понять, где у полотна ближе, а где дальше. Объём даёт конический
-   градиент — цвета в нём идут по кругу и на повороте ложатся полосами,
-   как отсвет на натянутой ткани. */
-const КОШ_ПОЛОТНО_ПЕРЕЛИВ = "conic-gradient(from 210deg at 44% 28%, #2E6BFF 0deg, #8E2DE2 54deg, #FF3D8B 112deg, #FFB020 172deg, #38D39F 226deg, #2E6BFF 296deg, #8E2DE2 360deg)";
-/* Блик и провал. Белое пятно поверх (режим «экран») высветляет цвет, не
-   выбеливая его в серое; чёрное (режим «умножение») уводит соседний
-   участок в тень. Между ними и возникает выпуклость. */
-const КОШ_ПОЛОТНО_СВЕТ = [
-  "radial-gradient(40% 32% at 26% 8%, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0) 70%)",
-  "radial-gradient(26% 20% at 74% 2%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 72%)",
-].join(", ");
-const КОШ_ПОЛОТНО_ТЕНЬ = [
-  "radial-gradient(46% 38% at 64% 34%, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0) 72%)",
-  "radial-gradient(32% 26% at 8% 36%, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 74%)",
-].join(", ");
 /* Мгла поверх пятен: у верхнего края почти прозрачная, ниже заголовка
    уже глухая. Она же держит цвет в узде — без неё полотно спорит с
    картой и слепит. */
@@ -14405,141 +14370,6 @@ function СлоиТкани() {
       background: `linear-gradient(180deg, ${hexA("#FFFFFF", 0.10)} 0%, ${hexA("#FFFFFF", 0.02)} 22%, ${hexA("#000000", 0.22)} 72%, ${hexA("#000000", 0.30)} 100%)`,
     }} />
   );
-}
-
-/* Перелив полотна «Твои токены».
- *
- * Пятна и конические градиенты дают плоскую картинку: цвет меняется, но
- * поверхности нет — не понять, где складка поднялась, а где ушла в
- * тень. Здесь считается настоящее поле высоты (шум, дважды свёрнутый
- * сам с собой), из него берётся нормаль, и уже по нормали кладётся свет
- * с бликом. Отсюда и объём: краска течёт по складкам, а не светится
- * кружками. Считает видеокарта, потому кадр стоит дёшево; если WebGL
- * недоступен, остаётся тот же фон, что нарисован под холстом. */
-function ПолотноПерелив() {
-  const холст = React.useRef(null);
-  React.useEffect(() => {
-    const э = холст.current;
-    if (!э) return;
-    const gl = э.getContext("webgl", { alpha: true, antialias: false, premultipliedAlpha: false });
-    if (!gl) return;
-    /* Имена внутри шейдера — только латиницей: GLSL не принимает
-       кириллицу в идентификаторах и молча не собирается. */
-    const вершинный = `attribute vec2 pos; void main(){ gl_Position = vec4(pos, 0.0, 1.0); }`;
-    const фрагментный = `
-      precision highp float;
-      uniform vec2 size; uniform float time;
-      float noise(vec2 p){
-        vec2 i = floor(p), f = fract(p);
-        vec2 u = f*f*(3.0-2.0*f);
-        float a = fract(sin(dot(i, vec2(127.1,311.7)))*43758.5453);
-        float b = fract(sin(dot(i+vec2(1.0,0.0), vec2(127.1,311.7)))*43758.5453);
-        float c = fract(sin(dot(i+vec2(0.0,1.0), vec2(127.1,311.7)))*43758.5453);
-        float d = fract(sin(dot(i+vec2(1.0,1.0), vec2(127.1,311.7)))*43758.5453);
-        return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
-      }
-      // Три октавы, не пять: лишние дают мелкую рябь — камень вместо
-      // шёлка, а складки должны быть крупными.
-      float fbm(vec2 p){
-        float s = 0.0, w = 0.5;
-        for(int i=0;i<4;i++){ s += w*noise(p); p *= 2.06; w *= 0.5; }
-        return s;
-      }
-      // Высота: шум, свёрнутый сам с собой, — так пятна вытягиваются в
-      // складки, как на натянутой ткани.
-      float height(vec2 p){
-        vec2 q = vec2(fbm(p + vec2(0.0, time*0.05)), fbm(p + vec2(5.2, 1.3) - time*0.035));
-        vec2 r = vec2(fbm(p + 2.2*q + vec2(1.7, 9.2)), fbm(p + 2.2*q + vec2(8.3, 2.8)));
-        return fbm(p + 2.0*r);
-      }
-      // Косинусная палитра: чистые переходы вместо серой каши, которая
-      // выходит при смешении многих красок.
-      vec3 paint(float t){
-        vec3 c = 0.5 + 0.5*cos(6.28318*(vec3(1.0, 0.92, 0.78)*t + vec3(0.08, 0.52, 0.86)));
-        // Насыщенность поднимаем отдельно: свет по складкам подмешивает
-        // серый, и без этого краска выцветает в хаки.
-        float g = dot(c, vec3(0.333));
-        return clamp(mix(vec3(g), c, 1.45), 0.0, 1.0);
-      }
-      void main(){
-        vec2 uv = gl_FragCoord.xy / size;
-        vec2 p = vec2(uv.x*1.25, uv.y*1.6);
-        float e = 1.6/size.y;
-        float h  = height(p);
-        float hx = height(p + vec2(e, 0.0));
-        float hy = height(p + vec2(0.0, e));
-        // Нормаль складки — из наклона поля высоты. Свет по ней и даёт
-        // объём: один склон горит, встречный тонет.
-        vec3 n = normalize(vec3((h-hx)*18.0, (h-hy)*18.0, 1.0));
-        vec3 lgt = normalize(vec3(-0.45, 0.75, 0.55));
-        float dif = max(dot(n, lgt), 0.0);
-        float spc = pow(max(dot(reflect(-lgt, n), vec3(0.0,0.0,1.0)), 0.0), 26.0);
-        vec3 col = paint(h*2.1 + time*0.008);
-        col *= 0.34 + 0.95*dif;
-        col += spc*0.9;
-        // Верх у полотна цветной, к низу оно уходит в чёрный: там список.
-        float fade = smoothstep(0.15, 0.95, uv.y);
-        // Дизер: без него плавные переходы ложатся полосами — восемь
-        // бит на канал для такого растяжения цвета слишком грубы.
-        float dith = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)))*43758.5453) - 0.5)/512.0;
-        gl_FragColor = vec4(col*fade + dith, fade);
-      }`;
-    const собрать = (вид, текст) => {
-      const ш = gl.createShader(вид);
-      gl.shaderSource(ш, текст); gl.compileShader(ш);
-      return gl.getShaderParameter(ш, gl.COMPILE_STATUS) ? ш : null;
-    };
-    const в = собрать(gl.VERTEX_SHADER, вершинный);
-    const ф = собрать(gl.FRAGMENT_SHADER, фрагментный);
-    if (!в || !ф) return;
-    const программа = gl.createProgram();
-    gl.attachShader(программа, в); gl.attachShader(программа, ф); gl.linkProgram(программа);
-    if (!gl.getProgramParameter(программа, gl.LINK_STATUS)) return;
-    gl.useProgram(программа);
-    const буфер = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, буфер);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
-    const место = gl.getAttribLocation(программа, "pos");
-    gl.enableVertexAttribArray(место);
-    gl.vertexAttribPointer(место, 2, gl.FLOAT, false, 0, 0);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    const uЭкран = gl.getUniformLocation(программа, "size");
-    const uВремя = gl.getUniformLocation(программа, "time");
-    /* Считаем ровно в плотности экрана, без понижения: любое — хоть
-       вдвое, хоть в полтора раза — браузер растягивает обратно, и на
-       переходах видно лесенку. Потолок в три точки на точку стоит
-       только против совсем уж редких экранов. */
-    const плотность = Math.min(typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1, 3);
-    const подогнать = () => {
-      const ш = Math.max(1, Math.round(э.clientWidth * плотность));
-      const в2 = Math.max(1, Math.round(э.clientHeight * плотность));
-      if (э.width !== ш || э.height !== в2) { э.width = ш; э.height = в2; }
-      gl.viewport(0, 0, э.width, э.height);
-      gl.uniform2f(uЭкран, э.width, э.height);
-    };
-    const наблюдатель = typeof ResizeObserver !== "undefined" ? new ResizeObserver(подогнать) : null;
-    if (наблюдатель) наблюдатель.observe(э);
-    подогнать();
-    const покой = typeof window !== "undefined" && window.matchMedia
-      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false;
-    let кадр = 0, живо = true, прошлый = 0;
-    const рисовать = (сейчас) => {
-      if (!живо) return;
-      // Тридцати кадров хватает: движение медленное, а батарею экономит.
-      if (сейчас - прошлый > 33) {
-        прошлый = сейчас;
-        подогнать();
-        gl.uniform1f(uВремя, покой ? 0 : сейчас * 0.001);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-        if (покой) return;               // без движения хватит одного кадра
-      }
-      кадр = requestAnimationFrame(рисовать);
-    };
-    кадр = requestAnimationFrame(рисовать);
-    return () => { живо = false; cancelAnimationFrame(кадр); if (наблюдатель) наблюдатель.disconnect(); };
-  }, []);
-  return <canvas ref={холст} aria-hidden style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }} />;
 }
 
 function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none" }) {
@@ -14950,9 +14780,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           position: "relative", isolation: "isolate", overflow: "hidden",
         }}
       >
-        {/* Подложка полотна. Перелив считает холст; пятна под ним —
-            запасной вид на случай, когда WebGL недоступен, и заодно
-            цвет, который видно в первый кадр. */}
+        {/* Подложка полотна: цветные пятна плывут под мглой. Своё
+            обрезание по краю — чтобы они не вылезли за скруглённый
+            верх страницы. */}
         <span
           aria-hidden
           style={{
@@ -14963,7 +14793,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           }}
         >
           <span style={{ position: "absolute", inset: "-25%", background: КОШ_ПОЛОТНО, animation: "полотноПлывёт 32s ease-in-out infinite", willChange: "transform" }} />
-          <ПолотноПерелив />
           <span style={{ position: "absolute", inset: 0, background: КОШ_ПОЛОТНО_МГЛА }} />
         </span>
         <div style={{ marginBottom: 12 }}>
