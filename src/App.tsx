@@ -1353,7 +1353,7 @@ const ГРАДИЕНТ_БРЕНДА = "linear-gradient(135deg, #8E2DE2 0%, #4A00
    невелика — надпись читается так же, как на заливке, а кнопка при этом
    выглядит живой. Полосы и мелкие переключатели берут тот же градиент
    без движения: там перелив был бы мельтешением. */
-const ЦВЕТ_КНОПКИ = "linear-gradient(112deg, #5B12C4 0%, #6C16E1 26%, #9A3CF0 50%, #6C16E1 74%, #5B12C4 100%)";
+const ЦВЕТ_КНОПКИ = "linear-gradient(112deg, #4A0BAE 0%, #6C16E1 24%, #B14CFF 50%, #6C16E1 76%, #4A0BAE 100%)";
 /* Та же краска плоским цветом — для мест, где градиент не годится:
    внутри другого градиента (градиент в градиенте — не CSS) и на
    мелочи вроде точек кода, где перелив всё равно не виден. */
@@ -1748,10 +1748,18 @@ function GlobalStyle() {
          отдельная возня фона. В начале и конце круга звезда погашена,
          поэтому возврат на место не виден. */
       @keyframes звёздыЛетят {
-        0%   { opacity: 0; transform: translate3d(14px, -26px, 0); }
-        18%  { opacity: 1; }
-        78%  { opacity: 1; }
-        100% { opacity: 0; transform: translate3d(-16px, 30px, 0); }
+        0%   { opacity: 0; transform: translate3d(34px, -64px, 0); }
+        8%   { opacity: 1; }
+        92%  { opacity: 1; }
+        100% { opacity: 0; transform: translate3d(-38px, 72px, 0); }
+      }
+      /* Звезда на ходу покачивается — тем же движением, что и ракета:
+         так они идут одной связкой. Качается сама картинка внутри
+         обёртки, снос лежит на обёртке — иначе анимации спорили бы за
+         transform. */
+      @keyframes звездаКачается {
+        0%, 100% { transform: translateY(3px); }
+        50%      { transform: translateY(-6px); }
       }
       @keyframes пламяДышит { from { transform: scaleY(0.75); opacity: 0.8; } to { transform: scaleY(1.15); opacity: 1; } }
       /* Блик по карте баланса: проходит редко и медленно — карта
@@ -12608,6 +12616,8 @@ function СценаЗапуска() {
   const пыль = [
     [58, 18], [70, 62], [52, 96], [64, 128], [46, 44],
     [78, 104], [56, 140], [72, 26], [50, 72], [66, 116],
+    [84, 34], [90, 88], [44, 118], [76, 140], [88, 14],
+    [54, 58], [68, 8], [82, 120], [48, 10], [94, 52],
   ];
   return (
     <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
@@ -12626,7 +12636,7 @@ function СценаЗапуска() {
         <span key={i} style={{
           position: "absolute", left: `${x}%`, top: `${y}%`, width: 2, height: 2, borderRadius: "50%",
           background: "#FFFFFF",
-          animation: `звёздыЛетят ${16 + (i % 5) * 3}s linear ${-(i * 2.3)}s infinite`,
+          animation: `звёздыЛетят ${6 + (i % 5) * 1.4}s linear ${-(i * 0.9)}s infinite`,
         }} />
       ))}
 
@@ -12648,14 +12658,20 @@ function СценаЗапуска() {
         src="/banner-rocket.webp" alt=""
         style={{
           position: "absolute", right: "2%", bottom: "-6%", width: "52%",
+          /* Ракета неподвижна: движение кадру задают звёзды, идущие ей
+             навстречу. Качать заодно и её — значит спорить с ними. */
           filter: `drop-shadow(0 6px 26px ${hexA(ФИОЛЕТ, 0.55)})`,
-          animation: "ракетаВзлетает 3.6s ease-in-out infinite",
         }}
       />
       {[
-        { left: "60%", top: "8%", w: "9%", d: 19, з: -2 },
-        { left: "51%", top: "58%", w: "6%", d: 23, з: -9 },
-        { left: "86%", top: "40%", w: "5%", d: 21, з: -15 },
+        { left: "58%", top: "6%", w: "9%", d: 7, з: -1 },
+        { left: "49%", top: "54%", w: "6%", d: 9, з: -4 },
+        { left: "86%", top: "38%", w: "5%", d: 8, з: -6 },
+        { left: "70%", top: "70%", w: "7%", d: 7.5, з: -2.5 },
+        { left: "40%", top: "22%", w: "4.5%", d: 10, з: -7 },
+        { left: "78%", top: "12%", w: "4%", d: 8.5, з: -3 },
+        { left: "62%", top: "86%", w: "5.5%", d: 9.5, з: -5 },
+        { left: "92%", top: "68%", w: "4%", d: 7.8, з: -6.5 },
       ].map((з, i) => (
         <span
           key={i}
@@ -12667,7 +12683,7 @@ function СценаЗапуска() {
             animation: `звёздыЛетят ${з.d}s linear ${з.з}s infinite`,
           }}
         >
-          <img src="/banner-star.webp" alt="" style={{ width: "100%", display: "block", animation: `искраДышит ${3.2 + i * 0.6}s ease-in-out infinite` }} />
+          <img src="/banner-star.webp" alt="" style={{ width: "100%", display: "block", animation: `звездаКачается ${2.6 + i * 0.35}s ease-in-out infinite` }} />
         </span>
       ))}
 
