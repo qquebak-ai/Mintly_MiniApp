@@ -1717,6 +1717,9 @@ function GlobalStyle() {
       @keyframes монетаПлавает { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
       @keyframes листКачается { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(7deg); } }
       @keyframes ракетаВзлетает { 0%, 100% { transform: translateY(4px); } 50% { transform: translateY(-8px); } }
+      /* Искры на баннере не мигают, а разгораются и гаснут: от мигания
+         рябит, а медленное дыхание читается как звёздный свет. */
+      @keyframes искраДышит { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.1); } }
       @keyframes пламяДышит { from { transform: scaleY(0.75); opacity: 0.8; } to { transform: scaleY(1.15); opacity: 1; } }
       /* Блик по карте баланса: проходит редко и медленно — карта
          выглядит из материала, а не мигает. */
@@ -12517,10 +12520,10 @@ const БАННЕРЫ = [
     цвет: "#6C7CFF",
     действие: "create",
     знак: "ракета",
-    /* Готовая картинка вместо собранной сцены: заголовок и кнопка на
-       ней уже нарисованы, потому баннер с картинкой рисуется одним
-       слоем, а нажимается целиком. */
-    картинка: "/banner-launch.webp",
+    /* Своя сцена вместо сетки со знаком: планета, искры и ракета над
+       облаками — та же композиция, что у рекламных баннеров, но в
+       красках приложения. */
+    сцена: "запуск",
   },
   {
     id: "trade",
@@ -12552,6 +12555,100 @@ const БАННЕРЫ = [
    всё время что-то происходит, поэтому лента живая даже когда её не
    листают. Формы фирменные — ромб TON, полосы Solana, лист Mintly — а не
    нарисованные на глаз силуэты. */
+/* Сцена первого баннера: та же композиция, что у рекламных картинок —
+ * планета в углу, искры, ракета со следом и облака по низу, — но
+ * собранная своими руками и в своих красках. Рисунком, а не снимком:
+ * он тянется под любую ширину, не мылит на плотном экране и весит
+ * столько же, сколько абзац текста. */
+function СценаЗапуска() {
+  const СИРЕНЬ = "#C79BFF", ФИОЛЕТ = "#8E2DE2", РОЗА = "#FF3D8B";
+  const искры = [
+    { x: 196, y: 30, r: 3.4, o: 0.9 }, { x: 240, y: 96, r: 2.2, o: 0.6 },
+    { x: 150, y: 116, r: 2.6, o: 0.5 }, { x: 330, y: 60, r: 2.4, o: 0.7 },
+    { x: 286, y: 18, r: 2, o: 0.5 },
+  ];
+  return (
+    <svg
+      aria-hidden viewBox="0 0 360 150" preserveAspectRatio="xMidYMid slice"
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+    >
+      <defs>
+        <linearGradient id="бнНебо" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#0A0B12" />
+          <stop offset="0.55" stopColor="#140C28" />
+          <stop offset="1" stopColor="#24103F" />
+        </linearGradient>
+        <radialGradient id="бнЛуна" cx="0.32" cy="0.28" r="0.85">
+          <stop offset="0" stopColor="#6A52A8" />
+          <stop offset="1" stopColor="#120C22" />
+        </radialGradient>
+        <linearGradient id="бнКорпус" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#F0E6FF" />
+          <stop offset="0.5" stopColor={СИРЕНЬ} />
+          <stop offset="1" stopColor={ФИОЛЕТ} />
+        </linearGradient>
+        <linearGradient id="бнПламя" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="0.35" stopColor={СИРЕНЬ} />
+          <stop offset="1" stopColor={РОЗА} stopOpacity="0" />
+        </linearGradient>
+        <radialGradient id="бнЗарево" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor={ФИОЛЕТ} stopOpacity="0.5" />
+          <stop offset="1" stopColor={ФИОЛЕТ} stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      <rect width="360" height="150" fill="url(#бнНебо)" />
+      <circle cx="292" cy="34" r="86" fill="url(#бнЗарево)" />
+      {/* Планета уходит за край — так кадр читается куском большой сцены,
+          а не картинкой, уместившейся целиком. */}
+      <g>
+        <circle cx="300" cy="18" r="62" fill="url(#бнЛуна)" />
+        <circle cx="278" cy="10" r="9" fill="#0E0A1A" opacity="0.5" />
+        <circle cx="312" cy="36" r="6" fill="#0E0A1A" opacity="0.45" />
+        <circle cx="330" cy="6" r="4.5" fill="#0E0A1A" opacity="0.4" />
+      </g>
+      <path d="M170 128C214 84 262 46 360 26" stroke={СИРЕНЬ} strokeOpacity="0.22" strokeWidth="1.2" fill="none" />
+      <path d="M196 150C238 108 286 76 360 62" stroke={РОЗА} strokeOpacity="0.14" strokeWidth="1.2" fill="none" />
+
+      {искры.map((и, i) => (
+        <path
+          key={i}
+          d={`M${и.x} ${и.y - и.r * 2.6}c.4 ${и.r * 1.6} .6 ${и.r * 2.2} ${и.r * 2.6} ${и.r * 2.6}c-2 .4-2.2.6-${и.r * 2.6} ${и.r * 2.6}c-.4-2-.6-2.2-${и.r * 2.6}-${и.r * 2.6}c2-.4 2.2-.6 ${и.r * 2.6}-${и.r * 2.6}z`}
+          fill="#FFFFFF" opacity={и.o}
+          style={{ animation: `искраДышит ${2.4 + i * 0.5}s ease-in-out ${i * 0.4}s infinite` }}
+        />
+      ))}
+
+      {/* Ракета и её след: след уходит вниз, к облакам, — оттого и видно,
+          что она только что оттуда вышла. */}
+      <g style={{ transformOrigin: "266px 70px", animation: "ракетаВзлетает 3.6s ease-in-out infinite" }}>
+        <g transform="rotate(28 268 66)">
+          {/* Пламя — в той же повёрнутой связке, что и корпус: иначе оно
+              бьёт вертикально вниз, мимо сопла. */}
+          <path d="M268 90l-13 54 13 10 13-10z" fill="url(#бнПламя)" opacity="0.85"
+            style={{ transformOrigin: "268px 90px", animation: "пламяДышит 0.5s ease-in-out infinite alternate" }} />
+          <path d="M254 96l-12 10 2 10 12-8z" fill={ФИОЛЕТ} />
+          <path d="M282 96l12 10-2 10-12-8z" fill={ФИОЛЕТ} />
+          <path d="M268 24c11 12 16 28 15 46l-3 28h-24l-3-28c-1-18 4-34 15-46z" fill="url(#бнКорпус)" />
+          <circle cx="268" cy="56" r="9" fill="#0B0A14" />
+          <circle cx="268" cy="56" r="6" fill={ФИОЛЕТ} />
+          <circle cx="265.6" cy="53.4" r="2.2" fill="#FFFFFF" opacity="0.85" />
+          <rect x="256" y="84" width="24" height="7" rx="3" fill={ФИОЛЕТ} opacity="0.85" />
+        </g>
+      </g>
+
+      {/* Облака по низу — тёмные комья, подсвеченные снизу заревом. */}
+      <g>
+        <ellipse cx="300" cy="150" rx="86" ry="34" fill={ФИОЛЕТ} opacity="0.28" />
+        <ellipse cx="236" cy="152" rx="44" ry="24" fill="#15102A" />
+        <ellipse cx="290" cy="146" rx="52" ry="28" fill="#1B1436" />
+        <ellipse cx="348" cy="150" rx="46" ry="24" fill="#150F2A" />
+      </g>
+    </svg>
+  );
+}
+
 function ЗнакБаннера({ вид, цвет }) {
   const общее = { width: 104, height: 104, viewBox: "0 0 104 104", fill: "none" };
 
@@ -12691,13 +12788,10 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
               background: T.surface, border: "none", cursor: "pointer",
             }}
           >
-            {б.картинка ? (
-              <img
-                src={б.картинка}
-                alt={(б.строки[язык] || б.строки.RU).join(" ")}
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-              />
-            ) : (
+            {/* Задник: у первого баннера своя сцена, у остальных — сетка
+                в перспективе, то же ощущение плоскости, на которой стоит
+                предмет. */}
+            {б.сцена === "запуск" ? <СценаЗапуска /> : (
             <>
             {/* Сетка в перспективе — то же ощущение сцены, что на
                 рекламных баннерах: плоскость, на которой стоит предмет. */}
@@ -12724,6 +12818,8 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
                 filter: "blur(6px)",
               }} />
             </div>
+            </>
+            )}
 
             <div style={{ position: "relative", zIndex: 1, maxWidth: "68%" }}>
               {(б.строки[язык] || б.строки.RU).map((строка, i) => (
@@ -12745,10 +12841,10 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
               </span>
             </div>
 
-            <div aria-hidden style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", zIndex: 1 }}>
-              <ЗнакБаннера вид={б.знак} цвет={б.цвет} />
-            </div>
-            </>
+            {!б.сцена && (
+              <div aria-hidden style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", zIndex: 1 }}>
+                <ЗнакБаннера вид={б.знак} цвет={б.цвет} />
+              </div>
             )}
           </div>
         ))}
