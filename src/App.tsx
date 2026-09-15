@@ -12787,7 +12787,7 @@ function СценаТорговли() {
           пятне тот же ореол становится обычной тенью. */}
       <span style={{
         position: "absolute", right: "-14%", bottom: "-34%", width: "78%", aspectRatio: "1 / 1", borderRadius: "50%",
-        background: "radial-gradient(circle, #08080E 0%, rgba(8,8,14,0.82) 46%, rgba(8,8,14,0) 72%)",
+        background: "radial-gradient(circle, #06060B 0%, rgba(6,6,11,0.94) 42%, rgba(6,6,11,0.55) 62%, rgba(6,6,11,0) 78%)",
       }} />
 
       {/* Лента свечей по низу: две одинаковые половины идут подряд, и
@@ -12816,7 +12816,7 @@ function СценаТорговли() {
       {/* Сам герой. Держится правого края и слегка покачивается — как
           будто дышит над кружкой. */}
       <img
-        src="/banner-pepe.webp" alt=""
+        src="/banner-pepe-v2.webp" alt=""
         style={{
           position: "absolute", right: "-4%", bottom: "-14%", width: "56%",
           filter: `drop-shadow(0 8px 30px ${hexA(ФИОЛЕТ, 0.6)})`,
