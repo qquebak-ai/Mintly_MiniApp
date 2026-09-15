@@ -1835,11 +1835,15 @@ function GlobalStyle() {
          печать, — так видно, что проверка прошла именно сейчас. */
       /* Углеволокно едет вниз ровно на клетку плетения: в конце круга
          рисунок совпадает сам с собой, поэтому шва не видно и полотно
-         кажется бесконечным. Позиции слоёв — те самые смещения, что
-         собирают «ёлочку» твила. */
+         кажется бесконечным.
+         Двигаем сам слой, а не его фон. Прежняя анимация меняла
+         background-position, и браузер округлял её до целых точек: при
+         двадцати точках за четырнадцать секунд ткань стояла на месте и
+         раз в полсекунды прыгала на точку — ровно то дёрганье, которое
+         было видно. Сдвиг слоя считается дробно и идёт на видеокарте. */
       @keyframes карбонЕдет {
-        from { background-position: 0 5px, 10px 0px, 0 10px, 10px 5px, 0 0, 0 0; }
-        to   { background-position: 0 25px, 10px 20px, 0 30px, 10px 25px, 0 20px, 0 20px; }
+        from { transform: translate3d(0, 0, 0); }
+        to   { transform: translate3d(0, 20px, 0); }
       }
       @keyframes галочкаВстала {
         0%   { opacity: 0; transform: scale(0.4) rotate(-18deg); }
@@ -10583,14 +10587,14 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
           <div style={{
             position: "relative", zIndex: 1, width: "82%", height: 62, borderRadius: 12,
             overflow: "hidden",
-            background: item.fill,
-            backgroundColor: item.ткань ? "#131319" : undefined,
-            backgroundSize: item.size || "320% 320%",
-            // Ткань не переливается — по ней ходит блик, как на карте.
-            animation: item.ткань ? "карбонЕдет 14s linear infinite" : "картаПереливается 9s ease-in-out infinite",
+            background: item.ткань ? "#131319" : item.fill,
+            backgroundSize: item.ткань ? undefined : (item.size || "320% 320%"),
+            // Ткань не переливается: плетение едет отдельным слоем.
+            animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
             boxShadow: `0 8px 22px ${hexA(item.glow || "#7C3AED", 0.35)}`,
             padding: "9px 10px", textAlign: "left",
           }}>
+            {item.ткань && <СлойКарбона fill={item.fill} size={item.size} />}
             {item.ткань && <СлоиТкани />}
             <div style={{ fontFamily: bodyFont, fontSize: 8.5, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
             <div style={{ fontFamily: displayFont, fontSize: 15, fontWeight: 700, color: "#FFFFFF", marginTop: 2 }}>
@@ -10764,12 +10768,12 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
             <div style={{
               width: "84%", height: 96, borderRadius: 16, padding: "12px 14px", textAlign: "left",
               position: "relative", overflow: "hidden",
-              background: item.fill,
-              backgroundColor: item.ткань ? "#131319" : undefined,
-              backgroundSize: item.size || "320% 320%",
-              animation: item.ткань ? "карбонЕдет 14s linear infinite" : "картаПереливается 9s ease-in-out infinite",
+              background: item.ткань ? "#131319" : item.fill,
+              backgroundSize: item.ткань ? undefined : (item.size || "320% 320%"),
+              animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
               boxShadow: `0 12px 30px ${hexA(item.glow || "#7C3AED", 0.38)}`,
             }}>
+              {item.ткань && <СлойКарбона fill={item.fill} size={item.size} />}
               {item.ткань && <СлоиТкани />}
               <div style={{ fontFamily: bodyFont, fontSize: 11, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
               <div style={{ fontFamily: displayFont, fontSize: 24, fontWeight: 700, color: "#FFFFFF", marginTop: 4 }}>
@@ -14331,6 +14335,26 @@ const WALLET_SKIN_BY_ID = Object.fromEntries(WALLET_SKINS.map((с) => [с.id, с
  * плотной, — подсветка сверху и затемнение к низу; само полотно при
  * этом медленно едет вниз (см. «карбонЕдет»), и этого движения хватает.
  */
+/* Плетение отдельным слоем.
+ *
+ * Слой на клетку выше самой карты и уезжает вниз ровно на клетку: к
+ * концу круга рисунок совпадает сам с собой, шва не видно. Держать его
+ * отдельно от карточки нужно ради движения — фон карточки браузер
+ * двигает рывками, а слой едет плавно. */
+function СлойКарбона({ fill, size = "20px 20px", длительность = 9 }) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        position: "absolute", left: 0, right: 0, top: -20, height: "calc(100% + 40px)",
+        background: fill, backgroundColor: "#131319", backgroundSize: size,
+        animation: `карбонЕдет ${длительность}s linear infinite`,
+        willChange: "transform", pointerEvents: "none",
+      }}
+    />
+  );
+}
+
 function СлоиТкани() {
   return (
     <span aria-hidden style={{
@@ -14579,15 +14603,17 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // Оттенков больше, чем нужно для простого градиента: розовый,
           // сиреневый, синий и почти чёрный ходят друг за другом, и
           // поверхность не повторяет один и тот же переход.
-          background: видКарты.fill,
-          backgroundColor: ткань ? "#131319" : undefined,
-          backgroundSize: видКарты.size || "320% 320%",
+          // У ткани сама карта — ровная тёмная подложка: плетение живёт
+          // отдельным слоем ниже, иначе его не сдвинуть плавно.
+          background: ткань ? "#131319" : видКарты.fill,
+          backgroundSize: ткань ? undefined : (видКарты.size || "320% 320%"),
           animation: ткань
-            ? "карбонЕдет 14s linear infinite"
+            ? "none"
             : `картаПереливается ${ходКарты.длительность}s ease-in-out ${ходКарты.сдвиг}s infinite`,
           border: "none",
         }}
       >
+        {ткань && <СлойКарбона fill={видКарты.fill} size={видКарты.size} />}
         {/* Волны от касаний — поверх заливки, но под текстом. */}
         {волны.map((в) => (
           <span
@@ -14683,32 +14709,24 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         >
           {курсСети > 0 ? `≈ $${usd.toFixed(2)}` : "—"}
         </span>
-        {/* Мягкая кромка снизу: узкая полоса лёгкого размытия, уходящая в
-            ноль к середине. Она смазывает последние точки рисунка у
-            самого края, и карта кажется сходящей на нет, а не обрезанной
-            по линейке. Размытие нарочно слабое — на глаз оно не читается
-            как эффект, только как аккуратный край. */}
-        <span aria-hidden style={{
-          position: "absolute", left: 0, right: 0, bottom: 0, height: 26,
-          backdropFilter: "blur(1.6px)", WebkitBackdropFilter: "blur(1.6px)",
-          WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 85%)",
-          maskImage: "linear-gradient(180deg, transparent 0%, #000 85%)",
-          pointerEvents: "none",
-        }} />
-        {/* У карбона кромка идёт по всем четырём сторонам: плетение —
-            рисунок мелкий и жёсткий, и обрезанный по линейке он выдаёт
-            прямоугольник. Та же слабая дымка сверху и по бокам — и
-            ткань уходит под край, как настоящая. */}
-        {ткань && [
-          { бок: "top", стиль: { left: 0, right: 0, top: 0, height: 22 }, маска: "linear-gradient(0deg, transparent 0%, #000 85%)" },
-          { бок: "left", стиль: { top: 0, bottom: 0, left: 0, width: 22 }, маска: "linear-gradient(270deg, transparent 0%, #000 85%)" },
-          { бок: "right", стиль: { top: 0, bottom: 0, right: 0, width: 22 }, маска: "linear-gradient(90deg, transparent 0%, #000 85%)" },
+        {/* Мягкая кромка: рисунок сходит на нет у самого края, и карта
+            не выглядит обрезанной по линейке.
+            Раньше кромка размывала подложку (backdrop-filter). Пока по
+            карте идёт блик, он живёт отдельным слоем видеокарты, и
+            размытию его не видно — кромка на глазах обрывалась ровной
+            полосой. Теперь это не размытие, а затемнение поверх всего:
+            блик под ним гаснет так же, как плетение, и рвать нечему. */}
+        {[
+          { бок: "bottom", стиль: { left: 0, right: 0, bottom: 0, height: 26 }, угол: 0 },
+          ...(ткань ? [
+            { бок: "top", стиль: { left: 0, right: 0, top: 0, height: 22 }, угол: 180 },
+            { бок: "left", стиль: { top: 0, bottom: 0, left: 0, width: 22 }, угол: 90 },
+            { бок: "right", стиль: { top: 0, bottom: 0, right: 0, width: 22 }, угол: 270 },
+          ] : []),
         ].map((к) => (
           <span key={к.бок} aria-hidden style={{
-            position: "absolute", ...к.стиль,
-            backdropFilter: "blur(1.6px)", WebkitBackdropFilter: "blur(1.6px)",
-            WebkitMaskImage: к.маска, maskImage: к.маска,
-            pointerEvents: "none",
+            position: "absolute", ...к.стиль, pointerEvents: "none",
+            background: `linear-gradient(${к.угол}deg, ${hexA("#000000", 0.42)} 0%, ${hexA("#000000", 0.16)} 45%, ${hexA("#000000", 0)} 100%)`,
           }} />
         ))}
       </section>
