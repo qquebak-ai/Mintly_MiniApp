@@ -1361,6 +1361,19 @@ const ЦВЕТ_КНОПКИ_ПЛОСКО = "#6C16E1";
 /* Тот же перелив для текста. Краски светлее кнопочных: буквы лежат на
    тёмном небе, и фирменный фиолет в них ушёл бы в нечитаемое пятно —
    поэтому волна идёт от белого к сирени и обратно. */
+const переливТекста = (краски) => ({
+  backgroundImage: `linear-gradient(112deg, ${краски})`,
+  backgroundSize: "230% 100%",
+  WebkitBackgroundClip: "text",
+  backgroundClip: "text",
+  color: "transparent",
+  WebkitTextFillColor: "transparent",
+  animation: "кнопкаПереливается 5.5s ease-in-out infinite",
+});
+/* Голубой — под GRAM, фиолетовый — под Solana: у каждой сети свой цвет
+   в приложении, и в заголовке они те же. */
+const ПЕРЕЛИВ_ГОЛУБОЙ = переливТекста("#FFFFFF 0%, #DCF2FF 20%, #4FC3FF 50%, #DCF2FF 80%, #FFFFFF 100%");
+const ПЕРЕЛИВ_СИРЕНЬ = переливТекста("#FFFFFF 0%, #F0E4FF 22%, #C79BFF 50%, #F0E4FF 78%, #FFFFFF 100%");
 const ПЕРЕЛИВ_ТЕКСТА = {
   backgroundImage: "linear-gradient(112deg, #FFFFFF 0%, #F0E4FF 22%, #C79BFF 50%, #F0E4FF 78%, #FFFFFF 100%)",
   backgroundSize: "230% 100%",
@@ -1777,6 +1790,17 @@ function GlobalStyle() {
       @keyframes полоскаНаливается {
         from { transform: scaleX(0); }
         to   { transform: scaleX(1); }
+      }
+      /* Лента свечей едет влево ровно на свою половину: вторая копия
+         встаёт на место первой, и стыка не видно. */
+      @keyframes лентаСвечей {
+        from { transform: translate3d(0, 0, 0); }
+        to   { transform: translate3d(-50%, 0, 0); }
+      }
+      /* Герой на баннере дышит: чуть поднимается и опускается. */
+      @keyframes геройДышит {
+        0%, 100% { transform: translate3d(0, 0, 0); }
+        50%      { transform: translate3d(0, -6px, 0); }
       }
       @keyframes звездаКачается {
         0%, 100% { transform: translateY(3px); }
@@ -12597,15 +12621,22 @@ const БАННЕРЫ = [
     сцена: "запуск",
     // Перелив забирает себе только обещание срока — остальной заголовок
     // белый: если переливается вся фраза, выделять уже нечего.
-    выделено: { RU: "за пару секунд", EN: "in seconds" },
+    выделения: [{ RU: "за пару секунд", EN: "in seconds", стиль: "сирень" }],
   },
   {
     id: "trade",
-    строки: { RU: ["Торгуй мемкоинами", "TON и Solana"], EN: ["Trade memecoins", "on TON and Solana"] },
+    строки: { RU: ["Торгуй мемкоинами", "Gram и Solana"], EN: ["Trade memecoins", "Gram and Solana"] },
     кнопка: { RU: "Открыть мемпад", EN: "Open mempad" },
     цвет: "#2ED47A",
     действие: "mempad",
     знак: "свечи",
+    сцена: "торговля",
+    // Имена сетей переливаются каждое своим цветом — тем же, каким сеть
+    // помечена во всём приложении.
+    выделения: [
+      { RU: "Gram", EN: "Gram", стиль: "голубой" },
+      { RU: "Solana", EN: "Solana", стиль: "сирень" },
+    ],
   },
   {
     id: "wallet",
@@ -12717,6 +12748,76 @@ function СценаЗапуска() {
   );
 }
 
+/* Сцена второго баннера — торговый стол.
+ *
+ * Герой справа, за ним зелёное зарево от свечей и фиолетовое от сети, а
+ * по низу идёт сам график: столбики растут один за другим и уходят
+ * влево, будто лента сделок не останавливается. Свечи нарисованы, а не
+ * взяты картинкой, — их высота меняется от кадра к кадру, и повтор не
+ * читается. */
+function СценаТорговли() {
+  const ЗЕЛЁНЫЙ = "#2ED47A", ФИОЛЕТ = "#8E2DE2", ГОЛУБОЙ = "#4FC3FF";
+  // Высоты подобраны так, чтобы лента читалась как движение вверх с
+  // откатами, а не как случайный частокол.
+  const свечи = [26, 34, 22, 40, 30, 46, 36, 52, 42, 58, 48, 64, 54, 70, 60, 76];
+  return (
+    <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+      <span style={{
+        position: "absolute", inset: 0,
+        background: `radial-gradient(120% 130% at 88% 18%, ${hexA(ФИОЛЕТ, 0.40)} 0%, ${hexA("#12203A", 0.30)} 38%, #0A0B12 72%, #07070C 100%)`,
+      }} />
+      <span style={{
+        position: "absolute", left: "-10%", bottom: "-40%", width: "70%", aspectRatio: "1 / 1", borderRadius: "50%",
+        background: `radial-gradient(circle, ${hexA(ЗЕЛЁНЫЙ, 0.28)} 0%, ${hexA(ЗЕЛЁНЫЙ, 0)} 70%)`,
+      }} />
+
+      {/* Лента свечей по низу: две одинаковые половины идут подряд, и
+          когда первая уходит за край, на её месте оказывается вторая —
+          шва не видно. */}
+      <span style={{
+        position: "absolute", left: 0, right: 0, bottom: 0, height: "62%",
+        display: "flex", alignItems: "flex-end", gap: 6, width: "200%",
+        animation: "лентаСвечей 26s linear infinite",
+        opacity: 0.5,
+        WebkitMaskImage: "linear-gradient(90deg, transparent, #000 12%, #000 72%, transparent)",
+        maskImage: "linear-gradient(90deg, transparent, #000 12%, #000 72%, transparent)",
+      }}>
+        {[...свечи, ...свечи].map((в, i) => {
+          const рост = i % 3 !== 1;
+          const цвет = рост ? ЗЕЛЁНЫЙ : "#FF4D6A";
+          return (
+            <span key={i} style={{ position: "relative", flex: "1 0 auto", width: 8, height: `${в}%` }}>
+              <span style={{ position: "absolute", left: 3, top: "-18%", bottom: "-12%", width: 2, borderRadius: 1, background: hexA(цвет, 0.5) }} />
+              <span style={{ position: "absolute", inset: 0, borderRadius: 3, background: hexA(цвет, 0.85), boxShadow: `0 0 12px ${hexA(цвет, 0.5)}` }} />
+            </span>
+          );
+        })}
+      </span>
+
+      {/* Сам герой. Держится правого края и слегка покачивается — как
+          будто дышит над кружкой. */}
+      <img
+        src="/banner-pepe.webp" alt=""
+        style={{
+          position: "absolute", right: "-4%", bottom: "-14%", width: "56%",
+          filter: `drop-shadow(0 8px 30px ${hexA(ФИОЛЕТ, 0.6)})`,
+          animation: "геройДышит 6s ease-in-out infinite",
+        }}
+      />
+
+      <span style={{
+        position: "absolute", left: 0, top: 0, bottom: 0, width: "64%",
+        background: "linear-gradient(90deg, rgba(7,7,12,0.88) 0%, rgba(7,7,12,0.6) 52%, rgba(7,7,12,0) 100%)",
+      }} />
+      <span style={{
+        position: "absolute", left: "8%", top: "12%", width: 4, height: 4, borderRadius: "50%",
+        background: ГОЛУБОЙ, boxShadow: `0 0 10px ${ГОЛУБОЙ}`, opacity: 0.8,
+        animation: "звездаКачается 3.4s ease-in-out infinite",
+      }} />
+    </span>
+  );
+}
+
 function ЗнакБаннера({ вид, цвет }) {
   const общее = { width: 104, height: 104, viewBox: "0 0 104 104", fill: "none" };
 
@@ -12792,6 +12893,37 @@ function ЗнакБаннера({ вид, цвет }) {
 /* Сколько баннер держится на экране. Пяти секунд не хватало: пока
    прочитаешь заголовок, карточка уже уезжает. */
 const ПОКАЗ_БАННЕРА = 9000;
+
+/* Заголовок с выделенными словами.
+ *
+ * Строка режется по меткам, и каждая метка получает свой перелив.
+ * Возвращаем куски, а не размеченную строку: цвет здесь — не разметка
+ * текста, а часть картинки, и хранить его в переводе незачем. */
+const ПЕРЕЛИВЫ_ТЕКСТА = { голубой: ПЕРЕЛИВ_ГОЛУБОЙ, сирень: ПЕРЕЛИВ_СИРЕНЬ };
+
+function разбитьПоВыделениям(строка, выделения, язык) {
+  if (!выделения || !выделения.length) return строка;
+  const куски = [];
+  let хвост = строка;
+  let ключ = 0;
+  while (хвост) {
+    // Берём ближайшую метку: порядок в списке не обязан совпадать с
+    // порядком слов в строке.
+    let лучшая = null;
+    for (const в of выделения) {
+      const слово = в[язык] || в.RU;
+      const где = слово ? хвост.indexOf(слово) : -1;
+      if (где >= 0 && (!лучшая || где < лучшая.где)) лучшая = { где, слово, стиль: в.стиль };
+    }
+    if (!лучшая) { куски.push(хвост); break; }
+    if (лучшая.где > 0) куски.push(хвост.slice(0, лучшая.где));
+    куски.push(
+      <span key={`в${ключ++}`} style={ПЕРЕЛИВЫ_ТЕКСТА[лучшая.стиль] || ПЕРЕЛИВ_СИРЕНЬ}>{лучшая.слово}</span>
+    );
+    хвост = хвост.slice(лучшая.где + лучшая.слово.length);
+  }
+  return куски;
+}
 
 function БаннерыГлавной({ onGoTab, onGoCreate }) {
   // Язык берётся из общей настройки приложения, как и весь остальной текст.
@@ -12883,7 +13015,7 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
             {/* Задник: у первого баннера своя сцена, у остальных — сетка
                 в перспективе, то же ощущение плоскости, на которой стоит
                 предмет. */}
-            {б.сцена === "запуск" ? <СценаЗапуска /> : (
+            {б.сцена === "запуск" ? <СценаЗапуска /> : б.сцена === "торговля" ? <СценаТорговли /> : (
             <>
             {/* Сетка в перспективе — то же ощущение сцены, что на
                 рекламных баннерах: плоскость, на которой стоит предмет. */}
@@ -12914,21 +13046,11 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
             )}
 
             <div style={{ position: "relative", zIndex: 1, maxWidth: "72%" }}>
-              {(б.строки[язык] || б.строки.RU).map((строка, i) => {
-                const метка = б.выделено && (б.выделено[язык] || б.выделено.RU);
-                const от = метка ? строка.indexOf(метка) : -1;
-                return (
-                  <div key={i} style={{ fontFamily: displayFont, fontSize: 23, fontWeight: 800, color: T.ice, letterSpacing: "-0.02em", lineHeight: 1.18 }}>
-                    {от < 0 ? строка : (
-                      <>
-                        {строка.slice(0, от)}
-                        <span style={ПЕРЕЛИВ_ТЕКСТА}>{метка}</span>
-                        {строка.slice(от + метка.length)}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
+              {(б.строки[язык] || б.строки.RU).map((строка, i) => (
+                <div key={i} style={{ fontFamily: displayFont, fontSize: 23, fontWeight: 800, color: T.ice, letterSpacing: "-0.02em", lineHeight: 1.18 }}>
+                  {разбитьПоВыделениям(строка, б.выделения, язык)}
+                </div>
+              ))}
             </div>
 
             <div style={{ position: "relative", zIndex: 1 }}>
