@@ -1383,6 +1383,18 @@ const ПЕРЕЛИВ_ТЕКСТА = {
   WebkitTextFillColor: "transparent",
   animation: "кнопкаПереливается 5.5s ease-in-out infinite",
 };
+/* Кнопка мемпада: слева зелёная, справа красная — те же цвета, какими
+   в приложении помечены рост и падение, и та же волна, что на прочих
+   кнопках. Середина не смешивается в грязь: между цветами оставлен
+   тёмный стык, он и держит их раздельно. */
+const ПЕРЕЛИВ_КНОПКИ_ТОРГИ = {
+  background: "linear-gradient(100deg, #0FA85A 0%, #2ED47A 30%, #1B2432 50%, #FF4D6A 70%, #D62F4E 100%)",
+  /* Полотно почти по ширине кнопки: при широком волна уносила стык за
+     край, и кнопка становилась то целиком зелёной, то целиком красной —
+     а половины должны читаться всегда. */
+  backgroundSize: "124% 100%",
+  animation: "кнопкаПереливается 5.5s ease-in-out infinite",
+};
 const ПЕРЕЛИВ_КНОПКИ = {
   background: ЦВЕТ_КНОПКИ,
   // Полотно вдвое шире кнопки — иначе волне негде идти.
@@ -13064,9 +13076,11 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
                 style={{
                   display: "inline-block", padding: "10px 18px", borderRadius: 999,
                   fontFamily: displayFont, fontSize: 14, fontWeight: 700,
-                  ...(б.сцена
-                    ? { ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#8E2DE2", 0.45)}` }
-                    : { background: T.ice, color: T.bg }),
+                  ...(б.сцена === "торговля"
+                    ? { ...ПЕРЕЛИВ_КНОПКИ_ТОРГИ, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#0FA85A", 0.28)}, 0 8px 24px ${hexA("#FF4D6A", 0.24)}` }
+                    : б.сцена
+                      ? { ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#8E2DE2", 0.45)}` }
+                      : { background: T.ice, color: T.bg }),
                 }}
               >
                 {(б.кнопка[язык] || б.кнопка.RU)}
