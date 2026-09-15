@@ -14481,7 +14481,7 @@ function ПолотноПерелив() {
         float fade = smoothstep(0.15, 0.95, uv.y);
         // Дизер: без него плавные переходы ложатся полосами — восемь
         // бит на канал для такого растяжения цвета слишком грубы.
-        float dith = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)))*43758.5453) - 0.5)/255.0;
+        float dith = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)))*43758.5453) - 0.5)/512.0;
         gl_FragColor = vec4(col*fade + dith, fade);
       }`;
     const собрать = (вид, текст) => {
@@ -14506,10 +14506,11 @@ function ПолотноПерелив() {
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     const uЭкран = gl.getUniformLocation(программа, "size");
     const uВремя = gl.getUniformLocation(программа, "time");
-    /* Считаем в разрешении экрана (с потолком в две точки на точку):
-       половинное давало лесенку на переходах — растянутый вдвое кадр
-       видно сразу, никакой мягкостью перелива это не прикрыть. */
-    const плотность = Math.min(typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1, 2);
+    /* Считаем ровно в плотности экрана, без понижения: любое — хоть
+       вдвое, хоть в полтора раза — браузер растягивает обратно, и на
+       переходах видно лесенку. Потолок в три точки на точку стоит
+       только против совсем уж редких экранов. */
+    const плотность = Math.min(typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1, 3);
     const подогнать = () => {
       const ш = Math.max(1, Math.round(э.clientWidth * плотность));
       const в2 = Math.max(1, Math.round(э.clientHeight * плотность));
