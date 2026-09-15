@@ -12756,7 +12756,7 @@ function СценаЗапуска() {
  * взяты картинкой, — их высота меняется от кадра к кадру, и повтор не
  * читается. */
 function СценаТорговли() {
-  const ЗЕЛЁНЫЙ = "#2ED47A", ФИОЛЕТ = "#8E2DE2", ГОЛУБОЙ = "#4FC3FF";
+  const ЗЕЛЁНЫЙ = "#2ED47A", ФИОЛЕТ = "#8E2DE2";
   // Высоты подобраны так, чтобы лента читалась как движение вверх с
   // откатами, а не как случайный частокол.
   const свечи = [26, 34, 22, 40, 30, 46, 36, 52, 42, 58, 48, 64, 54, 70, 60, 76];
@@ -12815,11 +12815,6 @@ function СценаТорговли() {
       <span style={{
         position: "absolute", left: 0, top: 0, bottom: 0, width: "64%",
         background: "linear-gradient(90deg, rgba(7,7,12,0.88) 0%, rgba(7,7,12,0.6) 52%, rgba(7,7,12,0) 100%)",
-      }} />
-      <span style={{
-        position: "absolute", left: "8%", top: "12%", width: 4, height: 4, borderRadius: "50%",
-        background: ГОЛУБОЙ, boxShadow: `0 0 10px ${ГОЛУБОЙ}`, opacity: 0.8,
-        animation: "звездаКачается 3.4s ease-in-out infinite",
       }} />
     </span>
   );
