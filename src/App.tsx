@@ -1358,6 +1358,18 @@ const ЦВЕТ_КНОПКИ = "linear-gradient(112deg, #4A0BAE 0%, #6C16E1 24%, 
    внутри другого градиента (градиент в градиенте — не CSS) и на
    мелочи вроде точек кода, где перелив всё равно не виден. */
 const ЦВЕТ_КНОПКИ_ПЛОСКО = "#6C16E1";
+/* Тот же перелив для текста. Краски светлее кнопочных: буквы лежат на
+   тёмном небе, и фирменный фиолет в них ушёл бы в нечитаемое пятно —
+   поэтому волна идёт от белого к сирени и обратно. */
+const ПЕРЕЛИВ_ТЕКСТА = {
+  backgroundImage: "linear-gradient(112deg, #FFFFFF 0%, #F0E4FF 22%, #C79BFF 50%, #F0E4FF 78%, #FFFFFF 100%)",
+  backgroundSize: "230% 100%",
+  WebkitBackgroundClip: "text",
+  backgroundClip: "text",
+  color: "transparent",
+  WebkitTextFillColor: "transparent",
+  animation: "кнопкаПереливается 5.5s ease-in-out infinite",
+};
 const ПЕРЕЛИВ_КНОПКИ = {
   background: ЦВЕТ_КНОПКИ,
   // Полотно вдвое шире кнопки — иначе волне негде идти.
@@ -12868,7 +12880,11 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
 
             <div style={{ position: "relative", zIndex: 1, maxWidth: "68%" }}>
               {(б.строки[язык] || б.строки.RU).map((строка, i) => (
-                <div key={i} style={{ fontFamily: displayFont, fontSize: 19, fontWeight: 700, color: T.ice, letterSpacing: "-0.01em", lineHeight: 1.25 }}>
+                <div key={i} style={{
+                  fontFamily: displayFont, fontSize: 19, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.25,
+                  // На баннере со сценой заголовок переливается заодно с кнопкой.
+                  ...(б.сцена ? ПЕРЕЛИВ_ТЕКСТА : { color: T.ice }),
+                }}>
                   {строка}
                 </div>
               ))}
