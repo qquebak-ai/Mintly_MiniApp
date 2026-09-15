@@ -12913,12 +12913,12 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
             </>
             )}
 
-            <div style={{ position: "relative", zIndex: 1, maxWidth: "68%" }}>
+            <div style={{ position: "relative", zIndex: 1, maxWidth: "72%" }}>
               {(б.строки[язык] || б.строки.RU).map((строка, i) => {
                 const метка = б.выделено && (б.выделено[язык] || б.выделено.RU);
                 const от = метка ? строка.indexOf(метка) : -1;
                 return (
-                  <div key={i} style={{ fontFamily: displayFont, fontSize: 19, fontWeight: 700, color: T.ice, letterSpacing: "-0.01em", lineHeight: 1.25 }}>
+                  <div key={i} style={{ fontFamily: displayFont, fontSize: 23, fontWeight: 800, color: T.ice, letterSpacing: "-0.02em", lineHeight: 1.18 }}>
                     {от < 0 ? строка : (
                       <>
                         {строка.slice(0, от)}
