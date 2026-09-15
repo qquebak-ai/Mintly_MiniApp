@@ -1861,16 +1861,9 @@ function GlobalStyle() {
          двадцати точках за четырнадцать секунд ткань стояла на месте и
          раз в полсекунды прыгала на точку — ровно то дёрганье, которое
          было видно. Сдвиг слоя считается дробно и идёт на видеокарте. */
-      /* Снимок ткани качается вниз и обратно: повторить его по кругу
-         нельзя, стык выдал бы край, а чуть заметное движение карте
-         нужно. Запас высоты у слоя снизу — на него он и уходит. */
-      @keyframes карбонКачается {
-        0%, 100% { transform: translate3d(0, 0, 0); }
-        50%      { transform: translate3d(0, -26px, 0); }
-      }
       @keyframes карбонЕдет {
         from { transform: translate3d(0, 0, 0); }
-        to   { transform: translate3d(0, var(--шаг-ткани, 20px), 0); }
+        to   { transform: translate3d(0, 20px, 0); }
       }
       @keyframes галочкаВстала {
         0%   { opacity: 0; transform: scale(0.4) rotate(-18deg); }
@@ -10614,7 +10607,7 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
           <div style={{
             position: "relative", zIndex: 1, width: "82%", height: 62, borderRadius: 12,
             overflow: "hidden",
-            background: item.ткань ? "#0A0A0D" : item.fill,
+            background: item.ткань ? "#131319" : item.fill,
             backgroundSize: item.ткань ? undefined : (item.size || "320% 320%"),
             // Ткань не переливается: плетение едет отдельным слоем.
             animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
@@ -10795,7 +10788,7 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
             <div style={{
               width: "84%", height: 96, borderRadius: 16, padding: "12px 14px", textAlign: "left",
               position: "relative", overflow: "hidden",
-              background: item.ткань ? "#0A0A0D" : item.fill,
+              background: item.ткань ? "#131319" : item.fill,
               backgroundSize: item.ткань ? undefined : (item.size || "320% 320%"),
               animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
               boxShadow: `0 12px 30px ${hexA(item.glow || "#7C3AED", 0.38)}`,
@@ -14351,17 +14344,22 @@ const WALLET_SKINS = [
     fill: "linear-gradient(120deg, #9945FF 0%, #7A3DF5 35%, #19FB9B 100%)", glow: "#14F195",
   },
   {
-    /* Плетение — снимок настоящего углеволокна целиком, не нарезанный
-       на плитку. Нарезка всякий раз что-то теряла: уменьшение
-       усредняло блики, а повтор мелкой клетки читался сеткой. Снимок
-       лежит как есть, левым верхним углом в углу карты, и закрывает её
-       целиком (cover). */
     id: "carbon", label: { RU: "Карбон", EN: "Carbon" }, price: 120,
-    fill: 'url("/carbon-photo.webp")',
-    /* «cover» для СлояКарбона — знак, что это снимок, а не плитка:
-       повторять его нельзя, потому вместо бесконечного хода вниз он
-       медленно качается и возвращается. */
-    size: "cover",
+    fill: [
+      /* Сдвиги слоёв обязательны: именно они складывают из четырёх
+         встречных клиньев шахматку плетения. Без них все четыре лежат
+         в одной точке и карбон читается полосами. */
+      "linear-gradient(27deg, #14141A 5px, transparent 5px) 0 5px",
+      "linear-gradient(207deg, #14141A 5px, transparent 5px) 10px 0",
+      "linear-gradient(27deg, #24242E 5px, transparent 5px) 0 10px",
+      "linear-gradient(207deg, #24242E 5px, transparent 5px) 10px 5px",
+      "linear-gradient(90deg, #1B1B22 10px, transparent 10px)",
+      "linear-gradient(180deg, #1E1E26 25%, #1A1A21 25%, #1A1A21 50%, transparent 50%, transparent 75%, #26262F 75%, #26262F)",
+    ].join(", "),
+    /* Шаг плетения. Смещения слоёв друг относительно друга ведёт
+       анимация «карбонЕдет»: она же медленно тянет всю ткань вниз ровно
+       на клетку, так что стык не виден и полотно кажется бесконечным. */
+    size: "20px 20px",
     ткань: true,
     glow: "#5A5A6B",
   },
@@ -14386,36 +14384,13 @@ const WALLET_SKIN_BY_ID = Object.fromEntries(WALLET_SKINS.map((с) => [с.id, с
  * концу круга рисунок совпадает сам с собой, шва не видно. Держать его
  * отдельно от карточки нужно ради движения — фон карточки браузер
  * двигает рывками, а слой едет плавно. */
-function СлойКарбона({ fill, size = "20px 20px", длительность = 14 }) {
-  /* Снимок целиком повторять нельзя — край выдал бы себя стыком. Потому
-     он лежит углом в угол карты, запас оставлен только снизу, а ход
-     вниз заменён на медленное качание с возвратом. */
-  const снимок = String(size) === "cover";
-  if (снимок) {
-    return (
-      <span
-        aria-hidden
-        style={{
-          position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% + 26px)",
-          background: fill, backgroundColor: "#0A0A0D",
-          backgroundSize: "cover", backgroundPosition: "left top", backgroundRepeat: "no-repeat",
-          animation: `карбонКачается ${длительность * 2}s ease-in-out infinite`,
-          willChange: "transform", pointerEvents: "none",
-        }}
-      />
-    );
-  }
-  /* Плитку уезжать нужно ровно на клетку, иначе к концу круга рисунок не
-     совпадёт сам с собой и будет виден скачок. Клетку берём из размера
-     плитки и отдаём анимации переменной. */
-  const шаг = parseFloat(String(size)) || 20;
+function СлойКарбона({ fill, size = "20px 20px", длительность = 9 }) {
   return (
     <span
       aria-hidden
       style={{
-        position: "absolute", left: 0, right: 0, top: -шаг, height: `calc(100% + ${шаг * 2}px)`,
-        background: fill, backgroundColor: "#0A0A0D", backgroundSize: size,
-        ["--шаг-ткани" as any]: `${шаг}px`,
+        position: "absolute", left: 0, right: 0, top: -20, height: "calc(100% + 40px)",
+        background: fill, backgroundColor: "#131319", backgroundSize: size,
         animation: `карбонЕдет ${длительность}s linear infinite`,
         willChange: "transform", pointerEvents: "none",
       }}
@@ -14673,7 +14648,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // поверхность не повторяет один и тот же переход.
           // У ткани сама карта — ровная тёмная подложка: плетение живёт
           // отдельным слоем ниже, иначе его не сдвинуть плавно.
-          background: ткань ? "#0A0A0D" : видКарты.fill,
+          background: ткань ? "#131319" : видКарты.fill,
           backgroundSize: ткань ? undefined : (видКарты.size || "320% 320%"),
           animation: ткань
             ? "none"
