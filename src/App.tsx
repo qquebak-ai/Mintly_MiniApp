@@ -180,7 +180,6 @@ const STR = {
     appWalletSweep: "Автовывод излишка",
     appWalletSweepOff: "выключен",
     homeInCurves: "Сейчас в токенах",
-    homeStatToday: "запусков за сутки",
     homeMoving: "В движении",
     homeTopAll: "Весь топ",
     homeTopHide: "Свернуть",
@@ -364,15 +363,6 @@ const STR = {
     homeWelcome: "Добро пожаловать!",
     homeWelcomeSub: "Ты часть площадки. Создавай, торгуй, расти.",
     homeLive: "Онлайн",
-    homeEcoTitle: "Площадка растёт",
-    homeEcoRaised: "GRAM в токенах",
-    homeEcoDex: "на бирже",
-    funnelTitle: "Путь токенов",
-    funnelHint: "Сколько запусков доходит до каждой ступени",
-    funnelLaunched: "Запущено",
-    funnelTraded: "Прошла первая сделка",
-    funnelHalf: "Собрано половина кривой",
-    funnelListed: "Вышли на биржу",
     homeDoNow: "Что сделать сейчас",
     homeDoLaunchNote: "Свой токен за пару минут",
     homeDoMempadNote: "Смотри, что запускают сейчас",
@@ -771,7 +761,6 @@ const STR = {
     appWalletSweep: "Auto-withdraw excess",
     appWalletSweepOff: "off",
     homeInCurves: "Live in curves",
-    homeStatToday: "launched today",
     homeMoving: "On the move",
     homeTopAll: "Full top",
     homeTopHide: "Collapse",
@@ -955,15 +944,6 @@ const STR = {
     homeWelcome: "Welcome!",
     homeWelcomeSub: "You are part of the platform. Create, trade, grow.",
     homeLive: "Online",
-    homeEcoTitle: "The platform is growing",
-    homeEcoRaised: "TON in tokens",
-    homeEcoDex: "on DEX",
-    funnelTitle: "Token journey",
-    funnelHint: "How far launches get, stage by stage",
-    funnelLaunched: "Launched",
-    funnelTraded: "First trade done",
-    funnelHalf: "Half of the curve raised",
-    funnelListed: "Listed on DEX",
     homeDoNow: "What to do now",
     homeDoLaunchNote: "Your token in a couple of minutes",
     homeDoMempadNote: "See what is launching now",
@@ -11434,181 +11414,6 @@ function useTicker(target, duration = 800) {
    биржу считает функция базы, запуски за сутки — она же.
    Счётчика «онлайн» здесь больше нет: он рисовался случайными числами,
    и, раз заметив это, человек перестал бы верить и остальным. */
-/* Счётчики площадки. Читает их сама главная, а не этот блок: пока они в
-   пути, весь экран стоит плашками, и блок не должен появляться отдельной
-   заглушкой посреди уже готовой страницы. */
-function useСчётчикиПлощадки() {
-  const [stats, setStats] = useState(null);
-  useEffect(() => {
-    let брошено = false;
-    const прочитать = () => supabase.rpc("platform_stats", { p_network: CURRENT_NETWORK }).then(({ data, error }) => {
-      if (!брошено && !error && data) setStats(data);
-    }, () => {});
-    прочитать();
-    const id = setInterval(() => { if (document.visibilityState === "visible") прочитать(); }, 60000);
-    return () => { брошено = true; clearInterval(id); };
-  }, []);
-  return stats;
-}
-
-/* Путь токенов площадки.
- *
- * Одно число «запущено столько-то» ничего не говорит: важно, сколько из
- * запусков дошло до торгов, сколько добралось до середины кривой и
- * сколько вышло на биржу. Это воронка, и читается она сразу: каждая
- * следующая полоса короче предыдущей ровно во столько раз, во сколько
- * меньше токенов её прошло.
- *
- * Считается по тем же строкам, что уже загружены для ленты: отдельного
- * запроса не нужно, а живой поток кривых обновляет полосы сам.
- */
-function ВоронкаТокенов({ tokens = [] }) {
-  const ступени = useMemo(() => {
-    const собрано = (т) => Number(т.raisedTon) || 0;
-    const цель = (т) => Number(т.graduationTon) || 0;
-    const всего = tokens.length;
-    const торгуются = tokens.filter((т) => т.graduated || собрано(т) > 0).length;
-    const половина = tokens.filter((т) => т.graduated || (цель(т) > 0 && собрано(т) >= цель(т) / 2)).length;
-    const наБирже = tokens.filter((т) => !!т.graduated).length;
-    return [
-      { key: "launched", label: t("funnelLaunched"), value: всего },
-      { key: "traded", label: t("funnelTraded"), value: торгуются },
-      { key: "half", label: t("funnelHalf"), value: половина },
-      { key: "listed", label: t("funnelListed"), value: наБирже },
-    ];
-  }, [tokens]);
-
-  const основание = ступени[0] ? ступени[0].value : 0;
-  if (!основание) return null;
-
-  return (
-    <div className="flex flex-col" style={{ gap: 12 }}>
-      <div>
-        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 600, letterSpacing: "-0.01em" }}>
-          {t("funnelTitle")}
-        </div>
-        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2 }}>{t("funnelHint")}</div>
-      </div>
-      <div className="flex flex-col" style={{ gap: 10 }}>
-        {ступени.map((с, i) => {
-          const доля = основание > 0 ? с.value / основание : 0;
-          /* Цвет гаснет к низу воронки: верхняя ступень — цвет площадки,
-             нижняя — зелёный выхода на биржу, между ними тот же тон,
-             только глуше. Так видно направление, а не четыре разных
-             показателя рядом. */
-          const цвет = i === ступени.length - 1 ? T.up : T.electric;
-          return (
-            <div key={с.key}>
-              <div className="flex items-baseline justify-between" style={{ gap: 10, marginBottom: 5 }}>
-                <span className="truncate" style={{ fontFamily: bodyFont, color: i === 0 ? T.ice : T.muted, fontSize: 13 }}>{с.label}</span>
-                <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap" }}>
-                  {с.value}
-                  {i > 0 && (
-                    <span style={{ color: T.faint, fontSize: 11.5, marginLeft: 6 }}>
-                      {Math.round(доля * 100)}%
-                    </span>
-                  )}
-                </span>
-              </div>
-              <div style={{ height: 10, borderRadius: 999, background: hexA("#FFFFFF", 0.05), overflow: "hidden" }}>
-                <div
-                  style={{
-                    // Пустая ступень остаётся пустой: полоска в один
-                    // пиксель вместо нуля — это враньё в пользу площадки.
-                    width: `${Math.max(0, Math.min(1, доля)) * 100}%`,
-                    height: "100%", borderRadius: 999,
-                    background: `linear-gradient(90deg, ${hexA(цвет, 0.85)} 0%, ${hexA(цвет, 0.45)} 100%)`,
-                    transition: `width ${EASE}`,
-                  }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ГлавнаяСводка({ live = [], stats = null }) {
-  // Собранное и вышедших на биржу берём из ленты: она читает кривые
-  // напрямую, а в базе эти числа от обхода по расписанию и отстают.
-  const живые = useMemo(() => {
-    const ряд = (live || []).filter((tok) => tok && tok.raisedTon != null);
-    if (!ряд.length) return null;
-    return {
-      raisedTon: ряд.filter((tok) => !tok.graduated).reduce((s, tok) => s + (Number(tok.raisedTon) || 0), 0),
-      graduated: ряд.filter((tok) => tok.graduated).length,
-    };
-  }, [live]);
-
-  const собрано = Math.max((живые && живые.raisedTon) || 0, Number((stats || {}).raisedTon) || 0);
-  const наБирже = Math.max((живые && живые.graduated) || 0, Number((stats || {}).graduated) || 0);
-  const заСутки = Number((stats || {}).launched24) || 0;
-  const плавно = useTicker(собрано);
-
-  const показатели = [
-    { число: String(заСутки), подпись: t("homeStatToday") },
-    { число: String(наБирже), подпись: t("homeEcoDex") },
-  ];
-
-
-  /* Карта, а не строка чисел.
-     По дизайн-плану баланс площадки оформлен как банковская карта: он
-     приподнят над фоном и читается как предмет, а не как заголовок
-     раздела. Блик по диагонали медленно проходит — карта выглядит
-     сделанной из материала, а не нарисованной заливкой. */
-  return (
-    <section
-      style={{
-        position: "relative", overflow: "hidden", borderRadius: 22, padding: "18px 18px 16px",
-        background: `linear-gradient(140deg, ${hexA(T.electric, 0.22)} 0%, ${hexA(T.violet, 0.10)} 42%, ${T.surface} 100%)`,
-        // Без обводки: серая линия поверх фирменной заливки читалась
-        // грязным кантом и рвала градиент по краю.
-        border: "none",
-        boxShadow: `0 18px 40px ${hexA("#000000", 0.45)}`,
-      }}
-    >
-      <div aria-hidden style={{
-        position: "absolute", top: -60, left: -80, width: 240, height: 300,
-        background: `linear-gradient(90deg, ${hexA(T.ice, 0)} 0%, ${hexA(T.ice, 0.10)} 50%, ${hexA(T.ice, 0)} 100%)`,
-        transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
-      }} />
-
-      <div className="flex items-center" style={{ gap: 7, position: "relative" }}>
-        <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.up }} />
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-          {t("homeInCurves")}
-        </span>
-      </div>
-
-      {/* Единственное крупное число на экране. Всё остальное — мельче,
-          и потому взгляд начинает отсюда. */}
-      <div className="flex items-baseline" style={{ gap: 8, marginTop: 10, position: "relative" }}>
-        <span style={{ fontFamily: displayFont, fontSize: 42, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.03em", ...текстГрадиентом(ГРАДИЕНТ_БРЕНДА) }}>
-          {fmtTon(плавно).replace(" TON", "")}
-        </span>
-        <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 15 }}>TON</span>
-      </div>
-
-      <div className="flex items-center" style={{ gap: 18, marginTop: 14, position: "relative" }}>
-        {показатели.map((п, i) => (
-          <div key={i} className="flex items-baseline" style={{ gap: 5 }}>
-            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14, fontWeight: 600 }}>{п.число}</span>
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{п.подпись}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* Главный токен экрана — ближайший к листингу. Единственная карточка на
-   главной, и потому она читается как «смотри сюда».
-
-   Ближайший, а не самый крупный: у крупного всё уже случилось, а здесь
-   виден отсчёт, который вот-вот кончится. Кривых нет вовсе — берём
-   лучший по капитализации, чтобы место не пустовало. */
 function ГлавныйТокен({ tokens = [], onOpen }) {
   const выбор = useMemo(() => {
     const наКривой = (tokens || [])
@@ -12856,21 +12661,15 @@ function HomeView({
     [curveTokens],
   );
 
-  /* Счётчики площадки читаются здесь же, а не внутри сводки: пока их нет,
-     экран должен стоять плашками целиком. Раньше общий скелет спадал
-     раньше счётчиков, и на месте сводки загоралась ещё одна заглушка —
-     посреди уже готовой страницы.
-
-     Страховка по времени: если платформенный запрос не ответит вовсе,
-     главная всё равно откроется — сводка просто покажет то, что знает
-     лента. */
-  const stats = useСчётчикиПлощадки();
+  /* Страховка по времени: экран стоит плашками, пока едет лента, но не
+     дольше нескольких секунд — иначе при молчащем источнике главная не
+     открылась бы вовсе. */
   const [ждёмДольше, setЖдёмДольше] = useState(false);
   useEffect(() => {
     const id = setTimeout(() => setЖдёмДольше(true), 6000);
     return () => clearTimeout(id);
   }, []);
-  const вПлашках = грузится || (stats == null && !ждёмДольше);
+  const вПлашках = грузится && !ждёмДольше;
 
   return (
     // Запас снизу — под закреплённую кнопку: в конце прокрутки она
@@ -12886,20 +12685,13 @@ function HomeView({
       {вПлашках ? <ПлашкаБлока h={150} radius={20} /> : <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />}
       {вПлашках ? (
         <>
-          <ПлашкаБлока h={96} />
           <ПлашкаБлока h={46} radius={999} />
           <ПлашкаБлока h={168} />
           <ПлашкаБлока h={196} radius={24} />
-          <ПлашкаБлока h={150} />
           <ПлашкаБлока h={190} />
         </>
       ) : (
         <>
-          <ГлавнаяСводка live={боевые} stats={stats} />
-          {/* Воронка считает все запуски площадки, а не только те, что
-              попали на витрину: её смысл как раз в том, сколько из них
-              дошло дальше первой ступени. */}
-          <ВоронкаТокенов tokens={curveTokens} />
           <БегущаяЛента />
           <МоиДела
             myTokens={myTokens}
