@@ -14306,10 +14306,13 @@ const WALLET_SKINS = [
        не половина карты. */
     id: "carbon", label: { RU: "Карбон", EN: "Carbon" }, price: 120,
     fill: [
-      "linear-gradient(27deg, #14141A 5px, transparent 5px)",
-      "linear-gradient(207deg, #14141A 5px, transparent 5px)",
-      "linear-gradient(27deg, #24242E 5px, transparent 5px)",
-      "linear-gradient(207deg, #24242E 5px, transparent 5px)",
+      /* Сдвиги слоёв обязательны: именно они складывают из четырёх
+         встречных клиньев шахматку плетения. Без них все четыре лежат
+         в одной точке и карбон читается полосами. */
+      "linear-gradient(27deg, #14141A 5px, transparent 5px) 0 5px",
+      "linear-gradient(207deg, #14141A 5px, transparent 5px) 10px 0",
+      "linear-gradient(27deg, #24242E 5px, transparent 5px) 0 10px",
+      "linear-gradient(207deg, #24242E 5px, transparent 5px) 10px 5px",
       "linear-gradient(90deg, #1B1B22 10px, transparent 10px)",
       "linear-gradient(180deg, #1E1E26 25%, #1A1A21 25%, #1A1A21 50%, transparent 50%, transparent 75%, #26262F 75%, #26262F)",
     ].join(", "),
