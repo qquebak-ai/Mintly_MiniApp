@@ -1843,7 +1843,7 @@ function GlobalStyle() {
          было видно. Сдвиг слоя считается дробно и идёт на видеокарте. */
       @keyframes карбонЕдет {
         from { transform: translate3d(0, 0, 0); }
-        to   { transform: translate3d(0, 20px, 0); }
+        to   { transform: translate3d(0, var(--шаг-ткани, 20px), 0); }
       }
       @keyframes галочкаВстала {
         0%   { opacity: 0; transform: scale(0.4) rotate(-18deg); }
@@ -10587,7 +10587,7 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
           <div style={{
             position: "relative", zIndex: 1, width: "82%", height: 62, borderRadius: 12,
             overflow: "hidden",
-            background: item.ткань ? "#131319" : item.fill,
+            background: item.ткань ? "#0A0A0D" : item.fill,
             backgroundSize: item.ткань ? undefined : (item.size || "320% 320%"),
             // Ткань не переливается: плетение едет отдельным слоем.
             animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
@@ -10768,7 +10768,7 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
             <div style={{
               width: "84%", height: 96, borderRadius: 16, padding: "12px 14px", textAlign: "left",
               position: "relative", overflow: "hidden",
-              background: item.ткань ? "#131319" : item.fill,
+              background: item.ткань ? "#0A0A0D" : item.fill,
               backgroundSize: item.ткань ? undefined : (item.size || "320% 320%"),
               animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
               boxShadow: `0 12px 30px ${hexA(item.glow || "#7C3AED", 0.38)}`,
@@ -14297,29 +14297,16 @@ const WALLET_SKINS = [
     fill: "linear-gradient(120deg, #9945FF 0%, #7A3DF5 35%, #19FB9B 100%)", glow: "#14F195",
   },
   {
-    /* Настоящее плетение углеволокна, а не полоски по диагонали. Ткань
-       набирается шестью слоями: две пары встречных нитей под 27° и 207°
-       (это и есть «ёлочка» твила), поперечная линия шва между
-       квадратами и подложка из четырёх ступеней серого — она даёт
-       объём, будто нить то поднимается, то уходит под соседнюю. Клетка
-       у настоящего карбона мелкая, потому размер шага двадцать точек, а
-       не половина карты. */
+    /* Плетение — снимок настоящего углеволокна, а не набор градиентов:
+       блики на жгутах и то, как нить ныряет под соседнюю, градиентами
+       не собираются. Из фотографии вырезан ровно один период плетения
+       (82×74 точки исходника), поэтому плитка стыкуется сама с собой
+       без шва. */
     id: "carbon", label: { RU: "Карбон", EN: "Carbon" }, price: 120,
-    fill: [
-      /* Сдвиги слоёв обязательны: именно они складывают из четырёх
-         встречных клиньев шахматку плетения. Без них все четыре лежат
-         в одной точке и карбон читается полосами. */
-      "linear-gradient(27deg, #14141A 5px, transparent 5px) 0 5px",
-      "linear-gradient(207deg, #14141A 5px, transparent 5px) 10px 0",
-      "linear-gradient(27deg, #24242E 5px, transparent 5px) 0 10px",
-      "linear-gradient(207deg, #24242E 5px, transparent 5px) 10px 5px",
-      "linear-gradient(90deg, #1B1B22 10px, transparent 10px)",
-      "linear-gradient(180deg, #1E1E26 25%, #1A1A21 25%, #1A1A21 50%, transparent 50%, transparent 75%, #26262F 75%, #26262F)",
-    ].join(", "),
-    /* Шаг плетения. Смещения слоёв друг относительно друга ведёт
-       анимация «карбонЕдет»: она же медленно тянет всю ткань вниз ровно
-       на клетку, так что стык не виден и полотно кажется бесконечным. */
-    size: "20px 20px",
+    fill: 'url("/carbon-weave.png")',
+    /* Шаг плетения; на него же уезжает вниз анимация «карбонЕдет», так
+       что за круг рисунок совпадает сам с собой и стыка не видно. */
+    size: "32px 32px",
     ткань: true,
     glow: "#5A5A6B",
   },
@@ -14344,13 +14331,18 @@ const WALLET_SKIN_BY_ID = Object.fromEntries(WALLET_SKINS.map((с) => [с.id, с
  * концу круга рисунок совпадает сам с собой, шва не видно. Держать его
  * отдельно от карточки нужно ради движения — фон карточки браузер
  * двигает рывками, а слой едет плавно. */
-function СлойКарбона({ fill, size = "20px 20px", длительность = 9 }) {
+function СлойКарбона({ fill, size = "20px 20px", длительность = 14 }) {
+  /* Уезжать нужно ровно на клетку плетения, иначе к концу круга рисунок
+     не совпадёт сам с собой и будет виден скачок. Клетку берём из
+     размера плитки и отдаём анимации переменной. */
+  const шаг = parseFloat(String(size)) || 20;
   return (
     <span
       aria-hidden
       style={{
-        position: "absolute", left: 0, right: 0, top: -20, height: "calc(100% + 40px)",
-        background: fill, backgroundColor: "#131319", backgroundSize: size,
+        position: "absolute", left: 0, right: 0, top: -шаг, height: `calc(100% + ${шаг * 2}px)`,
+        background: fill, backgroundColor: "#0A0A0D", backgroundSize: size,
+        ["--шаг-ткани" as any]: `${шаг}px`,
         animation: `карбонЕдет ${длительность}s linear infinite`,
         willChange: "transform", pointerEvents: "none",
       }}
@@ -14608,7 +14600,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // поверхность не повторяет один и тот же переход.
           // У ткани сама карта — ровная тёмная подложка: плетение живёт
           // отдельным слоем ниже, иначе его не сдвинуть плавно.
-          background: ткань ? "#131319" : видКарты.fill,
+          background: ткань ? "#0A0A0D" : видКарты.fill,
           backgroundSize: ткань ? undefined : (видКарты.size || "320% 320%"),
           animation: ткань
             ? "none"
