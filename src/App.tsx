@@ -1736,11 +1736,22 @@ function GlobalStyle() {
       /* Искры на баннере не мигают, а разгораются и гаснут: от мигания
          рябит, а медленное дыхание читается как звёздный свет. */
       @keyframes искраДышит { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.1); } }
-      /* Планета чуть дышит и ведёт в сторону: неподвижная она выдаёт,
-         что это картинка, а не кусок сцены. */
-      @keyframes планетаДышит {
-        0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-        50%      { transform: translate3d(-4px, 5px, 0) scale(1.035); }
+      /* Планета медленно поворачивается — полный круг за две минуты.
+         Быстрее и становится видно, что это не шар, а картинка: узор на
+         ней начинает читаться как вертушка. */
+      @keyframes планетаКрутится {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+      }
+      /* Звёзды сносит вниз-влево — ровно вдоль оси, по которой уходит
+         ракета, так что кадр читается как её движение вперёд, а не как
+         отдельная возня фона. В начале и конце круга звезда погашена,
+         поэтому возврат на место не виден. */
+      @keyframes звёздыЛетят {
+        0%   { opacity: 0; transform: translate3d(14px, -26px, 0); }
+        18%  { opacity: 1; }
+        78%  { opacity: 1; }
+        100% { opacity: 0; transform: translate3d(-16px, 30px, 0); }
       }
       @keyframes пламяДышит { from { transform: scaleY(0.75); opacity: 0.8; } to { transform: scaleY(1.15); opacity: 1; } }
       /* Блик по карте баланса: проходит редко и медленно — карта
@@ -12614,8 +12625,8 @@ function СценаЗапуска() {
       {пыль.map(([x, y], i) => (
         <span key={i} style={{
           position: "absolute", left: `${x}%`, top: `${y}%`, width: 2, height: 2, borderRadius: "50%",
-          background: "#FFFFFF", opacity: 0.3 + (i % 4) * 0.15,
-          animation: `искраДышит ${3 + (i % 5) * 0.7}s ease-in-out ${(i % 6) * 0.5}s infinite`,
+          background: "#FFFFFF",
+          animation: `звёздыЛетят ${16 + (i % 5) * 3}s linear ${-(i * 2.3)}s infinite`,
         }} />
       ))}
 
@@ -12630,7 +12641,7 @@ function СценаЗапуска() {
         src="/banner-planet.webp" alt=""
         style={{
           position: "absolute", right: "-13%", top: "-58%", width: "46%",
-          animation: "планетаДышит 14s ease-in-out infinite",
+          animation: "планетаКрутится 120s linear infinite",
         }}
       />
       <img
@@ -12642,17 +12653,22 @@ function СценаЗапуска() {
         }}
       />
       {[
-        { left: "60%", top: "8%", w: "9%", d: 3.4, з: 0 },
-        { left: "51%", top: "62%", w: "6%", d: 4.2, з: 0.8 },
-        { left: "86%", top: "44%", w: "5%", d: 3.8, з: 1.6 },
+        { left: "60%", top: "8%", w: "9%", d: 19, з: -2 },
+        { left: "51%", top: "58%", w: "6%", d: 23, з: -9 },
+        { left: "86%", top: "40%", w: "5%", d: 21, з: -15 },
       ].map((з, i) => (
-        <img
-          key={i} src="/banner-star.webp" alt=""
+        <span
+          key={i}
           style={{
             position: "absolute", left: з.left, top: з.top, width: з.w,
-            animation: `искраДышит ${з.d}s ease-in-out ${з.з}s infinite`,
+            /* Две анимации на одной звезде спорили бы за transform,
+               поэтому снос лежит на обёртке, а дыхание — на самой
+               картинке внутри. */
+            animation: `звёздыЛетят ${з.d}s linear ${з.з}s infinite`,
           }}
-        />
+        >
+          <img src="/banner-star.webp" alt="" style={{ width: "100%", display: "block", animation: `искраДышит ${3.2 + i * 0.6}s ease-in-out infinite` }} />
+        </span>
       ))}
 
       {/* Тень под заголовком: слева небо всё же не чёрное, и белые буквы
