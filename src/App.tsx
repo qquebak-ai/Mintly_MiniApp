@@ -14407,6 +14407,136 @@ function СлоиТкани() {
   );
 }
 
+/* Перелив полотна «Твои токены».
+ *
+ * Пятна и конические градиенты дают плоскую картинку: цвет меняется, но
+ * поверхности нет — не понять, где складка поднялась, а где ушла в
+ * тень. Здесь считается настоящее поле высоты (шум, дважды свёрнутый
+ * сам с собой), из него берётся нормаль, и уже по нормали кладётся свет
+ * с бликом. Отсюда и объём: краска течёт по складкам, а не светится
+ * кружками. Считает видеокарта, потому кадр стоит дёшево; если WebGL
+ * недоступен, остаётся тот же фон, что нарисован под холстом. */
+function ПолотноПерелив() {
+  const холст = React.useRef(null);
+  React.useEffect(() => {
+    const э = холст.current;
+    if (!э) return;
+    const gl = э.getContext("webgl", { alpha: true, antialias: false, premultipliedAlpha: false });
+    if (!gl) return;
+    /* Имена внутри шейдера — только латиницей: GLSL не принимает
+       кириллицу в идентификаторах и молча не собирается. */
+    const вершинный = `attribute vec2 pos; void main(){ gl_Position = vec4(pos, 0.0, 1.0); }`;
+    const фрагментный = `
+      precision highp float;
+      uniform vec2 size; uniform float time;
+      float noise(vec2 p){
+        vec2 i = floor(p), f = fract(p);
+        vec2 u = f*f*(3.0-2.0*f);
+        float a = fract(sin(dot(i, vec2(127.1,311.7)))*43758.5453);
+        float b = fract(sin(dot(i+vec2(1.0,0.0), vec2(127.1,311.7)))*43758.5453);
+        float c = fract(sin(dot(i+vec2(0.0,1.0), vec2(127.1,311.7)))*43758.5453);
+        float d = fract(sin(dot(i+vec2(1.0,1.0), vec2(127.1,311.7)))*43758.5453);
+        return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+      }
+      // Три октавы, не пять: лишние дают мелкую рябь — камень вместо
+      // шёлка, а складки должны быть крупными.
+      float fbm(vec2 p){
+        float s = 0.0, w = 0.5;
+        for(int i=0;i<4;i++){ s += w*noise(p); p *= 2.02; w *= 0.5; }
+        return s;
+      }
+      // Высота: шум, свёрнутый сам с собой, — так пятна вытягиваются в
+      // складки, как на натянутой ткани.
+      float height(vec2 p){
+        vec2 q = vec2(fbm(p + vec2(0.0, time*0.05)), fbm(p + vec2(5.2, 1.3) - time*0.035));
+        vec2 r = vec2(fbm(p + 2.2*q + vec2(1.7, 9.2)), fbm(p + 2.2*q + vec2(8.3, 2.8)));
+        return fbm(p + 2.0*r);
+      }
+      // Косинусная палитра: чистые переходы вместо серой каши, которая
+      // выходит при смешении многих красок.
+      vec3 paint(float t){
+        vec3 c = 0.5 + 0.5*cos(6.28318*(vec3(1.0, 0.92, 0.78)*t + vec3(0.08, 0.52, 0.86)));
+        // Насыщенность поднимаем отдельно: свет по складкам подмешивает
+        // серый, и без этого краска выцветает в хаки.
+        float g = dot(c, vec3(0.333));
+        return clamp(mix(vec3(g), c, 1.45), 0.0, 1.0);
+      }
+      void main(){
+        vec2 uv = gl_FragCoord.xy / size;
+        vec2 p = vec2(uv.x*1.25, uv.y*1.6);
+        float e = 1.6/size.y;
+        float h  = height(p);
+        float hx = height(p + vec2(e, 0.0));
+        float hy = height(p + vec2(0.0, e));
+        // Нормаль складки — из наклона поля высоты. Свет по ней и даёт
+        // объём: один склон горит, встречный тонет.
+        vec3 n = normalize(vec3((h-hx)*18.0, (h-hy)*18.0, 1.0));
+        vec3 lgt = normalize(vec3(-0.45, 0.75, 0.55));
+        float dif = max(dot(n, lgt), 0.0);
+        float spc = pow(max(dot(reflect(-lgt, n), vec3(0.0,0.0,1.0)), 0.0), 26.0);
+        vec3 col = paint(h*2.1 + time*0.008);
+        col *= 0.34 + 0.95*dif;
+        col += spc*0.9;
+        // Верх у полотна цветной, к низу оно уходит в чёрный: там список.
+        float fade = smoothstep(0.15, 0.95, uv.y);
+        gl_FragColor = vec4(col*fade, fade);
+      }`;
+    const собрать = (вид, текст) => {
+      const ш = gl.createShader(вид);
+      gl.shaderSource(ш, текст); gl.compileShader(ш);
+      return gl.getShaderParameter(ш, gl.COMPILE_STATUS) ? ш : null;
+    };
+    const в = собрать(gl.VERTEX_SHADER, вершинный);
+    const ф = собрать(gl.FRAGMENT_SHADER, фрагментный);
+    if (!в || !ф) return;
+    const программа = gl.createProgram();
+    gl.attachShader(программа, в); gl.attachShader(программа, ф); gl.linkProgram(программа);
+    if (!gl.getProgramParameter(программа, gl.LINK_STATUS)) return;
+    gl.useProgram(программа);
+    const буфер = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, буфер);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+    const место = gl.getAttribLocation(программа, "pos");
+    gl.enableVertexAttribArray(место);
+    gl.vertexAttribPointer(место, 2, gl.FLOAT, false, 0, 0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    const uЭкран = gl.getUniformLocation(программа, "size");
+    const uВремя = gl.getUniformLocation(программа, "time");
+    /* Считаем в половинном разрешении: перелив мягкий, резкости в нём
+       нет, зато кадр обходится вчетверо дешевле — на слабом телефоне
+       это разница между плавным ходом и рывками. */
+    const подогнать = () => {
+      const ш = Math.max(1, Math.round(э.clientWidth * 0.5));
+      const в2 = Math.max(1, Math.round(э.clientHeight * 0.5));
+      if (э.width !== ш || э.height !== в2) { э.width = ш; э.height = в2; }
+      gl.viewport(0, 0, э.width, э.height);
+      gl.uniform2f(uЭкран, э.width, э.height);
+    };
+    const наблюдатель = typeof ResizeObserver !== "undefined" ? new ResizeObserver(подогнать) : null;
+    if (наблюдатель) наблюдатель.observe(э);
+    подогнать();
+    const покой = typeof window !== "undefined" && window.matchMedia
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false;
+    let кадр = 0, живо = true, прошлый = 0;
+    const рисовать = (сейчас) => {
+      if (!живо) return;
+      // Тридцати кадров хватает: движение медленное, а батарею экономит.
+      if (сейчас - прошлый > 33) {
+        прошлый = сейчас;
+        подогнать();
+        gl.uniform1f(uВремя, покой ? 0 : сейчас * 0.001);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        if (покой) return;               // без движения хватит одного кадра
+      }
+      кадр = requestAnimationFrame(рисовать);
+    };
+    кадр = requestAnimationFrame(рисовать);
+    return () => { живо = false; cancelAnimationFrame(кадр); if (наблюдатель) наблюдатель.disconnect(); };
+  }, []);
+  return <canvas ref={холст} aria-hidden style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }} />;
+}
+
 function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none" }) {
   // Вид карты берём из купленного в магазине; неизвестный id — обычная
   // карта Mintly, а не пустая заливка.
@@ -14815,9 +14945,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           position: "relative", isolation: "isolate", overflow: "hidden",
         }}
       >
-        {/* Подложка полотна. Слои внутри смешиваются между собой, но не
-            с тем, что под страницей, — потому своя плоскость наложения
-            и своё обрезание по краю. */}
+        {/* Подложка полотна. Перелив считает холст; пятна под ним —
+            запасной вид на случай, когда WebGL недоступен, и заодно
+            цвет, который видно в первый кадр. */}
         <span
           aria-hidden
           style={{
@@ -14825,14 +14955,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             overflow: "hidden", isolation: "isolate", pointerEvents: "none",
             borderTopLeftRadius: 26, borderTopRightRadius: 26,
             background: КОШ_СТРАНИЦА,
-            // Наложение режимами съедает насыщенность — возвращаем её.
-            filter: "saturate(1.45)",
           }}
         >
           <span style={{ position: "absolute", inset: "-25%", background: КОШ_ПОЛОТНО, animation: "полотноПлывёт 32s ease-in-out infinite", willChange: "transform" }} />
-          <span style={{ position: "absolute", inset: "-60%", background: КОШ_ПОЛОТНО_ПЕРЕЛИВ, mixBlendMode: "overlay", opacity: 0.85, filter: "blur(24px)", animation: "переливКрутится 54s linear infinite", willChange: "transform" }} />
-          <span style={{ position: "absolute", inset: "-30%", background: КОШ_ПОЛОТНО_ТЕНЬ, mixBlendMode: "multiply", filter: "blur(18px)", animation: "теньПлывёт 38s ease-in-out infinite", willChange: "transform" }} />
-          <span style={{ position: "absolute", inset: "-30%", background: КОШ_ПОЛОТНО_СВЕТ, mixBlendMode: "screen", filter: "blur(18px)", animation: "светПлывёт 30s ease-in-out infinite", willChange: "transform" }} />
+          <ПолотноПерелив />
           <span style={{ position: "absolute", inset: 0, background: КОШ_ПОЛОТНО_МГЛА }} />
         </span>
         <div style={{ marginBottom: 12 }}>
