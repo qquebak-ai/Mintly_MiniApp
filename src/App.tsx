@@ -1764,6 +1764,25 @@ function GlobalStyle() {
         50%  { transform: translate3d(4%, 3%, 0) scale(1.24) rotate(6deg); }
         100% { transform: translate3d(-4%, -3%, 0) scale(1.14) rotate(0deg); }
       }
+      /* Перелив полотна крутится целиком: у конического градиента цвета
+         идут по кругу, и вращение гонит их волной, как отсвет по
+         натянутой ткани. */
+      @keyframes переливКрутится {
+        from { transform: rotate(0deg) scale(1.9); }
+        to   { transform: rotate(360deg) scale(1.9); }
+      }
+      /* Свет и тень ходят навстречу друг другу — от этого полотно и
+         читается объёмным: там, где блик ушёл, остаётся провал. */
+      @keyframes светПлывёт {
+        0%   { transform: translate3d(-6%, -4%, 0) scale(1.1); }
+        50%  { transform: translate3d(8%, 5%, 0) scale(1.3); }
+        100% { transform: translate3d(-6%, -4%, 0) scale(1.1); }
+      }
+      @keyframes теньПлывёт {
+        0%   { transform: translate3d(7%, 5%, 0) scale(1.25); }
+        50%  { transform: translate3d(-7%, -5%, 0) scale(1.05); }
+        100% { transform: translate3d(7%, 5%, 0) scale(1.25); }
+      }
       /* Ореол вокруг карты: рамка отходит от её краёв и растворяется.
          Идёт сама по себе, без касания, — карта на экране одна и должна
          быть заметна среди ровных прямоугольников. */
@@ -14100,10 +14119,26 @@ const КОШ_ПОЛОТНО = [
   "radial-gradient(46% 38% at 28% 30%, #38D39F 0%, rgba(56,211,159,0) 60%)",
   "radial-gradient(62% 44% at 54% 16%, #FFB020 0%, rgba(255,176,32,0) 55%)",
 ].join(", ");
+/* Перелив. Пятна сами по себе плоские: они смешиваются, но не дают
+   понять, где у полотна ближе, а где дальше. Объём даёт конический
+   градиент — цвета в нём идут по кругу и на повороте ложатся полосами,
+   как отсвет на натянутой ткани. */
+const КОШ_ПОЛОТНО_ПЕРЕЛИВ = "conic-gradient(from 210deg at 44% 28%, #2E6BFF 0deg, #8E2DE2 54deg, #FF3D8B 112deg, #FFB020 172deg, #38D39F 226deg, #2E6BFF 296deg, #8E2DE2 360deg)";
+/* Блик и провал. Белое пятно поверх (режим «экран») высветляет цвет, не
+   выбеливая его в серое; чёрное (режим «умножение») уводит соседний
+   участок в тень. Между ними и возникает выпуклость. */
+const КОШ_ПОЛОТНО_СВЕТ = [
+  "radial-gradient(40% 32% at 26% 8%, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0) 70%)",
+  "radial-gradient(26% 20% at 74% 2%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 72%)",
+].join(", ");
+const КОШ_ПОЛОТНО_ТЕНЬ = [
+  "radial-gradient(46% 38% at 64% 34%, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0) 72%)",
+  "radial-gradient(32% 26% at 8% 36%, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 74%)",
+].join(", ");
 /* Мгла поверх пятен: у верхнего края почти прозрачная, ниже заголовка
    уже глухая. Она же держит цвет в узде — без неё полотно спорит с
    картой и слепит. */
-const КОШ_ПОЛОТНО_МГЛА = "linear-gradient(180deg, rgba(8,9,12,0.06) 0%, rgba(8,9,12,0.30) 26%, rgba(8,9,12,0.72) 52%, rgba(8,9,12,0.94) 72%, #08090C 90%)";
+const КОШ_ПОЛОТНО_МГЛА = "linear-gradient(180deg, rgba(8,9,12,0.02) 0%, rgba(8,9,12,0.20) 26%, rgba(8,9,12,0.72) 52%, rgba(8,9,12,0.94) 72%, #08090C 90%)";
 const КОШ_КАРТОЧКА = "#171A21";   // строки на ней
 const КОШ_РОСТ_ФОН = hexA("#8E2DE2", 0.20);
 const КОШ_РОСТ_ТЕКСТ = "#C79BFF";
@@ -14779,22 +14814,26 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           position: "relative", isolation: "isolate", overflow: "hidden",
         }}
       >
-        <span
-          aria-hidden
-          style={{
-            position: "absolute", inset: "-25%", zIndex: -1,
-            background: КОШ_ПОЛОТНО,
-            animation: "полотноПлывёт 32s ease-in-out infinite",
-            willChange: "transform", pointerEvents: "none",
-          }}
-        />
+        {/* Подложка полотна. Слои внутри смешиваются между собой, но не
+            с тем, что под страницей, — потому своя плоскость наложения
+            и своё обрезание по краю. */}
         <span
           aria-hidden
           style={{
             position: "absolute", inset: 0, zIndex: -1,
-            background: КОШ_ПОЛОТНО_МГЛА, pointerEvents: "none",
+            overflow: "hidden", isolation: "isolate", pointerEvents: "none",
+            borderTopLeftRadius: 26, borderTopRightRadius: 26,
+            background: КОШ_СТРАНИЦА,
+            // Наложение режимами съедает насыщенность — возвращаем её.
+            filter: "saturate(1.45)",
           }}
-        />
+        >
+          <span style={{ position: "absolute", inset: "-25%", background: КОШ_ПОЛОТНО, animation: "полотноПлывёт 32s ease-in-out infinite", willChange: "transform" }} />
+          <span style={{ position: "absolute", inset: "-60%", background: КОШ_ПОЛОТНО_ПЕРЕЛИВ, mixBlendMode: "overlay", opacity: 0.85, filter: "blur(24px)", animation: "переливКрутится 54s linear infinite", willChange: "transform" }} />
+          <span style={{ position: "absolute", inset: "-30%", background: КОШ_ПОЛОТНО_ТЕНЬ, mixBlendMode: "multiply", filter: "blur(18px)", animation: "теньПлывёт 38s ease-in-out infinite", willChange: "transform" }} />
+          <span style={{ position: "absolute", inset: "-30%", background: КОШ_ПОЛОТНО_СВЕТ, mixBlendMode: "screen", filter: "blur(18px)", animation: "светПлывёт 30s ease-in-out infinite", willChange: "transform" }} />
+          <span style={{ position: "absolute", inset: 0, background: КОШ_ПОЛОТНО_МГЛА }} />
+        </span>
         <div style={{ marginBottom: 12 }}>
           {/* Тень под буквами: заголовок лежит на самой яркой части
               полотна, и без неё белое по жёлтому не прочитать. */}
