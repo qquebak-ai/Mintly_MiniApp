@@ -1348,11 +1348,23 @@ function tf(key, vars) {
 /* Готовые сочетания из тёмной подборки, а не подобранные на глаз:
    «Amin» (#8E2DE2 → #4A00E0) — фирменный акцент, он же цвет маскота. */
 const ГРАДИЕНТ_БРЕНДА = "linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%)";
-/* Кнопки заливаются одним цветом — серединой того же градиента.
-   Переливание на кнопке спорит с надписью и делает её похожей на
-   картинку: градиент остаётся там, где он украшает (карточки, полосы,
-   крупные цифры), а нажимаемое — плоское и однозначное. */
-const ЦВЕТ_КНОПКИ = "#6C16E1";
+/* Кнопка — фирменный фиолетовый, но не плоский: по ней медленно идёт
+   волна от тёмного края к светлому и обратно. Оттенки соседние, разница
+   невелика — надпись читается так же, как на заливке, а кнопка при этом
+   выглядит живой. Полосы и мелкие переключатели берут тот же градиент
+   без движения: там перелив был бы мельтешением. */
+const ЦВЕТ_КНОПКИ = "linear-gradient(112deg, #5B12C4 0%, #6C16E1 26%, #9A3CF0 50%, #6C16E1 74%, #5B12C4 100%)";
+/* Та же краска плоским цветом — для мест, где градиент не годится:
+   внутри другого градиента (градиент в градиенте — не CSS) и на
+   мелочи вроде точек кода, где перелив всё равно не виден. */
+const ЦВЕТ_КНОПКИ_ПЛОСКО = "#6C16E1";
+const ПЕРЕЛИВ_КНОПКИ = {
+  background: ЦВЕТ_КНОПКИ,
+  // Полотно вдвое шире кнопки — иначе волне негде идти.
+  backgroundSize: "230% 100%",
+  // Пять с половиной секунд — тот же круг, что у кнопки сделки.
+  animation: "кнопкаПереливается 5.5s ease-in-out infinite",
+};
 /* Пара под рост и падение — от цветов свечи и к ней же: тот самый
    зелёный с графика в светлый край градиента, тот самый красный — в
    тёмный. Плоские цвета остаются для текста и линий: их градиентом не
@@ -10468,7 +10480,7 @@ function WelcomeScreen({ onCreate, onLogin, onSkip, insetTop = 0 }) {
               className="fx-tap вст-кнопка w-full flex items-center justify-center gap-2"
               style={{
                 padding: "17px 0", borderRadius: 20,
-                background: ЦВЕТ_КНОПКИ,
+                ...ПЕРЕЛИВ_КНОПКИ,
                 color: PRISM_TEXT, border: "none",
                 boxShadow: `inset 0 1px 0 ${hexA("#FFFFFF", 0.3)}, 0 14px 34px ${hexA(T.electric, 0.34)}`,
                 fontFamily: displayFont, fontWeight: 600, fontSize: 15.5, letterSpacing: "-0.01em",
@@ -10496,7 +10508,7 @@ function WelcomeScreen({ onCreate, onLogin, onSkip, insetTop = 0 }) {
             className="fx-tap вст-кнопка w-full flex items-center justify-center gap-2"
             style={{
               padding: "17px 0", borderRadius: 20,
-              background: ЦВЕТ_КНОПКИ,
+              ...ПЕРЕЛИВ_КНОПКИ,
               color: PRISM_TEXT, border: "none",
               boxShadow: `inset 0 1px 0 ${hexA("#FFFFFF", 0.3)}, 0 14px 34px ${hexA(T.electric, 0.34)}`,
               fontFamily: displayFont, fontWeight: 600, fontSize: 15.5, letterSpacing: "-0.01em",
@@ -10827,7 +10839,7 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
         <button
           onClick={() => onBuy(kind, item.id)}
           className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3.5"
-          style={{ marginTop: 12, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15.5 }}
+          style={{ marginTop: 12, ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15.5 }}
         >
           {tf("shopBuyFor", { n: price })}
         </button>
@@ -10904,7 +10916,7 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
           <button
             onClick={() => onOpenLogin && onOpenLogin()}
             className="fx-tap flex items-center justify-center gap-1.5 rounded-[14px] px-5 py-3"
-            style={{ alignSelf: "flex-start", background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 600, fontSize: 14.5 }}
+            style={{ alignSelf: "flex-start", ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 600, fontSize: 14.5 }}
           >
             <Send size={14} /> {t("tgAuthCta")}
           </button>
@@ -11385,7 +11397,7 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
             className="fx-tap flex items-center gap-1.5"
             style={{
               padding: "8px 14px", borderRadius: 10,
-              background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, border: "none",
+              ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, border: "none",
               fontFamily: displayFont, fontSize: 13.5, fontWeight: 600,
             }}
           >
@@ -11927,7 +11939,7 @@ function ПолзунокОтключения({ подпись, готовоПо
         aria-hidden
         style={{
           position: "absolute", inset: 0,
-          background: `linear-gradient(90deg, ${ЦВЕТ_КНОПКИ} 0%, #B7237E 55%, ${T.down} 100%)`,
+          background: `linear-gradient(90deg, ${ЦВЕТ_КНОПКИ_ПЛОСКО} 0%, #B7237E 55%, ${T.down} 100%)`,
           clipPath: `inset(0 ${(1 - (сработал ? 1 : доля)) * 100}% 0 0)`,
           transition: ведут ? "none" : "clip-path 260ms cubic-bezier(0.22, 1, 0.36, 1)",
         }}
@@ -11985,7 +11997,7 @@ function СтрокаНастройки({ item, значение, метка, п
       {метка > 0 && (
         <span style={{
           minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
-          background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: monoFont, fontSize: 12, fontWeight: 700,
+          ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: monoFont, fontSize: 12, fontWeight: 700,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           {метка > 9 ? "9+" : метка}
@@ -12149,7 +12161,7 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
       {item.метка > 0 && (
         <span style={{
           minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
-          background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: monoFont, fontSize: 12, fontWeight: 700,
+          ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: monoFont, fontSize: 12, fontWeight: 700,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           {item.метка > 9 ? "9+" : item.метка}
@@ -13284,7 +13296,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
           style={{
             position: "relative", overflow: "hidden",
             gap: 8, padding: "16px 0", borderRadius: 999, border: "none",
-            background: ЦВЕТ_КНОПКИ,
+            ...ПЕРЕЛИВ_КНОПКИ,
             color: PRISM_TEXT, fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             animation: скопировано ? "кнопкаКивнула 420ms cubic-bezier(0.22, 1, 0.36, 1)" : "none",
           }}
@@ -17965,7 +17977,7 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
         </div>
         <div className="flex items-center gap-2 w-full">
           <button onClick={onCancel} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>{t("cancel")}</button>
-          <button onClick={handleConfirm} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>{t("cropConfirm")}</button>
+          <button onClick={handleConfirm} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>{t("cropConfirm")}</button>
         </div>
       </div>
     </div>
@@ -18078,7 +18090,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
             <button onClick={copyErrorLog} className="fx-tap w-full rounded-[20px] py-3" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.ice, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
               <Copy size={14} color={T.ice} /> {logCopied ? t("linkCopied") : "Скопировать лог"}
             </button>
-            <button onClick={onRetry} className="fx-tap w-full rounded-[20px] py-3" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
+            <button onClick={onRetry} className="fx-tap w-full rounded-[20px] py-3" style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
               {t("retry")}
             </button>
             <button onClick={() => onClose && onClose(null)} className="fx-tap w-full rounded-[20px] py-3" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>
@@ -18181,7 +18193,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
             <button
               onClick={() => onViewToken && onViewToken(result)}
               className="fx-tap w-full rounded-[20px] py-3"
-              style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
+              style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
             >
               {t("launchBuyCta")}
             </button>
@@ -18480,7 +18492,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         </p>
         <div className="flex flex-col gap-2 w-full mt-2" style={{ maxWidth: 260 }}>
           {!accountCreated && (
-            <button onClick={onOpenCreateProfile} className="fx-tap w-full rounded-[20px] py-3" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>
+            <button onClick={onOpenCreateProfile} className="fx-tap w-full rounded-[20px] py-3" style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>
               {t("createAccount")}
             </button>
           )}
@@ -18521,7 +18533,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           <button
             onClick={() => setСетьЗапуска("ton")}
             className="fx-tap self-start"
-            style={{ padding: "9px 14px", borderRadius: 999, background: ЦВЕТ_КНОПКИ, border: "none", color: PRISM_TEXT, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700 }}
+            style={{ padding: "9px 14px", borderRadius: 999, ...ПЕРЕЛИВ_КНОПКИ, border: "none", color: PRISM_TEXT, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700 }}
           >
             {t("solLaunchSwitchTon")}
           </button>
@@ -18784,7 +18796,7 @@ function PinDots({ length = PIN_LENGTH, filled, error }) {
       {Array.from({ length }).map((_, i) => (
         <div key={i} style={{
           width: 14, height: 14, borderRadius: "50%",
-          background: i < filled ? (error ? T.down : ЦВЕТ_КНОПКИ) : "transparent",
+          background: i < filled ? (error ? T.down : ЦВЕТ_КНОПКИ_ПЛОСКО) : "transparent",
           border: `1.5px solid ${i < filled && !error ? "transparent" : error ? T.down : "rgba(255,255,255,0.20)"}`,
           transition: `background ${EASE}, border-color ${EASE}`,
         }} />
@@ -19233,7 +19245,7 @@ function SupportChat({ accountCreated, showToast, onRead }) {
         <button
           onClick={() => setMode("chat")}
           className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3"
-          style={{ marginTop: 14, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
+          style={{ marginTop: 14, ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
         >
           <Send size={14} /> {t("supportOther")}
         </button>
@@ -19935,7 +19947,7 @@ function SettingsPanel({
             <button onClick={copyReferral} className="fx-tap" disabled={!refLink}><Copy size={14} color={T.muted} /></button>
           </div>
           {refLink && (
-            <button onClick={shareReferral} className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3 mt-3" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
+            <button onClick={shareReferral} className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3 mt-3" style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
               <Send size={14} /> {t("refShare")}
             </button>
           )}
@@ -20995,7 +21007,7 @@ function ProfileView({
               <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 18.5, fontWeight: 700, marginTop: 4 }}>{t("accountNotCreated")}</div>
               <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, maxWidth: 260, lineHeight: 1.5 }}>{t("accountNotCreatedBody")}</p>
               <div className="flex items-center gap-2 mt-2" style={{ width: "100%", maxWidth: 300 }}>
-                <button onClick={onOpenLogin} className="fx-tap flex-1 flex items-center justify-center gap-1.5 rounded-[20px] px-4 py-3" style={{ background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14 }}>
+                <button onClick={onOpenLogin} className="fx-tap flex-1 flex items-center justify-center gap-1.5 rounded-[20px] px-4 py-3" style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14 }}>
                   <Send size={14} /> {t("tgAuthCta")}
                 </button>
               </div>
@@ -24153,7 +24165,7 @@ function mapTokenRow(row) {
           <button
             onClick={() => { const с = ждётПодписи || ждётПокупкиСумма; if (с > 0) { setЖдётПодписи(0); автопокупка(с); } }}
             className="fx-tap w-full rounded-[20px] py-3 mt-2"
-            style={{ maxWidth: 320, background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
+            style={{ maxWidth: 320, ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
           >
             {t("openWalletCta")}
           </button>
