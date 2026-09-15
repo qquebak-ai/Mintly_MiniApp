@@ -12587,6 +12587,9 @@ const БАННЕРЫ = [
        облаками — та же композиция, что у рекламных баннеров, но в
        красках приложения. */
     сцена: "запуск",
+    // Перелив забирает себе только обещание срока — остальной заголовок
+    // белый: если переливается вся фраза, выделять уже нечего.
+    выделено: { RU: "за минуту", EN: "in a minute" },
   },
   {
     id: "trade",
@@ -12879,15 +12882,21 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
             )}
 
             <div style={{ position: "relative", zIndex: 1, maxWidth: "68%" }}>
-              {(б.строки[язык] || б.строки.RU).map((строка, i) => (
-                <div key={i} style={{
-                  fontFamily: displayFont, fontSize: 19, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.25,
-                  // На баннере со сценой заголовок переливается заодно с кнопкой.
-                  ...(б.сцена ? ПЕРЕЛИВ_ТЕКСТА : { color: T.ice }),
-                }}>
-                  {строка}
-                </div>
-              ))}
+              {(б.строки[язык] || б.строки.RU).map((строка, i) => {
+                const метка = б.выделено && (б.выделено[язык] || б.выделено.RU);
+                const от = метка ? строка.indexOf(метка) : -1;
+                return (
+                  <div key={i} style={{ fontFamily: displayFont, fontSize: 19, fontWeight: 700, color: T.ice, letterSpacing: "-0.01em", lineHeight: 1.25 }}>
+                    {от < 0 ? строка : (
+                      <>
+                        {строка.slice(0, от)}
+                        <span style={ПЕРЕЛИВ_ТЕКСТА}>{метка}</span>
+                        {строка.slice(от + метка.length)}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div style={{ position: "relative", zIndex: 1 }}>
