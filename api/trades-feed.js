@@ -67,16 +67,29 @@ export default async function handler(req, res) {
 
   /* Обмены сюда не попадают: side «swap» — это перекладывание своих
      монет, а не сделка по токену, и в ленте покупок ему нечего делать. */
-  const { data: сделки, error } = адресаЦепочки.length
-    ? await db
-      .from("trades")
-      .select("id, user_id, token_id, token_address, ticker, side, ton_amount, ton_price_usd, created_at")
-      .in("side", ["buy", "sell"])
-      .in("token_address", адресаЦепочки)
-      .order("created_at", { ascending: false })
-      .limit(предел)
-    : { data: [], error: null };
+  /* Ищем сделки и по адресу токена, и по его идентификатору. Адрес в
+     TON пишется в трёх видах сразу (EQ…, UQ…, сырой), и у старых сделок
+     в базе лежит не тот, что у токена: по одному адресу лента TON
+     оставалась пустой даже там, где сделки были. */
+  const поля = "id, user_id, token_id, token_address, ticker, side, ton_amount, ton_price_usd, created_at";
+  const идЦепочки = (цепочкаТокенов || []).map((т) => т.id).filter(Boolean);
+  const [поАдресуОтвет, поИдОтвет] = await Promise.all([
+    адресаЦепочки.length
+      ? db.from("trades").select(поля).in("side", ["buy", "sell"]).in("token_address", адресаЦепочки)
+        .order("created_at", { ascending: false }).limit(предел)
+      : Promise.resolve({ data: [], error: null }),
+    идЦепочки.length
+      ? db.from("trades").select(поля).in("side", ["buy", "sell"]).in("token_id", идЦепочки)
+        .order("created_at", { ascending: false }).limit(предел)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  const error = поАдресуОтвет.error || поИдОтвет.error;
   if (error) return res.status(500).json({ error: "db", detail: error.message });
+  const собранные = new Map();
+  for (const с of [...(поАдресуОтвет.data || []), ...(поИдОтвет.data || [])]) собранные.set(с.id, с);
+  const сделки = [...собранные.values()]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, предел);
 
   /* Запуски — такие же события ленты, как покупки: «$CATS запущен» — это
      первое, что о токене вообще можно сказать, и пропускать его значит
@@ -98,6 +111,7 @@ export default async function handler(req, res) {
   // Карточки токенов уже прочитаны вместе с цепочкой — второй раз в базу
   // за ними ходить незачем.
   const поАдресу = new Map((цепочкаТокенов || []).filter((т) => адреса.includes(т.address)).map((т) => [т.address, т]));
+  const поИд = new Map((цепочкаТокенов || []).map((т) => [т.id, т]));
 
   /* Кошелёк покупателя — тот же, что виден в списке держателей токена:
      новой огласки тут нет, а строка «кто-то купил» без «кто» читается
@@ -152,7 +166,7 @@ export default async function handler(req, res) {
 
   const тело = {
     rows: [...строкиЗапусков, ...(сделки || []).map((с) => {
-      const т = поАдресу.get(с.token_address) || null;
+      const т = поАдресу.get(с.token_address) || поИд.get(с.token_id) || null;
       const сумма = Number(с.ton_amount) || 0;
       const цепочка = (т && т.chain) || "ton";
       const курс = цепочка === "solana"
@@ -163,7 +177,7 @@ export default async function handler(req, res) {
         kind: с.side === "sell" ? "sell" : "buy",
         at: с.created_at,
         tokenId: т ? т.id : (с.token_id || null),
-        address: с.token_address,
+        address: (т && т.address) || с.token_address,
         ticker: (т && т.ticker) || с.ticker || null,
         chain: (т && т.chain) || null,
         logoUrl: (т && т.logo_url) || null,
