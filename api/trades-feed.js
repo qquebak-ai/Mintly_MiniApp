@@ -117,11 +117,32 @@ export default async function handler(req, res) {
     from: поЧеловеку.get(`${т.owner_id}:${т.chain || "ton"}`) || null,
   }));
 
+  /* Курсы обеих монет — на случай, когда в записи сделки цены нет или
+     она чужая. Колонка называется ton_price_usd, но приложение кладёт в
+     неё курс TON и для сделок Solana: в ленте из-за этого «купил 10 SOL»
+     превращалось в «купил 0,07 SOL» — сумма пересчитывалась долларами,
+     посчитанными по чужому курсу. Поэтому для Solana берём курс SOL, а
+     записанный курс оставляем только TON. */
+  let курсSolСейчас = 0;
+  let курсTonСейчас = 0;
+  try {
+    const рынок = await import("./_market.js");
+    const [sol, ton] = await Promise.all([
+      рынок.курсSol().catch(() => 0),
+      рынок.курсTon().catch(() => 0),
+    ]);
+    курсSolСейчас = Number(sol) || 0;
+    курсTonСейчас = Number(ton) || 0;
+  } catch { /* без курсов покажем сумму в монете, доллары подождут */ }
+
   const тело = {
     rows: [...строкиЗапусков, ...(сделки || []).map((с) => {
       const т = поАдресу.get(с.token_address) || null;
       const сумма = Number(с.ton_amount) || 0;
-      const курс = Number(с.ton_price_usd) || 0;
+      const цепочка = (т && т.chain) || "ton";
+      const курс = цепочка === "solana"
+        ? курсSolСейчас
+        : (Number(с.ton_price_usd) || курсTonСейчас);
       return {
         id: String(с.id),
         kind: с.side === "sell" ? "sell" : "buy",

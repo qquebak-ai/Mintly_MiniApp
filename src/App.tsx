@@ -5800,9 +5800,11 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
           at: с.at,
           from: с.from,
           volUsd: Number(с.usd) || 0,
-          // В TON сумма сделки и есть сумма в монете; в Solana её
-          // пересчитает сама строка, по курсу.
-          volTon: нужная === "ton" ? Number(с.amount) || 0 : null,
+          /* Сумма сделки — в монете той цепочки, где она прошла, и
+             берётся как есть. Пересчёт из долларов здесь врал: у сделок
+             Solana в базе записан курс TON, и «купил 10 SOL» выходило
+             «купил 0,07 SOL». */
+          volCoin: Number(с.amount) || 0,
           token: tok,
         });
       }
@@ -6022,7 +6024,9 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
           {b.kind === "sell" ? t("tickerSold") : t("tickerBought")} {(() => {
             const соло = b.token && b.token.chain === "solana";
             const курс = соло ? solUsd() : tonUsd();
-            const сумма = !соло && b.volTon != null ? b.volTon : (курс > 0 ? b.volUsd / курс : 0);
+            // Сумма сделки известна в монете — её и показываем; доллары
+            // остаются запасным путём, когда монеты в записи нет.
+            const сумма = b.volCoin > 0 ? b.volCoin : (курс > 0 ? b.volUsd / курс : 0);
             // Без курса пересчитывать нечего, и «0 SOL» здесь означало бы
             // не мелкую сделку, а незагруженный курс — показываем доллары,
             // они у источника есть всегда.
@@ -15264,8 +15268,8 @@ function ДействиеКошелька({ icon: Icon, label, onClick }) {
 // Ключ строки истории: подпись, если она есть, иначе собственный id.
 const c_id = (с) => String((с && с.id) || "");
 
-function ИсторияКошелька({ userId, тик = 0, свежие = [] }) {
-  const сервер = useСделки(userId, 12, тик);
+function ИсторияКошелька({ userId, тик = 0, свежие = [], безЗаголовка = false, предел = 12 }) {
+  const сервер = useСделки(userId, предел, тик);
 
   /* Только что сделанный перевод показываем сразу, не дожидаясь круга
      чтения: запись о нём сервер уже сохранил, но до экрана она доедет
@@ -15279,16 +15283,20 @@ function ИсторияКошелька({ userId, тик = 0, свежие = [] 
     if (!свои.length) return сервер;
     return [...свои, ...сервер]
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 12);
-  }, [сервер, свежие]);
+      .slice(0, предел);
+  }, [сервер, свежие, предел]);
 
   if (!ряд) return null;
 
   return (
-    <section style={{ marginTop: 22 }}>
-      <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, marginBottom: 10 }}>
-        {t("walletHistory")}
-      </div>
+    <section style={{ marginTop: безЗаголовка ? 0 : 22 }}>
+      {/* На своей странице заголовок уже стоит в шапке листа — второй
+          такой же под ним читался бы как повтор. */}
+      {!безЗаголовка && (
+        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, marginBottom: 10 }}>
+          {t("walletHistory")}
+        </div>
+      )}
       {ряд.length === 0 ? (
         <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
           {t("noActivityYet")}
@@ -15462,6 +15470,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const [обменОткрыт, setОбменОткрыт] = useState(false);
   const [получитьОткрыт, setПолучитьОткрыт] = useState(false);
   const [выводОткрыт, setВыводОткрыт] = useState(false);
+  // История — своя страница, а не хвост кошелька: список длинный, и в
+  // столбце под токенами его всё равно никто не дочитывал.
+  const [историяОткрыта, setИсторияОткрыта] = useState(false);
   /* Волны от касаний карты. Каждая живёт своё время и убирается сама —
      иначе их накапливались бы десятки за один сеанс. */
   const [волны, setВолны] = useState([]);
@@ -15745,7 +15756,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
                 style={{
                   padding: "4px 10px", borderRadius: 999, border: "none",
                   background: сетьКошелька === id ? hexA("#FFFFFF", 0.9) : "transparent",
-                  color: сетьКошелька === id ? "#2C0A78" : hexA("#FFFFFF", 0.8),
+                  // Выбранная сеть — чёрным по белому: фиолетовый на
+                  // белой плашке читался хуже и спорил с самой картой,
+                  // которая уже фиолетовая.
+                  color: сетьКошелька === id ? "#0B0B0F" : hexA("#FFFFFF", 0.8),
                   fontFamily: displayFont, fontSize: 11.5, fontWeight: 800, letterSpacing: "0.02em",
                 }}
               >
@@ -15825,7 +15839,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         <ДействиеКошелька
           icon={Clock}
           label={t("walletActHistory")}
-          onClick={() => низ.current && низ.current.scrollIntoView({ behavior: "smooth", block: "start" })}
+          onClick={() => setИсторияОткрыта(true)}
         />
       </div>
 
@@ -15906,9 +15920,25 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           </div>
         )}
 
-        <ИсторияКошелька userId={userId} тик={тик + своиОбновления} свежие={свежиеОперации} />
-
       </div>
+
+      <ЭкранСнизу
+        открыт={историяОткрыта}
+        onClose={() => setИсторияОткрыта(false)}
+        заголовок={t("walletHistory")}
+        insetTop={insetTop}
+        insetBottom={insetBottom}
+      >
+        <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "4px 18px 28px" }}>
+          <ИсторияКошелька
+            userId={userId}
+            тик={тик + своиОбновления}
+            свежие={свежиеОперации}
+            безЗаголовка
+            предел={60}
+          />
+        </div>
+      </ЭкранСнизу>
 
       <ЭкранПолучить
         открыт={получитьОткрыт}
