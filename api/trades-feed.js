@@ -29,7 +29,7 @@ const ПАМЯТЬ_МС = 5000;
 // каждый, кто был в приложении, а назавтра он в ленту уже не вернётся.
 const ЗАПУСК_СВЕЖ_МС = 30 * 60 * 1000;
 
-let кеш = null; // { до, тело }
+const кеш = new Map(); // цепочка -> { до, тело }
 
 function admin() {
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return null;
@@ -40,49 +40,64 @@ export default async function handler(req, res) {
   const db = admin();
   if (!db) return res.status(503).json({ error: "not_configured" });
 
-  if (кеш && кеш.до > Date.now()) {
+  /* Цепочка — своя лента у каждой. Раньше отдавались последние
+     полсотни сделок площадки скопом, и раздел GRAM оставался пустым:
+     все свежие сделки шли в Solana, а до TON окно просто не доставало.
+     Теперь за строками ходим по токенам нужной цепочки. */
+  const цепочка = String((req.query && req.query.chain) || "").toLowerCase() === "ton" ? "ton" : "solana";
+  const ключКеша = цепочка;
+  const было = кеш.get(ключКеша);
+  if (было && было.до > Date.now()) {
     res.setHeader("Cache-Control", "no-store");
-    return res.status(200).json(кеш.тело);
+    return res.status(200).json(было.тело);
   }
 
   const предел = Math.min(СТРОК, Math.max(5, Number((req.query && req.query.limit) || СТРОК) || СТРОК));
 
+  // Токены этой цепочки: по их адресам отбираются и сделки, и запуски.
+  const { data: цепочкаТокенов, error: бедаТокенов } = await db
+    .from("tokens")
+    .select("id, address, ticker, chain, logo_url, owner_id, created_at, curve_cache(real_ton)")
+    .eq("chain", цепочка)
+    .not("address", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(300);
+  if (бедаТокенов) return res.status(500).json({ error: "db", detail: бедаТокенов.message });
+  const адресаЦепочки = (цепочкаТокенов || []).map((т) => т.address).filter(Boolean);
+
   /* Обмены сюда не попадают: side «swap» — это перекладывание своих
      монет, а не сделка по токену, и в ленте покупок ему нечего делать. */
-  const { data: сделки, error } = await db
-    .from("trades")
-    .select("id, user_id, token_id, token_address, ticker, side, ton_amount, ton_price_usd, created_at")
-    .in("side", ["buy", "sell"])
-    .not("token_address", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(предел);
+  const { data: сделки, error } = адресаЦепочки.length
+    ? await db
+      .from("trades")
+      .select("id, user_id, token_id, token_address, ticker, side, ton_amount, ton_price_usd, created_at")
+      .in("side", ["buy", "sell"])
+      .in("token_address", адресаЦепочки)
+      .order("created_at", { ascending: false })
+      .limit(предел)
+    : { data: [], error: null };
   if (error) return res.status(500).json({ error: "db", detail: error.message });
 
   /* Запуски — такие же события ленты, как покупки: «$CATS запущен» — это
      первое, что о токене вообще можно сказать, и пропускать его значит
      показывать хронику с середины. */
-  const { data: запуски } = await db
-    .from("tokens")
-    /* Состояние кривой берём тем же запросом: пока стартовая покупка не
-       прошла, объявлять о запуске нечего — у токена ещё нули во всех
-       числах, и по ссылке из ленты человек попадёт на пустую карточку. */
-    .select("id, address, ticker, chain, logo_url, owner_id, created_at, curve_cache(real_ton)")
-    .not("address", "is", null)
-    /* Только что запущенные — и никогда больше. «$CATS запущен» через
-       сутки после запуска это уже не новость, а строка ленты, которую
-       человек читает как «прямо сейчас». */
-    .gt("created_at", new Date(Date.now() - ЗАПУСК_СВЕЖ_МС).toISOString())
-    .order("created_at", { ascending: false })
-    .limit(предел);
+  /* Состояние кривой пришло тем же запросом: пока стартовая покупка не
+     прошла, объявлять о запуске нечего — у токена ещё нули во всех
+     числах, и по ссылке из ленты человек попадёт на пустую карточку.
+     Только что запущенные — и никогда больше: «$CATS запущен» через
+     сутки после запуска это уже не новость. */
+  const свежесть = Date.now() - ЗАПУСК_СВЕЖ_МС;
+  const запуски = (цепочкаТокенов || [])
+    .filter((т) => new Date(т.created_at).getTime() > свежесть)
+    .slice(0, предел);
 
   const адреса = [...new Set([
     ...(сделки || []).map((с) => с.token_address),
     ...(запуски || []).map((т) => т.address),
   ].filter(Boolean))];
-  const { data: токены } = адреса.length
-    ? await db.from("tokens").select("id, address, ticker, chain, logo_url").in("address", адреса)
-    : { data: [] };
-  const поАдресу = new Map((токены || []).map((т) => [т.address, т]));
+  // Карточки токенов уже прочитаны вместе с цепочкой — второй раз в базу
+  // за ними ходить незачем.
+  const поАдресу = new Map((цепочкаТокенов || []).filter((т) => адреса.includes(т.address)).map((т) => [т.address, т]));
 
   /* Кошелёк покупателя — тот же, что виден в списке держателей токена:
      новой огласки тут нет, а строка «кто-то купил» без «кто» читается
@@ -165,7 +180,7 @@ export default async function handler(req, res) {
       .slice(0, предел),
   };
 
-  кеш = { до: Date.now() + ПАМЯТЬ_МС, тело };
+  кеш.set(ключКеша, { до: Date.now() + ПАМЯТЬ_МС, тело });
   res.setHeader("Cache-Control", "no-store");
   return res.status(200).json(тело);
 }

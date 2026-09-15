@@ -5778,10 +5778,14 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
     if (!своиПоАдресу.size) { setLoaded(true); return undefined; }
     let брошено = false;
 
+    const нужная = сеть === "sol" ? "solana" : "ton";
+
     async function прочитать() {
       let j = null;
       try {
-        const r = await fetch(апи("/api/trades-feed?limit=50"));
+        // Лента своя у каждой цепочки: в общем списке последних сделок
+        // раздел GRAM оставался пустым — все свежие шли в Solana.
+        const r = await fetch(апи(`/api/trades-feed?limit=50&chain=${нужная}`));
         if (!r.ok) { if (!брошено) setLoaded(true); return; }
         j = await r.json();
       } catch { if (!брошено) setLoaded(true); return; }
@@ -5789,7 +5793,6 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
       // Даже пустой ответ — это ответ: держать скелет, пока сделок нет,
       // значит держать весь раздел за ним.
       if (!j || !Array.isArray(j.rows)) { setLoaded(true); return; }
-      const нужная = сеть === "sol" ? "solana" : "ton";
       const ряд = [];
       for (const с of j.rows) {
         const tok = своиПоАдресу.get(с.address);
@@ -7040,13 +7043,15 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
         animationDelay: `${Math.min(index, 6) * 22}ms`,
       }}
     >
+      {/* Логотип — крупнее прежнего: в списке он и есть лицо токена, а
+          на нём разбирают картинку, а не тикер. */}
       <div className="flex items-center" style={{ gap: 12 }}>
         {своя ? (
-          <КольцоДоБиржи size={46} доля={доляДоБиржи} готово={доляДоБиржи >= 1}>
-            <TokenAvatar size={46} tone={рост ? "up" : "down"} src={tok.logoUrl} />
+          <КольцоДоБиржи size={54} доля={доляДоБиржи} готово={доляДоБиржи >= 1}>
+            <TokenAvatar size={54} tone={рост ? "up" : "down"} src={tok.logoUrl} />
           </КольцоДоБиржи>
         ) : (
-          <TokenAvatar size={46} tone={рост ? "up" : "down"} src={tok.logoUrl} />
+          <TokenAvatar size={54} tone={рост ? "up" : "down"} src={tok.logoUrl} />
         )}
 
         <div className="flex-1 min-w-0">
@@ -7267,7 +7272,7 @@ function Конфетти({ количество = 26 }) {
 function MempadRowSkeleton({ index }) {
   return (
     <div className="w-full flex items-center gap-3 py-3" style={{ animationDelay: `${index * 55}ms` }}>
-      <div className="fx-skeleton" style={{ width: 44, height: 44, borderRadius: "50%" }} />
+      <div className="fx-skeleton" style={{ width: 54, height: 54, borderRadius: "50%" }} />
       <div className="flex-1 flex flex-col gap-2">
         <div className="fx-skeleton" style={{ width: "35%", height: 12, borderRadius: 4 }} />
         <div className="fx-skeleton" style={{ width: "50%", height: 9, borderRadius: 4 }} />
@@ -11981,12 +11986,15 @@ function NetworkSlider({ value, onChange, ширина = 168, высота = 38 
           // Рамка считается внутрь ширины: иначе бегунок шире половины
           // дорожки на её толщину и в правом положении вылезает за край.
           boxSizing: "border-box",
-          background: T.surfaceHi, border: "none",
+          /* Бегунок — белая плашка, как на карте в кошельке: два разных
+             переключателя сети в одном приложении выглядели как две
+             разные вещи. */
+          background: hexA("#FFFFFF", 0.92), border: "none",
           transform: `translateX(${x}px)`,
           transition: сдвиг == null ? `transform 220ms cubic-bezier(0.32,1.2,0.5,1)` : "none",
         }}
       />
-      {[["ton", ТИКЕР_TON, "#31A6F5"], ["sol", "SOL", "#9945FF"]].map(([id, подпись, цвет], i) => {
+      {[["ton", ТИКЕР_TON], ["sol", "SOL"]].map(([id, подпись], i) => {
         // Подпись светлеет по мере подхода ползунка, а не скачком в
         // момент отпускания: иначе при перетаскивании ничего не
         // происходит до самого конца.
@@ -11999,16 +12007,11 @@ function NetworkSlider({ value, onChange, ширина = 168, высота = 38 
               boxSizing: "border-box",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontFamily: displayFont, fontSize: 13.5, fontWeight: близость > 0.5 ? 800 : 600,
-              /* Выбранная сеть подписана своим цветом и светится им же:
-                 голубой у TON, фиолетовый у Solana — те самые, что на их
-                 собственных значках. Сила свечения растёт вместе с
-                 близостью ползунка, поэтому при перетаскивании цвет
-                 переходит плавно, а не вспыхивает в конце. */
-              color: близость > 0.5 ? цвет : T.faint,
-              textShadow: близость > 0.5
-                ? `0 0 ${8 * близость}px ${hexA(цвет, 0.85 * близость)}, 0 0 ${18 * близость}px ${hexA(цвет, 0.45 * близость)}`
-                : "none",
-              transition: сдвиг == null ? `color 220ms ease-out, text-shadow 220ms ease-out` : "none",
+              /* Выбранная сеть — чёрным по белой плашке, остальное
+                 приглушено. Цветного свечения здесь больше нет: оно
+                 тянуло взгляд сильнее самого списка токенов. */
+              color: близость > 0.5 ? "#0B0B0F" : T.faint,
+              transition: сдвиг == null ? "color 220ms ease-out" : "none",
               pointerEvents: "none",
             }}
           >
