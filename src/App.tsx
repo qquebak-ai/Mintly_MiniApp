@@ -10521,6 +10521,100 @@ function BootSplash({ steps, done, уходит = false, insetTop = 0 }) {
    предмета меняются ровно две карточки из десятка, а остальные — со всеми
    своими размытиями и анимациями — вообще не перерисовываются. Раньше
    перерисовывались все, и оранжевая рамка появлялась с задержкой. */
+const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, price, affordable, onOwnedTap, onBuy, onTooPoor }) {
+  const handle = useCallback(() => {
+    if (owned) return onOwnedTap && onOwnedTap(kind, item.id);
+    if (!affordable) return onTooPoor && onTooPoor(price);
+    return onBuy(kind, item.id);
+  }, [owned, affordable, price, onOwnedTap, onBuy, onTooPoor, kind, item.id]);
+  const плитка = useRef(null);
+  const наЭкране = useOnScreen(плитка);
+
+  return (
+    <button
+      ref={плитка}
+      onClick={handle}
+      // Подложки у плитки больше нет: рамка вокруг рамки — это две
+      // рамки, и витрина превращалась в сетку контейнеров вместо сетки
+      // предметов. Сам предмет остаётся в своём окне, подпись и цена —
+      // просто под ним.
+      // Надетое отмечается самим окном предмета, а не рамкой вокруг всей
+      // плитки: та обводила заодно подпись и слово «Надето», упиралась в
+      // края сетки и рисовалась прямыми углами поверх скруглённого
+      // превью.
+      className={`fx-card flex flex-col items-center gap-2.5 p-0${наЭкране ? "" : " fx-frozen"}`}
+      style={{
+        background: "transparent", border: "none",
+        position: "relative", overflow: "hidden", contain: "paint",
+        // Витрина длинная, а на экране помещается четыре плитки. Всё
+        // остальное браузер до сих пор честно рисовал и анимировал —
+        // два с лишним сотни движущихся слоёв разом, из-за чего нажатия
+        // по нижнему меню отрабатывали через раз. С этим правилом
+        // невидимые плитки не считаются вовсе; размер задан заранее,
+        // чтобы полоса прокрутки не прыгала.
+        contentVisibility: "auto",
+        containIntrinsicSize: "190px 210px",
+      }}
+    >
+      {/* Некупленное не гасим прозрачностью: предмет видно целиком, на
+          то он и витрина, а что он ещё не твой — сказано ценой. */}
+      <div style={{
+        position: "relative", width: "100%", height: 104, borderRadius: 16, overflow: "hidden",
+        background: T.surface,
+        border: `1px solid ${equipped ? T.electric : T.line}`,
+        // Второй контур внутрь: снаружи его срезал бы overflow плитки, а
+        // так надетое видно с одного взгляда и по краю ничего не торчит.
+        boxShadow: equipped ? `inset 0 0 0 1px ${hexA(T.electric, 0.45)}` : "none",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {kind === "card" && <ProfileCardBg cardId={item.id} height={96} radius={16} showcase />}
+        {kind === "wallet" ? (
+          /* Скин карты показываем самой картой: кружок аватарки тут
+             ничего не объясняет, а маленькая карта баланса — сразу всё. */
+          <div style={{
+            position: "relative", zIndex: 1, width: "82%", height: 62, borderRadius: 12,
+            overflow: "hidden",
+            background: item.fill,
+            backgroundColor: item.ткань ? "#131319" : undefined,
+            backgroundSize: item.size || "320% 320%",
+            // Ткань не переливается — по ней ходит блик, как на карте.
+            animation: item.ткань ? "карбонЕдет 14s linear infinite" : "картаПереливается 9s ease-in-out infinite",
+            boxShadow: `0 8px 22px ${hexA(item.glow || "#7C3AED", 0.35)}`,
+            padding: "9px 10px", textAlign: "left",
+          }}>
+            {item.ткань && <СлоиТкани />}
+            <div style={{ fontFamily: bodyFont, fontSize: 8.5, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
+            <div style={{ fontFamily: displayFont, fontSize: 15, fontWeight: 700, color: "#FFFFFF", marginTop: 2 }}>
+              12,40 <span style={{ fontSize: 9, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
+            </div>
+          </div>
+        ) : (
+          <div style={{ position: "relative", zIndex: 1 }}>
+            {/* Внутри рамки — просто чёрный кружок: витрина про сам
+                предмет, а своя аватарка тут только отвлекает. */}
+            <AvatarFrame frameId={kind === "frame" ? item.id : "none"} size={62}>
+              <div style={{ width: "100%", height: "100%", background: T.bg }} />
+            </AvatarFrame>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 600 }}>{pickLabel(item.label)}</span>
+        {equipped && <CheckCircle2 size={13} color={T.electric} />}
+      </div>
+      {owned ? (
+        <span style={{ fontFamily: bodyFont, fontSize: 12, color: equipped ? T.electric : T.muted, textAlign: "center", lineHeight: 1.3 }}>
+          {equipped ? t("shopEquipped") : t("shopOwned")}
+        </span>
+      ) : (
+        <span className="flex items-center gap-1" style={{ fontFamily: monoFont, fontSize: 12.5, fontWeight: 600, color: affordable ? T.electric : T.muted }}>
+          <CoinIcon size={12} dim={!affordable} /> {price}
+        </span>
+      )}
+    </button>
+  );
+});
+
 /* Витрина только продаёт. Надеть купленное можно в профиле, кнопкой
    «Редактировать профиль»: примерка — это про себя, а не про кассу, и
    раньше два действия жили на одной плитке и путались между собой. */
