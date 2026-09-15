@@ -12555,61 +12555,114 @@ const БАННЕРЫ = [
    всё время что-то происходит, поэтому лента живая даже когда её не
    листают. Формы фирменные — ромб TON, полосы Solana, лист Mintly — а не
    нарисованные на глаз силуэты. */
-/* Сцена первого баннера: та же композиция, что у рекламных картинок —
- * планета в углу, искры, ракета со следом и облака по низу, — но
- * собранная своими руками и в своих красках. Рисунком, а не снимком:
- * он тянется под любую ширину, не мылит на плотном экране и весит
- * столько же, сколько абзац текста. */
+/* Сцена первого баннера.
+ *
+ * Это не плоская аппликация, а попытка написать свет: у корпуса тёмный
+ * металл с продольным бликом и подсветкой по кромке, у стекла —
+ * отражение и зайчик, у выхлопа — раскалённое ядро в размытом ореоле,
+ * у луны — терминатор и кратеры с собственной тенью. Отсюда и
+ * объём. Рисунком, а не снимком: тянется под любую ширину, не мылит на
+ * плотном экране и весит как абзац текста. */
 function СценаЗапуска() {
-  const СИРЕНЬ = "#C79BFF", ФИОЛЕТ = "#8E2DE2", РОЗА = "#FF3D8B";
+  const СИРЕНЬ = "#C79BFF", ФИОЛЕТ = "#8E2DE2";
   const искры = [
-    { x: 196, y: 30, r: 3.4, o: 0.9 }, { x: 240, y: 96, r: 2.2, o: 0.6 },
-    { x: 150, y: 116, r: 2.6, o: 0.5 }, { x: 330, y: 60, r: 2.4, o: 0.7 },
-    { x: 286, y: 18, r: 2, o: 0.5 },
+    /* Левее 215 искры не ставим: там лежит заголовок, и точки рядом с
+       буквами читаются грязью на стекле. */
+    { x: 224, y: 122, r: 3.2, o: 0.75 }, { x: 232, y: 24, r: 4, o: 0.95 },
+    { x: 238, y: 104, r: 2.4, o: 0.6 }, { x: 330, y: 74, r: 2.8, o: 0.7 },
+    { x: 288, y: 14, r: 2.2, o: 0.5 },
   ];
+  const пыль = [[222, 58], [246, 136], [264, 8], [316, 112], [350, 40], [300, 96], [340, 128]];
   return (
     <svg
       aria-hidden viewBox="0 0 360 150" preserveAspectRatio="xMidYMid slice"
       style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
     >
       <defs>
-        <linearGradient id="бнНебо" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#0A0B12" />
-          <stop offset="0.55" stopColor="#140C28" />
-          <stop offset="1" stopColor="#24103F" />
-        </linearGradient>
-        <radialGradient id="бнЛуна" cx="0.32" cy="0.28" r="0.85">
-          <stop offset="0" stopColor="#6A52A8" />
-          <stop offset="1" stopColor="#120C22" />
+        <radialGradient id="бнНебо" cx="0.78" cy="0.22" r="0.9">
+          <stop offset="0" stopColor="#241043" />
+          <stop offset="0.55" stopColor="#120A22" />
+          <stop offset="1" stopColor="#07070C" />
         </radialGradient>
-        <linearGradient id="бнКорпус" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#F0E6FF" />
-          <stop offset="0.5" stopColor={СИРЕНЬ} />
-          <stop offset="1" stopColor={ФИОЛЕТ} />
+        {/* Луна освещена сбоку: светлый край, терминатор и тёмная
+            половина — без этого круг остаётся кругом, а не шаром. */}
+        <radialGradient id="бнЛуна" cx="0.26" cy="0.24" r="0.92">
+          <stop offset="0" stopColor="#8E7CC4" />
+          <stop offset="0.42" stopColor="#4A3C78" />
+          <stop offset="0.78" stopColor="#1C1533" />
+          <stop offset="1" stopColor="#0B0814" />
+        </radialGradient>
+        {/* Корпус: тёмный металл, по центру продольный блик, справа
+            отражённый свет от выхлопа. */}
+        <linearGradient id="бнМеталл" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#0A0A10" />
+          <stop offset="0.28" stopColor="#3A3A47" />
+          <stop offset="0.44" stopColor="#E9E4F5" />
+          <stop offset="0.58" stopColor="#4C4459" />
+          <stop offset="0.86" stopColor="#12101A" />
+          <stop offset="1" stopColor="#241A3A" />
         </linearGradient>
-        <linearGradient id="бнПламя" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#FFFFFF" />
+        <linearGradient id="бнКрыло" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={СИРЕНЬ} />
+          <stop offset="0.5" stopColor={ФИОЛЕТ} />
+          <stop offset="1" stopColor="#3B1266" />
+        </linearGradient>
+        <radialGradient id="бнСтекло" cx="0.34" cy="0.3" r="0.8">
+          <stop offset="0" stopColor="#F2EAFF" />
           <stop offset="0.35" stopColor={СИРЕНЬ} />
-          <stop offset="1" stopColor={РОЗА} stopOpacity="0" />
+          <stop offset="0.75" stopColor="#3D1F74" />
+          <stop offset="1" stopColor="#120A22" />
+        </radialGradient>
+        <linearGradient id="бнЯдро" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="0.3" stopColor="#E7D6FF" />
+          <stop offset="0.7" stopColor={ФИОЛЕТ} stopOpacity="0.85" />
+          <stop offset="1" stopColor={ФИОЛЕТ} stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="бнОблако" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#3B2A63" />
+          <stop offset="0.45" stopColor="#1E1538" />
+          <stop offset="1" stopColor="#0C0917" />
         </linearGradient>
         <radialGradient id="бнЗарево" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor={ФИОЛЕТ} stopOpacity="0.5" />
+          <stop offset="0" stopColor={ФИОЛЕТ} stopOpacity="0.55" />
           <stop offset="1" stopColor={ФИОЛЕТ} stopOpacity="0" />
         </radialGradient>
+        {/* Свечение делаем размытием самой фигуры, а не обводкой: так
+            свет ложится вокруг предмета, как в жизни. */}
+        <filter id="бнОреол" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="5" />
+        </filter>
+        <filter id="бнМягко" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="2.2" />
+        </filter>
+        <clipPath id="бнЛунаОбрез"><circle cx="300" cy="18" r="62" /></clipPath>
       </defs>
 
       <rect width="360" height="150" fill="url(#бнНебо)" />
-      <circle cx="292" cy="34" r="86" fill="url(#бнЗарево)" />
-      {/* Планета уходит за край — так кадр читается куском большой сцены,
-          а не картинкой, уместившейся целиком. */}
+      <circle cx="286" cy="52" r="96" fill="url(#бнЗарево)" opacity="0.7" />
+
+      {пыль.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r={0.9} fill="#FFFFFF" opacity={0.35 + (i % 3) * 0.12} />
+      ))}
+
       <g>
         <circle cx="300" cy="18" r="62" fill="url(#бнЛуна)" />
-        <circle cx="278" cy="10" r="9" fill="#0E0A1A" opacity="0.5" />
-        <circle cx="312" cy="36" r="6" fill="#0E0A1A" opacity="0.45" />
-        <circle cx="330" cy="6" r="4.5" fill="#0E0A1A" opacity="0.4" />
+        <g clipPath="url(#бнЛунаОбрез)" opacity="0.55">
+          {/* Кратер — светлый ободок сверху и тень внутри: свет падает
+              оттуда же, откуда освещён сам шар. */}
+          {[[276, 6, 10], [312, 34, 7], [332, 4, 5], [292, 46, 4.5]].map(([x, y, r], i) => (
+            <g key={i}>
+              <circle cx={x} cy={y} r={r} fill="#0B0814" opacity="0.75" />
+              <circle cx={x - r * 0.25} cy={y - r * 0.3} r={r * 0.82} fill="#6F5EA8" opacity="0.35" />
+            </g>
+          ))}
+        </g>
+        <circle cx="300" cy="18" r="62" fill="none" stroke={СИРЕНЬ} strokeOpacity="0.18" strokeWidth="1" />
       </g>
-      <path d="M170 128C214 84 262 46 360 26" stroke={СИРЕНЬ} strokeOpacity="0.22" strokeWidth="1.2" fill="none" />
-      <path d="M196 150C238 108 286 76 360 62" stroke={РОЗА} strokeOpacity="0.14" strokeWidth="1.2" fill="none" />
+
+      <path d="M150 140C200 92 254 54 360 30" stroke={СИРЕНЬ} strokeOpacity="0.20" strokeWidth="1.1" fill="none" />
+      <path d="M176 150C224 112 284 82 360 68" stroke="#FF3D8B" strokeOpacity="0.12" strokeWidth="1.1" fill="none" />
 
       {искры.map((и, i) => (
         <path
@@ -12620,30 +12673,47 @@ function СценаЗапуска() {
         />
       ))}
 
-      {/* Ракета и её след: след уходит вниз, к облакам, — оттого и видно,
-          что она только что оттуда вышла. */}
       <g style={{ transformOrigin: "266px 70px", animation: "ракетаВзлетает 3.6s ease-in-out infinite" }}>
-        <g transform="rotate(28 268 66)">
-          {/* Пламя — в той же повёрнутой связке, что и корпус: иначе оно
-              бьёт вертикально вниз, мимо сопла. */}
-          <path d="M268 90l-13 54 13 10 13-10z" fill="url(#бнПламя)" opacity="0.85"
-            style={{ transformOrigin: "268px 90px", animation: "пламяДышит 0.5s ease-in-out infinite alternate" }} />
-          <path d="M254 96l-12 10 2 10 12-8z" fill={ФИОЛЕТ} />
-          <path d="M282 96l12 10-2 10-12-8z" fill={ФИОЛЕТ} />
-          <path d="M268 24c11 12 16 28 15 46l-3 28h-24l-3-28c-1-18 4-34 15-46z" fill="url(#бнКорпус)" />
-          <circle cx="268" cy="56" r="9" fill="#0B0A14" />
-          <circle cx="268" cy="56" r="6" fill={ФИОЛЕТ} />
-          <circle cx="265.6" cy="53.4" r="2.2" fill="#FFFFFF" opacity="0.85" />
-          <rect x="256" y="84" width="24" height="7" rx="3" fill={ФИОЛЕТ} opacity="0.85" />
+        <g transform="rotate(26 268 66)">
+          {/* Выхлоп: размытый ореол, за ним раскалённое ядро. */}
+          <g style={{ transformOrigin: "268px 92px", animation: "пламяДышит 0.45s ease-in-out infinite alternate" }}>
+            <path d="M268 92l-17 62 17 12 17-12z" fill={ФИОЛЕТ} opacity="0.55" filter="url(#бнОреол)" />
+            <path d="M268 92l-9 44 9 8 9-8z" fill="url(#бнЯдро)" />
+            <path d="M268 94l-4 24 4 5 4-5z" fill="#FFFFFF" opacity="0.9" filter="url(#бнМягко)" />
+          </g>
+
+          <path d="M252 62l-14 28 2 14 14-12z" fill="url(#бнКрыло)" />
+          <path d="M284 62l14 28-2 14-14-12z" fill="url(#бнКрыло)" />
+          <path d="M284 62l14 28-2 14-14-12z" fill="#000000" opacity="0.28" />
+
+          {/* Корпус и его кромка: тонкая светящаяся линия по силуэту —
+              то, что на снимках даёт ощущение подсвеченного предмета. */}
+          <path d="M268 18c12 13 17 30 16 49l-2 25h-28l-2-25c-1-19 4-36 16-49z" fill="url(#бнМеталл)" />
+          <path d="M268 18c12 13 17 30 16 49l-2 25h-28l-2-25c-1-19 4-36 16-49z" fill="none" stroke={СИРЕНЬ} strokeOpacity="0.9" strokeWidth="1.2" />
+          <path d="M268 20c-8 12-11 27-10 43" stroke="#FFFFFF" strokeOpacity="0.5" strokeWidth="2" fill="none" filter="url(#бнМягко)" />
+          <path d="M254 70h28" stroke="#0A0A10" strokeOpacity="0.8" strokeWidth="2.4" />
+          <path d="M254 70h28" stroke={СИРЕНЬ} strokeOpacity="0.55" strokeWidth="0.8" />
+
+          <circle cx="268" cy="52" r="10.5" fill="#07060C" />
+          <circle cx="268" cy="52" r="8.5" fill="url(#бнСтекло)" />
+          <path d="M263 47c2-2 5-3 8-2" stroke="#FFFFFF" strokeOpacity="0.85" strokeWidth="2" strokeLinecap="round" fill="none" />
+          <circle cx="268" cy="52" r="10.5" fill="none" stroke={СИРЕНЬ} strokeOpacity="0.8" strokeWidth="1.2" />
+
+          {/* Сопло: тёмное кольцо, подсвеченное снизу пламенем. */}
+          <path d="M256 92h24l-3 8h-18z" fill="#15121F" />
+          <path d="M256 92h24" stroke={СИРЕНЬ} strokeOpacity="0.7" strokeWidth="1.2" />
         </g>
       </g>
 
-      {/* Облака по низу — тёмные комья, подсвеченные снизу заревом. */}
+      {/* Облака: подсвеченные сверху комья, нижние — глуше. Размытие по
+          верхней кромке не даёт им читаться вырезанными фигурами. */}
       <g>
-        <ellipse cx="300" cy="150" rx="86" ry="34" fill={ФИОЛЕТ} opacity="0.28" />
-        <ellipse cx="236" cy="152" rx="44" ry="24" fill="#15102A" />
-        <ellipse cx="290" cy="146" rx="52" ry="28" fill="#1B1436" />
-        <ellipse cx="348" cy="150" rx="46" ry="24" fill="#150F2A" />
+        <ellipse cx="292" cy="150" rx="92" ry="34" fill={ФИОЛЕТ} opacity="0.30" filter="url(#бнОреол)" />
+        <ellipse cx="228" cy="154" rx="48" ry="26" fill="url(#бнОблако)" />
+        <ellipse cx="286" cy="148" rx="56" ry="30" fill="url(#бнОблако)" />
+        <ellipse cx="344" cy="152" rx="50" ry="26" fill="url(#бнОблако)" />
+        <ellipse cx="286" cy="132" rx="34" ry="12" fill={СИРЕНЬ} opacity="0.20" filter="url(#бнМягко)" />
+        <ellipse cx="232" cy="140" rx="22" ry="8" fill={СИРЕНЬ} opacity="0.12" filter="url(#бнМягко)" />
       </g>
     </svg>
   );
