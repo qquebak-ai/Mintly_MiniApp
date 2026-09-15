@@ -12666,7 +12666,7 @@ function HomeView({
   return (
     // Запас снизу — под закреплённую кнопку: в конце прокрутки она
     // должна висеть над пустотой, а не над последней строкой топа.
-    <div className="flex flex-col" style={{ gap: 26, paddingTop: 8, paddingBottom: 96 }}>
+    <div className="flex flex-col" style={{ gap: 26, paddingTop: 8, paddingBottom: 40 }}>
       {/* Аватарка с именем ждут вместе со всем экраном, а не только свой
           профиль: они узнавались первыми, и над полем плашек висела одна
           готовая строка — будто загрузилось только «я», а остальное
@@ -12699,27 +12699,6 @@ function HomeView({
           <ТопСтрока onOpenToken={onOpenToken} onOpenProfile={onOpenProfile} live={боевые} />
         </>
       )}
-
-      {/* Запуск — главное действие экрана, и оно стоит в его конце.
-          Раньше кнопка прилипала к низу и висела поверх прокрутки: пока
-          на главной были только витринные блоки, это работало, но теперь
-          под ней идут свои токены, активность и достижения — и она
-          просвечивала прямо по ним. Читать список сквозь кнопку хуже,
-          чем пролистать до неё; то же действие есть и в мемпаде. */}
-      <div style={{ marginTop: 2, paddingTop: 6, paddingBottom: 10 }}>
-        <button
-          onClick={onGoCreate}
-          className="fx-tap w-full flex items-center justify-center gap-2"
-          style={{
-            padding: "14px 16px", borderRadius: 16,
-            background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT, border: "none",
-            fontFamily: displayFont, fontSize: 15, fontWeight: 600,
-            boxShadow: `0 10px 30px ${hexA(T.electric, 0.35)}`,
-          }}
-        >
-          <Rocket size={17} strokeWidth={1.8} /> {t("homeActionLaunch")}
-        </button>
-      </div>
 
     </div>
   );
