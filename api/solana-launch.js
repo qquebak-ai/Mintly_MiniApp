@@ -50,6 +50,9 @@ async function библиотеки() {
 }
 
 const RPC = process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com";
+// Какая это сеть — видно по узлу. Нужно, чтобы не брать комиссию там,
+// где монеты игрушечные.
+const СЕТЬ_SOL = /devnet/.test(RPC) ? "devnet" : /testnet/.test(RPC) ? "testnet" : "mainnet";
 const PROGRAM = (process.env.SOLANA_CURVE_PROGRAM || "").trim();
 const FEE_ACCOUNT = (process.env.SOLANA_FEE_ACCOUNT || "").trim();
 const LIQUIDITY = (process.env.SOLANA_LIQUIDITY || FEE_ACCOUNT || "").trim();
@@ -108,8 +111,9 @@ export const КРИВАЯ = {
      35 монетами, просто вложить придётся примерно на процент больше.
      Ставка записывается в кривую при создании и задним числом не
      меняется — у токенов, запущенных при нулевой комиссии, она нулевой
-     и останется. */
-  feeBps: 100,
+     и останется. В devnet комиссии нет вовсе: там торгуют игрушечными
+     монетами, и процент с них только мешает сверять расчёты. */
+  feeBps: СЕТЬ_SOL === "mainnet" ? 100 : 0,
   // Запас под пару на бирже. Кривая выпускает его при закрытии вместе с
   // непроданным остатком: собранные монеты и эти токены и становятся
   // ликвидностью. Размер не произвольный — он и выравнивает цену пула с

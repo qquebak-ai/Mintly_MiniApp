@@ -371,11 +371,13 @@ const STR = {
     mempadSpotlight: "В центре внимания",
     mempadLaunchToken: "Запустить токен",
     tickerBought: "купил", tickerSold: "продал", tickerLaunched: "запущен",
+    // В ленте говорим о токене, а не о том, кто нажал кнопку: «купили на».
+    tickerBoughtFor: "купили на", tickerSoldFor: "продали на",
     sinceJustNow: "только что", sinceMin: "м", sinceHour: "ч", mempadFilterNew: "Новые", mempadFilterTrend: "Трендовые", mempadFilterHot: "Горячие", mempadFilterSoon: "Скоро на бирже", mempadFilterVol: "По обороту", mempadFilterBluming: "В росте", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Создать токен", homeActionMempad: "Мемпад", homeActionProfile: "Профиль",
     feedTitle: "Прямо сейчас",
     feedSub: "Что происходит на площадке",
-    feedTrade: "{who} купил ${ticker} на {ton} GRAM",
-    feedLaunch: "{who} запустил ${ticker}",
+    feedTrade: "${ticker} купили на {ton} GRAM",
+    feedLaunch: "${ticker} запущен",
     topTitle: "Топ",
     topTokens: "Токены",
     topCreators: "Создатели",
@@ -956,11 +958,12 @@ const STR = {
     mempadSpotlight: "Spotlight",
     mempadLaunchToken: "Launch token",
     tickerBought: "bought", tickerSold: "sold", tickerLaunched: "launched",
+    tickerBoughtFor: "bought for", tickerSoldFor: "sold for",
     sinceJustNow: "just now", sinceMin: "m", sinceHour: "h", mempadFilterNew: "New", mempadFilterTrend: "Trending", mempadFilterHot: "Hot", mempadFilterSoon: "Almost listed", mempadFilterVol: "By volume", mempadFilterBluming: "Bluming", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Launch token", homeActionMempad: "Mempad", homeActionProfile: "Profile",
     feedTitle: "Right now",
     feedSub: "What's happening here",
-    feedTrade: "{who} bought ${ticker} for {ton} GRAM",
-    feedLaunch: "{who} launched ${ticker}",
+    feedTrade: "${ticker} bought for {ton} GRAM",
+    feedLaunch: "${ticker} launched",
     topTitle: "Top",
     topTokens: "Tokens",
     topCreators: "Creators",
@@ -1709,6 +1712,7 @@ function GlobalStyle() {
       @keyframes spin360 { from{ transform: rotate(0deg); } to{ transform: rotate(360deg); } }
       @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
       @keyframes scaleIn { from{opacity:0; transform:scale(0.92);} to{opacity:1; transform:scale(1);} }
+      @keyframes страницаСнизу { from { opacity: 0; transform: translateY(34px); } to { opacity: 1; transform: none; } }
       /* Сцены на баннерах: свечи растут, монеты плавают, лист качается,
          ракета взлетает. Периоды разные, чтобы соседние баннеры не
          бились в такт. */
@@ -2212,9 +2216,9 @@ function GlobalStyle() {
       /* Появление страницы: 200 мс вместо 320. Полсекунды на переход
          между вкладками читаются задержкой, а не плавностью — особенно
          теперь, когда отклик на нажатие приходит сразу. */
-      .fx-view { animation: viewIn 200ms cubic-bezier(0.16,1,0.3,1) backwards; }
+      .fx-view { animation: viewIn 260ms cubic-bezier(0.22,1,0.36,1) backwards; }
       @keyframes viewIn {
-        from { opacity: 0; transform: translateY(8px) scale(0.994); }
+        from { opacity: 0; transform: translateY(16px); }
         to   { opacity: 1; transform: none; }
       }
       /* Заглушка вместо ещё не пришедших данных.
@@ -2237,7 +2241,10 @@ function GlobalStyle() {
          же места, и рамка не дёргается заново при каждой прокрутке. */
       .fx-frozen, .fx-frozen * { animation-play-state: paused !important; }
       .fx-modal-back { animation: fadeIn 220ms ease-out both; }
-      .fx-modal-card { animation: scaleIn 260ms cubic-bezier(0.16,1,0.3,1) backwards; }
+      /* Окна и листы приходят снизу, а не разрастаются из центра: так
+         видно, откуда взялась страница, и возврат пальцем вниз читается
+         продолжением того же движения. */
+      .fx-modal-card { animation: страницаСнизу 300ms cubic-bezier(0.22,1,0.36,1) backwards; }
       /* Уход: затемнение гаснет, окно проседает вниз и слегка сжимается.
          Кривая с резким началом — рывок в сторону пальца, а не вязкое
          сползание. Ровно ${CLOSE_MS} мс: быстрее открытия, иначе окно
@@ -5935,12 +5942,15 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
           </span>
         ) : (
         <>
-        <span className="truncate" style={{ fontFamily: monoFont, color: T.muted, fontSize: 12.5 }}>{shortAddr(b.from) || "—"}</span>
-        <span style={{ fontFamily: bodyFont, color: цветСобытия, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>
+        {/* Строка о токене, а не о кошельке: «$BURN купили на 2 SOL».
+            Адрес покупателя тут ничего не сообщал — ни имени, ни
+            истории, только шум перед тикером. */}
+        <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${b.token.ticker}</span>
+        <span style={{ fontFamily: bodyFont, color: цветСобытия, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", flex: 1 }}>
           <>
           {/* Сумма в монете той сети, где прошла сделка: в разделе
               Solana цифры в TON были просто неправдой. */}
-          {b.kind === "sell" ? t("tickerSold") : t("tickerBought")} {(() => {
+          {b.kind === "sell" ? t("tickerSoldFor") : t("tickerBoughtFor")} {(() => {
             const соло = b.token && b.token.chain === "solana";
             const курс = соло ? solUsd() : tonUsd();
             // Сумма сделки известна в монете — её и показываем; доллары
@@ -5957,7 +5967,6 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
           })()}
           </>
         </span>
-        <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700, flex: 1 }}>${b.token.ticker}</span>
         </>
         )}
         <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11.5, whiteSpace: "nowrap" }}>{fmtSince(b.at)}</span>
@@ -11647,9 +11656,11 @@ function БегущаяЛента() {
 
   if (!items || !items.length) return null;
 
+  /* Говорим о токене, а не о том, кто нажал кнопку: у половины строк
+     имени всё равно нет, и вместо него стоял прочерк. */
   const текст = (с) => (с.kind === "launch"
-    ? tf("feedLaunch", { who: с.nickname || "—", ticker: с.ticker || "?" })
-    : tf("feedTrade", { who: с.nickname || "—", ticker: с.ticker || "?", ton: fmtTon(Number(с.ton) || 0) }));
+    ? tf("feedLaunch", { ticker: с.ticker || "?" })
+    : tf("feedTrade", { ticker: с.ticker || "?", ton: fmtTon(Number(с.ton) || 0) }));
 
   return (
     <div style={{ overflow: "hidden", height: 20, position: "relative", maskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)" }}>
@@ -14280,9 +14291,8 @@ const КОШ_ПОЛОТНО = [
   "radial-gradient(46% 38% at 28% 30%, #38D39F 0%, rgba(56,211,159,0) 60%)",
   "radial-gradient(62% 44% at 54% 16%, #FFB020 0%, rgba(255,176,32,0) 55%)",
 ].join(", ");
-/* Мгла поверх пятен: у верхнего края почти прозрачная, ниже заголовка
-   уже глухая. Она же держит цвет в узде — без неё полотно спорит с
-   картой и слепит. */
+/* Мгла поверх пятен: у верхнего края приглушает цвет, ниже заголовка
+   уже глухая. Без неё пятна слепят и текст по ним не прочитать. */
 const КОШ_ПОЛОТНО_МГЛА = "linear-gradient(180deg, rgba(8,9,12,0.42) 0%, rgba(8,9,12,0.58) 22%, rgba(8,9,12,0.82) 48%, rgba(8,9,12,0.95) 70%, #08090C 88%)";
 const КОШ_КАРТОЧКА = "#171A21";   // строки на ней
 const КОШ_РОСТ_ФОН = hexA("#8E2DE2", 0.20);
@@ -14954,31 +14964,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // Без кромки по верху: она читалась рамкой вокруг страницы, а
           // отделяет её от фона сам тон — он на ступень светлее.
           border: "none",
-          /* Пятна лежат отдельными слоями под текстом (z-index -1), и
-             своя плоскость наложения нужна, чтобы они не ушли под фон
-             всей страницы; скруглённые углы обрезают их по форме. */
-          position: "relative", isolation: "isolate", overflow: "hidden",
+          position: "relative",
         }}
       >
-        {/* Подложка полотна: цветные пятна плывут под мглой. Своё
-            обрезание по краю — чтобы они не вылезли за скруглённый
-            верх страницы. */}
-        <span
-          aria-hidden
-          style={{
-            position: "absolute", inset: 0, zIndex: -1,
-            overflow: "hidden", isolation: "isolate", pointerEvents: "none",
-            borderTopLeftRadius: 26, borderTopRightRadius: 26,
-            background: КОШ_СТРАНИЦА,
-          }}
-        >
-          <span style={{ position: "absolute", inset: "-25%", background: КОШ_ПОЛОТНО, animation: "полотноПлывёт 32s ease-in-out infinite", willChange: "transform" }} />
-          <span style={{ position: "absolute", inset: 0, background: КОШ_ПОЛОТНО_МГЛА }} />
-        </span>
         <div style={{ marginBottom: 12 }}>
-          {/* Тень под буквами: заголовок лежит на самой яркой части
-              полотна, и без неё белое по жёлтому не прочитать. */}
-          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, textShadow: "0 1px 10px rgba(0,0,0,0.65)" }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700 }}>
             {t("walletHoldings")}
           </span>
         </div>
@@ -14991,9 +14981,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           </div>
         ) : !holdings.length ? (
           <div style={{ padding: "4px 2px 8px" }}>
-            {/* Светлее обычного приглушённого и с тенью: строка лежит
-                на цветном полотне, а не на ровном тёмном фоне. */}
-            <div style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.72), fontSize: 13.5, lineHeight: 1.45, textShadow: "0 1px 8px rgba(0,0,0,0.7)" }}>
+            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.45 }}>
               {t("walletHoldingsEmpty")}
             </div>
           </div>
@@ -18582,7 +18570,13 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   // прокручиваемый контейнер экрана. Раньше к ней добавлялись ещё сто
   // сорок точек, и под кнопкой запуска оставалась пустая половина экрана.
   return (
-    <div className="fx-view flex flex-col gap-7" style={{ position: "relative" }}>
+    <div className="fx-view flex flex-col gap-7" style={{ position: "relative", isolation: "isolate" }}>
+      {/* Полотно уходит за края колонки: страница начинается цветом, а
+          не сразу строками. */}
+      <span aria-hidden style={{ position: "absolute", left: -16, right: -16, top: -20, height: 260, zIndex: -1, overflow: "hidden", isolation: "isolate", pointerEvents: "none" }}>
+        <span style={{ position: "absolute", inset: "-25%", background: КОШ_ПОЛОТНО, animation: "полотноПлывёт 32s ease-in-out infinite", willChange: "transform" }} />
+        <span style={{ position: "absolute", inset: 0, background: КОШ_ПОЛОТНО_МГЛА }} />
+      </span>
       <div>
         <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 20.5, fontWeight: 700 }}>{t("launchTokenTitle")}</div>
         <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 2 }}>
