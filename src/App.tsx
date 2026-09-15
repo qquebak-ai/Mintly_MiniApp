@@ -12517,6 +12517,10 @@ const БАННЕРЫ = [
     цвет: "#6C7CFF",
     действие: "create",
     знак: "ракета",
+    /* Готовая картинка вместо собранной сцены: заголовок и кнопка на
+       ней уже нарисованы, потому баннер с картинкой рисуется одним
+       слоем, а нажимается целиком. */
+    картинка: "/banner-launch.webp",
   },
   {
     id: "trade",
@@ -12687,6 +12691,14 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
               background: T.surface, border: "none", cursor: "pointer",
             }}
           >
+            {б.картинка ? (
+              <img
+                src={б.картинка}
+                alt={(б.строки[язык] || б.строки.RU).join(" ")}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
+            ) : (
+            <>
             {/* Сетка в перспективе — то же ощущение сцены, что на
                 рекламных баннерах: плоскость, на которой стоит предмет. */}
             <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
@@ -12736,6 +12748,8 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
             <div aria-hidden style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", zIndex: 1 }}>
               <ЗнакБаннера вид={б.знак} цвет={б.цвет} />
             </div>
+            </>
+            )}
           </div>
         ))}
       </div>
