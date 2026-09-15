@@ -12764,11 +12764,18 @@ function СценаТорговли() {
     <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
       <span style={{
         position: "absolute", inset: 0,
-        background: `radial-gradient(120% 130% at 88% 18%, ${hexA(ФИОЛЕТ, 0.40)} 0%, ${hexA("#12203A", 0.30)} 38%, #0A0B12 72%, #07070C 100%)`,
+        background: `radial-gradient(120% 130% at 78% 6%, ${hexA(ФИОЛЕТ, 0.34)} 0%, ${hexA("#12203A", 0.26)} 40%, #0A0B12 74%, #07070C 100%)`,
       }} />
       <span style={{
         position: "absolute", left: "-10%", bottom: "-40%", width: "70%", aspectRatio: "1 / 1", borderRadius: "50%",
         background: `radial-gradient(circle, ${hexA(ЗЕЛЁНЫЙ, 0.28)} 0%, ${hexA(ЗЕЛЁНЫЙ, 0)} 70%)`,
+      }} />
+      {/* Тёмное пятно под героем. У самой картинки по контуру идёт тёмный
+          ореол, и на светлом зареве он читался чёрной аурой; на тёмном
+          пятне тот же ореол становится обычной тенью. */}
+      <span style={{
+        position: "absolute", right: "-14%", bottom: "-34%", width: "78%", aspectRatio: "1 / 1", borderRadius: "50%",
+        background: "radial-gradient(circle, #08080E 0%, rgba(8,8,14,0.82) 46%, rgba(8,8,14,0) 72%)",
       }} />
 
       {/* Лента свечей по низу: две одинаковые половины идут подряд, и
