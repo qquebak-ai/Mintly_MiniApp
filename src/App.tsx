@@ -14138,7 +14138,7 @@ const КОШ_ПОЛОТНО_ТЕНЬ = [
 /* Мгла поверх пятен: у верхнего края почти прозрачная, ниже заголовка
    уже глухая. Она же держит цвет в узде — без неё полотно спорит с
    картой и слепит. */
-const КОШ_ПОЛОТНО_МГЛА = "linear-gradient(180deg, rgba(8,9,12,0.02) 0%, rgba(8,9,12,0.20) 26%, rgba(8,9,12,0.72) 52%, rgba(8,9,12,0.94) 72%, #08090C 90%)";
+const КОШ_ПОЛОТНО_МГЛА = "linear-gradient(180deg, rgba(8,9,12,0.42) 0%, rgba(8,9,12,0.58) 22%, rgba(8,9,12,0.82) 48%, rgba(8,9,12,0.95) 70%, #08090C 88%)";
 const КОШ_КАРТОЧКА = "#171A21";   // строки на ней
 const КОШ_РОСТ_ФОН = hexA("#8E2DE2", 0.20);
 const КОШ_РОСТ_ТЕКСТ = "#C79BFF";
@@ -14851,7 +14851,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           </div>
         ) : !holdings.length ? (
           <div style={{ padding: "4px 2px 8px" }}>
-            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.45 }}>
+            {/* Светлее обычного приглушённого и с тенью: строка лежит
+                на цветном полотне, а не на ровном тёмном фоне. */}
+            <div style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.72), fontSize: 13.5, lineHeight: 1.45, textShadow: "0 1px 8px rgba(0,0,0,0.7)" }}>
               {t("walletHoldingsEmpty")}
             </div>
           </div>
