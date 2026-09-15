@@ -536,13 +536,28 @@ export default async function handler(req, res) {
   {
     const { data: свойства } = await admin
       .from("tokens")
-      .select("id, name, ticker, chain, live_chart, buyback, chat_id")
+      .select("id, name, ticker, chain, live_chart, buyback, chat_id, owner_id")
       .in("id", строки.map((с) => с.token_id));
+
+    /* Живой график переехал со страницы запуска в настройки уведомлений:
+       это не обещание покупателю, а то, как бот ведёт себя в чате. У
+       токенов, запущенных раньше, флаг стоит в самой записи токена —
+       поэтому смотрим и туда, и в настройку владельца. */
+    const владельцы = [...new Set((свойства || []).map((т) => т.owner_id).filter(Boolean))];
+    let графикУВладельца = new Set();
+    if (владельцы.length) {
+      const { data: профили } = await admin
+        .from("profiles")
+        .select("id, notify_live_chart")
+        .in("id", владельцы);
+      графикУВладельца = new Set((профили || []).filter((п) => п.notify_live_chart === true).map((п) => п.id));
+    }
+
     for (const токен of свойства || []) {
       const кеш = строки.find((с) => с.token_id === токен.id);
       if (!кеш) continue;
 
-      if (токен.live_chart) {
+      if (токен.live_chart || графикУВладельца.has(токен.owner_id)) {
         const вышло = await обновитьЖивойГрафик(admin, { токен, кеш }).catch(() => false);
         if (вышло) графиков += 1;
       }

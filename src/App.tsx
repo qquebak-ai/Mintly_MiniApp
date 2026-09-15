@@ -190,13 +190,9 @@ const STR = {
     solLaunchClosedBody: "Программа токена в этой сети ещё не развёрнута. Запусти в TON — или подожди, пока Solana откроется.",
     solLaunchSwitchTon: "Запустить в TON",
     draftFromChat: "Монета из сообщения — проверь и запускай",
-    templatesTitle: "С чего начать",
-    templateApplied: "Заготовка подставлена — правь как хочешь",
     mechTitle: "Механики запуска",
     mechFairStart: "Честный старт",
     mechFairStartBody: "Первую минуту токен открыт только людям из Telegram — снайперы-боты не успевают.",
-    mechBuyback: "Обратный выкуп",
-    mechBuybackBody: "Часть комиссии копится и выкупает токен на просадках, а не уходит из него.",
     mechLiveChart: "Живой график в чате",
     mechLiveChartBody: "Бот держит в чате одно сообщение и сам обновляет в нём свечу и цену.",
     lockTitle: "Защита от слива",
@@ -771,13 +767,9 @@ const STR = {
     solLaunchClosedBody: "The token program is not deployed on this network yet. Launch on TON — or wait until Solana opens.",
     solLaunchSwitchTon: "Launch on TON",
     draftFromChat: "Coin from the message — check and launch",
-    templatesTitle: "Start from",
-    templateApplied: "Template applied — edit as you like",
     mechTitle: "Launch mechanics",
     mechFairStart: "Fair start",
     mechFairStartBody: "For the first minute the curve is open to Telegram people only — sniper bots miss it.",
-    mechBuyback: "Buyback",
-    mechBuybackBody: "Part of the fee accumulates and buys the token back on dips instead of leaving the curve.",
     mechLiveChart: "Live chart in chat",
     mechLiveChartBody: "The bot keeps one message in the chat and updates the candle and price inside it.",
     lockTitle: "Rug protection",
@@ -17958,27 +17950,6 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
   );
 }
 
-/* Заготовки запуска — «шаблоны трендов».
- *
- * Пустая форма — самая дорогая часть запуска: человек открывает её,
- * упирается в поле «название» и уходит. Заготовка заполняет имя, тикер
- * и описание за одно нажатие, дальше правится как обычный текст.
- *
- * Список живёт в таблице launch_templates, а встроенный набор ниже —
- * запасной: без сети и до первой миграции форма всё равно должна
- * предлагать, с чего начать.
- */
-const ЗАГОТОВКИ_ЗАПУСКА = [
-  { знак: "🐸", name: "Pepe Revival", ticker: "PEPER", desc: "Классика мемов вернулась. Ни обещаний, ни дорожной карты — только лягушка и токен." },
-  { знак: "🚀", name: "To The Moon", ticker: "MOON", desc: "Токен, у которой одна цель. Комиссия одна для всех, условия зашиты в контракт." },
-  { знак: "🐕", name: "Doge Telegram", ticker: "DOGETG", desc: "Мемкоин для тех, кто живёт в переписке. Запуск — из чата, торговля — там же." },
-  { знак: "🧊", name: "Diamond Hands", ticker: "DIAMOND", desc: "Для тех, кто не продаёт. Держи и смотри, как токен собирается до биржи." },
-  { знак: "🔥", name: "Burn It All", ticker: "BURN", desc: "Половина выпуска сгорает на старте. Остальное решает рынок." },
-  { знак: "🐈", name: "Cat Season", ticker: "CATS", desc: "Сезон котов открыт. Ни утилити, ни белой бумаги — только хвост и усы." },
-  { знак: "🍌", name: "Banana Pump", ticker: "NANA", desc: "Жёлтая, токен и очень скользкая. Как раз то, что нужно этому рынку." },
-  { знак: "👽", name: "Alien Cash", ticker: "ALIEN", desc: "Деньги не с этой планеты. Токен торгует с первой секунды." },
-];
-
 /* Механики запуска.
  *
  * Их включает создатель — и они видны покупателю на странице токена.
@@ -17992,18 +17963,6 @@ const МЕХАНИКИ_ЗАПУСКА = [
     tKey: "mechFairStart",
     описание: "mechFairStartBody",
   },
-  {
-    key: "buyback",
-    icon: RefreshCw,
-    tKey: "mechBuyback",
-    описание: "mechBuybackBody",
-  },
-  {
-    key: "live_chart",
-    icon: TrendingUp,
-    tKey: "mechLiveChart",
-    описание: "mechLiveChartBody",
-  },
 ];
 
 /* Замок доли создателя. Не время, а вехи: доля открывается по мере
@@ -18014,55 +17973,6 @@ const ЗАМКИ_СОЗДАТЕЛЯ = [
   { key: "milestones", tKey: "lockMilestones", описание: "lockMilestonesBody" },
   { key: "graduation", tKey: "lockGraduation", описание: "lockGraduationBody" },
 ];
-
-function ЗаготовкиЗапуска({ onВыбрать }) {
-  const [набор, setНабор] = useState(ЗАГОТОВКИ_ЗАПУСКА);
-
-  // Живой список — из базы, если он там есть. Не доехал — остаётся
-  // встроенный: форма не должна ждать сеть, чтобы что-то предложить.
-  useEffect(() => {
-    let брошено = false;
-    supabase
-      .from("launch_templates")
-      .select("emoji, name, ticker, description")
-      .order("weight", { ascending: false })
-      .limit(12)
-      .then(({ data, error }) => {
-        if (брошено || error || !data || !data.length) return;
-        setНабор(data.map((р) => ({ знак: р.emoji || "✨", name: р.name, ticker: р.ticker, desc: р.description || "" })));
-      });
-    return () => { брошено = true; };
-  }, []);
-
-  return (
-    <div>
-      <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, marginBottom: 8 }}>
-        {t("templatesTitle")}
-      </div>
-      <div className="no-scrollbar flex" style={{ gap: 8, overflowX: "auto", paddingBottom: 2, touchAction: "pan-x" }}>
-        {набор.map((з) => (
-          <button
-            key={з.ticker}
-            onClick={() => { haptic("light"); onВыбрать(з); }}
-            className="fx-tap flex-shrink-0 text-left"
-            style={{
-              width: 168, padding: "12px 13px", borderRadius: 18,
-              background: T.surface, border: "none",
-            }}
-          >
-            <span style={{ fontSize: 20 }}>{з.знак}</span>
-            <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700, marginTop: 6 }}>
-              {з.name}
-            </span>
-            <span style={{ display: "block", fontFamily: monoFont, color: T.muted, fontSize: 12, marginTop: 2 }}>
-              ${String(з.ticker).toUpperCase()}
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function ПереключательМеханики({ item, включено, onToggle }) {
   return (
@@ -18185,7 +18095,10 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   /* Что включено при запуске. Хранится вместе с токеном и показывается
      покупателю: механика ценна не тем, что она есть, а тем, что о ней
      знают до покупки. */
-  const [механики, setМеханики] = useState({ fair_start: true, buyback: false, live_chart: true });
+  /* Из механик осталась одна: обратный выкуп и живой график со страницы
+     запуска убраны — график стал настройкой чата, а не обещанием
+     токена. У прежних токенов их значки остаются на месте. */
+  const [механики, setМеханики] = useState({ fair_start: true });
   const [замок, setЗамок] = useState("milestones");
   const [logoCropFile, setLogoCropFile] = useState(null);
   const logoInputRef = useRef(null);
@@ -18297,7 +18210,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
 
   function resetForm() {
     setForm({ name: "", ticker: "", buyAmount: "", desc: "", tg: "", x: "", site: "" });
-    setМеханики({ fair_start: true, buyback: false, live_chart: true });
+    setМеханики({ fair_start: true });
     setЗамок("milestones");
     setCategory(null);
     setLogoUrl(null);
@@ -18363,15 +18276,6 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           </button>
         </div>
       )}
-
-      {/* Заготовки — первым делом: пустое поле «название» отпугивает
-          сильнее, чем длинная форма. */}
-      <ЗаготовкиЗапуска
-        onВыбрать={(з) => {
-          setForm((f) => ({ ...f, name: з.name, ticker: String(з.ticker).toUpperCase(), desc: з.desc || f.desc }));
-          showToast(t("templateApplied"));
-        }}
-      />
 
       <div>
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("logoLabel")}</span>
@@ -19428,7 +19332,7 @@ function SettingsPanel({
   profile, showToast,
   onTogglePin, onChangePin, insetBottom = 0, insetTop = 0,
   accountCreated, onDeleteAccount, userId, inviteCount = 0, onSupportRead,
-  notifyPrefs = { buys: true, minTon: 0.05, progress: true }, onUpdateNotify,
+  notifyPrefs = { buys: true, minTon: 0.05, progress: true, liveChart: false }, onUpdateNotify,
 }) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -19597,6 +19501,12 @@ function SettingsPanel({
             </SettingsRow>
             <SettingsRow label={t("notifyProgress")} sub={t("notifyProgressSub")}>
               <ToggleSwitch on={notifyPrefs.progress} onChange={(v) => onUpdateNotify && onUpdateNotify({ progress: v })} />
+            </SettingsRow>
+            {/* Живой график переехал сюда со страницы запуска: это не
+                обещание покупателю, а то, как бот ведёт себя в чате, —
+                и решает это владелец чата, а не токен. */}
+            <SettingsRow label={t("mechLiveChart")} sub={t("mechLiveChartBody")}>
+              <ToggleSwitch on={notifyPrefs.liveChart} onChange={(v) => onUpdateNotify && onUpdateNotify({ liveChart: v })} />
             </SettingsRow>
           </div>
 
@@ -21473,7 +21383,7 @@ const FEE_PERCENT = 0.01; // 1% комиссии
   // зашёл и завёл аккаунт, а не по кликам.
   // Что присылать в Telegram и с какой суммы. Живёт в профиле: сообщения
   // шлёт сервер, и на устройстве эти настройки ему недоступны.
-  const [notifyPrefs, setNotifyPrefs] = useState({ buys: true, minTon: 0.05, progress: true });
+  const [notifyPrefs, setNotifyPrefs] = useState({ buys: true, minTon: 0.05, progress: true, liveChart: false });
   async function updateNotifyPrefs(patch) {
     const next = { ...notifyPrefs, ...patch };
     setNotifyPrefs(next);
@@ -21485,6 +21395,16 @@ const FEE_PERCENT = 0.01; // 1% комиссии
     if (error) {
       console.warn("[mintly] notify prefs not saved:", error.message);
       showToast(t("saveFailed"));
+    }
+    /* Живой график сохраняется отдельно и молча: колонка появилась
+       позже остальных, и пока миграция не применена, её отсутствие не
+       должно ронять сохранение всех прочих настроек. */
+    if ("liveChart" in patch) {
+      const { error: беда } = await supabase
+        .from("profiles")
+        .update({ notify_live_chart: next.liveChart })
+        .eq("id", userId);
+      if (беда) console.warn("[mintly] live chart pref not saved:", беда.message);
     }
   }
 
@@ -21579,6 +21499,7 @@ const FEE_PERCENT = 0.01; // 1% комиссии
     setNotifyPrefs({
       buys: prof.notify_buys !== false,
       progress: prof.notify_progress !== false,
+      liveChart: prof.notify_live_chart === true,
       minTon: Number(prof.notify_min_ton) >= 0 ? Number(prof.notify_min_ton) : 0.05,
     });
     setAccountCreated(true);
