@@ -12698,7 +12698,7 @@ function СценаЗапуска() {
         }}
       />
       <img
-        src="/banner-rocket.webp" alt=""
+        src="/banner-rocket2.webp" alt=""
         style={{
           position: "absolute", right: "2%", bottom: "-6%", width: "52%",
           /* Ракета неподвижна: движение кадру задают звёзды, идущие ей
