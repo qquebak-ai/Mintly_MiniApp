@@ -1760,6 +1760,19 @@ function GlobalStyle() {
          так они идут одной связкой. Качается сама картинка внутри
          обёртки, снос лежит на обёртке — иначе анимации спорили бы за
          transform. */
+      /* Выхлоп: короткий рывок вдоль оси с подсветкой — огонь тянется и
+         опадает по нескольку раз в секунду. Точка опоры у сопла, иначе
+         вместе с пламенем ездит и сама струя. */
+      @keyframes огоньБьёт {
+        from { transform: scale(0.94, 0.9); filter: brightness(0.92); }
+        to   { transform: scale(1.04, 1.1); filter: brightness(1.12); }
+      }
+      /* Ореол вокруг струи дышит медленнее самой струи: вместе они дают
+         ощущение живого пламени, а не мигающей картинки. */
+      @keyframes огоньОреол {
+        from { transform: scale(0.98, 0.94); opacity: 0.4; }
+        to   { transform: scale(1.1, 1.16); opacity: 0.7; }
+      }
       @keyframes звездаКачается {
         0%, 100% { transform: translateY(3px); }
         50%      { transform: translateY(-6px); }
@@ -12643,6 +12656,37 @@ function СценаЗапуска() {
           animation: "планетаКрутится 120s linear infinite",
         }}
       />
+      {/* Ракета лежит двумя слоями: корпус неподвижен, а выхлоп живёт
+          сам — тянется и опадает, и под ним дышит ореол. Разрез прошёл
+          по линии поперёк оси, у самого сопла, поэтому слои сходятся
+          без шва; обе половины сохранены в полный кадр, так что
+          совмещаются одним и тем же положением. */}
+      <span style={{ position: "absolute", right: "2%", bottom: "-6%", width: "52%", aspectRatio: "720 / 576" }}>
+        <img
+          src="/banner-rocket-flame.webp" alt=""
+          style={{
+            position: "absolute", inset: 0, width: "100%",
+            transformOrigin: "44% 66%",
+            filter: "blur(6px)", opacity: 0.55,
+            animation: "огоньОреол 1.6s ease-in-out infinite alternate",
+          }}
+        />
+        <img
+          src="/banner-rocket-flame.webp" alt=""
+          style={{
+            position: "absolute", inset: 0, width: "100%",
+            transformOrigin: "44% 66%",
+            animation: "огоньБьёт 0.42s ease-in-out infinite alternate",
+          }}
+        />
+        <img
+          src="/banner-rocket-body.webp" alt=""
+          style={{
+            position: "absolute", inset: 0, width: "100%",
+            filter: `drop-shadow(0 6px 26px ${hexA(ФИОЛЕТ, 0.55)})`,
+          }}
+        />
+      </span>
       {[
         /* Дорожки идут по всей ширине, а фазы разведены по кругу: иначе
            звёзды собираются кучей и полкадра пустует. Крупная — пять
