@@ -14442,7 +14442,7 @@ function ПолотноПерелив() {
       // шёлка, а складки должны быть крупными.
       float fbm(vec2 p){
         float s = 0.0, w = 0.5;
-        for(int i=0;i<4;i++){ s += w*noise(p); p *= 2.02; w *= 0.5; }
+        for(int i=0;i<4;i++){ s += w*noise(p); p *= 2.06; w *= 0.5; }
         return s;
       }
       // Высота: шум, свёрнутый сам с собой, — так пятна вытягиваются в
@@ -14479,7 +14479,10 @@ function ПолотноПерелив() {
         col += spc*0.9;
         // Верх у полотна цветной, к низу оно уходит в чёрный: там список.
         float fade = smoothstep(0.15, 0.95, uv.y);
-        gl_FragColor = vec4(col*fade, fade);
+        // Дизер: без него плавные переходы ложатся полосами — восемь
+        // бит на канал для такого растяжения цвета слишком грубы.
+        float dith = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)))*43758.5453) - 0.5)/255.0;
+        gl_FragColor = vec4(col*fade + dith, fade);
       }`;
     const собрать = (вид, текст) => {
       const ш = gl.createShader(вид);
@@ -14503,12 +14506,13 @@ function ПолотноПерелив() {
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     const uЭкран = gl.getUniformLocation(программа, "size");
     const uВремя = gl.getUniformLocation(программа, "time");
-    /* Считаем в половинном разрешении: перелив мягкий, резкости в нём
-       нет, зато кадр обходится вчетверо дешевле — на слабом телефоне
-       это разница между плавным ходом и рывками. */
+    /* Считаем в разрешении экрана (с потолком в две точки на точку):
+       половинное давало лесенку на переходах — растянутый вдвое кадр
+       видно сразу, никакой мягкостью перелива это не прикрыть. */
+    const плотность = Math.min(typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1, 2);
     const подогнать = () => {
-      const ш = Math.max(1, Math.round(э.clientWidth * 0.5));
-      const в2 = Math.max(1, Math.round(э.clientHeight * 0.5));
+      const ш = Math.max(1, Math.round(э.clientWidth * плотность));
+      const в2 = Math.max(1, Math.round(э.clientHeight * плотность));
       if (э.width !== ш || э.height !== в2) { э.width = ш; э.height = в2; }
       gl.viewport(0, 0, э.width, э.height);
       gl.uniform2f(uЭкран, э.width, э.height);
