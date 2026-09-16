@@ -13050,52 +13050,72 @@ function СценаКошелька() {
   );
 }
 
-/* Сцена четвёртого баннера — карбон и лавка.
+/* Сцена четвёртого баннера — ночная витрина.
  *
- * Задник кладётся как есть, без растяжений и подкраски: это готовая
- * ткань, и любая правка её портит. Лавка стоит неподвижно — своё
- * свечение у неё нарисовано, добавлять второе незачем, — а вокруг
- * парят звёзды, каждая своим кругом и со своей задержкой.
+ * Карбон отсюда ушёл на карту кошелька, и повторять его тут незачем.
+ * Вместо него своё: фиолетовое небо, пол в перспективе, который
+ * медленно уезжает под лавку, и мягкий свет из-под неё. Лавка стоит
+ * неподвижно — своё свечение у неё нарисовано, — а вокруг парят
+ * звёзды.
  */
 function СценаМагазина() {
+  const СИРЕНЬ = "#C08BFF", ФИОЛЕТ = "#7C3AED";
   const звёзды = [
     { left: "58%", top: "8%", w: "7%", d: 6.4, з: -0.5 },
     { left: "92%", top: "18%", w: "5%", d: 7.2, з: -2.4 },
-    { left: "66%", top: "76%", w: "6%", d: 6.8, з: -4.1 },
-    { left: "88%", top: "70%", w: "4.5%", d: 7.6, з: -1.3 },
+    { left: "66%", top: "72%", w: "6%", d: 6.8, з: -4.1 },
+    { left: "88%", top: "66%", w: "4.5%", d: 7.6, з: -1.3 },
     { left: "76%", top: "2%", w: "4%", d: 6.6, з: -3.2 },
-    { left: "52%", top: "48%", w: "4%", d: 7.4, з: -5.4 },
+    { left: "52%", top: "44%", w: "4%", d: 7.4, з: -5.4 },
   ];
   return (
     <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-      <img
-        src="/banner-shop-bg-v2.webp" alt=""
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-      />
+      <span style={{
+        position: "absolute", inset: 0,
+        background: `radial-gradient(130% 120% at 74% 8%, ${hexA(ФИОЛЕТ, 0.42)} 0%, ${hexA("#2A1150", 0.34)} 36%, #0E0A1A 72%, #07060C 100%)`,
+      }} />
+
+      {/* Пол в перспективе: линии уходят к горизонту и медленно едут на
+          зрителя — лавка от этого стоит на плоскости, а не висит. */}
+      <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "58%", perspective: 150, perspectiveOrigin: "50% 0%" }}>
+        <span style={{
+          position: "absolute", left: "-50%", right: "-50%", top: 0, height: "220%",
+          backgroundImage: `linear-gradient(${hexA(СИРЕНЬ, 0.22)} 1px, transparent 1px), linear-gradient(90deg, ${hexA(СИРЕНЬ, 0.16)} 1px, transparent 1px)`,
+          backgroundSize: "40px 40px",
+          transform: "rotateX(72deg)", transformOrigin: "50% 0%",
+          animation: "полБаннера 9s linear infinite",
+          WebkitMaskImage: "linear-gradient(to bottom, #000 0%, transparent 72%)",
+          maskImage: "linear-gradient(to bottom, #000 0%, transparent 72%)",
+        }} />
+      </span>
+
+      {/* Свет из-под лавки ложится на пол пятном, а не ореолом вокруг
+          неё: так он читается как отражение, а не как подсветка. */}
+      <span style={{
+        position: "absolute", right: "8%", bottom: "2%", width: "44%", height: "26%", borderRadius: "50%",
+        background: `radial-gradient(circle, ${hexA(ФИОЛЕТ, 0.55)} 0%, ${hexA(ФИОЛЕТ, 0)} 72%)`,
+        filter: "blur(2px)",
+      }} />
+
       {звёзды.map((з, i) => (
         <img
           key={i} src="/banner-star.webp" alt=""
           style={{
             position: "absolute", left: з.left, top: з.top, width: з.w,
-            // Тот же ход, что был у лавки: подъём с возвратом.
+            // Подъём с возвратом — тот же ход, что у звёзд на первом баннере.
             animation: `лавкаПарит ${з.d}s ease-in-out ${з.з}s infinite`,
           }}
         />
       ))}
+
       <img
         src="/banner-shop-icon-v2.webp" alt=""
         style={{ position: "absolute", right: "6%", bottom: "6%", height: "84%", width: "auto" }}
       />
+
       <span style={{
-        position: "absolute", left: 0, top: 0, bottom: 0, width: "62%",
-        background: "linear-gradient(90deg, rgba(6,6,10,0.9) 0%, rgba(6,6,10,0.62) 56%, rgba(6,6,10,0) 100%)",
-      }} />
-      {/* Кромка по краю. Карточки у всех баннеров одного размера, но
-          чёрный карбон сливается с фоном страницы, и эта выглядит уже
-          соседних; светлая линия возвращает ей границу. */}
-      <span style={{
-        position: "absolute", inset: 0, borderRadius: 20, pointerEvents: "none",
-        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.10)",
+        position: "absolute", left: 0, top: 0, bottom: 0, width: "60%",
+        background: "linear-gradient(90deg, rgba(7,6,12,0.88) 0%, rgba(7,6,12,0.55) 58%, rgba(7,6,12,0) 100%)",
       }} />
     </span>
   );
