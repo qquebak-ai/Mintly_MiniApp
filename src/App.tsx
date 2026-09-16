@@ -12712,7 +12712,11 @@ function СценаЗапуска() {
       <img
         src="/banner-rocket5.webp" alt=""
         style={{
-          position: "absolute", right: "8%", bottom: "-6%", width: "52%",
+          position: "absolute", right: "10%", bottom: "-10%", width: "60%",
+          /* Разворот к правому верхнему углу: сама картинка нарисована
+             под сорок пять градусов, а угол баннера лежит примерно под
+             двадцатью — без поправки ракета целилась в потолок. */
+          transform: "rotate(10deg)", transformOrigin: "50% 60%",
           /* Ракета неподвижна: движение кадру задают звёзды, идущие ей
              навстречу. */
           filter: `drop-shadow(0 6px 26px ${hexA(ФИОЛЕТ, 0.55)})`,
