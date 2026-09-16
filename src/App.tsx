@@ -13057,7 +13057,7 @@ function СценаМагазина() {
   return (
     <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
       <img
-        src="/banner-shop-bg.webp" alt=""
+        src="/banner-shop-bg-v2.webp" alt=""
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
       />
       {звёзды.map((з, i) => (
