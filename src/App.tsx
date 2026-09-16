@@ -15110,12 +15110,15 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     /* Поля держит не корень раздела, а каждый блок внутри: тогда нижняя
        страница просто занимает всю ширину и упирается в край сама, без
        отрицательных отступов и пересчёта ширины окна. */
-    <div className="flex flex-col" style={{ paddingTop: 4 }}>
+    <div className="flex flex-col" style={{ paddingTop: 8 }}>
       {/* Адреса в шапке нет: за ним ходят на «Получить», где он показан
           целиком и кодом, а обрубок в углу только занимал место рядом с
-          заголовком. */}
+          заголовком.
+          Заголовок набран ровно так же, как в мемпаде: тот же кегль,
+          начертание и отступ сверху — иначе при переходе между
+          разделами название прыгает. */}
       <div style={{ marginBottom: 14, padding: "0 16px" }}>
-        <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
+        <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, margin: 0, letterSpacing: "-0.01em" }}>
           {t("navWallet")}
         </h1>
       </div>
