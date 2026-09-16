@@ -2348,11 +2348,22 @@ function GlobalStyle() {
          светлеет, будто продавилось, и возвращается с пружиной. */
       .fx-glass {
         position: relative;
-        background: linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.06) 48%, rgba(255,255,255,0.03) 100%);
-        backdrop-filter: blur(20px) saturate(1.7);
-        -webkit-backdrop-filter: blur(20px) saturate(1.7);
-        border: 1px solid rgba(255,255,255,0.16);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.25), 0 8px 22px rgba(0,0,0,0.35);
+        /* Заливка светлее, чем кажется нужным: на чёрном фоне шесть
+           процентов белого дают почти чёрное — кнопки пропадали. В
+           панели iOS стекло держится примерно на четверти белого, и
+           только тогда оно читается как матовый кругляш поверх фона. */
+        background: linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.18) 55%, rgba(255,255,255,0.13) 100%);
+        /* Подложку не только размываем, но и подсвечиваем: над тёмным
+           размывать нечего, а brightness поднимает то, что под стеклом,
+           и даёт ту самую глубину. */
+        backdrop-filter: blur(24px) saturate(1.8) brightness(1.5);
+        -webkit-backdrop-filter: blur(24px) saturate(1.8) brightness(1.5);
+        border: 1px solid rgba(255,255,255,0.24);
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,0.5),
+          inset 0 -10px 18px rgba(255,255,255,0.06),
+          inset 0 -1px 0 rgba(0,0,0,0.3),
+          0 6px 18px rgba(0,0,0,0.4);
         transition: transform ${SPRING}, background 220ms ease, box-shadow 220ms ease;
       }
       /* Блик по верхней кромке — то, что отличает стекло от плёнки:
@@ -2366,8 +2377,12 @@ function GlobalStyle() {
       }
       .fx-glass:active {
         transform: scale(0.94);
-        background: linear-gradient(180deg, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.12) 48%, rgba(255,255,255,0.06) 100%);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.4);
+        background: linear-gradient(180deg, rgba(255,255,255,0.44) 0%, rgba(255,255,255,0.3) 55%, rgba(255,255,255,0.22) 100%);
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,0.7),
+          inset 0 -10px 18px rgba(255,255,255,0.1),
+          inset 0 -1px 0 rgba(0,0,0,0.3),
+          0 3px 10px rgba(0,0,0,0.45);
         transition: transform ${PRESS}, background 90ms ease, box-shadow 90ms ease;
       }
       /* Главная кнопка — то же стекло, но подкрашенное фирменным
@@ -2387,7 +2402,7 @@ function GlobalStyle() {
       /* Без прозрачности у экрана нет и размытия: тогда стекло
          подменяется плотной заливкой, иначе кнопка пропадает. */
       @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-        .fx-glass { background: rgba(255,255,255,0.10); }
+        .fx-glass { background: rgba(255,255,255,0.22); }
       }
       /* Нажатие внутри виджета не должно вдавливать виджет целиком.
          Браузер считает нажатым не только то, на что нажали, но и всё,
