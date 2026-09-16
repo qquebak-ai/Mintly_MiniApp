@@ -1832,18 +1832,11 @@ function GlobalStyle() {
         0%, 100% { transform: translate3d(0, 0, 0) rotate(-1.2deg); }
         50%      { transform: translate3d(-4px, -5px, 0) rotate(1.2deg); }
       }
-      /* Кольца витрины крутятся: у круга вращение видно только по
-         неровностям кромки, поэтому оно и читается как лёгкое живое
-         движение, а не как карусель. */
-      @keyframes кольцоВитрины {
-        from { transform: rotate(0deg); }
-        to   { transform: rotate(360deg); }
-      }
-      /* Блёстки всплывают и гаснут на месте: товар на витрине не мчится
-         мимо, он лежит и поблёскивает. */
-      @keyframes блёсткаВсплывает {
-        0%, 100% { opacity: 0.25; transform: translate3d(0, 4px, 0) scale(0.9); }
-        50%      { opacity: 1; transform: translate3d(0, -5px, 0) scale(1.08); }
+      /* Свет под лавкой дышит: сам снимок неподвижен, а кадр от этого
+         перестаёт выглядеть картинкой в рамке. */
+      @keyframes витринаДышит {
+        0%, 100% { opacity: 0.55; transform: scale(0.96); }
+        50%      { opacity: 1; transform: scale(1.06); }
       }
       /* Герой на баннере дышит: чуть поднимается и опускается. */
       @keyframes геройДышит {
@@ -13044,78 +13037,28 @@ function СценаКошелька() {
   );
 }
 
-/* Сцена четвёртого баннера — витрина магазина.
+/* Сцена четвёртого баннера — готовая картинка.
  *
- * В центре знак площадки: лист в кольце, вокруг которого медленно
- * ходит светлая дуга — так в магазине показывают предмет, который
- * можно взять. За ним второе кольцо пошире и блёстки: это про облик, а
- * не про торговлю, поэтому ни свечей, ни графиков. */
+ * Карбон и лавка нарисованы заранее, поэтому здесь остаётся положить
+ * снимок целиком и притемнить левую половину: заголовок с кнопкой
+ * лежат на ней, а на голом карбоне белые буквы теряются. Свечение под
+ * лавкой чуть дышит — оно и оживляет кадр, двигать сам снимок незачем.
+ */
 function СценаМагазина() {
-  const СИРЕНЬ = "#C08BFF", ФИОЛЕТ = "#8E2DE2";
   return (
     <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+      <img
+        src="/banner-shop.webp" alt=""
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "right center" }}
+      />
       <span style={{
-        position: "absolute", inset: 0,
-        background: `radial-gradient(120% 130% at 80% 16%, ${hexA(СИРЕНЬ, 0.34)} 0%, ${hexA(ФИОЛЕТ, 0.26)} 38%, #0D0A18 74%, #07060C 100%)`,
-      }} />
-
-      {/* Два кольца витрины: дальнее шире и бледнее, ближнее держит
-          знак. Вращаются в разные стороны — от этого между ними видна
-          глубина. */}
-      <span style={{
-        position: "absolute", right: "8%", top: "50%", width: 128, height: 128, marginTop: -64,
-        borderRadius: "50%", border: `1px solid ${hexA(СИРЕНЬ, 0.28)}`,
-        animation: "кольцоВитрины 26s linear infinite",
+        position: "absolute", right: "6%", bottom: "-16%", width: "46%", aspectRatio: "2 / 1", borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(124,58,237,0.5) 0%, rgba(124,58,237,0) 70%)",
+        animation: "витринаДышит 5.2s ease-in-out infinite",
       }} />
       <span style={{
-        position: "absolute", right: "14%", top: "50%", width: 92, height: 92, marginTop: -46,
-        borderRadius: "50%",
-        background: `radial-gradient(circle, ${hexA(ФИОЛЕТ, 0.4)} 0%, ${hexA(ФИОЛЕТ, 0)} 70%)`,
-        border: `1px solid ${hexA(СИРЕНЬ, 0.45)}`,
-        animation: "кольцоВитрины 18s linear infinite reverse",
-      }} />
-
-      {/* Знак площадки — тот же лист, что и в венках достижений. */}
-      <svg
-        viewBox="0 0 104 104" width="86" height="86" aria-hidden
-        style={{ position: "absolute", right: "18%", top: "50%", marginTop: -46, filter: `drop-shadow(0 8px 22px ${hexA(ФИОЛЕТ, 0.65)})` }}
-      >
-        <defs>
-          <linearGradient id="бнЛист" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#F2E6FF" />
-            <stop offset="0.45" stopColor={СИРЕНЬ} />
-            <stop offset="1" stopColor="#6A1FB0" />
-          </linearGradient>
-        </defs>
-        <g style={{ transformOrigin: "52px 88px", animation: "листКачается 5.2s ease-in-out infinite" }}>
-          <path d="M52 14C28 32 26 62 52 84c26-22 24-52 0-70z" fill="url(#бнЛист)" />
-          <path d="M52 22v62" stroke="#1A0B2E" strokeWidth="3" opacity="0.45" strokeLinecap="round" />
-          <path d="M52 40L34 32M52 40l18-8M52 58L32 48M52 58l20-10" stroke="#1A0B2E" strokeWidth="2.4" opacity="0.4" strokeLinecap="round" />
-          <path d="M52 84v10" stroke={СИРЕНЬ} strokeWidth="3" opacity="0.75" strokeLinecap="round" />
-        </g>
-      </svg>
-
-      {/* Блёстки: те же звёзды, что на первом баннере, но они не летят, а
-          всплывают — товар на витрине не мчится мимо. */}
-      {[
-        { left: "58%", top: "18%", w: "6%", d: 5.2, з: -0.4 },
-        { left: "88%", top: "26%", w: "4.5%", d: 6.4, з: -2.1 },
-        { left: "66%", top: "72%", w: "5%", d: 5.8, з: -3.6 },
-        { left: "82%", top: "82%", w: "3.6%", d: 6.8, з: -1.2 },
-        { left: "50%", top: "52%", w: "3.4%", d: 6, з: -4.4 },
-      ].map((б, i) => (
-        <img
-          key={i} src="/banner-star.webp" alt=""
-          style={{
-            position: "absolute", left: б.left, top: б.top, width: б.w,
-            animation: `блёсткаВсплывает ${б.d}s ease-in-out ${б.з}s infinite`,
-          }}
-        />
-      ))}
-
-      <span style={{
-        position: "absolute", left: 0, top: 0, bottom: 0, width: "58%",
-        background: "linear-gradient(90deg, rgba(7,6,12,0.86) 0%, rgba(7,6,12,0.5) 58%, rgba(7,6,12,0) 100%)",
+        position: "absolute", left: 0, top: 0, bottom: 0, width: "64%",
+        background: "linear-gradient(90deg, rgba(6,6,10,0.88) 0%, rgba(6,6,10,0.6) 56%, rgba(6,6,10,0) 100%)",
       }} />
     </span>
   );
