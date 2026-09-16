@@ -12816,13 +12816,37 @@ function СценаТорговли() {
       {/* Сам герой. Держится правого края и слегка покачивается — как
           будто дышит над кружкой. */}
       <img
-        src="/banner-pepe-v2.webp" alt=""
+        src="/banner-pepe-v3.webp" alt=""
         style={{
           position: "absolute", right: "-4%", bottom: "-14%", width: "56%",
-          filter: `drop-shadow(0 8px 30px ${hexA(ФИОЛЕТ, 0.6)})`,
+          /* Тёмный ореол вокруг героя — часть самой иллюстрации, и по
+             яркости он неотличим от капюшона: любая вырезка либо
+             оставляет ауру, либо делает капюшон дырявым. Поэтому края
+             картинки растворяем маской — фигура словно выходит из
+             темноты, и ореолу негде читаться. */
+          WebkitMaskImage: "radial-gradient(75% 68% at 52% 44%, #000 52%, rgba(0,0,0,0.65) 72%, transparent 88%)",
+          maskImage: "radial-gradient(75% 68% at 52% 44%, #000 52%, rgba(0,0,0,0.65) 72%, transparent 88%)",
+          filter: `drop-shadow(0 8px 30px ${hexA(ФИОЛЕТ, 0.45)})`,
           animation: "геройДышит 6s ease-in-out infinite",
         }}
       />
+
+      {/* Звёзды идут тем же курсом, что и на первом баннере: у площадки
+          одно небо на все карточки. */}
+      {[
+        /* Правее шестидесяти процентов звёзд нет: там герой, и они
+           садились ему прямо на очки. */
+        { left: "9%", top: "26%", w: "4.6%", d: 9.2, з: -1.4 },
+        { left: "20%", top: "26%", w: "3.2%", d: 8.1, з: -5.2 },
+        { left: "31%", top: "26%", w: "4%", d: 9.8, з: -3.1 },
+        { left: "42%", top: "26%", w: "3%", d: 8.6, з: -7.2 },
+        { left: "52%", top: "26%", w: "4.2%", d: 9.4, з: -2.6 },
+        { left: "60%", top: "26%", w: "3.2%", d: 8.3, з: -6.3 },
+      ].map((з, i) => (
+        <span key={i} style={{ position: "absolute", left: з.left, top: з.top, width: з.w, animation: `звёздыЛетят ${з.d}s linear ${з.з}s infinite` }}>
+          <img src="/banner-star.webp" alt="" style={{ width: "100%", display: "block", animation: `звездаКачается ${2.6 + i * 0.4}s ease-in-out infinite` }} />
+        </span>
+      ))}
 
       <span style={{
         position: "absolute", left: 0, top: 0, bottom: 0, width: "64%",
