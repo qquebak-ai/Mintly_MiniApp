@@ -12745,14 +12745,17 @@ function СценаЗапуска() {
       <img
         src="/banner-planet.webp" alt=""
         style={{
-          position: "absolute", right: "-13%", top: "-58%", width: "46%",
+          position: "absolute", right: "-13%", top: "-58%", width: "46%", zIndex: 0,
           animation: "планетаКрутится 120s linear infinite",
         }}
       />
       <img
         src="/banner-rocket5.webp" alt=""
         style={{
-          position: "absolute", right: "10%", bottom: "-10%", width: "60%",
+          /* Порядок задан числом, а не местом в разметке: у планеты своя
+             композиторная плоскость из-за вращения, и на прокрутке
+             браузер укладывал её поверх ракеты. */
+          position: "absolute", right: "10%", bottom: "-10%", width: "60%", zIndex: 2,
           /* Ракета неподвижна: движение кадру задают звёзды, идущие ей
              навстречу. */
           filter: `drop-shadow(0 6px 26px ${hexA(ФИОЛЕТ, 0.55)})`,
@@ -12779,7 +12782,7 @@ function СценаЗапуска() {
         <span
           key={i}
           style={{
-            position: "absolute", left: з.left, top: з.top, width: з.w,
+            position: "absolute", left: з.left, top: з.top, width: з.w, zIndex: 1,
             /* Две анимации на одной звезде спорили бы за transform,
                поэтому снос лежит на обёртке, а дыхание — на самой
                картинке внутри. */
