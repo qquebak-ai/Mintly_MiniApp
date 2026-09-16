@@ -12138,7 +12138,7 @@ function СтрокаНастройки({ item, значение, метка, п
   );
 }
 
-function ЭкранНастроек({ открыт, onClose, profile, accountCreated, supportUnread = 0, onПункт, onПрофиль, insetTop = 0, insetBottom = 0 }) {
+function ЭкранНастроек({ открыт, onClose, profile, accountCreated, supportUnread = 0, onПункт, onПрофиль, onВыход, insetTop = 0, insetBottom = 0 }) {
   const [запрос, setЗапрос] = useState("");
 
   useEffect(() => { if (!открыт) setЗапрос(""); }, [открыт]);
@@ -12205,6 +12205,24 @@ function ЭкранНастроек({ открыт, onClose, profile, accountCre
               ))}
             </div>
           ))}
+
+          {/* Выход — последним и отдельно от списка: в профиле он висел
+              поверх карточки и попадал под палец при каждом заходе, а
+              здесь его находят, когда за ним и пришли. Поиск его не
+              прячет: это не пункт настроек, а дверь наружу. */}
+          {accountCreated && (
+            <button
+              onClick={onВыход}
+              className="fx-tap w-full flex items-center justify-center"
+              style={{
+                gap: 8, padding: "14px 16px", borderRadius: 20,
+                background: hexA(T.rose, 0.10), border: `1px solid ${hexA(T.rose, 0.28)}`,
+                fontFamily: displayFont, fontSize: 15, fontWeight: 700, color: T.rose,
+              }}
+            >
+              <LogOut size={15} /> {t("logOutShort")}
+            </button>
+          )}
         </div>
       </div>
     </ЭкранСнизу>
@@ -21468,7 +21486,7 @@ async function uploadAvatarIfNeeded(userId) {
 
 function ProfileView({
   connected, showToast,
-  accountCreated, profile, onOpenCreateProfile, onOpenLogin, onOpenEditProfile, onLogOut,
+  accountCreated, profile, onOpenCreateProfile, onOpenLogin, onOpenEditProfile,
   onOpenSetting, onGoCreate, onOpenToken, myTokens = [],
   cosmetics: cosmeticsProp = { frame: "none", card: "none" }, onGoShop, onOpenAchievements, insetTop = 0, userId = null,
   // Достижения считаются в корне: их же показывает магазин и отдельная
@@ -21509,11 +21527,6 @@ function ProfileView({
   function openSettingItem(item) {
     onOpenSetting(item);
   }
-  function logOut() {
-    setVerifyStatus("none");
-    onLogOut();
-  }
-
   return (
     <div className="fx-view" style={{ position: "relative" }}>
       <div className="flex flex-col gap-0 pb-4">
@@ -21526,11 +21539,6 @@ function ProfileView({
               кнопки Telegram («свернуть» и «ещё»), и без зазора она
               читалась как их кривой сосед, а не как часть профиля.
               Подложка отделяет её от картинки карточки. */}
-          {accountCreated && (
-            <button onClick={logOut} className="fx-tap flex items-center gap-1.5" style={{ position: "absolute", top: 14, right: 0, zIndex: 2, background: "rgba(10,10,14,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: `1px solid rgba(140,140,148,0.3)`, borderRadius: 999, padding: "7px 13px", fontFamily: bodyFont, fontSize: 13, lineHeight: 1, color: T.rose }}>
-              <LogOut size={13} /> {t("logOutShort")}
-            </button>
-          )}
           <button
             onClick={onGoShop}
             className="fx-tap"
@@ -24960,6 +24968,7 @@ function mapTokenRow(row) {
           supportUnread={supportUnread}
           onПункт={(item) => setSettingsItem(item)}
           onПрофиль={() => { setНастройкиОткрыты(false); goTab("profile"); }}
+          onВыход={() => { setНастройкиОткрыты(false); logOutProfile(); }}
           insetTop={insetTop}
           insetBottom={insetBottom}
         />
@@ -24993,7 +25002,6 @@ function mapTokenRow(row) {
               onOpenCreateProfile={openCreateProfile}
               onOpenLogin={openLoginProfile}
               onOpenEditProfile={openEditProfile}
-              onLogOut={logOutProfile}
               supportUnread={supportUnread}
               onOpenSetting={(item) => setSettingsItem(item)}
               onGoCreate={openCreate}
