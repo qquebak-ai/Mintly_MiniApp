@@ -12837,13 +12837,18 @@ const СВЕЧИ_ФОНА = (() => {
     const закр = цена;
     const верхЦены = Math.min(97, Math.max(откр, закр) + 4 + дальше() * 11);
     const низЦены = Math.max(3, Math.min(откр, закр) - 4 - дальше() * 11);
+    /* Тени — две отдельные: над телом и под ним. Одной сплошной палкой
+       от максимума до минимума было нельзя: тело полупрозрачное, и
+       палка просвечивала сквозь него. */
     ряд.push({
       рост: закр >= откр,
       // Сверху вниз: большая цена — меньший отступ от верхнего края.
       тело: 100 - Math.max(откр, закр),
       высота: Math.max(2, Math.abs(закр - откр)),
-      верх: 100 - верхЦены,
-      тень: верхЦены - низЦены,
+      теньВерх: 100 - верхЦены,
+      теньВерхH: верхЦены - Math.max(откр, закр),
+      теньНиз: 100 - Math.min(откр, закр),
+      теньНизH: Math.min(откр, закр) - низЦены,
     });
   }
   return ряд;
@@ -12884,7 +12889,11 @@ function СценаТорговли() {
             <span key={i} style={{ position: "relative", flex: 1, minWidth: 7, maxWidth: 13 }}>
               <span style={{
                 position: "absolute", left: "50%", marginLeft: -1, width: 2, borderRadius: 1,
-                top: `${с.верх}%`, height: `${с.тень}%`, background: hexA(цвет, 0.6),
+                top: `${с.теньВерх}%`, height: `${с.теньВерхH}%`, background: hexA(цвет, 0.6),
+              }} />
+              <span style={{
+                position: "absolute", left: "50%", marginLeft: -1, width: 2, borderRadius: 1,
+                top: `${с.теньНиз}%`, height: `${с.теньНизH}%`, background: hexA(цвет, 0.6),
               }} />
               <span style={{
                 position: "absolute", left: 0, right: 0, borderRadius: 3,
