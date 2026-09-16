@@ -12710,7 +12710,7 @@ function СценаЗапуска() {
         }}
       />
       <img
-        src="/banner-rocket3.webp" alt=""
+        src="/banner-rocket4.webp" alt=""
         style={{
           position: "absolute", right: "8%", bottom: "-6%", width: "52%",
           /* Ракета неподвижна: движение кадру задают звёзды, идущие ей
@@ -12809,7 +12809,7 @@ function СценаТорговли() {
       {/* Сам герой. Держится правого края и слегка покачивается — как
           будто дышит над кружкой. */}
       <img
-        src="/banner-pepe-v5.webp" alt=""
+        src="/banner-pepe-v6.webp" alt=""
         style={{
           position: "absolute", right: "-4%", bottom: "-14%", width: "56%",
           filter: `drop-shadow(0 8px 30px ${hexA(ФИОЛЕТ, 0.45)})`,
