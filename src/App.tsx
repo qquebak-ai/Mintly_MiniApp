@@ -12710,7 +12710,7 @@ function СценаЗапуска() {
         }}
       />
       <img
-        src="/banner-rocket4.webp" alt=""
+        src="/banner-rocket5.webp" alt=""
         style={{
           position: "absolute", right: "8%", bottom: "-6%", width: "52%",
           /* Ракета неподвижна: движение кадру задают звёзды, идущие ей
