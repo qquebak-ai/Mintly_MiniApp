@@ -2341,54 +2341,6 @@ function GlobalStyle() {
       }
       .fx-tap { transition: transform ${SPRING}; }
       .fx-tap:active { transform: scale(0.96); transition: transform ${PRESS}; }
-      /* Стекло кошелька.
-         Кнопка не залита цветом, а сделана из мутного стекла: сквозь неё
-         видно, что под ней, кромка сверху ловит свет, снизу лежит тень.
-         Нажатие не просто уменьшает кнопку — стекло на миг густеет и
-         светлеет, будто продавилось, и возвращается с пружиной. */
-      .fx-glass {
-        position: relative;
-        background: linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.06) 48%, rgba(255,255,255,0.03) 100%);
-        backdrop-filter: blur(20px) saturate(1.7);
-        -webkit-backdrop-filter: blur(20px) saturate(1.7);
-        border: 1px solid rgba(255,255,255,0.16);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.25), 0 8px 22px rgba(0,0,0,0.35);
-        transition: transform ${SPRING}, background 220ms ease, box-shadow 220ms ease;
-      }
-      /* Блик по верхней кромке — то, что отличает стекло от плёнки:
-         узкая светлая дуга, которая ярче в середине. */
-      .fx-glass::after {
-        content: "";
-        position: absolute; left: 8%; right: 8%; top: 0; height: 1px;
-        border-radius: inherit;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
-        pointer-events: none;
-      }
-      .fx-glass:active {
-        transform: scale(0.94);
-        background: linear-gradient(180deg, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.12) 48%, rgba(255,255,255,0.06) 100%);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.4);
-        transition: transform ${PRESS}, background 90ms ease, box-shadow 90ms ease;
-      }
-      /* Главная кнопка — то же стекло, но подкрашенное фирменным
-         фиолетовым: акцент виден, а материал остаётся стеклом. */
-      .fx-glass-accent {
-        background:
-          linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.06) 60%, rgba(255,255,255,0.02) 100%),
-          linear-gradient(180deg, rgba(140,45,226,0.72) 0%, rgba(90,20,170,0.68) 100%);
-        border-color: rgba(214,180,255,0.35);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -1px 0 rgba(0,0,0,0.3), 0 10px 26px rgba(90,20,170,0.42);
-      }
-      .fx-glass-accent:active {
-        background:
-          linear-gradient(180deg, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.12) 60%, rgba(255,255,255,0.05) 100%),
-          linear-gradient(180deg, rgba(160,60,245,0.8) 0%, rgba(105,26,190,0.76) 100%);
-      }
-      /* Без прозрачности у экрана нет и размытия: тогда стекло
-         подменяется плотной заливкой, иначе кнопка пропадает. */
-      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-        .fx-glass { background: rgba(255,255,255,0.10); }
-      }
       /* Нажатие внутри виджета не должно вдавливать виджет целиком.
          Браузер считает нажатым не только то, на что нажали, но и всё,
          что вокруг: карточку, её обёртку, экран. Поэтому у внешнего
@@ -12514,10 +12466,11 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
       <div className="flex flex-col" style={{ gap: 10, padding: "0 18px 22px", flexShrink: 0 }}>
         <button
           onClick={копировать}
-          className="fx-glass fx-glass-accent w-full flex items-center justify-center"
+          className="fx-tap w-full flex items-center justify-center"
           style={{
             position: "relative", overflow: "hidden",
-            gap: 8, padding: "16px 0", borderRadius: 999,
+            gap: 8, padding: "16px 0", borderRadius: 999, border: "none",
+            ...ПЕРЕЛИВ_КНОПКИ,
             color: PRISM_TEXT, fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             animation: скопировано ? "кнопкаКивнула 420ms cubic-bezier(0.22, 1, 0.36, 1)" : "none",
           }}
@@ -12556,9 +12509,9 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
         </button>
         <button
           onClick={поделиться}
-          className="fx-glass w-full"
+          className="fx-tap w-full"
           style={{
-            padding: "16px 0", borderRadius: 999,
+            padding: "16px 0", borderRadius: 999, border: "none", background: T.surfaceHi,
             color: T.ice, fontFamily: displayFont, fontSize: 16, fontWeight: 700,
           }}
         >
@@ -12794,9 +12747,9 @@ function ЭкранВывода({
             </div>
             <button
               onClick={вставить}
-              className="fx-glass"
+              className="fx-tap"
               style={{
-                padding: "15px 14px", borderRadius: 16,
+                padding: "15px 14px", borderRadius: 16, border: "none", background: T.surfaceHi,
                 color: T.ice, fontFamily: displayFont, fontSize: 14, fontWeight: 700,
               }}
             >
@@ -12816,9 +12769,10 @@ function ЭкранВывода({
           <button
             onClick={() => { if (адресГоден) { setШаг("сумма"); haptic("light"); } }}
             disabled={!адресГоден}
-            className={`fx-glass w-full${адресГоден ? " fx-glass-accent" : ""}`}
+            className="fx-tap w-full"
             style={{
-              padding: "16px 0", borderRadius: 999,
+              padding: "16px 0", borderRadius: 999, border: "none",
+              background: адресГоден ? ЦВЕТ_КНОПКИ : T.surfaceHi,
               color: адресГоден ? PRISM_TEXT : T.muted,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             }}
@@ -12840,8 +12794,8 @@ function ЭкранВывода({
       <div className="flex items-center" style={{ gap: 12, padding: "2px 18px 0", flexShrink: 0 }}>
         <button
           onClick={() => { setШаг("адрес"); haptic("light"); }}
-          className="fx-glass flex items-center justify-center flex-shrink-0"
-          style={{ width: 44, height: 44, borderRadius: 999, color: T.ice }}
+          className="fx-tap flex items-center justify-center flex-shrink-0"
+          style={{ width: 44, height: 44, borderRadius: 999, background: T.surface, border: "none", color: T.ice }}
         >
           <ChevronLeft size={20} />
         </button>
@@ -12912,10 +12866,10 @@ function ЭкранВывода({
           <button
             key={ч}
             onClick={() => доля(ч)}
-            className="fx-glass"
+            className="fx-tap"
             style={{
-              flex: 1, padding: "14px 0", borderRadius: 999,
-              color: T.ice, fontFamily: displayFont, fontSize: 15.5, fontWeight: 700,
+              flex: 1, padding: "14px 0", borderRadius: 999, border: "none",
+              background: T.surface, color: T.ice, fontFamily: displayFont, fontSize: 15.5, fontWeight: 700,
             }}
           >
             {Math.round(ч * 100)}%
@@ -13022,9 +12976,9 @@ function КлавишиОбмена({ onКлавиша }) {
             <button
               key={к}
               onClick={() => { haptic("light"); onКлавиша(к); }}
-              className="fx-glass flex-1 flex items-center justify-center"
+              className="fx-tap flex-1 flex items-center justify-center"
               style={{
-                height: высота, borderRadius: 18,
+                height: высота, borderRadius: 18, border: "none", background: "transparent",
                 fontFamily: displayFont, fontSize: 23, fontWeight: 600, color: T.paper,
               }}
             >
@@ -13255,8 +13209,8 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
             <span className="truncate" style={{ fontFamily: displayFont, color: сумма ? T.ice : T.faint, fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em" }}>
               {сумма || "0"}
             </span>
-            <button onClick={() => setВыбор("дать")} className="fx-glass flex items-center"
-              style={{ gap: 7, padding: "7px 12px 7px 8px", borderRadius: 999, flexShrink: 0 }}>
+            <button onClick={() => setВыбор("дать")} className="fx-tap flex items-center"
+              style={{ gap: 7, padding: "7px 12px 7px 8px", borderRadius: 999, background: T.surface, border: "none", flexShrink: 0 }}>
               <ЗначокМонеты монета={отдаю} size={24} />
               <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{отдаю.тикер}</span>
               <ChevronDown size={14} color={T.muted} />
@@ -13302,8 +13256,8 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
                   многоточие: строка не прыгает, и видно, что ответ идёт. */}
               {считаем ? <РазмытаяСумма образец="0,000" /> : выход != null ? изДолей(выход, беру.знаки) : "0"}
             </span>
-            <button onClick={() => setВыбор("взять")} className="fx-glass flex items-center"
-              style={{ gap: 7, padding: "7px 12px 7px 8px", borderRadius: 999, flexShrink: 0 }}>
+            <button onClick={() => setВыбор("взять")} className="fx-tap flex items-center"
+              style={{ gap: 7, padding: "7px 12px 7px 8px", borderRadius: 999, background: T.surface, border: "none", flexShrink: 0 }}>
               <ЗначокМонеты монета={беру} size={24} />
               <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{беру.тикер}</span>
               <ChevronDown size={14} color={T.muted} />
@@ -13317,9 +13271,9 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
         {солью && (
           <div className="flex items-center" style={{ gap: 8, marginTop: 14 }}>
             {[[0.25, "25%"], [0.5, "50%"], [1, t("swapAll")]].map(([ч, подпись]) => (
-              <button key={подпись} onClick={() => доля(ч)} className="fx-glass flex-1"
+              <button key={подпись} onClick={() => доля(ч)} className="fx-tap flex-1"
                 style={{
-                  padding: "11px 0", borderRadius: 999,
+                  padding: "11px 0", borderRadius: 999, background: T.surfaceHi, border: "none",
                   fontFamily: displayFont, fontSize: 14, fontWeight: 600, color: T.paper,
                 }}>
                 {подпись}
@@ -13339,9 +13293,10 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
         <button
           onClick={обменять}
           disabled={!готово}
-          className={`fx-glass w-full${готово ? " fx-glass-accent" : ""}`}
+          className="fx-tap w-full"
           style={{
-            padding: "16px 0", borderRadius: 20,
+            padding: "16px 0", borderRadius: 20, border: "none",
+            background: готово ? ЦВЕТ_КНОПКИ : T.surfaceHi,
             color: готово ? PRISM_TEXT : T.faint,
             fontFamily: displayFont, fontSize: 16, fontWeight: 700,
           }}
@@ -13499,12 +13454,12 @@ function ДействиеКошелька({ icon: Icon, label, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center"
+      className="fx-tap flex flex-col items-center"
       style={{ gap: 7, background: "transparent", border: "none", padding: 0, flex: 1 }}
     >
       <span
-        className="fx-glass flex items-center justify-center"
-        style={{ width: 54, height: 54, borderRadius: 18 }}
+        className="flex items-center justify-center"
+        style={{ width: 54, height: 54, borderRadius: 18, background: T.surfaceHi }}
       >
         <Icon size={20} strokeWidth={1.9} color={T.ice} />
       </span>
@@ -14026,15 +13981,14 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           {/* Переключатель сети прямо на карте: кошелёк один, а монет на
               нём две, и держать их на разных экранах — значит заставлять
               человека помнить, где что лежит. */}
-          <span className="fx-glass flex items-center" style={{ gap: 2, padding: 3, borderRadius: 999 }}>
+          <span className="flex items-center" style={{ gap: 2, padding: 3, borderRadius: 999, background: hexA("#000000", 0.22) }}>
             {[["sol", "SOL"], ["ton", ТИКЕР_TON]].map(([id, подпись]) => (
               <button
                 key={id}
                 onClick={(e) => { e.stopPropagation(); setСетьКошелька(id); haptic("light"); }}
-                className={`fx-tap${сетьКошелька === id ? " fx-glass" : ""}`}
+                className="fx-tap"
                 style={{
-                  padding: "4px 10px", borderRadius: 999,
-                  border: сетьКошелька === id ? undefined : "none",
+                  padding: "4px 10px", borderRadius: 999, border: "none",
                   background: сетьКошелька === id ? hexA("#FFFFFF", 0.9) : "transparent",
                   // Выбранная сеть — чёрным по белому: фиолетовый на
                   // белой плашке читался хуже и спорил с самой картой,
