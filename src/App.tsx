@@ -13514,6 +13514,79 @@ function ПилюляИзменения({ значение, подпись }) {
 /* Кнопка действия под картой: тёмный квадрат со значком и подписью под
    ним. Подпись снаружи квадрата — так значок остаётся крупным, а слово
    не жмётся к его краям. */
+/* Переключатель сети на карте.
+ *
+ * Выглядит как прежде, но белая плашка не перекрашивается с кнопки на
+ * кнопку, а переезжает: её положение и ширину меряем по самой кнопке,
+ * поэтому подписи разной длины («SOL» и «GRAM») остаются на своих
+ * местах, а плашка садится точно под выбранную. */
+function ПереключательСетиКарты({ сеть, onВыбор }) {
+  const кнопки = useRef({});
+  const [бегунок, setБегунок] = useState(null);
+
+  // Меряем после отрисовки и до кадра: иначе плашка успевает мигнуть в
+  // нулевой позиции.
+  useLayoutEffect(() => {
+    const э = кнопки.current[сеть];
+    if (!э) return undefined;
+    const померить = () => setБегунок({ x: э.offsetLeft, w: э.offsetWidth });
+    померить();
+    // Ширина зависит от шрифта: пока он не загружен, подписи уже, и
+    // плашка садится мимо.
+    if (typeof document !== "undefined" && document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(померить).catch(() => {});
+    }
+    const н = typeof ResizeObserver !== "undefined" ? new ResizeObserver(померить) : null;
+    if (н) н.observe(э);
+    return () => { if (н) н.disconnect(); };
+  }, [сеть]);
+
+  return (
+    <span
+      className="flex items-center"
+      style={{
+        position: "relative",
+        gap: 2, padding: 3, borderRadius: 999,
+        background: "#000000",
+        boxShadow: `inset 0 2px 4px ${hexA("#000000", 0.9)}, 0 1px 0 ${hexA("#FFFFFF", 0.12)}`,
+      }}
+    >
+      {бегунок && (
+        <span
+          aria-hidden
+          style={{
+            position: "absolute", top: 3, bottom: 3, left: 0,
+            width: бегунок.w, borderRadius: 999, background: hexA("#FFFFFF", 0.9),
+            transform: `translateX(${бегунок.x}px)`,
+            transition: `transform ${SPRING}, width ${SPRING}`,
+            pointerEvents: "none",
+          }}
+        />
+      )}
+      {[["sol", "SOL"], ["ton", ТИКЕР_TON]].map(([id, подпись]) => (
+        <button
+          key={id}
+          ref={(э) => { кнопки.current[id] = э; }}
+          onClick={(e) => { e.stopPropagation(); onВыбор(id); haptic("light"); }}
+          className="fx-tap"
+          style={{
+            position: "relative", zIndex: 1,
+            padding: "4px 10px", borderRadius: 999, border: "none",
+            background: "transparent",
+            // Выбранная сеть — чёрным по белому: фиолетовый на белой
+            // плашке читался хуже и спорил с самой картой.
+            color: сеть === id ? "#0B0B0F" : hexA("#FFFFFF", 0.8),
+            transition: `color ${EASE}`,
+            fontFamily: displayFont, fontSize: 11.5, fontWeight: 800, letterSpacing: "0.02em",
+          }}
+        >
+          {подпись}
+        </button>
+      ))}
+    </span>
+  );
+}
+
 function ДействиеКошелька({ icon: Icon, label, onClick }) {
   return (
     <button
@@ -14075,33 +14148,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
               читается вырезом в поверхности, а не наклейкой поверх неё.
               Полупрозрачная подложка раньше пропускала перелив скина, и
               на светлых картах подписи тонули. */}
-          <span
-            className="flex items-center"
-            style={{
-              gap: 2, padding: 3, borderRadius: 999,
-              background: "#000000",
-              boxShadow: `inset 0 2px 4px ${hexA("#000000", 0.9)}, 0 1px 0 ${hexA("#FFFFFF", 0.12)}`,
-            }}
-          >
-            {[["sol", "SOL"], ["ton", ТИКЕР_TON]].map(([id, подпись]) => (
-              <button
-                key={id}
-                onClick={(e) => { e.stopPropagation(); setСетьКошелька(id); haptic("light"); }}
-                className="fx-tap"
-                style={{
-                  padding: "4px 10px", borderRadius: 999, border: "none",
-                  background: сетьКошелька === id ? hexA("#FFFFFF", 0.9) : "transparent",
-                  // Выбранная сеть — чёрным по белому: фиолетовый на
-                  // белой плашке читался хуже и спорил с самой картой,
-                  // которая уже фиолетовая.
-                  color: сетьКошелька === id ? "#0B0B0F" : hexA("#FFFFFF", 0.8),
-                  fontFamily: displayFont, fontSize: 11.5, fontWeight: 800, letterSpacing: "0.02em",
-                }}
-              >
-                {подпись}
-              </button>
-            ))}
-          </span>
+          <ПереключательСетиКарты сеть={сетьКошелька} onВыбор={setСетьКошелька} />
         </div>
         <div className="flex items-baseline" style={{ gap: 7, marginTop: 6, position: "relative" }}>
           {/* Целую и дробную части режем из одного округлённого числа, а не
