@@ -13072,14 +13072,18 @@ function СценаМагазина() {
       ))}
       <img
         src="/banner-shop-icon-v2.webp" alt=""
-        /* Лавка выходит за нижнюю кромку, как ракета и герой на соседних
-           карточках: предмет, целиком уместившийся в кадр, читается
-           мельче, даже когда сама карточка того же размера. */
-        style={{ position: "absolute", right: "2%", bottom: "-8%", height: "108%", width: "auto" }}
+        style={{ position: "absolute", right: "6%", bottom: "6%", height: "84%", width: "auto" }}
       />
       <span style={{
         position: "absolute", left: 0, top: 0, bottom: 0, width: "62%",
         background: "linear-gradient(90deg, rgba(6,6,10,0.9) 0%, rgba(6,6,10,0.62) 56%, rgba(6,6,10,0) 100%)",
+      }} />
+      {/* Кромка по краю. Карточки у всех баннеров одного размера, но
+          чёрный карбон сливается с фоном страницы, и эта выглядит уже
+          соседних; светлая линия возвращает ей границу. */}
+      <span style={{
+        position: "absolute", inset: 0, borderRadius: 20, pointerEvents: "none",
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.10)",
       }} />
     </span>
   );
