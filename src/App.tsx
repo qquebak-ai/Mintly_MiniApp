@@ -13111,14 +13111,6 @@ function СценаМагазина() {
         }} />
       </span>
 
-      {/* Свет из-под лавки ложится на пол пятном, а не ореолом вокруг
-          неё: так он читается как отражение, а не как подсветка. */}
-      <span style={{
-        position: "absolute", right: "8%", bottom: "2%", width: "44%", height: "26%", borderRadius: "50%",
-        background: `radial-gradient(circle, ${hexA(ФИОЛЕТ, 0.55)} 0%, ${hexA(ФИОЛЕТ, 0)} 72%)`,
-        filter: "blur(2px)",
-      }} />
-
       {звёзды.map((з, i) => (
         <img
           key={i} src="/banner-star.webp" alt=""
