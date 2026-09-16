@@ -12782,15 +12782,17 @@ const СВЕЧИ_ФОНА = (() => {
   };
   const ряд = [];
   let цена = 50;
-  for (let i = 0; i < 11; i++) {
+  for (let i = 0; i < 18; i++) {
     const откр = цена;
-    цена = Math.max(20, Math.min(82, цена + (дальше() - 0.44) * 42));
+    цена = Math.max(22, Math.min(80, цена + (дальше() - 0.44) * 46));
     const закр = цена;
-    const верхЦены = Math.min(96, Math.max(откр, закр) + 5 + дальше() * 10);
-    const низЦены = Math.max(4, Math.min(откр, закр) - 5 - дальше() * 10);
+    const верхЦены = Math.min(97, Math.max(откр, закр) + 7 + дальше() * 13);
+    const низЦены = Math.max(3, Math.min(откр, закр) - 7 - дальше() * 13);
     // Сверху вниз: у графика большая цена — это меньший отступ от верха.
     const тело = 100 - Math.max(откр, закр);
-    const высота = Math.max(11, Math.abs(закр - откр));
+    // Короткие тела на фоне читаются точками, поэтому нижняя граница
+    // высокая: даже спокойная свеча занимает шестую часть кадра.
+    const высота = Math.max(17, Math.abs(закр - откр));
     ряд.push({
       рост: закр >= откр,
       тело, высота,
@@ -12824,7 +12826,7 @@ function СценаТорговли() {
           лента целиком, двумя одинаковыми половинами подряд, поэтому
           стыка не видно. */}
       <span style={{
-        position: "absolute", inset: 0, display: "flex", alignItems: "stretch", gap: 14,
+        position: "absolute", inset: 0, display: "flex", alignItems: "stretch", gap: 7,
         width: "200%", opacity: 0.55,
         animation: "лентаСвечей 60s linear infinite",
         WebkitMaskImage: "linear-gradient(90deg, transparent, #000 8%, #000 62%, transparent 86%)",
@@ -12833,9 +12835,9 @@ function СценаТорговли() {
         {[...СВЕЧИ_ФОНА, ...СВЕЧИ_ФОНА].map((с, i) => {
           const цвет = с.рост ? ЗЕЛЁНЫЙ : "#FF4D6A";
           return (
-            <span key={i} style={{ position: "relative", flex: 1, minWidth: 14, maxWidth: 26 }}>
+            <span key={i} style={{ position: "relative", flex: 1, minWidth: 7, maxWidth: 13 }}>
               <span style={{
-                position: "absolute", left: "50%", marginLeft: -1.5, width: 3, borderRadius: 2,
+                position: "absolute", left: "50%", marginLeft: -1, width: 2, borderRadius: 1,
                 top: `${с.верх}%`, height: `${с.тень}%`, background: hexA(цвет, 0.6),
               }} />
               <span style={{
