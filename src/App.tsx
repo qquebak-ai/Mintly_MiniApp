@@ -1832,17 +1832,12 @@ function GlobalStyle() {
         0%, 100% { transform: translate3d(0, 0, 0) rotate(-1.2deg); }
         50%      { transform: translate3d(-4px, -5px, 0) rotate(1.2deg); }
       }
-      /* Лавка парит над плитой — ровно настолько, чтобы это читалось
-         как объём, а не как подпрыгивание. */
+      /* Подъём с возвратом: им теперь ходят звёзды вокруг лавки —
+         ровно настолько, чтобы это читалось как парение, а не как
+         подпрыгивание. */
       @keyframes лавкаПарит {
         0%, 100% { transform: translate3d(0, 0, 0); }
         50%      { transform: translate3d(0, -5px, 0); }
-      }
-      /* Свет под лавкой дышит: сам задник неподвижен, а кадр от этого
-         перестаёт выглядеть картинкой в рамке. */
-      @keyframes витринаДышит {
-        0%, 100% { opacity: 0.55; transform: scale(0.96); }
-        50%      { opacity: 1; transform: scale(1.06); }
       }
       /* Герой на баннере дышит: чуть поднимается и опускается. */
       @keyframes геройДышит {
@@ -13046,30 +13041,38 @@ function СценаКошелька() {
 /* Сцена четвёртого баннера — карбон и лавка.
  *
  * Задник кладётся как есть, без растяжений и подкраски: это готовая
- * ткань, и любая правка её портит. Лавка лежит отдельным слоем — так
- * она может парить над плитой, а фон при этом стоит на месте. Под ней
- * дышит своё свечение: снимок неподвижен, и без него кадр выглядит
- * картинкой в рамке.
+ * ткань, и любая правка её портит. Лавка стоит неподвижно — своё
+ * свечение у неё нарисовано, добавлять второе незачем, — а вокруг
+ * парят звёзды, каждая своим кругом и со своей задержкой.
  */
 function СценаМагазина() {
+  const звёзды = [
+    { left: "58%", top: "8%", w: "7%", d: 6.4, з: -0.5 },
+    { left: "92%", top: "18%", w: "5%", d: 7.2, з: -2.4 },
+    { left: "66%", top: "76%", w: "6%", d: 6.8, з: -4.1 },
+    { left: "88%", top: "70%", w: "4.5%", d: 7.6, з: -1.3 },
+    { left: "76%", top: "2%", w: "4%", d: 6.6, з: -3.2 },
+    { left: "52%", top: "48%", w: "4%", d: 7.4, з: -5.4 },
+  ];
   return (
     <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
       <img
         src="/banner-shop-bg.webp" alt=""
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
       />
-      <span style={{
-        position: "absolute", right: "10%", bottom: "2%", width: "40%", aspectRatio: "2 / 1", borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(124,58,237,0.55) 0%, rgba(124,58,237,0) 70%)",
-        animation: "витринаДышит 5.2s ease-in-out infinite",
-      }} />
+      {звёзды.map((з, i) => (
+        <img
+          key={i} src="/banner-star.webp" alt=""
+          style={{
+            position: "absolute", left: з.left, top: з.top, width: з.w,
+            // Тот же ход, что был у лавки: подъём с возвратом.
+            animation: `лавкаПарит ${з.d}s ease-in-out ${з.з}s infinite`,
+          }}
+        />
+      ))}
       <img
         src="/banner-shop-icon-v2.webp" alt=""
-        style={{
-          position: "absolute", right: "6%", bottom: "6%", height: "84%", width: "auto",
-          filter: "drop-shadow(0 10px 24px rgba(88,28,180,0.7))",
-          animation: "лавкаПарит 6.4s ease-in-out infinite",
-        }}
+        style={{ position: "absolute", right: "6%", bottom: "6%", height: "84%", width: "auto" }}
       />
       <span style={{
         position: "absolute", left: 0, top: 0, bottom: 0, width: "62%",
