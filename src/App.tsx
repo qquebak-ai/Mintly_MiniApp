@@ -1803,12 +1803,6 @@ function GlobalStyle() {
         from { transform: scaleX(0); }
         to   { transform: scaleX(1); }
       }
-      /* Лента свечей едет влево ровно на свою половину: вторая копия
-         встаёт на место первой, и стыка не видно. */
-      @keyframes лентаСвечей {
-        from { transform: translate3d(0, 0, 0); }
-        to   { transform: translate3d(-50%, 0, 0); }
-      }
       /* Герой на баннере дышит: чуть поднимается и опускается. */
       @keyframes геройДышит {
         0%, 100% { transform: translate3d(0, 0, 0); }
@@ -12787,24 +12781,25 @@ function СценаТорговли() {
         background: `radial-gradient(circle, ${hexA(ЗЕЛЁНЫЙ, 0.28)} 0%, ${hexA(ЗЕЛЁНЫЙ, 0)} 70%)`,
       }} />
 
-      {/* Лента свечей по низу: две одинаковые половины идут подряд, и
-          когда первая уходит за край, на её месте оказывается вторая —
-          шва не видно. */}
-      <span style={{
-        position: "absolute", left: 0, right: 0, bottom: 0, height: "62%",
-        display: "flex", alignItems: "flex-end", gap: 6, width: "200%",
-        animation: "лентаСвечей 26s linear infinite",
-        opacity: 0.5,
-        WebkitMaskImage: "linear-gradient(90deg, transparent, #000 12%, #000 72%, transparent)",
-        maskImage: "linear-gradient(90deg, transparent, #000 12%, #000 72%, transparent)",
-      }}>
-        {[...свечи, ...свечи].map((в, i) => {
+      {/* Свечи по низу — те же, что на знаке мемпада: тело, фитиль и
+          рост от основания. Каждая живёт своим кругом и своей задержкой,
+          поэтому ряд не пульсирует в такт; зелёные растут, красные
+          проседают. */}
+      <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "64%", display: "flex", alignItems: "flex-end", gap: 7, padding: "0 10px", opacity: 0.55 }}>
+        {[34, 52, 40, 64, 46, 72, 56, 82, 62, 90, 70, 96, 76, 58, 44, 66, 50, 78].map((в, i) => {
           const рост = i % 3 !== 1;
           const цвет = рост ? ЗЕЛЁНЫЙ : "#FF4D6A";
           return (
-            <span key={i} style={{ position: "relative", flex: "1 0 auto", width: 8, height: `${в}%` }}>
-              <span style={{ position: "absolute", left: 3, top: "-18%", bottom: "-12%", width: 2, borderRadius: 1, background: hexA(цвет, 0.5) }} />
-              <span style={{ position: "absolute", inset: 0, borderRadius: 3, background: hexA(цвет, 0.85), boxShadow: `0 0 12px ${hexA(цвет, 0.5)}` }} />
+            <span
+              key={i}
+              style={{
+                position: "relative", flex: 1, height: `${в}%`, minWidth: 6,
+                transformOrigin: "50% 100%",
+                animation: `свечаРастёт ${3.4 + (i % 5) * 0.6}s ease-in-out ${(i % 7) * 0.35}s infinite`,
+              }}
+            >
+              <span style={{ position: "absolute", left: "50%", marginLeft: -1, top: "-16%", bottom: "-10%", width: 2, borderRadius: 1, background: hexA(цвет, 0.55) }} />
+              <span style={{ position: "absolute", inset: 0, borderRadius: 3, background: hexA(цвет, 0.9), boxShadow: `0 0 14px ${hexA(цвет, 0.45)}` }} />
             </span>
           );
         })}
