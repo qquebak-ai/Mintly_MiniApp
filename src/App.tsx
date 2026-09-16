@@ -11214,7 +11214,17 @@ function МояАктивность({ userId, тик = 0 }) {
             const приход = этоПриход(с);
             const сделка = этоСделка(с);
             return (
-              <div key={с.id} className="flex items-center" style={{ gap: 10 }}>
+              /* Каждая строка — своя плашка, как в истории кошелька:
+                 голым списком строки сливались и читались абзацем, а не
+                 перечнем событий. */
+              <div
+                key={с.id}
+                className="flex items-center"
+                style={{
+                  gap: 10, padding: "11px 13px", borderRadius: 18,
+                  background: T.surface, border: `1px solid ${hexA(приход ? T.up : T.down, 0.14)}`,
+                }}
+              >
                 {/* Стрелка о деньгах, а не о направлении сделки: расход —
                     вниз и красным, приход — вверх и зелёным. Запуск,
                     вывод и свод излишков — тоже расходы, и рисуются так
@@ -19430,18 +19440,11 @@ function markSignedOut(on) {
   } catch (e) { /* приватный режим — тогда просто не запомним */ }
 }
 
-/* Одной отметки о выходе мало. Она пишется в момент нажатия, а до этого
-   выход мог случиться на прошлой версии приложения или в тот раз, когда
-   память телефона не приняла запись, — тогда отметки нет, и молчаливый
-   вход снова затаскивает внутрь. Поэтому вторая отметка: «на этом
-   телефоне вход уже был». Молча входим только пока её нет, то есть
-   ровно один раз — при первом знакомстве. Дальше сессия живёт сама, а
-   если она пропала, значит человек вышел или её срок истёк, и правильно
-   показать кнопку входа, а не заводить сессию за него. */
+/* Отметка «на этом телефоне вход уже был». Молчаливый вход ею больше не
+   ограничен — внутри Telegram приложение открывается под аккаунтом
+   всегда, — но сама отметка нужна: по ней видно, что сессия когда-то
+   заводилась, и на неё смотрит вход по почте. */
 const SEEN_SESSION_KEY = "mintly_seen_session";
-function hasSeenSession() {
-  try { return localStorage.getItem(SEEN_SESSION_KEY) === "1"; } catch (e) { return false; }
-}
 function markSeenSession() {
   try { localStorage.setItem(SEEN_SESSION_KEY, "1"); } catch (e) { /* см. выше */ }
 }
@@ -21407,13 +21410,17 @@ function mapTokenRow(row) {
         // здесь не понадобится. Не ждём ответа, приложению это не мешает.
         linkReferralIfAny();
       }
-      // Молчаливый вход — только при первом знакомстве с приложением на
-      // этом телефоне. Дальше сессия живёт сама; если её нет, значит из
-      // аккаунта вышли или её срок истёк, и правильно показать кнопку
-      // входа, а не заводить сессию за человека. Раньше вход случался при
-      // каждом запуске, и выйти было нельзя: подпись Telegram лежит в
-      // окне всегда, поэтому обновление страницы возвращало внутрь.
-      if (!session && telegramInitData() && storageWorks() && !isSignedOutByHand() && !hasSeenSession()) {
+      /* Молчаливый вход при каждом запуске внутри Telegram: подпись
+         initData у окна уже есть, и спрашивать человека не о чем —
+         приложение открывается сразу под его аккаунтом, даже если
+         сессия успела истечь.
+
+         Единственный, кого не втаскивает обратно, — тот, кто сам нажал
+         «Выйти»: отметка о выходе держится, пока он не войдёт снова
+         руками. Раньше сюда же входила проверка «этот телефон уже
+         видел сессию», и человек с истёкшей сессией оставался снаружи,
+         хотя ничего не делал. */
+      if (!session && telegramInitData() && storageWorks() && !isSignedOutByHand()) {
         // Разведка может не ответить — сеть, лимит, перезапуск сервера.
         // Тогда пробуем войти как есть: у того, кто уже заходил, вход
         // пройдёт, а новому сервер ответит «нужен ник», и мы откроем
@@ -21508,6 +21515,13 @@ function mapTokenRow(row) {
   const [profileModalMode, setProfileModalMode] = useState("create");
   // Какую вкладку примерки открыть, когда в профиль пришли из магазина.
   const [lookFocus, setLookFocus] = useState(null);
+  /* Откуда открыли достижения. Раньше «назад» всегда вело в профиль, и
+     человек, зашедший с главной, оказывался не там, откуда шёл. */
+  const [откудаДостижения, setОткудаДостижения] = useState("profile");
+  const открытьДостижения = useCallback((откуда) => {
+    setОткудаДостижения(откуда === "profile" ? "profile" : "home");
+    setView("achievements");
+  }, []);
   const [settingsItem, setSettingsItem] = useState(null);
   const [менюОткрыто, setМенюОткрыто] = useState(false);
   const [настройкиОткрыты, setНастройкиОткрыты] = useState(false);
@@ -22833,9 +22847,9 @@ function mapTokenRow(row) {
     if (view === "user") return backFromUserProfile;
     if (view === "token") return backFromToken;
     if (view === "create") return () => setView(tab);
-    if (view === "achievements") return () => setView("profile");
+    if (view === "achievements") return () => setView(откудаДостижения);
     return null;
-  }, [pinLocked, pinModal, launchRequest, profileModalOpen, settingsItem, tradeModal, manageToken_, view, tab, token]);
+  }, [pinLocked, pinModal, launchRequest, profileModalOpen, settingsItem, tradeModal, manageToken_, view, tab, token, откудаДостижения]);
 
   useEffect(() => {
     const tg = typeof window !== "undefined" ? window.Telegram && window.Telegram.WebApp : null;
@@ -23411,7 +23425,7 @@ function mapTokenRow(row) {
               achievements={achievements}
               userId={userId}
               onOpenMyProfile={() => setМенюОткрыто(true)}
-              onOpenAchievements={() => setView("achievements")}
+              onOpenAchievements={() => открытьДостижения("home")}
             />
           </KeepAlive>
           <KeepAlive show={view === "mempad"}>
@@ -23449,14 +23463,14 @@ function mapTokenRow(row) {
               onOpenLook={openLookFromShop}
               onEquip={equipCosmetic}
               achievementsReady={achievementsReady}
-              onOpenAchievements={() => setView("achievements")}
+              onOpenAchievements={() => открытьДостижения("home")}
               showToast={showToast}
               accountCreated={accountCreated}
               onOpenLogin={openLoginProfile}
             />
           </KeepAlive>
           {view === "achievements" && (
-            <AchievementsView achievements={achievements} onGoShop={() => goTab("shop")} onBack={() => setView("profile")} />
+            <AchievementsView achievements={achievements} onGoShop={() => goTab("shop")} onBack={() => setView(откудаДостижения)} />
           )}
           {view === "user" && (
             <PublicProfileView
@@ -23510,7 +23524,7 @@ function mapTokenRow(row) {
           insetBottom={insetBottom}
           onПункт={(ключ) => {
             if (ключ === "profile") { goTab("profile"); return; }
-            if (ключ === "achievements") { setView("achievements"); return; }
+            if (ключ === "achievements") { открытьДостижения("home"); return; }
             if (ключ === "shop" || ключ === "wallet") { goTab(ключ); return; }
             if (ключ === "settings") { setНастройкиОткрыты(true); return; }
             if (ключ === "support") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "support")); return; }
@@ -23535,7 +23549,7 @@ function mapTokenRow(row) {
               myTokens={myTokens}
               cosmetics={cosmetics}
               onGoShop={() => goTab("shop")}
-              onOpenAchievements={() => setView("achievements")}
+              onOpenAchievements={() => открытьДостижения("profile")}
               achievements={achievements}
               insetTop={insetTop}
               userId={userId}
