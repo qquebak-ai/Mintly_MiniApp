@@ -7514,14 +7514,29 @@ function PublicProfileView({ userId: ownerId, currentUserId, onBack, onOpenToken
       if (cancelled) return;
       setProfile(prof);
 
-      const { data } = await supabase
-        .from("tokens")
-        .select("*")
-        .eq("owner_id", ownerId)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      /* Список идёт через сервер, а не напрямую в таблицу: tokens закрыт
+         политиками, и вошедший видит там только свои строки — на чужом
+         профиле список всегда оставался пустым. Если сервер недоступен,
+         пробуем прямой запрос: своему владельцу он всё равно ответит. */
+      let ряд = [];
+      try {
+        const r = await fetch(апи(`/api/creator-tokens?owner=${encodeURIComponent(ownerId)}`));
+        if (r.ok) {
+          const j = await r.json();
+          ряд = Array.isArray(j && j.rows) ? j.rows : [];
+        }
+      } catch { /* ниже запасной путь */ }
+      if (!ряд.length) {
+        const { data } = await supabase
+          .from("tokens")
+          .select("*")
+          .eq("owner_id", ownerId)
+          .order("created_at", { ascending: false })
+          .limit(50);
+        ряд = data || [];
+      }
       if (cancelled) return;
-      setTokens(data || []);
+      setTokens(ряд);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -12804,24 +12819,29 @@ function СценаЗапуска() {
         /* Дорожки идут по всей ширине, а фазы разведены по кругу: иначе
            звёзды собираются кучей и полкадра пустует. Крупная — пять
            процентов ширины: больше и она спорит с ракетой. */
-        { left: "3%", top: "30%", w: "3.4%", d: 9.4, з: -5.2 },
+        /* «Ближе» — звезда идёт перед ракетой, иначе за ней. Вперёд
+           пускаем мелкие: крупная, прошедшая поверх корпуса, читается
+           накладкой, а не звездой в паре метров от него. */
+        { left: "3%", top: "30%", w: "3.4%", d: 9.4, з: -5.2, ближе: true },
         { left: "10%", top: "30%", w: "4.2%", d: 8.1, з: -1.4 },
-        { left: "17%", top: "30%", w: "3%", d: 9.9, з: -7.7 },
+        { left: "17%", top: "30%", w: "3%", d: 9.9, з: -7.7, ближе: true },
         { left: "25%", top: "30%", w: "4.6%", d: 7.6, з: -3.3 },
-        { left: "33%", top: "30%", w: "3.2%", d: 9.1, з: -6.5 },
+        { left: "33%", top: "30%", w: "3.2%", d: 9.1, з: -6.5, ближе: true },
         { left: "41%", top: "30%", w: "5%", d: 8.4, з: -0.7 },
-        { left: "49%", top: "30%", w: "3.6%", d: 9.6, з: -4.4 },
+        { left: "49%", top: "30%", w: "3.6%", d: 9.6, з: -4.4, ближе: true },
         { left: "57%", top: "30%", w: "4.2%", d: 7.9, з: -8.3 },
-        { left: "65%", top: "30%", w: "3%", d: 8.8, з: -2.1 },
+        { left: "65%", top: "30%", w: "3%", d: 8.8, з: -2.1, ближе: true },
         { left: "73%", top: "30%", w: "4.8%", d: 9.3, з: -6.9 },
-        { left: "81%", top: "30%", w: "3.4%", d: 8.2, з: -3.8 },
+        { left: "81%", top: "30%", w: "3.4%", d: 8.2, з: -3.8, ближе: true },
         { left: "89%", top: "30%", w: "4%", d: 9.7, з: -1.1 },
-        { left: "96%", top: "30%", w: "3.2%", d: 8.6, з: -5.9 },
+        { left: "96%", top: "30%", w: "3.2%", d: 8.6, з: -5.9, ближе: true },
       ].map((з, i) => (
         <span
           key={i}
           style={{
-            position: "absolute", left: з.left, top: з.top, width: з.w, zIndex: 1,
+            position: "absolute", left: з.left, top: з.top, width: з.w,
+            // Ракета лежит на втором слое: всё, что выше, проходит перед ней.
+            zIndex: з.ближе ? 3 : 1,
             /* Две анимации на одной звезде спорили бы за transform,
                поэтому снос лежит на обёртке, а дыхание — на самой
                картинке внутри. */
@@ -14815,6 +14835,11 @@ const КОШ_ПРИХОД_ТЕКСТ = "#00E96B";
    в списке они выглядели как полноценная монета с ценой в ноль
    долларов. Ниже этого порога токен в «твоих токенах» не показываем. */
 const ПЫЛЬ_ТОКЕНОВ = 100;
+
+/* Ключ, под которым живёт открытый токен. Хранилище — sessionStorage:
+   оно умирает вместе с вкладкой, а значит переживает обновление
+   страницы и не переживает закрытие мини-приложения. */
+const ОТКРЫТЫЙ_ТОКЕН = "mintly.открытый_токен";
 
 /* Пилюля с изменением — как в макете: цветной фон, стрелка, проценты.
    Рост идёт фирменным фиолетовым, а не зелёным: зелёный в этой палитре
@@ -22002,6 +22027,18 @@ const FEE_PERCENT = 0.01; // 1% комиссии
   const [view, setView] = useState("home");
   const [tab, setTab] = useState("home");
   const [token, setToken] = useState(null);
+
+  /* Открытый токен переживает обновление страницы, но не новый запуск.
+     Для этого он лежит в sessionStorage: у него срок жизни — вкладка.
+     Перезагрузка вкладку сохраняет, а закрытое и заново открытое
+     мини-приложение получает от Телеграма чистое окно, и человек, как и
+     ждёт, оказывается на главной. */
+  const запомнитьТокен = useCallback((row) => {
+    try {
+      if (row && row.id) window.sessionStorage.setItem(ОТКРЫТЫЙ_ТОКЕН, String(row.id));
+      else window.sessionStorage.removeItem(ОТКРЫТЫЙ_ТОКЕН);
+    } catch { /* приватный режим */ }
+  }, []);
   const { height, insetBottom, insetTop } = useTelegramViewport();
   const device = useDevice();
   const rocketVariant = typeof window !== "undefined" && /[?&]rocket=outline/.test(window.location.search) ? "outline" : "default";
@@ -24106,6 +24143,7 @@ function mapTokenRow(row) {
     // обращении к цене. Приводим к общему виду ленты.
     setToken(t.price == null ? localTokenToFeedShape(t) : t);
     setView("token");
+    запомнитьТокен(t);
   }
   // Пришли из чата прямо за подписью: интерфейс в этот момент не нужен,
   // человек ждёт окно кошелька и ничего больше. Сумма лежит здесь, пока
@@ -24117,6 +24155,27 @@ function mapTokenRow(row) {
   // сумма уходит из ждётПодписи и обнуляется, как только подпись ушла.
   const [ждётПокупкиСумма, setЖдётПокупкиСумма] = useState(0);
   const [ждётПокупкиТокен, setЖдётПокупкиТокен] = useState("");
+
+  /* Возвращаемся на экран токена после обновления страницы. Запись
+     читается один раз при запуске: если вкладка та же — она на месте, и
+     мы открываем тот же токен; после закрытия приложения хранилище
+     пустое, и человек остаётся на главной. */
+  useEffect(() => {
+    let брошено = false;
+    let сохранённый = null;
+    try { сохранённый = window.sessionStorage.getItem(ОТКРЫТЫЙ_ТОКЕН); } catch { /* приватный режим */ }
+    if (!сохранённый) return undefined;
+    (async () => {
+      const { data } = await supabase.from("tokens").select("*").eq("id", сохранённый).maybeSingle();
+      if (брошено) return;
+      // Токена больше нет — чистим запись, иначе она будет всплывать
+      // при каждом обновлении.
+      if (!data) { try { window.sessionStorage.removeItem(ОТКРЫТЫЙ_ТОКЕН); } catch { /* пусто */ } return; }
+      setToken(localTokenToFeedShape(mapTokenRow(data)));
+      setView("token");
+    })();
+    return () => { брошено = true; };
+  }, []);
 
   // Токен, который создался в сети, но не записался в базу. Пробуем
   // дописать его при каждом входе: сессия к этому моменту свежая, и
@@ -24275,7 +24334,7 @@ function mapTokenRow(row) {
       });
     return () => { брошено = true; };
   }, []);
-  function backFromToken() { setView(tab); }
+  function backFromToken() { setView(tab); запомнитьТокен(null); }
 
   // Открытый токен — из своих? Тогда на его экране появляется управление
   // (ссылка и удаление). Сравниваем по записи из базы, а не по флагу в
