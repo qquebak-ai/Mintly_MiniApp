@@ -1374,6 +1374,17 @@ const переливТекста = (краски) => ({
    в приложении, и в заголовке они те же. */
 const ПЕРЕЛИВ_ГОЛУБОЙ = переливТекста("#FFFFFF 0%, #DCF2FF 20%, #4FC3FF 50%, #DCF2FF 80%, #FFFFFF 100%");
 const ПЕРЕЛИВ_СИРЕНЬ = переливТекста("#FFFFFF 0%, #F0E4FF 22%, #C79BFF 50%, #F0E4FF 78%, #FFFFFF 100%");
+/* Блик, пробегающий по слову. Полоса узкая и яркая, идёт без возврата и
+   вдвое быстрее прочих переливов — слово читается как вспышка. */
+const ПЕРЕЛИВ_МОЛНИЯ = {
+  backgroundImage: "linear-gradient(100deg, #29B6FF 0%, #29B6FF 34%, #FFFFFF 46%, #DFF6FF 54%, #29B6FF 66%, #29B6FF 100%)",
+  backgroundSize: "260% 100%",
+  WebkitBackgroundClip: "text",
+  backgroundClip: "text",
+  color: "transparent",
+  WebkitTextFillColor: "transparent",
+  animation: "бликБежит 1.5s linear infinite",
+};
 const ПЕРЕЛИВ_ТЕКСТА = {
   backgroundImage: "linear-gradient(112deg, #FFFFFF 0%, #F0E4FF 22%, #C79BFF 50%, #F0E4FF 78%, #FFFFFF 100%)",
   backgroundSize: "230% 100%",
@@ -1909,13 +1920,25 @@ function GlobalStyle() {
       /* Перелив на кнопке сделки: та же медленная волна, что на карточке
          баланса. Кнопка выглядит живой, но не мигает и не отвлекает —
          полный круг занимает пять с половиной секунд. */
+      /* Блик идёт в одну сторону и начинает сначала: возврат читался бы
+         качанием, а нужна пробежка. */
+      @keyframes бликБежит {
+        from { background-position: 100% 50%; }
+        to   { background-position: 0% 50%; }
+      }
       @keyframes кнопкаПереливается {
         0%   { background-position: 0% 50%; }
         50%  { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
       }
       @media (prefers-reduced-motion: reduce) {
-        @keyframes кнопкаПереливается { from { background-position: 0% 50%; } to { background-position: 0% 50%; } }
+        /* Блик идёт в одну сторону и начинает сначала: возврат читался бы
+         качанием, а нужна пробежка. */
+      @keyframes бликБежит {
+        from { background-position: 100% 50%; }
+        to   { background-position: 0% 50%; }
+      }
+      @keyframes кнопкаПереливается { from { background-position: 0% 50%; } to { background-position: 0% 50%; } }
       }
       /* Смена числа: цифры не подменяются молча, а коротко вспыхивают
          цветом движения и подскакивают. Так видно, что цена только что
@@ -12664,13 +12687,18 @@ const БАННЕРЫ = [
   },
   {
     id: "wallet",
-    строки: { RU: ["Кошелёк, покупки", "и вывод внутри"], EN: ["Wallet, buys", "and payouts inside"] },
+    строки: { RU: ["Самые быстрые транзакции", "на всём рынке"], EN: ["The fastest transactions", "on the market"] },
     кнопка: { RU: "Мой кошелёк", EN: "My wallet" },
     цвет: "#0098EA",
     действие: "wallet",
     знак: "монеты",
     сцена: "кошелёк",
-    выделения: [{ RU: "вывод", EN: "payouts", стиль: "голубой" }],
+    // «Быстрые» и переливается быстро: блик пробегает по слову за
+    // полторы секунды — вдвое быстрее прочих, отсюда и ощущение скорости.
+    выделения: [{ RU: "быстрые", EN: "fastest", стиль: "молния" }],
+    // Строка тут длиннее прочих: при общем кегле она ломалась натрое и
+    // наезжала на кнопку.
+    кегль: 19.5,
   },
   {
     id: "shop",
@@ -13034,7 +13062,7 @@ const ПОКАЗ_БАННЕРА = 9000;
  * Строка режется по меткам, и каждая метка получает свой перелив.
  * Возвращаем куски, а не размеченную строку: цвет здесь — не разметка
  * текста, а часть картинки, и хранить его в переводе незачем. */
-const ПЕРЕЛИВЫ_ТЕКСТА = { голубой: ПЕРЕЛИВ_ГОЛУБОЙ, сирень: ПЕРЕЛИВ_СИРЕНЬ };
+const ПЕРЕЛИВЫ_ТЕКСТА = { голубой: ПЕРЕЛИВ_ГОЛУБОЙ, сирень: ПЕРЕЛИВ_СИРЕНЬ, молния: ПЕРЕЛИВ_МОЛНИЯ };
 
 function разбитьПоВыделениям(строка, выделения, язык) {
   if (!выделения || !выделения.length) return строка;
@@ -13184,7 +13212,7 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
 
             <div style={{ position: "relative", zIndex: 1, maxWidth: "72%" }}>
               {(б.строки[язык] || б.строки.RU).map((строка, i) => (
-                <div key={i} style={{ fontFamily: displayFont, fontSize: 23, fontWeight: 800, color: T.ice, letterSpacing: "-0.02em", lineHeight: 1.18 }}>
+                <div key={i} style={{ fontFamily: displayFont, fontSize: б.кегль || 23, fontWeight: 800, color: T.ice, letterSpacing: "-0.02em", lineHeight: 1.18 }}>
                   {разбитьПоВыделениям(строка, б.выделения, язык)}
                 </div>
               ))}
