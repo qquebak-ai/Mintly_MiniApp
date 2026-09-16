@@ -7,7 +7,8 @@ import {
   Copy, ExternalLink, LogOut, ChevronRight, ChevronDown, Rocket, HeartCrack,
   Lock, Gift, LifeBuoy, Plus, ArrowDownLeft, Repeat,
   FileText, CheckCircle2, AlertTriangle, Info, RefreshCw, X,
-  Eye, EyeOff, LogIn, ShoppingBag, Trash2, Crown, Bell, Check, Cpu, Settings
+  Eye, EyeOff, LogIn, ShoppingBag, Trash2, Crown, Bell, Check, Cpu, Settings,
+  Mail, CalendarDays
 } from "lucide-react";
 import { useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { Address, beginCell, toNano } from "@ton/core";
@@ -332,6 +333,23 @@ const STR = {
     withdrawPaste: "Вставить",
     withdrawNext: "Далее",
     withdrawSendTitle: "Отправить",
+    bookTitle: "Адресная книга",
+    bookEmpty: "Пусто. Сохрани адрес, на который выводишь часто — набирать его больше не придётся.",
+    bookSave: "Сохранить адрес",
+    bookSaved: "Адрес сохранён",
+    bookExists: "Этот адрес уже в книге",
+    bookBadAddress: "Проверь адрес — он не похож на адрес этой сети",
+    bookNamePlaceholder: "Название — например, Bybit",
+    bookAdd: "Добавить",
+    bookRemoved: "Адрес убран из книги",
+    withdrawCodeTitle: "Подтверди вывод",
+    withdrawCodeSent: "Код отправлен на {mail}. Он живёт десять минут.",
+    withdrawCodeHint: "Введи шесть цифр из письма",
+    withdrawCodeBad: "Код не подошёл — проверь цифры или запроси новый",
+    withdrawCodeResend: "Отправить код заново",
+    withdrawCodeSending: "Отправляем письмо…",
+    withdrawCodeNoMail: "К аккаунту не привязана почта — вывод недоступен",
+    withdrawCodeConfirm: "Подтвердить",
     walletActSwap: "Обменять",
     walletActHistory: "История",
     walletHoldingsEmpty: "Пока пусто. Купи токен в мемпаде — он появится здесь.",
@@ -919,6 +937,23 @@ const STR = {
     withdrawPaste: "Paste",
     withdrawNext: "Next",
     withdrawSendTitle: "Send",
+    bookTitle: "Address book",
+    bookEmpty: "Empty. Save an address you send to often — no more typing it out.",
+    bookSave: "Save address",
+    bookSaved: "Address saved",
+    bookExists: "That address is already in the book",
+    bookBadAddress: "Check the address — it doesn't look like this network",
+    bookNamePlaceholder: "Name — Bybit, for example",
+    bookAdd: "Add",
+    bookRemoved: "Address removed from the book",
+    withdrawCodeTitle: "Confirm the withdrawal",
+    withdrawCodeSent: "Code sent to {mail}. It lives for ten minutes.",
+    withdrawCodeHint: "Enter the six digits from the email",
+    withdrawCodeBad: "Wrong code — check the digits or request a new one",
+    withdrawCodeResend: "Send the code again",
+    withdrawCodeSending: "Sending the email…",
+    withdrawCodeNoMail: "No email is linked to this account — withdrawals are off",
+    withdrawCodeConfirm: "Confirm",
     walletActSwap: "Swap",
     walletActHistory: "History",
     walletHoldingsEmpty: "Nothing yet. Buy a token in the mempad and it shows up here.",
@@ -12662,13 +12697,12 @@ function адресTonОк(строка) {
 
 function ЭкранВывода({
   открыт, onClose, сеть = "sol", остаток = 0, курс = 0, единица = "SOL", свой = "",
-  пределЗаСутки = null,
+  пределЗаСутки = null, userId = null,
   showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0,
 }) {
-  // Два шага, как в кошельках: сначала «кому», потом «сколько». Один
-  // экран с обоими полями заставлял держать в голове и адрес, и сумму,
-  // а промах в адресе — это потерянные деньги, и его стоит подтвердить
-  // отдельно.
+  // Три шага: «кому», «сколько» и код с почты. Один экран с обоими полями
+  // заставлял держать в голове и адрес, и сумму, а промах в адресе — это
+  // потерянные деньги, и его стоит подтвердить отдельно.
   const [шаг, setШаг] = useState("адрес");
   const [адрес, setАдрес] = useState("");
   const [ввод, setВвод] = useState("");
@@ -12679,9 +12713,27 @@ function ЭкранВывода({
   const [вДолларах, setВДолларах] = useState(false);
   const [всё, setВсё] = useState(false);
   const [идёт, setИдёт] = useState(false);
+  // Код с почты: без него перевод не уходит.
+  const [код, setКод] = useState("");
+  const [кодБеда, setКодБеда] = useState("");
+  const [письмоИдёт, setПисьмоИдёт] = useState(false);
+  // Куда уйдёт письмо с кодом. Берём из самой сессии, а не из профиля:
+  // код проверяет Supabase Auth, и адрес ему нужен тот же, что у аккаунта.
+  const [почта, setПочта] = useState("");
+  // Адресная книга: свои проверенные адреса этой сети.
+  const [книга, setКнига] = useState([]);
+  const [метка, setМетка] = useState("");
+  const [добавляем, setДобавляем] = useState(false);
+  const [новый, setНовый] = useState("");
 
+  /* Всё поле — начисто при каждом открытии, включая адрес. Подставленный
+     прошлый получатель — это перевод не туда: сеть переключили, деньги
+     шлют другому, а поле выглядит заполненным и его не перечитывают. */
   useEffect(() => {
-    if (!открыт) { setШаг("адрес"); setВвод(""); setВсё(false); setИдёт(false); }
+    if (!открыт) {
+      setШаг("адрес"); setАдрес(""); setВвод(""); setВсё(false); setИдёт(false);
+      setКод(""); setКодБеда(""); setДобавляем(false); setНовый(""); setМетка("");
+    }
   }, [открыт]);
 
   /* Запас, который остаётся на кошельке. В TON перевод стоит заметно
@@ -12740,10 +12792,121 @@ function ЭкранВывода({
     haptic("light");
   }
 
-  async function отправить() {
+  useEffect(() => {
+    if (!открыт) return;
+    let живо = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!живо) return;
+      const м = String((data && data.user && data.user.email) || "");
+      // Адрес вида tg123@telegram.local письма не получает — у аккаунтов
+      // старого входа через Telegram почты, считай, нет вовсе.
+      setПочта(/\.local$/i.test(м) ? "" : м);
+    });
+    return () => { живо = false; };
+  }, [открыт]);
+
+  /* Книга живёт в базе, а не в телефоне: аккаунт один, а устройств у него
+     несколько, и список «куда я вывожу» нужен на каждом. Читаем при
+     открытии и при смене сети — адрес Solana в списке GRAM был бы верным
+     способом потерять деньги. */
+  useEffect(() => {
+    if (!открыт || !userId) return;
+    let живо = true;
+    supabase
+      .from("address_book")
+      .select("id, address, label")
+      .eq("owner_id", userId)
+      .eq("chain", сеть)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (!живо) return;
+        if (error) { console.warn("[mintly] адресная книга недоступна:", error.message); return; }
+        setКнига(data || []);
+      });
+    return () => { живо = false; };
+  }, [открыт, userId, сеть]);
+
+  // В книгу — с той же проверкой, что и перед отправкой: адрес с опечаткой
+  // в списке проверенных опаснее, чем набранный руками.
+  async function вКнигу(строка, имя) {
+    const чист = String(строка || "").trim();
+    const годен = сеть === "ton" ? адресTonОк(чист) : адресSolanaОк(чист);
+    if (!годен) { showToast(t("bookBadAddress")); haptic("error"); return; }
+    if (книга.some((з) => з.address === чист)) { showToast(t("bookExists")); return; }
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from("address_book")
+      .insert({ owner_id: userId, chain: сеть, address: чист, label: String(имя || "").trim() || null })
+      .select("id, address, label")
+      .single();
+    if (error) { showToast(`${t("bookSave")}: ${error.message.slice(0, 70)}`); haptic("error"); return; }
+    setКнига((б) => [data, ...б]);
+    setДобавляем(false);
+    setНовый("");
+    setМетка("");
+    showToast(t("bookSaved"));
+    haptic("success");
+  }
+
+  async function изКниги(id) {
+    setКнига((б) => б.filter((з) => з.id !== id));
+    haptic("light");
+    const { error } = await supabase.from("address_book").delete().eq("id", id);
+    if (error) showToast(error.message.slice(0, 70));
+    else showToast(t("bookRemoved"));
+  }
+
+  /* Код на почту. Уходит сам, как только человек нажал «Отправить»:
+     просить у него второе нажатие «пришлите письмо» незачем. */
+  async function запроситьКод() {
+    if (!почта) { showToast(t("withdrawCodeNoMail")); return false; }
+    setПисьмоИдёт(true);
+    setКодБеда("");
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ email: почта, options: { shouldCreateUser: false } });
+      if (error) throw error;
+      showToast(tf("withdrawCodeSent", { mail: почта }));
+      return true;
+    } catch (e) {
+      showToast(`${t("withdrawFailed")}: ${String((e && e.message) || "").slice(0, 80)}`);
+      return false;
+    } finally {
+      setПисьмоИдёт(false);
+    }
+  }
+
+  function отправить() {
     if (!можно) return;
-    setИдёт(true);
+    // Подтверждать нечем — значит и выводить нельзя: украденная сессия
+    // иначе уносит весь кошелёк одним нажатием.
+    if (!почта) { showToast(t("withdrawCodeNoMail")); haptic("error"); return; }
+    setКод("");
+    setКодБеда("");
+    setШаг("код");
     haptic("medium");
+    запроситьКод();
+  }
+
+  async function подтвердитьИОтправить() {
+    if (идёт || код.trim().length !== 6) return;
+    setИдёт(true);
+    setКодБеда("");
+    let сошлось = false;
+    try {
+      const { error } = await supabase.auth.verifyOtp({ email: почта, token: код.trim(), type: "email" });
+      сошлось = !error;
+    } catch (e) { /* сеть не ответила — код считаем неподтверждённым */ }
+    if (!сошлось) {
+      setКодБеда(t("withdrawCodeBad"));
+      setИдёт(false);
+      haptic("error");
+      return;
+    }
+    await вСеть();
+  }
+
+  async function вСеть() {
+    setИдёт(true);
     try {
       const кошелёк = await import("./appWallet");
       const шлём = сеть === "ton" ? кошелёк.вывестиСВнутреннегоTON : кошелёк.вывестиСВнутреннего;
@@ -12847,6 +13010,99 @@ function ЭкранВывода({
           {беда && (
             <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5, animation: "меткаПришла 200ms ease-out both" }}>{беда}</span>
           )}
+
+          {/* Книга — под полем. Набранный адрес кладётся в неё той же
+              кнопкой, которой он проверен: галочка уже стоит, значит
+              сохранять безопасно. */}
+          <div className="flex items-center justify-between" style={{ marginTop: 4, gap: 8 }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{t("bookTitle")}</span>
+            <button
+              onClick={() => {
+                if (адресГоден) { вКнигу(чистый, метка); return; }
+                setДобавляем((б) => !б);
+                haptic("light");
+              }}
+              className="fx-tap flex items-center"
+              style={{
+                gap: 5, padding: "7px 12px", borderRadius: 999, border: "none",
+                background: T.surfaceHi, color: T.ice, fontFamily: displayFont, fontSize: 12.5, fontWeight: 700,
+              }}
+            >
+              <Plus size={13} strokeWidth={3} /> {t("bookSave")}
+            </button>
+          </div>
+
+          {/* Своё поле — для адреса, которого в поле выше нет: человек
+              заносит кошелёк биржи заранее, не собираясь выводить сейчас. */}
+          {добавляем && !адресГоден && (
+            <div className="flex flex-col" style={{ gap: 8, animation: "меткаПришла 200ms ease-out both" }}>
+              <input
+                value={новый}
+                onChange={(e) => setНовый(e.target.value)}
+                placeholder={сеть === "ton" ? "UQ…" : "5x…"}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+                style={{
+                  padding: "13px 14px", borderRadius: 14, border: `1px solid ${T.line}`,
+                  background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 13, outline: "none",
+                }}
+              />
+              <div className="flex items-center" style={{ gap: 8 }}>
+                <input
+                  value={метка}
+                  onChange={(e) => setМетка(e.target.value)}
+                  placeholder={t("bookNamePlaceholder")}
+                  maxLength={24}
+                  style={{
+                    flex: 1, padding: "13px 14px", borderRadius: 14, border: `1px solid ${T.line}`,
+                    background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 13.5, outline: "none",
+                  }}
+                />
+                <button
+                  onClick={() => вКнигу(новый, метка)}
+                  className="fx-tap"
+                  style={{
+                    padding: "13px 16px", borderRadius: 14, border: "none", background: ЦВЕТ_КНОПКИ,
+                    color: PRISM_TEXT, fontFamily: displayFont, fontSize: 13.5, fontWeight: 800,
+                  }}
+                >
+                  {t("bookAdd")}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="no-scrollbar flex flex-col" style={{ flex: 1, minHeight: 0, overflowY: "auto", gap: 8, paddingBottom: 4 }}>
+            {книга.length === 0 ? (
+              <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5, lineHeight: 1.5 }}>{t("bookEmpty")}</span>
+            ) : книга.map((з) => (
+              <div key={з.id} className="flex items-center" style={{ gap: 8 }}>
+                <button
+                  onClick={() => { setАдрес(з.address); haptic("light"); }}
+                  className="fx-tap flex flex-col text-left"
+                  style={{
+                    flex: 1, minWidth: 0, padding: "11px 14px", borderRadius: 14, border: "none",
+                    background: чистый === з.address ? hexA(T.up, 0.12) : T.surface, gap: 2,
+                  }}
+                >
+                  <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>
+                    {з.label || `${з.address.slice(0, 4)}…${з.address.slice(-4)}`}
+                  </span>
+                  <span className="truncate" style={{ fontFamily: monoFont, color: T.faint, fontSize: 11.5 }}>
+                    {`${з.address.slice(0, 10)}…${з.address.slice(-6)}`}
+                  </span>
+                </button>
+                <button
+                  onClick={() => изКниги(з.id)}
+                  className="fx-tap flex items-center justify-center flex-shrink-0"
+                  style={{ width: 38, height: 38, borderRadius: 999, background: T.surface, border: "none", color: T.muted }}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div style={{ padding: "14px 18px 22px", flexShrink: 0 }}>
@@ -12862,6 +13118,87 @@ function ЭкранВывода({
             }}
           >
             {t("withdrawNext")}
+          </button>
+        </div>
+      </ЭкранСнизу>
+    );
+  }
+
+  /* Шаг «код». Последняя дверь перед сетью: обратно перевод не вернуть, и
+     одной живой сессии на чужом телефоне для него мало. */
+  if (шаг === "код") {
+    const кодГоден = код.trim().length === 6;
+    return (
+      <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={t("withdrawCodeTitle")} insetTop={insetTop} insetBottom={insetBottom}>
+        <div className="flex flex-col" style={{ flex: 1, minHeight: 0, padding: "0 18px", gap: 14 }}>
+          <div className="flex items-center" style={{ gap: 10 }}>
+            <span className="flex items-center justify-center flex-shrink-0" style={{
+              width: 40, height: 40, borderRadius: 999, background: hexA(T.electric, 0.14), color: T.electric,
+            }}>
+              <Mail size={18} />
+            </span>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.45 }}>
+              {tf("withdrawCodeSent", { mail: почта })}
+            </span>
+          </div>
+
+          <input
+            value={код}
+            onChange={(e) => { setКод(e.target.value.replace(/\D/g, "").slice(0, 6)); setКодБеда(""); }}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="······"
+            style={{
+              padding: "16px 14px", borderRadius: 16, textAlign: "center",
+              border: `1px solid ${кодБеда ? T.down : (кодГоден ? T.up : T.line)}`,
+              background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 26,
+              letterSpacing: "0.32em", outline: "none", transition: "border-color 200ms ease",
+            }}
+          />
+          <span style={{ fontFamily: bodyFont, color: кодБеда ? T.down : T.faint, fontSize: 12.5 }}>
+            {кодБеда || t("withdrawCodeHint")}
+          </span>
+
+          <button
+            onClick={запроситьКод}
+            disabled={письмоИдёт}
+            className="fx-tap"
+            style={{
+              alignSelf: "flex-start", padding: 0, border: "none", background: "transparent",
+              color: письмоИдёт ? T.faint : T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+            }}
+          >
+            {письмоИдёт ? t("withdrawCodeSending") : t("withdrawCodeResend")}
+          </button>
+
+          <div className="flex flex-col" style={{ marginTop: "auto", gap: 3, paddingBottom: 4 }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
+              {fmtСумма(монет)} {единица}
+            </span>
+            <span className="truncate" style={{ fontFamily: monoFont, color: T.faint, fontSize: 12 }}>{короткий}</span>
+          </div>
+        </div>
+
+        <div className="flex" style={{ gap: 10, padding: "14px 18px 22px", flexShrink: 0 }}>
+          <button
+            onClick={() => { setШаг("сумма"); haptic("light"); }}
+            className="fx-tap flex items-center justify-center flex-shrink-0"
+            style={{ width: 54, height: 54, borderRadius: 999, background: T.surface, border: "none", color: T.ice }}
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <button
+            onClick={подтвердитьИОтправить}
+            disabled={!кодГоден || идёт}
+            className="fx-tap"
+            style={{
+              flex: 1, padding: "16px 0", borderRadius: 999, border: "none",
+              background: кодГоден && !идёт ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+              color: кодГоден && !идёт ? PRISM_TEXT : T.muted,
+              fontFamily: displayFont, fontSize: 16, fontWeight: 800,
+            }}
+          >
+            {идёт ? t("withdrawGoing") : t("withdrawCodeConfirm")}
           </button>
         </div>
       </ЭкранСнизу>
@@ -14374,6 +14711,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         onClose={() => setВыводОткрыт(false)}
         сеть={вTON ? "ton" : "sol"}
         свой={адресВнутри}
+        userId={userId}
         остаток={наКошельке}
         пределЗаСутки={пределЗаСутки}
         курс={курсСети}
