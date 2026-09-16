@@ -323,6 +323,8 @@ const STR = {
     withdrawTestnetHint: "Это тестовая сеть: в кошельке получателя переключи её, иначе перевода не видно",
     withdrawFailed: "Вывод не прошёл",
     withdrawNotEnough: "На кошельке столько нет",
+    withdrawDailyLimit: "Упёрлись в суточный предел вывода — остаток ниже",
+    withdrawLimitHint: "За сутки можно вывести ещё {left}",
     withdrawBadAddress: "Проверь адрес — он не похож на адрес этой сети",
     withdrawSelfAddress: "Это адрес твоего же кошелька",
     withdrawLocked: "Вывод идёт на привязанный адрес",
@@ -908,6 +910,8 @@ const STR = {
     withdrawTestnetHint: "This is a test network: switch it in the recipient wallet or the transfer stays invisible",
     withdrawFailed: "Withdrawal failed",
     withdrawNotEnough: "Not enough on the wallet",
+    withdrawDailyLimit: "Daily withdrawal limit reached — the rest waits",
+    withdrawLimitHint: "You can withdraw {left} more today",
     withdrawBadAddress: "Check the address — it doesn't look like this network",
     withdrawSelfAddress: "That's your own wallet address",
     withdrawLocked: "Withdrawals go to the linked address",
@@ -12653,6 +12657,7 @@ function адресTonОк(строка) {
 
 function ЭкранВывода({
   открыт, onClose, сеть = "sol", остаток = 0, курс = 0, единица = "SOL", свой = "",
+  пределЗаСутки = null,
   showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0,
 }) {
   // Два шага, как в кошельках: сначала «кому», потом «сколько». Один
@@ -12677,7 +12682,13 @@ function ЭкранВывода({
   // Запас на комиссию сети: в TON перевод стоит заметно дороже, чем в
   // Solana, и остаток «под ноль» там не уходит вовсе.
   const запас = сеть === "ton" ? 0.05 : 0.0001;
-  const свободно = Math.max(0, Number(остаток) - запас);
+  /* Свободно — не весь остаток: из него уходит запас на комиссию, а
+     сверху лежит суточный предел вывода. Без предела «100%» набирала
+     сумму, которую сервер всё равно отклонял. */
+  const безЗапаса = Math.max(0, Number(остаток) - запас);
+  const свободно = пределЗаСутки == null ? безЗапаса : Math.max(0, Math.min(безЗапаса, пределЗаСутки));
+  // Предел ниже остатка — значит человек упирается в него, а не в деньги.
+  const упёрлисьВПредел = пределЗаСутки != null && пределЗаСутки < безЗапаса - 1e-9;
   const набрано = Number(String(ввод).replace(",", ".")) || 0;
   // Сколько монет уйдёт на самом деле.
   const монет = вДолларах ? (курс > 0 ? набрано / курс : 0) : набрано;
@@ -12742,7 +12753,8 @@ function ЭкранВывода({
       // Сервер отвечает короткими метками — переводим их в человеческие.
       if (текст.includes("payout_locked")) showToast(t("withdrawLocked"));
       else if (текст.includes("bad_address") || текст.includes("same_address")) showToast(t("withdrawBadAddress"));
-      else if (текст.includes("bad_amount") || текст.includes("daily_limit")) showToast(t("withdrawNotEnough"));
+      else if (текст.includes("daily_limit")) showToast(t("withdrawDailyLimit"));
+      else if (текст.includes("bad_amount")) showToast(t("withdrawNotEnough"));
       else showToast(`${t("withdrawFailed")}: ${текст.slice(0, 90)}`);
       haptic("error");
     } finally {
@@ -12919,10 +12931,17 @@ function ЭкранВывода({
       {/* Что тратим и сколько этого есть. Без стрелки: переключение
           счёта живёт на самой сумме, а вторая точка входа в то же
           действие только путала. */}
-      <div className="flex items-center" style={{ padding: "0 18px 12px", flexShrink: 0 }}>
+      <div className="flex flex-col" style={{ padding: "0 18px 12px", flexShrink: 0, gap: 3 }}>
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
           {единица} <span style={{ color: T.muted, fontWeight: 500 }}>· {fmtСумма(свободно)} ({`$${(свободно * курс).toFixed(2)}`})</span>
         </span>
+        {/* Почему доступно меньше, чем на кошельке: предел, а не деньги.
+            Без этой строки «100%» выглядела ошибкой счёта. */}
+        {упёрлисьВПредел && (
+          <span style={{ fontFamily: bodyFont, color: T.warning, fontSize: 12.5 }}>
+            {tf("withdrawLimitHint", { left: `${fmtСумма(пределЗаСутки)} ${единица}` })}
+          </span>
+        )}
       </div>
 
       <div className="flex" style={{ gap: 10, padding: "0 18px 10px", flexShrink: 0 }}>
@@ -13939,6 +13958,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const годен = текущий && !текущий.нуженВход && !текущий.ошибка;
   const солНаКошельке = внутр && !внутр.нуженВход && !внутр.ошибка ? Number(внутр.sol) || 0 : 0;
   const сыройОстаток = вTON ? (годен ? Number(текущий.ton) || 0 : 0) : солНаКошельке;
+  /* Сколько ещё можно вывести за сутки. Предел стоит на сервере, и
+     раньше о нём узнавали только отказом: кнопка «100%» подставляла весь
+     остаток, а сервер отвечал «столько нет» — хотя деньги на месте, это
+     упёрлось в предел. */
+  const пределЗаСутки = годен && текущий.dailyLeft != null ? Number(текущий.dailyLeft) : null;
 
   /* Только что отправленное списываем с показанной суммы сами.
      Сеть подтверждает перевод секунду-другую, и всё это время баланс
@@ -14341,6 +14365,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         сеть={вTON ? "ton" : "sol"}
         свой={адресВнутри}
         остаток={наКошельке}
+        пределЗаСутки={пределЗаСутки}
         курс={курсСети}
         единица={единица}
         showToast={showToast}
