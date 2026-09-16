@@ -12248,6 +12248,11 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
     const т = e.touches && e.touches[0];
     if (!т) return;
     if (e.target instanceof Element && прокрученныйПредок(e.target)) return;
+    /* Места, где тянуть нельзя: своя клавиатура и прочие поля, по
+       которым водят пальцем. Палец там принадлежит кнопке, а не листу —
+       иначе половина нажатий превращалась бы в закрытие. Помечены
+       атрибутом, чтобы лист не знал, что именно внутри него лежит. */
+    if (e.target instanceof Element && e.target.closest("[data-без-жеста]")) return;
     жест.current = { y0: т.clientY, тянем: false };
   }
   function ходЖеста(e) {
@@ -12866,7 +12871,7 @@ function ЭкранВывода({
   const ряды = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], [".", "0", "⌫"]];
 
   return (
-    <ЭкранСнизу открыт={открыт} onClose={onClose} insetTop={insetTop} insetBottom={insetBottom} жестВыключен>
+    <ЭкранСнизу открыт={открыт} onClose={onClose} insetTop={insetTop} insetBottom={insetBottom}>
       <div className="flex items-center" style={{ gap: 12, padding: "2px 18px 0", flexShrink: 0 }}>
         <button
           onClick={() => { setШаг("адрес"); haptic("light"); }}
@@ -12960,7 +12965,9 @@ function ЭкранВывода({
         ))}
       </div>
 
-      <div style={{ padding: "0 8px 14px", flexShrink: 0 }}>
+      {/* Клавиатура помечена: палец здесь принадлежит цифрам, а не листу
+          — тянуть окно вниз отсюда нельзя. */}
+      <div data-без-жеста="1" style={{ padding: "0 8px 14px", flexShrink: 0 }}>
         {ряды.map((ряд, i) => (
           <div key={i} className="flex">
             {ряд.map((к) => (
@@ -13052,7 +13059,7 @@ function КлавишиОбмена({ onКлавиша }) {
      58 пикселей выдавливали карточки за верхний край. */
   const высота = typeof window !== "undefined" ? Math.max(42, Math.min(58, Math.round(window.innerHeight * 0.068))) : 52;
   return (
-    <div className="flex flex-col" style={{ gap: 4 }}>
+    <div data-без-жеста="1" className="flex flex-col" style={{ gap: 4 }}>
       {ряды.map((ряд, i) => (
         <div key={i} className="flex" style={{ gap: 4 }}>
           {ряд.map((к) => (
