@@ -2378,6 +2378,22 @@ function GlobalStyle() {
         animation: shimmer 1.5s linear infinite;
       }
       @media (prefers-reduced-motion: reduce) { .fx-skeleton::after { animation: none; } }
+      /* Пока данные едут, на их месте стоит то же самое, но не в фокусе:
+         размытые строки той же высоты. Пустой экран читается поломкой, а
+         размытая заготовка — «сейчас будет», и подмена данных не двигает
+         раскладку. */
+      .fx-грузится {
+        filter: blur(7px) saturate(0.7);
+        opacity: 0.55;
+        pointer-events: none;
+        user-select: none;
+        animation: грузитсяДышит 1.7s ease-in-out infinite;
+      }
+      @keyframes грузитсяДышит {
+        0%, 100% { opacity: 0.4; }
+        50%      { opacity: 0.65; }
+      }
+      @media (prefers-reduced-motion: reduce) { .fx-грузится { animation: none; } }
       .fx-chip { transition: border-color ${EASE}, background ${EASE}, color ${EASE}, transform ${SPRING}; }
       .fx-chip:active { transition: border-color ${EASE}, background ${EASE}, color ${EASE}, transform ${PRESS}; }
       /* Замороженная плитка: всё внутри стоит. Анимации не снимаются, а
@@ -11202,7 +11218,28 @@ const этоПриход = (с) => с && (с.side === "sell" || с.side === "dep
 function МояАктивность({ userId, тик = 0 }) {
   const ряд = useСделки(userId, 5, тик);
 
-  if (!ряд) return null;
+  // Пока сделки едут, на их месте стоят размытые плашки той же высоты:
+  // раздел не прыгает, когда данные приходят.
+  if (!ряд) {
+    return (
+      <section>
+        <SectionTitle>{t("activityTitle")}</SectionTitle>
+        <div className="fx-грузится flex flex-col" aria-hidden style={{ gap: 8 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center"
+              style={{ gap: 10, padding: "11px 13px", borderRadius: 18, background: T.surface, border: `1px solid ${T.line}` }}
+            >
+              <span className="fx-skeleton" style={{ width: 15, height: 15, borderRadius: 5, flexShrink: 0 }} />
+              <span className="fx-skeleton flex-1" style={{ height: 11, borderRadius: 5, maxWidth: `${46 + i * 9}%` }} />
+              <span className="fx-skeleton" style={{ width: 52, height: 11, borderRadius: 5, flexShrink: 0 }} />
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
   return (
     <section>
       <SectionTitle>{t("activityTitle")}</SectionTitle>
@@ -13491,7 +13528,32 @@ function ИсторияКошелька({ userId, тик = 0, свежие = [],
       .slice(0, предел);
   }, [сервер, свежие, предел]);
 
-  if (!ряд) return null;
+  /* Страница истории открывается раньше, чем приходят строки. Пустой
+     лист в этот миг выглядел поломкой, поэтому на их месте стоят
+     размытые заготовки: та же высота строки, тот же ритм. */
+  if (!ряд) {
+    return (
+      <section style={{ marginTop: безЗаголовка ? 0 : 22 }}>
+        {!безЗаголовка && (
+          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, marginBottom: 10 }}>
+            {t("walletHistory")}
+          </div>
+        )}
+        <div className="fx-грузится flex flex-col" aria-hidden style={{ gap: 2 }}>
+          {Array.from({ length: Math.min(предел, 7) }).map((_, i) => (
+            <div key={i} className="flex items-center" style={{ gap: 12, padding: "13px 2px" }}>
+              <span className="fx-skeleton" style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0 }} />
+              <span className="flex-1 flex flex-col" style={{ gap: 6 }}>
+                <span className="fx-skeleton" style={{ width: `${52 + (i % 3) * 12}%`, height: 11, borderRadius: 5 }} />
+                <span className="fx-skeleton" style={{ width: `${28 + (i % 4) * 7}%`, height: 9, borderRadius: 5 }} />
+              </span>
+              <span className="fx-skeleton" style={{ width: 58, height: 12, borderRadius: 5, flexShrink: 0 }} />
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section style={{ marginTop: безЗаголовка ? 0 : 22 }}>
@@ -14099,10 +14161,19 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         </div>
 
         {!holdingsReady ? (
-          <div className="flex items-center justify-center" style={{ height: 90 }}>
-            <div style={{ width: 120, height: 10, borderRadius: 999, background: КОШ_КАРТОЧКА, overflow: "hidden" }}>
-              <div style={{ width: "40%", height: "100%", borderRadius: 999, background: hexA("#8E2DE2", 0.55), animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
-            </div>
+          /* Не полоска посреди пустоты, а размытые строки: место под
+             список занято сразу, и приход данных не двигает страницу. */
+          <div className="fx-грузится flex flex-col" aria-hidden style={{ gap: 2 }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center" style={{ gap: 12, padding: "12px 2px" }}>
+                <span className="fx-skeleton" style={{ width: 34, height: 34, borderRadius: "50%", flexShrink: 0 }} />
+                <span className="flex-1 flex flex-col" style={{ gap: 6 }}>
+                  <span className="fx-skeleton" style={{ width: `${40 + i * 12}%`, height: 11, borderRadius: 5 }} />
+                  <span className="fx-skeleton" style={{ width: `${24 + i * 8}%`, height: 9, borderRadius: 5 }} />
+                </span>
+                <span className="fx-skeleton" style={{ width: 56, height: 12, borderRadius: 5, flexShrink: 0 }} />
+              </div>
+            ))}
           </div>
         ) : !holdings.length ? (
           <div style={{ padding: "4px 2px 8px" }}>
