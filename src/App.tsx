@@ -1803,6 +1803,12 @@ function GlobalStyle() {
         from { transform: scaleX(0); }
         to   { transform: scaleX(1); }
       }
+      /* Лента графика едет влево ровно на свою половину: вторая копия
+         встаёт на место первой, и стыка не видно. */
+      @keyframes лентаСвечей {
+        from { transform: translate3d(0, 0, 0); }
+        to   { transform: translate3d(-50%, 0, 0); }
+      }
       /* Герой на баннере дышит: чуть поднимается и опускается. */
       @keyframes геройДышит {
         0%, 100% { transform: translate3d(0, 0, 0); }
@@ -12761,6 +12767,40 @@ function СценаЗапуска() {
  * влево, будто лента сделок не останавливается. Свечи нарисованы, а не
  * взяты картинкой, — их высота меняется от кадра к кадру, и повтор не
  * читается. */
+/* Ряд свечей для фона второго баннера.
+ *
+ * Считается один раз при загрузке и дальше не меняется: фон не должен
+ * жить своей жизнью и перетягивать внимание с заголовка. Цена ходит
+ * случайным блужданием с лёгким наклоном вверх — так ряд похож на
+ * настоящий график, а не на частокол. Числа — проценты высоты сверху
+ * вниз, потому что так их и кладёт CSS. */
+const СВЕЧИ_ФОНА = (() => {
+  let зерно = 20240917;
+  const дальше = () => {
+    зерно = (зерно * 1103515245 + 12345) % 2147483648;
+    return зерно / 2147483648;
+  };
+  const ряд = [];
+  let цена = 50;
+  for (let i = 0; i < 18; i++) {
+    const откр = цена;
+    цена = Math.max(16, Math.min(84, цена + (дальше() - 0.45) * 30));
+    const закр = цена;
+    const верхЦены = Math.max(откр, закр) + 3 + дальше() * 9;
+    const низЦены = Math.min(откр, закр) - 3 - дальше() * 9;
+    // Сверху вниз: у графика большая цена — это меньший отступ от верха.
+    const тело = 100 - Math.max(откр, закр);
+    const высота = Math.max(5, Math.abs(закр - откр));
+    ряд.push({
+      рост: закр >= откр,
+      тело, высота,
+      верх: 100 - верхЦены,
+      тень: Math.max(высота + 3, верхЦены - низЦены),
+    });
+  }
+  return ряд;
+})();
+
 function СценаТорговли() {
   const ЗЕЛЁНЫЙ = "#2ED47A", ФИОЛЕТ = "#8E2DE2";
   // Высоты подобраны так, чтобы лента читалась как движение вверх с
@@ -12777,25 +12817,32 @@ function СценаТорговли() {
         background: `radial-gradient(circle, ${hexA(ЗЕЛЁНЫЙ, 0.28)} 0%, ${hexA(ЗЕЛЁНЫЙ, 0)} 70%)`,
       }} />
 
-      {/* Свечи по низу — те же, что на знаке мемпада: тело, фитиль и
-          рост от основания. Каждая живёт своим кругом и своей задержкой,
-          поэтому ряд не пульсирует в такт; зелёные растут, красные
-          проседают. */}
-      <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "64%", display: "flex", alignItems: "flex-end", gap: 7, padding: "0 10px", opacity: 0.55 }}>
-        {[34, 52, 40, 64, 46, 72, 56, 82, 62, 90, 70, 96, 76, 58, 44, 66, 50, 78].map((в, i) => {
-          const рост = i % 3 !== 1;
-          const цвет = рост ? ЗЕЛЁНЫЙ : "#FF4D6A";
+      {/* График на фоне. Не столбики от пола, а настоящие свечи: тело
+          между открытием и закрытием, тени сверху и снизу, и идут они
+          по всей высоте — цена ходит вверх-вниз, а не растёт из нуля.
+          Ряд считается один раз и не дёргается: движется только вся
+          лента целиком, двумя одинаковыми половинами подряд, поэтому
+          стыка не видно. */}
+      <span style={{
+        position: "absolute", inset: 0, display: "flex", alignItems: "stretch", gap: 7,
+        width: "200%", opacity: 0.5,
+        animation: "лентаСвечей 60s linear infinite",
+        WebkitMaskImage: "linear-gradient(90deg, transparent, #000 8%, #000 62%, transparent 86%)",
+        maskImage: "linear-gradient(90deg, transparent, #000 8%, #000 62%, transparent 86%)",
+      }}>
+        {[...СВЕЧИ_ФОНА, ...СВЕЧИ_ФОНА].map((с, i) => {
+          const цвет = с.рост ? ЗЕЛЁНЫЙ : "#FF4D6A";
           return (
-            <span
-              key={i}
-              style={{
-                position: "relative", flex: 1, height: `${в}%`, minWidth: 6,
-                transformOrigin: "50% 100%",
-                animation: `свечаРастёт ${3.4 + (i % 5) * 0.6}s ease-in-out ${(i % 7) * 0.35}s infinite`,
-              }}
-            >
-              <span style={{ position: "absolute", left: "50%", marginLeft: -1, top: "-16%", bottom: "-10%", width: 2, borderRadius: 1, background: hexA(цвет, 0.55) }} />
-              <span style={{ position: "absolute", inset: 0, borderRadius: 3, background: hexA(цвет, 0.9), boxShadow: `0 0 14px ${hexA(цвет, 0.45)}` }} />
+            <span key={i} style={{ position: "relative", flex: 1, minWidth: 7, maxWidth: 12 }}>
+              <span style={{
+                position: "absolute", left: "50%", marginLeft: -1, width: 2, borderRadius: 1,
+                top: `${с.верх}%`, height: `${с.тень}%`, background: hexA(цвет, 0.6),
+              }} />
+              <span style={{
+                position: "absolute", left: 0, right: 0, borderRadius: 3,
+                top: `${с.тело}%`, height: `${с.высота}%`,
+                background: hexA(цвет, 0.9), boxShadow: `0 0 12px ${hexA(цвет, 0.35)}`,
+              }} />
             </span>
           );
         })}
