@@ -1387,6 +1387,12 @@ const ПЕРЕЛИВ_ТЕКСТА = {
    в приложении помечены рост и падение, и та же волна, что на прочих
    кнопках. Середина не смешивается в грязь: между цветами оставлен
    тёмный стык, он и держит их раздельно. */
+/* Кнопка кошелька — в цвете сети: та же волна, но синяя. */
+const ПЕРЕЛИВ_КНОПКИ_СЕТИ = {
+  background: "linear-gradient(112deg, #0059A8 0%, #0098EA 26%, #56CCFF 50%, #0098EA 74%, #0059A8 100%)",
+  backgroundSize: "230% 100%",
+  animation: "кнопкаПереливается 5.5s ease-in-out infinite",
+};
 const ПЕРЕЛИВ_КНОПКИ_ТОРГИ = {
   background: "linear-gradient(100deg, #0FA85A 0%, #2ED47A 30%, #1B2432 50%, #FF4D6A 70%, #D62F4E 100%)",
   /* Полотно почти по ширине кнопки: при широком волна уносила стык за
@@ -1808,6 +1814,12 @@ function GlobalStyle() {
       @keyframes лентаСвечей {
         from { transform: translate3d(0, 0, 0); }
         to   { transform: translate3d(-50%, 0, 0); }
+      }
+      /* Экран с графиком качается медленнее монеты: дальний предмет и
+         должен двигаться меньше — от этого и берётся глубина. */
+      @keyframes экранКачается {
+        0%, 100% { transform: translate3d(0, 0, 0) rotate(-1.2deg); }
+        50%      { transform: translate3d(-4px, -5px, 0) rotate(1.2deg); }
       }
       /* Герой на баннере дышит: чуть поднимается и опускается. */
       @keyframes геройДышит {
@@ -12652,11 +12664,13 @@ const БАННЕРЫ = [
   },
   {
     id: "wallet",
-    строки: { RU: ["Кошелёк, покупки", "и вывод — внутри"], EN: ["Wallet, buys", "and payouts inside"] },
+    строки: { RU: ["Кошелёк, покупки", "и вывод внутри"], EN: ["Wallet, buys", "and payouts inside"] },
     кнопка: { RU: "Мой кошелёк", EN: "My wallet" },
     цвет: "#0098EA",
     действие: "wallet",
     знак: "монеты",
+    сцена: "кошелёк",
+    выделения: [{ RU: "вывод", EN: "payouts", стиль: "голубой" }],
   },
   {
     id: "shop",
@@ -12886,6 +12900,59 @@ function СценаТорговли() {
   );
 }
 
+/* Сцена третьего баннера — кошелёк.
+ *
+ * Экран с графиком лежит дальше и медленно качается, монета — ближе и
+ * плавает над ним; за ними голубое зарево сети. Глубину даёт не размер,
+ * а движение: дальний предмет ходит медленнее ближнего. */
+function СценаКошелька() {
+  const ГОЛУБОЙ = "#0098EA", ЛЁД = "#7FD8FF";
+  return (
+    <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+      <span style={{
+        position: "absolute", inset: 0,
+        background: `radial-gradient(120% 130% at 76% 14%, ${hexA(ГОЛУБОЙ, 0.38)} 0%, ${hexA("#0B2A4A", 0.34)} 40%, #081019 74%, #06070C 100%)`,
+      }} />
+      <span style={{
+        position: "absolute", right: "6%", top: "-46%", width: "62%", aspectRatio: "1 / 1", borderRadius: "50%",
+        background: `radial-gradient(circle, ${hexA(ГОЛУБОЙ, 0.42)} 0%, ${hexA(ГОЛУБОЙ, 0)} 68%)`,
+      }} />
+
+      {/* Сетка рынка на заднике: тонкая, чтобы читалась плоскостью, а не
+          разлиновкой поверх картинки. */}
+      <span style={{
+        position: "absolute", inset: 0,
+        backgroundImage: `linear-gradient(${hexA(ЛЁД, 0.07)} 1px, transparent 1px), linear-gradient(90deg, ${hexA(ЛЁД, 0.07)} 1px, transparent 1px)`,
+        backgroundSize: "30px 30px",
+        WebkitMaskImage: "linear-gradient(90deg, transparent, #000 45%, #000 100%)",
+        maskImage: "linear-gradient(90deg, transparent, #000 45%, #000 100%)",
+      }} />
+
+      <img
+        src="/banner-chart.webp" alt=""
+        style={{
+          position: "absolute", right: "2%", top: "6%", width: "54%",
+          filter: `drop-shadow(0 10px 30px ${hexA(ГОЛУБОЙ, 0.45)})`,
+          animation: "экранКачается 9s ease-in-out infinite",
+        }}
+      />
+      <img
+        src="/banner-ton.webp" alt=""
+        style={{
+          position: "absolute", right: "8%", bottom: "-18%", width: "26%",
+          filter: `drop-shadow(0 12px 26px ${hexA(ГОЛУБОЙ, 0.6)})`,
+          animation: "монетаПлавает 4.6s ease-in-out infinite",
+        }}
+      />
+
+      <span style={{
+        position: "absolute", left: 0, top: 0, bottom: 0, width: "60%",
+        background: "linear-gradient(90deg, rgba(6,7,12,0.9) 0%, rgba(6,7,12,0.62) 54%, rgba(6,7,12,0) 100%)",
+      }} />
+    </span>
+  );
+}
+
 function ЗнакБаннера({ вид, цвет }) {
   const общее = { width: 104, height: 104, viewBox: "0 0 104 104", fill: "none" };
 
@@ -13083,7 +13150,9 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
             {/* Задник: у первого баннера своя сцена, у остальных — сетка
                 в перспективе, то же ощущение плоскости, на которой стоит
                 предмет. */}
-            {б.сцена === "запуск" ? <СценаЗапуска /> : б.сцена === "торговля" ? <СценаТорговли /> : (
+            {б.сцена === "запуск" ? <СценаЗапуска />
+              : б.сцена === "торговля" ? <СценаТорговли />
+              : б.сцена === "кошелёк" ? <СценаКошелька /> : (
             <>
             {/* Сетка в перспективе — то же ощущение сцены, что на
                 рекламных баннерах: плоскость, на которой стоит предмет. */}
@@ -13130,7 +13199,9 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
                 style={{
                   display: "inline-block", padding: "10px 18px", borderRadius: 999,
                   fontFamily: displayFont, fontSize: 14, fontWeight: 700,
-                  ...(б.сцена === "торговля"
+                  ...(б.сцена === "кошелёк"
+                    ? { ...ПЕРЕЛИВ_КНОПКИ_СЕТИ, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#0098EA", 0.42)}` }
+                    : б.сцена === "торговля"
                     ? { ...ПЕРЕЛИВ_КНОПКИ_ТОРГИ, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#0FA85A", 0.28)}, 0 8px 24px ${hexA("#FF4D6A", 0.24)}` }
                     : б.сцена
                       ? { ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#8E2DE2", 0.45)}` }
