@@ -12962,12 +12962,22 @@ function СценаКошелька() {
           animation: "экранКачается 9s ease-in-out infinite",
         }}
       />
+      {/* Две монеты — по одной на сеть. Плавают в противофазе: вместе
+          они качались бы как одна деталь. */}
       <img
         src="/banner-ton.webp" alt=""
         style={{
           position: "absolute", right: "8%", bottom: "-18%", width: "26%",
           filter: `drop-shadow(0 12px 26px ${hexA(ГОЛУБОЙ, 0.6)})`,
           animation: "монетаПлавает 4.6s ease-in-out infinite",
+        }}
+      />
+      <img
+        src="/banner-sol.webp" alt=""
+        style={{
+          position: "absolute", right: "34%", bottom: "-6%", width: "19%",
+          filter: "drop-shadow(0 10px 22px rgba(153,69,255,0.55))",
+          animation: "монетаПлавает 5.8s ease-in-out 1.4s infinite",
         }}
       />
 
