@@ -13299,30 +13299,36 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
 
       <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
         {БАННЕРЫ.map((б, i) => (
-          /* Полоска у текущего баннера не просто длиннее — она
-             наливается белым к моменту, когда карточка сменится. Так
-             видно, сколько её ещё держат, и переключение не застаёт
-             врасплох. Ключ по номеру круга перезапускает наливание
-             заново при каждой смене. */
-          <span key={б.id} style={{
-            position: "relative", overflow: "hidden",
-            width: i === текущий ? 22 : 6, height: 6, borderRadius: 999,
-            background: i === текущий ? hexA("#FFFFFF", 0.26) : T.line,
-            transition: `width ${EASE}, background ${EASE}`,
-          }}>
-            {i === текущий && (
-              /* Ключ включает и паузу: снятие паузы должно начать
-                 наливание заново, вместе с новым отсчётом. */
-              <span
-                key={`${круг}:${пауза ? "стоп" : "идёт"}`}
-                style={{
-                  position: "absolute", left: 0, top: 0, bottom: 0, width: "100%",
-                  borderRadius: 999, background: T.ice, transformOrigin: "left center",
-                  animation: `полоскаНаливается ${ПОКАЗ_БАННЕРА}ms linear both`,
-                  animationPlayState: пауза ? "paused" : "running",
-                }}
-              />
-            )}
+          /* Место под точку всегда одной ширины, меняется только
+             содержимое: растягивание самой точки шло через width, а это
+             пересчёт раскладки на каждом кадре — отсюда и рывки. Теперь
+             тянется transform, его считает видеокарта.
+
+             Полоска у текущего баннера не просто длиннее — она
+             наливается белым к моменту, когда карточка сменится: видно,
+             сколько её ещё держат, и переключение не застаёт врасплох. */
+          <span key={б.id} style={{ position: "relative", width: 22, height: 6, display: "block" }}>
+            <span style={{
+              position: "absolute", inset: 0, borderRadius: 999, overflow: "hidden",
+              background: i === текущий ? hexA("#FFFFFF", 0.26) : T.line,
+              transform: `scaleX(${i === текущий ? 1 : 6 / 22})`,
+              transition: `transform ${EASE}, background ${EASE}`,
+              willChange: "transform",
+            }}>
+              {i === текущий && (
+                /* Ключ включает и паузу: снятие паузы должно начать
+                   наливание заново, вместе с новым отсчётом. */
+                <span
+                  key={`${круг}:${пауза ? "стоп" : "идёт"}`}
+                  style={{
+                    position: "absolute", left: 0, top: 0, bottom: 0, width: "100%",
+                    borderRadius: 999, background: T.ice, transformOrigin: "left center",
+                    animation: `полоскаНаливается ${ПОКАЗ_БАННЕРА}ms linear both`,
+                    animationPlayState: пауза ? "paused" : "running",
+                  }}
+                />
+              )}
+            </span>
           </span>
         ))}
       </div>
