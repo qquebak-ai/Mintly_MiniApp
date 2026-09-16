@@ -1832,7 +1832,13 @@ function GlobalStyle() {
         0%, 100% { transform: translate3d(0, 0, 0) rotate(-1.2deg); }
         50%      { transform: translate3d(-4px, -5px, 0) rotate(1.2deg); }
       }
-      /* Свет под лавкой дышит: сам снимок неподвижен, а кадр от этого
+      /* Лавка парит над плитой — ровно настолько, чтобы это читалось
+         как объём, а не как подпрыгивание. */
+      @keyframes лавкаПарит {
+        0%, 100% { transform: translate3d(0, 0, 0); }
+        50%      { transform: translate3d(0, -5px, 0); }
+      }
+      /* Свет под лавкой дышит: сам задник неподвижен, а кадр от этого
          перестаёт выглядеть картинкой в рамке. */
       @keyframes витринаДышит {
         0%, 100% { opacity: 0.55; transform: scale(0.96); }
@@ -13037,28 +13043,37 @@ function СценаКошелька() {
   );
 }
 
-/* Сцена четвёртого баннера — готовая картинка.
+/* Сцена четвёртого баннера — карбон и лавка.
  *
- * Карбон и лавка нарисованы заранее, поэтому здесь остаётся положить
- * снимок целиком и притемнить левую половину: заголовок с кнопкой
- * лежат на ней, а на голом карбоне белые буквы теряются. Свечение под
- * лавкой чуть дышит — оно и оживляет кадр, двигать сам снимок незачем.
+ * Задник кладётся как есть, без растяжений и подкраски: это готовая
+ * ткань, и любая правка её портит. Лавка лежит отдельным слоем — так
+ * она может парить над плитой, а фон при этом стоит на месте. Под ней
+ * дышит своё свечение: снимок неподвижен, и без него кадр выглядит
+ * картинкой в рамке.
  */
 function СценаМагазина() {
   return (
     <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
       <img
-        src="/banner-shop.webp" alt=""
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "right center" }}
+        src="/banner-shop-bg.webp" alt=""
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
       />
       <span style={{
-        position: "absolute", right: "6%", bottom: "-16%", width: "46%", aspectRatio: "2 / 1", borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(124,58,237,0.5) 0%, rgba(124,58,237,0) 70%)",
+        position: "absolute", right: "10%", bottom: "2%", width: "40%", aspectRatio: "2 / 1", borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(124,58,237,0.55) 0%, rgba(124,58,237,0) 70%)",
         animation: "витринаДышит 5.2s ease-in-out infinite",
       }} />
+      <img
+        src="/banner-shop-icon.webp" alt=""
+        style={{
+          position: "absolute", right: "6%", bottom: "6%", height: "84%", width: "auto",
+          filter: "drop-shadow(0 10px 24px rgba(88,28,180,0.7))",
+          animation: "лавкаПарит 6.4s ease-in-out infinite",
+        }}
+      />
       <span style={{
-        position: "absolute", left: 0, top: 0, bottom: 0, width: "64%",
-        background: "linear-gradient(90deg, rgba(6,6,10,0.88) 0%, rgba(6,6,10,0.6) 56%, rgba(6,6,10,0) 100%)",
+        position: "absolute", left: 0, top: 0, bottom: 0, width: "62%",
+        background: "linear-gradient(90deg, rgba(6,6,10,0.9) 0%, rgba(6,6,10,0.62) 56%, rgba(6,6,10,0) 100%)",
       }} />
     </span>
   );
