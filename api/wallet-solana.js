@@ -61,7 +61,12 @@ const ЗАПАС_НА_КОМИССИЮ = 0.00002;
 const ЗАДЕРЖКА_ПРИВЯЗКИ = 24 * 60 * 60 * 1000;
 // Одноразовая строка для доказательства владения живёт десять минут.
 const ЖИЗНЬ_ВЫЗОВА = 10 * 60 * 1000;
-const ЛИМИТ_В_СУТКИ = Number(process.env.APP_WALLET_LIMIT || 10);
+/* Суточный предел вывода. По умолчанию его нет: человек выводит свои
+   деньги, и упираться в потолок на ровном месте он не должен. Ставится
+   только вручную — положительным числом в APP_WALLET_LIMIT; ноль и пустое
+   значение означают «без предела». */
+const ЛИМИТ_В_СУТКИ = Number(process.env.APP_WALLET_LIMIT || 0);
+const ЕСТЬ_ПРЕДЕЛ = ЛИМИТ_В_СУТКИ > 0;
 const ПОТОЛОК_ХРАНЕНИЯ = Number(process.env.APP_WALLET_CAP || 2);
 // Больше двенадцати операций в минуту человек руками не делает — дальше
 // это либо цикл в чужом скрипте, либо перебор.
@@ -843,7 +848,8 @@ export default async function handler(req, res) {
         pendingAt: строка.payout_pending_at || null,
         sweepAbove: строка.sweep_above == null ? null : Number(строка.sweep_above),
         cap: ПОТОЛОК_ХРАНЕНИЯ,
-        dailyLeft: Math.max(0, ЛИМИТ_В_СУТКИ - выведено),
+        // Без предела поле пустое: интерфейс тогда ничем сумму не режет.
+        dailyLeft: ЕСТЬ_ПРЕДЕЛ ? Math.max(0, ЛИМИТ_В_СУТКИ - выведено) : null,
         delayHours: ЗАДЕРЖКА_ПРИВЯЗКИ / 3600000,
       });
     }
@@ -1137,9 +1143,11 @@ export default async function handler(req, res) {
       const сумма = тело.all ? Math.max(0, есть - ЗАПАС_НА_КОМИССИЮ) : Number(тело.amount) || 0;
       if (!(сумма > 0) || сумма > есть) return res.status(400).json({ error: "bad_amount" });
 
-      const выведено = await выведеноЗаСутки(db, user);
-      if (выведено + сумма > ЛИМИТ_В_СУТКИ) {
-        return res.status(400).json({ error: "daily_limit", left: Math.max(0, ЛИМИТ_В_СУТКИ - выведено) });
+      if (ЕСТЬ_ПРЕДЕЛ) {
+        const выведено = await выведеноЗаСутки(db, user);
+        if (выведено + сумма > ЛИМИТ_В_СУТКИ) {
+          return res.status(400).json({ error: "daily_limit", left: Math.max(0, ЛИМИТ_В_СУТКИ - выведено) });
+        }
       }
 
       const оп = await начать(db, user, {

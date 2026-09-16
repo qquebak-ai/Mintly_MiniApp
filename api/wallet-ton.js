@@ -36,7 +36,12 @@ const TONAPI_KEY = process.env.TONAPI_KEY || "";
 const ПОТОЛОК = Number(process.env.TON_WALLET_CAP || 50);
 // Больше этого за сутки не уходит наружу: украденная сессия не выносит
 // всё разом.
-const ЛИМИТ_В_СУТКИ = Number(process.env.TON_WALLET_DAILY || 100);
+/* Суточный предел вывода. По умолчанию его нет: человек выводит свои
+   деньги, и упираться в потолок на ровном месте он не должен. Ставится
+   только вручную — положительным числом в TON_WALLET_DAILY; ноль и пустое
+   значение означают «без предела». */
+const ЛИМИТ_В_СУТКИ = Number(process.env.TON_WALLET_DAILY || 0);
+const ЕСТЬ_ПРЕДЕЛ = ЛИМИТ_В_СУТКИ > 0;
 
 // Газ, который контракт кривой удерживает на своей стороне. Та же
 // величина, что в приложении: иначе на кривую придёт меньше, чем ввёл
@@ -298,7 +303,8 @@ export default async function handler(req, res) {
         address: строка.address,
         ton: есть,
         cap: ПОТОЛОК,
-        dailyLeft: Math.max(0, ЛИМИТ_В_СУТКИ - выведено),
+        // Без предела поле пустое: интерфейс тогда ничем сумму не режет.
+        dailyLeft: ЕСТЬ_ПРЕДЕЛ ? Math.max(0, ЛИМИТ_В_СУТКИ - выведено) : null,
         payout: строка.payout_address || null,
         network: TESTNET ? "testnet" : "mainnet",
       });
@@ -473,9 +479,11 @@ export default async function handler(req, res) {
       const сумма = тело.all ? Math.max(0, есть - 0.05) : Number(тело.amount) || 0;
       if (!(сумма > 0) || сумма > есть) return res.status(400).json({ error: "bad_amount" });
 
-      const выведено = await выведеноЗаСутки(db, user);
-      if (выведено + сумма > ЛИМИТ_В_СУТКИ) {
-        return res.status(400).json({ error: "daily_limit", left: Math.max(0, ЛИМИТ_В_СУТКИ - выведено) });
+      if (ЕСТЬ_ПРЕДЕЛ) {
+        const выведено = await выведеноЗаСутки(db, user);
+        if (выведено + сумма > ЛИМИТ_В_СУТКИ) {
+          return res.status(400).json({ error: "daily_limit", left: Math.max(0, ЛИМИТ_В_СУТКИ - выведено) });
+        }
       }
 
       /* Отметка в журнале до перевода: по ней повтор того же запроса
