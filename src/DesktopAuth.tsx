@@ -1,8 +1,7 @@
 /* Вход в аккаунт на сайте.
  *
- * В мини-приложении вход один — через Telegram: там он бесплатный и
- * мгновенный, приложение и так знает, кто перед ним. На сайте Telegram
- * нет, поэтому способов три:
+ * Аккаунт заводится почтой — той же, что и в мини-приложении, так что
+ * человек везде один и тот же. Здесь способов три:
  *
  *   • Google — обычный OAuth Supabase, человек возвращается на ту же
  *     страницу уже с сессией;
@@ -30,13 +29,13 @@ async function токенСессии() {
 
 /* Профиль заводит сервер: таблица закрыта политиками, и клиент под своей
    сессией писать в неё не может. */
-export async function завестиПрофиль(nickname) {
+export async function завестиПрофиль(nickname, birthDate) {
   const t = await токенСессии();
   if (!t) throw new Error("нет сессии");
   const res = await fetch(апи("/api/telegram-auth?action=profile"), {
     method: "POST",
     headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ nickname }),
+    body: JSON.stringify({ nickname, birthDate }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error || `ошибка ${res.status}`);
@@ -114,6 +113,7 @@ export default function DesktopAuth({ наВход }) {
   const [почта, setПочта] = useState("");
   const [пароль, setПароль] = useState("");
   const [ник, setНик] = useState("");
+  const [дата, setДата] = useState("");
   const [нуженНик, setНуженНик] = useState(false);
   const [идёт, setИдёт] = useState(false);
   const [ошибка, setОшибка] = useState("");
@@ -152,6 +152,8 @@ export default function DesktopAuth({ наВход }) {
     const словарь = {
       nickname_taken: "Такой ник уже занят",
       nickname_required: "Придумайте ник",
+      birth_date_required: "Укажите дату рождения",
+      too_young: "Вход только с 18 лет",
       account_conflict: "На этот кошелёк уже заведён другой аккаунт",
       bad_signature: "Подпись не сошлась",
       nonce_expired: "Код устарел, попробуйте ещё раз",
@@ -205,12 +207,29 @@ export default function DesktopAuth({ наВход }) {
     setИдёт(true);
     setОшибка("");
     try {
-      await завестиПрофиль(ник.trim());
+      await завестиПрофиль(ник.trim(), дата);
       наВход && наВход();
-    } catch (e) { поймать(e); } finally { setИдёт(false); }
+    } catch (e) {
+      поймать(e);
+      // Отказ по возрасту — это конец разговора, а не подсказка: сессию
+      // закрываем, аккаунта у человека не осталось.
+      if (String((e && e.message) || "") === "too_young") {
+        try { await supabase.auth.signOut(); } catch (_) { /* уже не важно */ }
+      }
+    } finally { setИдёт(false); }
   }
 
   if (нуженНик) {
+    const лет = (() => {
+      const д = new Date(`${дата}T00:00:00`);
+      if (!дата || Number.isNaN(д.getTime())) return null;
+      const с = new Date();
+      let л = с.getFullYear() - д.getFullYear();
+      const м = с.getMonth() - д.getMonth();
+      if (м < 0 || (м === 0 && с.getDate() < д.getDate())) л -= 1;
+      return л;
+    })();
+    const датаГодна = лет != null && лет >= 18 && лет < 120;
     return (
       <Обёртка>
         <div style={{ fontFamily: шрифт, fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Придумайте ник</div>
@@ -218,8 +237,22 @@ export default function DesktopAuth({ наВход }) {
           Под ним вас увидят остальные. Он выбирается один раз и потом не меняется.
         </p>
         <input value={ник} onChange={(e) => setНик(e.target.value)} placeholder="Ник" style={поле} maxLength={20} />
+        {/* Дата рождения — один раз при создании аккаунта: младше
+            восемнадцати в Mintly нельзя, здесь торгуют на деньги. */}
+        <div style={{ marginTop: 8 }}>
+          <input
+            value={дата}
+            onChange={(e) => setДата(e.target.value)}
+            type="date"
+            max={new Date().toISOString().slice(0, 10)}
+            style={поле}
+          />
+        </div>
+        {дата && лет != null && лет < 18 && (
+          <div style={{ marginTop: 8, fontFamily: шрифт, fontSize: 12.5, color: Ц.падение }}>Вход только с 18 лет</div>
+        )}
         <div style={{ marginTop: 12 }}>
-          <Кнопка onClick={сохранитьНик} disabled={идёт || ник.trim().length < 3} главная>
+          <Кнопка onClick={сохранитьНик} disabled={идёт || ник.trim().length < 3 || !датаГодна} главная>
             {идёт ? "Сохраняем…" : "Готово"}
           </Кнопка>
         </div>
@@ -284,8 +317,7 @@ export default function DesktopAuth({ наВход }) {
       {ошибка && <Ошибка>{ошибка}</Ошибка>}
 
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${Ц.линия}`, fontFamily: шрифт, fontSize: 12.5, color: Ц.слабый, lineHeight: 1.5 }}>
-        Если аккаунт уже заведён в мини-приложении, войдите тем же способом, каким входили там:
-        аккаунты из Telegram и с сайта — разные, и объединить их пока нельзя.{" "}
+        Аккаунт один и там, и здесь: в мини-приложении вход идёт по той же почте, что и на сайте.{" "}
         <a
           href={`https://t.me/${БОТ}`}
           target="_blank"
