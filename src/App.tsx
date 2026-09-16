@@ -13072,7 +13072,10 @@ function СценаМагазина() {
       ))}
       <img
         src="/banner-shop-icon-v2.webp" alt=""
-        style={{ position: "absolute", right: "6%", bottom: "6%", height: "84%", width: "auto" }}
+        /* Лавка выходит за нижнюю кромку, как ракета и герой на соседних
+           карточках: предмет, целиком уместившийся в кадр, читается
+           мельче, даже когда сама карточка того же размера. */
+        style={{ position: "absolute", right: "2%", bottom: "-8%", height: "108%", width: "auto" }}
       />
       <span style={{
         position: "absolute", left: 0, top: 0, bottom: 0, width: "62%",
