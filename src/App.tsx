@@ -1990,6 +1990,13 @@ function GlobalStyle() {
          двадцати точках за четырнадцать секунд ткань стояла на месте и
          раз в полсекунды прыгала на точку — ровно то дёрганье, которое
          было видно. Сдвиг слоя считается дробно и идёт на видеокарте. */
+      /* Снимок ткани качается вниз и обратно: повторить его по кругу
+         нельзя, стык выдал бы край, а чуть заметное движение карте
+         нужно. Запас высоты у слоя снизу — на него он и уходит. */
+      @keyframes карбонКачается {
+        0%, 100% { transform: translate3d(0, 0, 0); }
+        50%      { transform: translate3d(0, -26px, 0); }
+      }
       @keyframes карбонЕдет {
         from { transform: translate3d(0, 0, 0); }
         to   { transform: translate3d(0, 20px, 0); }
@@ -14958,21 +14965,12 @@ const WALLET_SKINS = [
   },
   {
     id: "carbon", label: { RU: "Карбон", EN: "Carbon" }, price: 120,
-    fill: [
-      /* Сдвиги слоёв обязательны: именно они складывают из четырёх
-         встречных клиньев шахматку плетения. Без них все четыре лежат
-         в одной точке и карбон читается полосами. */
-      "linear-gradient(27deg, #14141A 5px, transparent 5px) 0 5px",
-      "linear-gradient(207deg, #14141A 5px, transparent 5px) 10px 0",
-      "linear-gradient(27deg, #24242E 5px, transparent 5px) 0 10px",
-      "linear-gradient(207deg, #24242E 5px, transparent 5px) 10px 5px",
-      "linear-gradient(90deg, #1B1B22 10px, transparent 10px)",
-      "linear-gradient(180deg, #1E1E26 25%, #1A1A21 25%, #1A1A21 50%, transparent 50%, transparent 75%, #26262F 75%, #26262F)",
-    ].join(", "),
-    /* Шаг плетения. Смещения слоёв друг относительно друга ведёт
-       анимация «карбонЕдет»: она же медленно тянет всю ткань вниз ровно
-       на клетку, так что стык не виден и полотно кажется бесконечным. */
-    size: "20px 20px",
+    /* Тот же снимок ткани, что лежит задником на баннере магазина:
+       градиентами плетение не собирается — ни бликов на жгутах, ни
+       того, как нить ныряет под соседнюю. */
+    fill: 'url("/banner-shop-bg-v2.webp")',
+    // «cover» для СлояКарбона — знак, что это снимок, а не плитка.
+    size: "cover",
     ткань: true,
     glow: "#5A5A6B",
   },
@@ -14998,6 +14996,23 @@ const WALLET_SKIN_BY_ID = Object.fromEntries(WALLET_SKINS.map((с) => [с.id, с
  * отдельно от карточки нужно ради движения — фон карточки браузер
  * двигает рывками, а слой едет плавно. */
 function СлойКарбона({ fill, size = "20px 20px", длительность = 9 }) {
+  /* Снимок повторять нельзя — край выдал бы себя стыком. Поэтому он
+     лежит углом в угол карты, запас оставлен снизу, а бесконечный ход
+     вниз заменён на медленное качание с возвратом. */
+  if (String(size) === "cover") {
+    return (
+      <span
+        aria-hidden
+        style={{
+          position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% + 26px)",
+          background: fill, backgroundColor: "#0A0A0D",
+          backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+          animation: `карбонКачается ${длительность * 2.4}s ease-in-out infinite`,
+          willChange: "transform", pointerEvents: "none",
+        }}
+      />
+    );
+  }
   return (
     <span
       aria-hidden
