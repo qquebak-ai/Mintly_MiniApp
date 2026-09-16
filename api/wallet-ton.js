@@ -275,6 +275,25 @@ async function завершить(db, id, signature) {
   await db.from("wallet_ops").update({ signature: signature || null }).eq("id", id);
 }
 
+/* Весточка в бота. Деньги ушли из кошелька — человек должен узнать об
+   этом, даже если приложение в этот момент закрыто. Молчание бота саму
+   операцию не отменяет. */
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+// Монета сети в письмах бота: в приложении она называется GRAM.
+const ТИКЕР = "GRAM";
+async function сообщить(db, user_id, текст) {
+  if (!BOT_TOKEN) return;
+  try {
+    const { data } = await db.from("profiles").select("telegram_id").eq("id", user_id).maybeSingle();
+    if (!data || !data.telegram_id) return;
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: data.telegram_id, text: текст, parse_mode: "HTML", disable_web_page_preview: true }),
+    });
+  } catch { /* бот молчит — это не повод отменять саму операцию */ }
+}
+
 async function записать(db, user, kind, amount, hash) {
   await db.from("wallet_ops").insert({
     user_id: user.id, chain: "ton", kind, amount, signature: hash || null,
@@ -510,6 +529,8 @@ export default async function handler(req, res) {
       });
 
       await завершить(db, оп.id, `seqno:${seqno}`);
+      await сообщить(db, user.id,
+        `Отправлено ${сумма.toFixed(4)} ${ТИКЕР} на <code>${куда}</code>`);
       return res.status(200).json({ ok: true, sent: сумма });
     }
 

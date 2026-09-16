@@ -1180,7 +1180,7 @@ export default async function handler(req, res) {
       }
       await завершить(db, оп.id, подпись);
       await сообщить(db, user.id,
-        `💸 Вывод ${сумма.toFixed(4)} SOL на <code>${куда}</code>.`);
+        `Отправлено ${сумма.toFixed(4)} SOL на <code>${куда}</code>`);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ signature: подпись, amount: сумма });
     }
