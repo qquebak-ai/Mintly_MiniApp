@@ -12809,7 +12809,7 @@ function СценаТорговли() {
       {/* Сам герой. Держится правого края и слегка покачивается — как
           будто дышит над кружкой. */}
       <img
-        src="/banner-pepe-v4.webp" alt=""
+        src="/banner-pepe-v5.webp" alt=""
         style={{
           position: "absolute", right: "-4%", bottom: "-14%", width: "56%",
           filter: `drop-shadow(0 8px 30px ${hexA(ФИОЛЕТ, 0.45)})`,
