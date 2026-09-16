@@ -14043,7 +14043,19 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           {/* Переключатель сети прямо на карте: кошелёк один, а монет на
               нём две, и держать их на разных экранах — значит заставлять
               человека помнить, где что лежит. */}
-          <span className="flex items-center" style={{ gap: 2, padding: 3, borderRadius: 999, background: hexA("#000000", 0.22) }}>
+          {/* Переключатель врезан в карту: фон под ним не просвечивает, а
+              заменён чёрным, и по верхней кромке идёт тень — так он
+              читается вырезом в поверхности, а не наклейкой поверх неё.
+              Полупрозрачная подложка раньше пропускала перелив скина, и
+              на светлых картах подписи тонули. */}
+          <span
+            className="flex items-center"
+            style={{
+              gap: 2, padding: 3, borderRadius: 999,
+              background: "#000000",
+              boxShadow: `inset 0 2px 4px ${hexA("#000000", 0.9)}, 0 1px 0 ${hexA("#FFFFFF", 0.12)}`,
+            }}
+          >
             {[["sol", "SOL"], ["ton", ТИКЕР_TON]].map(([id, подпись]) => (
               <button
                 key={id}
