@@ -13000,23 +13000,6 @@ function СценаТорговли() {
         }}
       />
 
-      {/* Звёзды идут тем же курсом, что и на первом баннере: у площадки
-          одно небо на все карточки. */}
-      {[
-        /* Правее шестидесяти процентов звёзд нет: там герой, и они
-           садились ему прямо на очки. */
-        { left: "9%", top: "26%", w: "4.6%", d: 9.2, з: -1.4 },
-        { left: "20%", top: "26%", w: "3.2%", d: 8.1, з: -5.2 },
-        { left: "31%", top: "26%", w: "4%", d: 9.8, з: -3.1 },
-        { left: "42%", top: "26%", w: "3%", d: 8.6, з: -7.2 },
-        { left: "52%", top: "26%", w: "4.2%", d: 9.4, з: -2.6 },
-        { left: "60%", top: "26%", w: "3.2%", d: 8.3, з: -6.3 },
-      ].map((з, i) => (
-        <span key={i} style={{ position: "absolute", left: з.left, top: з.top, width: з.w, animation: `звёздыЛетят ${з.d}s linear ${з.з}s infinite` }}>
-          <img src="/banner-star.webp" alt="" style={{ width: "100%", display: "block", animation: `звездаКачается ${2.6 + i * 0.4}s ease-in-out infinite` }} />
-        </span>
-      ))}
-
       <span style={{
         position: "absolute", left: 0, top: 0, bottom: 0, width: "64%",
         background: "linear-gradient(90deg, rgba(7,7,12,0.88) 0%, rgba(7,7,12,0.6) 52%, rgba(7,7,12,0) 100%)",
