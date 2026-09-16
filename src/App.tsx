@@ -13064,7 +13064,7 @@ function СценаМагазина() {
         animation: "витринаДышит 5.2s ease-in-out infinite",
       }} />
       <img
-        src="/banner-shop-icon.webp" alt=""
+        src="/banner-shop-icon-v2.webp" alt=""
         style={{
           position: "absolute", right: "6%", bottom: "6%", height: "84%", width: "auto",
           filter: "drop-shadow(0 10px 24px rgba(88,28,180,0.7))",
