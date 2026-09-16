@@ -264,8 +264,6 @@ const STR = {
     bootStepTokens: "Токены сообщества", bootStepRate: "Курс GRAM",
     shopTabFrames: "Рамки", shopTabCards: "Карточки", shopTabWallet: "Карта",
     shopEquip: "Надеть", shopEquipped: "Надето", shopOwned: "Куплено",
-    editLookTitle: "Внешний вид", editLookHint: "Надень купленную рамку и карточку. Остальное — в магазине.",
-    editLookEmpty: "Пока нечего надевать — рамки и карточки покупаются в магазине",
     shopNotEnough: "Не хватает {n} монет — закрой достижение",
     shopBuyFor: "Купить за {n}",
     shopLeftAfter: "Останется после покупки",
@@ -273,7 +271,7 @@ const STR = {
     shopBought: "{name} — куплено",
     shopCoinsHint: "Монеты приходят за достижения и за приглашённых друзей. Тратить их можно только здесь.",
     shopLockedTitle: "Магазин закрыт",
-    shopLockedBody: "Рамки и карточки надеваются на профиль, а монеты приходят за достижения. Войди, чтобы всё это стало твоим.",
+    shopLockedBody: "Вид карты баланса меняется здесь, а монеты приходят за достижения. Войди, чтобы всё это стало твоим.",
     cosmeticApplied: "Применено", cosmeticRemoved: "Снято",
     settingsSaved: "Настройки сохранены",
     langTitle: "Язык", themeTitle: "Оформление", themeWhite: "Светлая",
@@ -638,7 +636,7 @@ const STR = {
     homeHello: "Твоя площадка",
     achievementsTitle: "Достижения",
     achUnlockedOf: "{done} из {total}",
-    achievementsIntro: "За достижения дают монеты. На них в магазине берут рамки и карточки — любые, какие нравятся.",
+    achievementsIntro: "За достижения дают монеты. На них в магазине берут вид карты баланса — любой, какой нравится.",
     achProgress: "Прогресс",
     achGoShop: "Открыть магазин",
     achAll: "Все",
@@ -653,7 +651,7 @@ const STR = {
     achMcap100k: "Сто тысяч", achMcap100kHint: "Довести свой токен до $100K капитализации",
     achWallet: "Кошелёк на месте", achWalletHint: "Подключить кошелёк TON",
     achFace: "Лицо профиля", achFaceHint: "Поставить аватарку и написать о себе",
-    achStyle: "Со вкусом", achStyleHint: "Надеть рамку и карточку из магазина",
+    achStyle: "Со вкусом", achStyleHint: "Надеть вид карты баланса из магазина",
     achInvite1: "Первый приглашённый", achInvite1Hint: "Пригласить друга по своей ссылке",
     achInvite5: "Свой круг", achInvite5Hint: "Пригласить пятерых",
     achInvite10: "Десятка", achInvite10Hint: "Пригласить десятерых",
@@ -851,8 +849,6 @@ const STR = {
     bootStepTokens: "Community tokens", bootStepRate: "TON rate",
     shopTabFrames: "Frames", shopTabCards: "Cards", shopTabWallet: "Card",
     shopEquip: "Equip", shopEquipped: "Equipped", shopOwned: "Owned",
-    editLookTitle: "Look", editLookHint: "Put on a frame and a card you own. Buying happens in the shop.",
-    editLookEmpty: "Nothing to put on yet — frames and cards are bought in the shop",
     shopNotEnough: "{n} coins short — close an achievement",
     shopBuyFor: "Buy for {n}",
     shopLeftAfter: "Left after this",
@@ -860,7 +856,7 @@ const STR = {
     shopBought: "{name} — bought",
     shopCoinsHint: "Coins come from achievements and invited friends. They're only spent here.",
     shopLockedTitle: "Shop is locked",
-    shopLockedBody: "Frames and cards go on your profile, and coins come from achievements. Sign in to make them yours.",
+    shopLockedBody: "Your balance card gets its look here, and coins come from achievements. Sign in to make them yours.",
     cosmeticApplied: "Applied", cosmeticRemoved: "Removed",
     settingsSaved: "Settings saved",
     langTitle: "Language", themeTitle: "Appearance", themeWhite: "White",
@@ -1224,7 +1220,7 @@ const STR = {
     homeHello: "Your launchpad",
     achievementsTitle: "Achievements",
     achUnlockedOf: "{done} of {total}",
-    achievementsIntro: "Achievements pay in coins. Spend them in the shop on any frames and cards you like.",
+    achievementsIntro: "Achievements pay in coins. Spend them in the shop on the look of your balance card.",
     achProgress: "Progress",
     achGoShop: "Open shop",
     achAll: "All",
@@ -1239,7 +1235,7 @@ const STR = {
     achMcap100k: "Hundred thousand", achMcap100kHint: "Take one of your tokens to a $100K market cap",
     achWallet: "Wallet ready", achWalletHint: "Connect a TON wallet",
     achFace: "A face to the name", achFaceHint: "Add an avatar and a bio",
-    achStyle: "Good taste", achStyleHint: "Equip a frame and a card from the shop",
+    achStyle: "Good taste", achStyleHint: "Equip a balance card look from the shop",
     achInvite1: "First invite", achInvite1Hint: "Invite a friend with your link",
     achInvite5: "Your crowd", achInvite5Hint: "Invite five people",
     achInvite10: "Ten strong", achInvite10Hint: "Invite ten people",
@@ -6623,8 +6619,9 @@ function coinsFromInvites(inviteCount) {
 function buildAchievements({ tokensCount = 0, bestMcapUsd = 0, invites = 0, connected = false, profile = {}, cosmetics = {} }) {
   const bioLen = (profile.bio || "").trim().length;
   const hasFace = (profile.avatarUrl ? 1 : 0) + (bioLen >= 10 ? 1 : 0);
-  const dressed = ((cosmetics.frame && cosmetics.frame !== "none") ? 1 : 0)
-    + ((cosmetics.card && cosmetics.card !== "none") ? 1 : 0);
+  // Считаем надетый вид карты баланса: рамки и карточки профиля из
+  // приложения убраны, надевать больше нечего.
+  const dressed = (cosmetics.wallet && cosmetics.wallet !== "none") ? 1 : 0;
   return [
     { id: "firstLaunch", icon: Rocket, color: T.electric, value: tokensCount, target: 1 },
     // Не «сколько запустил», а «как высоко забрался»: берётся лучшая
@@ -6634,7 +6631,7 @@ function buildAchievements({ tokensCount = 0, bestMcapUsd = 0, invites = 0, conn
     { id: "mcap100k", icon: Crown, color: T.electric, value: bestMcapUsd, target: 100000, unit: "usd" },
     { id: "wallet", icon: Wallet, color: T.up, value: connected ? 1 : 0, target: 1 },
     { id: "face", icon: User, color: T.up, value: hasFace, target: 2 },
-    { id: "style", icon: ShoppingBag, color: T.up, value: dressed, target: 2 },
+    { id: "style", icon: ShoppingBag, color: T.up, value: dressed, target: 1 },
     // Приглашения по своей ссылке. Считаются по профилям, у которых в
     // поле «кто пригласил» стоит этот человек, — то есть по людям,
     // которые действительно зашли и завели аккаунт, а не по переходам.
@@ -7650,270 +7647,11 @@ function pickLabel(obj) {
   return obj[lang] || obj.RU || "";
 }
 
+/* Каталог пуст: рамки и карточки профиля из приложения убраны.
+   Запись «none» оставлена одна — на неё сводится всё, что могло
+   быть надето раньше. */
 const AVATAR_FRAMES = [
   { id: "none", label: { RU: "Без рамки", EN: "No frame" } },
-  {
-    // Не оранжевое кольцо, а тлеющий уголь: жар по кольцу дышит
-    // вразнобой, и с него срываются искры, которые гаснут на лету.
-    id: "ember", label: { RU: "Уголёк", EN: "Ember" }, price: 120,
-    // Кольцо толще прочих: под ним не полоска цвета, а корка прогоревших
-    // углей, и трещинам между ними нужна ширина.
-    ring: 0.075,
-    // Снизу — сама лава: от белого жара к тёмно-багровому, чтобы сквозь
-    // разрывы корки было видно разную температуру.
-    colors: ["#FF7A18", "#FFD08A", "#FF3B00", "#8E1400", "#FF7A18"], spin: 9, glow: "#FF4D0A",
-    heat: { color: "#FFC46B", dur: 2.4 },
-    rise: { count: 7, color: "#FF8A3D", dur: 2.8 },
-    // Корка: тёмная порода кладётся поверх лавы рваными пятнами, и там,
-    // где её нет, остаются светящиеся трещины.
-    crust: {
-      color: "#140B09", edge: "#FF6A1A",
-      // Два слоя породы: крупные куски и мелкий щебень поверх, каждый
-      // со своей скоростью — так корка не выглядит одним узором.
-      layers: [
-        { freq: 0.055, seed: 11, dur: 38, порог: [4.6, -1.5] },
-        { freq: 0.14, seed: 3, dur: 27, порог: [3.6, -1.55], opacity: 0.9, reverse: true },
-      ],
-    },
-    // Огонь: мелкая частая рябь на быстром повороте — язычки пламени
-    // бегут по кромке.
-    warp: {
-      colors: ["#FFE3B0", "#FF6B35", "#7A1B00"],
-      layers: [
-        { scale: 6, dur: 9, width: 5, opacity: 0.9, seed: 5, freq: 0.06 },
-        { scale: 10, dur: 17, width: 2.4, opacity: 0.5, seed: 21, freq: 0.09, reverse: true },
-      ],
-    },
-  },
-  {
-    // Сияние — не полоса цвета, а занавеси, которые идут одна сквозь
-    // другую. Поэтому поверх кольца ещё два размытых слоя: разные
-    // скорости и встречные направления дают ту самую переливчатость.
-    id: "aurora", label: { RU: "Полярное сияние", EN: "Aurora" }, price: 180,
-    colors: ["#38D39F", "#2E6BFF", "#B14CFF", "#38D39F"], spin: 11, glow: "#2E6BFF",
-    // Тонкое светлое ядро поверх цветного кольца. У настоящего сияния
-    // самая яркая часть — узкая кромка, а цвет расходится от неё; без
-    // ядра кольцо читается просто широкой цветной полосой.
-    core: { color: "#DCF3FF", width: 0.3, opacity: 0.85 },
-    // Занавеси наружу — то, чем сияние отличается от любого другого
-    // свечения: свет не окружает кольцо ровным ореолом, а вырывается
-    // вверх полосами разной длины и цвета.
-    streamers: {
-      colors: ["#38D39F", "#7CE3FF", "#2E6BFF", "#B14CFF"],
-      count: 18, dur: 26, length: 0.42, width: 5,
-    },
-    // Кольцо тоньше обычного: у сияния свет живёт снаружи, а само оно —
-    // узкая яркая кромка. Широкое кольцо съедало бы занавеси.
-    ring: 0.028,
-    curtains: [
-      { colors: ["rgba(56,211,159,0)", "#7CE3FF", "rgba(46,107,255,0)", "#B14CFF", "rgba(56,211,159,0)"], dur: 7, blur: 3, opacity: 0.55 },
-      { colors: ["rgba(177,76,255,0)", "#38D39F", "rgba(124,227,255,0)", "#2E6BFF", "rgba(177,76,255,0)"], dur: 17, blur: 5, opacity: 0.4, reverse: true },
-    ],
-    // Сияние: крупная медленная волна — занавесь колышется целиком, а
-    // не дрожит по краю.
-    warp: {
-      colors: ["#7CE3FF", "#38D39F", "#B14CFF"],
-      layers: [
-        { scale: 14, dur: 26, width: 5, opacity: 0.75, seed: 9, freq: 0.014 },
-        { scale: 20, dur: 40, width: 2.6, opacity: 0.45, seed: 31, freq: 0.02, reverse: true },
-      ],
-    },
-  },
-  {
-    // Металл, а не жёлтая полоска: фаска по внутреннему краю даёт
-    // толщину, а узкий блик, обегающий кольцо, — полировку.
-    id: "gold", label: { RU: "Золото", EN: "Gold" }, price: 260,
-    colors: ["#7A5B15", "#FFE9A8", "#C9A227", "#FFF6D5", "#7A5B15"], spin: 13, glow: "#FFD86B",
-    metal: { bevel: "#3A2A08", shine: "#FFF6D5", dur: 4.2 },
-    // Тонкий ободок снаружи — как вторая грань полированного кольца.
-    outerRing: { color: "#FFD86B", opacity: 0.35, gap: 1.6 },
-    // Пыль и искры вокруг. Полированное золото на чёрном без них
-    // выглядит нарисованным кругом: блеск читается по тому, что вокруг
-    // него что-то светится, а не по самому кольцу.
-    sparks: { color: "#FFF0C0", dust: "#FFD86B", stars: 3, count: 26, dur: 6 },
-    // Расплавленное золото: волна крупная, но очень медленная — тяжёлый
-    // металл течёт, а не колышется.
-    warp: {
-      colors: ["#FFF6D5", "#FFD86B", "#7A5B15"],
-      layers: [
-        { scale: 7, dur: 34, width: 6, opacity: 0.9, seed: 13, freq: 0.02 },
-      ],
-    },
-  },
-  {
-    // Лёд — это грани. По кольцу нарастают короткие иглы инея, каждая
-    // вспыхивает в свой черёд: серое кольцо само по себе читалось
-    // просто как металл потусклее.
-    id: "ice", label: { RU: "Лёд", EN: "Ice" }, price: 200,
-    colors: ["rgba(255,255,255,0.12)", "#FFFFFF", "rgba(255,255,255,0.12)", "#9FD8FF", "rgba(255,255,255,0.12)"],
-    spin: 16, glow: "#9FD8FF",
-    frost: { count: 9, color: "#DCF2FF", dur: 3.6 },
-    // Лёд — это грани, а не гладкая окружность: кольцо набрано из
-    // неровных кусков, и по стыкам идёт свет.
-    facets: { count: 14, fill: "#7FC8FF", edge: "#EAF7FF", opacity: 0.4 },
-    sparks: { color: "#EAF7FF", dust: "#9FD8FF", stars: 2, count: 16, dur: 5 },
-    // Лёд: шум с изломами вместо плавного — край получается колючим, а
-    // не волнистым. И почти неподвижным: лёд не течёт.
-    warp: {
-      colors: ["#FFFFFF", "#9FD8FF", "#2B4A63"],
-      layers: [
-        { scale: 5, dur: 60, width: 4.5, opacity: 0.32, seed: 7, freq: 0.05, type: "turbulence", octaves: 2 },
-      ],
-    },
-  },
-  {
-    // Не точки по кругу, а настоящая орбита: два наклонённых эллипса,
-    // по каждому идёт своё тело — и одно уходит за аватарку, другое
-    // проходит перед ней. Кольцо под ними почти не видно, вся рамка
-    // держится на этом движении.
-    id: "orbit", label: { RU: "Орбита", EN: "Orbit" }, price: 240,
-    colors: ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.22)", "rgba(255,255,255,0.05)"],
-    spin: 26, glow: "#FF6B35",
-    orbit: {
-      color: "#FF6B35",
-      // flare — период вспышки на этой линии. Периоды несоразмерны
-      // (3.7 и 5.3), поэтому извержения никогда не совпадают: рамка не
-      // мигает целиком, а живёт вразнобой, как поверхность звезды.
-      rings: [
-        { tilt: -20, squash: 0.36, dur: 6.5, size: 2.6, trail: true, flare: 3.7 },
-        { tilt: 38, squash: 0.24, dur: 10, size: 2, trail: true, flare: 5.3 },
-      ],
-    },
-  },
-  {
-    // Были шесть звёздочек, приклеенных к краю, — они и мигали на
-    // месте. Теперь искры срываются с кольца и гаснут на лету, а
-    // звёздочки остались редкой подсветкой.
-    id: "spark", label: { RU: "Искры", EN: "Sparks" }, price: 300,
-    colors: ["rgba(255,255,255,0.08)", "#FFFFFF", "rgba(255,255,255,0.25)", "#CFE8FF", "rgba(255,255,255,0.08)"],
-    spin: 24, glow: "#FFFFFF", sparks: 4,
-    burst: { count: 8, color: "#FFFFFF", dur: 1.9 },
-    // Разряд: мелкий частый излом на быстром повороте — кромка дрожит,
-    // как дуга между контактами.
-    warp: {
-      colors: ["#FFFFFF", "#CFE8FF", "#3A4A5C"],
-      layers: [
-        { scale: 5, dur: 6, width: 3.4, opacity: 0.85, seed: 11, freq: 0.12, type: "turbulence", octaves: 2 },
-      ],
-    },
-  },
-  {
-    // Кислота: со дна кольца поднимаются пузыри, а снизу срывается
-    // капля. Без этого рамка была просто зелёной.
-    id: "toxic", label: { RU: "Токсик", EN: "Toxic" }, price: 260,
-    colors: ["#0F3D2A", "#5BFF9F", "#0F3D2A", "#B6FF3D", "#0F3D2A"], spin: 6, glow: "#5BFF9F",
-    rise: { count: 4, color: "#B6FF3D", dur: 3.4, hollow: true },
-    drip: { count: 2, color: "#5BFF9F", dur: 4.6 },
-    // Слизь: крупная тягучая волна — край оплывает, а не рябит.
-    warp: {
-      colors: ["#B6FF3D", "#5BFF9F", "#0F3D2A"],
-      layers: [
-        { scale: 13, dur: 19, width: 6, opacity: 0.85, seed: 3, freq: 0.022 },
-        { scale: 18, dur: 31, width: 2.6, opacity: 0.4, seed: 27, freq: 0.035, reverse: true },
-      ],
-    },
-  },
-  // Дальше — рамки со своим устройством, а не просто с другим набором
-  // цветов: у каждой добавлен слой, которого нет у остальных.
-  {
-    // Голова с хвостом бежит по кольцу. Хвост — конический градиент,
-    // который к голове разгорается; сама голова отдельной точкой, иначе
-    // на тонком кольце она не читается.
-    // Ядро с двойным хвостом: длинный холодный след по самому кольцу и
-    // короткие искры, отстающие от головы. Голова разгорается и гаснет
-    // на витке — комета не просто ездит по кругу, а горит.
-    id: "comet", label: { RU: "Комета", EN: "Comet" }, price: 320,
-    colors: ["rgba(255,255,255,0.04)", "rgba(255,255,255,0.14)", "rgba(255,255,255,0.04)"],
-    spin: 28, glow: "#7CE3FF",
-    comet: { color: "#7CE3FF", dur: 3.4, embers: 5, flare: true },
-  },
-  {
-    // Пунктирная дуга поверх кольца: короткие штрихи бегут быстрее
-    // самого кольца, и получается разряд, а не вращение.
-    id: "plasma", label: { RU: "Плазма", EN: "Plasma" }, price: 320,
-    colors: ["#2A0A3D", "#B14CFF", "#2A0A3D", "#2E6BFF", "#2A0A3D"], spin: 9, glow: "#B14CFF",
-    // Два ряда штрихов навстречу друг другу: один разряд читается как
-    // вращение, встречные — как пробой.
-    dashes: { color: "#E6C8FF", dur: 2.8 },
-    dashes2: { color: "#7CB0FF", dur: 1.6, reverse: true },
-    // Пробой: самый мелкий и рваный край из всех, на быстром повороте.
-    warp: {
-      colors: ["#E6C8FF", "#B14CFF", "#2E6BFF"],
-      layers: [
-        { scale: 6, dur: 7, width: 3.2, opacity: 0.8, seed: 17, freq: 0.14, type: "turbulence", octaves: 2 },
-      ],
-    },
-  },
-  {
-    // Листья с фона приложения, только облетают аватарку по кругу и
-    // покачиваются на ходу.
-    // Листья теперь не просто едут по кругу: каждый крутится вокруг себя,
-    // покачивается и меняет размер на витке — то ближе, то дальше. Пород
-    // три, и у каждой свой оттенок, как на фоне приложения.
-    id: "leafring", label: { RU: "Листопад", EN: "Leaf fall" }, price: 280,
-    colors: ["rgba(56,211,159,0.08)", "rgba(56,211,159,0.38)", "rgba(91,255,159,0.18)", "rgba(56,211,159,0.08)"],
-    spin: 22, glow: "#38D39F",
-    leafFall: { count: 6, colors: ["#5BFF9F", "#38D39F", "#9BFFC7"] },
-  },
-  {
-    // Первая рамка, у которой край — не окружность. Кольцо пропущено
-    // через застывший шум и медленно поворачивается: неровности едут по
-    // краю, и получается язык пламени, а не вращение картинки. Шум
-    // считается один раз — движение даёт поворот, а не пересчёт.
-    id: "magma", label: { RU: "Магма", EN: "Magma" }, price: 460,
-    colors: ["#2A0A00", "#FF3D00", "#FFC46B", "#FF6B35", "#2A0A00"],
-    spin: 34, glow: "#FF5A1F",
-    warp: {
-      colors: ["#FFE3B0", "#FF6B35", "#7A1B00"],
-      layers: [
-        { scale: 9, dur: 15, width: 7, opacity: 0.95, seed: 3, freq: 0.03 },
-        { scale: 15, dur: 26, width: 3.5, opacity: 0.55, seed: 17, freq: 0.05, reverse: true },
-      ],
-    },
-    rise: { count: 6, color: "#FFB061", dur: 2.6 },
-  },
-  {
-    // Радуга по кольцу и белый блик, который проходит по ней насквозь.
-    id: "prism", label: { RU: "Призма", EN: "Prism" }, price: 400,
-    colors: ["#FF3D6E", "#FFC46B", "#5BFF9F", "#2E6BFF", "#B14CFF", "#FF3D6E"],
-    spin: 15, glow: "#B14CFF", sweep: true,
-    // Расслоение цвета: тот же радужный круг двумя тонкими копиями,
-    // сдвинутыми по фазе, — как свет, разложенный на краях стекла.
-    chroma: [{ dur: 21, opacity: 0.5 }, { dur: 9, opacity: 0.35, reverse: true }],
-    // Стекло: край гуляет медленно и по-разному у каждого цвета — от
-    // этого по кромке идёт расслоение, как в настоящей призме.
-    warp: {
-      layers: [
-        { scale: 9, dur: 23, width: 4, opacity: 0.7, seed: 4, freq: 0.026, colors: ["#FF3D6E", "#FFC46B", "#5BFF9F"] },
-        { scale: 12, dur: 33, width: 3, opacity: 0.6, seed: 19, freq: 0.03, reverse: true, colors: ["#2E6BFF", "#B14CFF", "#FF3D6E"] },
-      ],
-    },
-  },
-  {
-    // Кольца расходятся наружу — но не мерным метрономом, а ударом
-    // сердца: сильная волна, слабая следом, пауза.
-    id: "pulse", label: { RU: "Пульс", EN: "Pulse" }, price: 240,
-    colors: ["rgba(56,211,159,0.14)", "#38D39F", "rgba(56,211,159,0.14)"],
-    spin: 18, glow: "#38D39F", waves: 3, beat: true,
-  },
-  {
-    // Почти чёрное кольцо с одной раскалённой дугой и широким ореолом:
-    // видно только край, будто из-за него что-то светит.
-    id: "eclipse", label: { RU: "Затмение", EN: "Eclipse" }, price: 360,
-    colors: ["#08080C", "#08080C", "#FFE9A8", "#FF6B35", "#08080C", "#08080C"],
-    spin: 24, glow: "#FF9A3D", halo: true,
-    // Корона: лучи по кругу дышат вразнобой, поэтому свет из-за края
-    // виден даже там, где сама раскалённая дуга уже прошла.
-    corona: { count: 14, color: "#FFB061", dur: 4.4 },
-    // Кромка солнца за диском: медленная крупная волна, только самый
-    // край и раскалён.
-    warp: {
-      colors: ["#FFE9A8", "#FF9A3D", "#08080C"],
-      layers: [
-        { scale: 10, dur: 29, width: 4.5, opacity: 0.85, seed: 23, freq: 0.024 },
-      ],
-    },
-  },
 ];
 
 /* Поле лавы для карточки «Магма».
@@ -7971,89 +7709,11 @@ function magmaField(seedKey) {
   return плиты;
 }
 
+/* Каталог пуст: рамки и карточки профиля из приложения убраны.
+   Запись «none» оставлена одна — на неё сводится всё, что могло
+   быть надето раньше. */
 const PROFILE_CARDS = [
   { id: "none", label: { RU: "Без карточки", EN: "No card" } },
-  {
-    id: "grid", label: { RU: "Сетка", EN: "Grid" }, price: 80,
-    base: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0))",
-    grid: "rgba(255,255,255,0.10)", floor: true,
-  },
-  {
-    id: "night", label: { RU: "Ночь", EN: "Night" }, price: 140,
-    base: "linear-gradient(180deg, #101A3A 0%, #0A0A14 70%, rgba(0,0,0,0) 100%)",
-    stars: 26,
-  },
-  {
-    id: "emberCard", label: { RU: "Жар", EN: "Heat" }, price: 160,
-    base: "linear-gradient(180deg, rgba(255,107,53,0.30) 0%, rgba(255,61,0,0.08) 55%, rgba(0,0,0,0) 100%)",
-    blobs: [["#FF6B35", 0.35], ["#FFB35C", 0.22]],
-  },
-  {
-    id: "auroraCard", label: { RU: "Сияние", EN: "Aurora" }, price: 200,
-    base: "linear-gradient(180deg, rgba(46,107,255,0.22) 0%, rgba(177,76,255,0.12) 50%, rgba(0,0,0,0) 100%)",
-    blobs: [["#2E6BFF", 0.4], ["#B14CFF", 0.3], ["#38D39F", 0.22]],
-  },
-  {
-    id: "mint", label: { RU: "Мята", EN: "Mint" }, price: 160,
-    base: "linear-gradient(180deg, rgba(56,211,159,0.26) 0%, rgba(56,211,159,0.05) 60%, rgba(0,0,0,0) 100%)",
-    grid: "rgba(56,211,159,0.16)",
-  },
-  {
-    id: "sunset", label: { RU: "Закат", EN: "Sunset" }, price: 240,
-    base: "linear-gradient(180deg, #FF6B35 0%, #B14CFF 45%, rgba(0,0,0,0) 100%)",
-    floor: true, grid: "rgba(255,255,255,0.16)",
-  },
-  {
-    // Корка из плит: тёмные грани с раскалёнными швами между ними —
-    // тот же приём, что у кейса, только развёрнутый на всю карточку.
-    // Рисунок не случайный: плиты выложены руками, низ забит породой,
-    // верх оставлен пустым под аватарку и ник. Случайная сетка трещин
-    // получалась паутиной поверх текста.
-    id: "magmaCard", label: { RU: "Магма", EN: "Magma" }, price: 380,
-    // Не подложка с узором, а сцена: вулканический пейзаж, а на нём —
-    // сущность из обсидиана, внутри которой течёт магма. Аватарка
-    // приходится ей на голову, поэтому плечи и разведены в стороны.
-    base: "linear-gradient(180deg, #0B0406 0%, #1A0709 38%, #3B0A0A 72%, #6B1414 100%)",
-    magma: {
-      stone: "#0C0508",     // обсидиан
-      bordo: "#4A0E0E",     // тень в породе
-      seam: "#FF4D14",      // раскалённая трещина
-      hot: "#FFD27A",       // золото в жерле
-    },
-    obsidian: { edge: "#FF6B35", stone: "#08060A" },
-    rise: 12, riseColor: "#FF8A2D",
-    smoke: 3,
-  },
-  {
-    id: "meteor", label: { RU: "Метеоры", EN: "Meteors" }, price: 220,
-    base: "linear-gradient(180deg, #12163A 0%, #0A0A14 68%, rgba(0,0,0,0) 100%)",
-    streaks: 7, streakColor: "#9FD8FF", stars: 16,
-  },
-  {
-    id: "wave", label: { RU: "Волны", EN: "Waves" }, price: 220,
-    base: "linear-gradient(180deg, rgba(12,26,48,0.92) 0%, rgba(0,0,0,0) 100%)",
-    waves: [["#2E6BFF", 0.36], ["#38D39F", 0.26], ["#B14CFF", 0.22]],
-  },
-  {
-    id: "sparkCard", label: { RU: "Искры", EN: "Sparks" }, price: 200,
-    base: "linear-gradient(180deg, rgba(255,107,53,0.24) 0%, rgba(255,61,0,0.06) 60%, rgba(0,0,0,0) 100%)",
-    rise: 16, riseColor: "#FFB35C",
-  },
-  {
-    id: "leafCard", label: { RU: "Листопад", EN: "Leaf fall" }, price: 240,
-    base: "linear-gradient(180deg, rgba(56,211,159,0.20) 0%, rgba(255,107,53,0.07) 55%, rgba(0,0,0,0) 100%)",
-    cardLeaves: 9, leafColor: "#5BFF9F",
-  },
-  {
-    id: "beam", label: { RU: "Лучи", EN: "Beams" }, price: 220,
-    base: "linear-gradient(180deg, rgba(177,76,255,0.22) 0%, rgba(0,0,0,0) 75%)",
-    beams: 4, beamColor: "#C9A0FF", grid: "rgba(177,76,255,0.14)",
-  },
-  {
-    id: "holoCard", label: { RU: "Голограмма", EN: "Hologram" }, price: 300,
-    base: "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 70%)",
-    holo: true,
-  },
 ];
 
 const FRAME_BY_ID = Object.fromEntries(AVATAR_FRAMES.map(f => [f.id, f]));
@@ -8547,833 +8207,13 @@ function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false }) {
 // приложения (например всплывающая подсказка после выбора) заставляло
 // браузер заново раскладывать всю витрину, и выделение появлялось с
 // заметной задержкой.
-const AvatarFrame = React.memo(function AvatarFrame({ frameId, size = 120, children }) {
-  const f = FRAME_BY_ID[frameId] || FRAME_BY_ID.none;
-  // Толщина кольца по умолчанию одна на все рамки, но вещество бывает
-  // разной толщины: корка углей на волосяной окружности не читается —
-  // трещинам просто негде быть.
-  const ring = Math.max(2, Math.round(size * (f.ring || 0.035)));
-  // Чёрная середина лежит выше кольца явным этажом, а не просто следом
-  // за ним в разметке. Кольцо крутится и из-за этого уезжает на
-  // отдельный слой отрисовки, а такой слой в WebKit (в том числе внутри
-  // Telegram) поднимается над соседями, у которых своего этажа нет: на
-  // телефоне градиент затекал в середину, и рамка выглядела заливкой.
-  const inner = (
-    <div style={{ position: "absolute", inset: ring, borderRadius: "50%", overflow: "hidden", background: T.bg, zIndex: 2 }}>
-      {children}
-    </div>
-  );
-
-  if (f.id === "none") {
-    return <div style={{ position: "relative", width: size, height: size }}>{inner}</div>;
-  }
-
-  /* На витрине рамка рисуется в 62 точки, в комментариях — в 36. Вся
-     мелочь там не различима, но продолжает считаться: полтора десятка
-     вещей на экране давали полторы сотни одновременных анимаций, и
-     нажатия по нижнему меню начинали теряться. У мелких копий оставляем
-     столько частиц, чтобы приём читался, — на глаз то же самое. */
-  const крупно = size >= 84;
-  const мало = (n, предел) => (крупно ? n : Math.min(n || 0, предел));
-
-  const orbitR = size / 2 + ring * 1.5;
-  // Кольцо вырезано маской: в середине у него просто нет пикселей.
-  // Одной чёрной серединой поверх обойтись не вышло — на телефоне у
-  // запертых предметов (там вся карточка идёт с прозрачностью) градиент
-  // всё равно оказывался виден в центре. Теперь его там нет физически, и
-  // чем бы ни кончилась возня с порядком слоёв, заливки не будет.
-  const ringMask = `radial-gradient(circle at 50% 50%, transparent ${Math.max(0, size / 2 - ring - 0.5)}px, #000 ${Math.max(0.5, size / 2 - ring)}px)`;
-
+/* Рамок вокруг аватарки в приложении больше нет: остался только
+   контейнер нужного размера, чтобы не переписывать два десятка мест,
+   где аватарка рисуется. */
+const AvatarFrame = React.memo(function AvatarFrame({ size = 120, children }) {
   return (
-    <div style={{ position: "relative", width: size, height: size }}>
-      {/* дышащее свечение под рамкой; у «затмения» оно шире и ярче —
-          в этом вся рамка, кольцо там почти чёрное */}
-      <div style={{
-        position: "absolute", inset: -ring, borderRadius: "50%",
-        boxShadow: f.halo
-          ? `0 0 ${size * 0.34}px ${ring * 2.4}px ${hexA(f.glow, 0.42)}`
-          : `0 0 ${size * 0.18}px ${ring}px ${hexA(f.glow, 0.35)}`,
-        // Мелкие копии не пульсируют: на экране их бывает полтора
-        // десятка, а разницы на таком размере не видно.
-        animation: крупно ? "glowPulse 3.2s ease-in-out infinite" : undefined, zIndex: 0,
-      }} />
-      {/* само кольцо — вращающийся конический градиент */}
-      <div style={{
-        position: "absolute", inset: 0, borderRadius: "50%",
-        background: `conic-gradient(from 0deg, ${f.colors.join(", ")})`,
-        animation: `spin360 ${f.spin}s linear infinite`,
-        willChange: "transform", zIndex: 1,
-        WebkitMaskImage: ringMask, maskImage: ringMask,
-      }} />
-
-      {/* Занавеси сияния: те же цвета, но размытые и на своей скорости,
-          одна навстречу другой. Их наложение и даёт переливы, которых у
-          одного кольца быть не может. */}
-      {(крупно ? (f.curtains || []) : (f.curtains || []).slice(0, 1)).map((c, i) => (
-        <div key={`cu${i}`} style={{
-          position: "absolute", inset: 0, borderRadius: "50%",
-          background: `conic-gradient(from ${i * 120}deg, ${c.colors.join(", ")})`,
-          filter: `blur(${c.blur}px)`, opacity: c.opacity,
-          animation: `spin360 ${c.dur}s linear infinite${c.reverse ? " reverse" : ""}`,
-          willChange: "transform", zIndex: 1,
-          WebkitMaskImage: ringMask, maskImage: ringMask,
-        }} />
-      ))}
-
-      {/* Расслоение цвета у призмы. */}
-      {(крупно ? (f.chroma || []) : (f.chroma || []).slice(0, 1)).map((c, i) => (
-        <div key={`ch${i}`} style={{
-          // Копии шире самого кольца и смещены наружу: под ним они
-          // просто не видны, а по краю дают цветную кайму, как у стекла.
-          position: "absolute", inset: -ring * (0.7 + i * 0.6), borderRadius: "50%",
-          background: `conic-gradient(from ${i * 60}deg, ${f.colors.join(", ")})`,
-          opacity: c.opacity, filter: `blur(${Math.max(1.5, ring * 0.6)}px)`,
-          animation: `spin360 ${c.dur}s linear infinite${c.reverse ? " reverse" : ""}`,
-          willChange: "transform", zIndex: 0,
-        }} />
-      ))}
-
-      {/* Металл: тёмная фаска по внутреннему краю и узкий блик, который
-          обегает кольцо. Без фаски золото выглядит наклейкой. */}
-      {f.metal && (
-        <>
-          <div style={{
-            position: "absolute", inset: ring * 0.9, borderRadius: "50%",
-            boxShadow: `0 0 0 ${Math.max(1, ring * 0.28)}px ${hexA(f.metal.bevel, 0.85)}`,
-            zIndex: 1,
-          }} />
-          <div style={{
-            position: "absolute", inset: 0, borderRadius: "50%",
-            background: `conic-gradient(from 0deg, transparent 0deg, transparent 300deg, ${hexA(f.metal.shine, 0.9)} 342deg, #fff 352deg, transparent 360deg)`,
-            animation: `spin360 ${f.metal.dur}s linear infinite`,
-            willChange: "transform", zIndex: 1,
-            WebkitMaskImage: ringMask, maskImage: ringMask,
-          }} />
-        </>
-      )}
-
-      {/* Расплав: неровный, живущий край. Кольцо смещается застывшим
-          шумом, а потом медленно поворачивается вместе с ним — бугры и
-          языки едут по кромке. Пересчитывать шум на каждом кадре не
-          нужно: телефон греется, а на глаз то же самое. */}
-      {/* Живой край.
-
-          Приём, на котором держалась «Магма», теперь общий: кольцо
-          пропускается через застывший шум и медленно поворачивается
-          вместе с ним, поэтому неровности едут по кромке. Идеальная
-          окружность с точками по краю — это украшение; неровный край —
-          уже вещество, и у каждой рамки оно своё: у огня мелкое и
-          быстрое, у сияния крупное и медленное, у льда редкое и
-          колючее.
-
-          Шум считается один раз, движение даёт поворот — пересчитывать
-          его каждый кадр телефон не обязан, а на глаз то же самое.
-
-          Только для крупных копий. Мерил: полтора десятка таких колец на
-          витрине поднимают кадр с 44 до 86 мс — вдвое, — и это ровно та
-          нагрузка, из-за которой терялись нажатия. Ни область фильтра,
-          ни число октав дела не меняют: дорого само их количество.
-          Поэтому в плитках по 62 точки рамка остаётся прежней, а живой
-          край показывается в профиле и на выигрыше из кейса. */}
-      {f.warp && (крупно ? f.warp.layers : f.warp.layers.slice(0, 1)).map((L, i) => {
-        // Размер в ключе: у маленьких аватарок своя копия фильтра, иначе
-        // одна и та же деформация выглядела бы то грубой, то незаметной.
-        const uid = `w${f.id}-${i}-${size}`;
-        const цвета = L.colors || f.warp.colors;
-        return (
-          <svg
-            key={uid} width={size} height={size} viewBox="0 0 100 100"
-            style={{ position: "absolute", inset: 0, zIndex: 1, overflow: "visible", pointerEvents: "none" }}
-            aria-hidden
-          >
-            <defs>
-              {/* Область фильтра ровно под вылет кромки. Прежние минус
-                  сорок пять процентов — это площадь втрое больше самой
-                  рамки, и всю её браузер честно считал. Октав две:
-                  третья на таком размере не видна, а стоит как первые
-                  две вместе. */}
-              <filter id={`f-${uid}`} x="-22%" y="-22%" width="144%" height="144%">
-                <feTurbulence type={L.type || "fractalNoise"} baseFrequency={L.freq} numOctaves={L.octaves || 2} seed={L.seed} result="n" />
-                <feDisplacementMap in="SourceGraphic" in2="n" scale={L.scale} xChannelSelector="R" yChannelSelector="G" />
-              </filter>
-              <linearGradient id={`g-${uid}`} x1="0" y1="0" x2="0.8" y2="1">
-                {цвета.map((c, k) => (
-                  <stop key={k} offset={`${Math.round((k / (цвета.length - 1)) * 100)}%`} stopColor={c} />
-                ))}
-              </linearGradient>
-            </defs>
-            <g style={{
-              transformOrigin: "50px 50px",
-              animation: `spin360 ${L.dur}s linear infinite${L.reverse ? " reverse" : ""}`,
-            }}>
-              <circle
-                cx="50" cy="50" r={50 - L.width / 2}
-                fill="none" stroke={`url(#g-${uid})`} strokeWidth={L.width}
-                opacity={L.opacity} filter={`url(#f-${uid})`}
-              />
-            </g>
-          </svg>
-        );
-      })}
-
-      {/* Занавеси полярного сияния.
-
-          Свет уходит наружу полосами, а не ровным ореолом: у каждой
-          свой цвет, своя длина и своя яркость, а вся связка медленно
-          поворачивается. Полосы гаснут к концу — иначе они читались бы
-          спицами колеса, а не светом.
-
-          Только для крупных копий: на витрине и в комментариях аватарки
-          по 36–62 точки, там от полос остаётся цветная кайма, ради
-          которой не стоит держать два десятка элементов. */}
-      {f.streamers && крупно && (() => {
-        const S = f.streamers;
-        const вылет = size * S.length;
-        const поле = size + вылет * 2;
-        const ц = поле / 2;
-        const r0 = size / 2 - ring * 0.4;
-        // Длина каждой полосы своя, но постоянная: случай считается один
-        // раз по номеру, а не заново на каждом кадре.
-        const длина = (i) => вылет * (0.45 + ((Math.sin(i * 12.9898) * 43758.5453) % 1 + 1) % 1 * 0.55);
-        return (
-          <svg width={поле} height={поле} viewBox={`0 0 ${поле} ${поле}`}
-            style={{ position: "absolute", left: -вылет, top: -вылет, zIndex: 0, pointerEvents: "none" }}
-            aria-hidden
-          >
-            <defs>
-              {S.colors.map((c, k) => (
-                <linearGradient key={k} id={`au${k}-${size}`} x1="0" y1="1" x2="0" y2="0">
-                  <stop offset="0%" stopColor={c} stopOpacity="0.85" />
-                  <stop offset="40%" stopColor={c} stopOpacity="0.38" />
-                  <stop offset="100%" stopColor={c} stopOpacity="0" />
-                </linearGradient>
-              ))}
-            </defs>
-            <g style={{
-              transformOrigin: `${ц}px ${ц}px`,
-              animation: `spin360 ${S.dur}s linear infinite`,
-              // Размытие крупное: занавесь — это свет, а не спица. С
-              // мелким размытием полосы читались колесом со спицами.
-              filter: `blur(${Math.max(2.5, ring * 0.9)}px)`,
-            }}>
-              {Array.from({ length: S.count }, (_, i) => {
-                // Углы с разбросом: строго равномерные полосы читаются
-                // спицами колеса, а сияние — это неровный ряд.
-                const шаг = 360 / S.count;
-                const угол = шаг * i + (((Math.sin(i * 78.233) * 43758.5453) % 1 + 1) % 1 - 0.5) * шаг * 0.7;
-                // Цвет по месту, а не по номеру: соседние занавеси одного
-                // оттенка сливаются в одну широкую, как на небе, и по
-                // кругу получается переход зелёного в голубой и дальше в
-                // фиолетовый.
-                const цвет = Math.floor(((угол % 360) + 360) % 360 / (360 / S.colors.length)) % S.colors.length;
-                const L = длина(i);
-                // Ширина тоже своя у каждой: одинаковые полосы читаются
-                // разметкой, а не светом.
-                const W = S.width * (0.6 + (i % 4) * 0.3);
-                return (
-                  // Поворот — на обёртке, мерцание — на самой полосе:
-                  // в одном элементе они не уживаются, потому что стиль
-                  // из анимации перебивает атрибут transform целиком, и
-                  // полосы сваливаются в одну.
-                  <g key={i} transform={`rotate(${угол} ${ц} ${ц})`}>
-                    {/* Не прямоугольник, а расширяющаяся книзу полоса:
-                        занавесь сияния шире у горизонта и сходит на нет
-                        вверху. Прямые полосы одинаковой ширины и делали
-                        из неё колесо со спицами. */}
-                    <path
-                      d={`M ${ц - W / 2} ${ц - r0} L ${ц - W * 0.16} ${ц - r0 - L} L ${ц + W * 0.16} ${ц - r0 - L} L ${ц + W / 2} ${ц - r0} Z`}
-                      fill={`url(#au${цвет}-${size})`}
-                      style={{
-                        transformOrigin: `${ц}px ${ц}px`,
-                        // Вразнобой: полосы сияния не гаснут разом, и
-                        // одинаковая для всех анимация сразу выдаёт
-                        // механику.
-                        animation: `сияниеДышит ${(5.5 + (i % 5) * 1.7).toFixed(1)}s ease-in-out ${(i % 7) * 0.4}s infinite`,
-                      }}
-                    />
-                  </g>
-                );
-              })}
-            </g>
-          </svg>
-        );
-      })()}
-
-      {/* Светлое ядро кольца — самая яркая, самая узкая его часть. */}
-      {f.core && (
-        <div style={{
-          position: "absolute", inset: ring * 0.35, borderRadius: "50%",
-          border: `${Math.max(1, ring * f.core.width)}px solid ${hexA(f.core.color, f.core.opacity)}`,
-          boxShadow: `0 0 ${ring * 2}px ${hexA(f.core.color, 0.5)}`,
-          zIndex: 1,
-        }} />
-      )}
-
-      {/* Жар уголька: то же кольцо, но ярче и вразнобой мерцающее. */}
-      {f.heat && (
-        <div style={{
-          position: "absolute", inset: 0, borderRadius: "50%",
-          background: `conic-gradient(from 40deg, transparent 0deg, ${hexA(f.heat.color, 0.9)} 60deg, transparent 150deg, ${hexA(f.heat.color, 0.7)} 240deg, transparent 320deg)`,
-          filter: `blur(${Math.max(1, ring * 0.4)}px)`,
-          animation: `frameFlicker ${f.heat.dur}s ease-in-out infinite`,
-          zIndex: 1, WebkitMaskImage: ringMask, maskImage: ringMask,
-        }} />
-      )}
-
-      {/* хвост кометы: к голове разгорается, за ней сходит на нет */}
-      {f.comet && (
-        <div style={{
-          position: "absolute", inset: 0, borderRadius: "50%",
-          background: `conic-gradient(from 0deg, ${hexA(f.comet.color, 0)} 0deg, ${hexA(f.comet.color, 0)} 235deg, ${hexA(f.comet.color, 0.5)} 330deg, ${f.comet.color} 357deg, ${hexA(f.comet.color, 0)} 360deg)`,
-          animation: `spin360 ${f.comet.dur}s linear infinite`,
-          willChange: "transform", zIndex: 1,
-          WebkitMaskImage: ringMask, maskImage: ringMask,
-        }} />
-      )}
-
-      {/* пунктирный разряд поверх кольца */}
-      {f.dashes && (
-        <svg width={size} height={size} style={{
-          position: "absolute", inset: 0,
-          animation: `spin360 ${f.dashes.dur}s linear infinite`, willChange: "transform", zIndex: 1,
-        }} aria-hidden>
-          <circle
-            cx={size / 2} cy={size / 2} r={size / 2 - ring / 2}
-            fill="none" stroke={f.dashes.color} strokeWidth={ring * 0.55} strokeLinecap="round"
-            strokeDasharray={`${ring * 0.9} ${ring * 2.4}`} opacity={0.9}
-            style={{ filter: `drop-shadow(0 0 ${ring * 1.6}px ${f.dashes.color})` }}
-          />
-        </svg>
-      )}
-
-      {/* Встречный ряд штрихов у плазмы. */}
-      {f.dashes2 && (
-        <svg width={size} height={size} style={{
-          position: "absolute", inset: 0,
-          animation: `spin360 ${f.dashes2.dur}s linear infinite${f.dashes2.reverse ? " reverse" : ""}`,
-          willChange: "transform", zIndex: 1,
-        }} aria-hidden>
-          <circle
-            cx={size / 2} cy={size / 2} r={size / 2 - ring * 1.1}
-            fill="none" stroke={f.dashes2.color} strokeWidth={ring * 0.3} strokeLinecap="round"
-            strokeDasharray={`${ring * 0.5} ${ring * 3.2}`} opacity={0.75}
-            style={{ filter: `drop-shadow(0 0 ${ring}px ${f.dashes2.color})` }}
-          />
-        </svg>
-      )}
-
-      {/* белый блик, проходящий по радуге */}
-      {f.sweep && (
-        <div style={{ position: "absolute", inset: 0, borderRadius: "50%", overflow: "hidden", zIndex: 1, WebkitMaskImage: ringMask, maskImage: ringMask }}>
-          <div style={{
-            position: "absolute", top: "-30%", bottom: "-30%", width: "36%", left: 0,
-            background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)",
-            filter: "blur(2px)",
-            animation: "spotlightSweep 3.8s ease-in-out infinite",
-          }} />
-        </div>
-      )}
-
-      {/* Корка углей.
-
-          Кольцо снизу — сплошная лава; сверху на неё кладётся тёмная
-          порода, но не ровным слоем, а рваными пятнами: шум прогоняется
-          через резкую кривую прозрачности, и от него остаются острова
-          вместо мягкой дымки. Между островами лава и видна — это и есть
-          трещины, рисовать их отдельно не нужно.
-
-          Только для крупных копий: на витрине в шестьдесят точек
-          отдельные трещины не различимы, а фильтр считается честно. */}
-      {f.crust && крупно && f.crust.layers.map((L, i) => {
-        const uid = `cr-${f.id}-${i}-${size}`;
-        // Толщина кольца в единицах viewBox — оно рисуется в системе
-        // 0..100 независимо от размера на экране.
-        const ш = (ring / size) * 100;
-        const [к, сдвиг] = L.порог;
-        return (
-          <svg
-            key={uid} width={size} height={size} viewBox="0 0 100 100"
-            style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none", opacity: L.opacity || 1 }}
-            aria-hidden
-          >
-            <defs>
-              <filter id={uid} x="-15%" y="-15%" width="130%" height="130%">
-                <feTurbulence type="fractalNoise" baseFrequency={L.freq} numOctaves="3" seed={L.seed} result="n" />
-                {/* Прозрачность берётся из шума и растягивается так, что
-                    полутона исчезают: остаётся либо порода, либо
-                    просвет. */}
-                <feColorMatrix in="n" type="matrix" values={`0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  ${к} 0 0 0 ${сдвиг}`} result="m" />
-                <feComposite in="SourceGraphic" in2="m" operator="in" />
-              </filter>
-            </defs>
-            <g style={{
-              transformOrigin: "50px 50px",
-              animation: `spin360 ${L.dur}s linear infinite${L.reverse ? " reverse" : ""}`,
-            }}>
-              <circle cx="50" cy="50" r={50 - ш / 2} fill="none" stroke={f.crust.color} strokeWidth={ш} filter={`url(#${uid})`} />
-            </g>
-          </svg>
-        );
-      })}
-
-      {/* Раскалённые кромки: край корки всегда горячее её середины. */}
-      {f.crust && (
-        <>
-          <div style={{
-            position: "absolute", inset: 0, borderRadius: "50%",
-            boxShadow: `inset 0 0 ${Math.max(2, ring * 0.7)}px ${hexA(f.crust.edge, 0.85)}`,
-            zIndex: 1, WebkitMaskImage: ringMask, maskImage: ringMask,
-          }} />
-          <div style={{
-            position: "absolute", inset: ring - 1, borderRadius: "50%",
-            border: `1px solid ${hexA(f.crust.edge, 0.75)}`,
-            boxShadow: `0 0 ${ring}px ${hexA(f.crust.edge, 0.6)}`,
-            zIndex: 1,
-          }} />
-        </>
-      )}
-
-      {inner}
-
-      {/* голова кометы: та же длительность, что и у хвоста, но сдвинутая
-          на три четверти круга — так она попадает ровно в его светлый
-          конец и не убегает вперёд */}
-      {f.comet && (
-        <span style={{
-          position: "absolute", left: "50%", top: "50%",
-          width: ring * 1.8, height: ring * 1.8, marginLeft: -ring * 0.9, marginTop: -ring * 0.9,
-          borderRadius: "50%", background: "#FFFFFF",
-          boxShadow: `0 0 ${ring * 4}px ${ring}px ${hexA(f.comet.color, 0.75)}`,
-          ["--orbit-r"]: `${size / 2 - ring / 2}px`,
-          animation: `spotlightOrbit ${f.comet.dur}s linear ${-f.comet.dur * 0.75}s infinite`, zIndex: 3,
-        }} />
-      )}
-
-      {/* Искры, отстающие от головы кометы: каждая идёт по тому же
-          кругу, но с задержкой — и гаснет, не догнав. */}
-      {f.comet && Array.from({ length: мало(f.comet.embers || 0, 2) }).map((_, i) => {
-        const отставание = (i + 1) * 0.055;
-        const с = ring * (1.1 - i * 0.12);
-        return (
-          <span key={`e${i}`} style={{
-            position: "absolute", left: "50%", top: "50%",
-            width: с, height: с, marginLeft: -с / 2, marginTop: -с / 2,
-            borderRadius: "50%", background: f.comet.color,
-            opacity: 0.75 - i * 0.12,
-            boxShadow: `0 0 ${ring * 2}px ${hexA(f.comet.color, 0.7)}`,
-            ["--orbit-r"]: `${size / 2 - ring / 2}px`,
-            animation: `spotlightOrbit ${f.comet.dur}s linear ${-f.comet.dur * (0.75 - отставание)}s infinite`,
-            zIndex: 3,
-          }} />
-        );
-      })}
-
-      {/* Вспышка на витке: голова разгорается и опадает, а не светит
-          ровно — иначе комета читается как бегущая точка. */}
-      {f.comet && f.comet.flare && (
-        <span style={{
-          position: "absolute", inset: -ring * 2, borderRadius: "50%",
-          boxShadow: `0 0 ${size * 0.3}px ${ring * 1.6}px ${hexA(f.comet.color, 0.32)}`,
-          animation: `glowPulse ${f.comet.dur}s ease-in-out infinite`,
-          zIndex: 0,
-        }} />
-      )}
-
-      {/* круги, расходящиеся наружу; у «пульса» — ударами сердца */}
-      {Array.from({ length: мало(f.waves || 0, 2) }).map((_, i) => (
-        <span key={`w${i}`} style={{
-          position: "absolute", inset: 0, borderRadius: "50%",
-          border: `${Math.max(1, ring * 0.5)}px solid ${hexA(f.glow, 0.55)}`,
-          animation: f.beat
-            ? `heartWave 2.6s cubic-bezier(0.2,0.8,0.3,1) ${-i * 0.87}s infinite`
-            : `frameWave 3s ease-out ${-i * 1}s infinite`,
-          zIndex: 3,
-        }} />
-      ))}
-
-      {/* Частицы, срывающиеся с кольца: искры уголька и пузыри кислоты.
-          Каждая стартует в своей точке края и уходит наружу по радиусу —
-          поэтому поворот задаётся до подъёма, а сам подъём идёт по
-          вложенному слою: иначе «вверх» у всех был бы один и тот же. */}
-      {f.rise && Array.from({ length: мало(f.rise.count, 2) }).map((_, i) => {
-        const угол = (360 / f.rise.count) * i + (i % 2 ? 18 : 0);
-        const с = Math.max(2, ring * (0.7 + (i % 3) * 0.2));
-        return (
-          <span key={`ri${i}`} style={{
-            position: "absolute", left: "50%", top: "50%", width: 0, height: 0,
-            transform: `rotate(${угол}deg) translateY(${-(size / 2 - ring / 2)}px)`,
-            zIndex: 3,
-          }}>
-            <span style={{
-              display: "block", width: с, height: с, marginLeft: -с / 2, marginTop: -с / 2,
-              borderRadius: "50%",
-              background: f.rise.hollow ? "transparent" : f.rise.color,
-              border: f.rise.hollow ? `1px solid ${f.rise.color}` : "none",
-              boxShadow: `0 0 ${ring * 1.6}px ${hexA(f.rise.color, 0.8)}`,
-              ["--rise"]: `${Math.round(size * (0.16 + (i % 3) * 0.05))}px`,
-              animation: `emberRise ${f.rise.dur + (i % 3) * 0.6}s ease-out ${-i * (f.rise.dur / f.rise.count)}s infinite`,
-            }} />
-          </span>
-        );
-      })}
-
-      {/* Капли: срываются с нижней части кольца и падают. */}
-      {f.drip && Array.from({ length: мало(f.drip.count, 1) }).map((_, i) => {
-        const угол = 120 + i * 55;
-        const с = Math.max(2, ring * 0.9);
-        return (
-          <span key={`dr${i}`} style={{
-            position: "absolute", left: "50%", top: "50%", width: 0, height: 0,
-            transform: `rotate(${угол}deg) translateY(${size / 2 - ring / 2}px) rotate(${-угол}deg)`,
-            zIndex: 3,
-          }}>
-            <span style={{
-              display: "block", width: с, height: с * 1.3, marginLeft: -с / 2,
-              borderRadius: "50% 50% 50% 50% / 60% 60% 40% 40%",
-              background: f.drip.color,
-              boxShadow: `0 0 ${ring * 1.4}px ${hexA(f.drip.color, 0.7)}`,
-              ["--drop"]: `${Math.round(size * 0.2)}px`,
-              animation: `dripFall ${f.drip.dur + i * 1.3}s ease-in ${-i * 2.1}s infinite`,
-            }} />
-          </span>
-        );
-      })}
-
-      {/* Искры, слетающие с кольца по касательной. */}
-      {f.burst && Array.from({ length: мало(f.burst.count, 3) }).map((_, i) => {
-        const угол = (360 / f.burst.count) * i + 11;
-        const с = Math.max(1.6, ring * 0.62);
-        return (
-          <span key={`bu${i}`} style={{
-            position: "absolute", left: "50%", top: "50%", width: 0, height: 0,
-            // Минус девяносто, а не плюс: с плюсом ось X после поворота
-            // смотрит внутрь, и искры улетали в аватарку.
-            transform: `rotate(${угол}deg) translateY(${-(size / 2 - ring / 2)}px) rotate(${-90 + (i % 2 ? 25 : -25)}deg)`,
-            zIndex: 3,
-          }}>
-            <span style={{
-              // Росчерк вдоль полёта, а не точка: точка на этом размере
-              // читается как соринка, а не как искра.
-              display: "block", width: с * 3, height: с, marginLeft: -с * 1.5, marginTop: -с / 2,
-              borderRadius: с, background: `linear-gradient(90deg, ${hexA(f.burst.color, 0)}, ${f.burst.color})`,
-              boxShadow: `0 0 ${ring * 1.8}px ${hexA(f.burst.color, 0.9)}`,
-              ["--fly"]: `${Math.round(size * (0.16 + (i % 4) * 0.05))}px`,
-              animation: `sparkShoot ${f.burst.dur + (i % 4) * 0.5}s ease-out ${-i * 0.42}s infinite`,
-            }} />
-          </span>
-        );
-      })}
-
-      {/* Гранёное кольцо льда.
-
-          Настоящий лёд не бывает ровной трубой: он колется, и кольцо
-          из неровных кусков со светящимися стыками читается льдом с
-          первого взгляда, а гладкое — просто голубым металлом.
-
-          Радиусы вершин сдвинуты понемногу и постоянно (шум считается
-          по номеру вершины), поэтому куски разной толщины, но картинка
-          не дёргается от кадра к кадру. */}
-      {f.facets && крупно && (() => {
-        const N = f.facets.count;
-        const ц = size / 2;
-        const шум = (i, k) => (((Math.sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1) + 1) % 1;
-        const внешR = ц - ring * 0.4;
-        const внутрR = ц - ring * 1.7;
-        const точка = (a, r) => [ц + Math.cos(a) * r, ц + Math.sin(a) * r];
-        const внеш = [], внутр = [];
-        for (let i = 0; i < N; i++) {
-          const a = (Math.PI * 2 / N) * i;
-          внеш.push(точка(a, внешR * (1 - шум(i, 1) * 0.06)));
-          внутр.push(точка(a + Math.PI / N, внутрR * (1 + шум(i, 2) * 0.07)));
-        }
-        const путь = (тчк) => `M ${тчк.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L ")} Z`;
-        return (
-          <svg width={size} height={size} style={{ position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none" }} aria-hidden>
-            <defs>
-              <linearGradient id={`ice-${size}`} x1="0" y1="0" x2="0.6" y2="1">
-                <stop offset="0%" stopColor={f.facets.edge} stopOpacity="0.75" />
-                <stop offset="45%" stopColor={f.facets.fill} stopOpacity="0.25" />
-                <stop offset="100%" stopColor={f.facets.edge} stopOpacity="0.7" />
-              </linearGradient>
-            </defs>
-            <path
-              d={`${путь(внеш)} ${путь([...внутр].reverse())}`}
-              fillRule="evenodd" fill={`url(#ice-${size})`} opacity={f.facets.opacity}
-              stroke={f.facets.edge} strokeWidth={Math.max(0.6, ring * 0.14)} strokeLinejoin="round"
-            />
-            {/* Стыки кусков — короткие рёбра поперёк кольца, от внешней
-                вершины к ближайшей внутренней. По ним и видно, что оно
-                набрано из кусков, а не отлито. Раньше ребро тянулось к
-                вершине через одну, и кольцо затягивало паутиной. */}
-            {внеш.map(([x, y], i) => {
-              const a = (Math.PI * 2 / N) * i;
-              const [ix, iy] = точка(a, внутрR * (1 + шум(i, 2) * 0.07));
-              return <line key={i} x1={x} y1={y} x2={ix} y2={iy} stroke={f.facets.edge} strokeWidth={Math.max(0.5, ring * 0.12)} opacity="0.4" />;
-            })}
-          </svg>
-        );
-      })()}
-
-      {/* Тонкий ободок снаружи кольца. */}
-      {f.outerRing && (
-        <div style={{
-          position: "absolute", inset: -ring * f.outerRing.gap, borderRadius: "50%",
-          border: `${Math.max(1, ring * 0.16)}px solid ${hexA(f.outerRing.color, f.outerRing.opacity)}`,
-          zIndex: 0, pointerEvents: "none",
-        }} />
-      )}
-
-      {/* Пыль и искры вокруг кольца.
-
-          Блеск виден не по самому кольцу, а по тому, что вокруг него
-          что-то светится: мелкая пыль по орбите и несколько крупных
-          искр с лучами. Без них полированный металл на чёрном выглядит
-          просто нарисованным кругом. */}
-      {f.sparks && крупно && (() => {
-        const S = f.sparks;
-        const поле = size * 1.5;
-        const ц = поле / 2;
-        const R = size / 2;
-        const шум = (i, k) => (((Math.sin(i * 45.164 + k * 91.71) * 43758.5453) % 1) + 1) % 1;
-        return (
-          <svg width={поле} height={поле} viewBox={`0 0 ${поле} ${поле}`}
-            style={{ position: "absolute", left: -(поле - size) / 2, top: -(поле - size) / 2, zIndex: 0, pointerEvents: "none" }}
-            aria-hidden
-          >
-            <g style={{ transformOrigin: `${ц}px ${ц}px`, animation: `spin360 ${S.dur * 7}s linear infinite` }}>
-              {Array.from({ length: S.count }, (_, i) => {
-                const a = шум(i, 1) * Math.PI * 2;
-                const r = R * (1.02 + шум(i, 2) * 0.34);
-                const рад = Math.max(0.6, ring * (0.1 + шум(i, 3) * 0.22));
-                return (
-                  <circle
-                    key={i} cx={ц + Math.cos(a) * r} cy={ц + Math.sin(a) * r} r={рад}
-                    fill={S.dust} opacity={0.25 + шум(i, 4) * 0.5}
-                    style={{ animation: `frostTwinkle ${(S.dur + (i % 5)).toFixed(1)}s ease-in-out ${-i * 0.31}s infinite` }}
-                  />
-                );
-              })}
-              {/* Крупные искры: короткий крест с длинными лучами — так
-                  блик читается вспышкой, а не точкой побольше. */}
-              {Array.from({ length: S.stars }, (_, i) => {
-                const a = (Math.PI * 2 / S.stars) * i + шум(i, 5) * 1.2;
-                const r = R * (0.99 + шум(i, 6) * 0.06);
-                const x = ц + Math.cos(a) * r;
-                const y = ц + Math.sin(a) * r;
-                const L = ring * (0.9 + шум(i, 7) * 0.9);
-                const т = Math.max(0.6, ring * 0.11);
-                return (
-                  <g key={`s${i}`} style={{
-                    transformOrigin: `${x}px ${y}px`,
-                    animation: `frostTwinkle ${(S.dur * 0.8 + i * 1.3).toFixed(1)}s ease-in-out ${-i * 1.7}s infinite`,
-                    filter: `drop-shadow(0 0 ${ring}px ${S.color})`,
-                  }}>
-                    <line x1={x - L} y1={y} x2={x + L} y2={y} stroke={S.color} strokeWidth={т} strokeLinecap="round" />
-                    <line x1={x} y1={y - L} x2={x} y2={y + L} stroke={S.color} strokeWidth={т} strokeLinecap="round" />
-                    <circle cx={x} cy={y} r={т * 1.4} fill="#fff" />
-                  </g>
-                );
-              })}
-            </g>
-          </svg>
-        );
-      })()}
-
-      {/* Иней: короткие иглы по внутреннему краю, вспыхивают вразнобой. */}
-      {f.frost && (
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ position: "absolute", inset: 0, zIndex: 3, pointerEvents: "none" }} aria-hidden>
-          {Array.from({ length: мало(f.frost.count, 4) }).map((_, i) => {
-            // Углы неровные, длины разные: ровный шаг по кругу читается
-            // как деления циферблата, а не как наросший иней.
-            const a = ((360 / f.frost.count) * i + (i % 3) * 7 - 5) * Math.PI / 180;
-            const R = size / 2 - ring * 0.75;
-            const дл = ring * (0.7 + (i % 4) * 0.28);
-            const тчк = (rad, r) => [size / 2 + Math.cos(rad) * r, size / 2 + Math.sin(rad) * r];
-            const [x1, y1] = тчк(a, R);
-            const [x2, y2] = тчк(a, R - дл);
-            // Две ветки под углом от середины иглы — так растёт иней.
-            const [bx1, by1] = тчк(a + 0.3, R - дл * 0.85);
-            const [bx2, by2] = тчк(a - 0.3, R - дл * 0.85);
-            const [сx, сy] = тчк(a, R - дл * 0.45);
-            const толщ = Math.max(0.5, ring * 0.1);
-            return (
-              <g key={i} style={{
-                animation: `frostTwinkle ${f.frost.dur + (i % 4) * 0.8}s ease-in-out ${-i * 0.37}s infinite`,
-              }}>
-                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={f.frost.color} strokeWidth={толщ} strokeLinecap="round" />
-                <line x1={сx} y1={сy} x2={bx1} y2={by1} stroke={f.frost.color} strokeWidth={толщ * 0.7} strokeLinecap="round" opacity="0.75" />
-                <line x1={сx} y1={сy} x2={bx2} y2={by2} stroke={f.frost.color} strokeWidth={толщ * 0.7} strokeLinecap="round" opacity="0.75" />
-              </g>
-            );
-          })}
-        </svg>
-      )}
-
-      {/* Корона затмения: лучи из-за края, дышат вразнобой. */}
-      {f.corona && Array.from({ length: мало(f.corona.count, 5) }).map((_, i) => {
-        const угол = (360 / f.corona.count) * i;
-        const дл = ring * (2.2 + (i % 3) * 1.1);
-        return (
-          <span key={`co${i}`} style={{
-            position: "absolute", left: "50%", top: "50%", width: 0, height: 0,
-            transform: `rotate(${угол}deg)`, zIndex: 0,
-          }}>
-            <span style={{
-              display: "block", width: Math.max(1, ring * 0.5), height: дл,
-              marginLeft: -ring * 0.25,
-              marginTop: -(size / 2 + дл - ring * 0.5),
-              transformOrigin: "50% 100%",
-              background: `linear-gradient(to top, ${hexA(f.corona.color, 0.75)}, transparent)`,
-              filter: `blur(${Math.max(0.5, ring * 0.25)}px)`,
-              animation: `coronaBreath ${f.corona.dur + (i % 4) * 0.9}s ease-in-out ${-i * 0.31}s infinite`,
-            }} />
-          </span>
-        );
-      })}
-
-      {/* Листопад: лист идёт по кругу, крутится вокруг себя и меняет
-          размер — то приближается, то уходит вглубь. Половина листьев
-          рисуется за аватаркой, половина перед ней. */}
-      {f.leafFall && Array.from({ length: мало(f.leafFall.count, 3) }).map((_, i) => {
-        const с = Math.max(9, Math.round(size * (0.15 + (i % 3) * 0.03)));
-        const дл = 13 + (i % 4) * 3.5;
-        return (
-          <span key={`lf${i}`} style={{
-            position: "absolute", left: "50%", top: "50%",
-            width: с, height: с, marginLeft: -с / 2, marginTop: -с / 2,
-            ["--orbit-r"]: `${orbitR - (i % 2) * ring}px`,
-            animation: `spotlightOrbit ${дл}s linear ${-i * (дл / f.leafFall.count)}s infinite`,
-            zIndex: i % 2 ? 3 : 0,
-          }}>
-            <span style={{
-              display: "block",
-              animation: `leafTumble ${3.4 + (i % 3) * 0.9}s ease-in-out infinite`,
-              animationDelay: `${-i * 0.6}s`,
-            }}>
-              <LeafIcon size={с} kind={i % 3} color={f.leafFall.colors[i % f.leafFall.colors.length]} />
-            </span>
-          </span>
-        );
-      })}
-
-      {/* листья, облетающие аватарку */}
-      {Array.from({ length: f.leaves || 0 }).map((_, i) => {
-        const s = Math.max(9, Math.round(size * 0.17));
-        return (
-          <span key={`l${i}`} style={{
-            position: "absolute", left: "50%", top: "50%",
-            width: s, height: s, marginLeft: -s / 2, marginTop: -s / 2,
-            ["--orbit-r"]: `${orbitR}px`,
-            animation: `spotlightOrbit ${15 + i * 3}s linear ${-i * 5}s infinite`, zIndex: 3,
-          }}>
-            <span style={{ display: "block", animation: `wreathSway ${5.2 + i * 0.7}s ease-in-out infinite` }}>
-              <LeafIcon size={s} kind={i % 3} color={f.leafColor} />
-            </span>
-          </span>
-        );
-      })}
-      {/* Орбиты: наклонённые эллипсы и тела, идущие по ним. Тело в
-          верхней половине пути прячется за аватарку, в нижней проходит
-          перед ней — это и создаёт объём. Один слой рисуется под
-          аватаркой, другой поверх, а само тело переключается между ними
-          на середине витка. */}
-      {f.orbit && [0, 1].map((слой) => (
-        <div key={`ob${слой}`} style={{
-          position: "absolute", inset: -ring * 2, pointerEvents: "none",
-          zIndex: слой === 0 ? 0 : 3,
-        }}>
-          {f.orbit.rings.map((r, i) => {
-            const w = size + ring * 4;
-            const h = w * r.squash;
-            return (
-              <div key={i} style={{
-                position: "absolute", left: "50%", top: "50%",
-                width: w, height: h, marginLeft: -w / 2, marginTop: -h / 2,
-                transform: `rotate(${r.tilt}deg)`,
-              }}>
-                {/* Сама траектория — тонкая, чтобы не спорить с кольцом.
-                    Слоя два: ровная холодная линия, которая видна всегда,
-                    и поверх неё раскалённая — она и извергается. Порознь
-                    их держим потому, что при затухании вспышки линия
-                    должна не исчезать, а остывать. */}
-                {слой === 0 && (
-                  <>
-                    <div style={{
-                      position: "absolute", inset: 0, borderRadius: "50%",
-                      border: `${Math.max(1, ring * 0.35)}px solid ${hexA(f.orbit.color, 0.32)}`,
-                      boxShadow: `0 0 ${ring * 2}px ${hexA(f.orbit.color, 0.22)}`,
-                    }} />
-                    <div style={{
-                      position: "absolute", inset: 0, borderRadius: "50%",
-                      border: `${Math.max(1, ring * 0.45)}px solid ${hexA(f.orbit.color, 0.85)}`,
-                      boxShadow: `0 0 ${ring * 5}px ${ring}px ${hexA(f.orbit.color, 0.5)}, inset 0 0 ${ring * 2}px ${hexA(f.orbit.color, 0.4)}`,
-                      animation: `orbitFlare ${r.flare || 4}s cubic-bezier(0.2,0.9,0.3,1) infinite`,
-                      // Сдвиг по фазе — чтобы линии не вспыхивали разом
-                      // даже в первый заход, до расхождения периодов.
-                      animationDelay: `${-i * 1.9}s`,
-                    }} />
-                  </>
-                )}
-                {/* Тело. Верхнюю половину пути показывает нижний слой,
-                    нижнюю — верхний: половинки чередуются по фазе. */}
-                <div style={{
-                  position: "absolute", inset: 0,
-                  animation: `spin360 ${r.dur}s linear infinite`,
-                  animationDelay: `${-r.dur * (слой === 0 ? 0 : 0.5)}s`,
-                  clipPath: слой === 0 ? "inset(0 0 50% 0)" : "inset(50% 0 0 0)",
-                }}>
-                  <span style={{
-                    position: "absolute", left: "50%", top: 0,
-                    width: ring * r.size, height: ring * r.size,
-                    marginLeft: -ring * r.size / 2, marginTop: -ring * r.size / 2,
-                    borderRadius: "50%", background: "#fff",
-                    boxShadow: `0 0 ${ring * 4}px ${ring * 1.2}px ${f.orbit.color}`,
-                  }} />
-                  {/* След за телом: короткая дуга того же цвета. */}
-                  {r.trail && (
-                    <div style={{
-                      position: "absolute", inset: 0, borderRadius: "50%",
-                      border: `${Math.max(1, ring * 0.5)}px solid transparent`,
-                      borderTopColor: hexA(f.orbit.color, 0.55),
-                      filter: `blur(${ring * 0.3}px)`,
-                    }} />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ))}
-
-      {/* точки, вращающиеся по орбите вокруг рамки */}
-      {Array.from({ length: f.orbiters || 0 }).map((_, i) => (
-        <span key={`o${i}`} style={{
-          position: "absolute", left: "50%", top: "50%",
-          width: ring * 1.6, height: ring * 1.6, marginLeft: -ring * 0.8, marginTop: -ring * 0.8,
-          borderRadius: "50%", background: f.orbitColor,
-          boxShadow: `0 0 ${ring * 3}px ${ring * 0.6}px ${hexA(f.orbitColor, 0.6)}`,
-          ["--orbit-r"]: `${orbitR}px`,
-          animation: `spotlightOrbit ${9 + i * 2}s linear ${-i * 3}s infinite`, zIndex: 3,
-        }} />
-      ))}
-      {/* мерцающие звёздочки по краю */}
-      {Array.from({ length: мало(f.sparks || 0, 2) }).map((_, i) => {
-        const a = (360 / (f.sparks || 1)) * i;
-        const px = Math.cos((a * Math.PI) / 180) * orbitR;
-        const py = Math.sin((a * Math.PI) / 180) * orbitR;
-        const s = ring * 2.6;
-        return (
-          <svg key={`s${i}`} width={s} height={s} viewBox="0 0 10 10" style={{
-            position: "absolute", left: "50%", top: "50%",
-            transform: `translate(${px - s / 2}px, ${py - s / 2}px)`,
-            ["--o"]: 0.9,
-            opacity: 0, zIndex: 3,
-            animation: `starPulse ${2.6 + i * 0.3}s ease-in-out ${-i * 0.4}s infinite`,
-          }}>
-            <path d="M5 0 C5.4 3.2 6.8 4.6 10 5 C6.8 5.4 5.4 6.8 5 10 C4.6 6.8 3.2 5.4 0 5 C3.2 4.6 4.6 3.2 5 0 Z" fill="#FFFFFF" />
-          </svg>
-        );
-      })}
+    <div style={{ position: "relative", width: size, height: size, borderRadius: "50%", overflow: "hidden" }}>
+      {children}
     </div>
   );
 });
@@ -9522,289 +8362,10 @@ const MagmaScene = React.memo(function MagmaScene({ c, height, showcase }) {
   );
 });
 
-const ProfileCardBg = React.memo(function ProfileCardBg({ cardId, height = 260, radius = 24, bleed = 0, top = 0, showcase = false }) {
-  const c = CARD_BY_ID[cardId] || CARD_BY_ID.none;
-  const blobs = useMemo(() => {
-    const rnd = seededRand(hashSeed(cardId || "none"));
-    return (c.blobs || []).map(([color, opacity], i) => ({
-      color, opacity,
-      size: 180 + rnd() * 140,
-      left: `${5 + rnd() * 70}%`,
-      top: `${rnd() * 55}%`,
-      dur: 18 + rnd() * 14,
-      delay: -i * 6,
-    }));
-  }, [cardId]);
-  const stars = useMemo(() => {
-    const rnd = seededRand(hashSeed(`${cardId}-stars`));
-    return Array.from({ length: c.stars || 0 }, () => ({
-      left: rnd() * 100, top: rnd() * 100, size: 4 + rnd() * 4,
-      opacity: 0.35 + rnd() * 0.5, dur: 3 + rnd() * 4, delay: -rnd() * 6,
-    }));
-  }, [cardId]);
-  // Метеоры, искры и листья расставлены случайно, но не заново при каждой
-  // перерисовке: разброс считается один раз от самого предмета, иначе
-  // рисунок прыгал бы при любом обновлении экрана.
-  const streaks = useMemo(() => {
-    const rnd = seededRand(hashSeed(`${cardId}-streaks`));
-    return Array.from({ length: c.streaks || 0 }, () => ({
-      left: rnd() * 110 - 5, top: -10 - rnd() * 30, len: 46 + rnd() * 54,
-      opacity: 0.3 + rnd() * 0.5, dur: 2.6 + rnd() * 3.4, delay: -rnd() * 8,
-    }));
-  }, [cardId]);
-  const rises = useMemo(() => {
-    const rnd = seededRand(hashSeed(`${cardId}-rise`));
-    return Array.from({ length: c.rise || 0 }, () => ({
-      left: rnd() * 100, size: 2 + rnd() * 3,
-      opacity: 0.35 + rnd() * 0.5, dur: 4 + rnd() * 5, delay: -rnd() * 9,
-    }));
-  }, [cardId]);
-  const cardLeaves = useMemo(() => {
-    const rnd = seededRand(hashSeed(`${cardId}-leaves`));
-    return Array.from({ length: c.cardLeaves || 0 }, () => ({
-      left: rnd() * 100, size: 12 + rnd() * 13, kind: Math.floor(rnd() * 3),
-      dx: `${(rnd() - 0.5) * 70}px`, r0: `${rnd() * 360}deg`, r1: `${rnd() * 360 + 180}deg`,
-      opacity: 0.45 + rnd() * 0.45, dur: 9 + rnd() * 9, delay: -rnd() * 14,
-    }));
-  }, [cardId]);
-  const shards = useMemo(() => {
-    const rnd = seededRand(hashSeed(`${cardId}-shards`));
-    return Array.from({ length: c.shards || 0 }, () => ({
-      left: 8 + rnd() * 84,
-      // Только над породой: в верхней половине карточки осколкам
-      // взяться неоткуда, там небо — и они висели ни на чём.
-      top: 46 + rnd() * 40,
-      size: 6 + rnd() * 9,
-      rot: rnd() * 360,
-      dur: 11 + rnd() * 12,
-      delay: -rnd() * 14,
-      // Осколок — не ромб, а неровный скол: три-четыре грани разной
-      // длины, иначе получается кристалл из мультфильма.
-      d: `M0,-1 L${(0.5 + rnd() * 0.4).toFixed(2)},${(-0.2 + rnd() * 0.3).toFixed(2)} L${(0.2 + rnd() * 0.3).toFixed(2)},${(0.8 + rnd() * 0.3).toFixed(2)} L${(-0.6 - rnd() * 0.3).toFixed(2)},${(0.3 + rnd() * 0.4).toFixed(2)} Z`,
-    }));
-  }, [cardId]);
-  const smoke = useMemo(() => {
-    const rnd = seededRand(hashSeed(`${cardId}-smoke`));
-    return Array.from({ length: c.smoke || 0 }, () => ({
-      left: 10 + rnd() * 80,
-      size: 90 + rnd() * 120,
-      dur: 16 + rnd() * 14,
-      delay: -rnd() * 18,
-      opacity: 0.16 + rnd() * 0.14,
-    }));
-  }, [cardId]);
-  const field = useMemo(() => (c.crust ? magmaField(`${cardId}-field`) : []), [cardId]);
-  const beams = useMemo(() => {
-    const rnd = seededRand(hashSeed(`${cardId}-beams`));
-    return Array.from({ length: c.beams || 0 }, (_, i) => ({
-      left: 8 + i * 24 + rnd() * 8, width: 18 + rnd() * 22,
-      dur: 9 + rnd() * 6, delay: -rnd() * 8,
-    }));
-  }, [cardId]);
-
-  if (c.id === "none") return null;
-  const gridImg = c.grid
-    ? `linear-gradient(${c.grid} 1px, transparent 1px), linear-gradient(90deg, ${c.grid} 1px, transparent 1px)`
-    : null;
-
-  return (
-    <div aria-hidden style={{
-      position: "absolute", left: -bleed, right: -bleed, top,
-      height: height - Math.min(0, top),
-      borderRadius: radius, overflow: "hidden", pointerEvents: "none", zIndex: 0,
-      contain: "layout paint style",
-    }}>
-      <div style={{ position: "absolute", inset: 0, background: c.base }} />
-
-      {blobs.map((b, i) => (
-        <div key={i} style={{
-          position: "absolute", left: b.left, top: b.top, width: b.size, height: b.size,
-          borderRadius: "50%", filter: "blur(34px)",
-          background: `radial-gradient(circle, ${hexA(b.color, b.opacity)} 0%, ${hexA(b.color, 0)} 70%)`,
-          animation: `spotlightPulse ${b.dur}s ease-in-out ${b.delay}s infinite`,
-          willChange: "transform",
-        }} />
-      ))}
-
-      {gridImg && !c.floor && (
-        <div style={{
-          position: "absolute", inset: 0, backgroundImage: gridImg, backgroundSize: "38px 38px",
-          animation: "gridDrift 26s linear infinite",
-          WebkitMaskImage: "linear-gradient(to bottom, #000 0%, transparent 90%)",
-          maskImage: "linear-gradient(to bottom, #000 0%, transparent 90%)",
-        }} />
-      )}
-
-      {c.floor && (
-        <div style={{ position: "absolute", inset: 0, perspective: 220, perspectiveOrigin: "50% 0%" }}>
-          <div style={{
-            position: "absolute", left: "-50%", right: "-50%", top: "45%", height: "160%",
-            backgroundImage: gridImg || `linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)`,
-            backgroundSize: "38px 38px",
-            transform: "rotateX(76deg)", transformOrigin: "50% 0%",
-            animation: "gridRunToward 6s linear infinite",
-            WebkitMaskImage: "linear-gradient(to bottom, #000 0%, transparent 60%)",
-            maskImage: "linear-gradient(to bottom, #000 0%, transparent 60%)",
-          }} />
-        </div>
-      )}
-
-      {stars.map((s, i) => (
-        <svg key={i} width={s.size} height={s.size} viewBox="0 0 10 10" style={{
-          position: "absolute", left: `${s.left}%`, top: `${s.top}%`,
-          ["--o"]: s.opacity, opacity: 0,
-          animation: `starPulse ${s.dur}s ease-in-out ${s.delay}s infinite`,
-        }}>
-          <path d="M5 0 C5.4 3.2 6.8 4.6 10 5 C6.8 5.4 5.4 6.8 5 10 C4.6 6.8 3.2 5.4 0 5 C3.2 4.6 4.6 3.2 5 0 Z" fill="#FFFFFF" />
-        </svg>
-      ))}
-
-      {c.magma && <MagmaScene c={c} height={height} showcase={showcase} />}
-
-      {/* Дым над жерлом: тёмные клубы поднимаются и растворяются. Без
-          них жар читается светом, а не температурой. */}
-      {smoke.map((д, i) => (
-        <span key={`sm${i}`} style={{
-          position: "absolute", left: `${д.left}%`, bottom: "-10%",
-          width: д.size, height: д.size, marginLeft: -д.size / 2,
-          borderRadius: "50%",
-          background: `radial-gradient(circle, rgba(28,16,16,${д.opacity + 0.1}) 0%, rgba(20,10,10,${д.opacity}) 45%, transparent 72%)`,
-          animation: `smokeRise ${д.dur}s ease-in-out ${д.delay}s infinite`,
-        }} />
-      ))}
-
-      {/* Осколки обсидиана: чёрная грань с раскалённой кромкой. */}
-      {shards.map((о, i) => (
-        <svg key={`sh${i}`} width={о.size} height={о.size} viewBox="-1.2 -1.2 2.4 2.4" style={{
-          position: "absolute", left: `${о.left}%`, top: `${о.top}%`,
-          animation: `shardFloat ${о.dur}s ease-in-out ${о.delay}s infinite alternate`,
-        }} aria-hidden>
-          <g transform={`rotate(${о.rot})`}>
-            {/* Скол залит камнем, а раскалена только кромка — тонкой
-                линией. С толстой обводкой и пустой серединой получались
-                вырезанные из бумаги четырёхугольники. */}
-            <path d={о.d} fill="#2A1218" fillOpacity="0.96"
-              stroke={(c.obsidian && c.obsidian.edge) || T.electric} strokeWidth="0.07"
-              strokeLinejoin="round" opacity="0.9" />
-          </g>
-        </svg>
-      ))}
-
-      {/* Рама из обсидиана: тёмный кант по краю и раскалённая прожилка
-          по его внутренней кромке. Кант задан тенью, а не растянутой
-          картинкой: у растянутой ширина по бокам и сверху выходила
-          разной, и рама смотрелась прямоугольником, начерченным по
-          линейке. */}
-      {c.obsidian && (
-        <>
-          <div style={{
-            position: "absolute", inset: 0, borderRadius: radius, pointerEvents: "none",
-            boxShadow: `inset 0 0 0 7px ${c.obsidian.stone}, inset 0 0 22px 8px rgba(0,0,0,0.55)`,
-          }} />
-          <div style={{
-            position: "absolute", inset: 7, borderRadius: Math.max(0, radius - 5), pointerEvents: "none",
-            border: `1px solid ${hexA(c.obsidian.edge, 0.7)}`,
-            boxShadow: `0 0 10px ${hexA(c.obsidian.edge, 0.3)}, inset 0 0 16px ${hexA(c.obsidian.edge, 0.1)}`,
-            animation: "moltenBreath 6s ease-in-out infinite",
-          }} />
-        </>
-      )}
-
-      {/* Волны: широкие размытые полосы ходят вдоль карточки. Каждая со
-          своим сроком, поэтому они то расходятся, то накладываются. */}
-      {(c.waves || []).map(([color, opacity], i) => (
-        <div key={`v${i}`} style={{
-          position: "absolute", left: "-60%", right: "-60%", top: `${6 + i * 16}%`, height: Math.max(70, height * 0.32),
-          background: `radial-gradient(60% 100% at 50% 50%, ${hexA(color, opacity)} 0%, ${hexA(color, 0)} 70%)`,
-          filter: "blur(16px)",
-          animation: `cardWave ${15 + i * 5}s ease-in-out ${-i * 4}s infinite alternate`,
-          willChange: "transform",
-        }} />
-      ))}
-
-      {/* Метеоры: сама полоса наклонена, а движение задано снаружи —
-          иначе поворот из стиля стёрся бы кадрами анимации. */}
-      {streaks.map((s, i) => (
-        <span key={`m${i}`} style={{
-          position: "absolute", left: `${s.left}%`, top: s.top,
-          ["--o"]: s.opacity, ["--fall"]: `${height + 60}px`, opacity: 0,
-          animation: `cardStreak ${s.dur}s linear ${s.delay}s infinite`,
-        }}>
-          <span style={{
-            display: "block", width: 1.6, height: s.len, transform: "rotate(18deg)",
-            background: `linear-gradient(180deg, ${hexA(c.streakColor || "#FFFFFF", 0)} 0%, ${c.streakColor || "#FFFFFF"} 85%, #FFFFFF 100%)`,
-            borderRadius: 999,
-          }} />
-        </span>
-      ))}
-
-      {/* Искры поднимаются от нижнего края и гаснут на полпути. */}
-      {rises.map((s, i) => (
-        <span key={`r${i}`} style={{
-          position: "absolute", left: `${s.left}%`, bottom: -6,
-          width: s.size, height: s.size, borderRadius: "50%",
-          background: c.riseColor || "#FFFFFF",
-          boxShadow: `0 0 8px 1px ${hexA(c.riseColor || "#FFFFFF", 0.7)}`,
-          ["--o"]: s.opacity, ["--rise"]: `${-(height * 0.75)}px`, opacity: 0,
-          animation: `cardRise ${s.dur}s linear ${s.delay}s infinite`,
-        }} />
-      ))}
-
-      {/* Листья падают внутри карточки — те же, что и на фоне приложения. */}
-      {cardLeaves.map((l, i) => (
-        <span key={`cl${i}`} style={{
-          position: "absolute", left: `${l.left}%`, top: -22,
-          ["--o"]: l.opacity, ["--dx"]: l.dx, ["--r0"]: l.r0, ["--r1"]: l.r1,
-          ["--fall"]: `${height + 30}px`, opacity: 0,
-          animation: `cardLeafFall ${l.dur}s linear ${l.delay}s infinite`,
-        }}>
-          <LeafIcon size={l.size} kind={l.kind} color={c.leafColor || "#FFFFFF"} />
-        </span>
-      ))}
-
-      {/* Лучи: наклонные световые столбы, качающиеся вдоль карточки. */}
-      {beams.map((b, i) => (
-        <div key={`b${i}`} style={{
-          position: "absolute", top: -20, bottom: -20, left: `${b.left}%`, width: b.width,
-          background: `linear-gradient(180deg, ${hexA(c.beamColor || "#FFFFFF", 0)} 0%, ${hexA(c.beamColor || "#FFFFFF", 0.4)} 45%, ${hexA(c.beamColor || "#FFFFFF", 0)} 100%)`,
-          filter: "blur(7px)",
-          animation: `cardBeam ${b.dur}s ease-in-out ${b.delay}s infinite alternate`,
-          willChange: "transform",
-        }} />
-      ))}
-
-      {/* Голограмма: радуга медленно течёт поперёк, поверх неё изредка
-          проходит белый блик. */}
-      {c.holo && (
-        <>
-          <div style={{
-            position: "absolute", inset: 0,
-            background: "linear-gradient(115deg, rgba(255,61,110,0.42), rgba(255,196,107,0.36), rgba(91,255,159,0.36), rgba(46,107,255,0.42), rgba(177,76,255,0.44), rgba(255,61,110,0.42))",
-            backgroundSize: "320% 100%",
-            animation: "holoShift 13s linear infinite",
-            WebkitMaskImage: "linear-gradient(to bottom, #000 0%, transparent 86%)",
-            maskImage: "linear-gradient(to bottom, #000 0%, transparent 86%)",
-          }} />
-          <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-            <div style={{
-              position: "absolute", top: "-40%", bottom: "-40%", width: "13%", left: 0,
-              background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.34) 50%, rgba(255,255,255,0) 100%)",
-              transform: "skewX(-14deg)", filter: "blur(4px)",
-              animation: "spotlightSweep 6s ease-in-out infinite",
-            }} />
-          </div>
-        </>
-      )}
-
-      {/* низ подложки растворяется в фоне приложения, чтобы она читалась
-          как фон экрана, а не как обрезанный прямоугольник; по бокам
-          карточка идёт до самых краёв */}
-      <div style={{
-        position: "absolute", left: 0, right: 0, bottom: 0, height: "62%",
-        background: `linear-gradient(to bottom, ${hexA(T.bg, 0)} 0%, ${hexA(T.bg, 0.55)} 45%, ${T.bg} 100%)`,
-      }} />
-    </div>
-  );
+/* Карточек профиля в приложении больше нет. Компонент оставлен пустым,
+   чтобы не вычищать его из каждого места, где рисовалась шапка. */
+const ProfileCardBg = React.memo(function ProfileCardBg() {
+  return null;
 });
 
 /* BootSplash — стартовая заставка. Перекрывает весь интерфейс, пока идут
@@ -11007,7 +9568,9 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
    нажатию. Здесь же видно, сколько останется и что вообще может выпасть
    — иначе непонятно, за что платишь. */
 function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achievementsReady = true, onOpenAchievements, showToast, accountCreated = false, onOpenLogin }) {
-  const [tab, setTab] = useState("frames");
+  // Разделов в магазине больше нет: рамки и карточки профиля убраны,
+  // остался только вид карты баланса.
+  const tab = "wallet";
   // Нажатие на уже купленное открывает примерку в «Редактировать
   // профиль» — сразу на нужной вкладке. Витрина не надевает ничего
   // сама, но и не отвечает бесполезной подсказкой.
@@ -11040,8 +9603,8 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
     if (onOpenAchievements) onOpenAchievements();
   };
   const tooPoor = useCallback((price) => tooPoorRef.current(price), []);
-  const items = tab === "frames" ? AVATAR_FRAMES : tab === "cards" ? PROFILE_CARDS : WALLET_SKINS;
-  const kind = tab === "frames" ? "frame" : tab === "cards" ? "card" : "wallet";
+  const items = WALLET_SKINS;
+  const kind = "wallet";
   const equippedId = cosmetics[kind];
 
   // Без аккаунта магазин закрыт целиком: монеты копятся за достижения,
@@ -11118,24 +9681,6 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
         </button>
       </div>
       <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, marginTop: -8 }}>{t("shopCoinsHint")}</p>
-
-      <div className="flex items-center gap-2">
-        {[["frames", t("shopTabFrames")], ["cards", t("shopTabCards")], ["wallet", t("shopTabWallet")]].map(([id, label]) => {
-          const active = tab === id;
-          return (
-            <button key={id} onClick={() => setTab(id)} className="fx-tap"
-              // Те же правила, что у фильтров мемпада: только слова.
-              style={{
-                fontFamily: bodyFont, fontSize: 14.5, fontWeight: active ? 700 : 600,
-                background: "transparent", color: active ? T.ice : T.faint,
-                border: "none", padding: "6px 0", marginRight: 18,
-                transition: `color ${EASE}`,
-              }}>
-              {label}
-            </button>
-          );
-        })}
-      </div>
 
       <div className="grid grid-cols-2 gap-2.5" key={tab}>
         {items.map((item) => {
@@ -13080,7 +11625,7 @@ function СценаКошелька() {
  * звёзды.
  */
 function СценаМагазина() {
-  const СИРЕНЬ = "#C08BFF", ФИОЛЕТ = "#7C3AED";
+  const СИРЕНЬ = "#C08BFF", ФИОЛЕТ = "#7C3AED", ЛЁД = "#8FD8FF";
   /* Правее восьмидесяти процентов звёзд не ставим: там стоит лавка, и
      звезда за ней почти не видна — только мельтешит краем. */
   const звёзды = [
@@ -13096,6 +11641,61 @@ function СценаМагазина() {
         position: "absolute", inset: 0,
         background: `radial-gradient(130% 120% at 74% 8%, ${hexA(ФИОЛЕТ, 0.42)} 0%, ${hexA("#2A1150", 0.34)} 36%, #0E0A1A 72%, #07060C 100%)`,
       }} />
+
+      {/* Далёкие огни витрин по линии горизонта: точки разного размера и
+          яркости, каждая со своим дыханием. Это и даёт улице глубину —
+          за лавкой что-то есть, а не пустая заливка. */}
+      {[
+        [14, 2.5, 0.55, 3.6], [22, 1.8, 0.35, 4.4], [30, 3, 0.6, 5.2], [38, 2, 0.4, 3.9],
+        [46, 2.6, 0.5, 4.8], [54, 1.8, 0.3, 5.6], [62, 3, 0.55, 4.2], [70, 2.2, 0.45, 6],
+        [78, 2.6, 0.5, 3.4], [86, 1.8, 0.3, 5], [94, 2.4, 0.45, 4.6],
+      ].map(([x, р, я, д], i) => (
+        <span key={i} style={{
+          position: "absolute", left: `${x}%`, top: `${38 + (i % 3) * 2}%`,
+          width: р * 2, height: р * 2, borderRadius: "50%",
+          background: i % 3 === 0 ? ЛЁД : СИРЕНЬ,
+          boxShadow: `0 0 ${р * 5}px ${hexA(i % 3 === 0 ? ЛЁД : СИРЕНЬ, 0.8)}`,
+          opacity: я,
+          animation: `искраДышит ${д}s ease-in-out ${-i * 0.7}s infinite`,
+        }} />
+      ))}
+
+      {/* Дальний ряд домов: силуэты разной высоты, почти слитые с небом.
+          Они не читаются по отдельности, но без них горизонт пустой. */}
+      <span style={{
+        position: "absolute", left: 0, right: 0, bottom: "40%", height: "26%",
+        opacity: 0.85,
+        backgroundImage: `linear-gradient(90deg,
+          transparent 0 4%, ${hexA("#1B1236", 0.9)} 4% 11%, transparent 11% 14%,
+          ${hexA("#150F2C", 0.9)} 14% 19%, transparent 19% 24%,
+          ${hexA("#1B1236", 0.9)} 24% 33%, transparent 33% 36%,
+          ${hexA("#120C24", 0.9)} 36% 44%, transparent 44% 49%,
+          ${hexA("#1B1236", 0.9)} 49% 56%, transparent 56% 61%,
+          ${hexA("#150F2C", 0.9)} 61% 71%, transparent 71% 75%,
+          ${hexA("#1B1236", 0.9)} 75% 84%, transparent 84% 88%,
+          ${hexA("#120C24", 0.9)} 88% 97%, transparent 97%)`,
+        WebkitMaskImage: "linear-gradient(to top, #000 0%, transparent 92%)",
+        maskImage: "linear-gradient(to top, #000 0%, transparent 92%)",
+      }} />
+
+      {/* Дымка над горизонтом: тонкая полоса света там, где пол сходится
+          с небом — иначе стык читается линией. */}
+      <span style={{
+        position: "absolute", left: 0, right: 0, bottom: "40%", height: "14%",
+        background: `linear-gradient(180deg, ${hexA(ФИОЛЕТ, 0)} 0%, ${hexA(ФИОЛЕТ, 0.45)} 70%, ${hexA(ФИОЛЕТ, 0)} 100%)`,
+        filter: "blur(6px)",
+      }} />
+
+      {/* Отражения огней на полу: вытянутые размытые полосы под теми же
+          точками. Мокрый асфальт — самый дешёвый способ показать, что
+          плоскость есть, и она не просто разлинована. */}
+      {[[16, 0.35], [31, 0.28], [47, 0.3], [63, 0.26], [79, 0.3]].map(([x, я], i) => (
+        <span key={`о${i}`} style={{
+          position: "absolute", left: `${x}%`, bottom: "8%", width: 3, height: "30%",
+          background: `linear-gradient(180deg, ${hexA(i % 2 ? ЛЁД : СИРЕНЬ, я)} 0%, ${hexA(i % 2 ? ЛЁД : СИРЕНЬ, 0)} 100%)`,
+          filter: "blur(3px)",
+        }} />
+      ))}
 
       {/* Пол в перспективе: линии уходят к горизонту и медленно едут на
           зрителя — лавка от этого стоит на плоскости, а не висит. */}
@@ -20944,114 +19544,6 @@ async function signInWithTelegram(nickname) {
    "edit"   — profile fields only, no password, updates the existing row
    When not in "edit" mode, a segmented tab lets the user flip between
    login/create without closing the sheet — that's the "красивое меню". */
-/* Выбор рамки и карточки из купленных. Стоит в «Редактировать профиль»
-   и больше нигде: в магазине плитка отвечала сразу за покупку и за
-   примерку, и одно нажатие делало то одно, то другое. */
-function LookPicker({ cosmetics, owned, onEquip, focus }) {
-  // Из магазина сюда приходят с уже выбранным видом вещи: нажали на
-  // карточку — открылась вкладка карточек, а не рамок.
-  const [tab, setTab] = useState(focus === "card" ? "card" : "frame");
-  const блок = useRef(null);
-  useEffect(() => {
-    if (!focus) return;
-    setTab(focus === "card" ? "card" : "frame");
-    // Окно редактирования длинное, и примерка внизу: без подводки
-    // человек попадал бы на аватарку и ник, а пришёл он не за ними.
-    const id = setTimeout(() => {
-      if (блок.current && блок.current.scrollIntoView) блок.current.scrollIntoView({ block: "center", behavior: "smooth" });
-    }, 220);
-    return () => clearTimeout(id);
-  }, [focus]);
-  const все = tab === "frame" ? AVATAR_FRAMES : PROFILE_CARDS;
-  // Бесплатное доступно всегда — им же и снимают надетое.
-  const мои = все.filter((it) => !(it.price > 0) || (owned && owned.has(ownedKey(tab, it.id))));
-  const надето = cosmetics[tab] || "none";
-
-  return (
-    <div className="mt-4" ref={блок}>
-      <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
-        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{t("editLookTitle")}</span>
-        <div className="flex items-center gap-1.5">
-          {[["frame", t("shopTabFrames")], ["card", t("shopTabCards")]].map(([id, label]) => {
-            const active = tab === id;
-            return (
-              <button key={id} onClick={() => setTab(id)} className="fx-tap"
-                style={{
-                  fontFamily: bodyFont, fontSize: 13, fontWeight: active ? 700 : 600,
-                  background: "transparent", color: active ? T.ice : T.faint,
-                  border: "none", padding: "4px 0", marginLeft: 14,
-                  transition: `color ${EASE}`,
-                }}>
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.4, marginBottom: 10 }}>
-        {мои.length > 1 ? t("editLookHint") : t("editLookEmpty")}
-      </p>
-      {/* Ряд прокручивается вбок: вещей со временем становится много, а
-          сетка на всю ширину отодвинула бы кнопку «Сохранить» за экран.
-          key по вкладке — чтобы волна появления шла заново на каждом
-          переключении, а не только при открытии окна. */}
-      <div key={tab} className="no-scrollbar flex gap-2 overflow-x-auto" style={{ paddingBottom: 2 }}>
-        {мои.map((it, i) => {
-          const выбрано = надето === it.id;
-          return (
-            <button
-              key={it.id}
-              onClick={() => { haptic("light"); onEquip(tab, it.id); }}
-              className="fx-tap fx-look-in flex flex-col items-center gap-1.5 rounded-[18px] p-2"
-              style={{
-                flex: "0 0 auto", width: 84,
-                background: T.bg, border: `1px solid ${выбрано ? hexA(T.electric, 0.55) : T.line}`,
-                position: "relative", overflow: "hidden",
-                // Волна слева направо. Дальше десятой плитки задержку не
-                // копим: последняя иначе выезжала бы через секунду после
-                // того, как ряд уже прокрутили руками.
-                animationDelay: `${Math.min(i, 9) * 45}ms`,
-              }}
-            >
-              <div style={{ position: "relative", width: "100%", height: 54, borderRadius: 12, overflow: "hidden", background: T.surfaceHi, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {tab === "card" && <ProfileCardBg cardId={it.id} height={54} radius={12} showcase />}
-                <div style={{ position: "relative", zIndex: 1 }}>
-                  <AvatarFrame frameId={tab === "frame" ? it.id : "none"} size={38}>
-                    <div style={{ width: "100%", height: "100%", background: T.bg }} />
-                  </AvatarFrame>
-                </div>
-              </div>
-              <span style={{ fontFamily: bodyFont, fontSize: 11, color: выбрано ? T.electric : T.muted, textAlign: "center", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
-                {pickLabel(it.label)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* Расширение файла берём из его типа, а не из имени. Имя приходит от
-   пользователя: «logo.png/../../что-то» превратилось бы в путь, который
-   уезжает из своей папки, а «.svg» — в картинку, умеющую исполнять
-   скрипты у того, кто откроет её напрямую.
-
-   Живёт на уровне модуля, а не внутри окна профиля: тем же способом имя
-   файлу дают и логотип токена, и обложка при запуске. Пока функция
-   стояла внутри окна, запуск падал на «Can't find variable:
-   safeImageExt» — сборка о таком не предупреждает, видно только в
-   работе. */
-const UPLOAD_EXT_BY_TYPE = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-  "image/gif": "gif",
-};
-function safeImageExt(file) {
-  return UPLOAD_EXT_BY_TYPE[(file && file.type) || ""] || "png";
-}
-
 function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAddress, onChangeNickname, cosmetics = { frame: "none", card: "none" }, owned, onEquip, lookFocus = null }) {
   const isEdit = mode === "edit";
   // Окно держится на экране, пока идёт анимация ухода: без этого оно
@@ -21469,10 +19961,6 @@ async function uploadAvatarIfNeeded(userId) {
           {!isLogin && <Field label={t("bioLabel")} placeholder={t("bioPlaceholder")} area value={bio} onChange={(e) => setBio(e.target.value)} />}
         </div>
 
-        {/* Примерка. Магазин только продаёт, а надевают купленное здесь:
-            рядом с аватаркой и ником, то есть там, где человек и так
-            решает, как он выглядит. */}
-        {isEdit && onEquip && <LookPicker cosmetics={cosmetics} owned={owned} onEquip={onEquip} focus={lookFocus} />}
         {serverError && <span style={{ fontFamily: bodyFont, color: T.rose, fontSize: 13, marginTop: 10, display: "block" }}>{serverError}</span>}
         <button onClick={handleSubmit} disabled={submitting} className="fx-tap w-full rounded-[20px] py-3 mt-5" style={{ background: canSubmit ? PRISM : T.surfaceHi, color: canSubmit ? PRISM_TEXT : T.muted, fontFamily: displayFont, fontWeight: 700, fontSize: 15, boxShadow: canSubmit ? `0 0 22px ${glow(0.28)}` : "none", opacity: submitting ? 0.6 : 1 }}>
           {submitting ? t("submittingText") : isEdit ? t("saveChanges") : isLogin ? t("loginCta") : t("createAccountShort")}
