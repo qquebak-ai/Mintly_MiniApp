@@ -19616,6 +19616,11 @@ function SettingsPanel({
   const [deleting, setDeleting] = useState(false);
   // Почта для второго ключа: открывается из раздела «Безопасность».
   const [почтаОткрыта, setПочтаОткрыта] = useState(false);
+  /* Отступ карточки сверху считается один раз, при открытии, и дальше не
+     пересчитывается. В долях экрана (vh) он зависел от высоты окна, а
+     Telegram укорачивает окно на высоту клавиатуры — и карточка прыгала
+     вверх от каждого касания поля и обратно при закрытии клавиатуры. */
+  const [отступСверху, setОтступСверху] = useState(112);
   // Окно держится на экране, пока идёт анимация ухода, поэтому и
   // содержимое берём последнее — иначе на кадр уходило бы пустое.
   const [item, closing] = useClosing(itemProp);
@@ -20600,6 +20605,11 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const [почтаБеда, setПочтаБеда] = useState("");
   const [естьАккаунт, setЕстьАккаунт] = useState(null); // null — ещё спрашиваем
   const [почтаОткрыта, setПочтаОткрыта] = useState(false);
+  /* Отступ карточки сверху считается один раз, при открытии, и дальше не
+     пересчитывается. В долях экрана (vh) он зависел от высоты окна, а
+     Telegram укорачивает окно на высоту клавиатуры — и карточка прыгала
+     вверх от каждого касания поля и обратно при закрытии клавиатуры. */
+  const [отступСверху, setОтступСверху] = useState(112);
   const [authTab, setAuthTab] = useState(isEdit ? "create" : mode); // "login" | "create"
   const [serverError, setServerError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -20629,6 +20639,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     setШагВхода("почта");
     setПочтаВвод("");
     setПочтаБеда("");
+    const высота = typeof window !== "undefined" ? window.innerHeight || 844 : 844;
+    // Не ниже сотни и не глубже ста сорока точек: на низком экране карточка
+    // иначе упирается в клавиатуру, на высоком — висит слишком низко.
+    setОтступСверху(Math.round(Math.min(Math.max(высота * 0.13, 64), 140)));
     setTgNick("");
     setTgNickTouched(false);
     setЕстьАккаунт(null);
@@ -20761,7 +20775,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         style={{
           position: "fixed", inset: 0, zIndex: 60, background: "#000000",
           display: "flex", alignItems: "flex-start", justifyContent: "center",
-          padding: "calc(15vh + var(--tg-inset-top, 0px)) 20px 0",
+          padding: `calc(${отступСверху}px + var(--tg-inset-top, 0px)) 20px 0`,
           overflow: "hidden",
         }}
       >
@@ -20771,6 +20785,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           style={{
             width: "100%", maxWidth: 352, background: T.surface, borderRadius: 28,
             padding: "26px 22px 22px", border: "none", gap: 14,
+            // Если окно совсем низкое (клавиатура на маленьком экране),
+            // карточка не обрезается, а листается внутри себя.
+            maxHeight: "100%", overflowY: "auto",
           }}
         >
           {шагВхода === "почта" ? (
