@@ -14135,6 +14135,7 @@ function МастерФразы({
   onГотово = () => {},
   onПропустить = () => {},
   onНазад = null,
+  onСтрелка = () => {},
   showToast = () => {},
   insetTop = 0,
   insetBottom = 0,
@@ -14211,6 +14212,22 @@ function МастерФразы({
   }
 
   const всёВыбрано = спрос.length === 3 && спрос.every((в) => выбор[в.номер]);
+
+  /* Стрелка Telegram знает, куда ведёт назад с каждого шага. Раньше в
+     шапке оставалось одно «Закрыть»: выход из приложения целиком вместо
+     шага назад — и это посреди записи фразы, которую человек как раз и
+     переписывал. */
+  const назад = шаг === "викторина" ? () => setШаг("слова")
+    : шаг === "слова" ? (режим === "фраза" ? () => setШаг("безопасность") : onПропустить)
+    : шаг === "безопасность" ? () => setШаг("вручную")
+    : шаг === "вручную" ? onНазад
+    : null;
+
+  useEffect(() => {
+    onСтрелка(назад ? () => назад : null);
+    return () => onСтрелка(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [шаг, режим]);
 
   // Кнопка внизу — одна на все шаги, и выглядит одинаково.
   function Кнопка({ надпись, onClick, активна = true, краска = ЦВЕТ_КНОПКИ_НОЧЬ }) {
@@ -14487,7 +14504,7 @@ function МастерФразы({
   );
 }
 
-function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none", фраза = null, setФраза = () => {}, запросФразы = 0 }) {
+function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none", фраза = null, setФраза = () => {}, запросФразы = 0, onСтрелкаФразы = () => {} }) {
   // Вид карты берём из купленного в магазине; неизвестный id — обычная
   // карта Mintly, а не пустая заливка.
   const видКарты = WALLET_SKIN_BY_ID[скинКарты] || WALLET_SKIN_BY_ID.none;
@@ -14647,6 +14664,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         insetTop={insetTop}
         insetBottom={insetBottom}
         showToast={showToast}
+        onСтрелка={onСтрелкаФразы}
         onГотово={() => setФраза({ готово: true, начато: true })}
         onПропустить={() => setФраза({ готово: false, начато: true })}
       />
@@ -14663,6 +14681,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         insetTop={insetTop}
         insetBottom={insetBottom}
         showToast={showToast}
+        onСтрелка={onСтрелкаФразы}
         onНазад={() => setФразаОткрыта(false)}
         onГотово={() => { setФразаОткрыта(false); setФраза({ готово: true, начато: true }); }}
       />
@@ -24468,6 +24487,9 @@ function mapTokenRow(row) {
   const [фразаКошелька, setФразаКошелька] = useState(null);
   // Счётчик нажатий на пункт меню: кошелёк по нему открывает длинную дорогу.
   const [запросФразы, setЗапросФразы] = useState(0);
+  /* Что значит «назад» внутри мастера фразы. Шаги там свои, и снаружи о
+     них знать нечего — мастер сам кладёт сюда свою стрелку. */
+  const [назадФразы, setНазадФразы] = useState(null);
 
   useEffect(() => {
     if (!accountCreated || !userId) { setФразаКошелька(null); return undefined; }
@@ -24742,6 +24764,8 @@ function mapTokenRow(row) {
     if (settingsItem) return () => setSettingsItem(null);
     if (tradeModal) return () => setTradeModal(null);
     if (manageToken_) return () => setManageToken_(null);
+    // Мастер фразы ведёт по своим шагам, и его стрелка важнее разделов.
+    if (назадФразы) return назадФразы;
     if (view === "user") return backFromUserProfile;
     if (view === "token") return backFromToken;
     if (view === "create") return backFromCreate;
@@ -24751,7 +24775,7 @@ function mapTokenRow(row) {
     if (view === "profile") return backFromProfile;
     if (view === "achievements") return backFromAchievements;
     return null;
-  }, [pinLocked, pinModal, launchRequest, profileModalOpen, settingsItem, tradeModal, manageToken_, view, tab, token, откудаДостижения]);
+  }, [pinLocked, pinModal, launchRequest, profileModalOpen, settingsItem, tradeModal, manageToken_, назадФразы, view, tab, token, откудаДостижения]);
 
   useEffect(() => {
     const tg = typeof window !== "undefined" ? window.Telegram && window.Telegram.WebApp : null;
@@ -25374,6 +25398,7 @@ function mapTokenRow(row) {
               фраза={фразаКошелька}
               setФраза={setФразаКошелька}
               запросФразы={запросФразы}
+              onСтрелкаФразы={setНазадФразы}
             />
           </KeepAlive>
           <div className="px-4">
