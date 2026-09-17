@@ -20081,6 +20081,10 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
   const УХОД_ШАГА = 200;
   // Задержка между окошками в зелёной волне.
   const ВОЛНА_ШАГ = 70;
+  /* Сколько знаков в коде. Длину задаёт Supabase (Authentication →
+     Providers → Email → Email OTP Length), и окошек на экране должно быть
+     ровно столько же — иначе последние цифры вводить некуда. */
+  const ДЛИНА_КОДА = 8;
 
   function сменитьШаг(новый) {
     setУходит(true);
@@ -20149,7 +20153,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
 
   const чистая = почта.trim().toLowerCase();
   const годна = ПОЧТА_RE.test(чистая);
-  const кодГоден = код.trim().length === 6;
+  const кодГоден = код.trim().length === ДЛИНА_КОДА;
   // Набран целиком и без отказа — по окошкам бежит зелёное.
   const полон = кодГоден && !беда;
 
@@ -20189,18 +20193,18 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
     haptic("light");
     if (к === "⌫") { setКод((было) => было.slice(0, -1)); return; }
     if (!/^[0-9]$/.test(к)) return;
-    setКод((было) => (было.length >= 6 ? было : было + к));
+    setКод((было) => (было.length >= ДЛИНА_КОДА ? было : было + к));
   }
 
   /* Шестая цифра — и код уходит на проверку сам. Отдельная кнопка
      «подтвердить» под клавиатурой была бы лишним нажатием: набирать
      больше нечего. */
   useEffect(() => {
-    if (шаг !== "письмо" || код.length !== 6 || идёт) return undefined;
+    if (шаг !== "письмо" || код.length !== ДЛИНА_КОДА || идёт) return undefined;
     // Ждём, пока по окошкам пробежит зелёная волна: набор закончен, и это
     // видно глазом раньше, чем ответит сервер. Проверка поверх бегущей
     // анимации выглядела бы обрывом.
-    const id = setTimeout(() => подтвердить(), ВОЛНА_ШАГ * 6 + 200);
+    const id = setTimeout(() => подтвердить(), ВОЛНА_ШАГ * ДЛИНА_КОДА + 200);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [код, шаг]);
@@ -20282,18 +20286,23 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
             </div>
             {/* Шесть окошек вместо одного поля: видно, сколько знаков уже
                 набрано и сколько осталось, а следующее место подсвечено. */}
-            <div className="flex" style={{ gap: 8 }}>
-              {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div className="flex" style={{ gap: 6 }}>
+              {Array.from({ length: ДЛИНА_КОДА }, (_, i) => i).map((i) => (
                 <span
                   key={i}
                   className="flex items-center justify-center"
                   style={{
-                    flex: 1, minWidth: 0, height: 58, borderRadius: 14, background: T.surface,
-                    border: `1.5px solid ${беда ? T.down : (полон || код.length === i ? T.up : (код[i] ? T.lineHi : T.line))}`,
+                    flex: 1, minWidth: 0, height: 54, borderRadius: 12, background: T.surface,
+                    /* Место под следующую цифру подсвечено светло-серым:
+                       зелёное здесь обещало бы, что цифра уже принята. */
+                    border: `1.5px solid ${беда ? T.down
+                      : полон ? T.up
+                      : код.length === i ? hexA("#FFFFFF", 0.5)
+                      : (код[i] ? T.lineHi : T.line)}`,
                     /* Код набран — зелёное загорается по окошкам слева
                        направо: одна волна вместо шести рамок разом. */
                     boxShadow: полон ? `0 0 0 3px ${hexA(T.up, 0.16)}` : "0 0 0 0 transparent",
-                    color: T.ice, fontFamily: monoFont, fontSize: 25, fontWeight: 700,
+                    color: T.ice, fontFamily: monoFont, fontSize: 20, fontWeight: 700,
                     transition: "border-color 260ms ease, box-shadow 260ms ease",
                     transitionDelay: полон ? `${i * ВОЛНА_ШАГ}ms` : "0ms",
                   }}
