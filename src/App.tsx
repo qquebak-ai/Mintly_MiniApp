@@ -24463,11 +24463,30 @@ function mapTokenRow(row) {
     setProfileModalOpen(false);
     showToast(profileModalMode === "edit" ? t("profileUpdated") : profileModalMode === "login" ? t("loggedIn") : t("accountCreatedToast"));
   }
+  /* Убрать с экрана всё открытое.
+   *
+   * Выход и удаление начинаются из настроек, а листы настроек живут в
+   * портале и лежат выше экрана создания аккаунта. Не закрыв их, человек
+   * после «удалить аккаунт» упирался в те же «Настройки» поверх карточки
+   * с ником: приложение выглядело застрявшим до перезапуска. */
+  function закрытьВсёОткрытое() {
+    setSettingsItem(null);
+    setНастройкиОткрыты(false);
+    setМенюОткрыто(false);
+    setProfileModalOpen(false);
+    setTradeModal(null);
+    setManageToken_(null);
+    запомнитьТокен(null);
+    setView("home");
+    setTab("home");
+  }
+
   async function logOutProfile() {
     markSignedOut(true);
     await supabase.auth.signOut();
     setAccountCreated(false);
     setProfile(EMPTY_PROFILE);
+    закрытьВсёОткрытое();
     вернутьПриветствие();
     if (wallet) tonConnectUI.disconnect();
     showToast(t("loggedOut"));
@@ -24504,6 +24523,7 @@ function mapTokenRow(row) {
     await supabase.auth.signOut();
     setAccountCreated(false);
     setProfile(EMPTY_PROFILE);
+    закрытьВсёОткрытое();
     вернутьПриветствие();
     if (wallet) tonConnectUI.disconnect();
     showToast(t("accountDeleted"));
