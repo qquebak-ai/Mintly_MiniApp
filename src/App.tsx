@@ -14233,7 +14233,9 @@ function МастерФразы({
   function Кнопка({ надпись, onClick, активна = true, краска = ЦВЕТ_КНОПКИ_НОЧЬ }) {
     return (
       <button
-        onClick={onClick}
+        // Отклик в ладонь на каждое нажатие: экран длинный, и по нему
+        // идут вслепую, переписывая слова на бумагу.
+        onClick={() => { haptic("light"); onClick(); }}
         disabled={!активна}
         className="fx-tap w-full"
         style={{
@@ -14280,20 +14282,11 @@ function МастерФразы({
       ) : шаг === "вручную" ? (
         /* Вход из кошелька: сначала про саму копию, без слов на экране. */
         <>
-          <div className="flex items-center" style={{ gap: 12 }}>
-            {onНазад && (
-              <button
-                onClick={onНазад}
-                className="fx-tap flex items-center justify-center flex-shrink-0"
-                style={{ width: 36, height: 36, borderRadius: "50%", background: T.surfaceHi, border: "none", color: T.ice }}
-              >
-                <ChevronLeft size={19} />
-              </button>
-            )}
-            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em" }}>
-              {t("secretTitle")}
-            </span>
-          </div>
+          {/* Своей стрелки нет: назад ведёт кнопка Telegram в шапке —
+              вторая такая же под ней читалась бы как другая дорога. */}
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em" }}>
+            {t("secretTitle")}
+          </span>
           <div className="flex flex-col" style={{ gap: 6, marginTop: 10 }}>
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
               {t("secretManualTitle")}
@@ -14319,15 +14312,6 @@ function МастерФразы({
            слова открывают кошелёк целиком, и человек должен сказать это
            сам, а не пролистать. */
         <>
-          <div className="flex justify-end">
-            <button
-              onClick={() => setШаг("вручную")}
-              className="fx-tap flex items-center justify-center"
-              style={{ width: 36, height: 36, borderRadius: "50%", background: T.surfaceHi, border: "none", color: T.ice }}
-            >
-              <X size={18} />
-            </button>
-          </div>
           <div className="flex flex-col items-center text-center" style={{ gap: 14 }}>
             <span className="flex items-center justify-center" style={{
               width: 76, height: 76, borderRadius: "50%", background: "#F5A623", color: "#1A1200",
@@ -14427,7 +14411,7 @@ function МастерФразы({
                 сделана. */}
             {режим === "создание" && (
               <button
-                onClick={onПропустить}
+                onClick={() => { haptic("light"); onПропустить(); }}
                 className="fx-tap w-full"
                 style={{
                   padding: "12px 0 2px", border: "none", background: "transparent",
@@ -14441,15 +14425,6 @@ function МастерФразы({
         </>
       ) : (
         <>
-          <div className="flex items-center" style={{ gap: 12 }}>
-            <button
-              onClick={() => setШаг("слова")}
-              className="fx-tap flex items-center justify-center flex-shrink-0"
-              style={{ width: 36, height: 36, borderRadius: "50%", background: T.surfaceHi, border: "none", color: T.ice }}
-            >
-              <ChevronLeft size={19} />
-            </button>
-          </div>
           <div className="flex flex-col items-center text-center" style={{ gap: 6 }}>
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
               {t("quizTitle")}
