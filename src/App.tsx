@@ -2000,6 +2000,11 @@ function GlobalStyle() {
         50%  { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
       }
+      /* Заливка буквенной аватарки качается между краями градиента. */
+      @keyframes букваЦветёт {
+        0%, 100% { background-position: 0% 50%; }
+        50%      { background-position: 100% 50%; }
+      }
       @media (prefers-reduced-motion: reduce) {
         /* Блик идёт в одну сторону и начинает сначала: возврат читался бы
          качанием, а нужна пробежка. */
@@ -2008,6 +2013,7 @@ function GlobalStyle() {
         to   { background-position: 0% 50%; }
       }
       @keyframes кнопкаПереливается { from { background-position: 0% 50%; } to { background-position: 0% 50%; } }
+      @keyframes букваЦветёт { from { background-position: 0% 50%; } to { background-position: 0% 50%; } }
       }
       /* Смена числа: цифры не подменяются молча, а коротко вспыхивают
          цветом движения и подскакивают. Так видно, что цена только что
@@ -8295,23 +8301,31 @@ function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false }) {
  * кружка выводится из самого ника — одно и то же имя всегда даёт один и тот
  * же оттенок, и аватарка узнаётся даже краем глаза.
  */
+/* Цвет берём с первой буквы и только с неё.
+   Раньше в счёт шло всё имя, и кружок перекрашивался на каждом нажатии
+   клавиши — на экране создания это выглядело припадком. Первая буква
+   меняться уже не будет, а золотой угол разводит соседние буквы по разным
+   краям круга: «a» и «b» не выходят одинаково зелёными. */
 function оттенокНика(ник) {
-  const с = String(ник || "?");
-  let сумма = 0;
-  for (let i = 0; i < с.length; i += 1) сумма = (сумма * 31 + с.charCodeAt(i)) % 360;
-  return сумма;
+  const первая = String(ник || "?").trim().charAt(0).toLowerCase();
+  const код = первая.charCodeAt(0) || 63;
+  return (код * 137) % 360;
 }
 
 function БукваАватара({ ник, size = 40 }) {
   const буква = String(ник || "").trim().charAt(0).toUpperCase() || "?";
-  const тон = оттенокНика(ник);
+  const т = оттенокНика(ник);
   return (
     <span
       className="flex items-center justify-center"
       aria-hidden
       style={{
         width: "100%", height: "100%", borderRadius: "50%",
-        background: `linear-gradient(140deg, hsl(${тон} 58% 46%), hsl(${(тон + 42) % 360} 54% 30%))`,
+        /* Три оттенка вместо двух и медленное качание заливки: кружок
+           живёт, но не мигает — полный круг семь секунд. */
+        background: `linear-gradient(125deg, hsl(${т} 64% 50%) 0%, hsl(${(т + 48) % 360} 58% 34%) 45%, hsl(${(т + 150) % 360} 60% 46%) 100%)`,
+        backgroundSize: "220% 220%",
+        animation: "букваЦветёт 7s ease-in-out infinite",
         color: "#FFFFFF", fontFamily: displayFont, fontWeight: 800,
         fontSize: Math.round(size * 0.44), lineHeight: 1, letterSpacing: "-0.02em",
         userSelect: "none",
