@@ -22,7 +22,7 @@
 
 import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
-import { фразаПользователя } from "./_seed.js";
+import { фразаПользователя, новаяФраза } from "./_seed.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -115,7 +115,23 @@ export default async function handler(req, res) {
       // Записал — значит видел. Второй раз фраза не показывается: сессию
       // могли и увести, а слова открывают кошелёк целиком.
       if (состояние.готово) return res.status(409).json({ error: "already_saved" });
-      const фраза = await фразаПользователя(db, user, набор);
+
+      /* Первый показ — это и есть «создать кошелёк»: выдаём свежую фразу,
+         а не ту, что завелась сама при первом обращении к кошельку. Ту
+         человек не видел и не выбирал, и привязывать к ней его деньги
+         неправильно. Кошельки, выведенные из прежней записи, убираем —
+         иначе слова на экране не открывали бы то, что за ними стоит.
+         Дальше (вход из строки «Секретная фраза») отдаём как есть:
+         там за фразой уже могут лежать деньги. */
+      let фраза;
+      if (!состояние.начато) {
+        фраза = await новаяФраза(db, user, набор);
+        const { error: убрать } = await db.from("app_wallets").delete().eq("user_id", user.id);
+        if (убрать) console.error("[wallet-seed] прежние кошельки не убраны:", убрать.message);
+      } else {
+        фраза = await фразаПользователя(db, user, набор);
+      }
+
       // Помечаем, что слова человек уже видел: с этой минуты кошелёк
       // считается заведённым, даже если запись он отложил.
       await db.from("app_seeds").update({ revealed_at: new Date().toISOString() })
