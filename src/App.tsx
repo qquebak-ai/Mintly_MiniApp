@@ -375,7 +375,7 @@ const STR = {
     mailCodeTo: "Отправили на {mail}",
     mailChangePending: "Код верный, но почта не привязалась. Выключи Secure email change в Supabase.",
     walletMakeTitle: "Создай кошелёк",
-    walletMakeBody: "Кошелёк Mintly держит TON и Solana, и платит им же — без подтверждений снаружи. Ключ от него — двадцать четыре слова.",
+    walletMakeBody: "Отправляй и получай средства за считанные секунды, наслаждайся мгновенными переводами и торгуй своими активами без лишних задержек.",
     walletMakeCta: "Создать кошелёк",
     walletMakeWait: "Заводим кошелёк…",
     seedTitle: "Двадцать четыре слова",
@@ -1022,7 +1022,7 @@ const STR = {
     mailCodeTo: "Sent to {mail}",
     mailChangePending: "The code is right, but the email didn't attach. Turn off Secure email change in Supabase.",
     walletMakeTitle: "Create a wallet",
-    walletMakeBody: "The Mintly wallet holds TON and Solana and pays with them — no outside confirmations. Its key is twenty-four words.",
+    walletMakeBody: "Send and receive in seconds, enjoy instant transfers and trade your assets with no delays in between.",
     walletMakeCta: "Create a wallet",
     walletMakeWait: "Setting up the wallet…",
     seedTitle: "Twenty-four words",
@@ -9895,7 +9895,7 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
           пустым экраном читалась как «здесь всё, а ниже сломалось». */}
       <div className="flex items-center justify-between">
         {разделГотов ? (
-          <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, letterSpacing: "-0.01em", margin: 0 }}>
+          <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>
             {t("navMempad")}
           </h1>
         ) : <ПлашкаЧисла width={118} height={26} radius={8} />}
@@ -14144,8 +14144,11 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
   const всёВписано = спрос.length === 3 && ответы.every((о) => о.trim().length > 1);
 
   return (
-    <div className="flex flex-col" style={{ padding: `${8 + insetTop / 2}px 16px 40px`, gap: 16 }}>
-      <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, margin: 0, letterSpacing: "-0.01em" }}>
+    /* Отступ сверху — тот же, что у самого кошелька: заголовок обязан
+       стоять на одном месте до заведения и после, иначе при первом
+       переходе он прыгает. */
+    <div className="flex flex-col" style={{ padding: "8px 16px 40px", gap: 16 }}>
+      <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
         {t("navWallet")}
       </h1>
 
@@ -14532,7 +14535,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           начертание и отступ сверху — иначе при переходе между
           разделами название прыгает. */}
       <div style={{ marginBottom: 14, padding: "0 16px" }}>
-        <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, margin: 0, letterSpacing: "-0.01em" }}>
+        <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
           {t("navWallet")}
         </h1>
       </div>
