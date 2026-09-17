@@ -7763,10 +7763,15 @@ function PublicProfileView({ userId: ownerId, currentUserId, onBack, onOpenToken
         </div>
 
         <div className="flex flex-col items-center gap-2" style={{ position: "relative", zIndex: 1, width: "100%" }}>
-          <span className="flex items-center gap-1.5" style={{ fontFamily: displayFont, color: T.ice, fontSize: 20.5, fontWeight: 700, marginTop: 4 }}>
+          <span style={{ position: "relative", fontFamily: displayFont, color: T.ice, fontSize: 20.5, fontWeight: 700, marginTop: 4 }}>
             {profile.nickname}
-            <VerifiedBadge verified={!!profile.verified} size={16} />
-            <CreatorWreathBadge tier={creatorTier} size={19} />
+            <span className="flex items-center" style={{
+              position: "absolute", left: "100%", top: "50%", transform: "translateY(-50%)",
+              marginLeft: 6, gap: 6,
+            }}>
+              <VerifiedBadge verified={!!profile.verified} size={16} />
+              <CreatorWreathBadge tier={creatorTier} size={19} />
+            </span>
           </span>
           <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, maxWidth: 260, lineHeight: 1.5 }}>
             {profile.bio || tr("bioEmptyPlaceholder")}
@@ -21672,10 +21677,21 @@ function ProfileView({
           <div className="flex flex-col items-center text-center gap-2" style={{ position: "relative", zIndex: 1, width: "100%" }}>
           {accountCreated ? (
             <>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 20.5, fontWeight: 700 }}>{profile.nickname}</span>
-                <CreatorWreathBadge tier={creatorTier} size={19} />
-                <VerifiedBadge verified={verifyStatus === "verified"} size={16} />
+              {/* Значки висят справа от имени и в его ширину не входят.
+                  Раньше они стояли в одном ряду с ним, ряд центровался
+                  целиком — и само имя уезжало левее аватарки ровно на
+                  половину значков. */}
+              <div className="flex items-center justify-center mt-1">
+                <span style={{ position: "relative", fontFamily: displayFont, color: T.ice, fontSize: 20.5, fontWeight: 700 }}>
+                  {profile.nickname}
+                  <span className="flex items-center" style={{
+                    position: "absolute", left: "100%", top: "50%", transform: "translateY(-50%)",
+                    marginLeft: 6, gap: 6,
+                  }}>
+                    <CreatorWreathBadge tier={creatorTier} size={19} />
+                    <VerifiedBadge verified={verifyStatus === "verified"} size={16} />
+                  </span>
+                </span>
               </div>
               {/* Описание в две строки: длинное всё равно дочитывают на
                   своей странице токена, а здесь оно раздвигало экран так,
