@@ -370,6 +370,9 @@ const STR = {
     authMailService: "Такую почту не принимаем. Подойдут Gmail, Mail.ru, Яндекс, Proton, iCloud, Outlook.",
     authMailServices: "Gmail, Mail.ru, Яндекс, Proton, iCloud, Outlook и другие крупные службы",
     mailLocked: "Почта у аккаунта одна и не меняется",
+    mailSendCode: "Отправить код",
+    mailCodeTitle: "Введите код",
+    mailCodeTo: "Отправили на {mail}",
     mailSendFailed: "Письмо не ушло: почтовый сервер отказал. Попробуй позже.",
     authCodeResend: "Отправить заново",
     authGotIt: "Понятно",
@@ -997,6 +1000,9 @@ const STR = {
     authMailService: "We don't accept that provider. Gmail, Mail.ru, Yandex, Proton, iCloud and Outlook work.",
     authMailServices: "Gmail, Mail.ru, Yandex, Proton, iCloud, Outlook and other major providers",
     mailLocked: "An account keeps one email, and it can't be changed",
+    mailSendCode: "Send the code",
+    mailCodeTitle: "Enter the code",
+    mailCodeTo: "Sent to {mail}",
     mailSendFailed: "The letter didn't go out: the mail server refused. Try again later.",
     authCodeResend: "Send again",
     authGotIt: "Got it",
@@ -2023,6 +2029,17 @@ function GlobalStyle() {
         0%   { background-position: 0% 50%; }
         50%  { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
+      }
+      /* Смена шага на экране почты: старое уходит вверх, новое приходит
+         снизу. Одно движение вместо подмены — видно, что это продолжение
+         того же разговора, а не другой экран. */
+      @keyframes шагУходитВверх {
+        from { opacity: 1; transform: none; }
+        to   { opacity: 0; transform: translateY(-26px); }
+      }
+      @keyframes шагПриходитСнизу {
+        from { opacity: 0; transform: translateY(26px); }
+        to   { opacity: 1; transform: none; }
       }
       /* Заливка буквенной аватарки качается между краями градиента. */
       @keyframes букваЦветёт {
@@ -20044,7 +20061,7 @@ function telegramStartParam() {
  * или ссылка — и мы принимаем оба пути: поле для кода и ожидание
  * перехода по ссылке идут рядом, а не вместо друг друга.
  */
-function ЭкранПочты({ открыт, onClose, onГотово = () => {}, почтаЗаранее = "", слатьСразу = false, insetTop = 0, insetBottom = 0 }) {
+function ЭкранПочты({ открыт, onClose, onГотово = () => {}, почтаЗаранее = "", insetTop = 0, insetBottom = 0 }) {
   const [шаг, setШаг] = useState("адрес");   // адрес | письмо | готово
   const [почта, setПочта] = useState("");
   const [код, setКод] = useState("");
@@ -20059,9 +20076,17 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
      сессии, значило бы отдать ему аккаунт целиком. Поле остаётся на
      экране — но только чтобы человек видел, куда уйдёт письмо. */
   const [заперта, setЗаперта] = useState(false);
+  // Кадр между шагами: старое уходит вверх, новое приходит снизу.
+  const [уходит, setУходит] = useState(false);
+  const УХОД_ШАГА = 200;
+
+  function сменитьШаг(новый) {
+    setУходит(true);
+    setTimeout(() => { setШаг(новый); setУходит(false); }, УХОД_ШАГА);
+  }
 
   useEffect(() => {
-    if (!открыт) { setШаг("адрес"); setКод(""); setБеда(""); setИдёт(false); return undefined; }
+    if (!открыт) { setШаг("адрес"); setКод(""); setБеда(""); setИдёт(false); setУходит(false); return undefined; }
     let живо = true;
     (async () => {
       const м = await почтаАккаунта();
@@ -20069,16 +20094,14 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
       setПривязана(м);
       if (м) { setПочта(м); setЗаперта(true); setШаг("готово"); }
       /* Адрес человек назвал при создании аккаунта — второй раз спрашивать
-         его незачем. Открылись из плашки «подтверди почту» — тем же
-         движением и шлём письмо: нажатие на плашку и есть просьба о коде. */
+         его незачем: показываем, куда уйдёт код, и ждём нажатия. Письмо
+         само по себе, без просьбы, уходить не должно. */
       else if (почтаЗаранее) {
         setПочта(почтаЗаранее);
         // Запираем только пригодный адрес: с почтой, которую мы больше не
         // принимаем, человек иначе остался бы взаперти — ни подтвердить,
         // ни исправить.
         setЗаперта(службаПодходит(почтаЗаранее));
-        if (слатьСразу) послать(почтаЗаранее);
-        else setШаг("письмо");
       } else {
         // Открылись из настроек — адрес всё равно уже известен, набирать
         // его второй раз незачем, достаточно нажать «отправить письмо».
@@ -20114,7 +20137,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
       const м = await почтаАккаунта();
       if (м && м.toLowerCase() === нужна) {
         setПривязана(м);
-        setШаг("готово");
+        сменитьШаг("готово");
         await отметить(true);
         haptic("success");
       }
@@ -20138,7 +20161,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
       await привязатьПочту(адрес);
       setПочта(адрес);
       setКод("");
-      setШаг("письмо");
+      сменитьШаг("письмо");
       haptic("light");
     } catch (e) {
       const т = String((e && e.message) || "");
@@ -20154,6 +20177,26 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
     }
   }
 
+  // Цифры набираются своей клавиатурой: системная на этом экране
+  // закрывала бы половину окошек, а ввод тут — шесть знаков, не текст.
+  function цифра(к) {
+    if (идёт) return;
+    setБеда("");
+    haptic("light");
+    if (к === "⌫") { setКод((было) => было.slice(0, -1)); return; }
+    if (!/^[0-9]$/.test(к)) return;
+    setКод((было) => (было.length >= 6 ? было : было + к));
+  }
+
+  /* Шестая цифра — и код уходит на проверку сам. Отдельная кнопка
+     «подтвердить» под клавиатурой была бы лишним нажатием: набирать
+     больше нечего. */
+  useEffect(() => {
+    if (шаг !== "письмо" || код.length !== 6 || идёт) return;
+    подтвердить();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [код, шаг]);
+
   async function подтвердить() {
     if (!кодГоден || идёт) return;
     setБеда("");
@@ -20161,7 +20204,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
     try {
       await подтвердитьПочту(чистая, код.trim());
       setПривязана(чистая);
-      setШаг("готово");
+      сменитьШаг("готово");
       await отметить(true);
       haptic("success");
     } catch (e) {
@@ -20174,7 +20217,16 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
 
   return (
     <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={t("mail2faTitle")} insetTop={insetTop} insetBottom={insetBottom}>
-      <div className="flex flex-col" style={{ flex: 1, minHeight: 0, padding: "0 18px", gap: 14 }}>
+      <div
+        key={шаг}
+        className="flex flex-col"
+        style={{
+          flex: 1, minHeight: 0, padding: "0 18px", gap: 14,
+          animation: уходит
+            ? `шагУходитВверх ${УХОД_ШАГА}ms ease-in forwards`
+            : "шагПриходитСнизу 280ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        }}
+      >
         {шаг === "готово" ? (
           <div className="flex flex-col items-center text-center" style={{ gap: 12, paddingTop: 10 }}>
             <span className="flex items-center justify-center" style={{
@@ -20212,42 +20264,45 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
           </div>
         ) : шаг === "письмо" ? (
           <>
-            <div className="flex items-center" style={{ gap: 10 }}>
-              <span className="flex items-center justify-center flex-shrink-0" style={{
-                width: 40, height: 40, borderRadius: 999, background: hexA(T.electric, 0.14), color: T.electric,
-              }}>
-                <Mail size={18} />
+            <div className="flex flex-col items-center text-center" style={{ gap: 6, paddingTop: 4 }}>
+              <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
+                {t("mailCodeTitle")}
               </span>
-              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.45 }}>
-                {tf("mail2faSent", { mail: чистая })}
+              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>
+                {tf("mailCodeTo", { mail: чистая })}
               </span>
             </div>
-            <input
-              value={код}
-              onChange={(e) => { setКод(e.target.value.replace(/\D/g, "").slice(0, 6)); setБеда(""); }}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="······"
-              style={{
-                padding: "16px 14px", borderRadius: 16, textAlign: "center",
-                border: `1px solid ${беда ? T.down : (кодГоден ? T.up : T.line)}`,
-                background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 26,
-                letterSpacing: "0.32em", outline: "none", transition: "border-color 200ms ease",
-              }}
-            />
-            <span style={{ fontFamily: bodyFont, color: беда ? T.down : T.faint, fontSize: 12.5 }}>
-              {беда || t("mail2faWaiting")}
+            {/* Шесть окошек вместо одного поля: видно, сколько знаков уже
+                набрано и сколько осталось, а следующее место подсвечено. */}
+            <div className="flex" style={{ gap: 8 }}>
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <span
+                  key={i}
+                  className="flex items-center justify-center"
+                  style={{
+                    flex: 1, minWidth: 0, height: 58, borderRadius: 14, background: T.surface,
+                    border: `1.5px solid ${беда ? T.down : (код.length === i ? T.up : (код[i] ? T.lineHi : T.line))}`,
+                    color: T.ice, fontFamily: monoFont, fontSize: 25, fontWeight: 700,
+                    transition: "border-color 200ms ease",
+                  }}
+                >
+                  {код[i] || ""}
+                </span>
+              ))}
+            </div>
+            <span className="text-center" style={{ fontFamily: bodyFont, color: беда ? T.down : T.faint, fontSize: 12.5 }}>
+              {беда || (идёт ? t("mail2faSending") : t("mail2faWaiting"))}
             </span>
             <button
               onClick={() => послать()}
               disabled={идёт}
               className="fx-tap"
               style={{
-                alignSelf: "flex-start", padding: 0, border: "none", background: "transparent",
+                alignSelf: "center", padding: 0, border: "none", background: "transparent",
                 color: идёт ? T.faint : T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
               }}
             >
-              {идёт ? t("mail2faSending") : t("authCodeResend")}
+              {t("authCodeResend")}
             </button>
           </>
         ) : (
@@ -20277,21 +20332,47 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
         )}
       </div>
 
-      <div style={{ padding: "14px 18px 22px", flexShrink: 0 }}>
-        <button
-          onClick={шаг === "готово" ? () => { onГотово(привязана); onClose(); } : шаг === "письмо" ? подтвердить : () => послать()}
-          disabled={шаг === "адрес" ? (!годна || идёт) : шаг === "письмо" ? (!кодГоден || идёт) : false}
-          className="fx-tap w-full"
-          style={{
-            padding: "16px 0", borderRadius: 999, border: "none",
-            background: (шаг === "готово" || (шаг === "адрес" ? годна : кодГоден)) && !идёт ? ЦВЕТ_КНОПКИ : T.surfaceHi,
-            color: (шаг === "готово" || (шаг === "адрес" ? годна : кодГоден)) && !идёт ? PRISM_TEXT : T.muted,
-            fontFamily: displayFont, fontSize: 16, fontWeight: 800,
-          }}
-        >
-          {шаг === "готово" ? t("authGotIt") : шаг === "письмо" ? t("withdrawCodeConfirm") : (идёт ? t("mail2faSending") : t("mail2faSend"))}
-        </button>
-      </div>
+      {шаг === "письмо" ? (
+        /* Клавиатура помечена: палец здесь принадлежит цифрам, а не листу
+           — тянуть окно вниз отсюда нельзя. */
+        <div data-без-жеста="1" style={{ padding: "0 8px 14px", flexShrink: 0 }}>
+          {[["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["", "0", "⌫"]].map((ряд, i) => (
+            <div key={i} className="flex">
+              {ряд.map((к, j) => (
+                <button
+                  key={к || `пусто${j}`}
+                  onClick={() => к && цифра(к)}
+                  disabled={!к}
+                  className="fx-tap flex items-center justify-center"
+                  style={{
+                    flex: 1, padding: "14px 0", border: "none", background: "transparent",
+                    color: T.ice, fontFamily: displayFont, fontSize: 26, fontWeight: 600,
+                    opacity: к ? 1 : 0,
+                  }}
+                >
+                  {к === "⌫" ? <ChevronLeft size={24} /> : к}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ padding: "14px 18px 22px", flexShrink: 0 }}>
+          <button
+            onClick={шаг === "готово" ? () => { onГотово(привязана); onClose(); } : () => послать()}
+            disabled={шаг === "адрес" ? (!годна || идёт) : false}
+            className="fx-tap w-full"
+            style={{
+              padding: "16px 0", borderRadius: 999, border: "none",
+              background: (шаг === "готово" || годна) && !идёт ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+              color: (шаг === "готово" || годна) && !идёт ? PRISM_TEXT : T.muted,
+              fontFamily: displayFont, fontSize: 16, fontWeight: 800,
+            }}
+          >
+            {шаг === "готово" ? t("authGotIt") : (идёт ? t("mail2faSending") : t("mailSendCode"))}
+          </button>
+        </div>
+      )}
     </ЭкранСнизу>
   );
 }
@@ -20347,7 +20428,6 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
       <ЭкранПочты
         открыт={открыт}
         почтаЗаранее={черновик}
-        слатьСразу
         insetTop={insetTop}
         insetBottom={insetBottom}
         onClose={() => setОткрыт(false)}
