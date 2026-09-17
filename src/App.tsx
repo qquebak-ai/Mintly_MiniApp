@@ -343,6 +343,7 @@ const STR = {
     createdBody: "Осталось одно. Привяжи почту: ею подтверждается вывод, и через неё возвращают аккаунт, если пропадёт доступ к Telegram.",
     addMail: "Добавить почту",
     laterBtn: "Позже",
+    cropPinchHint: "Двумя пальцами — приблизить, одним — подвинуть",
     enterApp: "Войти в приложение",
     openInTelegram: "Открыть в Telegram",
     mail2faTitle: "Почта для 2ФА",
@@ -958,6 +959,7 @@ const STR = {
     createdBody: "One thing left. Add an email: it confirms withdrawals and brings the account back if you lose access to Telegram.",
     addMail: "Add email",
     laterBtn: "Later",
+    cropPinchHint: "Pinch to zoom, drag to move",
     enterApp: "Enter the app",
     openInTelegram: "Open in Telegram",
     mail2faTitle: "Email for 2FA",
@@ -17598,6 +17600,10 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
   const [zoom, setZoom] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const dragRef = useRef(null);
+  // Щипок двумя пальцами: запоминаем расстояние между ними и увеличение,
+  // с которого начали.
+  const щипокRef = useRef(null);
+  const рамкаRef = useRef(null);
   const objectUrlRef = useRef(null);
 
   useEffect(() => {
@@ -17635,11 +17641,52 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
   }, [zoom, natural.w, natural.h]);
 
   function pointFromEvent(e) { return e.touches ? e.touches[0] : e; }
+
+  // Расстояние между пальцами и точка ровно между ними.
+  function щипок(касания) {
+    const a = касания[0], b = касания[1];
+    return {
+      длина: Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY),
+      cx: (a.clientX + b.clientX) / 2,
+      cy: (a.clientY + b.clientY) / 2,
+    };
+  }
+
+  /* Увеличение с привязкой к точке. Картинка тянется не от края, а от
+     того места, за которое взялись пальцы: точка под ними остаётся на
+     месте, как в любой галерее. Меньше единицы не пускаем — на этом
+     увеличении картинка ровно накрывает кружок, и дальше в кадре
+     появились бы пустые поля. */
+  function увеличить(следующее, cx, cy) {
+    const рамка = рамкаRef.current ? рамкаRef.current.getBoundingClientRect() : null;
+    const z = Math.min(4, Math.max(1, следующее));
+    const было = baseScale * zoom;
+    const стало = baseScale * z;
+    if (рамка) {
+      const тx = cx - рамка.left, тy = cy - рамка.top;
+      const дx = (тx - pos.x) / было, дy = (тy - pos.y) / было;
+      setPos(clampPos(тx - дx * стало, тy - дy * стало, стало));
+    }
+    setZoom(z);
+  }
+
   function onPointerDown(e) {
+    if (e.touches && e.touches.length >= 2) {
+      dragRef.current = null;
+      щипокRef.current = { ...щипок(e.touches), zoom0: zoom };
+      return;
+    }
     const p = pointFromEvent(e);
     dragRef.current = { startX: p.clientX, startY: p.clientY, origX: pos.x, origY: pos.y };
   }
   function onPointerMove(e) {
+    if (e.touches && e.touches.length >= 2 && щипокRef.current) {
+      e.preventDefault();
+      const с = щипок(e.touches);
+      const н = щипокRef.current;
+      if (н.длина > 0) увеличить(н.zoom0 * (с.длина / н.длина), с.cx, с.cy);
+      return;
+    }
     if (!dragRef.current) return;
     if (e.touches) e.preventDefault();
     const p = pointFromEvent(e);
@@ -17647,7 +17694,25 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
     const dy = p.clientY - dragRef.current.startY;
     setPos(clampPos(dragRef.current.origX + dx, dragRef.current.origY + dy, scale));
   }
-  function onPointerUp() { dragRef.current = null; }
+  function onPointerUp(e) {
+    // Один палец подняли, второй остался — дальше это уже перетаскивание,
+    // и тянуть надо от нового места, а не от того, где начинался щипок.
+    if (e && e.touches && e.touches.length === 1) {
+      щипокRef.current = null;
+      const p = e.touches[0];
+      dragRef.current = { startX: p.clientX, startY: p.clientY, origX: pos.x, origY: pos.y };
+      return;
+    }
+    dragRef.current = null;
+    щипокRef.current = null;
+  }
+
+  // Колесо и трекпад — для тех, кто открыл приложение на компьютере:
+  // пальцев там нет, а ползунка больше нет тоже.
+  function onWheel(e) {
+    if (!imgEl) return;
+    увеличить(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX, e.clientY);
+  }
 
   function handleConfirm() {
     if (!imgEl) return;
@@ -17694,8 +17759,10 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
       <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 340, maxHeight: "100%", overflowY: "auto", background: T.surface, border: "none", borderRadius: 24, padding: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
         <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>{t("cropImageTitle")}</div>
         <div
+          ref={рамкаRef}
           onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp} onMouseLeave={onPointerUp}
           onTouchStart={onPointerDown} onTouchMove={onPointerMove} onTouchEnd={onPointerUp} onTouchCancel={onPointerUp}
+          onWheel={onWheel}
           style={{
             width: CROP_BOX, height: CROP_BOX, position: "relative", overflow: "hidden",
             borderRadius: shape === "circle" ? "50%" : 16,
@@ -17715,15 +17782,9 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
             />
           )}
         </div>
-        <div className="flex items-center gap-2.5 w-full">
-          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 14.5 }}>–</span>
-          <input
-            type="range" min={1} max={4} step={0.01} value={zoom}
-            onChange={(e) => setZoom(parseFloat(e.target.value))}
-            style={{ flex: 1, accentColor: T.turquoise }}
-          />
-          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 14.5 }}>+</span>
-        </div>
+        {/* Ползунка нет: картинку приближают двумя пальцами прямо на ней,
+            как в любой галерее, — а на компьютере колесом. */}
+        <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5, textAlign: "center" }}>{t("cropPinchHint")}</span>
         <div className="flex items-center gap-2 w-full">
           <button onClick={onCancel} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>{t("cancel")}</button>
           <button onClick={handleConfirm} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>{t("cropConfirm")}</button>
