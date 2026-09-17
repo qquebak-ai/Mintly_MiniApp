@@ -369,6 +369,8 @@ const STR = {
     authMailTooOften: "Слишком часто. Подожди минуту и попробуй снова.",
     authMailBad: "Проверь адрес — он не похож на почту",
     authMailService: "Такую почту не принимаем. Подойдут Gmail, Mail.ru, Яндекс, Proton, iCloud, Outlook.",
+    authMailTaken: "На эту почту аккаунт уже заведён",
+    authNickTaken: "Такой юзернейм уже занят",
     authMailServices: "Gmail, Mail.ru, Яндекс, Proton, iCloud, Outlook и другие крупные службы",
     mailLocked: "Почта у аккаунта одна и не меняется",
     mailSendCode: "Отправить код",
@@ -1037,6 +1039,8 @@ const STR = {
     authMailTooOften: "Too often. Wait a minute and try again.",
     authMailBad: "Check the address — it doesn't look like an email",
     authMailService: "We don't accept that provider. Gmail, Mail.ru, Yandex, Proton, iCloud and Outlook work.",
+    authMailTaken: "An account with this email already exists",
+    authNickTaken: "That username is taken",
     authMailServices: "Gmail, Mail.ru, Yandex, Proton, iCloud, Outlook and other major providers",
     mailLocked: "An account keeps one email, and it can't be changed",
     mailSendCode: "Send the code",
@@ -20651,6 +20655,26 @@ async function черновикПочты() {
   return почтаНастоящая(м) ? м : "";
 }
 
+/* Занято ли имя или почта. Спрашиваем у самой базы: профили открыты на
+   чтение, и ответ приходит до того, как человек упрётся в отказ сервера
+   после нажатия «создать». Молчим при любой ошибке связи — решает всё
+   равно сервер, а гасить кнопку из-за пропавшей сети нельзя. */
+async function никЗанят(ник) {
+  const имя = String(ник || "").trim();
+  if (!имя) return false;
+  const { data, error } = await supabase.from("profiles").select("id").ilike("nickname", имя).limit(1);
+  if (error) return false;
+  return !!(data && data.length);
+}
+
+async function почтаЗанята(почта) {
+  const адрес = String(почта || "").trim().toLowerCase();
+  if (!адрес) return false;
+  const { data, error } = await supabase.from("profiles").select("id").eq("email", адрес).limit(1);
+  if (error) return false;
+  return !!(data && data.length);
+}
+
 /* Кто пригласил. Telegram кладёт сюда то, что стояло после startapp= в
    ссылке приглашения. Значение только передаём — доверять ему нельзя,
    сервер сам проверит, что такой пользователь есть, что это не сам
@@ -21104,6 +21128,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const [почтаВвод, setПочтаВвод] = useState("");
   const [почтаБеда, setПочтаБеда] = useState("");
   const [естьАккаунт, setЕстьАккаунт] = useState(null); // null — ещё спрашиваем
+  /* Занято ли уже введённое. Спрашиваем на ходу: узнать об этом после
+     нажатия «создать» — значит пройти весь экран впустую. */
+  const [почтаНеСвободна, setПочтаНеСвободна] = useState(false);
+  const [никНеСвободен, setНикНеСвободен] = useState(false);
   /* Отступ карточки сверху считается один раз, при открытии, и дальше не
      пересчитывается. В долях экрана (vh) он зависел от высоты окна, а
      Telegram укорачивает окно на высоту клавиатуры — и карточка прыгала
@@ -21180,6 +21208,30 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     }
   }, [open, mode]);
 
+  /* Проверка идёт с задержкой в треть секунды после последней буквы:
+     спрашивать базу на каждое нажатие клавиши незачем. */
+  const почтаНабрана = почтаВвод.trim().toLowerCase();
+  useEffect(() => {
+    if (isEdit || !ПОЧТА_RE.test(почтаНабрана) || !службаПодходит(почтаНабрана)) { setПочтаНеСвободна(false); return undefined; }
+    let живо = true;
+    const id = setTimeout(async () => {
+      const занята = await почтаЗанята(почтаНабрана);
+      if (живо) setПочтаНеСвободна(занята);
+    }, 340);
+    return () => { живо = false; clearTimeout(id); };
+  }, [почтаНабрана, isEdit]);
+
+  const никНабран = tgNick.trim();
+  useEffect(() => {
+    if (isEdit || !NICKNAME_RE.test(никНабран)) { setНикНеСвободен(false); return undefined; }
+    let живо = true;
+    const id = setTimeout(async () => {
+      const занят = await никЗанят(никНабран);
+      if (живо) setНикНеСвободен(занят);
+    }, 340);
+    return () => { живо = false; clearTimeout(id); };
+  }, [никНабран, isEdit]);
+
   if (!видно) return null;
 
   /* Создание аккаунта. Чёрный экран во всю высоту и одна карточка
@@ -21189,13 +21241,13 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   if (!isEdit) {
     const внутриTelegram = !!telegramInitData();
     const ник = tgNick.trim();
-    const никГоден = NICKNAME_RE.test(ник);
+    const никГоден = NICKNAME_RE.test(ник) && !никНеСвободен;
     const ждём = внутриTelegram && естьАккаунт == null;
     const почтаЧистая = почтаВвод.trim().toLowerCase();
     const почтаПохожа = ПОЧТА_RE.test(почтаЧистая);
     // Кнопка загорается на любом похожем адресе, а про службу говорим
     // словами: погасшая кнопка без объяснения читается как поломка.
-    const почтаГодна = почтаПохожа && службаПодходит(почтаЧистая);
+    const почтаГодна = почтаПохожа && службаПодходит(почтаЧистая) && !почтаНеСвободна;
     // Почта привязалась молча, без письма — об этом и говорит карточка
     // «аккаунт готов».
     const почтаПривязана = шагВхода === "готово" && !!почтаЧистая && !почтаБеда;
@@ -21253,6 +21305,13 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         if (почтаЧистая) {
           try { await запомнитьПочту(почтаЧистая); setПочтаБеда(""); }
           catch (e) { setПочтаБеда(String((e && e.message) || "").slice(0, 120)); }
+          /* Тот же адрес кладём в профиль: следующий, кто наберёт его на
+             первом шаге, увидит «аккаунт уже заведён» до нажатия кнопки. */
+          try {
+            const { data } = await supabase.auth.getUser();
+            const id = data && data.user && data.user.id;
+            if (id) await supabase.from("profiles").update({ email: почтаЧистая }).eq("id", id);
+          } catch (e) { console.warn("[mintly] почта не легла в профиль:", e && e.message); }
         }
         setШагВхода("готово");
       } catch (err) {
@@ -21335,15 +21394,15 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   style={{
                     padding: "15px 15px", borderRadius: 18,
                     background: T.surfaceHi,
-                    border: `1px solid ${почтаБеда ? T.down : (почтаГодна ? T.up : "transparent")}`,
+                    border: `1px solid ${почтаБеда || почтаНеСвободна ? T.down : (почтаГодна ? T.up : "transparent")}`,
                     color: T.ice, fontFamily: bodyFont, fontSize: 16, fontWeight: 700, outline: "none",
                     transition: "border-color 260ms ease",
                   }}
                 />
               )}
-              {внутриTelegram && (
-                <span style={{ fontFamily: bodyFont, color: почтаБеда ? T.down : T.faint, fontSize: 12.5, lineHeight: 1.45 }}>
-                  {почтаБеда || t("authMailServices")}
+              {(почтаБеда || почтаНеСвободна) && (
+                <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5, lineHeight: 1.45 }}>
+                  {почтаБеда || t("authMailTaken")}
                 </span>
               )}
 
@@ -21351,23 +21410,24 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 onClick={() => {
                   if (!почтаПохожа) { setПочтаБеда(t("authMailBad")); return; }
                   if (!службаПодходит(почтаЧистая)) { setПочтаБеда(t("authMailService")); return; }
+                  if (почтаНеСвободна) { setПочтаБеда(t("authMailTaken")); return; }
                   setШагВхода("ник");
                   haptic("light");
                 }}
-                disabled={!почтаПохожа}
+                disabled={!почтаГодна}
                 className="fx-tap w-full flex items-center justify-center"
                 style={{
                   position: "relative", overflow: "hidden",
                   gap: 8, padding: "16px 0", borderRadius: 999, border: "none",
                   background: T.surfaceHi,
-                  color: почтаПохожа ? PRISM_TEXT : T.muted,
+                  color: почтаГодна ? PRISM_TEXT : T.muted,
                   fontFamily: displayFont, fontWeight: 800, fontSize: 16,
                   transition: "color 320ms ease",
                 }}
               >
                 <span aria-hidden style={{
                   position: "absolute", inset: 0, borderRadius: 999, ...ВОЛНА(ЦВЕТ_ВХОДА),
-                  pointerEvents: "none", opacity: почтаПохожа ? 1 : 0, transition: "opacity 320ms ease",
+                  pointerEvents: "none", opacity: почтаГодна ? 1 : 0, transition: "opacity 320ms ease",
                 }} />
                 <span style={{ position: "relative" }}>{t("withdrawNext")}</span>
               </button>
@@ -21451,7 +21511,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                     position: "relative",
                     gap: 2, padding: "14px 15px", borderRadius: 18,
                     background: T.surfaceHi,
-                    border: `1px solid ${tgNickTouched && !никГоден ? T.down : "transparent"}`,
+                    border: `1px solid ${(tgNickTouched && !никГоден) || никНеСвободен ? T.down : "transparent"}`,
                     transition: "border-color 260ms ease",
                   }}>
                     {/* Живая рамка отдельным слоем поверх края.
@@ -21506,8 +21566,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                       <Check size={17} strokeWidth={3} />
                     </span>
                   </div>
-                  {tgNickTouched && !никГоден && (
-                    <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12 }}>{t("nicknameError")}</span>
+                  {((tgNickTouched && !никГоден) || никНеСвободен) && (
+                    <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12 }}>
+                      {никНеСвободен ? t("authNickTaken") : t("nicknameError")}
+                    </span>
                   )}
                 </div>
               )}
