@@ -20079,6 +20079,8 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
   // Кадр между шагами: старое уходит вверх, новое приходит снизу.
   const [уходит, setУходит] = useState(false);
   const УХОД_ШАГА = 200;
+  // Задержка между окошками в зелёной волне.
+  const ВОЛНА_ШАГ = 70;
 
   function сменитьШаг(новый) {
     setУходит(true);
@@ -20148,6 +20150,8 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
   const чистая = почта.trim().toLowerCase();
   const годна = ПОЧТА_RE.test(чистая);
   const кодГоден = код.trim().length === 6;
+  // Набран целиком и без отказа — по окошкам бежит зелёное.
+  const полон = кодГоден && !беда;
 
   // Адрес можно передать прямо сюда: при открытии из плашки состояние с
   // почтой ещё не успело обновиться, а письмо надо слать уже сейчас.
@@ -20192,8 +20196,12 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
      «подтвердить» под клавиатурой была бы лишним нажатием: набирать
      больше нечего. */
   useEffect(() => {
-    if (шаг !== "письмо" || код.length !== 6 || идёт) return;
-    подтвердить();
+    if (шаг !== "письмо" || код.length !== 6 || идёт) return undefined;
+    // Ждём, пока по окошкам пробежит зелёная волна: набор закончен, и это
+    // видно глазом раньше, чем ответит сервер. Проверка поверх бегущей
+    // анимации выглядела бы обрывом.
+    const id = setTimeout(() => подтвердить(), ВОЛНА_ШАГ * 6 + 200);
+    return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [код, шаг]);
 
@@ -20281,9 +20289,13 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
                   className="flex items-center justify-center"
                   style={{
                     flex: 1, minWidth: 0, height: 58, borderRadius: 14, background: T.surface,
-                    border: `1.5px solid ${беда ? T.down : (код.length === i ? T.up : (код[i] ? T.lineHi : T.line))}`,
+                    border: `1.5px solid ${беда ? T.down : (полон || код.length === i ? T.up : (код[i] ? T.lineHi : T.line))}`,
+                    /* Код набран — зелёное загорается по окошкам слева
+                       направо: одна волна вместо шести рамок разом. */
+                    boxShadow: полон ? `0 0 0 3px ${hexA(T.up, 0.16)}` : "0 0 0 0 transparent",
                     color: T.ice, fontFamily: monoFont, fontSize: 25, fontWeight: 700,
-                    transition: "border-color 200ms ease",
+                    transition: "border-color 260ms ease, box-shadow 260ms ease",
+                    transitionDelay: полон ? `${i * ВОЛНА_ШАГ}ms` : "0ms",
                   }}
                 >
                   {код[i] || ""}
