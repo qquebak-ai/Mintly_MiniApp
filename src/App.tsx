@@ -20706,14 +20706,19 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   onClick={() => avatarInputRef.current && avatarInputRef.current.click()}
                   className="fx-tap flex items-center justify-center"
                   style={{
-                    width: 76, height: 76, borderRadius: "50%", flexShrink: 0, padding: 0,
+                    width: 96, height: 96, borderRadius: "50%", flexShrink: 0, padding: 0, overflow: "hidden",
                     background: лицо ? `center/cover no-repeat url(${лицо})` : "transparent",
-                    // Пунктир у пустого кружка: он сам говорит, что здесь
-                    // чего-то не хватает, и значок поверх края не нужен.
-                    border: лицо ? `1px solid ${T.lineHi}` : `1px dashed ${T.lineHi}`,
+                    /* Пунктир — только у совсем пустого кружка: он сам
+                       говорит, что здесь чего-то не хватает. Как только
+                       появилось имя, в кружке стоит буква, и пунктир вокруг
+                       неё выглядел бы недоделкой. */
+                    border: лицо || ник ? `1px solid ${T.lineHi}` : `1px dashed ${T.lineHi}`,
+                    transition: "border-color 260ms ease",
                   }}
                 >
-                  {!лицо && <Plus size={26} strokeWidth={2.2} color={T.muted} />}
+                  {!лицо && (ник
+                    ? <БукваАватара ник={ник} size={96} />
+                    : <Plus size={30} strokeWidth={2.2} color={T.muted} />)}
                 </button>
                 <div className="flex flex-col" style={{ gap: 6 }}>
                   <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
