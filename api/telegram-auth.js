@@ -43,9 +43,19 @@ const MAX_AUTH_AGE_SEC = 24 * 60 * 60;
 // «bad_signature (bot token len 46)» и вовсе рассказывал о длине
 // секрета.
 const EXPOSE_DETAIL = process.env.AUTH_DEBUG === "1";
+
+/* Три отказа, где причина всё-таки нужна на экране.
+ *
+ * Это не разведданные, а поломка на стороне базы: без причины человек
+ * видит «попробуй ещё раз» и пробует по кругу, а чинить нечего — журнал
+ * сервера у него в руках не откроется. Подпись и содержимое initData
+ * по-прежнему молчат. */
+const ГРОМКИЕ = new Set(["create_user_failed", "link_failed", "profile_failed"]);
+
 function fail(res, status, error, detail) {
   if (detail) console.error(`[telegram-auth] ${error}:`, detail);
-  return res.status(status).json(EXPOSE_DETAIL && detail ? { error, detail: String(detail) } : { error });
+  const видно = detail && (EXPOSE_DETAIL || ГРОМКИЕ.has(error));
+  return res.status(status).json(видно ? { error, detail: String(detail).slice(0, 200) } : { error });
 }
 
 /* Проверка подписи по документации Telegram: собираем строку из всех
