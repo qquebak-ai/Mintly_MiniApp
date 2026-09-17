@@ -20667,7 +20667,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
   );
 }
 
-function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAddress, onChangeNickname, cosmetics = { frame: "none", card: "none" }, owned, onEquip, lookFocus = null }) {
+function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAddress, onChangeNickname, cosmetics = { frame: "none", card: "none" }, owned, onEquip, lookFocus = null, onСоздан = () => {} }) {
   const isEdit = mode === "edit";
   // Окно держится на экране, пока идёт анимация ухода: без этого оно
   // пропадало кадром, и закрытие читалось сбоем, а не действием.
@@ -20683,8 +20683,6 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const [почтаБеда, setПочтаБеда] = useState("");
   const [естьАккаунт, setЕстьАккаунт] = useState(null); // null — ещё спрашиваем
   const [почтаОткрыта, setПочтаОткрыта] = useState(false);
-  // Залп конфетти после создания аккаунта.
-  const [залп, setЗалп] = useState(false);
   /* Отступ карточки сверху считается один раз, при открытии, и дальше не
      пересчитывается. В долях экрана (vh) он зависел от высоты окна, а
      Telegram укорачивает окно на высоту клавиатуры — и карточка прыгала
@@ -20809,8 +20807,6 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         await signInWithTelegram(входБезНика ? "" : ник);
         // Вошедшему второй ключ предлагать незачем — он уже выбирал.
         if (входБезНика) { onClose(); return; }
-        // Аккаунт заводится один раз в жизни — отмечаем залпом.
-        setЗалп(true);
         haptic("success");
         /* Картинку кладём после создания: до него нет ни сессии, ни
            папки в хранилище — оно закрыто политиками по владельцу.
@@ -21182,7 +21178,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   неё аккаунт уже работает, просто держится на одном
                   Telegram. */}
               <button
-                onClick={onClose}
+                onClick={() => { onСоздан(); onClose(); }}
                 className="fx-tap w-full"
                 style={{
                   padding: "6px 0 0", border: "none", background: "transparent",
@@ -21199,10 +21195,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           открыт={почтаОткрыта}
           почтаЗаранее={письмоУшло ? почтаЧистая : ""}
           onClose={() => setПочтаОткрыта(false)}
-          onГотово={() => { setПочтаОткрыта(false); onClose(); }}
+          onГотово={() => { setПочтаОткрыта(false); onСоздан(); onClose(); }}
         />
         <ImageCropModal file={avatarCropFile} shape="circle" onCancel={() => setAvatarCropFile(null)} onConfirm={handleAvatarCropConfirm} />
-        <КонфеттиЗалп включено={залп} onКонец={() => setЗалп(false)} />
       </div>
     );
     return typeof document !== "undefined" ? createPortal(экран, document.body) : экран;
@@ -24094,6 +24089,9 @@ function mapTokenRow(row) {
   // не подтянутся кошелёк и курс — TonConnect восстанавливает сессию
   // асинхронно, и сразу после запуска адреса ещё нет.
   const [сразуВКошелёк, setСразуВКошелёк] = useState(false);
+  // Заказан ли залп конфетти: ставится, когда аккаунт создан и карточка
+  // уходит с экрана.
+  const [залпНаГлавной, setЗалпНаГлавной] = useState(false);
 
   /* Без аккаунта приложение не показывается вовсе.
    *
@@ -24721,6 +24719,9 @@ function mapTokenRow(row) {
       {/* Заставки на входе больше нет: приложение открывается сразу, а
           то, что ещё не приехало, стоит серыми плашками на своих местах.
           Ждать чёрный экран с котом ради тех же двух секунд незачем. */}
+      {/* Залп конфетти — уже на главной, а не поверх карточки: человек
+          должен увидеть приложение, в которое только что вошёл. */}
+      <КонфеттиЗалп включено={залпНаГлавной} onКонец={() => setЗалпНаГлавной(false)} />
       <Toast
         key={toast ? toast.номер : 0}
         toast={toast}
@@ -24773,7 +24774,7 @@ function mapTokenRow(row) {
         <PinLockScreen pin={pinCode} profile={profile} onUnlock={() => setPinLocked(false)} onForgot={forgotPin} />
       )}
 
-      <AuthModal open={profileModalOpen} onClose={() => { setProfileModalOpen(false); setLookFocus(null); }} onSubmit={submitProfile} initial={profile} mode={profileModalMode} walletAddress={walletAddress} onChangeNickname={changeNickname} cosmetics={cosmetics} owned={owned} onEquip={equipCosmetic} lookFocus={lookFocus} />
+      <AuthModal open={profileModalOpen} onСоздан={() => setЗалпНаГлавной(true)} onClose={() => { setProfileModalOpen(false); setLookFocus(null); }} onSubmit={submitProfile} initial={profile} mode={profileModalMode} walletAddress={walletAddress} onChangeNickname={changeNickname} cosmetics={cosmetics} owned={owned} onEquip={equipCosmetic} lookFocus={lookFocus} />
       <SettingsPanel
         item={settingsItem}
         onClose={() => setSettingsItem(null)}
