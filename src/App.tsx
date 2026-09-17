@@ -20640,9 +20640,12 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     setПочтаВвод("");
     setПочтаБеда("");
     const высота = typeof window !== "undefined" ? window.innerHeight || 844 : 844;
-    // Не ниже сотни и не глубже ста сорока точек: на низком экране карточка
-    // иначе упирается в клавиатуру, на высоком — висит слишком низко.
-    setОтступСверху(Math.round(Math.min(Math.max(высота * 0.13, 64), 140)));
+    /* Восьмая часть экрана, но не меньше сорока четырёх точек и не больше
+       восьмидесяти восьми. Считается один раз и дальше не меняется: с
+       клавиатурой окно становится вдвое ниже, и карточка должна целиком
+       помещаться над ней — иначе кнопка «Создать аккаунт» уходит под
+       клавиатуру, а двигать карточку нельзя, это и есть тот прыжок. */
+    setОтступСверху(Math.round(Math.min(Math.max(высота * 0.08, 44), 88)));
     setTgNick("");
     setTgNickTouched(false);
     setЕстьАккаунт(null);
@@ -20829,7 +20832,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                     padding: "15px 15px", borderRadius: 18,
                     background: T.surfaceHi,
                     border: `1px solid ${почтаБеда ? T.down : (почтаГодна ? T.up : "transparent")}`,
-                    color: T.ice, fontFamily: bodyFont, fontSize: 16, outline: "none",
+                    color: T.ice, fontFamily: bodyFont, fontSize: 16, fontWeight: 700, outline: "none",
                     transition: "border-color 260ms ease",
                   }}
                 />
@@ -20970,7 +20973,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                         transition: "opacity 320ms ease",
                       }}
                     />
-                    <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 16 }}>@</span>
+                    <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 16, fontWeight: 700 }}>@</span>
                     <input
                       value={tgNick}
                       onChange={(e) => { setTgNick(e.target.value.replace(/[^A-Za-z0-9_.]/g, "")); setTgNickTouched(true); setTgError(""); }}
@@ -20984,7 +20987,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                       autoCorrect="off"
                       style={{
                         flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none",
-                        color: T.ice, fontFamily: monoFont, fontSize: 16,
+                        color: T.ice, fontFamily: monoFont, fontSize: 16, fontWeight: 700,
                       }}
                     />
                     <span style={{
