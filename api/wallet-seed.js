@@ -1,0 +1,127 @@
+/* Фраза кошелька: показать один раз и запомнить, что её записали.
+ *
+ * Кошелёк у человека появляется сам, вместе с аккаунтом, — и это плохо
+ * ровно тем, что он появляется молча: деньги есть, а записи из двадцати
+ * четырёх слов, по которой их можно вернуть, человек в глаза не видел.
+ * Здесь эта запись показывается: один экран со словами, потом проверка,
+ * и только после неё кошелёк считается заведённым.
+ *
+ * Что здесь важно.
+ *   — Слова отдаются только их владельцу и только пока он не подтвердил,
+ *     что записал их. После подтверждения этот ход закрыт: открытая
+ *     сессия не должна показывать фразу заново тому, кто до неё
+ *     дорвался.
+ *   — В базе фраза остаётся зашифрованной, как и была: сервер
+ *     расшифровывает её на время одного ответа и нигде не сохраняет.
+ *   — Проверку слов делает сам экран: это память человека, а не пароль,
+ *     и обманывать здесь он может только себя.
+ *
+ * Переменные окружения: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+ * APP_WALLET_KEY (те же, что у кошельков).
+ */
+
+import crypto from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
+import { фразаПользователя } from "./_seed.js";
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+function admin() {
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return null;
+  return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+}
+
+function разобратьКлюч(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  try {
+    const b = /^[0-9a-f]{64}$/i.test(s) ? Buffer.from(s, "hex") : Buffer.from(s, "base64");
+    return b.length === 32 ? b : null;
+  } catch {
+    return null;
+  }
+}
+
+const меткаКлюча = (ключ) => crypto.createHash("sha256").update(ключ).digest("hex").slice(0, 8);
+
+// Тот же набор ключей, что у кошельков: текущий и прежний, чтобы смена
+// APP_WALLET_KEY не отрезала старые записи.
+function ключи() {
+  const текущий = разобратьКлюч(process.env.APP_WALLET_KEY);
+  if (!текущий) return null;
+  const прежний = разобратьКлюч(process.env.APP_WALLET_KEY_OLD);
+  const набор = new Map([[меткаКлюча(текущий), текущий]]);
+  if (прежний) набор.set(меткаКлюча(прежний), прежний);
+  return { текущий, метка: меткаКлюча(текущий), набор };
+}
+
+async function хозяин(req, db) {
+  const заголовок = req.headers.authorization || "";
+  const токен = заголовок.startsWith("Bearer ") ? заголовок.slice(7).trim() : "";
+  if (!токен) return null;
+  const { data, error } = await db.auth.getUser(токен);
+  if (error || !data || !data.user) return null;
+  return data.user;
+}
+
+// Записана ли фраза. Колонки может ещё не быть — тогда считаем, что нет.
+async function записана(db, id) {
+  const { data, error } = await db
+    .from("app_seeds").select("user_id, confirmed_at")
+    .eq("user_id", id).maybeSingle();
+  if (error) return { есть: false, готово: false, колонки: false };
+  return { есть: !!data, готово: !!(data && data.confirmed_at), колонки: true };
+}
+
+export default async function handler(req, res) {
+  const db = admin();
+  const набор = ключи();
+  const действие = String((req.query && req.query.action) || "state");
+
+  if (!db || !набор) return res.status(503).json({ error: "not_configured" });
+
+  const user = await хозяин(req, db);
+  if (!user) return res.status(401).json({ error: "unauthorized" });
+
+  try {
+    const состояние = await записана(db, user.id);
+
+    if (действие === "state") {
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).json({ ready: состояние.готово, exists: состояние.есть });
+    }
+
+    if (req.method !== "POST") {
+      res.setHeader("Allow", "POST");
+      return res.status(405).json({ error: "method_not_allowed" });
+    }
+
+    if (действие === "reveal") {
+      // Записал — значит видел. Второй раз фраза не показывается: сессию
+      // могли и увести, а слова открывают кошелёк целиком.
+      if (состояние.готово) return res.status(409).json({ error: "already_saved" });
+      const фраза = await фразаПользователя(db, user, набор);
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).json({ words: String(фраза).trim().split(/\s+/) });
+    }
+
+    if (действие === "confirm") {
+      // Проверку слов делает экран: это память человека, а не пароль.
+      // Серверу остаётся запомнить, что копия сделана.
+      const { error } = await db
+        .from("app_seeds").update({ confirmed_at: new Date().toISOString() })
+        .eq("user_id", user.id);
+      if (error) {
+        console.error("[wallet-seed] отметка не легла:", error.message);
+        return res.status(500).json({ error: "confirm_failed", detail: error.message.slice(0, 160) });
+      }
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(400).json({ error: "bad_action" });
+  } catch (e) {
+    console.error("[wallet-seed]", e && e.message);
+    return res.status(500).json({ error: "seed_failed", detail: String((e && e.message) || "").slice(0, 160) });
+  }
+}

@@ -243,3 +243,21 @@ export async function отменитьПривязку() {
 export async function автовывод(порог) {
   return await запрос("/api/wallet-solana?action=sweep-set", { above: порог });
 }
+
+/* Фраза кошелька: показать один раз и отметить, что её записали.
+ *
+ * Кошелёк заводится сам, вместе с аккаунтом, — и до этого экрана человек
+ * ни разу не видел запись из двадцати четырёх слов, по которой деньги
+ * возвращаются. Сервер отдаёт её ровно до подтверждения и больше не
+ * повторяет: открытая сессия не должна открывать кошелёк целиком. */
+export async function состояниеФразы() {
+  return запрос(апи("/api/wallet-seed?action=state"));
+}
+
+export async function показатьФразу() {
+  return запрос(апи("/api/wallet-seed?action=reveal"), {});
+}
+
+export async function отметитьФразу() {
+  return запрос(апи("/api/wallet-seed?action=confirm"), {});
+}
