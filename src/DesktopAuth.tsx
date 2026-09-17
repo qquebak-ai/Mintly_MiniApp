@@ -219,7 +219,7 @@ export default function DesktopAuth({ наВход }) {
         </p>
         <input value={ник} onChange={(e) => setНик(e.target.value)} placeholder="Ник" style={поле} maxLength={20} />
         <div style={{ marginTop: 12 }}>
-          <Кнопка onClick={сохранитьНик} disabled={идёт || ник.trim().length < 3} главная>
+          <Кнопка onClick={сохранитьНик} disabled={идёт || ник.trim().length < 4} главная>
             {идёт ? "Сохраняем…" : "Готово"}
           </Кнопка>
         </div>

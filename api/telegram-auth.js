@@ -105,9 +105,9 @@ async function nicknameTaken(admin, nickname) {
 // Ник, выбранный человеком на экране входа. Своего варианта сервер не
 // предлагает: имя из профиля Telegram досталось бы человеку без его
 // участия, а поменять его потом нельзя. Правило то же, что и в
-// приложении: латиница, цифры, точка и подчёркивание, 2–20 знаков,
+// приложении: латиница, цифры, точка и подчёркивание, 4–20 знаков,
 // первая буква. Проверяем и здесь — форма в браузере ничего не гарантирует.
-const NICKNAME_RE = /^[A-Za-z][A-Za-z0-9_.]{1,19}$/;
+const NICKNAME_RE = /^[A-Za-z][A-Za-z0-9_.]{3,19}$/;
 function wantedNickname(body) {
   const raw = typeof body.nickname === "string" ? body.nickname.trim() : "";
   return NICKNAME_RE.test(raw) ? raw : null;

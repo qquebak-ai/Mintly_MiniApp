@@ -636,7 +636,7 @@ const STR = {
     loginHint: "Войди в свой аккаунт по почте и паролю.",
     createHint: "Никнейм, почта и пароль обязательны, остальное можно заполнить позже.",
     nicknameLabel: "Никнейм",
-    nicknameError: "2–20 символов, только латинские буквы, цифры, _ и ., начинается с буквы",
+    nicknameError: "4–20 символов, только латинские буквы, цифры, _ и ., начинается с буквы",
     bioLabel: "О себе (необязательно)",
     bioPlaceholder: "Пара слов о себе",
     submittingText: "Проверяем...",
@@ -1250,7 +1250,7 @@ const STR = {
     loginHint: "Log in to your account with email and password.",
     createHint: "Nickname, email and password are required, everything else can be filled in later.",
     nicknameLabel: "Nickname",
-    nicknameError: "2–20 characters, Latin letters, digits, _ and . only, must start with a letter",
+    nicknameError: "4–20 characters, Latin letters, digits, _ and . only, must start with a letter",
     bioLabel: "Bio (optional)",
     bioPlaceholder: "A few words about yourself",
     submittingText: "Checking...",
@@ -20053,9 +20053,9 @@ function TokenManageSheet({ token: tokenProp, onClose, showToast, onDelete, за
 const PROFILE_EMOJI_POOL = ["😎", "🦊", "🐼", "🐸", "🐵", "🦁", "🐯", "🐨", "🐙", "🦄", "🐳", "🦉", "🐺", "🐲", "🤖", "👾", "🎃", "🧊", "🌟", "🔥"];
 function randomProfileEmoji() { return PROFILE_EMOJI_POOL[Math.floor(Math.random() * PROFILE_EMOJI_POOL.length)]; }
 
-/* Nickname rule: Latin letters, numbers, underscore and dot only, 2–20
+/* Nickname rule: Latin letters, numbers, underscore and dot only, 4–20
    chars, must start with a letter — keeps profile URLs / mentions safe. */
-const NICKNAME_RE = /^[A-Za-z][A-Za-z0-9_.]{1,19}$/;
+const NICKNAME_RE = /^[A-Za-z][A-Za-z0-9_.]{3,19}$/;
 
 /* Токены, которые создались в сети, но не записались в базу.
  *
