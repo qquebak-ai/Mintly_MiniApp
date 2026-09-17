@@ -14244,25 +14244,43 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
               <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5 }}>
                 {tf("seedWordNo", { n: н + 1 })}
               </span>
-              <input
-                value={ответы[i]}
-                onChange={(e) => {
-                  const свежие = [...ответы];
-                  свежие[i] = e.target.value.replace(/[^a-zA-Zа-яА-Я]/g, "").toLowerCase();
-                  setОтветы(свежие);
-                  setБеда("");
-                }}
-                spellCheck={false}
-                autoCapitalize="off"
-                autoCorrect="off"
-                autoComplete="off"
-                style={{
-                  padding: "14px 14px", borderRadius: 16,
-                  border: `1px solid ${беда ? T.down : (ответы[i].trim().toLowerCase() === слова[н] ? T.up : T.line)}`,
-                  background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 16, fontWeight: 700,
-                  outline: "none", transition: "border-color 200ms ease",
-                }}
-              />
+              {/* Галочка справа: слово либо то самое, либо нет, и
+                  говорить об этом надо сразу, а не после «Готово». */}
+              <div style={{ position: "relative" }}>
+                <input
+                  value={ответы[i]}
+                  onChange={(e) => {
+                    const свежие = [...ответы];
+                    свежие[i] = e.target.value.replace(/[^a-zA-Zа-яА-Я]/g, "").toLowerCase();
+                    setОтветы(свежие);
+                    setБеда("");
+                  }}
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  style={{
+                    width: "100%", padding: "14px 44px 14px 14px", borderRadius: 16,
+                    border: `1px solid ${беда ? T.down : (ответы[i].trim().toLowerCase() === слова[н] ? T.up : T.line)}`,
+                    background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 16, fontWeight: 700,
+                    outline: "none", transition: "border-color 200ms ease",
+                  }}
+                />
+                <span
+                  aria-hidden
+                  className="flex items-center justify-center"
+                  style={{
+                    position: "absolute", right: 12, top: "50%", marginTop: -11,
+                    width: 22, height: 22, borderRadius: "50%",
+                    background: hexA(T.up, 0.16), color: T.up, pointerEvents: "none",
+                    opacity: ответы[i].trim().toLowerCase() === слова[н] ? 1 : 0,
+                    transform: ответы[i].trim().toLowerCase() === слова[н] ? "none" : "scale(0.7)",
+                    transition: "opacity 200ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                  }}
+                >
+                  <Check size={14} strokeWidth={3} />
+                </span>
+              </div>
             </div>
           ))}
           {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
