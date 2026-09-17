@@ -342,24 +342,32 @@ const STR = {
     withdrawCodeNoMail: "К аккаунту не привязана почта — вывод недоступен",
     withdrawCodeConfirm: "Подтвердить",
     authSignInCta: "Войти",
-    authMailTitle: "Вход по почте",
-    authMailHint: "Пришлём код на почту. Ни пароля, ни лишних полей.",
-    authMailLabel: "Почта",
-    authMailBad: "Проверь адрес почты",
-    authMailSend: "Получить код",
-    authMailBusy: "Отправляем письмо…",
+    createTitle: "Создай аккаунт",
+    createLead: "Аккаунт привяжется к твоему Telegram. Придумай имя — под ним тебя увидят остальные, и поменять его потом нельзя.",
+    createCta: "Создать аккаунт",
+    createOutside: "Открой приложение внутри Telegram, чтобы создать аккаунт.",
+    createFailed: "Не получилось создать аккаунт. Попробуй ещё раз.",
+    createStale: "Telegram выдал подпись давно — закрой приложение полностью (смахни из списка) и открой заново.",
+    createNotConfigured: "Вход пока не настроен на сервере.",
+    createdTitle: "Аккаунт готов",
+    createdBody: "Осталось одно. Привяжи почту: ею подтверждается вывод, и через неё возвращают аккаунт, если пропадёт доступ к Telegram.",
+    addMail: "Добавить почту",
+    laterBtn: "Позже",
+    mail2faTitle: "Почта для 2ФА",
+    mail2faHint: "Пришлём письмо на этот адрес. Дальше он понадобится при выводе и если потеряется доступ к Telegram.",
+    mail2faSend: "Отправить письмо",
+    mail2faSending: "Отправляем письмо…",
+    mail2faSent: "Письмо ушло на {mail}. Введи код из него — или просто перейди по ссылке внутри, мы заметим сами.",
+    mail2faWaiting: "Ждём подтверждения…",
+    mail2faDone: "Почта привязана",
+    mail2faBadCode: "Код не подошёл — проверь цифры или запроси письмо заново",
+    mail2faAgain: "Другая почта",
+    mail2faCurrent: "Почта для 2ФА: {mail}",
+    mail2faOff: "Почта не привязана",
+    mail2faRow: "Почта для 2ФА",
+    mail2faAsk: "Спрашивать код с почты при выводе",
     authMailTooOften: "Слишком часто. Подожди минуту и попробуй снова.",
-    authCodeTitle: "Код из письма",
-    authCodeHint: "Шесть цифр, письмо ушло на {mail}",
-    authCodeBad: "Код не подошёл — проверь цифры или запроси новый",
     authCodeResend: "Отправить заново",
-    authNickTitle: "Придумай никнейм",
-    authNickHint: "Под ним тебя увидят остальные. Он выбирается один раз и потом не меняется.",
-    authBirthTitle: "Дата рождения",
-    authBirthHint: "Спрашиваем один раз: младше восемнадцати в Mintly нельзя.",
-    authBirthDone: "Создать аккаунт",
-    authTooYoungTitle: "Вход только с 18 лет",
-    authTooYoung: "Здесь торгуют на настоящие деньги, и открыть аккаунт можно с восемнадцати. Возвращайся, когда исполнится.",
     authGotIt: "Понятно",
     walletActSwap: "Обменять",
     walletActHistory: "История",
@@ -957,24 +965,32 @@ const STR = {
     withdrawCodeNoMail: "No email is linked to this account — withdrawals are off",
     withdrawCodeConfirm: "Confirm",
     authSignInCta: "Sign in",
-    authMailTitle: "Sign in with email",
-    authMailHint: "We'll email you a code. No password, no extra fields.",
-    authMailLabel: "Email",
-    authMailBad: "Check the email address",
-    authMailSend: "Get the code",
-    authMailBusy: "Sending the email…",
+    createTitle: "Create your account",
+    createLead: "The account is tied to your Telegram. Pick a name — that's how everyone else sees you, and it can't be changed later.",
+    createCta: "Create account",
+    createOutside: "Open the app inside Telegram to create an account.",
+    createFailed: "Couldn't create the account. Try again.",
+    createStale: "Telegram signed this session a while ago — close the app completely and open it again.",
+    createNotConfigured: "Sign-in is not configured on the server yet.",
+    createdTitle: "Account is ready",
+    createdBody: "One thing left. Add an email: it confirms withdrawals and brings the account back if you lose access to Telegram.",
+    addMail: "Add email",
+    laterBtn: "Later",
+    mail2faTitle: "Email for 2FA",
+    mail2faHint: "We'll send a letter to that address. You'll need it for withdrawals and if you lose access to Telegram.",
+    mail2faSend: "Send the letter",
+    mail2faSending: "Sending the letter…",
+    mail2faSent: "The letter went to {mail}. Enter the code from it — or just follow the link inside, we'll notice.",
+    mail2faWaiting: "Waiting for confirmation…",
+    mail2faDone: "Email linked",
+    mail2faBadCode: "Wrong code — check the digits or ask for the letter again",
+    mail2faAgain: "Another email",
+    mail2faCurrent: "2FA email: {mail}",
+    mail2faOff: "No email linked",
+    mail2faRow: "Email for 2FA",
+    mail2faAsk: "Ask for the emailed code on withdrawal",
     authMailTooOften: "Too often. Wait a minute and try again.",
-    authCodeTitle: "Code from the email",
-    authCodeHint: "Six digits, the email went to {mail}",
-    authCodeBad: "Wrong code — check the digits or request a new one",
     authCodeResend: "Send again",
-    authNickTitle: "Pick a nickname",
-    authNickHint: "That's how everyone else sees you. It's chosen once and can't be changed later.",
-    authBirthTitle: "Date of birth",
-    authBirthHint: "Asked once: Mintly is not for anyone under eighteen.",
-    authBirthDone: "Create account",
-    authTooYoungTitle: "18 and over only",
-    authTooYoung: "Real money is traded here, and accounts open at eighteen. Come back when you get there.",
     authGotIt: "Got it",
     walletActSwap: "Swap",
     walletActHistory: "History",
@@ -12881,15 +12897,18 @@ function ЭкранВывода({
   useEffect(() => {
     if (!открыт) return;
     let живо = true;
-    supabase.auth.getUser().then(({ data }) => {
+    (async () => {
+      const м = await почтаАккаунта();
       if (!живо) return;
-      const м = String((data && data.user && data.user.email) || "");
-      // Адрес вида tg123@telegram.local письма не получает — у аккаунтов
-      // старого входа через Telegram почты, считай, нет вовсе.
-      setПочта(/\.local$/i.test(м) ? "" : м);
-    });
+      /* Код спрашиваем, только если человек сам включил подтверждение.
+         Одного адреса мало: у аккаунтов из Telegram он технический
+         (tg<id>@telegram.local) и писем не получает вовсе. */
+      if (!м || !userId) { setПочта(""); return; }
+      const { data } = await supabase.from("profiles").select("mail_2fa").eq("id", userId).maybeSingle();
+      if (живо) setПочта(data && data.mail_2fa ? м : "");
+    })();
     return () => { живо = false; };
-  }, [открыт]);
+  }, [открыт, userId]);
 
   /* Книга живёт в базе, а не в телефоне: аккаунт один, а устройств у него
      несколько, и список «куда я вывожу» нужен на каждом. Читаем при
@@ -12963,9 +12982,11 @@ function ЭкранВывода({
 
   function отправить() {
     if (!можно) return;
-    // Подтверждать нечем — значит и выводить нельзя: украденная сессия
-    // иначе уносит весь кошелёк одним нажатием.
-    if (!почта) { showToast(t("withdrawCodeNoMail")); haptic("error"); return; }
+    /* Код спрашиваем только у тех, кто привязал почту. Это и есть второй
+       ключ: с ним украденная сессия не уносит кошелёк одним нажатием, а
+       без него закрывать человеку вывод не за что — почта дело
+       добровольное. */
+    if (!почта) { вСеть(); return; }
     setКод("");
     setКодБеда("");
     setШаг("код");
@@ -19480,6 +19501,8 @@ function SettingsPanel({
 }) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Почта для второго ключа: открывается из раздела «Безопасность».
+  const [почтаОткрыта, setПочтаОткрыта] = useState(false);
   // Окно держится на экране, пока идёт анимация ухода, поэтому и
   // содержимое берём последнее — иначе на кадр уходило бы пустое.
   const [item, closing] = useClosing(itemProp);
@@ -19596,6 +19619,22 @@ function SettingsPanel({
           >
             <Lock size={14} color={T.muted} /> {t("changePinCta")}
           </button>
+          {/* Почта — второй ключ. Аккаунт держится на Telegram, и это
+              хорошо ровно до дня, когда телеграм пропадает. */}
+          {accountCreated && (
+            <button
+              onClick={() => setПочтаОткрыта(true)}
+              className="fx-tap w-full flex items-center gap-2 rounded-[20px] px-3.5 py-3 mt-3"
+              style={{ background: T.surfaceHi, border: "none" }}
+            >
+              <Mail size={15} color={T.muted} />
+              <span className="flex-1 text-left truncate" style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>
+                {t("mail2faRow")}
+              </span>
+              <ChevronRight size={16} color={T.faint} />
+            </button>
+          )}
+          <ЭкранПочты открыт={почтаОткрыта} onClose={() => setПочтаОткрыта(false)} />
           {/* Удаление аккаунта переехало сюда из «Профиля»: пункт с
               одной кнопкой «Редактировать» дублировал такую же кнопку на
               самом экране профиля, а удаление по смыслу и так о
@@ -20027,69 +20066,151 @@ function markSeenSession() {
 }
 
 /* ---------------------------------------------------------
-   ВХОД ПО ПОЧТЕ
-   Аккаунт заводится одним адресом почты: письмо с шестизначным кодом,
-   код, ник и дата рождения. Ни пароля, ни Telegram — приложение живёт и
-   на сайте, где никакого initData нет вовсе, а пароль, который человек
-   придумывает ради одной площадки, чаще всего повторяет чужой.
+   ВХОД ЧЕРЕЗ TELEGRAM
+   Мини-приложение получает от Telegram строку initData, подписанную
+   ключом бота. Проверить подпись можно только зная токен бота, поэтому
+   она уходит на сервер (api/telegram-auth.js), а оттуда возвращается
+   одноразовый токен, которым открывается обычная сессия Supabase.
+   Ни почта, ни пароль при создании аккаунта не спрашиваются: почта
+   добавляется потом и только ради второго ключа ко входу.
 --------------------------------------------------------- */
 
-const ПОЧТА_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
-
-// Письмо шлёт сам Supabase Auth. shouldCreateUser: заводим пользователя,
-// если его ещё нет — это и вход, и регистрация одной дверью.
-async function послатьКодНаПочту(почта) {
-  const { error } = await supabase.auth.signInWithOtp({ email: почта, options: { shouldCreateUser: true } });
-  if (error) throw error;
+function telegramInitData() {
+  if (typeof window === "undefined") return null;
+  const data = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData;
+  return data && data.length ? data : null;
 }
 
-async function проверитьКодПочты(почта, код) {
-  // Отметки снимаем до проверки: она сама поднимает событие о входе, и
-  // обработчик читает их сразу же. Сними мы их следом — событие успело бы
-  // увидеть «человек вышел» и не загрузить профиль.
+function telegramUser() {
+  if (typeof window === "undefined") return null;
+  const wa = window.Telegram && window.Telegram.WebApp;
+  return (wa && wa.initDataUnsafe && wa.initDataUnsafe.user) || null;
+}
+
+/* Принимает ли телефон записи вообще. Если нет — молчаливый вход
+   выключаем совсем: отметка о добровольном выходе не сохранится, и выйти
+   станет физически невозможно, сколько ни нажимай. */
+function storageWorks() {
+  try {
+    localStorage.setItem("mintly_probe", "1");
+    localStorage.removeItem("mintly_probe");
+    return true;
+  } catch (e) { return false; }
+}
+
+/* Заводится ли аккаунт впервые. Спрашиваем до входа: если профиля ещё
+   нет, показываем экран с полем ника, и человек выбирает имя сам, а не
+   получает выдуманное из профиля Telegram. Сервер на этот вызов ничего
+   не создаёт и не меняет — только смотрит. */
+async function probeTelegramAccount() {
+  const initData = telegramInitData();
+  if (!initData) throw new Error("no_telegram");
+  const res = await fetch(апи("/api/telegram-auth"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initData, probe: true }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || `probe_failed_${res.status}`);
+  return { exists: !!json.exists, nickname: json.nickname || "" };
+}
+
+/* Засчитать приглашение тому, кто уже вошёл. Метку из ссылки отправлял
+   только вход, поэтому человек с готовой сессией переходил по чужой
+   ссылке впустую: входить ему незачем, а больше её никто не отправлял.
+   Ошибки глотаем — это фоновое дело, мешать открытию приложения ему
+   нечем. */
+async function linkReferralIfAny() {
+  const initData = telegramInitData();
+  const startParam = telegramStartParam();
+  if (!initData || !startParam.startsWith("ref_")) return;
+  try {
+    await fetch(апи("/api/telegram-auth"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData, startParam, linkReferralOnly: true }),
+    });
+  } catch (err) {
+    console.warn("[mintly] referral link failed:", err && err.message);
+  }
+}
+
+// Бросает ошибку с понятным кодом — вызывающая сторона показывает текст.
+async function signInWithTelegram(nickname) {
+  const initData = telegramInitData();
+  if (!initData) throw new Error("no_telegram");
+
+  const startParam = telegramStartParam();
+
+  const res = await fetch(апи("/api/telegram-auth"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initData, startParam, nickname: nickname || undefined }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    // Консоли внутри Telegram нет, поэтому текст ошибки сервера едет
+    // вместе с кодом — иначе непонятно, на каком шаге всё встало.
+    const err = new Error(json.error || `auth_failed_${res.status}`);
+    err.detail = json.detail || "";
+    throw err;
+  }
+
+  // Отметки снимаем до обмена токена, а не после: обмен сам поднимает
+  // событие о входе, и обработчик события читает их сразу же. Сними мы
+  // их следом — событие успело бы увидеть «человек вышел» и не загрузить
+  // профиль. Если обмен не удастся, сессии всё равно не будет.
   markSignedOut(false);
   markSeenSession();
-  const { data, error } = await supabase.auth.verifyOtp({ email: почта, token: код, type: "email" });
+  const { error } = await supabase.auth.verifyOtp({ token_hash: json.token_hash, type: "magiclink" });
   if (error) throw error;
-  return (data && data.user) || null;
 }
 
-// Есть ли у вошедшего профиль. Нет — значит аккаунт заводится сейчас, и
-// дальше идут ник с датой рождения.
+// Есть ли у вошедшего профиль. Нет — значит аккаунт ещё не заведён, и
+// человека ждёт экран с ником.
 async function профильЕсть(userId) {
   if (!userId) return false;
   const { data } = await supabase.from("profiles").select("id").eq("id", userId).maybeSingle();
   return !!data;
 }
 
-/* Сколько лет. Считаем по календарю, а не делением дней на 365: в день
-   восемнадцатилетия вход уже открыт, и ошибка в сутки здесь — это отказ
-   живому человеку. */
-function летСРождения(строка) {
-  const д = new Date(`${String(строка || "").slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(д.getTime())) return null;
-  const сейчас = new Date();
-  let лет = сейчас.getFullYear() - д.getFullYear();
-  const мес = сейчас.getMonth() - д.getMonth();
-  if (мес < 0 || (мес === 0 && сейчас.getDate() < д.getDate())) лет -= 1;
-  return лет;
+const ПОЧТА_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
+
+/* Почта как второй ключ ко входу.
+ *
+ * Аккаунт живёт на Telegram: пока приложение открывают из него, войти
+ * может только владелец этого телеграма. Почта нужна на случай, когда
+ * телеграм потерян, и как подтверждение вывода — деньги уходят
+ * безвозвратно, и одной открытой сессии для них мало.
+ *
+ * Письмо шлёт сам Supabase Auth: смена почты у него — отдельное
+ * действие, и на новый адрес уходит подтверждение. Если в шаблоне письма
+ * стоит {{ .Token }}, придёт шестизначный код; если шаблон не трогали —
+ * ссылка, по которой почта подтверждается сама. Приложение принимает оба
+ * пути: поле для кода и ожидание перехода по ссылке идут рядом.
+ */
+async function привязатьПочту(почта) {
+  const { error } = await supabase.auth.updateUser({ email: почта });
+  if (error) throw error;
 }
 
-/* Профиль после входа. Клиент под своей сессией сказать «заведи мне
-   профиль» не может: таблица закрыта политиками и пишет в неё только
-   service_role. Возраст там же проверяется заново — форма в браузере
-   ничего не гарантирует. */
-async function завестиПрофильПоПочте({ nickname, birthDate }) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error("no_session");
-  const res = await fetch(апи("/api/telegram-auth?action=profile"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-    body: JSON.stringify({ nickname, birthDate, startParam: приглашениеИзСсылки() }),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || `profile_failed_${res.status}`);
-  return json;
+async function подтвердитьПочту(почта, код) {
+  // Смена почты подтверждается своим видом кода — email_change.
+  const { error } = await supabase.auth.verifyOtp({ email: почта, token: код, type: "email_change" });
+  if (error) throw error;
+}
+
+/* Привязана ли почта. Технический адрес Telegram (tg<id>@telegram.local)
+   почтой не считается: письма на него не доходят. */
+function почтаНастоящая(адрес) {
+  const м = String(адрес || "");
+  return !!м && !/\.local$/i.test(м) && ПОЧТА_RE.test(м);
+}
+
+async function почтаАккаунта() {
+  const { data } = await supabase.auth.getUser();
+  const м = (data && data.user && data.user.email) || "";
+  return почтаНастоящая(м) ? м : "";
 }
 
 /* Кто пригласил. Telegram кладёт сюда то, что стояло после startapp= в
@@ -20105,27 +20226,248 @@ function telegramStartParam() {
   return (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
 }
 
-/* Кто пригласил — из ссылки. Приложение открывают и из чата с ботом
-   (startapp=ref_…), и обычной ссылкой на сайт (?ref=…): метку читаем
-   отовсюду и только передаём — сервер сам проверит, что такой человек
-   есть и что это не сам приглашённый. */
-function приглашениеИзСсылки() {
-  const изTelegram = telegramStartParam();
-  if (изTelegram.startsWith("ref_")) return изTelegram;
-  try {
-    const п = new URLSearchParams(window.location.search);
-    const сырое = String(п.get("ref") || п.get("startapp") || "").trim();
-    if (сырое.startsWith("ref_")) return сырое;
-    return UUID_RE_APP.test(сырое) ? `ref_${сырое}` : "";
-  } catch (e) { return ""; }
-}
-
 /* AuthModal — replaces the old single-button flow. Handles three modes:
    "login"  — email + password, signs in against real Supabase auth
    "create" — nickname + email + password (+ optional avatar/bio), signs up
    "edit"   — profile fields only, no password, updates the existing row
    When not in "edit" mode, a segmented tab lets the user flip between
    login/create without closing the sheet — that's the "красивое меню". */
+/* Почта как второй ключ ко входу.
+ *
+ * Аккаунт держится на Telegram, и это хорошо ровно до того дня, когда
+ * телеграм пропадает. Почта — запасная дверь и подтверждение вывода:
+ * деньги уходят безвозвратно, и одной открытой сессии для них мало.
+ *
+ * Письмо шлёт Supabase Auth. В его шаблоне может стоять код ({{ .Token }})
+ * или ссылка — и мы принимаем оба пути: поле для кода и ожидание
+ * перехода по ссылке идут рядом, а не вместо друг друга.
+ */
+function ЭкранПочты({ открыт, onClose, onГотово = () => {}, insetTop = 0, insetBottom = 0 }) {
+  const [шаг, setШаг] = useState("адрес");   // адрес | письмо | готово
+  const [почта, setПочта] = useState("");
+  const [код, setКод] = useState("");
+  const [идёт, setИдёт] = useState(false);
+  const [беда, setБеда] = useState("");
+  const [привязана, setПривязана] = useState("");
+  // Включено ли подтверждение вывода. Отметка живёт в профиле: сам адрес
+  // хранит Supabase Auth, а «спрашивать код» — это выбор человека.
+  const [включено, setВключено] = useState(false);
+
+  useEffect(() => {
+    if (!открыт) { setШаг("адрес"); setКод(""); setБеда(""); setИдёт(false); return undefined; }
+    let живо = true;
+    (async () => {
+      const м = await почтаАккаунта();
+      if (!живо) return;
+      setПривязана(м);
+      if (м) { setПочта(м); setШаг("готово"); }
+      const { data } = await supabase.auth.getUser();
+      const id = data && data.user && data.user.id;
+      if (!id || !живо) return;
+      const { data: строка } = await supabase.from("profiles").select("mail_2fa").eq("id", id).maybeSingle();
+      if (живо) setВключено(!!(строка && строка.mail_2fa));
+    })();
+    return () => { живо = false; };
+  }, [открыт]);
+
+  // Отметку ставим только после подтверждения адреса: иначе вывод начал бы
+  // спрашивать код с почты, которой у человека нет.
+  async function отметить(значение) {
+    const { data } = await supabase.auth.getUser();
+    const id = data && data.user && data.user.id;
+    if (!id) return;
+    await supabase.from("profiles").update({ mail_2fa: значение }).eq("id", id);
+    setВключено(значение);
+  }
+
+  /* Ждём перехода по ссылке. Человек уходит в почтовое приложение,
+     нажимает «подтвердить» и возвращается — экран должен знать об этом
+     сам, а не просить нажать что-то ещё. */
+  useEffect(() => {
+    if (!открыт || шаг !== "письмо") return undefined;
+    const нужна = почта.trim().toLowerCase();
+    const id = setInterval(async () => {
+      const м = await почтаАккаунта();
+      if (м && м.toLowerCase() === нужна) {
+        setПривязана(м);
+        setШаг("готово");
+        await отметить(true);
+        haptic("success");
+      }
+    }, 4000);
+    return () => clearInterval(id);
+  }, [открыт, шаг, почта]);
+
+  const чистая = почта.trim().toLowerCase();
+  const годна = ПОЧТА_RE.test(чистая);
+  const кодГоден = код.trim().length === 6;
+
+  async function послать() {
+    if (!годна || идёт) return;
+    setБеда("");
+    setИдёт(true);
+    try {
+      await привязатьПочту(чистая);
+      setКод("");
+      setШаг("письмо");
+      haptic("light");
+    } catch (e) {
+      const т = String((e && e.message) || "");
+      setБеда(/rate|seconds|too many/i.test(т) ? t("authMailTooOften") : т.slice(0, 120));
+      haptic("error");
+    } finally {
+      setИдёт(false);
+    }
+  }
+
+  async function подтвердить() {
+    if (!кодГоден || идёт) return;
+    setБеда("");
+    setИдёт(true);
+    try {
+      await подтвердитьПочту(чистая, код.trim());
+      setПривязана(чистая);
+      setШаг("готово");
+      await отметить(true);
+      haptic("success");
+    } catch (e) {
+      setБеда(t("mail2faBadCode"));
+      haptic("error");
+    } finally {
+      setИдёт(false);
+    }
+  }
+
+  return (
+    <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={t("mail2faTitle")} insetTop={insetTop} insetBottom={insetBottom}>
+      <div className="flex flex-col" style={{ flex: 1, minHeight: 0, padding: "0 18px", gap: 14 }}>
+        {шаг === "готово" ? (
+          <div className="flex flex-col items-center text-center" style={{ gap: 12, paddingTop: 10 }}>
+            <span className="flex items-center justify-center" style={{
+              width: 60, height: 60, borderRadius: "50%", background: hexA(T.up, 0.14), color: T.up,
+            }}>
+              <Check size={28} strokeWidth={3} />
+            </span>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800 }}>{t("mail2faDone")}</span>
+            <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 13.5, wordBreak: "break-all" }}>{привязана}</span>
+            {/* Переключатель, а не одна дорога в обе стороны: пока письмо
+                с кодом не доходит, человек должен уметь выключить
+                подтверждение сам — иначе деньги заперты в кошельке. */}
+            <div className="flex items-center justify-between w-full" style={{
+              gap: 10, padding: "12px 14px", borderRadius: 18, background: T.surfaceHi, marginTop: 4,
+            }}>
+              <span className="text-left" style={{ fontFamily: bodyFont, color: T.ice, fontSize: 13.5, lineHeight: 1.4 }}>
+                {t("mail2faAsk")}
+              </span>
+              <button
+                onClick={() => отметить(!включено)}
+                className="fx-tap flex-shrink-0"
+                style={{
+                  width: 46, height: 27, borderRadius: 999, border: "none", padding: 3,
+                  background: включено ? T.up : T.line, display: "flex",
+                  justifyContent: включено ? "flex-end" : "flex-start",
+                  transition: "background 220ms ease",
+                }}
+              >
+                <span style={{
+                  width: 21, height: 21, borderRadius: "50%", background: "#FFFFFF",
+                  transition: `transform ${SPRING}`,
+                }} />
+              </button>
+            </div>
+            <button
+              onClick={() => { setШаг("адрес"); setКод(""); setБеда(""); }}
+              className="fx-tap"
+              style={{
+                padding: 0, border: "none", background: "transparent", marginTop: 2,
+                color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+              }}
+            >
+              {t("mail2faAgain")}
+            </button>
+          </div>
+        ) : шаг === "письмо" ? (
+          <>
+            <div className="flex items-center" style={{ gap: 10 }}>
+              <span className="flex items-center justify-center flex-shrink-0" style={{
+                width: 40, height: 40, borderRadius: 999, background: hexA(T.electric, 0.14), color: T.electric,
+              }}>
+                <Mail size={18} />
+              </span>
+              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.45 }}>
+                {tf("mail2faSent", { mail: чистая })}
+              </span>
+            </div>
+            <input
+              value={код}
+              onChange={(e) => { setКод(e.target.value.replace(/\D/g, "").slice(0, 6)); setБеда(""); }}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="······"
+              style={{
+                padding: "16px 14px", borderRadius: 16, textAlign: "center",
+                border: `1px solid ${беда ? T.down : (кодГоден ? T.up : T.line)}`,
+                background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 26,
+                letterSpacing: "0.32em", outline: "none", transition: "border-color 200ms ease",
+              }}
+            />
+            <span style={{ fontFamily: bodyFont, color: беда ? T.down : T.faint, fontSize: 12.5 }}>
+              {беда || t("mail2faWaiting")}
+            </span>
+            <button
+              onClick={послать}
+              disabled={идёт}
+              className="fx-tap"
+              style={{
+                alignSelf: "flex-start", padding: 0, border: "none", background: "transparent",
+                color: идёт ? T.faint : T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+              }}
+            >
+              {идёт ? t("mail2faSending") : t("authCodeResend")}
+            </button>
+          </>
+        ) : (
+          <>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>{t("mail2faHint")}</span>
+            <input
+              value={почта}
+              onChange={(e) => { setПочта(e.target.value); setБеда(""); }}
+              type="email"
+              placeholder="you@mail.com"
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              style={{
+                padding: "15px 14px", borderRadius: 16,
+                border: `1px solid ${беда ? T.down : (годна ? T.up : T.line)}`,
+                background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 15.5, outline: "none",
+                transition: "border-color 200ms ease",
+              }}
+            />
+            {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
+          </>
+        )}
+      </div>
+
+      <div style={{ padding: "14px 18px 22px", flexShrink: 0 }}>
+        <button
+          onClick={шаг === "готово" ? () => { onГотово(привязана); onClose(); } : шаг === "письмо" ? подтвердить : послать}
+          disabled={шаг === "адрес" ? (!годна || идёт) : шаг === "письмо" ? (!кодГоден || идёт) : false}
+          className="fx-tap w-full"
+          style={{
+            padding: "16px 0", borderRadius: 999, border: "none",
+            background: (шаг === "готово" || (шаг === "адрес" ? годна : кодГоден)) && !идёт ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+            color: (шаг === "готово" || (шаг === "адрес" ? годна : кодГоден)) && !идёт ? PRISM_TEXT : T.muted,
+            fontFamily: displayFont, fontSize: 16, fontWeight: 800,
+          }}
+        >
+          {шаг === "готово" ? t("authGotIt") : шаг === "письмо" ? t("withdrawCodeConfirm") : (идёт ? t("mail2faSending") : t("mail2faSend"))}
+        </button>
+      </div>
+    </ЭкранСнизу>
+  );
+}
+
 function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAddress, onChangeNickname, cosmetics = { frame: "none", card: "none" }, owned, onEquip, lookFocus = null }) {
   const isEdit = mode === "edit";
   // Окно держится на экране, пока идёт анимация ухода: без этого оно
@@ -20133,14 +20475,13 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const [видно, closing] = useClosing(open);
   const [tgBusy, setTgBusy] = useState(false);
   const [tgError, setTgError] = useState("");
-  /* Вход по почте: четыре шага одной дверью — адрес, код из письма, ник и
-     дата рождения. Вход и регистрация здесь одно и то же: у кого профиль
-     есть, тот после кода сразу внутри, у кого нет — идёт дальше. */
-  const [шагВхода, setШагВхода] = useState("почта");
-  const [почта, setПочта] = useState("");
-  const [кодПисьма, setКодПисьма] = useState("");
-  const [дата, setДата] = useState("");
-  const [малолетка, setМалолетка] = useState(false);
+  /* Создание аккаунта: одно поле и одна кнопка. Аккаунт берётся из
+     самого Telegram — приложение уже знает, кто перед ним, — и всё, что
+     человек выбирает сам, это имя. Почта добавляется потом, вторым
+     ключом, и на этом же экране предлагается сразу после создания. */
+  const [шагВхода, setШагВхода] = useState("ник");   // ник | почта
+  const [естьАккаунт, setЕстьАккаунт] = useState(null); // null — ещё спрашиваем
+  const [почтаОткрыта, setПочтаОткрыта] = useState(false);
   const [authTab, setAuthTab] = useState(isEdit ? "create" : mode); // "login" | "create"
   const [serverError, setServerError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -20161,27 +20502,23 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const [newNick, setNewNick] = useState("");
   const [nickTouched, setNickTouched] = useState(false);
 
-  // Открыли окно входа — начинаем с чистого листа: чужая почта и старый
-  // код в полях никому не нужны.
+  /* Открыли экран — спрашиваем сервер, заведён ли уже аккаунт на этот
+     телеграм. Есть — входим молча, спрашивать нечего; нет — показываем
+     поле ника. Сервер на этот вызов ничего не создаёт. */
   useEffect(() => {
     if (!open || isEdit) return;
     let живо = true;
-    setШагВхода("почта");
-    setКодПисьма("");
-    setДата("");
-    setМалолетка(false);
+    setШагВхода("ник");
     setTgNick("");
     setTgNickTouched(false);
-    /* Сессия уже есть, а окно открылось — значит код человек ввёл, но до
-       ника не дошёл. Второе письмо ему не нужно, продолжаем с того же
-       места. */
-    supabase.auth.getSession().then(({ data }) => {
-      if (!живо) return;
-      const с = data && data.session;
-      if (!с) return;
-      setШагВхода("ник");
-      if (с.user && с.user.email) setПочта(с.user.email);
-    });
+    setЕстьАккаунт(null);
+    if (!telegramInitData()) { setЕстьАккаунт(false); return undefined; }
+    probeTelegramAccount()
+      .then((о) => { if (живо) setЕстьАккаунт(!!о.exists); })
+      // Не достучались до сервера — считаем, что аккаунт есть: у того,
+      // кто уже заходил, ник не спрашивают, а новому сервер ответит
+      // «нужен ник», и поле появится само.
+      .catch(() => { if (живо) setЕстьАккаунт(true); });
     return () => { живо = false; };
   }, [open, isEdit]);
 
@@ -20204,277 +20541,212 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
 
   if (!видно) return null;
 
-  /* Вход и регистрация — одна дверь по почте: адрес, код из письма, а для
-     нового аккаунта ещё ник и дата рождения. Режим редактирования профиля
-     остаётся прежней формой (ник, описание, аватарка). */
+  /* Создание аккаунта. Чёрный экран во всю высоту и одна карточка
+     посередине: на этом шаге человеку нечего выбирать, кроме имени, и
+     всё остальное на экране только отвлекало бы. Режим редактирования
+     профиля остаётся прежней формой (ник, описание, аватарка). */
   if (!isEdit) {
-    const почтаЧистая = почта.trim().toLowerCase();
-    const почтаГодна = ПОЧТА_RE.test(почтаЧистая);
-    const кодГоден = кодПисьма.trim().length === 6;
-    const tgNickTrimmed = tgNick.trim();
-    const tgNickValid = NICKNAME_RE.test(tgNickTrimmed);
-    const лет = дата ? летСРождения(дата) : null;
-    // Дата вида 1899 или из будущего — это опечатка, а не возраст.
-    const датаГодна = лет != null && лет >= 0 && лет < 120;
-    const совершеннолетний = датаГодна && лет >= 18;
-    // Верхняя граница поля: родиться завтра нельзя.
-    const сегодня = new Date().toISOString().slice(0, 10);
+    const tgUser = telegramUser();
+    const внутриTelegram = !!telegramInitData();
+    const ник = tgNick.trim();
+    const никГоден = NICKNAME_RE.test(ник);
+    const ждём = внутриTelegram && естьАккаунт == null;
+    // У кого аккаунт уже есть — тому нечего придумывать: одна кнопка.
+    const входБезНика = естьАккаунт === true;
+    const можно = внутриTelegram && !tgBusy && !ждём && (входБезНика || никГоден);
 
-    function понятнаяОшибкаПочты(err) {
-      const текст = String((err && err.message) || "").toLowerCase();
-      if (текст.includes("rate") || текст.includes("seconds") || текст.includes("too many")) return t("authMailTooOften");
-      if (текст.includes("invalid") && текст.includes("email")) return t("authMailBad");
-      return (err && err.message) || t("authErrGeneric");
+    function поймать(err) {
+      const код = (err && err.message) || "";
+      const хвост = (err && err.detail) ? ` — ${String(err.detail).slice(0, 220)}` : "";
+      setTgError(код === "no_telegram" ? t("createOutside")
+        // Подпись Telegram выдаёт один раз, при запуске; у свёрнутого
+        // приложения она стареет вместе с ним, и починить это можно
+        // только полным перезапуском.
+        : код === "stale_init_data" ? t("createStale")
+        : код === "server_not_configured" ? t("createNotConfigured")
+        // Имя увели между проверкой и созданием — человек остаётся на том
+        // же экране и выбирает другое.
+        : код === "nickname_taken" ? tf("authErrNicknameTaken", { name: ник })
+        : код === "nickname_required" ? t("nicknameError")
+        : `${t("createFailed")} (${код || "?"})${хвост}`);
     }
 
-    async function послатьКод() {
-      if (!почтаГодна) { setTgError(t("authMailBad")); return; }
+    async function создать() {
+      if (!входБезНика && !никГоден) { setTgNickTouched(true); return; }
       setTgError("");
       setTgBusy(true);
       try {
-        await послатьКодНаПочту(почтаЧистая);
-        setКодПисьма("");
-        setШагВхода("код");
+        await signInWithTelegram(входБезНика ? "" : ник);
+        // Вошедшему второй ключ предлагать незачем — он уже выбирал.
+        if (входБезНика) { onClose(); return; }
+        setШагВхода("почта");
       } catch (err) {
-        setTgError(понятнаяОшибкаПочты(err));
+        if ((err && err.message) === "nickname_required") setЕстьАккаунт(false);
+        поймать(err);
       } finally {
         setTgBusy(false);
       }
     }
-
-    async function проверитьКод() {
-      if (!кодГоден) return;
-      setTgError("");
-      setTgBusy(true);
-      try {
-        const кто = await проверитьКодПочты(почтаЧистая, кодПисьма.trim());
-        // Профиль есть — человек просто вошёл, спрашивать больше нечего.
-        if (await профильЕсть(кто && кто.id)) { onClose(); return; }
-        setШагВхода("ник");
-      } catch (err) {
-        setTgError(t("authCodeBad"));
-      } finally {
-        setTgBusy(false);
-      }
-    }
-
-    async function завершить() {
-      if (!tgNickValid) { setTgNickTouched(true); setШагВхода("ник"); return; }
-      if (!датаГодна) return;
-      setTgError("");
-      setTgBusy(true);
-      try {
-        await завестиПрофильПоПочте({ nickname: tgNickTrimmed, birthDate: дата });
-        onClose();
-      } catch (err) {
-        const код = (err && err.message) || "";
-        if (код === "too_young") {
-          // Возраст проверяет сервер, а не только форма: профиля нет, и
-          // сессию закрываем — аккаунта у человека не осталось.
-          setМалолетка(true);
-          try { await supabase.auth.signOut(); } catch (e) { /* уже не важно */ }
-        } else if (код === "nickname_taken") {
-          setШагВхода("ник");
-          setTgError(tf("authErrNicknameTaken", { name: tgNickTrimmed }));
-        } else {
-          setTgError(код === "nickname_required" ? t("nicknameError") : код);
-        }
-      } finally {
-        setTgBusy(false);
-      }
-    }
-
-    // Отказ по возрасту. Отдельный вид, а не красная строка: это конец
-    // разговора, а не подсказка, что поправить.
-    if (малолетка) {
-      return (
-        <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ ...SHEET_BACK, zIndex: 60 }} onClick={onClose}>
-          <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={sheetCard(22)}>
-            <div className="flex flex-col items-center text-center gap-3" style={{ padding: "6px 0 2px" }}>
-              <span className="flex items-center justify-center" style={{
-                width: 56, height: 56, borderRadius: 999, background: hexA(T.down, 0.14), color: T.down,
-              }}>
-                <ShieldAlert size={26} />
-              </span>
-              <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800 }}>{t("authTooYoungTitle")}</span>
-              <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, maxWidth: 290 }}>{t("authTooYoung")}</p>
-              <button
-                onClick={onClose}
-                className="fx-tap w-full rounded-[20px] py-3.5 mt-1"
-                style={{ background: T.surfaceHi, border: "none", color: T.ice, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
-              >
-                {t("authGotIt")}
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    const заголовок = шагВхода === "почта" ? t("authMailTitle")
-      : шагВхода === "код" ? t("authCodeTitle")
-      : шагВхода === "ник" ? t("authNickTitle")
-      : t("authBirthTitle");
 
     return (
-      <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ ...SHEET_BACK, zIndex: 60 }} onClick={onClose}>
-        <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={sheetCard(22)}>
-          <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
-            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700 }}>{заголовок}</span>
-            <button onClick={onClose} className="fx-tap fx-close"><X size={16} color={T.muted} /></button>
-          </div>
-
-          <div className="flex flex-col gap-3" style={{ paddingBottom: 6 }}>
-            {шагВхода === "почта" && (
-              <>
-                <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>{t("authMailHint")}</p>
-                <Field
-                  label={t("authMailLabel")}
-                  placeholder="you@mail.com"
-                  value={почта}
-                  onChange={(e) => { setПочта(e.target.value); setTgError(""); }}
-                  error={!!почта.trim() && !почтаГодна}
-                  type="email"
-                />
-                {tgError && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{tgError}</span>}
-                <button
-                  onClick={послатьКод}
-                  disabled={!почтаГодна || tgBusy}
-                  className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3.5"
-                  style={{
-                    background: почтаГодна && !tgBusy ? ЦВЕТ_КНОПКИ : T.surfaceHi,
-                    color: почтаГодна && !tgBusy ? PRISM_TEXT : T.muted,
-                    border: "none", fontFamily: displayFont, fontWeight: 700, fontSize: 15,
-                  }}
-                >
-                  {tgBusy
-                    ? <><RefreshCw size={15} style={{ animation: "spin360 1.1s linear infinite" }} /> {t("authMailBusy")}</>
-                    : <><Mail size={15} /> {t("authMailSend")}</>}
-                </button>
-              </>
-            )}
-
-            {шагВхода === "код" && (
-              <>
-                <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
-                  {tf("authCodeHint", { mail: почтаЧистая })}
-                </p>
-                <input
-                  value={кодПисьма}
-                  onChange={(e) => { setКодПисьма(e.target.value.replace(/\D/g, "").slice(0, 6)); setTgError(""); }}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="······"
-                  style={{
-                    padding: "15px 14px", borderRadius: 16, textAlign: "center",
-                    border: `1px solid ${tgError ? T.down : (кодГоден ? T.up : T.line)}`,
-                    background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 25,
-                    letterSpacing: "0.3em", outline: "none",
-                  }}
-                />
-                {tgError && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{tgError}</span>}
-                <button
-                  onClick={проверитьКод}
-                  disabled={!кодГоден || tgBusy}
-                  className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3.5"
-                  style={{
-                    background: кодГоден && !tgBusy ? ЦВЕТ_КНОПКИ : T.surfaceHi,
-                    color: кодГоден && !tgBusy ? PRISM_TEXT : T.muted,
-                    border: "none", fontFamily: displayFont, fontWeight: 700, fontSize: 15,
-                  }}
-                >
-                  {tgBusy
-                    ? <><RefreshCw size={15} style={{ animation: "spin360 1.1s linear infinite" }} /> {t("submittingText")}</>
-                    : <><LogIn size={15} /> {t("authSignInCta")}</>}
-                </button>
-                <button
-                  onClick={послатьКод}
-                  disabled={tgBusy}
-                  className="fx-tap"
-                  style={{
-                    alignSelf: "center", padding: 0, border: "none", background: "transparent",
-                    color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
-                  }}
-                >
-                  {t("authCodeResend")}
-                </button>
-              </>
-            )}
-
-            {шагВхода === "ник" && (
-              <>
-                <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>{t("authNickHint")}</p>
-                <Field
-                  label={t("nicknameLabel")}
-                  placeholder="leo_builds"
-                  value={tgNick}
-                  onChange={(e) => { setTgNick(e.target.value); setTgNickTouched(true); setTgError(""); }}
-                  error={tgNickTouched && !tgNickValid}
-                />
-                {tgNickTouched && !tgNickValid && (
-                  <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12 }}>{t("nicknameError")}</span>
-                )}
-                {tgError && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{tgError}</span>}
-                <button
-                  onClick={() => { if (tgNickValid) setШагВхода("дата"); else setTgNickTouched(true); }}
-                  disabled={!tgNickValid}
-                  className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3.5"
-                  style={{
-                    background: tgNickValid ? ЦВЕТ_КНОПКИ : T.surfaceHi,
-                    color: tgNickValid ? PRISM_TEXT : T.muted,
-                    border: "none", fontFamily: displayFont, fontWeight: 700, fontSize: 15,
-                  }}
-                >
-                  {t("withdrawNext")}
-                </button>
-              </>
-            )}
-
-            {шагВхода === "дата" && (
-              <>
-                <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>{t("authBirthHint")}</p>
-                {/* Родное поле даты: на телефоне оно открывает системный
-                    выбор года и месяца, а три поля руками здесь неизбежно
-                    превращаются в ввод «31.02». */}
-                <div className="flex items-center" style={{
-                  gap: 10, padding: "13px 14px", borderRadius: 16,
-                  border: `1px solid ${дата && !совершеннолетний ? T.down : (совершеннолетний ? T.up : T.line)}`,
-                  background: T.surface,
+      <div
+        className={`fx-modal-back${closing ? " fx-out" : ""}`}
+        style={{
+          position: "fixed", inset: 0, zIndex: 60, background: "#000000",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px",
+        }}
+      >
+        <div
+          className="fx-modal-card flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: "100%", maxWidth: 352, background: T.surface, borderRadius: 28,
+            padding: "26px 22px 22px", border: "none", gap: 14,
+          }}
+        >
+          {шагВхода === "ник" ? (
+            <>
+              {/* Лицо из Telegram: аккаунт заводится именно на него, и это
+                  видно до нажатия, а не после. */}
+              <div className="flex flex-col items-center text-center" style={{ gap: 12 }}>
+                <span style={{
+                  width: 76, height: 76, borderRadius: "50%", flexShrink: 0,
+                  background: tgUser && tgUser.photo_url
+                    ? `center/cover no-repeat url(${tgUser.photo_url})`
+                    : T.surfaceHi,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `1px solid ${T.lineHi}`,
                 }}>
-                  <CalendarDays size={17} color={T.muted} />
-                  <input
-                    type="date"
-                    value={дата}
-                    max={сегодня}
-                    onChange={(e) => { setДата(e.target.value); setTgError(""); }}
-                    style={{
-                      flex: 1, border: "none", background: "transparent", outline: "none",
-                      color: T.ice, fontFamily: monoFont, fontSize: 15,
-                    }}
-                  />
+                  {!(tgUser && tgUser.photo_url) && <User size={30} color={T.muted} />}
+                </span>
+                <div className="flex flex-col" style={{ gap: 6 }}>
+                  <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
+                    {t("createTitle")}
+                  </span>
+                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
+                    {!внутриTelegram ? t("createOutside") : t("createLead")}
+                  </span>
                 </div>
-                {дата && датаГодна && !совершеннолетний && (
-                  <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{t("authTooYoungTitle")}</span>
-                )}
-                {tgError && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{tgError}</span>}
-                <button
-                  onClick={завершить}
-                  disabled={!датаГодна || tgBusy}
-                  className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3.5"
-                  style={{
-                    background: датаГодна && !tgBusy ? ЦВЕТ_КНОПКИ : T.surfaceHi,
-                    color: датаГодна && !tgBusy ? PRISM_TEXT : T.muted,
-                    border: "none", fontFamily: displayFont, fontWeight: 700, fontSize: 15,
-                  }}
-                >
-                  {tgBusy
-                    ? <><RefreshCw size={15} style={{ animation: "spin360 1.1s linear infinite" }} /> {t("submittingText")}</>
-                    : t("authBirthDone")}
-                </button>
-              </>
-            )}
-          </div>
+              </div>
+
+              {внутриTelegram && !входБезНика && (
+                <div className="flex flex-col" style={{ gap: 6 }}>
+                  {/* Собачка приклеена к полю, а не набирается руками: ник
+                      хранится без неё, и человеку не нужно про это знать. */}
+                  <div className="flex items-center" style={{
+                    gap: 2, padding: "14px 15px", borderRadius: 18,
+                    background: T.surfaceHi,
+                    border: `1px solid ${tgNickTouched && !никГоден ? T.down : (никГоден ? T.up : "transparent")}`,
+                    transition: "border-color 200ms ease",
+                  }}>
+                    <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 16 }}>@</span>
+                    <input
+                      value={tgNick}
+                      onChange={(e) => { setTgNick(e.target.value.replace(/[^A-Za-z0-9_.]/g, "")); setTgNickTouched(true); setTgError(""); }}
+                      placeholder="leo_builds"
+                      maxLength={20}
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      style={{
+                        flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none",
+                        color: T.ice, fontFamily: monoFont, fontSize: 16,
+                      }}
+                    />
+                    {никГоден && <Check size={17} strokeWidth={3} color={T.up} />}
+                  </div>
+                  {tgNickTouched && !никГоден && (
+                    <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12 }}>{t("nicknameError")}</span>
+                  )}
+                </div>
+              )}
+
+              {tgError && (
+                <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5, lineHeight: 1.45 }}>{tgError}</span>
+              )}
+
+              <button
+                onClick={создать}
+                disabled={!можно}
+                className="fx-tap w-full flex items-center justify-center"
+                style={{
+                  gap: 8, padding: "16px 0", borderRadius: 999, border: "none",
+                  background: можно ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+                  color: можно ? PRISM_TEXT : T.muted,
+                  fontFamily: displayFont, fontWeight: 800, fontSize: 16,
+                }}
+              >
+                {tgBusy || ждём
+                  ? <><RefreshCw size={15} style={{ animation: "spin360 1.1s linear infinite" }} /> {t("submittingText")}</>
+                  : входБезНика ? t("authSignInCta") : t("createCta")}
+              </button>
+
+              {/* Уйти можно и отсюда: приложение открыто и без аккаунта —
+                  лента, мемпад и чужие токены видны всем. */}
+              <button
+                onClick={onClose}
+                className="fx-tap w-full"
+                style={{
+                  padding: "6px 0 0", border: "none", background: "transparent",
+                  color: T.faint, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+                }}
+              >
+                {t("laterBtn")}
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Аккаунт есть. Второй ключ предлагаем сразу, пока человек
+                  здесь: потом за этим нужно идти в настройки, а туда не
+                  идут. */}
+              <div className="flex flex-col items-center text-center" style={{ gap: 12 }}>
+                <span className="flex items-center justify-center" style={{
+                  width: 64, height: 64, borderRadius: "50%",
+                  background: hexA(T.up, 0.14), color: T.up,
+                  animation: "галочкаВстала 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
+                }}>
+                  <Check size={30} strokeWidth={3} />
+                </span>
+                <div className="flex flex-col" style={{ gap: 6 }}>
+                  <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
+                    {t("createdTitle")}
+                  </span>
+                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
+                    {t("createdBody")}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => { setПочтаОткрыта(true); haptic("light"); }}
+                className="fx-tap w-full flex items-center justify-center"
+                style={{
+                  gap: 8, padding: "16px 0", borderRadius: 999, border: "none",
+                  ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT,
+                  fontFamily: displayFont, fontWeight: 800, fontSize: 16,
+                }}
+              >
+                <Mail size={16} /> {t("addMail")}
+              </button>
+              <button
+                onClick={onClose}
+                className="fx-tap w-full"
+                style={{
+                  padding: "6px 0 0", border: "none", background: "transparent",
+                  color: T.faint, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+                }}
+              >
+                {t("laterBtn")}
+              </button>
+            </>
+          )}
         </div>
+
+        <ЭкранПочты
+          открыт={почтаОткрыта}
+          onClose={() => setПочтаОткрыта(false)}
+          onГотово={() => { setПочтаОткрыта(false); onClose(); }}
+        />
       </div>
     );
   }
@@ -22140,10 +22412,11 @@ function mapTokenRow(row) {
     let active = true;
     (async () => {
       let { data: { session } } = await supabase.auth.getSession();
-      /* Аккаунт заводится почтой, и молчаливого входа больше нет: код из
-         письма приходит человеку, а не окну, и сделать это за него
-         приложение не может. Сессия при этом живёт долго — тот, кто уже
-         вошёл, открывает приложение сразу внутри. */
+      /* Внутри Telegram повторный вход происходит сам: подпись initData
+         уже есть, спрашивать человека не о чем. А вот первый — нет: там
+         заводится аккаунт, и имя для него человек выбирает сам, поэтому
+         вместо тихого входа открывается экран создания. */
+      let нуженАккаунт = false;
       // Сессия пережила выход — так бывает, когда выход не доехал до
       // сервера или память телефона вернула прошлое значение. Раз человек
       // выходил и с тех пор не входил, доводим выход до конца здесь.
@@ -22151,15 +22424,49 @@ function mapTokenRow(row) {
         try { await supabase.auth.signOut(); } catch (e) { /* уже не важно */ }
         session = null;
       }
-      if (session) markSeenSession();
+      if (session) {
+        markSeenSession();
+        // Пришли по чужой ссылке приглашения, будучи уже внутри —
+        // засчитываем её отдельно: вход, который обычно передаёт метку,
+        // здесь не понадобится. Ответа не ждём, приложению это не мешает.
+        linkReferralIfAny();
+      }
+      /* Молчаливый вход при каждом запуске внутри Telegram. Единственный,
+         кого он не втаскивает обратно, — тот, кто сам нажал «Выйти»:
+         отметка о выходе держится, пока он не войдёт руками. */
+      if (!session && telegramInitData() && storageWorks() && !isSignedOutByHand()) {
+        // Разведка может не ответить — сеть, предел, перезапуск сервера.
+        // Тогда пробуем войти как есть: у того, кто уже заходил, вход
+        // пройдёт, а новому сервер ответит «нужен ник», и мы откроем
+        // экран создания.
+        let есть = null;
+        try {
+          есть = (await probeTelegramAccount()).exists;
+        } catch (err) {
+          console.warn("[mintly] telegram probe failed:", err && err.message);
+        }
+        if (есть === false) {
+          нуженАккаунт = true;
+        } else {
+          try {
+            await signInWithTelegram();
+            session = (await supabase.auth.getSession()).data.session;
+          } catch (err) {
+            if ((err && err.message) === "nickname_required") нуженАккаунт = true;
+            else console.warn("[mintly] telegram auto sign-in failed:", err && err.message);
+          }
+        }
+      }
       if (!active) return;
       await loadProfileForUser(session?.user || null);
       setAuthChecked(true);
-      /* Сессия есть, а профиля нет — человек ввёл код и закрыл окно, не
-         добравшись до ника. Аккаунт без профиля нигде не показывается и
-         ничего не умеет, поэтому доводим создание до конца сразу. */
-      if (session && session.user && !(await профильЕсть(session.user.id))) {
-        if (!active) return;
+      /* Сессия есть, а профиля нет — человек закрыл экран, не дойдя до
+         имени. Аккаунт без профиля нигде не показывается и ничего не
+         умеет, поэтому доводим создание до конца сразу. */
+      if (!нуженАккаунт && session && session.user && !(await профильЕсть(session.user.id))) {
+        нуженАккаунт = true;
+      }
+      if (нуженАккаунт && active) {
         setProfileModalMode("create");
         setProfileModalOpen(true);
       }
