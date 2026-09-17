@@ -249,7 +249,6 @@ const STR = {
     welcomeSlide4Body: "Имя, тикер, картинка и первая покупка — остальное берёт на себя контракт: эмиссия, цена, комиссия и выход на биржу по достижении порога.",
     welcomeCreate: "Создать аккаунт",
     welcomeLogin: "У меня уже есть аккаунт",
-    welcomeSkip: "Продолжить без входа",
     welcomeRisk: "Криптоактивы связаны с риском: цена токенов может значительно меняться, а вложения — быть потеряны.",
     nicknameLocked: "Никнейм выбирается один раз при создании аккаунта и не меняется.",
     bootStepAuth: "Вход в аккаунт", bootStepFeed: "Лента покупок",
@@ -353,6 +352,8 @@ const STR = {
     createdBody: "Осталось одно. Привяжи почту: ею подтверждается вывод, и через неё возвращают аккаунт, если пропадёт доступ к Telegram.",
     addMail: "Добавить почту",
     laterBtn: "Позже",
+    enterApp: "Войти в приложение",
+    openInTelegram: "Открыть в Telegram",
     mail2faTitle: "Почта для 2ФА",
     mail2faHint: "Пришлём письмо на этот адрес. Дальше он понадобится при выводе и если потеряется доступ к Telegram.",
     mail2faSend: "Отправить письмо",
@@ -872,7 +873,6 @@ const STR = {
     welcomeSlide4Body: "Name, ticker, image and your first buy — the contract handles the rest: supply, price, fee and the move to a DEX once the threshold is met.",
     welcomeCreate: "Create account",
     welcomeLogin: "I already have an account",
-    welcomeSkip: "Continue without signing in",
     welcomeRisk: "Crypto assets carry risk: token prices can swing hard, and what you put in can be lost.",
     nicknameLocked: "A nickname is chosen once, when the account is created, and can't be changed.",
     bootStepAuth: "Signing in", bootStepFeed: "Buy feed",
@@ -976,6 +976,8 @@ const STR = {
     createdBody: "One thing left. Add an email: it confirms withdrawals and brings the account back if you lose access to Telegram.",
     addMail: "Add email",
     laterBtn: "Later",
+    enterApp: "Enter the app",
+    openInTelegram: "Open in Telegram",
     mail2faTitle: "Email for 2FA",
     mail2faHint: "We'll send a letter to that address. You'll need it for withdrawals and if you lose access to Telegram.",
     mail2faSend: "Send the letter",
@@ -9090,7 +9092,7 @@ function ВступлениеКошельки({ активен }) {
  *
  * Показывается один раз: закрыл — больше не мешает.
  */
-function WelcomeScreen({ onCreate, onLogin, onSkip, insetTop = 0 }) {
+function WelcomeScreen({ onCreate, onLogin, insetTop = 0 }) {
   const лист = LEAF_KINDS[2];
   const лента = useRef(null);
   const [страница, setСтраница] = useState(0);
@@ -9131,7 +9133,10 @@ function WelcomeScreen({ onCreate, onLogin, onSkip, insetTop = 0 }) {
         overflow: "hidden",
       }}
     >
-      {/* Знак и «пропустить» — над лентой: они не листаются вместе с ней. */}
+      {/* Знак — над лентой: он не листается вместе с ней. Кнопки
+          «продолжить без входа» здесь больше нет: без аккаунта в
+          приложении нечего делать — ни кошелька, ни сделок, ни своих
+          токенов, — и дверь мимо входа только вводила в заблуждение. */}
       <div className="flex items-center justify-between" style={{ padding: "18px 22px 4px", position: "relative", zIndex: 1 }}>
         <div className="flex items-center" style={{ gap: 9 }}>
           <svg width="20" height="23" viewBox="-15 -31 30 34" aria-hidden>
@@ -9146,9 +9151,6 @@ function WelcomeScreen({ onCreate, onLogin, onSkip, insetTop = 0 }) {
           </svg>
           <span style={{ fontFamily: displayFont, color: "#F4F6FB", fontSize: 16.5, fontWeight: 600, letterSpacing: "-0.01em" }}>Mintly</span>
         </div>
-        <button onClick={onSkip} className="fx-tap вст-тихо" style={{ fontFamily: bodyFont, fontSize: 13, color: hexA("#FFFFFF", 0.42), background: "transparent", letterSpacing: "-0.005em" }}>
-          {t("welcomeSkip")}
-        </button>
       </div>
 
       {/* Сами страницы. Прилипание по горизонтали, вертикальной прокрутки
@@ -20681,18 +20683,24 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   : входБезНика ? t("authSignInCta") : t("createCta")}
               </button>
 
-              {/* Уйти можно и отсюда: приложение открыто и без аккаунта —
-                  лента, мемпад и чужие токены видны всем. */}
-              <button
-                onClick={onClose}
-                className="fx-tap w-full"
-                style={{
-                  padding: "6px 0 0", border: "none", background: "transparent",
-                  color: T.faint, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
-                }}
-              >
-                {t("laterBtn")}
-              </button>
+              {/* Мимо этого экрана хода нет: без аккаунта в приложении
+                  нечего делать — ни кошелька, ни сделок, ни своих
+                  токенов. Снаружи Telegram остаётся одна дверь — открыть
+                  приложение в нём. */}
+              {!внутриTelegram && (
+                <a
+                  href={`https://t.me/${TG_BOT}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="fx-tap w-full flex items-center justify-center"
+                  style={{
+                    gap: 7, padding: "6px 0 0", textDecoration: "none",
+                    color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+                  }}
+                >
+                  <Send size={14} /> {t("openInTelegram")}
+                </a>
+              )}
             </>
           ) : (
             <>
@@ -20728,6 +20736,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               >
                 <Mail size={16} /> {t("addMail")}
               </button>
+              {/* Почта — дело добровольное, и этот шаг пропускается: без
+                  неё аккаунт уже работает, просто держится на одном
+                  Telegram. */}
               <button
                 onClick={onClose}
                 className="fx-tap w-full"
@@ -20736,7 +20747,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   color: T.faint, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
                 }}
               >
-                {t("laterBtn")}
+                {t("enterApp")}
               </button>
             </>
           )}
@@ -23646,6 +23657,19 @@ function mapTokenRow(row) {
   // не подтянутся кошелёк и курс — TonConnect восстанавливает сессию
   // асинхронно, и сразу после запуска адреса ещё нет.
   const [сразуВКошелёк, setСразуВКошелёк] = useState(false);
+
+  /* Без аккаунта приложение не показывается вовсе.
+   *
+   * Раньше мимо входа был ход: лента листалась, а половина экранов при
+   * этом просила войти, кошелёк пустовал, и человек не понимал, сломано
+   * оно или так задумано. Теперь дверь одна — экран создания стоит
+   * поверх всего, пока профиля нет, и закрыть его нечем. */
+  useEffect(() => {
+    if (!authChecked || accountCreated || приветствие || сразуВКошелёк) return;
+    setProfileModalMode("create");
+    setProfileModalOpen(true);
+  }, [authChecked, accountCreated, приветствие, сразуВКошелёк]);
+
   const [ждётПодписи, setЖдётПодписи] = useState(0);
   // Что именно покупаем — только для надписи на экране ожидания: сама
   // сумма уходит из ждётПодписи и обнуляется, как только подпись ушла.
@@ -24256,7 +24280,6 @@ function mapTokenRow(row) {
           insetTop={insetTop}
           onCreate={() => { закрытьПриветствие(); openCreateProfile(); }}
           onLogin={() => { закрытьПриветствие(); openLoginProfile(); }}
-          onSkip={закрытьПриветствие}
         />
       )}
       {/* Заставки на входе больше нет: приложение открывается сразу, а
