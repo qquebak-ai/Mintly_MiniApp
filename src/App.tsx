@@ -24006,6 +24006,10 @@ function mapTokenRow(row) {
     if (view === "user") return backFromUserProfile;
     if (view === "token") return backFromToken;
     if (view === "create") return () => setView(tab);
+    /* Профиль в капсуле не живёт: в него приходят из меню, и без стрелки
+       Telegram предлагал единственный выход — «Закрыть», то есть выйти из
+       приложения целиком. */
+    if (view === "profile") return () => goTab("home");
     if (view === "achievements") return () => setView(откудаДостижения);
     return null;
   }, [pinLocked, pinModal, launchRequest, profileModalOpen, settingsItem, tradeModal, manageToken_, view, tab, token, откудаДостижения]);
