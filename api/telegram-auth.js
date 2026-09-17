@@ -360,8 +360,11 @@ export default async function handler(req, res) {
         telegram_id: tgUser.id,
         nickname: wantedNickname(body) || "",
         bio: "",
-        avatar_url: tgUser.photo_url || null,
-        emoji: tgUser.photo_url ? null : "🚀",
+        // Лицо из Telegram сюда не переносится: человек его не выбирал,
+        // а выглядело бы это как «аватарка уже есть». Без своей картинки
+        // приложение рисует букву ника — одну и ту же во всех списках.
+        avatar_url: null,
+        emoji: null,
         wallet_address: null,
       },
     });
@@ -426,8 +429,8 @@ export default async function handler(req, res) {
         nickname,
         email,
         bio: "",
-        avatar_url: tgUser.photo_url || null,
-        emoji: tgUser.photo_url ? null : "🚀",
+        avatar_url: null,
+        emoji: null,
         invited_by: invitedBy,
       }, { onConflict: "id" });
       if (insertErr) {
@@ -605,7 +608,8 @@ async function завестиПрофиль(req, res) {
     email: кто.user.email || null,
     bio: "",
     avatar_url: мета.avatar_url || мета.picture || null,
-    emoji: мета.avatar_url || мета.picture ? null : "🚀",
+    // Без картинки лицом служит буква ника — эмодзи здесь больше не нужен.
+    emoji: null,
     wallet_address: мета.wallet_address || null,
   }, { onConflict: "id" });
   if (insertErr) {

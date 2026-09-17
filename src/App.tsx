@@ -7556,7 +7556,7 @@ function TokenCreatorCard({ ownerId, currentUserId, onNeedAuth, showToast, onOpe
         className="fx-tap flex items-center gap-3 flex-1 min-w-0"
         style={{ background: "transparent", border: "none", padding: 0, textAlign: "left" }}
       >
-        <TokenAvatar size={44} src={creator.avatar_url} />
+        <ЛицоЧеловека ник={creator.nickname} src={creator.avatar_url} size={44} />
         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.04em" }}>{tr("creatorLabel")}</span>
           <div className="flex items-center gap-1 min-w-0">
@@ -8456,6 +8456,24 @@ function БукваАватара({ ник, size = 40 }) {
       }}
     >
       {буква}
+    </span>
+  );
+}
+
+/* Лицо человека в списках: своя картинка или буква ника.
+   Эмодзи, звёзды и серые заглушки отсюда убраны намеренно — у того, кто
+   не поставил аватарку, лицо всё равно своё, а не общее на всех. */
+function ЛицоЧеловека({ ник, src, size = 40, рамка }) {
+  return (
+    <span
+      className="flex items-center justify-center flex-shrink-0"
+      style={{
+        width: size, height: size, borderRadius: "50%", overflow: "hidden",
+        background: src ? `center/cover no-repeat url(${src})` : T.surfaceHi,
+        border: рамка === null ? "none" : (рамка || `1px solid ${T.lineHi}`),
+      }}
+    >
+      {!src && <БукваАватара ник={ник} size={size} />}
     </span>
   );
 }
@@ -21443,18 +21461,22 @@ async function uploadAvatarIfNeeded(userId) {
                 >
                   <AvatarFrame frameId={cosmetics.frame} size={92}>
                     <div style={{
-                      width: "100%", height: "100%", fontSize: 34,
+                      width: "100%", height: "100%",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       background: avatarUrl ? `center/cover no-repeat url(${avatarUrl})` : T.bg,
                     }}>
-                      {!avatarUrl && previewEmoji}
+                      {/* Нет своей картинки — буква ника на том же живом
+                          градиенте, что и везде в приложении. Раньше здесь
+                          подмигивал случайный эмодзи, и в профиле у
+                          человека было одно лицо, а в правке — другое. */}
+                      {!avatarUrl && <БукваАватара ник={nickname || (initial && initial.nickname) || ""} size={92} />}
                     </div>
                   </AvatarFrame>
                 </button>
               </div>
             ) : (
-              <button onClick={() => avatarInputRef.current && avatarInputRef.current.click()} className="fx-tap flex flex-col items-center justify-center gap-1 overflow-hidden" style={{ width: 84, height: 84, borderRadius: "50%", background: avatarUrl ? `center/cover no-repeat url(${avatarUrl})` : T.bg, border: avatarUrl ? `1.5px solid ${T.lineHi}` : `1px dashed ${T.lineHi}`, fontSize: 34 }}>
-                {!avatarUrl && previewEmoji}
+              <button onClick={() => avatarInputRef.current && avatarInputRef.current.click()} className="fx-tap flex flex-col items-center justify-center gap-1 overflow-hidden" style={{ width: 84, height: 84, borderRadius: "50%", background: avatarUrl ? `center/cover no-repeat url(${avatarUrl})` : T.bg, border: avatarUrl ? `1.5px solid ${T.lineHi}` : `1px dashed ${T.lineHi}` }}>
+                {!avatarUrl && <БукваАватара ник={nickname || (initial && initial.nickname) || ""} size={84} />}
               </button>
             )}
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 11.5 }}>{avatarUrl ? t("changeAvatarHint") : t("addAvatarHint")}</span>
@@ -24451,27 +24473,32 @@ function mapTokenRow(row) {
     showToast(t("loggedOut"));
   }
   async function deleteAccountForever() {
-    // Удаляем профиль из таблицы profiles и выходим из сессии.
-    // Полное удаление самой auth-записи пользователя требует серверного
-    // вызова с service_role ключом (например, через Supabase Edge Function),
-    // так как анонимный/публичный ключ на клиенте не имеет прав это делать.
-    const { data: sessionData } = await supabase.auth.getUser();
-    const userId = sessionData?.user?.id;
-    if (userId) {
-      // Ответ базы проверяем. Раньше он игнорировался, и при запрете на
-      // удаление (в базе может не стоять разрешения удалять свою строку)
-      // человек видел «Аккаунт удалён», хотя из аккаунта его просто
-      // выкидывало, а профиль оставался на месте. Врать об этом нельзя:
-      // человек уходит в уверенности, что его данных больше нет.
-      const { error, count } = await supabase
-        .from("profiles")
-        .delete({ count: "exact" })
-        .eq("id", userId);
-      if (error || !count) {
-        console.warn("[mintly] delete profile failed:", error && error.message);
+    /* Удаляет сервер, а не браузер.
+     *
+     * Из браузера доступны только свои строки в таблицах, а сама учётная
+     * запись в auth.users анонимному ключу не по зубам — и она оставалась
+     * после «удалить аккаунт» вместе с почтой и телеграм-id. Сервер своим
+     * ключом убирает и нажитое, и саму запись; ответ проверяем, потому
+     * что говорить «аккаунт удалён» над живым аккаунтом нельзя. */
+    const { data: сессия } = await supabase.auth.getSession();
+    const токен = сессия && сессия.session && сессия.session.access_token;
+    if (!токен) { showToast(t("accountDeleteFailed")); return; }
+    try {
+      const ответ = await fetch("/api/delete-account", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${токен}` },
+      });
+      const тело = await ответ.json().catch(() => ({}));
+      if (!ответ.ok || !тело.ok) {
+        console.warn("[mintly] аккаунт не удалён:", тело.error || ответ.status, тело.detail || "");
         showToast(t("accountDeleteFailed"));
         return;
       }
+      if (тело.warnings) console.warn("[mintly] при удалении остались хвосты:", тело.warnings);
+    } catch (e) {
+      console.warn("[mintly] аккаунт не удалён:", e && e.message);
+      showToast(t("accountDeleteFailed"));
+      return;
     }
     markSignedOut(true);
     await supabase.auth.signOut();
