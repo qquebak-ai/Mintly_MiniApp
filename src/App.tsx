@@ -1507,12 +1507,22 @@ function tf(key, vars) {
 /* Готовые сочетания из тёмной подборки, а не подобранные на глаз:
    «Amin» (#8E2DE2 → #4A00E0) — фирменный акцент, он же цвет маскота. */
 const ГРАДИЕНТ_БРЕНДА = "linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%)";
-/* Кнопка — фирменный фиолетовый, но не плоский: по ней медленно идёт
-   волна от тёмного края к светлому и обратно. Оттенки соседние, разница
-   невелика — надпись читается так же, как на заливке, а кнопка при этом
-   выглядит живой. Полосы и мелкие переключатели берут тот же градиент
-   без движения: там перелив был бы мельтешением. */
-const ЦВЕТ_КНОПКИ = "linear-gradient(112deg, #4A0BAE 0%, #6C16E1 24%, #B14CFF 50%, #6C16E1 76%, #4A0BAE 100%)";
+/* Кнопки.
+ *
+ * Фиолетовый остался ровно один — на создании аккаунта. Там нажатие
+ * единственное, и весь экран держится на нём; когда же тем же цветом
+ * горели и отправка сообщения, и обрезка картинки, и подтверждение
+ * кода, он переставал что-либо значить и просто кричал на каждой
+ * странице.
+ *
+ * Остальные кнопки тёмные, и тёмных несколько — по месту: графит в общей
+ * работе, ночная синь в кошельке и хвоя на подтверждениях. По ним всем
+ * так же идёт медленная волна от края к краю: оттенки соседние, надпись
+ * читается ровно, а кнопка не выглядит наклейкой. */
+const ЦВЕТ_ВХОДА = "linear-gradient(112deg, #4A0BAE 0%, #6C16E1 24%, #B14CFF 50%, #6C16E1 76%, #4A0BAE 100%)";
+const ЦВЕТ_КНОПКИ = "linear-gradient(112deg, #15181F 0%, #242936 50%, #15181F 100%)";
+const ЦВЕТ_КНОПКИ_НОЧЬ = "linear-gradient(112deg, #0C1A2C 0%, #17324F 50%, #0C1A2C 100%)";
+const ЦВЕТ_КНОПКИ_ХВОЯ = "linear-gradient(112deg, #08251A 0%, #11402C 50%, #08251A 100%)";
 /* Та же краска плоским цветом — для мест, где градиент не годится:
    внутри другого градиента (градиент в градиенте — не CSS) и на
    мелочи вроде точек кода, где перелив всё равно не виден. */
@@ -1574,6 +1584,11 @@ const ПЕРЕЛИВ_КНОПКИ_ТОРГИ = {
      край, и кнопка становилась то целиком зелёной, то целиком красной —
      а половины должны читаться всегда. */
   backgroundSize: "124% 100%",
+  animation: "кнопкаПереливается 5.5s ease-in-out infinite",
+};
+const ПЕРЕЛИВ_ВХОДА = {
+  background: ЦВЕТ_ВХОДА,
+  backgroundSize: "230% 100%",
   animation: "кнопкаПереливается 5.5s ease-in-out infinite",
 };
 const ПЕРЕЛИВ_КНОПКИ = {
@@ -14261,7 +14276,7 @@ function МастерФразы({
   const всёВыбрано = спрос.length === 3 && спрос.every((в) => выбор[в.номер]);
 
   // Кнопка внизу — одна на все шаги, и выглядит одинаково.
-  function Кнопка({ надпись, onClick, активна = true }) {
+  function Кнопка({ надпись, onClick, активна = true, краска = ЦВЕТ_КНОПКИ_НОЧЬ }) {
     return (
       <button
         onClick={onClick}
@@ -14269,7 +14284,7 @@ function МастерФразы({
         className="fx-tap w-full"
         style={{
           padding: "16px 0", borderRadius: 999, border: "none",
-          background: активна ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+          background: активна ? краска : T.surfaceHi,
           color: активна ? PRISM_TEXT : T.muted,
           fontFamily: displayFont, fontSize: 16, fontWeight: 800,
         }}
@@ -14527,7 +14542,7 @@ function МастерФразы({
           ))}
           {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
           <div style={{ marginTop: "auto" }}>
-            <Кнопка надпись={t("quizDone")} onClick={сверить} активна={всёВыбрано && !идёт} />
+            <Кнопка надпись={t("quizDone")} onClick={сверить} активна={всёВыбрано && !идёт} краска={ЦВЕТ_КНОПКИ_ХВОЯ} />
           </div>
         </>
       )}
@@ -21016,7 +21031,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
             className="fx-tap w-full"
             style={{
               padding: "16px 0", borderRadius: 999, border: "none",
-              background: (шаг === "готово" || годна) && !идёт ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+              background: (шаг === "готово" || годна) && !идёт ? ЦВЕТ_КНОПКИ_НОЧЬ : T.surfaceHi,
               color: (шаг === "готово" || годна) && !идёт ? PRISM_TEXT : T.muted,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             }}
@@ -21366,7 +21381,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 }}
               >
                 <span aria-hidden style={{
-                  position: "absolute", inset: 0, borderRadius: 999, background: ЦВЕТ_КНОПКИ,
+                  position: "absolute", inset: 0, borderRadius: 999, background: ЦВЕТ_ВХОДА,
                   pointerEvents: "none", opacity: почтаПохожа ? 1 : 0, transition: "opacity 320ms ease",
                 }} />
                 <span style={{ position: "relative" }}>{t("withdrawNext")}</span>
@@ -21536,7 +21551,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   aria-hidden
                   style={{
                     position: "absolute", inset: 0, borderRadius: 999,
-                    background: ЦВЕТ_КНОПКИ, pointerEvents: "none",
+                    background: ЦВЕТ_ВХОДА, pointerEvents: "none",
                     opacity: можно ? 1 : 0, transition: "opacity 320ms ease",
                   }}
                 />
@@ -21599,7 +21614,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 className="fx-tap w-full flex items-center justify-center"
                 style={{
                   gap: 8, padding: "16px 0", borderRadius: 999, border: "none",
-                  ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT,
+                  ...ПЕРЕЛИВ_ВХОДА, color: PRISM_TEXT,
                   fontFamily: displayFont, fontWeight: 800, fontSize: 16,
                 }}
               >
