@@ -273,6 +273,7 @@ const STR = {
     nickChanged: "Теперь ты {name}",
     nickTaken: "Имя {name} уже занято",
     walletHoldings: "Твои токены",
+    walletAssets: "Мои активы",
     walletHistory: "История",
     swapTitle: "Обмен",
     swapAppToken: "Токен Mintly",
@@ -939,6 +940,7 @@ const STR = {
     nickChanged: "You are {name} now",
     nickTaken: "{name} is already taken",
     walletHoldings: "Your tokens",
+    walletAssets: "My assets",
     walletHistory: "History",
     swapTitle: "Swap",
     swapAppToken: "Mintly token",
@@ -1586,18 +1588,18 @@ const ПЕРЕЛИВ_КНОПКИ_ТОРГИ = {
   backgroundSize: "124% 100%",
   animation: "кнопкаПереливается 5.5s ease-in-out infinite",
 };
-const ПЕРЕЛИВ_ВХОДА = {
-  background: ЦВЕТ_ВХОДА,
+/* Любую кнопочную краску можно пустить волной: полотно вдвое шире
+   кнопки, и градиент медленно ходит от края к краю. Это тот же приём,
+   что у главной кнопки, — просто вынесенный, чтобы им пользовались все
+   кнопки с градиентом, а не одна. */
+const ВОЛНА = (краска) => ({
+  background: краска,
   backgroundSize: "230% 100%",
   animation: "кнопкаПереливается 5.5s ease-in-out infinite",
-};
-const ПЕРЕЛИВ_КНОПКИ = {
-  background: ЦВЕТ_КНОПКИ,
-  // Полотно вдвое шире кнопки — иначе волне негде идти.
-  backgroundSize: "230% 100%",
-  // Пять с половиной секунд — тот же круг, что у кнопки сделки.
-  animation: "кнопкаПереливается 5.5s ease-in-out infinite",
-};
+});
+
+const ПЕРЕЛИВ_ВХОДА = ВОЛНА(ЦВЕТ_ВХОДА);
+const ПЕРЕЛИВ_КНОПКИ = ВОЛНА(ЦВЕТ_КНОПКИ);
 /* Пара под рост и падение — от цветов свечи и к ней же: тот самый
    зелёный с графика в светлый край градиента, тот самый красный — в
    тёмный. Плоские цвета остаются для текста и линий: их градиентом не
@@ -13004,7 +13006,7 @@ function ЭкранВывода({
                   onClick={() => вКнигу(новый, метка)}
                   className="fx-tap"
                   style={{
-                    padding: "13px 16px", borderRadius: 14, border: "none", background: ЦВЕТ_КНОПКИ,
+                    padding: "13px 16px", borderRadius: 14, border: "none", ...ВОЛНА(ЦВЕТ_КНОПКИ),
                     color: PRISM_TEXT, fontFamily: displayFont, fontSize: 13.5, fontWeight: 800,
                   }}
                 >
@@ -13053,7 +13055,7 @@ function ЭкранВывода({
             className="fx-tap w-full"
             style={{
               padding: "16px 0", borderRadius: 999, border: "none",
-              background: адресГоден ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+              ...(адресГоден ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
               color: адресГоден ? PRISM_TEXT : T.muted,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             }}
@@ -13134,7 +13136,7 @@ function ЭкранВывода({
             className="fx-tap"
             style={{
               flex: 1, padding: "16px 0", borderRadius: 999, border: "none",
-              background: кодГоден && !идёт ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+              ...(кодГоден && !идёт ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
               color: кодГоден && !идёт ? PRISM_TEXT : T.muted,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             }}
@@ -13177,7 +13179,7 @@ function ЭкранВывода({
             className="fx-tap flex-shrink-0"
             style={{
               padding: "11px 16px", borderRadius: 999, border: "none",
-              background: можно ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+              ...(можно ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
               color: можно ? PRISM_TEXT : T.muted,
               fontFamily: displayFont, fontSize: 14.5, fontWeight: 800,
             }}
@@ -13667,7 +13669,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
           className="fx-tap w-full"
           style={{
             padding: "16px 0", borderRadius: 20, border: "none",
-            background: готово ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+            ...(готово ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
             color: готово ? PRISM_TEXT : T.faint,
             fontFamily: displayFont, fontSize: 16, fontWeight: 700,
           }}
@@ -13821,78 +13823,6 @@ function ПилюляИзменения({ значение, подпись }) {
 /* Кнопка действия под картой: тёмный квадрат со значком и подписью под
    ним. Подпись снаружи квадрата — так значок остаётся крупным, а слово
    не жмётся к его краям. */
-/* Переключатель сети на карте.
- *
- * Выглядит как прежде, но белая плашка не перекрашивается с кнопки на
- * кнопку, а переезжает: её положение и ширину меряем по самой кнопке,
- * поэтому подписи разной длины («SOL» и «GRAM») остаются на своих
- * местах, а плашка садится точно под выбранную. */
-function ПереключательСетиКарты({ сеть, onВыбор }) {
-  const кнопки = useRef({});
-  const [бегунок, setБегунок] = useState(null);
-
-  // Меряем после отрисовки и до кадра: иначе плашка успевает мигнуть в
-  // нулевой позиции.
-  useLayoutEffect(() => {
-    const э = кнопки.current[сеть];
-    if (!э) return undefined;
-    const померить = () => setБегунок({ x: э.offsetLeft, w: э.offsetWidth });
-    померить();
-    // Ширина зависит от шрифта: пока он не загружен, подписи уже, и
-    // плашка садится мимо.
-    if (typeof document !== "undefined" && document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(померить).catch(() => {});
-    }
-    const н = typeof ResizeObserver !== "undefined" ? new ResizeObserver(померить) : null;
-    if (н) н.observe(э);
-    return () => { if (н) н.disconnect(); };
-  }, [сеть]);
-
-  return (
-    <span
-      className="flex items-center"
-      style={{
-        position: "relative",
-        gap: 2, padding: 3, borderRadius: 999,
-        background: "#000000",
-        boxShadow: `inset 0 2px 4px ${hexA("#000000", 0.9)}, 0 1px 0 ${hexA("#FFFFFF", 0.12)}`,
-      }}
-    >
-      {бегунок && (
-        <span
-          aria-hidden
-          style={{
-            position: "absolute", top: 3, bottom: 3, left: 0,
-            width: бегунок.w, borderRadius: 999, background: hexA("#FFFFFF", 0.9),
-            transform: `translateX(${бегунок.x}px)`,
-            transition: `transform ${SPRING}, width ${SPRING}`,
-            pointerEvents: "none",
-          }}
-        />
-      )}
-      {[["sol", "SOL"], ["ton", ТИКЕР_TON]].map(([id, подпись]) => (
-        <button
-          key={id}
-          ref={(э) => { кнопки.current[id] = э; }}
-          onClick={(e) => { e.stopPropagation(); onВыбор(id); haptic("light"); }}
-          className="fx-tap"
-          style={{
-            position: "relative", zIndex: 1,
-            padding: "4px 10px", borderRadius: 999, border: "none",
-            background: "transparent",
-            // Выбранная сеть — чёрным по белому: фиолетовый на белой
-            // плашке читался хуже и спорил с самой картой.
-            color: сеть === id ? "#0B0B0F" : hexA("#FFFFFF", 0.8),
-            transition: `color ${EASE}`,
-            fontFamily: displayFont, fontSize: 11.5, fontWeight: 800, letterSpacing: "0.02em",
-          }}
-        >
-          {подпись}
-        </button>
-      ))}
-    </span>
-  );
-}
 
 function ДействиеКошелька({ icon: Icon, label, onClick }) {
   return (
@@ -14291,7 +14221,7 @@ function МастерФразы({
         className="fx-tap w-full"
         style={{
           padding: "16px 0", borderRadius: 999, border: "none",
-          background: активна ? краска : T.surfaceHi,
+          ...(активна ? ВОЛНА(краска) : { background: T.surfaceHi }),
           color: активна ? PRISM_TEXT : T.muted,
           fontFamily: displayFont, fontSize: 16, fontWeight: 800,
         }}
@@ -14656,6 +14586,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const текущий = вTON ? внутрTON : внутр;
   const годен = текущий && !текущий.нуженВход && !текущий.ошибка;
   const солНаКошельке = внутр && !внутр.нуженВход && !внутр.ошибка ? Number(внутр.sol) || 0 : 0;
+  const тонНаКошельке = внутрTON && !внутрTON.нуженВход && !внутрTON.ошибка ? Number(внутрTON.ton) || 0 : 0;
   const сыройОстаток = вTON ? (годен ? Number(текущий.ton) || 0 : 0) : солНаКошельке;
   /* Сколько ещё можно вывести за сутки. Предел стоит на сервере, и
      раньше о нём узнавали только отказом: кнопка «100%» подставляла весь
@@ -14893,15 +14824,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.72), fontSize: 13 }}>
             {t("walletBalanceLabel")}
           </span>
-          {/* Переключатель сети прямо на карте: кошелёк один, а монет на
-              нём две, и держать их на разных экранах — значит заставлять
-              человека помнить, где что лежит. */}
-          {/* Переключатель врезан в карту: фон под ним не просвечивает, а
-              заменён чёрным, и по верхней кромке идёт тень — так он
-              читается вырезом в поверхности, а не наклейкой поверх неё.
-              Полупрозрачная подложка раньше пропускала перелив скина, и
-              на светлых картах подписи тонули. */}
-          <ПереключательСетиКарты сеть={сетьКошелька} onВыбор={setСетьКошелька} />
         </div>
         <div className="flex items-baseline" style={{ gap: 7, marginTop: 6, position: "relative" }}>
           {/* Целую и дробную части режем из одного округлённого числа, а не
@@ -14993,6 +14915,56 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           position: "relative",
         }}
       >
+        {/* Мои активы. Монеты сети — те же две, что были в переключателе
+            на карте, только теперь они показаны, а не спрятаны: видно
+            сразу, сколько чего лежит и сколько это в долларах. Нажатие
+            выбирает сеть — ею и работают «отправить», «получить» и
+            «обменять». */}
+        <div style={{ marginBottom: 12 }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700 }}>
+            {t("walletAssets")}
+          </span>
+        </div>
+        <div className="flex flex-col" style={{ gap: 2, marginBottom: 22 }}>
+          {[
+            { ключ: "sol", тикер: "SOL", имя: "Solana", лого: "/coins/sol.png", сколько: солНаКошельке, курс: курсSol },
+            { ключ: "ton", тикер: ТИКЕР_TON, имя: "Gram", лого: "/coins/gram.png", сколько: тонНаКошельке, курс: tonPriceUsd },
+          ].map((монета) => (
+            <button
+              key={монета.ключ}
+              onClick={() => { setСетьКошелька(монета.ключ); haptic("light"); }}
+              className="fx-tap w-full flex items-center"
+              style={{
+                gap: 12, padding: "12px 10px", borderRadius: 18, border: "none",
+                background: сетьКошелька === монета.ключ ? T.surface : "transparent",
+                transition: "background 200ms ease",
+              }}
+            >
+              <img
+                src={монета.лого}
+                alt=""
+                style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }}
+              />
+              <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>
+                  {монета.имя}
+                </span>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>
+                  {монета.тикер}
+                </span>
+              </span>
+              <span className="flex flex-col items-end" style={{ gap: 2, flexShrink: 0 }}>
+                <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                  {монета.сколько.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                </span>
+                <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
+                  {монета.курс > 0 ? `≈ $${(монета.сколько * монета.курс).toFixed(2)}` : "—"}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+
         <div style={{ marginBottom: 12 }}>
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700 }}>
             {t("walletHoldings")}
@@ -15223,7 +15195,7 @@ function TokenComments({ tokenId, currentUserId, onNeedAuth, onOpenProfile, show
             className={`fx-tap flex items-center justify-center${sending ? " fx-busy" : ""}`}
             style={{
               width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
-              background: draft.trim() && !sending ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+              ...(draft.trim() && !sending ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
               border: draft.trim() && !sending ? "none" : `1px solid ${T.line}`,
             }}
           >
@@ -15561,7 +15533,7 @@ function ЧатТокена({ tokenId, свой = false, currentUserId, onNeedAu
               className={`fx-tap flex items-center justify-center${шлём ? " fx-busy" : ""}`}
               style={{
                 width: 40, height: 40, borderRadius: "50%", flexShrink: 0, border: "none",
-                background: состояние.canWrite && черновик.trim() ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+                ...(состояние.canWrite && черновик.trim() ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
                 opacity: состояние.canWrite ? 1 : 0.6,
               }}
             >
@@ -18437,7 +18409,7 @@ function ПереключательМеханики({ item, включено, on
         aria-hidden
         style={{
           width: 40, height: 24, borderRadius: 999, flexShrink: 0, position: "relative",
-          background: включено ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+          ...(включено ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
           transition: `background ${EASE}`,
         }}
       >
@@ -18902,7 +18874,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         style={{
           fontFamily: displayFont, fontWeight: 700, fontSize: 17.5,
           color: нехватка ? T.muted : PRISM_TEXT,
-          background: нехватка ? T.surfaceHi : ЦВЕТ_КНОПКИ,
+          ...(нехватка ? { background: T.surfaceHi } : ВОЛНА(ЦВЕТ_КНОПКИ)),
           opacity: нехватка ? 0.7 : 1,
           padding: "18px 0", marginTop: 4,
         }}
@@ -19178,7 +19150,7 @@ function ToggleSwitch({ on, onChange }) {
       className="fx-tap"
       style={{
         width: 42, height: 24, borderRadius: 999, flexShrink: 0, position: "relative",
-        background: on ? ЦВЕТ_КНОПКИ : T.surfaceHi, border: `1px solid ${on ? "transparent" : T.line}`,
+        ...(on ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }), border: `1px solid ${on ? "transparent" : T.line}`,
         transition: `background ${EASE}, border-color ${EASE}`,
       }}
     >
@@ -19510,7 +19482,7 @@ function SupportChat({ accountCreated, showToast, onRead }) {
             className={`fx-tap flex items-center justify-center${sending ? " fx-busy" : ""}`}
             style={{
               width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
-              background: draft.trim() && !sending ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+              ...(draft.trim() && !sending ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
               border: draft.trim() && !sending ? "none" : `1px solid ${T.line}`,
             }}
           >
@@ -19767,7 +19739,7 @@ function ПодключениеX({ showToast }) {
           className="fx-tap w-full rounded-[16px] py-2.5 flex items-center justify-center"
           style={{
             gap: 8,
-            background: никОк ? ЦВЕТ_КНОПКИ : T.surface, border: "none",
+            ...(никОк ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surface }), border: "none",
             fontFamily: displayFont, fontWeight: 700, fontSize: 14.5,
             color: никОк ? PRISM_TEXT : T.faint,
           }}
@@ -19844,7 +19816,7 @@ function ПодключениеX({ showToast }) {
             disabled={проверяю || !ссылка.trim()}
             className="fx-tap w-full rounded-[16px] py-2.5"
             style={{
-              background: ссылка.trim() ? ЦВЕТ_КНОПКИ : T.surface, border: "none",
+              ...(ссылка.trim() ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surface }), border: "none",
               fontFamily: displayFont, fontWeight: 700, fontSize: 14.5,
               color: ссылка.trim() ? PRISM_TEXT : T.faint,
               opacity: проверяю ? 0.6 : 1,
@@ -20993,7 +20965,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
             className="fx-tap w-full"
             style={{
               padding: "16px 0", borderRadius: 999, border: "none",
-              background: (шаг === "готово" || годна) && !идёт ? ЦВЕТ_КНОПКИ_НОЧЬ : T.surfaceHi,
+              ...((шаг === "готово" || годна) && !идёт ? ВОЛНА(ЦВЕТ_КНОПКИ_НОЧЬ) : { background: T.surfaceHi }),
               color: (шаг === "готово" || годна) && !идёт ? PRISM_TEXT : T.muted,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             }}
@@ -21343,7 +21315,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 }}
               >
                 <span aria-hidden style={{
-                  position: "absolute", inset: 0, borderRadius: 999, background: ЦВЕТ_ВХОДА,
+                  position: "absolute", inset: 0, borderRadius: 999, ...ВОЛНА(ЦВЕТ_ВХОДА),
                   pointerEvents: "none", opacity: почтаПохожа ? 1 : 0, transition: "opacity 320ms ease",
                 }} />
                 <span style={{ position: "relative" }}>{t("withdrawNext")}</span>
@@ -21513,7 +21485,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   aria-hidden
                   style={{
                     position: "absolute", inset: 0, borderRadius: 999,
-                    background: ЦВЕТ_ВХОДА, pointerEvents: "none",
+                    ...ВОЛНА(ЦВЕТ_ВХОДА), pointerEvents: "none",
                     opacity: можно ? 1 : 0, transition: "opacity 320ms ease",
                   }}
                 />
@@ -21712,7 +21684,7 @@ async function uploadAvatarIfNeeded(userId) {
                   onClick={() => { setAuthTab(id); setServerError(""); }}
                   className="fx-tap tf-btn flex-1 flex items-center justify-center gap-1.5 rounded-[16px] py-2"
                   style={{
-                    background: active ? ЦВЕТ_КНОПКИ : "transparent",
+                    ...(active ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: "transparent" }),
                     color: active ? PRISM_TEXT : T.muted,
                     fontFamily: displayFont, fontWeight: 700, fontSize: 14,
                   }}
@@ -21801,7 +21773,7 @@ async function uploadAvatarIfNeeded(userId) {
                       disabled={!NICKNAME_RE.test(newNick.trim())}
                       className="fx-tap flex-1 flex items-center justify-center gap-1.5 rounded-[20px] px-4 py-2.5"
                       style={{
-                        background: NICKNAME_RE.test(newNick.trim()) ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+                        ...(NICKNAME_RE.test(newNick.trim()) ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
                         color: NICKNAME_RE.test(newNick.trim()) ? PRISM_TEXT : T.muted,
                         border: NICKNAME_RE.test(newNick.trim()) ? "none" : `1px solid ${T.line}`,
                         fontFamily: displayFont, fontWeight: 700, fontSize: 13.5,
