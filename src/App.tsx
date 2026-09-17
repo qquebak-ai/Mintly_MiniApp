@@ -20673,9 +20673,18 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     return (
       <div
         className={`fx-modal-back${closing ? " fx-out" : ""}`}
+        /* Карточка стоит на своём месте и не ездит.
+         *
+         * По центру экрана она оказывалась ровно там, куда выезжает
+         * клавиатура: телефон поднимал её вместе со всем окном, и экран
+         * прыгал при каждом касании поля. Поэтому карточка прижата к
+         * верхней трети — над клавиатурой, — а прокрутки здесь нет вовсе,
+         * двигать нечего. */
         style={{
           position: "fixed", inset: 0, zIndex: 60, background: "#000000",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px",
+          display: "flex", alignItems: "flex-start", justifyContent: "center",
+          padding: "calc(15vh + var(--tg-inset-top, 0px)) 20px 0",
+          overflow: "hidden",
         }}
       >
         <div
@@ -20730,7 +20739,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                     <input
                       value={tgNick}
                       onChange={(e) => { setTgNick(e.target.value.replace(/[^A-Za-z0-9_.]/g, "")); setTgNickTouched(true); setTgError(""); }}
-                      placeholder="leo_builds"
+                      // Без примера имени: собачка слева и так говорит, что
+                      // сюда пишут ник, а чужое имя в поле некоторые
+                      // принимали за уже занятое место.
+                      placeholder=""
                       maxLength={20}
                       spellCheck={false}
                       autoCapitalize="off"
