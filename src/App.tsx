@@ -2000,12 +2000,6 @@ function GlobalStyle() {
         50%  { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
       }
-      /* Белый блик по зелёной рамке. Слоёв два: заливка поля и сама рамка,
-         поэтому и положений два — первое стоит на месте, второе бежит. */
-      @keyframes рамкаПереливается {
-        from { background-position: 0 0, 0% 50%; }
-        to   { background-position: 0 0, 100% 50%; }
-      }
       @media (prefers-reduced-motion: reduce) {
         /* Блик идёт в одну сторону и начинает сначала: возврат читался бы
          качанием, а нужна пробежка. */
@@ -2014,7 +2008,6 @@ function GlobalStyle() {
         to   { background-position: 0% 50%; }
       }
       @keyframes кнопкаПереливается { from { background-position: 0% 50%; } to { background-position: 0% 50%; } }
-      @keyframes рамкаПереливается { from { background-position: 0 0, 0% 50%; } to { background-position: 0 0, 0% 50%; } }
       }
       /* Смена числа: цифры не подменяются молча, а коротко вспыхивают
          цветом движения и подскакивают. Так видно, что цена только что
@@ -20737,24 +20730,38 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   {/* Собачка приклеена к полю, а не набирается руками: ник
                       хранится без неё, и человеку не нужно про это знать. */}
                   <div className="flex items-center" style={{
+                    position: "relative",
                     gap: 2, padding: "14px 15px", borderRadius: 18,
-                    /* Годный ник — живая рамка: по зелёному бежит белый
-                       блик. Рамка рисуется вторым слоем заливки (тем же
-                       приёмом, что и переливы на кнопках): у border-color
-                       градиента не бывает, а гонять тень вокруг поля
-                       дороже и заметнее по краям. */
-                    ...(никГоден ? {
-                      border: "1px solid transparent",
-                      background: `linear-gradient(${T.surfaceHi}, ${T.surfaceHi}) padding-box,`
-                        + ` linear-gradient(100deg, ${T.up} 0%, ${T.up} 44%, #FFFFFF 50%, ${T.up} 56%, ${T.up} 100%) border-box`,
-                      backgroundSize: "auto, 300% 100%",
-                      animation: "рамкаПереливается 2.6s linear infinite",
-                    } : {
-                      background: T.surfaceHi,
-                      border: `1px solid ${tgNickTouched && !никГоден ? T.down : "transparent"}`,
-                      transition: "border-color 200ms ease",
-                    }),
+                    background: T.surfaceHi,
+                    border: `1px solid ${tgNickTouched && !никГоден ? T.down : "transparent"}`,
+                    transition: "border-color 260ms ease",
                   }}>
+                    {/* Живая рамка отдельным слоем поверх края.
+                        Она здесь всегда и только проявляется прозрачностью:
+                        подменять цвет рамки на градиент нечем — переходов
+                        между градиентами в CSS не бывает, а так зелёный
+                        проступает плавно и так же плавно уходит. Сам
+                        градиент рисуется вторым слоем заливки, тем же
+                        приёмом, что переливы на кнопках. */}
+                    <span
+                      aria-hidden
+                      style={{
+                        position: "absolute", inset: -1, borderRadius: 19, pointerEvents: "none",
+                        padding: 1,
+                        background: `linear-gradient(100deg, ${T.up} 0%, ${T.up} 44%, #FFFFFF 50%, ${T.up} 56%, ${T.up} 100%)`,
+                        backgroundSize: "300% 100%",
+                        animation: "бликБежит 4.6s linear infinite",
+                        /* Вырезаем середину: остаётся ровно кромка в точку
+                           толщиной. Без этого зелёным заливало всё поле —
+                           градиент лежит под содержимым, а не вокруг него. */
+                        WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+                        WebkitMaskComposite: "xor",
+                        mask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+                        maskComposite: "exclude",
+                        opacity: никГоден ? 1 : 0,
+                        transition: "opacity 320ms ease",
+                      }}
+                    />
                     <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 16 }}>@</span>
                     <input
                       value={tgNick}
@@ -20772,7 +20779,14 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                         color: T.ice, fontFamily: monoFont, fontSize: 16,
                       }}
                     />
-                    {никГоден && <Check size={17} strokeWidth={3} color={T.up} />}
+                    <span style={{
+                      display: "flex", flexShrink: 0, color: T.up,
+                      opacity: никГоден ? 1 : 0,
+                      transform: никГоден ? "scale(1)" : "scale(0.7)",
+                      transition: `opacity 260ms ease, transform ${SPRING}`,
+                    }}>
+                      <Check size={17} strokeWidth={3} />
+                    </span>
                   </div>
                   {tgNickTouched && !никГоден && (
                     <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12 }}>{t("nicknameError")}</span>
@@ -20789,15 +20803,30 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 disabled={!можно}
                 className="fx-tap w-full flex items-center justify-center"
                 style={{
+                  position: "relative", overflow: "hidden",
                   gap: 8, padding: "16px 0", borderRadius: 999, border: "none",
-                  background: можно ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+                  background: T.surfaceHi,
                   color: можно ? PRISM_TEXT : T.muted,
                   fontFamily: displayFont, fontWeight: 800, fontSize: 16,
+                  transition: "color 320ms ease",
                 }}
               >
-                {tgBusy || ждём
-                  ? <><RefreshCw size={15} style={{ animation: "spin360 1.1s linear infinite" }} /> {t("submittingText")}</>
-                  : входБезНика ? t("authSignInCta") : t("createCta")}
+                {/* Заливка лежит отдельным слоем и проявляется вместе с
+                    рамкой: у градиента нет переходов, и без этого кнопка
+                    загоралась рывком на первой же годной букве. */}
+                <span
+                  aria-hidden
+                  style={{
+                    position: "absolute", inset: 0, borderRadius: 999,
+                    background: ЦВЕТ_КНОПКИ, pointerEvents: "none",
+                    opacity: можно ? 1 : 0, transition: "opacity 320ms ease",
+                  }}
+                />
+                <span className="flex items-center justify-center" style={{ position: "relative", gap: 8 }}>
+                  {tgBusy || ждём
+                    ? <><RefreshCw size={15} style={{ animation: "spin360 1.1s linear infinite" }} /> {t("submittingText")}</>
+                    : входБезНика ? t("authSignInCta") : t("createCta")}
+                </span>
               </button>
 
               {/* Мимо этого экрана хода нет: без аккаунта в приложении
