@@ -378,7 +378,7 @@ const STR = {
     walletMakeBody: "Отправляй и получай средства за считанные доли секунды, наслаждайся мгновенными переводами и торгуй своими активами без лишних задержек.",
     walletMakeCta: "Создать кошелёк",
     walletMakeWait: "Заводим кошелёк…",
-    seedTitle: "Двадцать четыре слова",
+    seedTitle: "24 слова",
     seedBody: "Перепиши их по порядку и держи подальше от телефона. Кто знает эти слова — распоряжается кошельком, и показываем мы их один раз.",
     seedCopy: "Скопировать",
     seedCopied: "Слова скопированы",
@@ -1025,7 +1025,7 @@ const STR = {
     walletMakeBody: "Send and receive in seconds, enjoy instant transfers and trade your assets with no delays in between.",
     walletMakeCta: "Create a wallet",
     walletMakeWait: "Setting up the wallet…",
-    seedTitle: "Twenty-four words",
+    seedTitle: "24 words",
     seedBody: "Write them down in order and keep them away from your phone. Whoever knows these words owns the wallet, and we show them once.",
     seedCopy: "Copy",
     seedCopied: "Words copied",
@@ -14202,9 +14202,11 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
          тогда стоит у нижнего края, а не посреди пустоты. */
       minHeight: `calc(100vh - ${contentTopPad(insetTop) + 96 + insetBottom}px)`,
     }}>
-      <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
-        {t("navWallet")}
-      </h1>
+      {шаг === "начало" && (
+        <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
+          {t("navWallet")}
+        </h1>
+      )}
 
       {шаг === "начало" ? (
         /* Подложки под текстом нет: карточка посреди пустого экрана
@@ -14239,10 +14241,10 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
       ) : шаг === "слова" ? (
         <div className="flex flex-col" style={{ gap: 14 }}>
           <div className="flex flex-col" style={{ gap: 6 }}>
-            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em" }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em" }}>
               {t("seedTitle")}
             </span>
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5 }}>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, fontWeight: 600, lineHeight: 1.5 }}>
               {t("seedBody")}
             </span>
           </div>
@@ -14294,10 +14296,10 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
       ) : (
         <div className="flex flex-col" style={{ gap: 14 }}>
           <div className="flex flex-col" style={{ gap: 6 }}>
-            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em" }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em" }}>
               {t("seedCheckTitle")}
             </span>
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5 }}>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, fontWeight: 600, lineHeight: 1.5 }}>
               {t("seedCheckBody")}
             </span>
           </div>
