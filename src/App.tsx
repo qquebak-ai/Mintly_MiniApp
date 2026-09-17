@@ -10686,7 +10686,7 @@ function ЭкранНастроек({ открыт, onClose, profile, accountCre
  * внутри него. Меню выкладывает эти двери в один список и закрывается
  * тем же движением, каким открылось.
  */
-function БоковоеМеню({ открыто, onClose, profile, accountCreated, supportUnread = 0, onПункт, onВход, insetTop = 0, insetBottom = 0 }) {
+function БоковоеМеню({ открыто, onClose, profile, accountCreated, supportUnread = 0, onПункт, onВход, фразаЖдёт = false, insetTop = 0, insetBottom = 0 }) {
   const [уходит, setУходит] = useState(false);
   const [тяга, setТяга] = useState(0);
   const жест = useRef(null);
@@ -10740,6 +10740,10 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
     { key: "achievements", icon: Crown, label: t("achTitleShort") },
     { key: "shop", icon: ShoppingBag, label: t("navShop") },
     { key: "wallet", icon: Wallet, label: t("navWallet") },
+    /* Пока копия фразы не сделана, пункт стоит здесь и с красной точкой.
+       В самом кошельке он занимал первую строку над балансом — а нужен
+       он один раз, и место над деньгами дороже. */
+    ...(фразаЖдёт ? [{ key: "secret", icon: Lock, label: t("secretTitle"), точка: true }] : []),
   ];
   const низ = [
     { key: "settings", icon: Settings, label: t("settings") },
@@ -10756,6 +10760,9 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
       <span className="flex-1 truncate text-left" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>
         {item.label}
       </span>
+      {item.точка && (
+        <span aria-hidden style={{ width: 9, height: 9, borderRadius: "50%", background: T.down, flexShrink: 0 }} />
+      )}
       {item.метка > 0 && (
         <span style={{
           minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
@@ -14550,7 +14557,7 @@ function МастерФразы({
   );
 }
 
-function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none" }) {
+function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none", фраза = null, setФраза = () => {}, запросФразы = 0 }) {
   // Вид карты берём из купленного в магазине; неизвестный id — обычная
   // карта Mintly, а не пустая заливка.
   const видКарты = WALLET_SKIN_BY_ID[скинКарты] || WALLET_SKIN_BY_ID.none;
@@ -14565,8 +14572,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   /* Что с фразой кошелька. null — ещё спрашиваем; started=false — раздел
      показывает заведение; started && !ready — кошелёк работает, но копия
      не сделана, и наверху висит строка «Секретная фраза». */
-  const [фраза, setФраза] = useState(null);
   const [фразаОткрыта, setФразаОткрыта] = useState(false);
+  // Пришли из меню по пункту «Секретная фраза» — открываем длинную дорогу.
+  useEffect(() => { if (запросФразы) setФразаОткрыта(true); }, [запросФразы]);
+  useEffect(() => { if (фраза && фраза.готово) setФразаОткрыта(false); }, [фраза]);
   const [обменОткрыт, setОбменОткрыт] = useState(false);
   const [получитьОткрыт, setПолучитьОткрыт] = useState(false);
   const [выводОткрыт, setВыводОткрыт] = useState(false);
@@ -14618,22 +14627,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     if (s) setВнутр(s);
     if (t) setВнутрTON(t);
   }, []);
-
-  useEffect(() => {
-    let жив = true;
-    (async () => {
-      try {
-        const { состояниеФразы } = await import("./appWallet");
-        const о = await состояниеФразы();
-        if (жив) setФраза({ готово: !!(о && о.ready), начато: !!(о && (о.started || о.ready)) });
-      } catch {
-        // Сервер не ответил — кошелёк не запираем: деньги должны быть
-        // видны, даже когда отметка недоступна.
-        if (жив) setФраза({ готово: true, начато: true });
-      }
-    })();
-    return () => { жив = false; };
-  }, [userId]);
 
   useEffect(() => {
     let жив = true;
@@ -14795,37 +14788,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           {t("navWallet")}
         </h1>
       </div>
-
-      {/* Копия фразы отложена — строка висит первой и с красной точкой.
-          Без неё «потом запишу» превращается в «никогда»: напомнить об
-          этом больше нечем, а без фразы кошелёк не вернуть. */}
-      {фраза && фраза.начато && !фраза.готово && (
-        <button
-          onClick={() => { setФразаОткрыта(true); haptic("light"); }}
-          className="fx-tap w-full flex items-center"
-          style={{
-            gap: 12, margin: "0 16px 14px", width: "calc(100% - 32px)",
-            padding: "13px 14px", borderRadius: 20,
-            background: T.surface, border: "none",
-          }}
-        >
-          <span className="flex items-center justify-center flex-shrink-0" style={{
-            width: 36, height: 36, borderRadius: 999, background: hexA("#F5A623", 0.16), color: "#F5A623",
-          }}>
-            <Lock size={17} />
-          </span>
-          <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 2 }}>
-            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 800 }}>
-              {t("secretTitle")}
-            </span>
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>
-              {t("secretRowHint")}
-            </span>
-          </span>
-          <span aria-hidden style={{ width: 9, height: 9, borderRadius: "50%", background: T.down, flexShrink: 0 }} />
-          <ChevronRight size={16} color={T.faint} />
-        </button>
-      )}
 
       {/* Карта баланса. Сумма читается одним взглядом: целые рубли
           крупно и белым, копейки приглушены — так глаз не спотыкается о
@@ -24528,6 +24490,29 @@ function mapTokenRow(row) {
   // не подтянутся кошелёк и курс — TonConnect восстанавливает сессию
   // асинхронно, и сразу после запуска адреса ещё нет.
   const [сразуВКошелёк, setСразуВКошелёк] = useState(false);
+  /* Что с фразой кошелька. Живёт в корне, а не в кошельке: о ней должно
+     знать и боковое меню — там висит пункт «Секретная фраза» с красной
+     точкой, пока копия не сделана. */
+  const [фразаКошелька, setФразаКошелька] = useState(null);
+  // Счётчик нажатий на пункт меню: кошелёк по нему открывает длинную дорогу.
+  const [запросФразы, setЗапросФразы] = useState(0);
+
+  useEffect(() => {
+    if (!accountCreated || !userId) { setФразаКошелька(null); return undefined; }
+    let жив = true;
+    (async () => {
+      try {
+        const { состояниеФразы } = await import("./appWallet");
+        const о = await состояниеФразы();
+        if (жив) setФразаКошелька({ готово: !!(о && о.ready), начато: !!(о && (о.started || о.ready)) });
+      } catch {
+        // Сервер не ответил — кошелёк не запираем: деньги должны быть
+        // видны, даже когда отметка недоступна.
+        if (жив) setФразаКошелька({ готово: true, начато: true });
+      }
+    })();
+    return () => { жив = false; };
+  }, [accountCreated, userId]);
   // Заказан ли залп конфетти: ставится, когда аккаунт создан и карточка
   // уходит с экрана.
   const [залпНаГлавной, setЗалпНаГлавной] = useState(false);
@@ -25414,6 +25399,9 @@ function mapTokenRow(row) {
               onGoTab={goTab}
               insetTop={insetTop}
               insetBottom={insetBottom}
+              фраза={фразаКошелька}
+              setФраза={setФразаКошелька}
+              запросФразы={запросФразы}
             />
           </KeepAlive>
           <div className="px-4">
@@ -25489,12 +25477,14 @@ function mapTokenRow(row) {
           accountCreated={accountCreated}
           supportUnread={supportUnread}
           onВход={openLoginProfile}
+          фразаЖдёт={!!(фразаКошелька && фразаКошелька.начато && !фразаКошелька.готово)}
           insetTop={insetTop}
           insetBottom={insetBottom}
           onПункт={(ключ) => {
             if (ключ === "profile") { goTab("profile"); return; }
             if (ключ === "achievements") { открытьДостижения("home"); return; }
             if (ключ === "shop" || ключ === "wallet") { goTab(ключ); return; }
+            if (ключ === "secret") { goTab("wallet"); setЗапросФразы((н) => н + 1); return; }
             if (ключ === "settings") { setНастройкиОткрыты(true); return; }
             if (ключ === "support") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "support")); return; }
           }}
