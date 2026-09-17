@@ -12415,14 +12415,21 @@ function черезПоле(текст) {
  * адрес кошелька — не то, что стоит отправлять чужому серверу ради
  * картинки.
  */
-function ЭкранПолучить({ открыт, onClose, адрес = "", сеть = "Solana", showToast = () => {}, insetTop = 0, insetBottom = 0 }) {
+function ЭкранПолучить({ открыт, onClose, адрес = "", адреса = null, сеть = "Solana", showToast = () => {}, insetTop = 0, insetBottom = 0 }) {
+  /* Какую сеть пополняем. Адрес у каждой свой, и перевод, ушедший не в ту
+     сеть, не возвращается — поэтому выбор стоит здесь, рядом с кодом, а
+     не где-то в настройках экрана. */
+  const [сетьПрихода, setСетьПрихода] = useState("sol");
+  useEffect(() => { if (открыт) setСетьПрихода("sol"); }, [открыт]);
+  const адресСети = адреса ? (сетьПрихода === "ton" ? адреса.ton : адреса.sol) || "" : адрес;
+  const подписьСети = адреса ? (сетьПрихода === "ton" ? ТИКЕР_TON : "Solana") : сеть;
   const [код, setКод] = useState(null);
   // Кнопка отвечает сама: подтверждение прямо на ней надёжнее всплывающей
   // подсказки — та живёт наверху экрана, а палец в этот момент внизу.
   const [скопировано, setСкопировано] = useState(false);
 
   useEffect(() => {
-    if (!открыт || !адрес) { setКод(null); return; }
+    if (!открыт || !адресСети) { setКод(null); return; }
     let брошено = false;
     (async () => {
       try {
@@ -12430,17 +12437,17 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
         // Матрица, а не готовая картинка: код рисуем сами точками и
         // скруглёнными углами — квадратная сетка из коробки выглядит как
         // распечатка с чека, а не как часть приложения.
-        const сетка = QR.create(адрес, { errorCorrectionLevel: "H" });
+        const сетка = QR.create(адресСети, { errorCorrectionLevel: "H" });
         if (!брошено) setКод(кодВSVG(сетка));
       } catch { if (!брошено) setКод(null); }
     })();
     return () => { брошено = true; };
-  }, [открыт, адрес]);
+  }, [открыт, адресСети]);
 
-  const короткий = адрес ? `${адрес.slice(0, 6)}…${адрес.slice(-6)}` : "";
+  const короткий = адресСети ? `${адресСети.slice(0, 6)}…${адресСети.slice(-6)}` : "";
 
   function копировать() {
-    if (!адрес) { showToast(t("needAccountShort")); return; }
+    if (!адресСети) { showToast(t("needAccountShort")); return; }
     /* Отклик — первым делом. Буфер обмена в webview Telegram отвечает
        по-разному: где-то отдаёт обещание, где-то бросает прямо на вызове,
        а где-то его нет вовсе. Если сначала копировать, а потом красить
@@ -12448,20 +12455,20 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
     setСкопировано(true);
     haptic("light");
     setTimeout(() => setСкопировано(false), 1600);
-    скопироватьВБуфер(адрес);
+    скопироватьВБуфер(адресСети);
   }
 
   async function поделиться() {
-    if (!адрес) return;
+    if (!адресСети) return;
     haptic("light");
     // В Telegram делимся его же окном, снаружи — системным.
     const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
     if (tg && tg.openTelegramLink) {
-      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(адрес)}`);
+      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(адресСети)}`);
       return;
     }
     try {
-      if (navigator.share) { await navigator.share({ text: адрес }); return; }
+      if (navigator.share) { await navigator.share({ text: адресСети }); return; }
     } catch { /* отменили — молчим */ }
     копировать();
   }
@@ -12469,6 +12476,29 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
   return (
     <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={t("receiveTitle")} insetTop={insetTop} insetBottom={insetBottom}>
       <div className="flex flex-col items-center justify-center" style={{ flex: 1, minHeight: 0, padding: "0 18px", gap: 18 }}>
+        {/* Сеть выбирают здесь же: перевод, ушедший не в ту сеть, не
+            возвращается, и выбор должен стоять рядом с кодом. */}
+        {адреса && (
+          <div className="flex" style={{ gap: 8, width: "100%", maxWidth: 330 }}>
+            {[{ ключ: "sol", имя: "Solana", лого: "/coins/sol.png" }, { ключ: "ton", имя: "Gram", лого: "/coins/gram.png" }].map((м) => (
+              <button
+                key={м.ключ}
+                onClick={() => { setСетьПрихода(м.ключ); haptic("light"); }}
+                className="fx-tap flex items-center justify-center"
+                style={{
+                  flex: 1, gap: 8, padding: "12px 0", borderRadius: 999, border: "none",
+                  background: сетьПрихода === м.ключ ? T.surfaceHi : "transparent",
+                  color: сетьПрихода === м.ключ ? T.ice : T.muted,
+                  fontFamily: displayFont, fontSize: 14.5, fontWeight: 700,
+                  transition: "background 200ms ease, color 200ms ease",
+                }}
+              >
+                <img src={м.лого} alt="" style={{ width: 20, height: 20, borderRadius: "50%" }} />
+                {м.имя}
+              </button>
+            ))}
+          </div>
+        )}
         <div
           className="flex items-center justify-center"
           style={{
@@ -12479,7 +12509,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
         >
           {код ? (
             <img src={код} alt="" style={{ width: "100%", height: "100%", display: "block" }} />
-          ) : адрес ? (
+          ) : адресСети ? (
             <div style={{ width: 120, height: 10, borderRadius: 999, background: T.surface, overflow: "hidden" }}>
               <div style={{ width: "40%", height: "100%", borderRadius: 999, background: hexA("#8E2DE2", 0.55), animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
             </div>
@@ -12503,7 +12533,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
                   стоял Solana всегда, и над адресом TON висел чужой
                   знак — самая дорогая ошибка из возможных. */}
               <img
-                src={сеть === "Solana" ? "/coins/sol.png" : "/coins/gram.png"}
+                src={подписьСети === "Solana" ? "/coins/sol.png" : "/coins/gram.png"}
                 alt=""
                 width={44}
                 height={44}
@@ -12519,7 +12549,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", с
           style={{ gap: 8, background: "transparent", border: "none", padding: 0, maxWidth: "100%" }}
         >
           <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
-            {сеть} · <span style={{ color: T.muted }}>{короткий}</span>
+            {подписьСети} · <span style={{ color: T.muted }}>{короткий}</span>
           </span>
           {/* Значок по делу: строка копирует адрес, а стрелка вниз обещала
               список, которого нет. */}
@@ -12652,8 +12682,8 @@ function адресTonОк(строка) {
 }
 
 function ЭкранВывода({
-  открыт, onClose, сеть = "sol", остаток = 0, курс = 0, единица = "SOL", свой = "",
-  пределЗаСутки = null, userId = null,
+  открыт, onClose, сеть: сетьПоУмолчанию = "sol", остаток = 0, курс = 0, единица = "SOL", свой = "",
+  остатки = null, курсы = null, пределЗаСутки = null, userId = null,
   showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0,
 }) {
   // Три шага: «кому», «сколько» и код с почты. Один экран с обоими полями
@@ -12661,6 +12691,17 @@ function ЭкранВывода({
   // потерянные деньги, и его стоит подтвердить отдельно.
   const [шаг, setШаг] = useState("адрес");
   const [адрес, setАдрес] = useState("");
+  /* Сеть спрашивать не надо: её видно по самому адресу. У TON он
+     начинается с UQ/EQ и длиной в сорок восемь знаков, у Solana это
+     base58 без такого начала — перепутать нельзя, а лишний переключатель
+     перед вводом только заставлял помнить, куда именно идёт перевод. */
+  const сеть = useMemo(() => {
+    const чист = String(адрес || "").trim();
+    if (!чист) return сетьПоУмолчанию;
+    if (адресTonОк(чист)) return "ton";
+    if (адресSolanaОк(чист)) return "sol";
+    return /^[UEK]Q/i.test(чист) ? "ton" : сетьПоУмолчанию;
+  }, [адрес, сетьПоУмолчанию]);
   const [ввод, setВвод] = useState("");
   /* В чём считаем. По умолчанию — в самой монете: выводят SOL и GRAM, а
      не доллары, и пересчёт по курсу в такой сумме только мешает — на
@@ -12697,17 +12738,23 @@ function ЭкранВывода({
      комиссии: сеть не разрешает оставить счёт с остатком ниже платы за
      хранение (0.00089 SOL) — перевод всего баланса она просто
      отклоняла. Держим ровно столько же, сколько сервер. */
+  /* Остаток, курс и подпись — той сети, что определилась по адресу.
+     Снаружи приходят обе, иначе при смене сети на лету экран показывал
+     бы чужие деньги. */
+  const остатокСети = остатки ? Number(сеть === "ton" ? остатки.ton : остатки.sol) || 0 : остаток;
+  const курсСети2 = курсы ? Number(сеть === "ton" ? курсы.ton : курсы.sol) || 0 : курс;
+  const единицаСети = сеть === "ton" ? ТИКЕР_TON : "SOL";
   const запас = сеть === "ton" ? 0.05 : 0.0014;
   /* Свободно — не весь остаток: из него уходит запас на комиссию, а
      сверху лежит суточный предел вывода. Без предела «100%» набирала
      сумму, которую сервер всё равно отклонял. */
-  const безЗапаса = Math.max(0, Number(остаток) - запас);
+  const безЗапаса = Math.max(0, остатокСети - запас);
   const свободно = пределЗаСутки == null ? безЗапаса : Math.max(0, Math.min(безЗапаса, пределЗаСутки));
   // Предел ниже остатка — значит человек упирается в него, а не в деньги.
   const упёрлисьВПредел = пределЗаСутки != null && пределЗаСутки < безЗапаса - 1e-9;
   const набрано = Number(String(ввод).replace(",", ".")) || 0;
   // Сколько монет уйдёт на самом деле.
-  const монет = вДолларах ? (курс > 0 ? набрано / курс : 0) : набрано;
+  const монет = вДолларах ? (курсСети2 > 0 ? набрано / курсСети2 : 0) : набрано;
   const вДеньгах = вДолларах ? набрано : набрано * курс;
   const многовато = монет > свободно + 1e-9;
   /* Разбор адреса. Пока человек набирает первые знаки, молчим: красная
@@ -12743,7 +12790,7 @@ function ЭкранВывода({
     const монеты = свободно * часть;
     setВсё(часть === 1);
     setВвод(вДолларах
-      ? (курс > 0 ? (монеты * курс).toFixed(2) : "0")
+      ? (курсСети2 > 0 ? (монеты * курсСети2).toFixed(2) : "0")
       : String(Number(монеты.toFixed(9))));
     haptic("light");
   }
@@ -12873,7 +12920,7 @@ function ЭкранВывода({
       const шлём = сеть === "ton" ? кошелёк.вывестиСВнутреннегоTON : кошелёк.вывестиСВнутреннего;
       const ответ = await шлём({ amount: монет, all: всё, адрес: адрес.trim() });
       const ушло = ответ && ответ.sent != null ? Number(ответ.sent) : (ответ && ответ.amount != null ? Number(ответ.amount) : монет);
-      showToast(tf("withdrawSent", { sum: `${fmtСумма(ушло)} ${единица}` }));
+      showToast(tf("withdrawSent", { sum: `${fmtСумма(ушло)} ${единицаСети}` }));
       // В тестовой сети перевод легко счесть пропавшим: кошелёк
       // получателя по умолчанию смотрит в боевую.
       if (тестовая) setTimeout(() => showToast(t("withdrawTestnetHint")), 2600);
@@ -13134,7 +13181,7 @@ function ЭкранВывода({
 
           <div className="flex flex-col" style={{ marginTop: "auto", gap: 3, paddingBottom: 4 }}>
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
-              {fmtСумма(монет)} {единица}
+              {fmtСумма(монет)} {единицаСети}
             </span>
             <span className="truncate" style={{ fontFamily: monoFont, color: T.faint, fontSize: 12 }}>{короткий}</span>
           </div>
@@ -13224,11 +13271,11 @@ function ЭкранВывода({
             wordBreak: "break-all",
           }}
         >
-          {вДолларах ? `$${ввод || "0"}` : `${ввод || "0"} ${единица}`}
+          {вДолларах ? `$${ввод || "0"}` : `${ввод || "0"} ${единицаСети}`}
         </button>
         <span style={{ marginTop: 10, fontFamily: monoFont, color: T.faint, fontSize: 14 }}>
           {вДолларах
-            ? `${fmtСумма(курс > 0 ? набрано / курс : 0)} ${единица}`
+            ? `${fmtСумма(курсСети2 > 0 ? набрано / курсСети2 : 0)} ${единицаСети}`
             : `$${вДеньгах.toFixed(2)}`}
         </span>
       </div>
@@ -13239,13 +13286,13 @@ function ЭкранВывода({
           действие только путала. */}
       <div className="flex flex-col" style={{ padding: "0 18px 12px", flexShrink: 0, gap: 3 }}>
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
-          {единица} <span style={{ color: T.muted, fontWeight: 500 }}>· {fmtСумма(свободно)} ({`$${(свободно * курс).toFixed(2)}`})</span>
+          {единицаСети} <span style={{ color: T.muted, fontWeight: 500 }}>· {fmtСумма(свободно)} ({`$${(свободно * курсСети2).toFixed(2)}`})</span>
         </span>
         {/* Почему доступно меньше, чем на кошельке: предел, а не деньги.
             Без этой строки «100%» выглядела ошибкой счёта. */}
         {упёрлисьВПредел && (
           <span style={{ fontFamily: bodyFont, color: T.warning, fontSize: 12.5 }}>
-            {tf("withdrawLimitHint", { left: `${fmtСумма(пределЗаСутки)} ${единица}` })}
+            {tf("withdrawLimitHint", { left: `${fmtСумма(пределЗаСутки)} ${единицаСети}` })}
           </span>
         )}
       </div>
@@ -14739,6 +14786,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const адресВнутри = текущий && текущий.address ? текущий.address : "";
   const balance = useCountUp(наКошельке, 900, !!адресВнутри);
   const usd = useCountUp(наКошельке * курсСети, 900, !!адресВнутри);
+  /* На карте — весь кошелёк одной суммой в долларах. Монет две, и
+     показывать одну из них значило врать про остаток: человек видел
+     ноль SOL и считал, что кошелёк пуст, пока на нём лежал GRAM. */
+  const всегоВДолларах = солНаКошельке * курсSol + тонНаКошельке * tonPriceUsd;
+  const итог = useCountUp(всегоВДолларах, 900, !!адресВнутри);
   const short = адресВнутри ? `${адресВнутри.slice(0, 4)}…${адресВнутри.slice(-4)}` : "";
 
   function скопироватьАдрес() {
@@ -14958,15 +15010,14 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           {(() => {
             // Вниз, а не по правилам округления: баланс не должен обещать
             // больше, чем на кошельке есть.
-            const [цел, дроб] = (Math.floor(Math.max(0, balance) * 100) / 100).toFixed(2).split(".");
+            const [цел, дроб] = (Math.floor(Math.max(0, итог) * 100) / 100).toFixed(2).split(".");
             return (
               <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#FFFFFF" }}>
-                {Number(цел).toLocaleString("ru-RU")}
+                ${Number(цел).toLocaleString("ru-RU")}
                 <span style={{ color: hexA("#FFFFFF", 0.55) }}>{`,${дроб}`}</span>
               </span>
             );
           })()}
-          <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.7), fontSize: 14 }}>{единица}</span>
         </div>
         <span
           className="inline-flex items-center"
@@ -14977,7 +15028,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             minHeight: 24,
           }}
         >
-          {курсСети > 0 ? `≈ $${usd.toFixed(2)}` : "—"}
+          {`${fmtСумма(солНаКошельке)} SOL · ${fmtСумма(тонНаКошельке)} ${ТИКЕР_TON}`}
         </span>
         {/* Мягкая кромка: рисунок сходит на нет у самого края, и карта
             не выглядит обрезанной по линейке.
@@ -15174,6 +15225,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         открыт={получитьОткрыт}
         onClose={() => setПолучитьОткрыт(false)}
         адрес={адресВнутри}
+        адреса={{
+          sol: внутр && внутр.address ? внутр.address : "",
+          ton: внутрTON && внутрTON.address ? внутрTON.address : "",
+        }}
         сеть={вTON ? ТИКЕР_TON : "Solana"}
         showToast={showToast}
         insetTop={insetTop}
@@ -15186,6 +15241,8 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         сеть={вTON ? "ton" : "sol"}
         свой={адресВнутри}
         userId={userId}
+        остатки={{ sol: солНаКошельке, ton: тонНаКошельке }}
+        курсы={{ sol: курсSol, ton: tonPriceUsd }}
         остаток={наКошельке}
         пределЗаСутки={пределЗаСутки}
         курс={курсСети}
