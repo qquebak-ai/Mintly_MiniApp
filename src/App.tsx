@@ -7679,7 +7679,7 @@ function PublicProfileView({ userId: ownerId, currentUserId, onBack, onOpenToken
               <div style={{
                 width: "100%", height: "100%", borderRadius: "50%",
                 background: profile.avatar_url ? `center/cover no-repeat url(${profile.avatar_url})` : T.surfaceHi,
-                border: frame === "none" ? `2px solid ${T.lineHi}` : "none",
+                border: frame === "none" ? ОБОД_ЛИЦА : "none",
                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52,
               }}>
                 {!profile.avatar_url && <БукваАватара ник={profile.nickname} size={128} />}
@@ -8434,6 +8434,12 @@ const РАДУГА_КОНВЕРТА = {
    клавиши — на экране создания это выглядело припадком. Первая буква
    меняться уже не будет, а золотой угол разводит соседние буквы по разным
    краям круга: «a» и «b» не выходят одинаково зелёными. */
+/* Кромка вокруг аватарки — одна на всё приложение: чёрная и
+   полупрозрачная. Светлое кольцо читалось оправой и спорило с самим
+   лицом, особенно с буквенным: у него свой цвет, и обводка поверх
+   выглядела лишней деталью. Чёрное просто отделяет кружок от подложки. */
+const ОБОД_ЛИЦА = "1.5px solid rgba(0, 0, 0, 0.55)";
+
 function оттенокНика(ник) {
   const первая = String(ник || "?").trim().charAt(0).toLowerCase();
   const код = первая.charCodeAt(0) || 63;
@@ -8474,7 +8480,7 @@ function ЛицоЧеловека({ ник, src, size = 40, рамка }) {
       style={{
         width: size, height: size, borderRadius: "50%", overflow: "hidden",
         background: src ? `center/cover no-repeat url(${src})` : T.surfaceHi,
-        border: рамка === null ? "none" : (рамка || `1px solid ${T.lineHi}`),
+        border: рамка === null ? "none" : (рамка || ОБОД_ЛИЦА),
       }}
     >
       {!src && <БукваАватара ник={ник} size={size} />}
@@ -10784,6 +10790,7 @@ function ТопСтрока({ onOpenToken, onOpenProfile, live = [] }) {
                 <div style={{
                   width: "100%", height: "100%", borderRadius: "50%",
                   background: э.avatar_url ? `center/cover no-repeat url(${э.avatar_url})` : T.surfaceHi,
+                  border: ОБОД_ЛИЦА,
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
                 }}>{!э.avatar_url && <БукваАватара ник={э.nickname} size={30} />}</div>
               </AvatarFrame>
@@ -10969,7 +10976,7 @@ function ЭкранНастроек({ открыт, onClose, profile, accountCre
           <span className="flex items-center justify-center" style={{
             width: 42, height: 42, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
             background: аватар ? `center/cover no-repeat url(${аватар})` : T.surface,
-            border: `1px solid ${T.lineHi}`,
+            border: ОБОД_ЛИЦА,
           }}>
             {!аватар && accountCreated && profile && profile.nickname && (
               <БукваАватара ник={profile.nickname} size={42} />
@@ -11145,7 +11152,7 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
             style={{
               width: 62, height: 62, borderRadius: "50%", overflow: "hidden",
               background: аватар ? `center/cover no-repeat url(${аватар})` : T.surfaceHi,
-              border: `1.5px solid ${T.lineHi}`,
+              border: ОБОД_ЛИЦА,
             }}
           >
             {!аватар && accountCreated && profile && profile.nickname && (
@@ -11204,7 +11211,7 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
         className={грузится ? "fx-skeleton" : undefined}
         style={{
           width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
-          border: `1.5px solid ${T.lineHi}`, overflow: "hidden",
+          border: ОБОД_ЛИЦА, overflow: "hidden",
           // Пока картинки нет — ровный тёмный кружок, а не серое пятно с
           // чужим значком внутри. А пока неизвестно, есть ли она вообще,
           // кружок мерцает вместе с плашками имени.
@@ -15119,6 +15126,7 @@ function TokenComments({ tokenId, currentUserId, onNeedAuth, onOpenProfile, show
                   <div style={{
                     width: "100%", height: "100%", borderRadius: "50%",
                     background: c.avatar_url ? `center/cover no-repeat url(${c.avatar_url})` : T.surfaceHi,
+                    border: ОБОД_ЛИЦА,
                     display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
                   }}>
                     {!c.avatar_url && <БукваАватара ник={c.nickname} size={36} />}
@@ -15380,7 +15388,7 @@ function ЧатТокена({ tokenId, свой = false, currentUserId, onNeedAu
             ) : сообщения.map((м) => (
               <div key={м.id} className="flex" style={{ gap: 8, flexDirection: м.mine ? "row-reverse" : "row" }}>
                 <span className="flex items-center justify-center" style={{
-                  width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                  width: 26, height: 26, borderRadius: "50%", flexShrink: 0, border: ОБОД_ЛИЦА,
                   background: м.avatarUrl ? `center/cover no-repeat url(${м.avatarUrl})` : T.surfaceHi,
                 }}>
                   {!м.avatarUrl && <БукваАватара ник={м.nickname} size={26} />}
@@ -16689,7 +16697,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
                   {h.профиль ? (
                     <div className="flex items-center" style={{ gap: 8, flex: 1, minWidth: 0 }}>
                       <div style={{
-                        width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                        width: 24, height: 24, borderRadius: "50%", flexShrink: 0, border: ОБОД_ЛИЦА,
                         display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
                         background: h.профиль.avatarUrl ? `center/cover no-repeat url(${h.профиль.avatarUrl})` : T.surfaceHi,
                       }}>
@@ -18993,7 +19001,7 @@ function PinLockScreen({ pin, profile, onUnlock, onForgot }) {
           <div style={{
             width: 76, height: 76, borderRadius: "50%", overflow: "hidden",
             background: profile && profile.avatarUrl ? `center/cover no-repeat url(${profile.avatarUrl})` : T.surfaceHi,
-            border: `1px solid ${T.lineHi}`, display: "flex", alignItems: "center", justifyContent: "center",
+            border: ОБОД_ЛИЦА, display: "flex", alignItems: "center", justifyContent: "center",
           }}>
             {!(profile && profile.avatarUrl) && (
               profile && profile.nickname
@@ -21101,7 +21109,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                        говорит, что здесь чего-то не хватает. Как только
                        загорается зелёная рамка поля, в кружке встаёт буква,
                        и кромка вокруг неё становится ровной. */
-                    border: лицо || никГоден ? `1px solid ${T.lineHi}` : `1px dashed ${T.lineHi}`,
+                    border: лицо || никГоден ? ОБОД_ЛИЦА : "1.5px dashed rgba(0, 0, 0, 0.55)",
                     transition: "border-color 260ms ease",
                   }}
                 >
@@ -21479,7 +21487,7 @@ async function uploadAvatarIfNeeded(userId) {
                 </button>
               </div>
             ) : (
-              <button onClick={() => avatarInputRef.current && avatarInputRef.current.click()} className="fx-tap flex flex-col items-center justify-center gap-1 overflow-hidden" style={{ width: 84, height: 84, borderRadius: "50%", background: avatarUrl ? `center/cover no-repeat url(${avatarUrl})` : T.bg, border: avatarUrl ? `1.5px solid ${T.lineHi}` : `1px dashed ${T.lineHi}` }}>
+              <button onClick={() => avatarInputRef.current && avatarInputRef.current.click()} className="fx-tap flex flex-col items-center justify-center gap-1 overflow-hidden" style={{ width: 84, height: 84, borderRadius: "50%", background: avatarUrl ? `center/cover no-repeat url(${avatarUrl})` : T.bg, border: avatarUrl ? ОБОД_ЛИЦА : "1.5px dashed rgba(0, 0, 0, 0.55)" }}>
                 {!avatarUrl && <БукваАватара ник={nickname || (initial && initial.nickname) || ""} size={84} />}
               </button>
             )}
@@ -21622,7 +21630,7 @@ function ProfileView({
             style={{ position: "relative", zIndex: 1, background: "transparent", border: "none", padding: 0, lineHeight: 0 }}
           >
             <AvatarFrame frameId={cosmetics.frame} size={100}>
-                <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: profile.avatarUrl ? `center/cover no-repeat url(${profile.avatarUrl})` : T.surfaceHi, border: cosmetics.frame === "none" ? (profile.avatarUrl ? `2px solid ${T.lineHi}` : `2px dashed ${T.lineHi}`) : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: accountCreated ? 52 : 40 }}>
+                <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: profile.avatarUrl ? `center/cover no-repeat url(${profile.avatarUrl})` : T.surfaceHi, border: cosmetics.frame === "none" ? ОБОД_ЛИЦА : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: accountCreated ? 52 : 40 }}>
                   {!profile.avatarUrl && (accountCreated && profile.nickname
                     ? <БукваАватара ник={profile.nickname} size={104} />
                     : <User size={40} color={T.muted} />)}
