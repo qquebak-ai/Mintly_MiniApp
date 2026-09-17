@@ -345,7 +345,10 @@ const STR = {
     laterBtn: "Позже",
     createMailLead: "Введи почту — на неё придёт код подтверждения",
     createdMailSent: "Письмо с кодом ушло на {mail}. Введи код — и почта привязана.",
+    createdMailSaved: "Почта {mail} привязана к аккаунту. Подтвердить её попросим уже внутри — письмо придёт по твоему нажатию.",
     mailLinkFailed: "Почту привязать не вышло: {msg}. Можно повторить.",
+    mailConfirmRow: "Подтверди почту",
+    mailConfirmHint: "Нажми — вышлем код на {mail}",
     enterCode: "Ввести код",
     enterApp: "Войти в приложение",
     openInTelegram: "Открыть в Telegram",
@@ -964,7 +967,10 @@ const STR = {
     laterBtn: "Later",
     createMailLead: "Enter your email — the confirmation code goes there",
     createdMailSent: "The code went to {mail}. Enter it and the email is linked.",
+    createdMailSaved: "{mail} is attached to the account. We'll ask you to confirm it inside the app — the letter goes out when you tap.",
     mailLinkFailed: "Couldn't link the email: {msg}. You can try again.",
+    mailConfirmRow: "Confirm your email",
+    mailConfirmHint: "Tap — we'll send a code to {mail}",
     enterCode: "Enter the code",
     enterApp: "Enter the app",
     openInTelegram: "Open in Telegram",
@@ -12418,6 +12424,11 @@ function HomeView({
           готовая строка — будто загрузилось только «я», а остальное
           сломалось. */}
       <ШапкаГлавной profile={profile} accountCreated={accountCreated} onOpenMyProfile={onOpenMyProfile} грузится={профильГрузится || вПлашках} />
+
+      {/* Почта, названная при создании аккаунта, ждёт подтверждения — и
+          просьба стоит первой строкой главной, а не в настройках, куда
+          никто не заходит. */}
+      <НапоминаниеПочты accountCreated={accountCreated} userId={userId} />
       {/* Баннеры ждут вместе со всеми: живая карусель посреди плашек
           выглядела так, будто остальной экран сломался. */}
       {вПлашках ? <ПлашкаБлока h={150} radius={20} /> : <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />}
@@ -20409,6 +20420,24 @@ async function почтаАккаунта() {
   return почтаНастоящая(м) ? м : "";
 }
 
+/* Почта, набранная при создании аккаунта.
+ *
+ * Письмо в ту минуту не уходит: человек только что придумал ник и ждёт
+ * приложение, а не почтовый ящик, — да и SMTP может не ответить, и тогда
+ * «аккаунт готов» кончался бы красной строкой про ошибку. Поэтому адрес
+ * просто привязывается к аккаунту (лежит в его метаданных), а подтвердить
+ * его просит уже плашка на главной — по нажатию и уходит код. */
+async function запомнитьПочту(почта) {
+  const { error } = await supabase.auth.updateUser({ data: { mail_pending: почта } });
+  if (error) throw error;
+}
+
+async function черновикПочты() {
+  const { data } = await supabase.auth.getUser();
+  const м = (data && data.user && data.user.user_metadata && data.user.user_metadata.mail_pending) || "";
+  return почтаНастоящая(м) ? м : "";
+}
+
 /* Кто пригласил. Telegram кладёт сюда то, что стояло после startapp= в
    ссылке приглашения. Значение только передаём — доверять ему нельзя,
    сервер сам проверит, что такой пользователь есть, что это не сам
@@ -20438,7 +20467,7 @@ function telegramStartParam() {
  * или ссылка — и мы принимаем оба пути: поле для кода и ожидание
  * перехода по ссылке идут рядом, а не вместо друг друга.
  */
-function ЭкранПочты({ открыт, onClose, onГотово = () => {}, почтаЗаранее = "", insetTop = 0, insetBottom = 0 }) {
+function ЭкранПочты({ открыт, onClose, onГотово = () => {}, почтаЗаранее = "", слатьСразу = false, insetTop = 0, insetBottom = 0 }) {
   const [шаг, setШаг] = useState("адрес");   // адрес | письмо | готово
   const [почта, setПочта] = useState("");
   const [код, setКод] = useState("");
@@ -20457,9 +20486,19 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
       if (!живо) return;
       setПривязана(м);
       if (м) { setПочта(м); setШаг("готово"); }
-      /* Письмо ушло раньше, при создании аккаунта: спрашивать адрес
-         второй раз незачем — открываемся сразу на поле кода. */
-      else if (почтаЗаранее) { setПочта(почтаЗаранее); setШаг("письмо"); }
+      /* Адрес человек назвал при создании аккаунта — второй раз спрашивать
+         его незачем. Открылись из плашки «подтверди почту» — тем же
+         движением и шлём письмо: нажатие на плашку и есть просьба о коде. */
+      else if (почтаЗаранее) {
+        setПочта(почтаЗаранее);
+        if (слатьСразу) послать(почтаЗаранее);
+        else setШаг("письмо");
+      } else {
+        // Открылись из настроек — адрес всё равно уже известен, набирать
+        // его второй раз незачем, достаточно нажать «отправить письмо».
+        const ч = await черновикПочты();
+        if (живо && ч) setПочта(ч);
+      }
       const { data } = await supabase.auth.getUser();
       const id = data && data.user && data.user.id;
       if (!id || !живо) return;
@@ -20501,12 +20540,16 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
   const годна = ПОЧТА_RE.test(чистая);
   const кодГоден = код.trim().length === 6;
 
-  async function послать() {
-    if (!годна || идёт) return;
+  // Адрес можно передать прямо сюда: при открытии из плашки состояние с
+  // почтой ещё не успело обновиться, а письмо надо слать уже сейчас.
+  async function послать(адресИли) {
+    const адрес = typeof адресИли === "string" ? адресИли.trim().toLowerCase() : чистая;
+    if (!ПОЧТА_RE.test(адрес) || идёт) return;
     setБеда("");
     setИдёт(true);
     try {
-      await привязатьПочту(чистая);
+      await привязатьПочту(адрес);
+      setПочта(адрес);
       setКод("");
       setШаг("письмо");
       haptic("light");
@@ -20614,7 +20657,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
               {беда || t("mail2faWaiting")}
             </span>
             <button
-              onClick={послать}
+              onClick={() => послать()}
               disabled={идёт}
               className="fx-tap"
               style={{
@@ -20650,7 +20693,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
 
       <div style={{ padding: "14px 18px 22px", flexShrink: 0 }}>
         <button
-          onClick={шаг === "готово" ? () => { onГотово(привязана); onClose(); } : шаг === "письмо" ? подтвердить : послать}
+          onClick={шаг === "готово" ? () => { onГотово(привязана); onClose(); } : шаг === "письмо" ? подтвердить : () => послать()}
           disabled={шаг === "адрес" ? (!годна || идёт) : шаг === "письмо" ? (!кодГоден || идёт) : false}
           className="fx-tap w-full"
           style={{
@@ -20664,6 +20707,65 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
         </button>
       </div>
     </ЭкранСнизу>
+  );
+}
+
+/* Плашка «подтверди почту» на главной.
+ *
+ * Адрес человек назвал при создании аккаунта, и письмо тогда не уходило —
+ * просьба о коде должна исходить от него, а не заставать посреди входа.
+ * Плашка и есть эта просьба: нажал — письмо ушло, открылось поле кода.
+ * Почта подтвердилась — плашка исчезает сама. */
+function НапоминаниеПочты({ accountCreated = false, userId = null }) {
+  const [черновик, setЧерновик] = useState("");
+  const [открыт, setОткрыт] = useState(false);
+
+  useEffect(() => {
+    if (!accountCreated || !userId) { setЧерновик(""); return undefined; }
+    let живо = true;
+    (async () => {
+      // Привязанная почта важнее черновика: подтвердили — напоминать не о чем.
+      const [привязана, ждёт] = await Promise.all([почтаАккаунта(), черновикПочты()]);
+      if (живо) setЧерновик(привязана ? "" : ждёт);
+    })();
+    return () => { живо = false; };
+  }, [accountCreated, userId, открыт]);
+
+  if (!черновик) return null;
+
+  return (
+    <>
+      <button
+        onClick={() => { setОткрыт(true); haptic("light"); }}
+        className="fx-tap w-full flex items-center"
+        style={{
+          gap: 12, padding: "13px 14px", borderRadius: 20,
+          background: hexA(T.electric, 0.1), border: `1px solid ${hexA(T.electric, 0.28)}`,
+        }}
+      >
+        <span className="flex items-center justify-center flex-shrink-0" style={{
+          width: 36, height: 36, borderRadius: 999, background: hexA(T.electric, 0.16), color: T.electric,
+        }}>
+          <Mail size={17} />
+        </span>
+        <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 800 }}>
+            {t("mailConfirmRow")}
+          </span>
+          <span className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>
+            {tf("mailConfirmHint", { mail: черновик })}
+          </span>
+        </span>
+        <ChevronRight size={16} color={T.faint} />
+      </button>
+      <ЭкранПочты
+        открыт={открыт}
+        почтаЗаранее={черновик}
+        слатьСразу
+        onClose={() => setОткрыт(false)}
+        onГотово={() => { setОткрыт(false); setЧерновик(""); }}
+      />
+    </>
   );
 }
 
@@ -20682,7 +20784,6 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const [почтаВвод, setПочтаВвод] = useState("");
   const [почтаБеда, setПочтаБеда] = useState("");
   const [естьАккаунт, setЕстьАккаунт] = useState(null); // null — ещё спрашиваем
-  const [почтаОткрыта, setПочтаОткрыта] = useState(false);
   /* Отступ карточки сверху считается один раз, при открытии, и дальше не
      пересчитывается. В долях экрана (vh) он зависел от высоты окна, а
      Telegram укорачивает окно на высоту клавиатуры — и карточка прыгала
@@ -20772,8 +20873,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     const ждём = внутриTelegram && естьАккаунт == null;
     const почтаЧистая = почтаВвод.trim().toLowerCase();
     const почтаГодна = ПОЧТА_RE.test(почтаЧистая);
-    // Письмо ушло — значит на карточке «готово» просят код, а не адрес.
-    const письмоУшло = шагВхода === "готово" && !!почтаЧистая && !почтаБеда;
+    // Почта привязалась молча, без письма — об этом и говорит карточка
+    // «аккаунт готов».
+    const почтаПривязана = шагВхода === "готово" && !!почтаЧистая && !почтаБеда;
     /* Кружок пустой, пока человек не выбрал картинку сам. Раньше сюда
        подставлялось лицо из Telegram — и выглядело это как «аватарка уже
        есть», хотя её никто не выбирал; поменять её при этом тоже не
@@ -20822,11 +20924,11 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             console.warn("[mintly] аватарка не загрузилась:", e && e.message);
           }
         }
-        /* Почта, набранная на первом шаге, привязывается сразу: письмо с
-           кодом уходит, пока человек ещё здесь. Не вышло — аккаунт всё
-           равно создан, а привязку можно повторить из карточки. */
+        /* Почта с первого шага привязывается к аккаунту здесь же, но
+           письмо не уходит: код человек запросит сам, плашкой на главной.
+           Так «аккаунт готов» не зависит от чужого почтового сервера. */
         if (почтаЧистая) {
-          try { await привязатьПочту(почтаЧистая); setПочтаБеда(""); }
+          try { await запомнитьПочту(почтаЧистая); setПочтаБеда(""); }
           catch (e) { setПочтаБеда(String((e && e.message) || "").slice(0, 120)); }
         }
         setШагВхода("готово");
@@ -21140,9 +21242,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             </>
           ) : (
             <>
-              {/* Аккаунт есть. Второй ключ предлагаем сразу, пока человек
-                  здесь: потом за этим нужно идти в настройки, а туда не
-                  идут. */}
+              {/* Аккаунт есть, почта к нему привязана. Подтверждать её
+                  здесь не заставляем: человек шёл в приложение, а не в
+                  почтовый ящик — напомним плашкой на главной. */}
               <div className="flex flex-col items-center text-center" style={{ gap: 12 }}>
                 <span className="flex items-center justify-center" style={{
                   width: 64, height: 64, borderRadius: "50%",
@@ -21157,32 +21259,22 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   </span>
                   <span style={{ fontFamily: bodyFont, color: почтаБеда ? T.down : T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
                     {почтаБеда ? tf("mailLinkFailed", { msg: почтаБеда })
-                      : письмоУшло ? tf("createdMailSent", { mail: почтаЧистая })
+                      : почтаПривязана ? tf("createdMailSaved", { mail: почтаЧистая })
                       : t("createdBody")}
                   </span>
                 </div>
               </div>
 
+              {/* Дальше только одна дорога — внутрь. Почта уже привязана, а
+                  код за ней человек запросит плашкой на главной, когда
+                  сам захочет; здесь письма не ждут. */}
               <button
-                onClick={() => { setПочтаОткрыта(true); haptic("light"); }}
+                onClick={() => { onСоздан(); onClose(); }}
                 className="fx-tap w-full flex items-center justify-center"
                 style={{
                   gap: 8, padding: "16px 0", borderRadius: 999, border: "none",
                   ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT,
                   fontFamily: displayFont, fontWeight: 800, fontSize: 16,
-                }}
-              >
-                <Mail size={16} /> {письмоУшло ? t("enterCode") : t("addMail")}
-              </button>
-              {/* Почта — дело добровольное, и этот шаг пропускается: без
-                  неё аккаунт уже работает, просто держится на одном
-                  Telegram. */}
-              <button
-                onClick={() => { onСоздан(); onClose(); }}
-                className="fx-tap w-full"
-                style={{
-                  padding: "6px 0 0", border: "none", background: "transparent",
-                  color: T.faint, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
                 }}
               >
                 {t("enterApp")}
@@ -21191,12 +21283,6 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           )}
         </div>
 
-        <ЭкранПочты
-          открыт={почтаОткрыта}
-          почтаЗаранее={письмоУшло ? почтаЧистая : ""}
-          onClose={() => setПочтаОткрыта(false)}
-          onГотово={() => { setПочтаОткрыта(false); onСоздан(); onClose(); }}
-        />
         <ImageCropModal file={avatarCropFile} shape="circle" onCancel={() => setAvatarCropFile(null)} onConfirm={handleAvatarCropConfirm} />
       </div>
     );
