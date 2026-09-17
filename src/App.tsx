@@ -8301,6 +8301,33 @@ function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false }) {
 /* Рамок вокруг аватарки в приложении больше нет: остался только
    контейнер нужного размера, чтобы не переписывать два десятка мест,
    где аватарка рисуется. */
+/* Радужный конверт. Цвет — заливка, форма — маска из того же значка:
+   так значок красится градиентом, которого у обводки не бывает, а
+   анимация остаётся обычной, css-ной. */
+const КОНВЕРТ_ФОРМА =
+  'url("data:image/svg+xml;utf8,'
+  + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black"'
+    + ' stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'
+    + '<rect width="20" height="16" x="2" y="4" rx="2"/>'
+    + '<path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>',
+  )
+  + '")';
+
+const РАДУГА_КОНВЕРТА = {
+  background: "linear-gradient(120deg, #4FC3FF 0%, #B14CFF 28%, #FF6BD6 52%, #3BE08F 76%, #4FC3FF 100%)",
+  backgroundSize: "300% 300%",
+  animation: "букваЦветёт 7s ease-in-out infinite",
+  WebkitMaskImage: КОНВЕРТ_ФОРМА,
+  maskImage: КОНВЕРТ_ФОРМА,
+  WebkitMaskRepeat: "no-repeat",
+  maskRepeat: "no-repeat",
+  WebkitMaskSize: "contain",
+  maskSize: "contain",
+  WebkitMaskPosition: "center",
+  maskPosition: "center",
+};
+
 /* Кружок с первой буквой ника — вместо аватарки, которую не поставили.
  *
  * Раньше на её месте стояла эмодзи (её выдавали при заведении аккаунта) или
@@ -20715,7 +20742,13 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
       }
     }
 
-    return (
+    /* Порталом прямо в документ, а не внутрь дерева приложения.
+     *
+     * position: fixed считается от ближайшего предка с transform, а экраны
+     * приложения приезжают с анимацией — и карточка ехала вместе с ними:
+     * стоило нажать на поле, телефон подтягивал окно под клавиатуру, и
+     * «неподвижный» экран уползал вверх. В документе таких предков нет. */
+    const экран = (
       <div
         className={`fx-modal-back${closing ? " fx-out" : ""}`}
         /* Карточка стоит на своём месте и не ездит.
@@ -20746,26 +20779,16 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   аккаунт, если пропадёт доступ к телеграму, — поэтому
                   спрашиваем сразу, а не «когда-нибудь в настройках». */}
               <div className="flex flex-col items-center text-center" style={{ gap: 12 }}>
-                {/* Конверт сам по себе, без кружка-подложки, и обведён не
-                    одним цветом, а перетекающей радугой: цвета живут в
-                    градиенте самой картинки — обводке значка его отдают
-                    ссылкой на defs. */}
-                <svg width="0" height="0" aria-hidden style={{ position: "absolute" }}>
-                  <defs>
-                    <linearGradient id="почтаРадуга" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#4FC3FF">
-                        <animate attributeName="stop-color" values="#4FC3FF;#B14CFF;#FF6BD6;#3BE08F;#4FC3FF" dur="7s" repeatCount="indefinite" />
-                      </stop>
-                      <stop offset="50%" stopColor="#B14CFF">
-                        <animate attributeName="stop-color" values="#B14CFF;#FF6BD6;#3BE08F;#4FC3FF;#B14CFF" dur="7s" repeatCount="indefinite" />
-                      </stop>
-                      <stop offset="100%" stopColor="#FF6BD6">
-                        <animate attributeName="stop-color" values="#FF6BD6;#3BE08F;#4FC3FF;#B14CFF;#FF6BD6" dur="7s" repeatCount="indefinite" />
-                      </stop>
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <Mail size={46} strokeWidth={1.6} style={{ stroke: "url(#почтаРадуга)" }} />
+                {/* Конверт сам по себе, без кружка-подложки, и залит
+                    перетекающей радугой.
+
+                    Цвет даёт обычная заливка, а форму — маска из того же
+                    конверта. Раньше цвета жили внутри картинки и качались
+                    SMIL-анимацией: она начинается заново при каждом
+                    пересоздании узла, и на первом же нажатии по полю
+                    значок перекрашивался рывком. Заливка так не умеет —
+                    она просто продолжает идти. */}
+                <span aria-hidden style={{ width: 46, height: 46, ...РАДУГА_КОНВЕРТА }} />
                 <div className="flex flex-col" style={{ gap: 6 }}>
                   <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
                     {t("createTitle")}
@@ -21078,6 +21101,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         <ImageCropModal file={avatarCropFile} shape="circle" onCancel={() => setAvatarCropFile(null)} onConfirm={handleAvatarCropConfirm} />
       </div>
     );
+    return typeof document !== "undefined" ? createPortal(экран, document.body) : экран;
   }
 
   const nicknameTrimmed = nickname.trim();
