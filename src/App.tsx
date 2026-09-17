@@ -8491,6 +8491,10 @@ function БукваАватара({ ник, size = 40 }) {
         animation: "букваЦветёт 7s ease-in-out infinite",
         color: "#FFFFFF", fontFamily: displayFont, fontWeight: 800,
         fontSize: Math.round(size * 0.44), lineHeight: 1, letterSpacing: "-0.02em",
+        /* Опускаем на полтора процента: по рамке строки буква стоит ровно,
+           а глазом читается выше середины — у прописных заглавных верх
+           строки выше макушки, и пустой запас уходит вниз. */
+        transform: "translateY(1.6%)",
         userSelect: "none",
       }}
     >
