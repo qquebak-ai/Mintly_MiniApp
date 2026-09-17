@@ -390,7 +390,6 @@ const STR = {
     seedCheckWrong: "Не сходится — проверь свою запись.",
     seedCheckCta: "Готово",
     seedDone: "Кошелёк готов",
-    seedOther: "Спросить другие слова",
     mailSendFailed: "Письмо не ушло: почтовый сервер отказал. Попробуй позже.",
     authCodeResend: "Отправить заново",
     authGotIt: "Понятно",
@@ -1038,7 +1037,6 @@ const STR = {
     seedCheckWrong: "Doesn't match — check your copy.",
     seedCheckCta: "Done",
     seedDone: "The wallet is ready",
-    seedOther: "Ask for other words",
     mailSendFailed: "The letter didn't go out: the mail server refused. Try again later.",
     authCodeResend: "Send again",
     authGotIt: "Got it",
@@ -9436,7 +9434,7 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
   if (!accountCreated) {
     return (
       <div className="flex flex-col gap-4 pt-2">
-        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em" }}>{t("shopTitle")}</span>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>{t("shopTitle")}</span>
         {/* Закрытая витрина — это состояние экрана, а не объект на нём:
             текст лежит прямо на фоне, карточка вокруг него только
             добавляла лишний слой. */}
@@ -9480,7 +9478,7 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
 
   return (
     <div className="flex flex-col gap-4 pt-2">
-      <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em" }}>{t("shopTitle")}</span>
+      <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>{t("shopTitle")}</span>
       {/* Счётчик монет живёт только здесь: тратить их больше негде, а на
           остальных экранах он был бы просто цифрой без применения.
           Стоит вровень с заголовком и выше не поднимается, а при
@@ -14300,7 +14298,7 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
           ))}
           {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
           {/* Назад к словам хода нет намеренно: подсмотреть — значит не
-              проверить. Не сошлось — можно попросить другие три. */}
+              проверить. */}
           <button
             onClick={сверить}
             disabled={!всёВписано || идёт}
@@ -14313,16 +14311,6 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
             }}
           >
             {t("seedCheckCta")}
-          </button>
-          <button
-            onClick={спросить}
-            className="fx-tap w-full"
-            style={{
-              padding: "4px 0 0", border: "none", background: "transparent",
-              color: T.faint, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
-            }}
-          >
-            {t("seedOther")}
           </button>
         </div>
       )}
