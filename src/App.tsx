@@ -373,6 +373,7 @@ const STR = {
     mailSendCode: "Отправить код",
     mailCodeTitle: "Введите код",
     mailCodeTo: "Отправили на {mail}",
+    mailChangePending: "Код верный, но почта не привязалась. Выключи Secure email change в Supabase.",
     mailSendFailed: "Письмо не ушло: почтовый сервер отказал. Попробуй позже.",
     authCodeResend: "Отправить заново",
     authGotIt: "Понятно",
@@ -1003,6 +1004,7 @@ const STR = {
     mailSendCode: "Send the code",
     mailCodeTitle: "Enter the code",
     mailCodeTo: "Sent to {mail}",
+    mailChangePending: "The code is right, but the email didn't attach. Turn off Secure email change in Supabase.",
     mailSendFailed: "The letter didn't go out: the mail server refused. Try again later.",
     authCodeResend: "Send again",
     authGotIt: "Got it",
@@ -20215,7 +20217,19 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
     setИдёт(true);
     try {
       await подтвердитьПочту(чистая, код.trim());
-      setПривязана(чистая);
+      /* Код принят — но это ещё не значит, что адрес встал.
+         При включённом «Secure email change» Supabase ждёт подтверждения
+         и со старого адреса, а он у нас технический (tg<id>@telegram.local)
+         и писем не получает никогда: смена висит в ожидании вечно.
+         Поэтому спрашиваем аккаунт, что у него теперь за почта, и говорим
+         «привязана» только когда это правда. */
+      const стало = await почтаАккаунта();
+      if (стало.toLowerCase() !== чистая) {
+        setБеда(t("mailChangePending"));
+        haptic("error");
+        return;
+      }
+      setПривязана(стало);
       сменитьШаг("готово");
       await отметить(true);
       haptic("success");
