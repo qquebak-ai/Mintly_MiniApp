@@ -20084,7 +20084,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
   /* Сколько знаков в коде. Длину задаёт Supabase (Authentication →
      Providers → Email → Email OTP Length), и окошек на экране должно быть
      ровно столько же — иначе последние цифры вводить некуда. */
-  const ДЛИНА_КОДА = 8;
+  const ДЛИНА_КОДА = 6;
 
   function сменитьШаг(новый) {
     setУходит(true);
@@ -20286,13 +20286,13 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
             </div>
             {/* Шесть окошек вместо одного поля: видно, сколько знаков уже
                 набрано и сколько осталось, а следующее место подсвечено. */}
-            <div className="flex" style={{ gap: 6 }}>
+            <div className="flex" style={{ gap: 8 }}>
               {Array.from({ length: ДЛИНА_КОДА }, (_, i) => i).map((i) => (
                 <span
                   key={i}
                   className="flex items-center justify-center"
                   style={{
-                    flex: 1, minWidth: 0, height: 54, borderRadius: 12, background: T.surface,
+                    flex: 1, minWidth: 0, height: 58, borderRadius: 14, background: T.surface,
                     /* Место под следующую цифру подсвечено светло-серым:
                        зелёное здесь обещало бы, что цифра уже принята. */
                     border: `1.5px solid ${беда ? T.down
@@ -20302,7 +20302,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
                     /* Код набран — зелёное загорается по окошкам слева
                        направо: одна волна вместо шести рамок разом. */
                     boxShadow: полон ? `0 0 0 3px ${hexA(T.up, 0.16)}` : "0 0 0 0 transparent",
-                    color: T.ice, fontFamily: monoFont, fontSize: 20, fontWeight: 700,
+                    color: T.ice, fontFamily: monoFont, fontSize: 25, fontWeight: 700,
                     transition: "border-color 260ms ease, box-shadow 260ms ease",
                     transitionDelay: полон ? `${i * ВОЛНА_ШАГ}ms` : "0ms",
                   }}
