@@ -2509,6 +2509,14 @@ function GlobalStyle() {
         from { opacity: 0; transform: translateY(16px); }
         to   { opacity: 1; transform: none; }
       }
+      /* Уход страницы — короче прихода: назад человек уже решил, и ждать
+         ему нечего. Без него вложенный экран просто исчезал кадром, и
+         переход читался морганием, а не возвратом. */
+      .fx-view-out { animation: viewOut 170ms cubic-bezier(0.4,0,1,1) forwards; pointer-events: none; }
+      @keyframes viewOut {
+        from { opacity: 1; transform: none; }
+        to   { opacity: 0; transform: translateY(12px); }
+      }
       /* Заглушка вместо ещё не пришедших данных.
          Блик едет отдельным слоем и размыт: градиентом по фону та же
          полоса выходит плоской и на широкой плашке почти не видна, а
@@ -8738,7 +8746,7 @@ const ProfileCardBg = React.memo(function ProfileCardBg() {
  * а вернуться можно панелью разделов — она висит выше по слою и остаётся
  * доступной, пока профиль открыт.
  */
-function СтраницаПрофиля({ открыт, insetTop = 0, children }) {
+function СтраницаПрофиля({ открыт, уходит = false, insetTop = 0, children }) {
   return (
     <div
       aria-hidden={открыт ? undefined : true}
@@ -8754,7 +8762,7 @@ function СтраницаПрофиля({ открыт, insetTop = 0, children }
       }}
     >
       <div
-        className={`no-scrollbar px-4${открыт ? " fx-view" : ""}`}
+        className={`no-scrollbar px-4${открыт ? (уходит ? " fx-view-out" : " fx-view") : ""}`}
         style={{
           flex: 1, overflowY: "auto", minHeight: 0,
           // Тот же отступ сверху, что и у главной: подложка карточки
@@ -10836,7 +10844,7 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
  *
  * В профиле они лежали за лишним переходом, и человек, запустивший
  * токен, не видел его до тех пор, пока не вспомнит, где смотреть. */
-function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, onOpenToken, onOpenAchievements, тик = 0 }) {
+function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, onOpenToken, onOpenAchievements, тик = 0, достиженияГотовы = true }) {
   const закрыто = achievements.filter((a) => a.done).length;
   return (
     <>
@@ -10864,14 +10872,27 @@ function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, 
       <section>
         <SectionTitle>{t("achievementsTitle")}</SectionTitle>
         <button onClick={onOpenAchievements} className="fx-tap w-full text-left" style={{ padding: "2px 0" }}>
+          {/* Счёт показываем только посчитанный. Раньше он выводился из
+              полупустых данных и на глазах прыгал: «2 из 11» превращалось
+              в «5 из 11» через секунду после запуска, а полоса дёргалась
+              вместе с ним. */}
           <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("achProgress")}</span>
-            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
-              {tf("achUnlockedOf", { done: закрыто, total: achievements.length })}
-            </span>
+            {достиженияГотовы
+              ? (
+                <span className="fx-view" style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
+                  {tf("achUnlockedOf", { done: закрыто, total: achievements.length })}
+                </span>
+              )
+              : <ПлашкаЧисла width={52} height={15} radius={6} />}
           </div>
           <div style={{ height: 6, borderRadius: 3, background: T.surfaceHi, overflow: "hidden" }}>
-            <div style={{ width: `${achievements.length ? (закрыто / achievements.length) * 100 : 0}%`, height: "100%", background: T.electric }} />
+            <div style={{
+              width: достиженияГотовы && achievements.length ? `${(закрыто / achievements.length) * 100}%` : "0%",
+              height: "100%", background: T.electric,
+              // Полоса доезжает до своего места, а не встаёт туда рывком.
+              transition: "width 520ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }} />
           </div>
           <div className="flex items-center gap-1.5" style={{ marginTop: 10, flexWrap: "wrap" }}>
             {achievements.filter((a) => !a.done).slice(0, 3).map((a) => (
@@ -11998,7 +12019,7 @@ function HomeView({
   onGoTab, onGoCreate, curveTokens = [], onOpenToken, onOpenProfile,
   profile = null, accountCreated = false, myTokens = [], achievements = [], userId = null,
   onOpenMyProfile, onOpenAchievements, профильГрузится = false, тик = 0, грузится = false,
-  insetTop = 0, insetBottom = 0,
+  insetTop = 0, insetBottom = 0, достиженияГотовы = true,
 }) {
   // Главная — витрина площадки: сводка, токен дня, движение, топ. Монетам
   // из пробной сети там не место — их цена ничего не значит, а сводка по
@@ -12037,20 +12058,24 @@ function HomeView({
       <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} />
       {/* Баннеры ждут вместе со всеми: живая карусель посреди плашек
           выглядела так, будто остальной экран сломался. */}
-      {вПлашках ? <ПлашкаБлока h={150} radius={20} /> : <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />}
       {вПлашках ? (
         <>
+          <ПлашкаБлока h={150} radius={20} />
           <ПлашкаБлока h={46} radius={999} />
           <ПлашкаБлока h={168} />
           <ПлашкаБлока h={196} radius={24} />
           <ПлашкаБлока h={190} />
         </>
       ) : (
-        <>
+        /* Содержимое проявляется на месте плашек, а не подменяет их
+           кадром: подмена читалась так, будто экран моргнул. */
+        <div className="fx-view flex flex-col" style={{ gap: 26 }}>
+          <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
           <БегущаяЛента />
           <МоиДела
             myTokens={myTokens}
             achievements={achievements}
+            достиженияГотовы={достиженияГотовы}
             userId={userId}
             onGoCreate={onGoCreate}
             onOpenToken={onOpenToken}
@@ -12060,7 +12085,7 @@ function HomeView({
           <ГлавныйТокен tokens={боевые} onOpen={onOpenToken} />
           <ВДвижении tokens={боевые} onOpen={onOpenToken} onAll={() => onGoTab("mempad")} />
           <ТопСтрока onOpenToken={onOpenToken} onOpenProfile={onOpenProfile} live={боевые} />
-        </>
+        </div>
       )}
 
     </div>
@@ -24381,7 +24406,28 @@ function mapTokenRow(row) {
       });
     return () => { брошено = true; };
   }, []);
-  function backFromToken() { setView(tab); запомнитьТокен(null); }
+  /* Возврат с вложенной страницы.
+   *
+   * Смена view убирает страницу из разметки тем же кадром, и переход
+   * читался как моргание. Держим узел ещё сто семьдесят миллисекунд —
+   * ровно столько играет уход, — и только потом меняем экран. Через эту
+   * же дверь ходят и стрелка Telegram, и кнопки «назад» внутри страниц:
+   * анимация не должна зависеть от того, за что человек нажал. */
+  const УХОД_СТРАНИЦЫ = 170;
+  const [уходСтраницы, setУходСтраницы] = useState(false);
+  const уходИдёт = useRef(false);
+  const уйтиСоСтраницы = useCallback((действие) => {
+    if (уходИдёт.current) return;
+    уходИдёт.current = true;
+    setУходСтраницы(true);
+    setTimeout(() => {
+      действие();
+      setУходСтраницы(false);
+      уходИдёт.current = false;
+    }, УХОД_СТРАНИЦЫ);
+  }, []);
+
+  function backFromToken() { уйтиСоСтраницы(() => { setView(tab); запомнитьТокен(null); }); }
 
   // Открытый токен — из своих? Тогда на его экране появляется управление
   // (ссылка и удаление). Сравниваем по записи из базы, а не по флагу в
@@ -24394,7 +24440,10 @@ function mapTokenRow(row) {
   // возвращает именно на неё, а не на вкладку.
   const [viewedUserId, setViewedUserId] = useState(null);
   function openUserProfile(id) { if (!id) return; setViewedUserId(id); setView("user"); }
-  function backFromUserProfile() { setView(token ? "token" : tab); }
+  function backFromUserProfile() { уйтиСоСтраницы(() => setView(token ? "token" : tab)); }
+  function backFromCreate() { уйтиСоСтраницы(() => setView(tab)); }
+  function backFromAchievements() { уйтиСоСтраницы(() => setView(откудаДостижения)); }
+  function backFromProfile() { уйтиСоСтраницы(() => goTab("home")); }
 
   /* Кнопка «Назад» в шапке Telegram.
 
@@ -24416,12 +24465,12 @@ function mapTokenRow(row) {
     if (manageToken_) return () => setManageToken_(null);
     if (view === "user") return backFromUserProfile;
     if (view === "token") return backFromToken;
-    if (view === "create") return () => setView(tab);
+    if (view === "create") return backFromCreate;
     /* Профиль в капсуле не живёт: в него приходят из меню, и без стрелки
        Telegram предлагал единственный выход — «Закрыть», то есть выйти из
        приложения целиком. */
-    if (view === "profile") return () => goTab("home");
-    if (view === "achievements") return () => setView(откудаДостижения);
+    if (view === "profile") return backFromProfile;
+    if (view === "achievements") return backFromAchievements;
     return null;
   }, [pinLocked, pinModal, launchRequest, profileModalOpen, settingsItem, tradeModal, manageToken_, view, tab, token, откудаДостижения]);
 
@@ -25017,6 +25066,7 @@ function mapTokenRow(row) {
               onOpenAchievements={() => открытьДостижения("home")}
               insetTop={insetTop}
               insetBottom={insetBottom}
+              достиженияГотовы={achievementsReady}
             />
           </KeepAlive>
           <KeepAlive show={view === "mempad"}>
@@ -25061,9 +25111,12 @@ function mapTokenRow(row) {
             />
           </KeepAlive>
           {view === "achievements" && (
-            <AchievementsView achievements={achievements} onGoShop={() => goTab("shop")} onBack={() => setView(откудаДостижения)} />
+            <div className={уходСтраницы ? "fx-view-out" : undefined}>
+              <AchievementsView achievements={achievements} onGoShop={() => goTab("shop")} onBack={backFromAchievements} />
+            </div>
           )}
           {view === "user" && (
+            <div className={уходСтраницы ? "fx-view-out" : undefined}>
             <PublicProfileView
               userId={viewedUserId}
               currentUserId={userId}
@@ -25073,9 +25126,11 @@ function mapTokenRow(row) {
               showToast={showToast}
               insetTop={insetTop}
             />
+            </div>
           )}
-          {view === "token" && <TokenDetail t={token} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} unlocked={accountCreated} connected={connected} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} />}
+          {view === "token" && <div className={уходСтраницы ? "fx-view-out" : undefined}><TokenDetail t={token} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} unlocked={accountCreated} connected={connected} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} /></div>}
           {view === "create" && (
+            <div className={уходСтраницы ? "fx-view-out" : undefined}>
             <CreateView
               черновик={черновикЗапуска}
               onЧерновикПринят={() => setЧерновикЗапуска(null)}
@@ -25087,6 +25142,7 @@ function mapTokenRow(row) {
               onLaunch={handleLaunchRequest}
               solДоступен={solЗапуск}
             />
+            </div>
           )}
           </div>
         </div>
@@ -25124,7 +25180,7 @@ function mapTokenRow(row) {
 
         {/* Профиль — отдельная страница поверх главной. Уйти с неё можно
             панелью разделов: она остаётся выше по слою. */}
-        <СтраницаПрофиля открыт={view === "profile"} insetTop={insetTop}>
+        <СтраницаПрофиля открыт={view === "profile"} уходит={уходСтраницы} insetTop={insetTop}>
             <ProfileView
               connected={connected}
               showToast={showToast}
