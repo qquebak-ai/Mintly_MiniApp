@@ -2507,6 +2507,12 @@ function GlobalStyle() {
         from { opacity: 0; transform: translateY(16px); }
         to   { opacity: 1; transform: none; }
       }
+      /* Строка набирается по букве: каждая проступает чуть позже
+         предыдущей, и текст читается слева направо, как его пишут. */
+      @keyframes букваПроступает {
+        from { opacity: 0; transform: translateY(3px); }
+        to   { opacity: 1; transform: none; }
+      }
       /* Галочка не подставляется готовой, а рисуется — одним росчерком,
          слева направо: так видно, что слово именно сейчас сошлось. */
       @keyframes галочкаРисуется {
@@ -14075,6 +14081,44 @@ function СлоиТкани() {
   );
 }
 
+/* Строка, которая набирается на глазах.
+ *
+ * Слова разбиты по буквам, каждая проступает на пару десятков
+ * миллисекунд позже предыдущей — получается письмо слева направо, а не
+ * готовый абзац, поставленный кадром. Разбивку держим по словам: если
+ * пустить в строку одни буквы, браузер начнёт переносить их посреди
+ * слова. */
+function НабраннаяСтрока({ текст, шаг = 14 }) {
+  const слова = String(текст || "").split(" ");
+  let номер = -1;
+  return (
+    <>
+      {слова.map((слово, i) => (
+        <React.Fragment key={i}>
+          <span style={{ display: "inline-block", whiteSpace: "nowrap" }}>
+            {[...слово].map((буква, j) => {
+              номер += 1;
+              return (
+                <span
+                  key={j}
+                  style={{
+                    display: "inline-block",
+                    animation: `букваПроступает 300ms ease both`,
+                    animationDelay: `${номер * шаг}ms`,
+                  }}
+                >
+                  {буква}
+                </span>
+              );
+            })}
+          </span>
+          {i < слова.length - 1 ? (() => { номер += 1; return " "; })() : null}
+        </React.Fragment>
+      ))}
+    </>
+  );
+}
+
 /* Заведение кошелька: слова и проверка.
  *
  * Кошелёк у человека появляется сам — сервер выводит ключи обеих сетей
@@ -14168,16 +14212,14 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
            её и ищет большой палец. */
         <>
           <div className="flex flex-col items-center text-center" style={{ gap: 14, paddingTop: 34 }}>
-            <span className="flex items-center justify-center" style={{
-              width: 62, height: 62, borderRadius: "50%", background: hexA(T.electric, 0.14), color: T.electric,
-            }}>
-              <Wallet size={28} />
-            </span>
+            {/* Кружка-подложки за значком нет: он и так один на пустом
+                экране, а подсвеченное пятно читалось кнопкой. */}
+            <Wallet size={36} color={T.electric} strokeWidth={1.6} />
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
               {t("walletMakeTitle")}
             </span>
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600, lineHeight: 1.55 }}>
-              {t("walletMakeBody")}
+              <НабраннаяСтрока текст={t("walletMakeBody")} />
             </span>
             {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
           </div>
