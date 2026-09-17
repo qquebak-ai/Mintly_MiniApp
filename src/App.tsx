@@ -343,7 +343,6 @@ const STR = {
     createdBody: "Осталось одно. Привяжи почту: ею подтверждается вывод, и через неё возвращают аккаунт, если пропадёт доступ к Telegram.",
     addMail: "Добавить почту",
     laterBtn: "Позже",
-    cropPinchHint: "Двумя пальцами — приблизить, одним — подвинуть",
     enterApp: "Войти в приложение",
     openInTelegram: "Открыть в Telegram",
     mail2faTitle: "Почта для 2ФА",
@@ -959,7 +958,6 @@ const STR = {
     createdBody: "One thing left. Add an email: it confirms withdrawals and brings the account back if you lose access to Telegram.",
     addMail: "Add email",
     laterBtn: "Later",
-    cropPinchHint: "Pinch to zoom, drag to move",
     enterApp: "Enter the app",
     openInTelegram: "Open in Telegram",
     mail2faTitle: "Email for 2FA",
@@ -17830,9 +17828,9 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
             />
           )}
         </div>
-        {/* Ползунка нет: картинку приближают двумя пальцами прямо на ней,
-            как в любой галерее, — а на компьютере колесом. */}
-        <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5, textAlign: "center" }}>{t("cropPinchHint")}</span>
+        {/* Ни ползунка, ни подписи: картинку приближают двумя пальцами
+            прямо на ней, как в любой галерее, — этому не учат. На
+            компьютере то же делает колесо. */}
         <div className="flex items-center gap-2 w-full">
           <button onClick={onCancel} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>{t("cancel")}</button>
           <button onClick={handleConfirm} className="fx-tap flex-1 rounded-[20px] py-2.5" style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>{t("cropConfirm")}</button>
