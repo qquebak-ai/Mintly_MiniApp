@@ -65,13 +65,23 @@ async function хозяин(req, db) {
   return data.user;
 }
 
-// Записана ли фраза. Колонки может ещё не быть — тогда считаем, что нет.
+/* Что с фразой у человека.
+ *
+ * «Заводили» и «записали» — разные вещи. Кошелёк на сервере появляется
+ * сам при первом же обращении к нему, поэтому одного наличия строки мало:
+ * начало отсчитываем от того, что человек попросил показать слова
+ * (revealed_at), а конец — от того, что он прошёл проверку (confirmed_at).
+ * Колонок может ещё не быть — тогда считаем, что ни того, ни другого. */
 async function записана(db, id) {
   const { data, error } = await db
-    .from("app_seeds").select("user_id, confirmed_at")
+    .from("app_seeds").select("user_id, confirmed_at, revealed_at")
     .eq("user_id", id).maybeSingle();
-  if (error) return { есть: false, готово: false, колонки: false };
-  return { есть: !!data, готово: !!(data && data.confirmed_at), колонки: true };
+  if (error) return { есть: false, начато: false, готово: false };
+  return {
+    есть: !!data,
+    начато: !!(data && data.revealed_at),
+    готово: !!(data && data.confirmed_at),
+  };
 }
 
 export default async function handler(req, res) {
@@ -89,7 +99,11 @@ export default async function handler(req, res) {
 
     if (действие === "state") {
       res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ ready: состояние.готово, exists: состояние.есть });
+      return res.status(200).json({
+        ready: состояние.готово,
+        started: состояние.начато,
+        exists: состояние.есть,
+      });
     }
 
     if (req.method !== "POST") {
@@ -102,6 +116,10 @@ export default async function handler(req, res) {
       // могли и увести, а слова открывают кошелёк целиком.
       if (состояние.готово) return res.status(409).json({ error: "already_saved" });
       const фраза = await фразаПользователя(db, user, набор);
+      // Помечаем, что слова человек уже видел: с этой минуты кошелёк
+      // считается заведённым, даже если запись он отложил.
+      await db.from("app_seeds").update({ revealed_at: new Date().toISOString() })
+        .eq("user_id", user.id).is("revealed_at", null);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ words: String(фраза).trim().split(/\s+/) });
     }

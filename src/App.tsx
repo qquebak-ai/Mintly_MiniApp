@@ -390,6 +390,25 @@ const STR = {
     seedCheckWrong: "Не сходится — проверь свою запись.",
     seedCheckCta: "Готово",
     seedDone: "Кошелёк готов",
+    secretTitle: "Секретная фраза",
+    secretRowHint: "Копия не сделана",
+    secretManualTitle: "Вручную",
+    secretManualBody: "Создайте резервную копию своего кошелька вручную, записав секретную фразу.",
+    secretManualCta: "Сделать копию вручную",
+    safetyTitle: "Проверка безопасности",
+    safety1: "Никогда никому не показывайте свою секретную фразу.",
+    safety2: "Любой, у кого есть ваша секретная фраза, может получить доступ к кошельку и вывести средства.",
+    safety3: "Поддержка Mintly никогда не запрашивает секретную фразу.",
+    safetyAgree: "Я понимаю, что передача секретной фразы может привести к",
+    safetyAgreeLoss: "безвозвратной потере средств.",
+    safetyShow: "Показать секретную фразу",
+    saveTitle: "Сохраните секретную фразу",
+    saveBody: "Запишите эти слова с их номерами и сохраните их в надёжном месте.",
+    saveCheck: "Проверить резервную копию",
+    saveSkip: "Пропустить",
+    quizTitle: "Проверка резервной копии",
+    quizBody: "Давайте проверим, всё ли вы записали правильно. Выберите слова {a}, {b} и {c}.",
+    quizDone: "Готово",
     mailSendFailed: "Письмо не ушло: почтовый сервер отказал. Попробуй позже.",
     authCodeResend: "Отправить заново",
     authGotIt: "Понятно",
@@ -1037,6 +1056,25 @@ const STR = {
     seedCheckWrong: "Doesn't match — check your copy.",
     seedCheckCta: "Done",
     seedDone: "The wallet is ready",
+    secretTitle: "Secret phrase",
+    secretRowHint: "No backup yet",
+    secretManualTitle: "Manually",
+    secretManualBody: "Back up your wallet by hand: write the secret phrase down.",
+    secretManualCta: "Back up manually",
+    safetyTitle: "Safety check",
+    safety1: "Never show your secret phrase to anyone.",
+    safety2: "Anyone who has your secret phrase can open the wallet and take the funds.",
+    safety3: "Mintly support never asks for your secret phrase.",
+    safetyAgree: "I understand that sharing the secret phrase can lead to",
+    safetyAgreeLoss: "an irreversible loss of funds.",
+    safetyShow: "Show the secret phrase",
+    saveTitle: "Save the secret phrase",
+    saveBody: "Write these words down with their numbers and keep them somewhere safe.",
+    saveCheck: "Check the backup",
+    saveSkip: "Skip",
+    quizTitle: "Backup check",
+    quizBody: "Let's check that you wrote everything down. Pick words {a}, {b} and {c}.",
+    quizDone: "Done",
     mailSendFailed: "The letter didn't go out: the mail server refused. Try again later.",
     authCodeResend: "Send again",
     authGotIt: "Got it",
@@ -14128,16 +14166,37 @@ function НабраннаяСтрока({ текст, шаг = 22 }) {
  * спрашивается обратно: три слова наугад — короткая проверка, что копия
  * действительно сделана, а не «потом запишу».
  */
-function СозданиеКошелька({ onГотово = () => {}, showToast = () => {}, insetTop = 0, insetBottom = 0 }) {
-  const [шаг, setШаг] = useState("начало");   // начало | слова | проверка
+/* Фраза кошелька: заведение и резервная копия.
+ *
+ * Один мастер на два входа. Первый — заведение кошелька: человек жмёт
+ * «Создать кошелёк» и сразу видит слова. Второй — строка «Секретная
+ * фраза» в кошельке у того, кто запись отложил: там путь длиннее, с
+ * предупреждением и галочкой, потому что слова показываются посреди
+ * работающего кошелька, где уже лежат деньги.
+ *
+ * Запись можно отложить, и это важно: заставлять переписывать двадцать
+ * четыре слова до того, как человек хоть раз увидел кошелёк, — верный
+ * способ получить копию, сделанную снимком экрана.
+ */
+function МастерФразы({
+  режим = "создание",            // создание | фраза
+  onГотово = () => {},
+  onПропустить = () => {},
+  onНазад = null,
+  showToast = () => {},
+  insetTop = 0,
+  insetBottom = 0,
+}) {
+  const [шаг, setШаг] = useState(режим === "фраза" ? "вручную" : "начало");
   const [слова, setСлова] = useState([]);
   const [идёт, setИдёт] = useState(false);
   const [беда, setБеда] = useState("");
-  // Какие слова спрашиваем и что человек вписал.
+  const [согласен, setСогласен] = useState(false);
+  // Какие слова спрашиваем и что человек выбрал.
   const [спрос, setСпрос] = useState([]);
-  const [ответы, setОтветы] = useState(["", "", ""]);
+  const [выбор, setВыбор] = useState({});
 
-  async function завести() {
+  async function показать() {
     if (идёт) return;
     setИдёт(true);
     setБеда("");
@@ -14157,8 +14216,9 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
     }
   }
 
-  // Три разных номера наугад — и каждый раз новые: заученный по первой
-  // попытке порядок проверкой быть перестаёт.
+  /* Три слова наугад, к каждому — два чужих из той же записи. Свои же
+     слова в подсказках честнее случайных: угадать по виду нельзя, а
+     проверяется именно порядок. */
   function спросить() {
     const номера = [];
     while (номера.length < 3) {
@@ -14166,14 +14226,22 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
       if (!номера.includes(н)) номера.push(н);
     }
     номера.sort((a, b) => a - b);
-    setСпрос(номера);
-    setОтветы(["", "", ""]);
+    setСпрос(номера.map((н) => {
+      const чужие = слова.map((_, i) => i).filter((i) => i !== н);
+      const подмена = [];
+      while (подмена.length < 2 && чужие.length) {
+        подмена.push(...чужие.splice(Math.floor(Math.random() * чужие.length), 1));
+      }
+      const варианты = [н, ...подмена].sort(() => Math.random() - 0.5);
+      return { номер: н, варианты };
+    }));
+    setВыбор({});
     setБеда("");
-    setШаг("проверка");
+    setШаг("викторина");
   }
 
   async function сверить() {
-    const сошлось = спрос.every((н, i) => ответы[i].trim().toLowerCase() === слова[н]);
+    const сошлось = спрос.every((в) => выбор[в.номер] === слова[в.номер]);
     if (!сошлось) { setБеда(t("seedCheckWrong")); haptic("error"); return; }
     setИдёт(true);
     try {
@@ -14190,18 +14258,34 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
     }
   }
 
-  const всёВписано = спрос.length === 3 && ответы.every((о) => о.trim().length > 1);
+  const всёВыбрано = спрос.length === 3 && спрос.every((в) => выбор[в.номер]);
+
+  // Кнопка внизу — одна на все шаги, и выглядит одинаково.
+  function Кнопка({ надпись, onClick, активна = true }) {
+    return (
+      <button
+        onClick={onClick}
+        disabled={!активна}
+        className="fx-tap w-full"
+        style={{
+          padding: "16px 0", borderRadius: 999, border: "none",
+          background: активна ? ЦВЕТ_КНОПКИ : T.surfaceHi,
+          color: активна ? PRISM_TEXT : T.muted,
+          fontFamily: displayFont, fontSize: 16, fontWeight: 800,
+        }}
+      >
+        {надпись}
+      </button>
+    );
+  }
 
   return (
-    /* Отступ сверху — тот же, что у самого кошелька: заголовок обязан
-       стоять на одном месте до заведения и после, иначе при первом
-       переходе он прыгает. */
     <div className="flex flex-col" style={{
       padding: "8px 16px 0", gap: 16,
-      /* Высота — ровно то, что осталось от экрана под разделом: кнопка
-         тогда стоит у нижнего края, а не посреди пустоты. */
       minHeight: `calc(100vh - ${contentTopPad(insetTop) + 96 + insetBottom}px)`,
     }}>
+      {/* Заголовок раздела — только на первом экране заведения: дальше у
+          каждого шага свой, и два подряд читались бы как два экрана. */}
       {шаг === "начало" && (
         <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
           {t("navWallet")}
@@ -14209,13 +14293,8 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
       )}
 
       {шаг === "начало" ? (
-        /* Подложки под текстом нет: карточка посреди пустого экрана
-           обводила рамкой воздух. Кнопка ушла к нижнему краю — туда, где
-           её и ищет большой палец. */
         <>
           <div className="flex flex-col items-center text-center" style={{ gap: 14, paddingTop: 34 }}>
-            {/* Кружка-подложки за значком нет: он и так один на пустом
-                экране, а подсвеченное пятно читалось кнопкой. */}
             <Wallet size={36} color={T.electric} strokeWidth={1.6} />
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
               {t("walletMakeTitle")}
@@ -14225,43 +14304,134 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
             </span>
             {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
           </div>
+          <div style={{ marginTop: "auto" }}>
+            <Кнопка надпись={идёт ? t("walletMakeWait") : t("walletMakeCta")} onClick={показать} активна={!идёт} />
+          </div>
+        </>
+      ) : шаг === "вручную" ? (
+        /* Вход из кошелька: сначала про саму копию, без слов на экране. */
+        <>
+          <div className="flex items-center" style={{ gap: 12 }}>
+            {onНазад && (
+              <button
+                onClick={onНазад}
+                className="fx-tap flex items-center justify-center flex-shrink-0"
+                style={{ width: 36, height: 36, borderRadius: "50%", background: T.surfaceHi, border: "none", color: T.ice }}
+              >
+                <ChevronLeft size={19} />
+              </button>
+            )}
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em" }}>
+              {t("secretTitle")}
+            </span>
+          </div>
+          <div className="flex flex-col" style={{ gap: 6, marginTop: 10 }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
+              {t("secretManualTitle")}
+            </span>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, fontWeight: 600, lineHeight: 1.5 }}>
+              {t("secretManualBody")}
+            </span>
+          </div>
           <button
-            onClick={завести}
-            disabled={идёт}
+            onClick={() => { setСогласен(false); setШаг("безопасность"); haptic("light"); }}
             className="fx-tap w-full"
             style={{
-              marginTop: "auto", padding: "16px 0", borderRadius: 999, border: "none",
-              background: идёт ? T.surfaceHi : ЦВЕТ_КНОПКИ, color: идёт ? T.muted : PRISM_TEXT,
+              marginTop: 6, padding: "18px 0", borderRadius: 20, border: "none",
+              background: T.surfaceHi, color: T.ice,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             }}
           >
-            {идёт ? t("walletMakeWait") : t("walletMakeCta")}
+            {t("secretManualCta")}
           </button>
         </>
-      ) : шаг === "слова" ? (
-        <div className="flex flex-col" style={{ gap: 14 }}>
-          <div className="flex flex-col" style={{ gap: 6 }}>
-            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em" }}>
-              {t("seedTitle")}
+      ) : шаг === "безопасность" ? (
+        /* Предупреждение перед показом. Галочка здесь не формальность:
+           слова открывают кошелёк целиком, и человек должен сказать это
+           сам, а не пролистать. */
+        <>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setШаг("вручную")}
+              className="fx-tap flex items-center justify-center"
+              style={{ width: 36, height: 36, borderRadius: "50%", background: T.surfaceHi, border: "none", color: T.ice }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="flex flex-col items-center text-center" style={{ gap: 14 }}>
+            <span className="flex items-center justify-center" style={{
+              width: 76, height: 76, borderRadius: "50%", background: "#F5A623", color: "#1A1200",
+            }}>
+              <AlertTriangle size={36} strokeWidth={2.4} />
             </span>
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, fontWeight: 600, lineHeight: 1.5 }}>
-              {t("seedBody")}
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em" }}>
+              {t("safetyTitle")}
             </span>
           </div>
-          {/* Два столбца по номерам: так слово и его место читаются
-              вместе, а переписывать удобно сверху вниз. */}
-          <div style={{
-            display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
-            padding: 14, borderRadius: 22, background: T.surface,
-          }}>
-            {слова.map((с, i) => (
-              <div key={i} className="flex items-center" style={{ gap: 8, minWidth: 0 }}>
-                <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 12, width: 18, textAlign: "right", flexShrink: 0 }}>
-                  {i + 1}
-                </span>
-                <span className="truncate" style={{ fontFamily: bodyFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
-                  {с}
-                </span>
+          <div className="flex flex-col" style={{ gap: 14, padding: "16px 16px", borderRadius: 20, background: T.surface }}>
+            {[t("safety1"), t("safety2"), t("safety3")].map((строка, i) => (
+              <div key={i} className="flex" style={{ gap: 10 }}>
+                <span style={{ color: T.muted, fontFamily: bodyFont, fontSize: 14, lineHeight: 1.5 }}>•</span>
+                <span style={{ fontFamily: bodyFont, color: T.ice, fontSize: 14.5, fontWeight: 600, lineHeight: 1.5 }}>{строка}</span>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => { setСогласен((б) => !б); haptic("light"); }}
+            className="fx-tap flex items-start text-left"
+            style={{ gap: 12, padding: "14px 16px", borderRadius: 20, background: T.surface, border: "none" }}
+          >
+            <span className="flex items-center justify-center flex-shrink-0" style={{
+              width: 24, height: 24, borderRadius: 8, marginTop: 1,
+              background: согласен ? T.up : "transparent",
+              border: согласен ? "none" : `2px solid ${T.lineHi}`,
+              color: "#04120A", transition: "background 180ms ease",
+            }}>
+              {согласен && <Check size={15} strokeWidth={3.4} />}
+            </span>
+            <span style={{ fontFamily: bodyFont, color: T.ice, fontSize: 14.5, fontWeight: 600, lineHeight: 1.45 }}>
+              {t("safetyAgree")}{" "}
+              <span style={{ color: "#F5A623" }}>{t("safetyAgreeLoss")}</span>
+            </span>
+          </button>
+          {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
+          <div style={{ marginTop: "auto" }}>
+            <Кнопка
+              надпись={идёт ? t("walletMakeWait") : t("safetyShow")}
+              onClick={показать}
+              активна={согласен && !идёт}
+            />
+          </div>
+        </>
+      ) : шаг === "слова" ? (
+        <>
+          <div className="flex flex-col items-center text-center" style={{ gap: 6 }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+              {t("saveTitle")}
+            </span>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600, lineHeight: 1.5 }}>
+              {t("saveBody")}
+            </span>
+          </div>
+          {/* Два столбца по порядку: слева первая половина, справа вторая.
+              Переписывать удобно сверху вниз, а не змейкой. */}
+          <div className="flex" style={{ gap: 10, padding: 16, borderRadius: 22, background: T.surface }}>
+            {[0, 1].map((столбец) => (
+              <div key={столбец} className="flex flex-col" style={{ flex: 1, minWidth: 0, gap: 10 }}>
+                {слова.slice(столбец * 12, столбец * 12 + 12).map((с, i) => {
+                  const номер = столбец * 12 + i + 1;
+                  return (
+                    <div key={номер} className="flex items-baseline" style={{ gap: 8, minWidth: 0 }}>
+                      <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 12.5, width: 22, textAlign: "right", flexShrink: 0 }}>
+                        {номер}.
+                      </span>
+                      <span className="truncate" style={{ fontFamily: bodyFont, color: T.ice, fontSize: 15, fontWeight: 600 }}>
+                        {с}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>
@@ -14281,98 +14451,85 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
           >
             <Copy size={15} /> {t("seedCopy")}
           </button>
-          <button
-            onClick={спросить}
-            className="fx-tap w-full"
-            style={{
-              padding: "16px 0", borderRadius: 999, border: "none",
-              background: ЦВЕТ_КНОПКИ, color: PRISM_TEXT,
-              fontFamily: displayFont, fontSize: 16, fontWeight: 800,
-            }}
-          >
-            {t("seedNext")}
-          </button>
-        </div>
+          <div className="flex flex-col" style={{ marginTop: "auto", gap: 4 }}>
+            <Кнопка надпись={t("saveCheck")} onClick={спросить} />
+            {/* Отложить можно: кошелёк уже заведён, а строка «Секретная
+                фраза» с красной точкой останется на виду, пока копия не
+                сделана. */}
+            {режим === "создание" && (
+              <button
+                onClick={onПропустить}
+                className="fx-tap w-full"
+                style={{
+                  padding: "12px 0 2px", border: "none", background: "transparent",
+                  color: T.faint, fontFamily: displayFont, fontSize: 14, fontWeight: 700,
+                }}
+              >
+                {t("saveSkip")}
+              </button>
+            )}
+          </div>
+        </>
       ) : (
-        <div className="flex flex-col" style={{ gap: 14 }}>
-          <div className="flex flex-col" style={{ gap: 6 }}>
-            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em" }}>
-              {t("seedCheckTitle")}
+        <>
+          <div className="flex items-center" style={{ gap: 12 }}>
+            <button
+              onClick={() => setШаг("слова")}
+              className="fx-tap flex items-center justify-center flex-shrink-0"
+              style={{ width: 36, height: 36, borderRadius: "50%", background: T.surfaceHi, border: "none", color: T.ice }}
+            >
+              <ChevronLeft size={19} />
+            </button>
+          </div>
+          <div className="flex flex-col items-center text-center" style={{ gap: 6 }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+              {t("quizTitle")}
             </span>
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, fontWeight: 600, lineHeight: 1.5 }}>
-              {t("seedCheckBody")}
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600, lineHeight: 1.5 }}>
+              {tf("quizBody", {
+                a: спрос[0] ? спрос[0].номер + 1 : "",
+                b: спрос[1] ? спрос[1].номер + 1 : "",
+                c: спрос[2] ? спрос[2].номер + 1 : "",
+              })}
             </span>
           </div>
-          {спрос.map((н, i) => (
-            <div key={н} className="flex flex-col" style={{ gap: 6 }}>
-              <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5 }}>
-                {tf("seedWordNo", { n: н + 1 })}
+          {спрос.map((вопрос) => (
+            <div key={вопрос.номер} className="flex flex-col" style={{ gap: 8 }}>
+              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 700 }}>
+                {вопрос.номер + 1}.
               </span>
-              {/* Галочка справа: слово либо то самое, либо нет, и
-                  говорить об этом надо сразу, а не после «Готово». */}
-              <div style={{ position: "relative" }}>
-                <input
-                  value={ответы[i]}
-                  onChange={(e) => {
-                    const свежие = [...ответы];
-                    свежие[i] = e.target.value.replace(/[^a-zA-Zа-яА-Я]/g, "").toLowerCase();
-                    setОтветы(свежие);
-                    setБеда("");
-                  }}
-                  spellCheck={false}
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  autoComplete="off"
-                  style={{
-                    width: "100%", padding: "14px 44px 14px 14px", borderRadius: 16,
-                    border: `1px solid ${беда ? T.down : (ответы[i].trim().toLowerCase() === слова[н] ? T.up : T.line)}`,
-                    background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 16, fontWeight: 700,
-                    outline: "none", transition: "border-color 200ms ease",
-                  }}
-                />
-                {ответы[i].trim().toLowerCase() === слова[н] && (
-                  <svg
-                    aria-hidden
-                    viewBox="0 0 24 24"
-                    style={{
-                      position: "absolute", right: 14, top: "50%", marginTop: -10,
-                      width: 20, height: 20, pointerEvents: "none", overflow: "visible",
-                    }}
-                  >
-                    <path
-                      d="M4 12.5 L9.5 18 L20 6.5"
-                      fill="none"
-                      stroke={T.up}
-                      strokeWidth="2.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{
-                        strokeDasharray: 26,
-                        animation: "галочкаРисуется 320ms cubic-bezier(0.65, 0, 0.35, 1) both",
+              <div className="flex" style={{ gap: 8 }}>
+                {вопрос.варианты.map((и) => {
+                  const выбран = выбор[вопрос.номер] === слова[и];
+                  return (
+                    <button
+                      key={и}
+                      onClick={() => {
+                        setВыбор((б) => ({ ...б, [вопрос.номер]: слова[и] }));
+                        setБеда("");
+                        haptic("light");
                       }}
-                    />
-                  </svg>
-                )}
+                      className="fx-tap"
+                      style={{
+                        flex: 1, minWidth: 0, padding: "14px 6px", borderRadius: 999,
+                        border: выбран ? `1.5px solid ${T.up}` : "1.5px solid transparent",
+                        background: T.surface, color: T.ice,
+                        fontFamily: bodyFont, fontSize: 14.5, fontWeight: 700,
+                        transition: "border-color 180ms ease",
+                      }}
+                    >
+                      {слова[и]}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
           {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
-          {/* Назад к словам хода нет намеренно: подсмотреть — значит не
-              проверить. */}
-          <button
-            onClick={сверить}
-            disabled={!всёВписано || идёт}
-            className="fx-tap w-full"
-            style={{
-              padding: "16px 0", borderRadius: 999, border: "none",
-              background: всёВписано && !идёт ? ЦВЕТ_КНОПКИ : T.surfaceHi,
-              color: всёВписано && !идёт ? PRISM_TEXT : T.muted,
-              fontFamily: displayFont, fontSize: 16, fontWeight: 800,
-            }}
-          >
-            {t("seedCheckCta")}
-          </button>
-        </div>
+          <div style={{ marginTop: "auto" }}>
+            <Кнопка надпись={t("quizDone")} onClick={сверить} активна={всёВыбрано && !идёт} />
+          </div>
+        </>
       )}
     </div>
   );
@@ -14390,9 +14547,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
      ничего снаружи. Внешний TON-кошелёк остаётся ниже отдельной
      карточкой: он не наш, и распоряжаться его содержимым мы не можем. */
   const [внутр, setВнутр] = useState(null);
-  /* Записана ли фраза кошелька. null — ещё спрашиваем, false — раздел
-     показывает заведение кошелька вместо самого кошелька. */
-  const [фразаГотова, setФразаГотова] = useState(null);
+  /* Что с фразой кошелька. null — ещё спрашиваем; started=false — раздел
+     показывает заведение; started && !ready — кошелёк работает, но копия
+     не сделана, и наверху висит строка «Секретная фраза». */
+  const [фраза, setФраза] = useState(null);
+  const [фразаОткрыта, setФразаОткрыта] = useState(false);
   const [обменОткрыт, setОбменОткрыт] = useState(false);
   const [получитьОткрыт, setПолучитьОткрыт] = useState(false);
   const [выводОткрыт, setВыводОткрыт] = useState(false);
@@ -14451,11 +14610,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       try {
         const { состояниеФразы } = await import("./appWallet");
         const о = await состояниеФразы();
-        if (жив) setФразаГотова(!!(о && о.ready));
+        if (жив) setФраза({ готово: !!(о && о.ready), начато: !!(о && (о.started || о.ready)) });
       } catch {
         // Сервер не ответил — кошелёк не запираем: деньги должны быть
         // видны, даже когда отметка недоступна.
-        if (жив) setФразаГотова(true);
+        if (жив) setФраза({ готово: true, начато: true });
       }
     })();
     return () => { жив = false; };
@@ -14542,11 +14701,36 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
      кошелёк на сервере уже есть, но человек ни разу не видел слов, по
      которым его возвращают: показываем их до того, как туда попадут
      деньги. */
-  if (фразаГотова === false) {
-    return <СозданиеКошелька insetTop={insetTop} insetBottom={insetBottom} showToast={showToast} onГотово={() => setФразаГотова(true)} />;
+  if (фраза && !фраза.начато) {
+    return (
+      <МастерФразы
+        режим="создание"
+        insetTop={insetTop}
+        insetBottom={insetBottom}
+        showToast={showToast}
+        onГотово={() => setФраза({ готово: true, начато: true })}
+        onПропустить={() => setФраза({ готово: false, начато: true })}
+      />
+    );
   }
 
-  if ((текущий == null || фразаГотова == null) && !ждёмДольше) {
+  /* Строку открыли — показываем тот же мастер, но длинной дорогой: с
+     предупреждением и галочкой. Слова здесь выходят посреди работающего
+     кошелька, где уже лежат деньги. */
+  if (фразаОткрыта) {
+    return (
+      <МастерФразы
+        режим="фраза"
+        insetTop={insetTop}
+        insetBottom={insetBottom}
+        showToast={showToast}
+        onНазад={() => setФразаОткрыта(false)}
+        onГотово={() => { setФразаОткрыта(false); setФраза({ готово: true, начато: true }); }}
+      />
+    );
+  }
+
+  if ((текущий == null || фраза == null) && !ждёмДольше) {
     return (
       <div className="flex flex-col" style={{ paddingTop: 4 }}>
         <div style={{ marginBottom: 14, padding: "0 16px" }}>
@@ -14596,6 +14780,37 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           {t("navWallet")}
         </h1>
       </div>
+
+      {/* Копия фразы отложена — строка висит первой и с красной точкой.
+          Без неё «потом запишу» превращается в «никогда»: напомнить об
+          этом больше нечем, а без фразы кошелёк не вернуть. */}
+      {фраза && фраза.начато && !фраза.готово && (
+        <button
+          onClick={() => { setФразаОткрыта(true); haptic("light"); }}
+          className="fx-tap w-full flex items-center"
+          style={{
+            gap: 12, margin: "0 16px 14px", width: "calc(100% - 32px)",
+            padding: "13px 14px", borderRadius: 20,
+            background: T.surface, border: "none",
+          }}
+        >
+          <span className="flex items-center justify-center flex-shrink-0" style={{
+            width: 36, height: 36, borderRadius: 999, background: hexA("#F5A623", 0.16), color: "#F5A623",
+          }}>
+            <Lock size={17} />
+          </span>
+          <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 800 }}>
+              {t("secretTitle")}
+            </span>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>
+              {t("secretRowHint")}
+            </span>
+          </span>
+          <span aria-hidden style={{ width: 9, height: 9, borderRadius: "50%", background: T.down, flexShrink: 0 }} />
+          <ChevronRight size={16} color={T.faint} />
+        </button>
+      )}
 
       {/* Карта баланса. Сумма читается одним взглядом: целые рубли
           крупно и белым, копейки приглушены — так глаз не спотыкается о

@@ -12,6 +12,12 @@
 alter table public.app_seeds
   add column if not exists confirmed_at timestamptz;
 
+-- Когда слова показали в первый раз. С этой минуты кошелёк считается
+-- заведённым: запись фразы можно отложить, и тогда в кошельке висит
+-- строка «Секретная фраза» с красной точкой, пока копия не сделана.
+alter table public.app_seeds
+  add column if not exists revealed_at timestamptz;
+
 -- Посмотреть, кто уже записал фразу:
 --
 --   select user_id, confirmed_at from public.app_seeds order by confirmed_at nulls first;
