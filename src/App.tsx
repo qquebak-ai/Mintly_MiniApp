@@ -2509,6 +2509,12 @@ function GlobalStyle() {
         from { opacity: 0; transform: translateY(16px); }
         to   { opacity: 1; transform: none; }
       }
+      /* Галочка не подставляется готовой, а рисуется — одним росчерком,
+         слева направо: так видно, что слово именно сейчас сошлось. */
+      @keyframes галочкаРисуется {
+        from { stroke-dashoffset: 26; }
+        to   { stroke-dashoffset: 0; }
+      }
       /* Уход страницы — короче прихода: назад человек уже решил, и ждать
          ему нечего. Без него вложенный экран просто исчезал кадром, и
          переход читался морганием, а не возвратом. */
@@ -14266,20 +14272,29 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
                     outline: "none", transition: "border-color 200ms ease",
                   }}
                 />
-                <span
-                  aria-hidden
-                  className="flex items-center justify-center"
-                  style={{
-                    position: "absolute", right: 12, top: "50%", marginTop: -11,
-                    width: 22, height: 22, borderRadius: "50%",
-                    background: hexA(T.up, 0.16), color: T.up, pointerEvents: "none",
-                    opacity: ответы[i].trim().toLowerCase() === слова[н] ? 1 : 0,
-                    transform: ответы[i].trim().toLowerCase() === слова[н] ? "none" : "scale(0.7)",
-                    transition: "opacity 200ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
-                  }}
-                >
-                  <Check size={14} strokeWidth={3} />
-                </span>
+                {ответы[i].trim().toLowerCase() === слова[н] && (
+                  <svg
+                    aria-hidden
+                    viewBox="0 0 24 24"
+                    style={{
+                      position: "absolute", right: 14, top: "50%", marginTop: -10,
+                      width: 20, height: 20, pointerEvents: "none", overflow: "visible",
+                    }}
+                  >
+                    <path
+                      d="M4 12.5 L9.5 18 L20 6.5"
+                      fill="none"
+                      stroke={T.up}
+                      strokeWidth="2.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{
+                        strokeDasharray: 26,
+                        animation: "галочкаРисуется 320ms cubic-bezier(0.65, 0, 0.35, 1) both",
+                      }}
+                    />
+                  </svg>
+                )}
               </div>
             </div>
           ))}
