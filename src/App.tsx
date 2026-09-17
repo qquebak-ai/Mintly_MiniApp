@@ -14079,7 +14079,7 @@ function СлоиТкани() {
  * спрашивается обратно: три слова наугад — короткая проверка, что копия
  * действительно сделана, а не «потом запишу».
  */
-function СозданиеКошелька({ onГотово = () => {}, showToast = () => {}, insetTop = 0 }) {
+function СозданиеКошелька({ onГотово = () => {}, showToast = () => {}, insetTop = 0, insetBottom = 0 }) {
   const [шаг, setШаг] = useState("начало");   // начало | слова | проверка
   const [слова, setСлова] = useState([]);
   const [идёт, setИдёт] = useState(false);
@@ -14147,40 +14147,48 @@ function СозданиеКошелька({ onГотово = () => {}, showToast
     /* Отступ сверху — тот же, что у самого кошелька: заголовок обязан
        стоять на одном месте до заведения и после, иначе при первом
        переходе он прыгает. */
-    <div className="flex flex-col" style={{ padding: "8px 16px 40px", gap: 16 }}>
+    <div className="flex flex-col" style={{
+      padding: "8px 16px 0", gap: 16,
+      /* Высота — ровно то, что осталось от экрана под разделом: кнопка
+         тогда стоит у нижнего края, а не посреди пустоты. */
+      minHeight: `calc(100vh - ${contentTopPad(insetTop) + 96 + insetBottom}px)`,
+    }}>
       <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
         {t("navWallet")}
       </h1>
 
       {шаг === "начало" ? (
-        <div className="flex flex-col items-center text-center" style={{
-          gap: 14, padding: "30px 20px", borderRadius: 26, background: T.surface,
-        }}>
-          <span className="flex items-center justify-center" style={{
-            width: 62, height: 62, borderRadius: "50%", background: hexA(T.electric, 0.14), color: T.electric,
-          }}>
-            <Wallet size={28} />
-          </span>
-          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            {t("walletMakeTitle")}
-          </span>
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
-            {t("walletMakeBody")}
-          </span>
-          {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
+        /* Подложки под текстом нет: карточка посреди пустого экрана
+           обводила рамкой воздух. Кнопка ушла к нижнему краю — туда, где
+           её и ищет большой палец. */
+        <>
+          <div className="flex flex-col items-center text-center" style={{ gap: 14, paddingTop: 34 }}>
+            <span className="flex items-center justify-center" style={{
+              width: 62, height: 62, borderRadius: "50%", background: hexA(T.electric, 0.14), color: T.electric,
+            }}>
+              <Wallet size={28} />
+            </span>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
+              {t("walletMakeTitle")}
+            </span>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600, lineHeight: 1.55 }}>
+              {t("walletMakeBody")}
+            </span>
+            {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
+          </div>
           <button
             onClick={завести}
             disabled={идёт}
             className="fx-tap w-full"
             style={{
-              marginTop: 4, padding: "16px 0", borderRadius: 999, border: "none",
+              marginTop: "auto", padding: "16px 0", borderRadius: 999, border: "none",
               background: идёт ? T.surfaceHi : ЦВЕТ_КНОПКИ, color: идёт ? T.muted : PRISM_TEXT,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             }}
           >
             {идёт ? t("walletMakeWait") : t("walletMakeCta")}
           </button>
-        </div>
+        </>
       ) : шаг === "слова" ? (
         <div className="flex flex-col" style={{ gap: 14 }}>
           <div className="flex flex-col" style={{ gap: 6 }}>
@@ -14486,7 +14494,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
      которым его возвращают: показываем их до того, как туда попадут
      деньги. */
   if (фразаГотова === false) {
-    return <СозданиеКошелька insetTop={insetTop} showToast={showToast} onГотово={() => setФразаГотова(true)} />;
+    return <СозданиеКошелька insetTop={insetTop} insetBottom={insetBottom} showToast={showToast} onГотово={() => setФразаГотова(true)} />;
   }
 
   if ((текущий == null || фразаГотова == null) && !ждёмДольше) {
