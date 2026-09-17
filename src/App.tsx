@@ -10958,42 +10958,48 @@ function МоиДела({ myTokens = [], achievements = [], userId, onGoCreate, 
 
       <МояАктивность userId={userId} тик={тик} />
 
-      <section>
-        <SectionTitle>{t("achievementsTitle")}</SectionTitle>
-        <button onClick={onOpenAchievements} className="fx-tap w-full text-left" style={{ padding: "2px 0" }}>
-          {/* Счёт показываем только посчитанный. Раньше он выводился из
-              полупустых данных и на глазах прыгал: «2 из 11» превращалось
-              в «5 из 11» через секунду после запуска, а полоса дёргалась
-              вместе с ним. */}
-          <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("achProgress")}</span>
-            {достиженияГотовы
-              ? (
-                <span className="fx-view" style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
-                  {tf("achUnlockedOf", { done: закрыто, total: achievements.length })}
-                </span>
-              )
-              : <ПлашкаЧисла width={52} height={15} radius={6} />}
-          </div>
-          <div style={{ height: 6, borderRadius: 3, background: T.surfaceHi, overflow: "hidden" }}>
-            <div style={{
-              width: достиженияГотовы && achievements.length ? `${(закрыто / achievements.length) * 100}%` : "0%",
-              height: "100%", background: T.electric,
-              // Полоса доезжает до своего места, а не встаёт туда рывком.
-              transition: "width 520ms cubic-bezier(0.22, 1, 0.36, 1)",
-            }} />
-          </div>
-          <div className="flex items-center gap-1.5" style={{ marginTop: 10, flexWrap: "wrap" }}>
-            {achievements.filter((a) => !a.done).slice(0, 3).map((a) => (
-              <span key={a.id} className="flex items-center gap-1 rounded-full px-2 py-1" style={{ background: T.surfaceHi, border: "none" }}>
-                <a.icon size={11} color={T.muted} />
-                <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: T.muted }}>{a.label}</span>
-              </span>
-            ))}
-          </div>
-        </button>
-      </section>
     </>
+  );
+}
+
+/* Достижения строкой прогресса. Стояли на главной, где их пролистывали
+   вместе с лентой; в профиле они на месте — это про себя, а не про
+   рынок. */
+function ДостиженияСтрокой({ achievements = [], onOpenAchievements, готовы = true }) {
+  const закрыто = achievements.filter((a) => a.done).length;
+  return (
+    <section>
+      <SectionTitle>{t("achievementsTitle")}</SectionTitle>
+      <button onClick={onOpenAchievements} className="fx-tap w-full text-left" style={{ padding: "2px 0" }}>
+        {/* Счёт показываем только посчитанный: из полупустых данных он на
+            глазах прыгал с «2 из 11» на другое число. */}
+        <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("achProgress")}</span>
+          {готовы
+            ? (
+              <span className="fx-view" style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
+                {tf("achUnlockedOf", { done: закрыто, total: achievements.length })}
+              </span>
+            )
+            : <ПлашкаЧисла width={52} height={15} radius={6} />}
+        </div>
+        <div style={{ height: 6, borderRadius: 3, background: T.surfaceHi, overflow: "hidden" }}>
+          <div style={{
+            width: готовы && achievements.length ? `${(закрыто / achievements.length) * 100}%` : "0%",
+            height: "100%", background: T.electric,
+            transition: "width 520ms cubic-bezier(0.22, 1, 0.36, 1)",
+          }} />
+        </div>
+        <div className="flex items-center gap-1.5" style={{ marginTop: 10, flexWrap: "wrap" }}>
+          {achievements.filter((a) => !a.done).slice(0, 3).map((a) => (
+            <span key={a.id} className="flex items-center gap-1 rounded-full px-2 py-1" style={{ background: T.surfaceHi, border: "none" }}>
+              <a.icon size={11} color={T.muted} />
+              <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: T.muted }}>{a.label}</span>
+            </span>
+          ))}
+        </div>
+      </button>
+    </section>
   );
 }
 
@@ -22113,6 +22119,14 @@ function ProfileView({
             за ними заходят каждый день, и держать их за лишним переходом
             значило прятать самое нужное. Здесь остаётся то, за чем
             приходят изредка, — подтверждение и настройки. */}
+
+        {/* Достижения вернулись сюда с главной: это про себя, а не про
+            рынок, и на ленте их пролистывали вместе с ней. */}
+        {accountCreated && (
+          <div className="mt-5">
+            <ДостиженияСтрокой achievements={achievements} onOpenAchievements={onOpenAchievements} />
+          </div>
+        )}
 
         {/* Подтверждённый профиль эту строку не показывает: о том, что он
             подтверждён, уже говорит значок у ника, а целый раздел ради
