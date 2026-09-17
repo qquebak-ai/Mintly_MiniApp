@@ -10757,7 +10757,7 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
       ) : (
       <span>
         {accountCreated && profile && profile.nickname && (
-          <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em" }}>
+          <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em" }}>
             {profile.nickname}
           </span>
         )}
