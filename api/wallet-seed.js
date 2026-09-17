@@ -67,10 +67,13 @@ async function хозяин(req, db) {
 
 /* Что с фразой у человека.
  *
- * «Заводили» и «записали» — разные вещи. Кошелёк на сервере появляется
- * сам при первом же обращении к нему, поэтому одного наличия строки мало:
- * начало отсчитываем от того, что человек попросил показать слова
- * (revealed_at), а конец — от того, что он прошёл проверку (confirmed_at).
+ * «Пущен в работу» и «записана» — разные вещи. Кошелёк на сервере
+ * появляется сам при первом обращении к нему, поэтому наличия строки мало.
+ * Начало отсчитываем от того, что человек сам отложил запись (revealed_at
+ * ставится действием «пропустить»), конец — от пройденной проверки
+ * (confirmed_at). Один лишь показ слов не значит ничего: человек мог
+ * ошибиться в проверке и уйти, и тогда при следующем запуске его снова
+ * встречает «Создать кошелёк» — уже со свежей фразой.
  * Колонок может ещё не быть — тогда считаем, что ни того, ни другого. */
 async function записана(db, id) {
   const { data, error } = await db
@@ -131,20 +134,31 @@ export default async function handler(req, res) {
       } else {
         фраза = await фразаПользователя(db, user, набор);
       }
-
-      // Помечаем, что слова человек уже видел: с этой минуты кошелёк
-      // считается заведённым, даже если запись он отложил.
-      await db.from("app_seeds").update({ revealed_at: new Date().toISOString() })
-        .eq("user_id", user.id).is("revealed_at", null);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ words: String(фраза).trim().split(/\s+/) });
+    }
+
+    if (действие === "skip") {
+      /* «Пропустить» — осознанный выбор: кошелёк идёт в работу, а запись
+         откладывается, и о ней напоминает красная точка в меню. Пока его
+         не сделали, показ слов заводит фразу заново — ошибиться в
+         проверке и уйти безопасно, деньгам ещё неоткуда взяться. */
+      const { error } = await db
+        .from("app_seeds").update({ revealed_at: new Date().toISOString() })
+        .eq("user_id", user.id).is("revealed_at", null);
+      if (error) {
+        console.error("[wallet-seed] отметка «отложено» не легла:", error.message);
+        return res.status(500).json({ error: "skip_failed", detail: error.message.slice(0, 160) });
+      }
+      return res.status(200).json({ ok: true });
     }
 
     if (действие === "confirm") {
       // Проверку слов делает экран: это память человека, а не пароль.
       // Серверу остаётся запомнить, что копия сделана.
       const { error } = await db
-        .from("app_seeds").update({ confirmed_at: new Date().toISOString() })
+        .from("app_seeds")
+        .update({ confirmed_at: new Date().toISOString(), revealed_at: new Date().toISOString() })
         .eq("user_id", user.id);
       if (error) {
         console.error("[wallet-seed] отметка не легла:", error.message);
