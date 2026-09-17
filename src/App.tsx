@@ -228,12 +228,6 @@ const STR = {
     welcomeWallet1Body: "Подключение TON-кошелька",
     welcomeWallet2: "Phantom",
     welcomeWallet2Body: "Подключение Solana-кошелька",
-    welcomeStep1: "Создай токен",
-    welcomeStep1Body: "Имя, тикер и изображение",
-    welcomeStep2: "Настрой запуск",
-    welcomeStep2Body: "Параметры токена и первая покупка",
-    welcomeStep3: "Выход на рынок",
-    welcomeStep3Body: "Токен появляется в приложении и становится доступен для торговли",
     welcomePoint1Title: "Свои контракты",
     welcomePoint1Body: "Контракт токена и пул написаны нами и открыты: весь выпуск уходит в токен, мимо него его не достать.",
     welcomePoint2Title: "Две сети",
@@ -241,14 +235,11 @@ const STR = {
     welcomePoint3Title: "Запуск за минуту",
     welcomePoint3Body: "Имя, тикер, картинка — и токен в сети вместе с первой покупкой, одной подписью в кошельке.",
     welcomeNext: "Дальше",
+    welcomeStart: "Начать",
     welcomeSlide2Title: "Рынок с первой секунды",
     welcomeSlide2Body: "Рынок токена — контракт, а не стакан заявок: он сам вторая сторона сделки. Цена идёт по формуле от выкупленного объёма, поэтому торговля начинается сразу, без чужой ликвидности.",
     welcomeSlide3Title: "TON и Solana рядом",
     welcomeSlide3Body: "TON и Solana с одинаковой математикой токена: контракт на Tact и программа на Rust. Переключение сетей — движением, а не переустановкой приложения.",
-    welcomeSlide4Title: "Запуск за пару минут",
-    welcomeSlide4Body: "Имя, тикер, картинка и первая покупка — остальное берёт на себя контракт: эмиссия, цена, комиссия и выход на биржу по достижении порога.",
-    welcomeCreate: "Создать аккаунт",
-    welcomeLogin: "У меня уже есть аккаунт",
     welcomeRisk: "Криптоактивы связаны с риском: цена токенов может значительно меняться, а вложения — быть потеряны.",
     nicknameLocked: "Никнейм выбирается один раз при создании аккаунта и не меняется.",
     bootStepAuth: "Вход в аккаунт", bootStepFeed: "Лента покупок",
@@ -848,6 +839,7 @@ const STR = {
     welcomePoint3Title: "A minute to launch",
     welcomePoint3Body: "Name, ticker, image — and the token is live, together with your first buy.",
     welcomeNext: "Next",
+    welcomeStart: "Start",
     welcomeChip1: "Fast launch",
     welcomeChip2: "Market from second one",
     welcomeChip3: "TON + Solana",
@@ -859,20 +851,10 @@ const STR = {
     welcomeWallet1Body: "Connect a TON wallet",
     welcomeWallet2: "Phantom",
     welcomeWallet2Body: "Connect a Solana wallet",
-    welcomeStep1: "Create a token",
-    welcomeStep1Body: "Name, ticker and image",
-    welcomeStep2: "Set up the launch",
-    welcomeStep2Body: "Token settings and your first buy",
-    welcomeStep3: "Go to market",
-    welcomeStep3Body: "The token lands on the curve and becomes tradable",
     welcomeSlide2Title: "A market from second one",
     welcomeSlide2Body: "A token\u2019s market is a contract, not an order book — it is the counterparty itself. Price follows a formula over the amount bought, so trading starts at once, with nobody else\u2019s liquidity.",
     welcomeSlide3Title: "TON and Solana side by side",
     welcomeSlide3Body: "TON and Solana with identical curve math: a Tact contract and a Rust program. Switching networks is a swipe, not a second app.",
-    welcomeSlide4Title: "A couple of minutes to launch",
-    welcomeSlide4Body: "Name, ticker, image and your first buy — the contract handles the rest: supply, price, fee and the move to a DEX once the threshold is met.",
-    welcomeCreate: "Create account",
-    welcomeLogin: "I already have an account",
     welcomeRisk: "Crypto assets carry risk: token prices can swing hard, and what you put in can be lost.",
     nicknameLocked: "A nickname is chosen once, when the account is created, and can't be changed.",
     bootStepAuth: "Signing in", bootStepFeed: "Buy feed",
@@ -8960,44 +8942,6 @@ function ВступлениеСети({ активен }) {
   );
 }
 
-/* Путь запуска: три шага, каждый со своей подписью.
-   Прежде здесь стояли три слова без пояснений — «Свои контракты», «Две
-   сети», «Запуск за минуту». Они ничего не обещали и ничего не
-   объясняли; человек на последнем экране должен видеть, что именно
-   произойдёт после кнопки. */
-function ВступлениеЗапуск({ активен }) {
-  const шаги = [
-    ["welcomeStep1", "welcomeStep1Body"],
-    ["welcomeStep2", "welcomeStep2Body"],
-    ["welcomeStep3", "welcomeStep3Body"],
-  ];
-  return (
-    <div className="flex flex-col justify-center" style={{ gap: 10 }}>
-      {шаги.map(([имя, подпись], i) => (
-        <div
-          key={имя}
-          className="flex items-center"
-          style={{
-            gap: 13, padding: "12px 15px", borderRadius: 18, ...СТЕКЛО,
-            animation: активен ? `вступлениеВверх 460ms ${i * 140}ms cubic-bezier(0.16,1,0.3,1) both` : "none",
-            opacity: активен ? undefined : 0,
-          }}
-        >
-          {/* Номер моноширинным и с нулём впереди: три строки выстраиваются
-              по одной вертикали, а «01» читается как шаг, а не как счётчик. */}
-          <span style={{ fontFamily: monoFont, fontSize: 12, color: T.electric, flexShrink: 0, letterSpacing: "0.02em" }}>
-            0{i + 1}
-          </span>
-          <div className="min-w-0">
-            <div style={{ fontFamily: displayFont, fontSize: 14, fontWeight: 600, color: "#F4F6FB" }}>{t(имя)}</div>
-            <div style={{ fontFamily: bodyFont, fontSize: 12.5, color: hexA("#FFFFFF", 0.56), marginTop: 1, lineHeight: 1.35 }}>{t(подпись)}</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /* Три обещания в строку под первым экраном. Заголовок говорит, что это
    за приложение, а эти три слова — что оно умеет; вместе они читаются
    быстрее любого абзаца. */
@@ -9092,7 +9036,7 @@ function ВступлениеКошельки({ активен }) {
  *
  * Показывается один раз: закрыл — больше не мешает.
  */
-function WelcomeScreen({ onCreate, onLogin, insetTop = 0 }) {
+function WelcomeScreen({ onCreate, insetTop = 0 }) {
   const лист = LEAF_KINDS[2];
   const лента = useRef(null);
   const [страница, setСтраница] = useState(0);
@@ -9107,7 +9051,6 @@ function WelcomeScreen({ onCreate, onLogin, insetTop = 0 }) {
     { title: "welcomeTitle", body: "welcomeSub", арт: ВступлениеМаскот, низ: ВступлениеЧипы },
     { title: "welcomeSlide2Title", body: "welcomeSlide2Body", арт: ВступлениеКривая, низ: ВступлениеРынок },
     { title: "welcomeSlide3Title", body: "welcomeSlide3Body", арт: ВступлениеСети, низ: ВступлениеКошельки },
-    { title: "welcomeSlide4Title", body: "welcomeSlide4Body", арт: ВступлениеЗапуск, низ: null },
   ];
   const последняя = страница >= страницы.length - 1;
 
@@ -9274,6 +9217,10 @@ function WelcomeScreen({ onCreate, onLogin, insetTop = 0 }) {
           })}
         </div>
 
+        {/* Отдельной страницы с кнопками «создать» и «уже есть аккаунт»
+            больше нет: первая вела на тот же экран создания, а вторая —
+            туда же, просто он сам узнаёт вошедшего. Последняя страница
+            знакомства заканчивается одной дверью. */}
         {последняя ? (
           <div className="flex flex-col" style={{ gap: 10, animation: "вступлениеВверх 420ms both" }}>
             <button
@@ -9287,17 +9234,7 @@ function WelcomeScreen({ onCreate, onLogin, insetTop = 0 }) {
                 fontFamily: displayFont, fontWeight: 600, fontSize: 15.5, letterSpacing: "-0.01em",
               }}
             >
-              {t("welcomeCreate")}
-            </button>
-            <button
-              onClick={onLogin}
-              className="fx-tap вст-кнопка w-full flex items-center justify-center gap-2"
-              style={{
-                padding: "15px 0", borderRadius: 20, ...СТЕКЛО,
-                color: "#F4F6FB", fontFamily: displayFont, fontWeight: 600, fontSize: 14.5,
-              }}
-            >
-              <Send size={14} /> {t("welcomeLogin")}
+              {t("welcomeStart")} <ChevronRight size={16} />
             </button>
             <p style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.34), fontSize: 11.5, lineHeight: 1.5, textAlign: "center", margin: "4px 0 0" }}>
               {t("welcomeRisk")}
@@ -20553,6 +20490,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     const ник = tgNick.trim();
     const никГоден = NICKNAME_RE.test(ник);
     const ждём = внутриTelegram && естьАккаунт == null;
+    // Выбранная картинка важнее телеграмной: человек только что её выбрал.
+    const лицо = avatarUrl || (tgUser && tgUser.photo_url) || "";
     // У кого аккаунт уже есть — тому нечего придумывать: одна кнопка.
     const входБезНика = естьАккаунт === true;
     const можно = внутриTelegram && !tgBusy && !ждём && (входБезНика || никГоден);
@@ -20581,6 +20520,20 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         await signInWithTelegram(входБезНика ? "" : ник);
         // Вошедшему второй ключ предлагать незачем — он уже выбирал.
         if (входБезНика) { onClose(); return; }
+        /* Картинку кладём после создания: до него нет ни сессии, ни
+           папки в хранилище — оно закрыто политиками по владельцу.
+           Неудача здесь аккаунт не отменяет, аватарку можно поменять
+           в профиле. */
+        if (avatarFile) {
+          try {
+            const { data } = await supabase.auth.getUser();
+            const id = data && data.user && data.user.id;
+            const ссылка = id ? await uploadAvatarIfNeeded(id) : null;
+            if (id && ссылка) await supabase.from("profiles").update({ avatar_url: ссылка }).eq("id", id);
+          } catch (e) {
+            console.warn("[mintly] аватарка не загрузилась:", e && e.message);
+          }
+        }
         setШагВхода("почта");
       } catch (err) {
         if ((err && err.message) === "nickname_required") setЕстьАккаунт(false);
@@ -20608,19 +20561,34 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         >
           {шагВхода === "ник" ? (
             <>
-              {/* Лицо из Telegram: аккаунт заводится именно на него, и это
-                  видно до нажатия, а не после. */}
+              {/* Лицо из Telegram — но его можно заменить сразу здесь:
+                  потом за этим пришлось бы идти в правку профиля, а
+                  аватарка это первое, что человек про себя решает. */}
               <div className="flex flex-col items-center text-center" style={{ gap: 12 }}>
-                <span style={{
-                  width: 76, height: 76, borderRadius: "50%", flexShrink: 0,
-                  background: tgUser && tgUser.photo_url
-                    ? `center/cover no-repeat url(${tgUser.photo_url})`
-                    : T.surfaceHi,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  border: `1px solid ${T.lineHi}`,
-                }}>
-                  {!(tgUser && tgUser.photo_url) && <User size={30} color={T.muted} />}
-                </span>
+                <input ref={avatarInputRef} type="file" accept="image/*" onChange={onPickAvatar} style={{ display: "none" }} />
+                <button
+                  onClick={() => avatarInputRef.current && avatarInputRef.current.click()}
+                  className="fx-tap flex items-center justify-center"
+                  style={{
+                    position: "relative", width: 76, height: 76, borderRadius: "50%", flexShrink: 0, padding: 0,
+                    background: лицо ? `center/cover no-repeat url(${лицо})` : T.surfaceHi,
+                    border: `1px solid ${T.lineHi}`,
+                  }}
+                >
+                  {!лицо && <User size={30} color={T.muted} />}
+                  {/* Значок камеры поверх края: без него кружок читается
+                      картинкой, а не кнопкой. */}
+                  <span className="flex items-center justify-center" style={{
+                    position: "absolute", right: -2, bottom: -2, width: 26, height: 26, borderRadius: "50%",
+                    background: T.surface, border: `2px solid ${T.surface}`, color: T.ice,
+                  }}>
+                    <span className="flex items-center justify-center" style={{
+                      width: "100%", height: "100%", borderRadius: "50%", background: ЦВЕТ_КНОПКИ_ПЛОСКО,
+                    }}>
+                      <ImageIcon size={13} color={PRISM_TEXT} />
+                    </span>
+                  </span>
+                </button>
                 <div className="flex flex-col" style={{ gap: 6 }}>
                   <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
                     {t("createTitle")}
@@ -20758,6 +20726,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           onClose={() => setПочтаОткрыта(false)}
           onГотово={() => { setПочтаОткрыта(false); onClose(); }}
         />
+        <ImageCropModal file={avatarCropFile} shape="circle" onCancel={() => setAvatarCropFile(null)} onConfirm={handleAvatarCropConfirm} />
       </div>
     );
   }
@@ -24279,7 +24248,6 @@ function mapTokenRow(row) {
         <WelcomeScreen
           insetTop={insetTop}
           onCreate={() => { закрытьПриветствие(); openCreateProfile(); }}
-          onLogin={() => { закрытьПриветствие(); openLoginProfile(); }}
         />
       )}
       {/* Заставки на входе больше нет: приложение открывается сразу, а
