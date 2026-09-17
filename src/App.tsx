@@ -20485,13 +20485,15 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
      всё остальное на экране только отвлекало бы. Режим редактирования
      профиля остаётся прежней формой (ник, описание, аватарка). */
   if (!isEdit) {
-    const tgUser = telegramUser();
     const внутриTelegram = !!telegramInitData();
     const ник = tgNick.trim();
     const никГоден = NICKNAME_RE.test(ник);
     const ждём = внутриTelegram && естьАккаунт == null;
-    // Выбранная картинка важнее телеграмной: человек только что её выбрал.
-    const лицо = avatarUrl || (tgUser && tgUser.photo_url) || "";
+    /* Кружок пустой, пока человек не выбрал картинку сам. Раньше сюда
+       подставлялось лицо из Telegram — и выглядело это как «аватарка уже
+       есть», хотя её никто не выбирал; поменять её при этом тоже не
+       приходило в голову. */
+    const лицо = avatarUrl || "";
     // У кого аккаунт уже есть — тому нечего придумывать: одна кнопка.
     const входБезНика = естьАккаунт === true;
     const можно = внутриTelegram && !tgBusy && !ждём && (входБезНика || никГоден);
@@ -20561,33 +20563,23 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         >
           {шагВхода === "ник" ? (
             <>
-              {/* Лицо из Telegram — но его можно заменить сразу здесь:
-                  потом за этим пришлось бы идти в правку профиля, а
-                  аватарка это первое, что человек про себя решает. */}
+              {/* Аватарка выбирается сразу здесь: потом за этим пришлось
+                  бы идти в правку профиля, а это первое, что человек про
+                  себя решает. */}
               <div className="flex flex-col items-center text-center" style={{ gap: 12 }}>
                 <input ref={avatarInputRef} type="file" accept="image/*" onChange={onPickAvatar} style={{ display: "none" }} />
                 <button
                   onClick={() => avatarInputRef.current && avatarInputRef.current.click()}
                   className="fx-tap flex items-center justify-center"
                   style={{
-                    position: "relative", width: 76, height: 76, borderRadius: "50%", flexShrink: 0, padding: 0,
-                    background: лицо ? `center/cover no-repeat url(${лицо})` : T.surfaceHi,
-                    border: `1px solid ${T.lineHi}`,
+                    width: 76, height: 76, borderRadius: "50%", flexShrink: 0, padding: 0,
+                    background: лицо ? `center/cover no-repeat url(${лицо})` : "transparent",
+                    // Пунктир у пустого кружка: он сам говорит, что здесь
+                    // чего-то не хватает, и значок поверх края не нужен.
+                    border: лицо ? `1px solid ${T.lineHi}` : `1px dashed ${T.lineHi}`,
                   }}
                 >
-                  {!лицо && <User size={30} color={T.muted} />}
-                  {/* Значок камеры поверх края: без него кружок читается
-                      картинкой, а не кнопкой. */}
-                  <span className="flex items-center justify-center" style={{
-                    position: "absolute", right: -2, bottom: -2, width: 26, height: 26, borderRadius: "50%",
-                    background: T.surface, border: `2px solid ${T.surface}`, color: T.ice,
-                  }}>
-                    <span className="flex items-center justify-center" style={{
-                      width: "100%", height: "100%", borderRadius: "50%", background: ЦВЕТ_КНОПКИ_ПЛОСКО,
-                    }}>
-                      <ImageIcon size={13} color={PRISM_TEXT} />
-                    </span>
-                  </span>
+                  {!лицо && <Plus size={26} strokeWidth={2.2} color={T.muted} />}
                 </button>
                 <div className="flex flex-col" style={{ gap: 6 }}>
                   <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
