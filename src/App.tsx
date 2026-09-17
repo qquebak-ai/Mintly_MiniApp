@@ -396,6 +396,8 @@ const STR = {
     seedDone: "Кошелёк готов",
     secretTitle: "Секретная фраза",
     secretRowHint: "Копия не сделана",
+    secretDoneTitle: "Резервная копия сделана",
+    secretShowRow: "Показать секретную фразу",
     secretManualTitle: "Вручную",
     secretManualBody: "Создайте резервную копию своего кошелька вручную, записав секретную фразу.",
     secretManualCta: "Сделать копию вручную",
@@ -1066,6 +1068,8 @@ const STR = {
     seedDone: "The wallet is ready",
     secretTitle: "Secret phrase",
     secretRowHint: "No backup yet",
+    secretDoneTitle: "Backup is done",
+    secretShowRow: "Show the secret phrase",
     secretManualTitle: "Manually",
     secretManualBody: "Back up your wallet by hand: write the secret phrase down.",
     secretManualCta: "Back up manually",
@@ -10694,7 +10698,7 @@ function ЭкранНастроек({ открыт, onClose, profile, accountCre
  * внутри него. Меню выкладывает эти двери в один список и закрывается
  * тем же движением, каким открылось.
  */
-function БоковоеМеню({ открыто, onClose, profile, accountCreated, supportUnread = 0, onПункт, onВход, фразаЖдёт = false, insetTop = 0, insetBottom = 0 }) {
+function БоковоеМеню({ открыто, onClose, profile, accountCreated, supportUnread = 0, onПункт, onВход, фразаЖдёт = false, фразаЕсть = false, insetTop = 0, insetBottom = 0 }) {
   const [уходит, setУходит] = useState(false);
   const [тяга, setТяга] = useState(0);
   const жест = useRef(null);
@@ -10751,7 +10755,9 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
     /* Пока копия фразы не сделана, пункт стоит здесь и с красной точкой.
        В самом кошельке он занимал первую строку над балансом — а нужен
        он один раз, и место над деньгами дороже. */
-    ...(фразаЖдёт ? [{ key: "secret", icon: Lock, label: t("secretTitle"), точка: true }] : []),
+    /* Пункт остаётся и после записи: фразу иногда нужно посмотреть
+       заново, а красная точка на нём горит, только пока копии нет. */
+    ...(фразаЕсть ? [{ key: "secret", icon: Lock, label: t("secretTitle"), точка: фразаЖдёт }] : []),
   ];
   const низ = [
     { key: "settings", icon: Settings, label: t("settings") },
@@ -14124,6 +14130,20 @@ function НабраннаяСтрока({ текст, шаг = 22 }) {
  * спрашивается обратно: три слова наугад — короткая проверка, что копия
  * действительно сделана, а не «потом запишу».
  */
+/* Когда сделали копию — одной строкой. Показывается там же, где стоит
+   галочка «резервная копия сделана». */
+function датаЗаписи(когда) {
+  const д = new Date(когда);
+  if (Number.isNaN(д.getTime())) return "";
+  try {
+    return д.toLocaleString(lang === "EN" ? "en-GB" : "ru-RU", {
+      day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
+    });
+  } catch {
+    return д.toISOString().slice(0, 16).replace("T", " ");
+  }
+}
+
 /* Фраза кошелька: заведение и резервная копия.
  *
  * Один мастер на два входа. Первый — заведение кошелька: человек жмёт
@@ -14138,6 +14158,8 @@ function НабраннаяСтрока({ текст, шаг = 22 }) {
  */
 function МастерФразы({
   режим = "создание",            // создание | фраза
+  записана = false,              // копия уже сделана — экран другой
+  когдаЗаписана = "",            // когда именно, готовой строкой
   onГотово = () => {},
   onПропустить = () => {},
   onНазад = null,
@@ -14340,17 +14362,53 @@ function МастерФразы({
               {t("secretManualBody")}
             </span>
           </div>
-          <button
-            onClick={() => { setСогласен(false); setШаг("безопасность"); haptic("light"); }}
-            className="fx-tap w-full"
-            style={{
-              marginTop: 6, padding: "18px 0", borderRadius: 20, border: "none",
-              background: T.surfaceHi, color: T.ice,
-              fontFamily: displayFont, fontSize: 16, fontWeight: 800,
-            }}
-          >
-            {t("secretManualCta")}
-          </button>
+          {записана ? (
+            /* Копия уже сделана: вместо призыва — отметка с датой, а
+               фразу можно посмотреть заново, снова через предупреждение. */
+            <>
+              <div className="flex items-center w-full" style={{
+                gap: 14, padding: "14px 16px", borderRadius: 20, background: T.surface, marginTop: 6,
+              }}>
+                <span className="flex items-center justify-center flex-shrink-0" style={{
+                  width: 48, height: 48, borderRadius: "50%", background: T.up, color: "#04120A",
+                }}>
+                  <Check size={26} strokeWidth={3.2} />
+                </span>
+                <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                  <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16.5, fontWeight: 800 }}>
+                    {t("secretDoneTitle")}
+                  </span>
+                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
+                    {когдаЗаписана || ""}
+                  </span>
+                </span>
+              </div>
+              <button
+                onClick={() => { setСогласен(false); setШаг("безопасность"); haptic("light"); }}
+                className="fx-tap w-full flex items-center"
+                style={{
+                  gap: 12, padding: "18px 16px", borderRadius: 20, border: "none",
+                  background: T.surface, color: T.ice,
+                  fontFamily: displayFont, fontSize: 16, fontWeight: 700,
+                }}
+              >
+                <span className="flex-1 text-left">{t("secretShowRow")}</span>
+                <Lock size={18} color={T.electric} />
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => { setСогласен(false); setШаг("безопасность"); haptic("light"); }}
+              className="fx-tap w-full"
+              style={{
+                marginTop: 6, padding: "18px 0", borderRadius: 20, border: "none",
+                background: T.surfaceHi, color: T.ice,
+                fontFamily: displayFont, fontSize: 16, fontWeight: 800,
+              }}
+            >
+              {t("secretManualCta")}
+            </button>
+          )}
         </>
       ) : шаг === "безопасность" ? (
         /* Предупреждение перед показом. Галочка здесь не формальность:
@@ -14450,7 +14508,10 @@ function МастерФразы({
             <Copy size={15} /> {t("seedCopy")}
           </button>
           <div className="flex flex-col" style={{ marginTop: "auto", gap: 4 }}>
-            <Кнопка надпись={t("saveCheck")} onClick={спросить} />
+            <Кнопка
+              надпись={записана ? t("authGotIt") : t("saveCheck")}
+              onClick={записана ? (onНазад || onГотово) : спросить}
+            />
             {/* Отложить можно: кошелёк уже заведён, а строка «Секретная
                 фраза» с красной точкой останется на виду, пока копия не
                 сделана. */}
@@ -14714,6 +14775,8 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     return (
       <МастерФразы
         режим="фраза"
+        записана={!!(фраза && фраза.готово)}
+        когдаЗаписана={фраза && фраза.когда ? датаЗаписи(фраза.когда) : ""}
         insetTop={insetTop}
         insetBottom={insetBottom}
         showToast={showToast}
@@ -14985,15 +15048,12 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             { ключ: "sol", тикер: "SOL", имя: "Solana", лого: "/coins/sol.png", сколько: солНаКошельке, курс: курсSol },
             { ключ: "ton", тикер: ТИКЕР_TON, имя: "Gram", лого: "/coins/gram.png", сколько: тонНаКошельке, курс: tonPriceUsd },
           ].map((монета) => (
-            <button
+            /* Строка, а не кнопка: выбирать тут нечего — сеть перевода
+               спрашивается там, где она и нужна, на пополнении. */
+            <div
               key={монета.ключ}
-              onClick={() => { setСетьКошелька(монета.ключ); haptic("light"); }}
-              className="fx-tap w-full flex items-center"
-              style={{
-                gap: 12, padding: "12px 10px", borderRadius: 18, border: "none",
-                background: сетьКошелька === монета.ключ ? T.surface : "transparent",
-                transition: "background 200ms ease",
-              }}
+              className="w-full flex items-center"
+              style={{ gap: 12, padding: "12px 10px" }}
             >
               <img
                 src={монета.лого}
@@ -15016,7 +15076,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
                   {монета.курс > 0 ? `≈ $${(монета.сколько * монета.курс).toFixed(2)}` : "—"}
                 </span>
               </span>
-            </button>
+            </div>
           ))}
         </div>
 
@@ -24592,7 +24652,11 @@ function mapTokenRow(row) {
       try {
         const { состояниеФразы } = await import("./appWallet");
         const о = await состояниеФразы();
-        if (жив) setФразаКошелька({ готово: !!(о && о.ready), начато: !!(о && (о.started || о.ready)) });
+        if (жив) setФразаКошелька({
+          готово: !!(о && о.ready),
+          начато: !!(о && (о.started || о.ready)),
+          когда: (о && о.confirmedAt) || null,
+        });
       } catch {
         // Сервер не ответил — кошелёк не запираем: деньги должны быть
         // видны, даже когда отметка недоступна.
@@ -25569,6 +25633,7 @@ function mapTokenRow(row) {
           supportUnread={supportUnread}
           onВход={openLoginProfile}
           фразаЖдёт={!!(фразаКошелька && фразаКошелька.начато && !фразаКошелька.готово)}
+          фразаЕсть={!!(фразаКошелька && фразаКошелька.начато)}
           insetTop={insetTop}
           insetBottom={insetBottom}
           onПункт={(ключ) => {

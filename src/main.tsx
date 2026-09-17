@@ -70,15 +70,6 @@ if (tg) {
       отдан = кому;
       try { кому ? tg.enableVerticalSwipes() : tg.disableVerticalSwipes(); } catch { /* старый клиент */ }
     };
-    // Есть ли под пальцем то, что вообще прокручивается: у самого
-    // элемента прокрутки может не быть, а у его предка — быть.
-    const естьПрокрутка = (эл: Element | null) => {
-      for (let у: Element | null = эл; у && у !== document.body; у = у.parentElement) {
-        const с = getComputedStyle(у);
-        if (/(auto|scroll)/.test(с.overflowY) && у.scrollHeight - у.clientHeight > 4) return true;
-      }
-      return (document.documentElement.scrollHeight - window.innerHeight) > 4;
-    };
     document.addEventListener(
       "touchstart",
       (e) => {
@@ -91,8 +82,13 @@ if (tg) {
         // же движением вниз. Отданный Telegram жест сворачивал вместо
         // этого всё приложение — прямо посреди набора суммы.
         if (цель.closest('[data-sheet="1"]')) { отдать(false); return; }
+        /* Решает только место касания, а не длина списка. Раньше в
+           расчёт шло, есть ли под пальцем чему прокручиваться, — и в
+           короткой ленте (например, в пустом мемпаде) пустое место под
+           списком сворачивало всё приложение движением вниз. Разделы
+           должны вести себя одинаково, сколько бы в них ни было строк. */
         const y = e.touches && e.touches[0] ? e.touches[0].clientY : 0;
-        отдать(y <= ПОЛОСА_ОКНА || !естьПрокрутка(цель));
+        отдать(y <= ПОЛОСА_ОКНА);
       },
       { passive: true, capture: true }
     );
