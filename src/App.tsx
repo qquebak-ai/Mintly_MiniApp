@@ -389,6 +389,7 @@ const STR = {
     seedCheckBody: "Впиши три слова из своей записи — так станет ясно, что копия у тебя есть.",
     seedWordNo: "Слово №{n}",
     seedCheckWrong: "Не сходится — проверь свою запись.",
+    seedTryAgain: "Не то слово — попробуй ещё раз.",
     seedCheckCta: "Готово",
     seedDone: "Кошелёк готов",
     secretTitle: "Секретная фраза",
@@ -1056,6 +1057,7 @@ const STR = {
     seedCheckBody: "Type three words from your copy — that proves you have it.",
     seedWordNo: "Word #{n}",
     seedCheckWrong: "Doesn't match — check your copy.",
+    seedTryAgain: "Wrong word — try again.",
     seedCheckCta: "Done",
     seedDone: "The wallet is ready",
     secretTitle: "Secret phrase",
@@ -14145,9 +14147,13 @@ function МастерФразы({
   const [идёт, setИдёт] = useState(false);
   const [беда, setБеда] = useState("");
   const [согласен, setСогласен] = useState(false);
-  // Какие слова спрашиваем и что человек выбрал.
+  /* Какие слова спрашиваем, что выбрано и до какого ряда дошли.
+     Ряды идут по очереди: вразнобой человек тыкал бы наугад, а проверка
+     держится как раз на том, что порядок он помнит. */
   const [спрос, setСпрос] = useState([]);
-  const [выбор, setВыбор] = useState({});
+  const [выбор, setВыбор] = useState({});   // номер → слово
+  const [мимо, setМимо] = useState(null);   // { номер, слово } — последняя ошибка
+  const [ряд, setРяд] = useState(0);
 
   async function показать() {
     if (идёт) return;
@@ -14189,13 +14195,14 @@ function МастерФразы({
       return { номер: н, варианты };
     }));
     setВыбор({});
+    setМимо(null);
+    setРяд(0);
     setБеда("");
     setШаг("викторина");
   }
 
   async function сверить() {
-    const сошлось = спрос.every((в) => выбор[в.номер] === слова[в.номер]);
-    if (!сошлось) { setБеда(t("seedCheckWrong")); haptic("error"); return; }
+    if (!всёВыбрано) { setБеда(t("seedCheckWrong")); haptic("error"); return; }
     setИдёт(true);
     try {
       const { отметитьФразу } = await import("./appWallet");
@@ -14211,7 +14218,24 @@ function МастерФразы({
     }
   }
 
-  const всёВыбрано = спрос.length === 3 && спрос.every((в) => выбор[в.номер]);
+  const всёВыбрано = спрос.length === 3 && спрос.every((в) => выбор[в.номер] === слова[в.номер]);
+
+  /* Ответ на текущий ряд. Верный открывает следующий, неверный остаётся
+     красным на нём же: ряд не пропускается, пока слово не сошлось. */
+  function ответить(вопрос, слово, номерРяда) {
+    if (номерРяда !== ряд) return;
+    if (слово === слова[вопрос.номер]) {
+      setВыбор((б) => ({ ...б, [вопрос.номер]: слово }));
+      setМимо(null);
+      setБеда("");
+      setРяд((н) => н + 1);
+      haptic("success");
+      return;
+    }
+    setМимо({ номер: вопрос.номер, слово });
+    setБеда(t("seedTryAgain"));
+    haptic("error");
+  }
 
   /* Стрелка Telegram знает, куда ведёт назад с каждого шага. Раньше в
      шапке оставалось одно «Закрыть»: выход из приложения целиком вместо
@@ -14437,38 +14461,54 @@ function МастерФразы({
               })}
             </span>
           </div>
-          {спрос.map((вопрос) => (
-            <div key={вопрос.номер} className="flex flex-col" style={{ gap: 8 }}>
-              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 700 }}>
-                {вопрос.номер + 1}.
-              </span>
-              <div className="flex" style={{ gap: 8 }}>
-                {вопрос.варианты.map((и) => {
-                  const выбран = выбор[вопрос.номер] === слова[и];
-                  return (
-                    <button
-                      key={и}
-                      onClick={() => {
-                        setВыбор((б) => ({ ...б, [вопрос.номер]: слова[и] }));
-                        setБеда("");
-                        haptic("light");
-                      }}
-                      className="fx-tap"
-                      style={{
-                        flex: 1, minWidth: 0, padding: "14px 6px", borderRadius: 999,
-                        border: выбран ? `1.5px solid ${T.up}` : "1.5px solid transparent",
-                        background: T.surface, color: T.ice,
-                        fontFamily: bodyFont, fontSize: 14.5, fontWeight: 700,
-                        transition: "border-color 180ms ease",
-                      }}
-                    >
-                      {слова[и]}
-                    </button>
-                  );
-                })}
+          {спрос.map((вопрос, номерРяда) => {
+            const открыт = номерРяда <= ряд;
+            return (
+              <div
+                key={вопрос.номер}
+                className="flex flex-col"
+                style={{
+                  gap: 8,
+                  // Ряды ниже текущего ждут своей очереди и не нажимаются.
+                  opacity: открыт ? 1 : 0.4,
+                  pointerEvents: открыт ? "auto" : "none",
+                  transition: "opacity 320ms ease",
+                }}
+              >
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 700 }}>
+                  {вопрос.номер + 1}.
+                </span>
+                <div className="flex" style={{ gap: 8 }}>
+                  {вопрос.варианты.map((и) => {
+                    const верно = выбор[вопрос.номер] === слова[и];
+                    const ошибка = !!мимо && мимо.номер === вопрос.номер && мимо.слово === слова[и];
+                    return (
+                      <button
+                        key={и}
+                        onClick={() => ответить(вопрос, слова[и], номерРяда)}
+                        className="fx-tap"
+                        style={{
+                          flex: 1, minWidth: 0, padding: "14px 6px", borderRadius: 999,
+                          /* Рамка проявляется медленно: ответ — это итог
+                             раздумья, и подсветка рывком читалась бы как
+                             отказ нажатия, а не как оценка. */
+                          border: `1.5px solid ${верно ? T.up : ошибка ? T.down : "transparent"}`,
+                          boxShadow: верно ? `0 0 0 3px ${hexA(T.up, 0.14)}`
+                            : ошибка ? `0 0 0 3px ${hexA(T.down, 0.14)}`
+                            : "0 0 0 0 transparent",
+                          background: T.surface, color: T.ice,
+                          fontFamily: bodyFont, fontSize: 14.5, fontWeight: 700,
+                          transition: "border-color 620ms ease, box-shadow 620ms ease",
+                        }}
+                      >
+                        {слова[и]}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
           <div style={{ marginTop: "auto" }}>
             <Кнопка надпись={t("quizDone")} onClick={сверить} активна={всёВыбрано && !идёт} краска={ЦВЕТ_КНОПКИ_ХВОЯ} />
