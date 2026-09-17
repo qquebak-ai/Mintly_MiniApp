@@ -17671,6 +17671,20 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
     return () => { if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); };
   }, [file]);
 
+  /* Пока кадрируют, вертикальный жест наш.
+   *
+   * Картинку двигают пальцем — в том числе вниз, — и Telegram принимал
+   * это движение за «свернуть приложение»: человек поправлял аватарку и
+   * терял приложение целиком. Просим окно отдать жест на всё время, пока
+   * открыто кадрирование, и возвращаем на выходе. */
+  useEffect(() => {
+    if (!file) return undefined;
+    const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    if (!tg || !tg.disableVerticalSwipes) return undefined;
+    try { tg.disableVerticalSwipes(); } catch (e) { /* старый клиент */ }
+    return () => { try { tg.enableVerticalSwipes(); } catch (e) { /* старый клиент */ } };
+  }, [file]);
+
   const scale = baseScale * zoom;
 
   function clampPos(x, y, s) {
@@ -17794,6 +17808,10 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
   const modal = (
     <div
       className="fx-modal-back"
+      // Пометка для main.tsx: внутри этого окна вертикальный жест наш, и
+      // отдавать его Telegram нельзя — иначе движение картинки вниз
+      // сворачивает приложение.
+      data-sheet="1"
       style={{
         position: "fixed", inset: 0, zIndex: 300,
         background: "rgba(0,0,0,0.9)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
