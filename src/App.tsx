@@ -2000,6 +2000,12 @@ function GlobalStyle() {
         50%  { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
       }
+      /* Белый блик по зелёной рамке. Слоёв два: заливка поля и сама рамка,
+         поэтому и положений два — первое стоит на месте, второе бежит. */
+      @keyframes рамкаПереливается {
+        from { background-position: 0 0, 0% 50%; }
+        to   { background-position: 0 0, 100% 50%; }
+      }
       @media (prefers-reduced-motion: reduce) {
         /* Блик идёт в одну сторону и начинает сначала: возврат читался бы
          качанием, а нужна пробежка. */
@@ -2008,6 +2014,7 @@ function GlobalStyle() {
         to   { background-position: 0% 50%; }
       }
       @keyframes кнопкаПереливается { from { background-position: 0% 50%; } to { background-position: 0% 50%; } }
+      @keyframes рамкаПереливается { from { background-position: 0 0, 0% 50%; } to { background-position: 0 0, 0% 50%; } }
       }
       /* Смена числа: цифры не подменяются молча, а коротко вспыхивают
          цветом движения и подскакивают. Так видно, что цена только что
@@ -20731,9 +20738,22 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                       хранится без неё, и человеку не нужно про это знать. */}
                   <div className="flex items-center" style={{
                     gap: 2, padding: "14px 15px", borderRadius: 18,
-                    background: T.surfaceHi,
-                    border: `1px solid ${tgNickTouched && !никГоден ? T.down : (никГоден ? T.up : "transparent")}`,
-                    transition: "border-color 200ms ease",
+                    /* Годный ник — живая рамка: по зелёному бежит белый
+                       блик. Рамка рисуется вторым слоем заливки (тем же
+                       приёмом, что и переливы на кнопках): у border-color
+                       градиента не бывает, а гонять тень вокруг поля
+                       дороже и заметнее по краям. */
+                    ...(никГоден ? {
+                      border: "1px solid transparent",
+                      background: `linear-gradient(${T.surfaceHi}, ${T.surfaceHi}) padding-box,`
+                        + ` linear-gradient(100deg, ${T.up} 0%, ${T.up} 44%, #FFFFFF 50%, ${T.up} 56%, ${T.up} 100%) border-box`,
+                      backgroundSize: "auto, 300% 100%",
+                      animation: "рамкаПереливается 2.6s linear infinite",
+                    } : {
+                      background: T.surfaceHi,
+                      border: `1px solid ${tgNickTouched && !никГоден ? T.down : "transparent"}`,
+                      transition: "border-color 200ms ease",
+                    }),
                   }}>
                     <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 16 }}>@</span>
                     <input
