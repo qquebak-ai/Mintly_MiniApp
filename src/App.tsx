@@ -366,6 +366,10 @@ const STR = {
     mail2faRow: "Почта для 2ФА",
     mail2faAsk: "Спрашивать код с почты при выводе",
     authMailTooOften: "Слишком часто. Подожди минуту и попробуй снова.",
+    authMailBad: "Проверь адрес — он не похож на почту",
+    authMailService: "Такую почту не принимаем. Подойдут Gmail, Mail.ru, Яндекс, Proton, iCloud, Outlook.",
+    authMailServices: "Gmail, Mail.ru, Яндекс, Proton, iCloud, Outlook и другие крупные службы",
+    mailLocked: "Почта у аккаунта одна и не меняется",
     mailSendFailed: "Письмо не ушло: почтовый сервер отказал. Попробуй позже.",
     authCodeResend: "Отправить заново",
     authGotIt: "Понятно",
@@ -989,6 +993,10 @@ const STR = {
     mail2faRow: "Email for 2FA",
     mail2faAsk: "Ask for the emailed code on withdrawal",
     authMailTooOften: "Too often. Wait a minute and try again.",
+    authMailBad: "Check the address — it doesn't look like an email",
+    authMailService: "We don't accept that provider. Gmail, Mail.ru, Yandex, Proton, iCloud and Outlook work.",
+    authMailServices: "Gmail, Mail.ru, Yandex, Proton, iCloud, Outlook and other major providers",
+    mailLocked: "An account keeps one email, and it can't be changed",
     mailSendFailed: "The letter didn't go out: the mail server refused. Try again later.",
     authCodeResend: "Send again",
     authGotIt: "Got it",
@@ -8971,497 +8979,6 @@ const СТЕКЛО = {
   boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07), 0 10px 26px rgba(0,0,0,0.34)",
 };
 
-/* Маскот на первом экране знакомства — крупно и по центру. */
-function ВступлениеМаскот() {
-  return (
-    <div style={{ display: "flex", justifyContent: "center", padding: "6px 0 2px" }}>
-      <КотПланета size={150} />
-    </div>
-  );
-}
-
-/* Цвета текста на этих экранах заданы прямо, а не через тему: экран
-   знакомства всегда тёмный, и в светлой теме «цвет основного текста»
-   становится почти чёрным — надписи на тёмном фоне пропадали. */
-function ВступлениеКривая({ активен }) {
-  const линия = "M8 96 C 40 92, 62 78, 84 56 S 128 14, 156 8";
-  // Та же кривая, замкнутая вниз: по ней заливается площадь под линией.
-  const площадь = `${линия} L 156 110 L 8 110 Z`;
-  const ДЛИТЕЛЬНОСТЬ = "1.4s";
-  // Плавность у линии и у точки должна быть одна и та же, иначе точка
-  // отрывается от кончика: она едет по пути, а он «проявляется» рядом.
-  const ПЛАВНО = "0.22 1 0.36 1";
-  return (
-    // Ключ перезапускает рисование при возврате на слайд: без него
-    // анимация проигрывается один раз за всё время жизни экрана.
-    <svg key={активен ? "идёт" : "стоит"} width="100%" height="150" viewBox="0 0 164 116"
-      style={{ overflow: "visible" }} aria-hidden>
-      <defs>
-        <linearGradient id="встТокен" x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor={hexA(T.electric, 0.35)} />
-          <stop offset="100%" stopColor="#A6B0FF" />
-        </linearGradient>
-        {/* Площадь под линией — то, чем биржевой график отличается от
-            росчерка: она показывает, что за линией стоит объём. */}
-        <linearGradient id="встПлощадь" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={hexA(T.electric, 0.28)} />
-          <stop offset="100%" stopColor={hexA(T.electric, 0)} />
-        </linearGradient>
-        <filter id="встСвечение" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="3.4" result="р" />
-          <feMerge><feMergeNode in="р" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <path id="встПуть" d={линия} />
-      </defs>
-
-      {/* Сетка почти не видна: она задаёт масштаб, а не рисует клетку. */}
-      {[26, 52, 78, 104].map((y) => (
-        <line key={y} x1="0" y1={y} x2="164" y2={y} stroke={hexA("#FFFFFF", 0.045)} strokeWidth="0.8" />
-      ))}
-      <line x1="0" y1="110" x2="164" y2="110" stroke={hexA("#FFFFFF", 0.09)} strokeWidth="0.8" />
-      {/* Деления по времени — короткие штрихи, как на настоящей оси. */}
-      {[24, 60, 96, 132].map((x) => (
-        <line key={x} x1={x} y1="110" x2={x} y2="113.5" stroke={hexA("#FFFFFF", 0.09)} strokeWidth="0.8" />
-      ))}
-
-      <path
-        d={площадь}
-        fill="url(#встПлощадь)"
-        style={активен
-          ? { animation: "вступлениеВверх 900ms 520ms cubic-bezier(0.16,1,0.3,1) both" }
-          : { opacity: 0 }}
-      />
-      <path
-        d={линия}
-        fill="none"
-        stroke="url(#встТокен)"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        filter="url(#встСвечение)"
-        /* Своя мера длины: без неё штрих в 240 единиц не совпадает с
-           настоящей длиной кривой, линия дорисовывается раньше времени и
-           убегает вперёд точки. */
-        pathLength="240"
-        style={активен ? {
-          ["--длина"]: 240,
-          strokeDasharray: 240,
-          animation: `линияРисуется ${ДЛИТЕЛЬНОСТЬ} cubic-bezier(0.22,1,0.36,1) both`,
-        } : { strokeDasharray: 240, strokeDashoffset: 240 }}
-      />
-      {/* Точка — «сейчас». Она не появляется на конце, а едет по самой
-          линии впереди её роста: так это читается как ход рынка, а не
-          как нарисованная заранее картинка. Движение задано разметкой, а
-          не стилями: CSS-путь понимают не все телефоны, а этот способ
-          работает везде, где вообще есть SVG. */}
-      {активен ? (
-        <g>
-          <circle r="7" fill={hexA(T.electric, 0.22)}>
-            <animateMotion dur={ДЛИТЕЛЬНОСТЬ} fill="freeze"
-              calcMode="spline" keyTimes="0;1" keySplines={ПЛАВНО}>
-              <mpath href="#встПуть" />
-            </animateMotion>
-            <animate attributeName="opacity" values="0;1" dur="0.25s" fill="freeze" />
-          </circle>
-          <circle r="3.4" fill="#FFFFFF" stroke={T.electric} strokeWidth="1.6">
-            <animateMotion dur={ДЛИТЕЛЬНОСТЬ} fill="freeze"
-              calcMode="spline" keyTimes="0;1" keySplines={ПЛАВНО}>
-              <mpath href="#встПуть" />
-            </animateMotion>
-            {/* Пока точка стоит на месте старта, её не должно быть видно —
-                иначе первые кадры она висит в пустоте слева. */}
-            <animate attributeName="opacity" values="0;1" dur="0.25s" fill="freeze" />
-          </circle>
-        </g>
-      ) : (
-        <circle cx="156" cy="8" r="3.4" fill="#FFFFFF" opacity="0" />
-      )}
-    </svg>
-  );
-}
-
-/* Знаки сетей. Рисуем сами, а не грузим картинки: первый экран должен
-   появляться сразу, а два маленьких значка стоят десятка строк. */
-function ЗнакTON({ size = 26, color }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M3.2 7.4h17.6L12 20.8 3.2 7.4Z" stroke={color} strokeWidth="1.7" strokeLinejoin="round" />
-      <path d="M12 7.4v13.4" stroke={color} strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function ЗнакSOL({ size = 26, color }) {
-  // Три ленты со скошенными краями: верхняя и нижняя наклонены в одну
-  // сторону, средняя — в другую.
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
-      <path d="M6.4 5.2h15.2l-4 3.6H2.4l4-3.6Z" fill={color} />
-      <path d="M2.4 10.2h15.2l4 3.6H6.4l-4-3.6Z" fill={color} />
-      <path d="M6.4 15.2h15.2l-4 3.6H2.4l4-3.6Z" fill={color} />
-    </svg>
-  );
-}
-
-function ВступлениеСети({ активен }) {
-  const монеты = [
-    { подпись: ТИКЕР_TON, цвет: T.electric, сдвиг: -48, Знак: ЗнакTON },
-    { подпись: "SOL", цвет: T.up, сдвиг: 48, Знак: ЗнакSOL },
-  ];
-  return (
-    <div className="flex items-center justify-center" style={{ height: 150, position: "relative" }}>
-      {/* Связь между сетями: тонкая дуга под кружками. Она и говорит,
-          что это одно приложение, а не два логотипа рядом. */}
-      <svg width="200" height="60" viewBox="0 0 200 60" aria-hidden
-        style={{ position: "absolute", top: "50%", transform: "translateY(-4px)", opacity: активен ? 1 : 0, transition: `opacity ${EASE}` }}>
-        <path d="M52 30 C 82 48, 118 48, 148 30" fill="none"
-          stroke={hexA("#FFFFFF", 0.14)} strokeWidth="1" strokeDasharray="3 4" />
-      </svg>
-
-      {/* Сдвиг в стороны и покачивание — на разных слоях. В один
-          transform они не помещаются: покачивание задаёт его целиком и
-          затирает сдвиг, отчего обе монеты слипались в центре. */}
-      {монеты.map(({ подпись, цвет, сдвиг, Знак }, i) => (
-        <div key={подпись} style={{ position: "absolute", transform: `translateX(${сдвиг}px)` }}>
-          <div
-            className="flex flex-col items-center justify-center"
-            style={{
-              width: 78, height: 78, borderRadius: "50%", gap: 2, position: "relative",
-              // Стекло, а не плашка: свет падает сверху, снизу поверхность
-              // темнее, и от этого кружок читается объёмным.
-              background: `radial-gradient(120% 120% at 50% 8%, ${hexA(цвет, 0.16)} 0%, rgba(255,255,255,0.04) 42%, rgba(255,255,255,0.015) 100%)`,
-              border: `1px solid ${hexA(цвет, 0.34)}`,
-              boxShadow: `inset 0 1px 0 ${hexA("#FFFFFF", 0.12)}, 0 14px 34px ${hexA(цвет, 0.18)}`,
-              animation: активен ? `монетаПлывёт 3.2s ease-in-out ${i * 0.6}s infinite` : "none",
-            }}
-          >
-            <Знак color={цвет} />
-            <span style={{ fontFamily: displayFont, fontSize: 10, fontWeight: 600, color: hexA(цвет, 0.92), letterSpacing: "0.1em" }}>
-              {подпись}
-            </span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* Три обещания в строку под первым экраном. Заголовок говорит, что это
-   за приложение, а эти три слова — что оно умеет; вместе они читаются
-   быстрее любого абзаца. */
-function ВступлениеЧипы({ активен }) {
-  const чипы = ["welcomeChip1", "welcomeChip2", "welcomeChip3"];
-  return (
-    <div className="flex items-center" style={{ gap: 6, flexWrap: "wrap" }}>
-      {чипы.map((ключ, i) => (
-        <span
-          key={ключ}
-          style={{
-            fontFamily: bodyFont, fontSize: 12, color: hexA("#FFFFFF", 0.86),
-            padding: "7px 12px", borderRadius: 999, ...СТЕКЛО,
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
-            animation: активен ? `вступлениеВверх 420ms ${260 + i * 90}ms cubic-bezier(0.16,1,0.3,1) both` : "none",
-            opacity: активен ? undefined : 0,
-          }}
-        >
-          {t(ключ)}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-/* Что именно значит «рынок с первой секунды» — тремя строчками, каждая с
-   галочкой. Обещание без разбивки на пункты человек пролистывает. */
-function ВступлениеРынок({ активен }) {
-  const пункты = ["welcomeMarket1", "welcomeMarket2", "welcomeMarket3"];
-  return (
-    <div className="flex flex-col" style={{ gap: 10 }}>
-      <div style={{
-        borderRadius: 18, ...СТЕКЛО, padding: "13px 15px",
-        animation: активен ? "вступлениеВверх 440ms 260ms cubic-bezier(0.16,1,0.3,1) both" : "none",
-        opacity: активен ? undefined : 0,
-      }}>
-        {пункты.map((ключ, i) => (
-          <div key={ключ} className="flex items-center" style={{ gap: 9, marginTop: i ? 8 : 0 }}>
-            <Check size={13} color={T.electric} style={{ flexShrink: 0 }} />
-            <span style={{ fontFamily: bodyFont, fontSize: 13, color: hexA("#FFFFFF", 0.86) }}>{t(ключ)}</span>
-          </div>
-        ))}
-      </div>
-      <p style={{ fontFamily: bodyFont, color: T.faint, fontSize: 11.5, lineHeight: 1.45, margin: 0 }}>
-        {t("welcomeRiskShort")}
-      </p>
-    </div>
-  );
-}
-
-/* Кошельки — по одному на сеть. Название и одна строка о том, зачем он:
-   человек, который слышит «Phantom» впервые, должен понять из карточки,
-   а не из поиска. */
-function ВступлениеКошельки({ активен }) {
-  const карточки = [
-    { имя: "welcomeWallet1", подпись: "welcomeWallet1Body", цвет: T.electric, Знак: ЗнакTON },
-    { имя: "welcomeWallet2", подпись: "welcomeWallet2Body", цвет: T.up, Знак: ЗнакSOL },
-  ];
-  return (
-    <div className="flex flex-col" style={{ gap: 8 }}>
-      {карточки.map(({ имя, подпись, цвет, Знак }, i) => (
-        <div
-          key={имя}
-          className="flex items-center"
-          style={{
-            gap: 12, padding: "11px 15px", borderRadius: 18, ...СТЕКЛО,
-            animation: активен ? `вступлениеВверх 440ms ${260 + i * 110}ms cubic-bezier(0.16,1,0.3,1) both` : "none",
-            opacity: активен ? undefined : 0,
-          }}
-        >
-          <Знак size={18} color={цвет} />
-          <div className="min-w-0">
-            <div style={{ fontFamily: displayFont, fontSize: 13.5, fontWeight: 600, color: "#F4F6FB" }}>{t(имя)}</div>
-            <div style={{ fontFamily: bodyFont, fontSize: 12, color: hexA("#FFFFFF", 0.56), marginTop: 1 }}>{t(подпись)}</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* Знакомство с приложением.
- *
- * Раньше здесь был один экран со списком: человек либо читал его целиком,
- * либо не читал вовсе. Теперь это четыре страницы, которые листаются
- * пальцем, — каждая говорит одну вещь и показывает её же картинкой.
- *
- * Листание сделано обычной прокруткой с прилипанием: браузер везёт её
- * сам, с инерцией и на своей частоте кадров, а нам остаётся следить, на
- * какой странице человек сейчас. Ручная анимация по касанию выглядела бы
- * ровно так же, но считалась бы в JavaScript.
- *
- * Показывается один раз: закрыл — больше не мешает.
- */
-function WelcomeScreen({ onCreate, insetTop = 0 }) {
-  const лист = LEAF_KINDS[2];
-  const лента = useRef(null);
-  const [страница, setСтраница] = useState(0);
-
-  // У каждой страницы своя картинка сверху и свой блок под текстом:
-  // заголовок обещает, картинка показывает, блок — уточняет. Без
-  // последнего экраны читались как четыре абзаца подряд.
-  const страницы = [
-    // Первый экран знакомства встречает маскотом: с него начинается
-    // узнавание бренда, и дальше он попадается в пустых состояниях и на
-    // заставке уже как знакомый.
-    { title: "welcomeTitle", body: "welcomeSub", арт: ВступлениеМаскот, низ: ВступлениеЧипы },
-    { title: "welcomeSlide2Title", body: "welcomeSlide2Body", арт: ВступлениеКривая, низ: ВступлениеРынок },
-    { title: "welcomeSlide3Title", body: "welcomeSlide3Body", арт: ВступлениеСети, низ: ВступлениеКошельки },
-  ];
-  const последняя = страница >= страницы.length - 1;
-
-  function приПрокрутке(e) {
-    const el = e.currentTarget;
-    const n = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
-    if (n !== страница) setСтраница(Math.max(0, Math.min(страницы.length - 1, n)));
-  }
-
-  function листнуть(куда) {
-    const el = лента.current;
-    if (!el) return;
-    el.scrollTo({ left: куда * el.clientWidth, behavior: "smooth" });
-  }
-
-  return (
-    <div
-      style={{
-        position: "absolute", inset: 0, zIndex: 880,
-        background: T.bg,
-        display: "flex", flexDirection: "column", paddingTop: insetTop,
-        animation: "fadeInUp 320ms cubic-bezier(0.16,1,0.3,1) both",
-        overflow: "hidden",
-      }}
-    >
-      {/* Знак — над лентой: он не листается вместе с ней. Кнопки
-          «продолжить без входа» здесь больше нет: без аккаунта в
-          приложении нечего делать — ни кошелька, ни сделок, ни своих
-          токенов, — и дверь мимо входа только вводила в заблуждение. */}
-      <div className="flex items-center justify-between" style={{ padding: "18px 22px 4px", position: "relative", zIndex: 1 }}>
-        <div className="flex items-center" style={{ gap: 9 }}>
-          <svg width="20" height="23" viewBox="-15 -31 30 34" aria-hidden>
-            <defs>
-              <linearGradient id="встЗнакЛист" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#A9B2FF" />
-                <stop offset="100%" stopColor={T.electric} />
-              </linearGradient>
-            </defs>
-            <path d={лист.outline} fill="url(#встЗнакЛист)" />
-            <path d={лист.stem} fill="none" stroke={hexA("#FFFFFF", 0.5)} strokeWidth="1" strokeLinecap="round" />
-          </svg>
-          <span style={{ fontFamily: displayFont, color: "#F4F6FB", fontSize: 16.5, fontWeight: 600, letterSpacing: "-0.01em" }}>Mintly</span>
-        </div>
-      </div>
-
-      {/* Сами страницы. Прилипание по горизонтали, вертикальной прокрутки
-          внутри нет — текст на каждой умещается целиком. */}
-      {/* Флага «палец на ленте» тут нет и не нужно: знакомство листают
-          только руками, автолистания на нём не бывает. Раньше внутри
-          тега стояли обработчики из другой карусели — они писали в чужую
-          переменную, и любое касание роняло экран. */}
-      <div
-        ref={лента}
-        onScroll={приПрокрутке}
-        className="no-scrollbar"
-        style={{
-          flex: 1, minHeight: 0, display: "flex", overflowX: "auto", overflowY: "hidden",
-          scrollSnapType: "x mandatory", overscrollBehaviorX: "contain",
-          position: "relative", zIndex: 1,
-        }}
-      >
-        {страницы.map((стр, i) => {
-          const Арт = стр.арт;
-          const Низ = стр.низ;
-          const активна = страница === i;
-          return (
-            <section
-              key={стр.title}
-              style={{
-                flex: "0 0 100%", width: "100%", scrollSnapAlign: "start",
-                display: "flex", flexDirection: "column", justifyContent: "center",
-                // Между картинкой и текстом воздуха больше, чем между
-                // строками текста: так экран читается сверху вниз одним
-                // движением, а не тремя равными кусками.
-                gap: 30, padding: "0 22px",
-              }}
-            >
-              {Арт ? <Арт активен={активна} /> : (
-                <div className="flex items-center justify-center" style={{ height: 150, position: "relative" }}>
-                  <div style={{
-                    position: "absolute", width: 210, height: 210, borderRadius: "50%",
-                    background: `radial-gradient(circle, ${hexA(T.electric, 0.22)} 0%, ${hexA(T.electric, 0.06)} 45%, transparent 70%)`,
-                    filter: "blur(4px)",
-                    animation: активна ? "аураДышит 4s ease-in-out infinite" : "none",
-                  }} />
-                  {/* Лист объёмный: свет падает слева сверху, у края —
-                      тень, жилка светлее самого листа. Плоская заливка
-                      выглядела значком из набора иконок. */}
-                  <svg width="86" height="98" viewBox="-15 -31 30 34" style={{ position: "relative" }} aria-hidden>
-                    <defs>
-                      <linearGradient id="встЛист" x1="0.1" y1="0" x2="0.9" y2="1">
-                        <stop offset="0%" stopColor="#C3C9FF" />
-                        <stop offset="45%" stopColor="#8B96FF" />
-                        <stop offset="100%" stopColor="#4A56D8" />
-                      </linearGradient>
-                      <radialGradient id="встБлик" cx="0.32" cy="0.18" r="0.6">
-                        <stop offset="0%" stopColor={hexA("#FFFFFF", 0.55)} />
-                        <stop offset="100%" stopColor={hexA("#FFFFFF", 0)} />
-                      </radialGradient>
-                      <filter id="встЛистСвет" x="-60%" y="-60%" width="220%" height="220%">
-                        <feGaussianBlur stdDeviation="1.6" result="р" />
-                        <feMerge><feMergeNode in="р" /><feMergeNode in="SourceGraphic" /></feMerge>
-                      </filter>
-                    </defs>
-                    <g style={активна ? { animation: "вступлениеВверх 520ms cubic-bezier(0.16,1,0.3,1) both" } : undefined}>
-                      <path d={лист.outline} fill="url(#встЛист)" filter="url(#встЛистСвет)" />
-                      <path d={лист.outline} fill="url(#встБлик)" />
-                      <path d={лист.stem} fill="none" stroke={hexA("#FFFFFF", 0.55)} strokeWidth="0.9" strokeLinecap="round" />
-                    </g>
-                  </svg>
-                </div>
-              )}
-
-              <div className="flex flex-col" style={{ gap: 14 }}>
-                <h1 style={{
-                  fontFamily: displayFont, color: "#F4F6FB", fontSize: 26, lineHeight: 1.24,
-                  // Заголовок крупный, но не тяжёлый: плотность букв важнее
-                  // жирности, иначе две строки превращаются в пятно.
-                  fontWeight: 600, letterSpacing: "-0.028em", margin: 0, maxWidth: "19ch",
-                  animation: активна ? "вступлениеВверх 480ms 80ms cubic-bezier(0.16,1,0.3,1) both" : "none",
-                }}>
-                  {t(стр.title)}
-                </h1>
-                <p style={{
-                  fontFamily: bodyFont, color: hexA("#FFFFFF", 0.56), fontSize: 14.5, lineHeight: 1.62,
-                  margin: 0, maxWidth: "36ch", letterSpacing: "-0.003em",
-                  animation: активна ? "вступлениеВверх 480ms 180ms cubic-bezier(0.16,1,0.3,1) both" : "none",
-                }}>
-                  {t(стр.body)}
-                </p>
-                {Низ ? <div style={{ marginTop: 6 }}><Низ активен={активна} /></div> : null}
-              </div>
-            </section>
-          );
-        })}
-      </div>
-
-      {/* Точки и кнопки. Точка — не только указатель, но и кнопка: на
-          последнюю страницу можно прыгнуть сразу. */}
-      <div className="flex flex-col" style={{ gap: 14, padding: "10px 22px 26px", position: "relative", zIndex: 1 }}>
-        <div className="flex items-center justify-center" style={{ gap: 7, paddingBottom: 2 }}>
-          {страницы.map((стр, i) => {
-            const тут = страница === i;
-            const пройдена = i < страница;
-            return (
-              <button
-                key={стр.title}
-                onClick={() => листнуть(i)}
-                className="fx-tap"
-                aria-label={`${i + 1}`}
-                style={{
-                  // Пройденные страницы остаются подсвеченными: полоска
-                  // читается как путь, а не как четыре одинаковые точки.
-                  width: тут ? 26 : 6, height: 6, borderRadius: 999,
-                  background: тут
-                    ? `linear-gradient(90deg, ${T.electric}, #A6B0FF)`
-                    : пройдена ? hexA(T.electric, 0.42) : hexA("#FFFFFF", 0.16),
-                  boxShadow: тут ? `0 0 12px ${hexA(T.electric, 0.5)}` : "none",
-                  transition: `width ${EASE}, background ${EASE}, box-shadow ${EASE}`,
-                  padding: 0, border: "none",
-                }}
-              />
-            );
-          })}
-        </div>
-
-        {/* Отдельной страницы с кнопками «создать» и «уже есть аккаунт»
-            больше нет: первая вела на тот же экран создания, а вторая —
-            туда же, просто он сам узнаёт вошедшего. Последняя страница
-            знакомства заканчивается одной дверью. */}
-        {последняя ? (
-          <div className="flex flex-col" style={{ gap: 10, animation: "вступлениеВверх 420ms both" }}>
-            <button
-              onClick={onCreate}
-              className="fx-tap вст-кнопка w-full flex items-center justify-center gap-2"
-              style={{
-                padding: "17px 0", borderRadius: 20,
-                ...ПЕРЕЛИВ_КНОПКИ,
-                color: PRISM_TEXT, border: "none",
-                boxShadow: `inset 0 1px 0 ${hexA("#FFFFFF", 0.3)}, 0 14px 34px ${hexA(T.electric, 0.34)}`,
-                fontFamily: displayFont, fontWeight: 600, fontSize: 15.5, letterSpacing: "-0.01em",
-              }}
-            >
-              {t("welcomeStart")} <ChevronRight size={16} />
-            </button>
-            <p style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.34), fontSize: 11.5, lineHeight: 1.5, textAlign: "center", margin: "4px 0 0" }}>
-              {t("welcomeRisk")}
-            </p>
-          </div>
-        ) : (
-          <button
-            onClick={() => листнуть(страница + 1)}
-            className="fx-tap вст-кнопка w-full flex items-center justify-center gap-2"
-            style={{
-              padding: "17px 0", borderRadius: 20,
-              ...ПЕРЕЛИВ_КНОПКИ,
-              color: PRISM_TEXT, border: "none",
-              boxShadow: `inset 0 1px 0 ${hexA("#FFFFFF", 0.3)}, 0 14px 34px ${hexA(T.electric, 0.34)}`,
-              fontFamily: displayFont, fontWeight: 600, fontSize: 15.5, letterSpacing: "-0.01em",
-            }}
-          >
-            {t("welcomeNext")} <ChevronRight size={16} />
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function BootSplash({ steps, done, уходит = false, insetTop = 0 }) {
   const readyCount = steps.filter((s) => s.done).length;
@@ -11149,24 +10666,20 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
         {/* Сверху — запас под шапку Telegram: там висят часы и кнопка
             «Закрыть», и аватар уходил прямо под них. */}
         <div style={{ padding: `${insetTop + 18}px 18px 10px` }}>
-          {/* Имя рядом с лицом, а не под ним: строка «@ник» короткая, и
-              столбиком она оставляла половину ширины меню пустой. */}
-          <div className="flex items-center" style={{ gap: 12 }}>
-            <span
-              className="flex items-center justify-center flex-shrink-0"
-              style={{
-                width: 72, height: 72, borderRadius: "50%", overflow: "hidden",
-                background: аватар ? `center/cover no-repeat url(${аватар})` : T.surfaceHi,
-                border: ОБОД_ЛИЦА,
-              }}
-            >
-              {!аватар && accountCreated && profile && profile.nickname && (
-                <БукваАватара ник={profile.nickname} size={72} />
-              )}
-            </span>
-            <div className="truncate" style={{ flex: 1, minWidth: 0, fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
-              {ник}
-            </div>
+          <span
+            className="flex items-center justify-center"
+            style={{
+              width: 72, height: 72, borderRadius: "50%", overflow: "hidden",
+              background: аватар ? `center/cover no-repeat url(${аватар})` : T.surfaceHi,
+              border: ОБОД_ЛИЦА,
+            }}
+          >
+            {!аватар && accountCreated && profile && profile.nickname && (
+              <БукваАватара ник={profile.nickname} size={72} />
+            )}
+          </span>
+          <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 800, marginTop: 14, letterSpacing: "-0.02em" }}>
+            {ник}
           </div>
           {!accountCreated && (
             <button
@@ -20420,6 +19933,33 @@ async function профильЕсть(userId) {
 
 const ПОЧТА_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
 
+/* Почтовые службы, которые мы принимаем.
+ *
+ * Адрес — запасная дверь в аккаунт и подтверждение вывода, поэтому он
+ * должен переживать сам аккаунт. Одноразовые ящики и адреса на своих
+ * доменах живут ровно до конца месяца или до конца оплаты домена, и
+ * человек остаётся без единственного способа вернуться. Список закрытый
+ * и короткий: то, чем пользуются, и что никуда не денется. */
+const ПОЧТОВЫЕ_СЛУЖБЫ = [
+  "gmail.com", "googlemail.com",
+  "mail.ru", "bk.ru", "inbox.ru", "list.ru", "internet.ru",
+  "yandex.ru", "yandex.com", "ya.ru",
+  "proton.me", "protonmail.com", "pm.me",
+  "icloud.com", "me.com", "mac.com",
+  "outlook.com", "hotmail.com", "live.com", "msn.com",
+  "yahoo.com", "rambler.ru", "gmx.com", "zoho.com", "aol.com",
+  "tutanota.com", "tuta.io", "fastmail.com",
+];
+
+function доменПочты(адрес) {
+  const части = String(адрес || "").trim().toLowerCase().split("@");
+  return части.length === 2 ? части[1] : "";
+}
+
+function службаПодходит(адрес) {
+  return ПОЧТОВЫЕ_СЛУЖБЫ.includes(доменПочты(адрес));
+}
+
 /* Почта как второй ключ ко входу.
  *
  * Аккаунт живёт на Telegram: пока приложение открывают из него, войти
@@ -20514,6 +20054,11 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
   // Включено ли подтверждение вывода. Отметка живёт в профиле: сам адрес
   // хранит Supabase Auth, а «спрашивать код» — это выбор человека.
   const [включено, setВключено] = useState(false);
+  /* Адрес аккаунта менять нельзя. Он назван один раз при создании и
+     служит запасной дверью: подменить его тому, кто дорвался до открытой
+     сессии, значило бы отдать ему аккаунт целиком. Поле остаётся на
+     экране — но только чтобы человек видел, куда уйдёт письмо. */
+  const [заперта, setЗаперта] = useState(false);
 
   useEffect(() => {
     if (!открыт) { setШаг("адрес"); setКод(""); setБеда(""); setИдёт(false); return undefined; }
@@ -20522,19 +20067,23 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
       const м = await почтаАккаунта();
       if (!живо) return;
       setПривязана(м);
-      if (м) { setПочта(м); setШаг("готово"); }
+      if (м) { setПочта(м); setЗаперта(true); setШаг("готово"); }
       /* Адрес человек назвал при создании аккаунта — второй раз спрашивать
          его незачем. Открылись из плашки «подтверди почту» — тем же
          движением и шлём письмо: нажатие на плашку и есть просьба о коде. */
       else if (почтаЗаранее) {
         setПочта(почтаЗаранее);
+        // Запираем только пригодный адрес: с почтой, которую мы больше не
+        // принимаем, человек иначе остался бы взаперти — ни подтвердить,
+        // ни исправить.
+        setЗаперта(службаПодходит(почтаЗаранее));
         if (слатьСразу) послать(почтаЗаранее);
         else setШаг("письмо");
       } else {
         // Открылись из настроек — адрес всё равно уже известен, набирать
         // его второй раз незачем, достаточно нажать «отправить письмо».
         const ч = await черновикПочты();
-        if (живо && ч) setПочта(ч);
+        if (живо && ч) { setПочта(ч); setЗаперта(службаПодходит(ч)); }
       }
       const { data } = await supabase.auth.getUser();
       const id = data && data.user && data.user.id;
@@ -20582,6 +20131,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
   async function послать(адресИли) {
     const адрес = typeof адресИли === "string" ? адресИли.trim().toLowerCase() : чистая;
     if (!ПОЧТА_RE.test(адрес) || идёт) return;
+    if (!службаПодходит(адрес)) { setБеда(t("authMailService")); haptic("error"); return; }
     setБеда("");
     setИдёт(true);
     try {
@@ -20659,16 +20209,6 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
                 }} />
               </button>
             </div>
-            <button
-              onClick={() => { setШаг("адрес"); setКод(""); setБеда(""); }}
-              className="fx-tap"
-              style={{
-                padding: 0, border: "none", background: "transparent", marginTop: 2,
-                color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
-              }}
-            >
-              {t("mail2faAgain")}
-            </button>
           </div>
         ) : шаг === "письмо" ? (
           <>
@@ -20715,7 +20255,8 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>{t("mail2faHint")}</span>
             <input
               value={почта}
-              onChange={(e) => { setПочта(e.target.value); setБеда(""); }}
+              onChange={(e) => { if (заперта) return; setПочта(e.target.value); setБеда(""); }}
+              readOnly={заперта}
               type="email"
               placeholder="you@mail.com"
               spellCheck={false}
@@ -20724,11 +20265,14 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
               style={{
                 padding: "15px 14px", borderRadius: 16,
                 border: `1px solid ${беда ? T.down : (годна ? T.up : T.line)}`,
-                background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 15.5, outline: "none",
+                background: T.surface, color: заперта ? T.muted : T.ice,
+                fontFamily: bodyFont, fontSize: 15.5, outline: "none",
                 transition: "border-color 200ms ease",
               }}
             />
-            {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
+            <span style={{ fontFamily: bodyFont, color: беда ? T.down : T.faint, fontSize: 12.5, lineHeight: 1.45 }}>
+              {беда || (заперта ? t("mailLocked") : t("authMailServices"))}
+            </span>
           </>
         )}
       </div>
@@ -20916,7 +20460,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     const никГоден = NICKNAME_RE.test(ник);
     const ждём = внутриTelegram && естьАккаунт == null;
     const почтаЧистая = почтаВвод.trim().toLowerCase();
-    const почтаГодна = ПОЧТА_RE.test(почтаЧистая);
+    const почтаПохожа = ПОЧТА_RE.test(почтаЧистая);
+    // Кнопка загорается на любом похожем адресе, а про службу говорим
+    // словами: погасшая кнопка без объяснения читается как поломка.
+    const почтаГодна = почтаПохожа && службаПодходит(почтаЧистая);
     // Почта привязалась молча, без письма — об этом и говорит карточка
     // «аккаунт готов».
     const почтаПривязана = шагВхода === "готово" && !!почтаЧистая && !почтаБеда;
@@ -21062,30 +20609,33 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   }}
                 />
               )}
-              {почтаБеда && (
-                <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{почтаБеда}</span>
+              {внутриTelegram && (
+                <span style={{ fontFamily: bodyFont, color: почтаБеда ? T.down : T.faint, fontSize: 12.5, lineHeight: 1.45 }}>
+                  {почтаБеда || t("authMailServices")}
+                </span>
               )}
 
               <button
                 onClick={() => {
-                  if (!почтаГодна) { setПочтаБеда(t("authMailBad")); return; }
+                  if (!почтаПохожа) { setПочтаБеда(t("authMailBad")); return; }
+                  if (!службаПодходит(почтаЧистая)) { setПочтаБеда(t("authMailService")); return; }
                   setШагВхода("ник");
                   haptic("light");
                 }}
-                disabled={!почтаГодна}
+                disabled={!почтаПохожа}
                 className="fx-tap w-full flex items-center justify-center"
                 style={{
                   position: "relative", overflow: "hidden",
                   gap: 8, padding: "16px 0", borderRadius: 999, border: "none",
                   background: T.surfaceHi,
-                  color: почтаГодна ? PRISM_TEXT : T.muted,
+                  color: почтаПохожа ? PRISM_TEXT : T.muted,
                   fontFamily: displayFont, fontWeight: 800, fontSize: 16,
                   transition: "color 320ms ease",
                 }}
               >
                 <span aria-hidden style={{
                   position: "absolute", inset: 0, borderRadius: 999, background: ЦВЕТ_КНОПКИ,
-                  pointerEvents: "none", opacity: почтаГодна ? 1 : 0, transition: "opacity 320ms ease",
+                  pointerEvents: "none", opacity: почтаПохожа ? 1 : 0, transition: "opacity 320ms ease",
                 }} />
                 <span style={{ position: "relative" }}>{t("withdrawNext")}</span>
               </button>
@@ -23829,9 +23379,6 @@ function mapTokenRow(row) {
      на пустой экран создания, без единого слова о том, куда он попал.
      У кого аккаунт есть, тот знакомства не видит вовсе — за этим следит
      условие показа, а не память телефона. */
-  const [приветствие, setПриветствие] = useState(true);
-  function закрытьПриветствие() { setПриветствие(false); }
-  function вернутьПриветствие() { setПриветствие(true); }
 
   const [solЗапуск, setSolЗапуск] = useState(false);
   useEffect(() => {
@@ -24234,10 +23781,10 @@ function mapTokenRow(row) {
    * оно или так задумано. Теперь дверь одна — экран создания стоит
    * поверх всего, пока профиля нет, и закрыть его нечем. */
   useEffect(() => {
-    if (!authChecked || accountCreated || приветствие || сразуВКошелёк) return;
+    if (!authChecked || accountCreated || сразуВКошелёк) return;
     setProfileModalMode("create");
     setProfileModalOpen(true);
-  }, [authChecked, accountCreated, приветствие, сразуВКошелёк]);
+  }, [authChecked, accountCreated, сразуВКошелёк]);
 
   const [ждётПодписи, setЖдётПодписи] = useState(0);
   // Что именно покупаем — только для надписи на экране ожидания: сама
@@ -24513,7 +24060,6 @@ function mapTokenRow(row) {
     setAccountCreated(false);
     setProfile(EMPTY_PROFILE);
     закрытьВсёОткрытое();
-    вернутьПриветствие();
     if (wallet) tonConnectUI.disconnect();
     showToast(t("loggedOut"));
   }
@@ -24550,7 +24096,6 @@ function mapTokenRow(row) {
     setAccountCreated(false);
     setProfile(EMPTY_PROFILE);
     закрытьВсёОткрытое();
-    вернутьПриветствие();
     if (wallet) tonConnectUI.disconnect();
     showToast(t("accountDeleted"));
   }
@@ -24863,18 +24408,9 @@ function mapTokenRow(row) {
           поджигала, убраны: на разных телефонах они ложились по-разному,
           а на тех, где острова нет, рамка выглядела случайной деталью. */}
       {rocketFlying && <LaunchRocket variant={rocketVariant} />}
-      {/* Пришли за подписью — заставка только задерживает: человек ждёт
-          кошелёк, а не знакомство с приложением. */}
-      {/* Приветствие ждёт, пока догрузится приложение: показывать его
-          поверх заставки — значит перебивать одно ожидание другим. */}
-      {/* Пока сессия не проверена, неизвестно, новичок ли это: у
-          вернувшегося человека приветствие успевало мигнуть и пропасть. */}
-      {приветствие && authChecked && !accountCreated && !сразуВКошелёк && (
-        <WelcomeScreen
-          insetTop={insetTop}
-          onCreate={() => { закрытьПриветствие(); openCreateProfile(); }}
-        />
-      )}
+      {/* Знакомства перед входом больше нет: три страницы о приложении
+          стояли между человеком и аккаунтом, а рассказать они успевали
+          ровно столько, сколько видно на главной. */}
       {/* Заставки на входе больше нет: приложение открывается сразу, а
           то, что ещё не приехало, стоит серыми плашками на своих местах.
           Ждать чёрный экран с котом ради тех же двух секунд незачем. */}
