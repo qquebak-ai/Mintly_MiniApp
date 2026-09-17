@@ -343,7 +343,6 @@ const STR = {
     createdBody: "Осталось одно. Привяжи почту: ею подтверждается вывод, и через неё возвращают аккаунт, если пропадёт доступ к Telegram.",
     addMail: "Добавить почту",
     laterBtn: "Позже",
-    stepOf: "ШАГ {n} ИЗ {all}",
     createMailLead: "Введи почту — на неё придёт код подтверждения",
     createdMailSent: "Письмо с кодом ушло на {mail}. Введи код — и почта привязана.",
     mailLinkFailed: "Почту привязать не вышло: {msg}. Можно повторить.",
@@ -963,7 +962,6 @@ const STR = {
     createdBody: "One thing left. Add an email: it confirms withdrawals and brings the account back if you lose access to Telegram.",
     addMail: "Add email",
     laterBtn: "Later",
-    stepOf: "STEP {n} OF {all}",
     createMailLead: "Enter your email — the confirmation code goes there",
     createdMailSent: "The code went to {mail}. Enter it and the email is linked.",
     mailLinkFailed: "Couldn't link the email: {msg}. You can try again.",
@@ -20747,16 +20745,27 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               {/* Шаг первый: почта. Ею подтверждается вывод и возвращается
                   аккаунт, если пропадёт доступ к телеграму, — поэтому
                   спрашиваем сразу, а не «когда-нибудь в настройках». */}
-              <div className="flex flex-col items-center text-center" style={{ gap: 10 }}>
-                <span className="flex items-center justify-center" style={{
-                  width: 64, height: 64, borderRadius: "50%",
-                  background: hexA(T.electric, 0.14), color: T.electric,
-                }}>
-                  <Mail size={28} />
-                </span>
-                <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 11.5, letterSpacing: "0.08em" }}>
-                  {tf("stepOf", { n: 1, all: 2 })}
-                </span>
+              <div className="flex flex-col items-center text-center" style={{ gap: 12 }}>
+                {/* Конверт сам по себе, без кружка-подложки, и обведён не
+                    одним цветом, а перетекающей радугой: цвета живут в
+                    градиенте самой картинки — обводке значка его отдают
+                    ссылкой на defs. */}
+                <svg width="0" height="0" aria-hidden style={{ position: "absolute" }}>
+                  <defs>
+                    <linearGradient id="почтаРадуга" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#4FC3FF">
+                        <animate attributeName="stop-color" values="#4FC3FF;#B14CFF;#FF6BD6;#3BE08F;#4FC3FF" dur="7s" repeatCount="indefinite" />
+                      </stop>
+                      <stop offset="50%" stopColor="#B14CFF">
+                        <animate attributeName="stop-color" values="#B14CFF;#FF6BD6;#3BE08F;#4FC3FF;#B14CFF" dur="7s" repeatCount="indefinite" />
+                      </stop>
+                      <stop offset="100%" stopColor="#FF6BD6">
+                        <animate attributeName="stop-color" values="#FF6BD6;#3BE08F;#4FC3FF;#B14CFF;#FF6BD6" dur="7s" repeatCount="indefinite" />
+                      </stop>
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <Mail size={46} strokeWidth={1.6} style={{ stroke: "url(#почтаРадуга)" }} />
                 <div className="flex flex-col" style={{ gap: 6 }}>
                   <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
                     {t("createTitle")}
@@ -20875,13 +20884,6 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   )}
                 </button>
                 <div className="flex flex-col" style={{ gap: 6 }}>
-                  {/* Второй шаг отмечаем только новичку: вошедшему заново
-                      шагов нет вовсе, у него одна кнопка. */}
-                  {!входБезНика && внутриTelegram && (
-                    <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 11.5, letterSpacing: "0.08em" }}>
-                      {tf("stepOf", { n: 2, all: 2 })}
-                    </span>
-                  )}
                   <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
                     {t("createTitle")}
                   </span>
