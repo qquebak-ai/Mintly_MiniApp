@@ -366,6 +366,7 @@ const STR = {
     mail2faRow: "Почта для 2ФА",
     mail2faAsk: "Спрашивать код с почты при выводе",
     authMailTooOften: "Слишком часто. Подожди минуту и попробуй снова.",
+    mailSendFailed: "Письмо не ушло: почтовый сервер отказал. Попробуй позже.",
     authCodeResend: "Отправить заново",
     authGotIt: "Понятно",
     walletActSwap: "Обменять",
@@ -988,6 +989,7 @@ const STR = {
     mail2faRow: "Email for 2FA",
     mail2faAsk: "Ask for the emailed code on withdrawal",
     authMailTooOften: "Too often. Wait a minute and try again.",
+    mailSendFailed: "The letter didn't go out: the mail server refused. Try again later.",
     authCodeResend: "Send again",
     authGotIt: "Got it",
     walletActSwap: "Swap",
@@ -12426,6 +12428,7 @@ function HomeView({
   onGoTab, onGoCreate, curveTokens = [], onOpenToken, onOpenProfile,
   profile = null, accountCreated = false, myTokens = [], achievements = [], userId = null,
   onOpenMyProfile, onOpenAchievements, профильГрузится = false, тик = 0, грузится = false,
+  insetTop = 0, insetBottom = 0,
 }) {
   // Главная — витрина площадки: сводка, токен дня, движение, топ. Монетам
   // из пробной сети там не место — их цена ничего не значит, а сводка по
@@ -12461,7 +12464,7 @@ function HomeView({
       {/* Почта, названная при создании аккаунта, ждёт подтверждения — и
           просьба стоит первой строкой главной, а не в настройках, куда
           никто не заходит. */}
-      <НапоминаниеПочты accountCreated={accountCreated} userId={userId} />
+      <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} />
       {/* Баннеры ждут вместе со всеми: живая карусель посреди плашек
           выглядела так, будто остальной экран сломался. */}
       {вПлашках ? <ПлашкаБлока h={150} radius={20} /> : <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />}
@@ -19875,7 +19878,7 @@ function SettingsPanel({
               <ChevronRight size={16} color={T.faint} />
             </button>
           )}
-          <ЭкранПочты открыт={почтаОткрыта} onClose={() => setПочтаОткрыта(false)} />
+          <ЭкранПочты открыт={почтаОткрыта} onClose={() => setПочтаОткрыта(false)} insetTop={insetTop} insetBottom={insetBottom} />
           {/* Удаление аккаунта переехало сюда из «Профиля»: пункт с
               одной кнопкой «Редактировать» дублировал такую же кнопку на
               самом экране профиля, а удаление по смыслу и так о
@@ -20589,7 +20592,12 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
       haptic("light");
     } catch (e) {
       const т = String((e && e.message) || "");
-      setБеда(/rate|seconds|too many/i.test(т) ? t("authMailTooOften") : т.slice(0, 120));
+      // Отказ почтового сервера приходит по-английски и человеку ничего не
+      // объясняет: «Error sending email change email» он читает как поломку
+      // приложения. Говорим то же самое, но своими словами.
+      setБеда(/rate|seconds|too many/i.test(т) ? t("authMailTooOften")
+        : /sending|smtp|mail server/i.test(т) ? t("mailSendFailed")
+        : т.slice(0, 120));
       haptic("error");
     } finally {
       setИдёт(false);
@@ -20750,7 +20758,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
  * просьба о коде должна исходить от него, а не заставать посреди входа.
  * Плашка и есть эта просьба: нажал — письмо ушло, открылось поле кода.
  * Почта подтвердилась — плашка исчезает сама. */
-function НапоминаниеПочты({ accountCreated = false, userId = null }) {
+function НапоминаниеПочты({ accountCreated = false, userId = null, insetTop = 0, insetBottom = 0 }) {
   const [черновик, setЧерновик] = useState("");
   const [открыт, setОткрыт] = useState(false);
 
@@ -20796,6 +20804,8 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
         открыт={открыт}
         почтаЗаранее={черновик}
         слатьСразу
+        insetTop={insetTop}
+        insetBottom={insetBottom}
         onClose={() => setОткрыт(false)}
         onГотово={() => { setОткрыт(false); setЧерновик(""); }}
       />
@@ -25054,6 +25064,8 @@ function mapTokenRow(row) {
               userId={userId}
               onOpenMyProfile={() => setМенюОткрыто(true)}
               onOpenAchievements={() => открытьДостижения("home")}
+              insetTop={insetTop}
+              insetBottom={insetBottom}
             />
           </KeepAlive>
           <KeepAlive show={view === "mempad"}>
