@@ -7664,7 +7664,7 @@ function PublicProfileView({ userId: ownerId, currentUserId, onBack, onOpenToken
                 border: frame === "none" ? `2px solid ${T.lineHi}` : "none",
                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52,
               }}>
-                {!profile.avatar_url && (profile.emoji || <User size={40} color={T.muted} />)}
+                {!profile.avatar_url && <БукваАватара ник={profile.nickname} size={128} />}
               </div>
             </AvatarFrame>
         </div>
@@ -8289,6 +8289,41 @@ function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false }) {
 /* Рамок вокруг аватарки в приложении больше нет: остался только
    контейнер нужного размера, чтобы не переписывать два десятка мест,
    где аватарка рисуется. */
+/* Кружок с первой буквой ника — вместо аватарки, которую не поставили.
+ *
+ * Раньше на её месте стояла эмодзи (её выдавали при заведении аккаунта) или
+ * серый значок человека: у половины людей в ленте были одинаковые ракеты, и
+ * узнать своего собеседника по ним было нельзя. Буква своя у каждого, а цвет
+ * кружка выводится из самого ника — одно и то же имя всегда даёт один и тот
+ * же оттенок, и аватарка узнаётся даже краем глаза.
+ */
+function оттенокНика(ник) {
+  const с = String(ник || "?");
+  let сумма = 0;
+  for (let i = 0; i < с.length; i += 1) сумма = (сумма * 31 + с.charCodeAt(i)) % 360;
+  return сумма;
+}
+
+function БукваАватара({ ник, size = 40 }) {
+  const буква = String(ник || "").trim().charAt(0).toUpperCase() || "?";
+  const тон = оттенокНика(ник);
+  return (
+    <span
+      className="flex items-center justify-center"
+      aria-hidden
+      style={{
+        width: "100%", height: "100%", borderRadius: "50%",
+        background: `linear-gradient(140deg, hsl(${тон} 58% 46%), hsl(${(тон + 42) % 360} 54% 30%))`,
+        color: "#FFFFFF", fontFamily: displayFont, fontWeight: 800,
+        fontSize: Math.round(size * 0.44), lineHeight: 1, letterSpacing: "-0.02em",
+        userSelect: "none",
+      }}
+    >
+      {буква}
+    </span>
+  );
+}
+
 const AvatarFrame = React.memo(function AvatarFrame({ size = 120, children }) {
   return (
     <div style={{ position: "relative", width: size, height: size, borderRadius: "50%", overflow: "hidden" }}>
@@ -10592,7 +10627,7 @@ function ТопСтрока({ onOpenToken, onOpenProfile, live = [] }) {
                   width: "100%", height: "100%", borderRadius: "50%",
                   background: э.avatar_url ? `center/cover no-repeat url(${э.avatar_url})` : T.surfaceHi,
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
-                }}>{!э.avatar_url && (э.emoji || "🙂")}</div>
+                }}>{!э.avatar_url && <БукваАватара ник={э.nickname} size={30} />}</div>
               </AvatarFrame>
               <div className="flex-1 min-w-0">
                 <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13.5, fontWeight: 700 }}>{э.nickname || "—"}</div>
@@ -10773,11 +10808,15 @@ function ЭкранНастроек({ открыт, onClose, profile, accountCre
           className="fx-tap w-full flex items-center"
           style={{ gap: 13, padding: "13px 16px", borderRadius: 20, background: T.surfaceHi, border: "none", marginBottom: 16 }}
         >
-          <span style={{
-            width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
+          <span className="flex items-center justify-center" style={{
+            width: 42, height: 42, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
             background: аватар ? `center/cover no-repeat url(${аватар})` : T.surface,
             border: `1px solid ${T.lineHi}`,
-          }} />
+          }}>
+            {!аватар && accountCreated && profile && profile.nickname && (
+              <БукваАватара ник={profile.nickname} size={42} />
+            )}
+          </span>
           <span className="flex-1 truncate text-left" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>
             {ник}
           </span>
@@ -10944,12 +10983,17 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
             «Закрыть», и аватар уходил прямо под них. */}
         <div style={{ padding: `${insetTop + 18}px 18px 10px` }}>
           <span
+            className="flex items-center justify-center"
             style={{
-              display: "block", width: 62, height: 62, borderRadius: "50%",
+              width: 62, height: 62, borderRadius: "50%", overflow: "hidden",
               background: аватар ? `center/cover no-repeat url(${аватар})` : T.surfaceHi,
               border: `1.5px solid ${T.lineHi}`,
             }}
-          />
+          >
+            {!аватар && accountCreated && profile && profile.nickname && (
+              <БукваАватара ник={profile.nickname} size={62} />
+            )}
+          </span>
           <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 800, marginTop: 14, letterSpacing: "-0.02em" }}>
             {ник}
           </div>
@@ -11010,7 +11054,9 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
           display: "flex", alignItems: "center", justifyContent: "center",
         }}
       >
-        {!грузится && !аватар && <User size={17} color={T.muted} />}
+        {!грузится && !аватар && (accountCreated && profile && profile.nickname
+          ? <БукваАватара ник={profile.nickname} size={38} />
+          : <User size={17} color={T.muted} />)}
       </span>
       {/* Без аккаунта имени нет. Раньше на его месте стояло «Mintly» —
           человек читал это как своё имя, хотя так называется само
@@ -14912,7 +14958,7 @@ function TokenComments({ tokenId, currentUserId, onNeedAuth, onOpenProfile, show
                     background: c.avatar_url ? `center/cover no-repeat url(${c.avatar_url})` : T.surfaceHi,
                     display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
                   }}>
-                    {!c.avatar_url && (c.emoji || "🙂")}
+                    {!c.avatar_url && <БукваАватара ник={c.nickname} size={36} />}
                   </div>
                 </AvatarFrame>
               </button>
@@ -15170,10 +15216,12 @@ function ЧатТокена({ tokenId, свой = false, currentUserId, onNeedAu
               <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{t("chatEmpty")}</span>
             ) : сообщения.map((м) => (
               <div key={м.id} className="flex" style={{ gap: 8, flexDirection: м.mine ? "row-reverse" : "row" }}>
-                <span style={{
+                <span className="flex items-center justify-center" style={{
                   width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
                   background: м.avatarUrl ? `center/cover no-repeat url(${м.avatarUrl})` : T.surfaceHi,
-                }} />
+                }}>
+                  {!м.avatarUrl && <БукваАватара ник={м.nickname} size={26} />}
+                </span>
                 <div style={{
                   maxWidth: "78%", padding: "8px 11px", borderRadius: 14,
                   background: м.mine ? hexA("#8E2DE2", 0.28) : T.surfaceHi,
@@ -16482,7 +16530,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
                         display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
                         background: h.профиль.avatarUrl ? `center/cover no-repeat url(${h.профиль.avatarUrl})` : T.surfaceHi,
                       }}>
-                        {!h.профиль.avatarUrl && (h.профиль.emoji || "🙂")}
+                        {!h.профиль.avatarUrl && <БукваАватара ник={h.профиль.nickname} size={24} />}
                       </div>
                       <div className="flex flex-col" style={{ minWidth: 0, gap: 1 }}>
                         <span className="truncate" style={{ fontFamily: bodyFont, color: T.paper, fontSize: 13, fontWeight: 600 }}>
@@ -18767,8 +18815,8 @@ function PinLockScreen({ pin, profile, onUnlock, onForgot }) {
             border: `1px solid ${T.lineHi}`, display: "flex", alignItems: "center", justifyContent: "center",
           }}>
             {!(profile && profile.avatarUrl) && (
-              profile && profile.emoji
-                ? <span style={{ fontSize: 32 }}>{profile.emoji}</span>
+              profile && profile.nickname
+                ? <БукваАватара ник={profile.nickname} size={76} />
                 : <Lock size={26} color={T.ice} />
             )}
           </div>
@@ -21092,7 +21140,9 @@ function ProfileView({
           >
             <AvatarFrame frameId={cosmetics.frame} size={100}>
                 <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: profile.avatarUrl ? `center/cover no-repeat url(${profile.avatarUrl})` : T.surfaceHi, border: cosmetics.frame === "none" ? (profile.avatarUrl ? `2px solid ${T.lineHi}` : `2px dashed ${T.lineHi}`) : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: accountCreated ? 52 : 40 }}>
-                  {!profile.avatarUrl && (accountCreated && profile.emoji ? profile.emoji : <User size={40} color={T.muted} />)}
+                  {!profile.avatarUrl && (accountCreated && profile.nickname
+                    ? <БукваАватара ник={profile.nickname} size={104} />
+                    : <User size={40} color={T.muted} />)}
                 </div>
             </AvatarFrame>
           </button>
