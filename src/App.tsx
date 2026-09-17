@@ -8344,12 +8344,16 @@ function КонфеттиЗалп({ включено, onКонец = () => {} })
       y: В + Math.random() * 40,
       vx: (Math.random() - 0.5) * 5,
       vy: -(20 + Math.random() * 15),
-      ш: 5 + Math.random() * 6,
-      в: 8 + Math.random() * 8,
+      ш: 3 + Math.random() * 3,
+      в: 5 + Math.random() * 4,
       угол: Math.random() * Math.PI,
       кручение: (Math.random() - 0.5) * 0.3,
       цвет: ЦВЕТА_КОНФЕТТИ[Math.floor(Math.random() * ЦВЕТА_КОНФЕТТИ.length)],
     }));
+
+    // Толчок в ладонь ровно в тот кадр, когда бумажки вылетают: залп
+    // должен ощущаться, а не только выглядеть.
+    haptic("success");
 
     const начало = performance.now();
     const ЖИЗНЬ = 3000;
