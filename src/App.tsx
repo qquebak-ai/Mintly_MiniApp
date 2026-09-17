@@ -8301,6 +8301,89 @@ function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false }) {
 /* Рамок вокруг аватарки в приложении больше нет: остался только
    контейнер нужного размера, чтобы не переписывать два десятка мест,
    где аватарка рисуется. */
+/* Конфетти: залп снизу вверх во весь экран.
+ *
+ * Аккаунт заводится один раз в жизни, и этот миг стоит отметить — иначе
+ * человек просто видит, что карточка сменилась. Рисуем на холсте поверх
+ * всего: сотня бумажек на экране это сотня узлов в дереве, а тут один.
+ * Залп единственный: частицы улетают, гаснут, и холст снимается сам. */
+const ЦВЕТА_КОНФЕТТИ = ["#B14CFF", "#4FC3FF", "#3BE08F", "#FFD84C", "#FF6BD6", "#FF7A45", "#FFFFFF"];
+
+function КонфеттиЗалп({ включено, onКонец = () => {} }) {
+  const холст = useRef(null);
+  const кадр = useRef(0);
+
+  useEffect(() => {
+    if (!включено) return undefined;
+    // Уважаем «поменьше движения»: там залп просто не нужен.
+    const тихо = typeof window !== "undefined" && window.matchMedia
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (тихо) { onКонец(); return undefined; }
+    const c = холст.current;
+    if (!c) return undefined;
+    const ctx = c.getContext("2d");
+    const пкс = Math.min((typeof window !== "undefined" && window.devicePixelRatio) || 1, 2);
+    const Ш = window.innerWidth;
+    const В = window.innerHeight;
+    c.width = Math.round(Ш * пкс);
+    c.height = Math.round(В * пкс);
+    ctx.scale(пкс, пкс);
+
+    /* Вылет — снизу и резко: скорость вверх такая, чтобы бумажка успела
+       дойти до верхней трети, а тяжесть вернула её обратно за пару
+       секунд. По ширине разбрасываем равномерно, иначе залп кучкуется
+       посередине. */
+    const частицы = Array.from({ length: 150 }, (_, i) => ({
+      x: (Ш * (i + Math.random())) / 150,
+      y: В + Math.random() * 40,
+      vx: (Math.random() - 0.5) * 5,
+      vy: -(20 + Math.random() * 15),
+      ш: 5 + Math.random() * 6,
+      в: 8 + Math.random() * 8,
+      угол: Math.random() * Math.PI,
+      кручение: (Math.random() - 0.5) * 0.3,
+      цвет: ЦВЕТА_КОНФЕТТИ[Math.floor(Math.random() * ЦВЕТА_КОНФЕТТИ.length)],
+    }));
+
+    const начало = performance.now();
+    const ЖИЗНЬ = 3000;
+    const шаг = (сейчас) => {
+      const прошло = сейчас - начало;
+      ctx.clearRect(0, 0, Ш, В);
+      for (const ч of частицы) {
+        ч.vy += 0.42;            // тяжесть
+        ч.vx *= 0.995;           // воздух
+        ч.x += ч.vx;
+        ч.y += ч.vy;
+        ч.угол += ч.кручение;
+        ctx.save();
+        ctx.translate(ч.x, ч.y);
+        ctx.rotate(ч.угол);
+        // Последние полсекунды бумажки тают, а не пропадают разом.
+        ctx.globalAlpha = Math.max(0, Math.min(1, (ЖИЗНЬ - прошло) / 600));
+        ctx.fillStyle = ч.цвет;
+        ctx.fillRect(-ч.ш / 2, -ч.в / 2, ч.ш, ч.в);
+        ctx.restore();
+      }
+      if (прошло < ЖИЗНЬ) кадр.current = requestAnimationFrame(шаг);
+      else { ctx.clearRect(0, 0, Ш, В); onКонец(); }
+    };
+    кадр.current = requestAnimationFrame(шаг);
+    return () => cancelAnimationFrame(кадр.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [включено]);
+
+  if (!включено || typeof document === "undefined") return null;
+  return createPortal(
+    <canvas
+      ref={холст}
+      aria-hidden
+      style={{ position: "fixed", inset: 0, zIndex: 999, pointerEvents: "none" }}
+    />,
+    document.body,
+  );
+}
+
 /* Радужный конверт. Цвет — заливка, форма — маска из того же значка:
    так значок красится градиентом, которого у обводки не бывает, а
    анимация остаётся обычной, css-ной. */
@@ -19616,11 +19699,6 @@ function SettingsPanel({
   const [deleting, setDeleting] = useState(false);
   // Почта для второго ключа: открывается из раздела «Безопасность».
   const [почтаОткрыта, setПочтаОткрыта] = useState(false);
-  /* Отступ карточки сверху считается один раз, при открытии, и дальше не
-     пересчитывается. В долях экрана (vh) он зависел от высоты окна, а
-     Telegram укорачивает окно на высоту клавиатуры — и карточка прыгала
-     вверх от каждого касания поля и обратно при закрытии клавиатуры. */
-  const [отступСверху, setОтступСверху] = useState(112);
   // Окно держится на экране, пока идёт анимация ухода, поэтому и
   // содержимое берём последнее — иначе на кадр уходило бы пустое.
   const [item, closing] = useClosing(itemProp);
@@ -20605,6 +20683,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const [почтаБеда, setПочтаБеда] = useState("");
   const [естьАккаунт, setЕстьАккаунт] = useState(null); // null — ещё спрашиваем
   const [почтаОткрыта, setПочтаОткрыта] = useState(false);
+  // Залп конфетти после создания аккаунта.
+  const [залп, setЗалп] = useState(false);
   /* Отступ карточки сверху считается один раз, при открытии, и дальше не
      пересчитывается. В долях экрана (vh) он зависел от высоты окна, а
      Telegram укорачивает окно на высоту клавиатуры — и карточка прыгала
@@ -20729,6 +20809,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         await signInWithTelegram(входБезНика ? "" : ник);
         // Вошедшему второй ключ предлагать незачем — он уже выбирал.
         if (входБезНика) { onClose(); return; }
+        // Аккаунт заводится один раз в жизни — отмечаем залпом.
+        setЗалп(true);
+        haptic("success");
         /* Картинку кладём после создания: до него нет ни сессии, ни
            папки в хранилище — оно закрыто политиками по владельцу.
            Неудача здесь аккаунт не отменяет, аватарку можно поменять
@@ -21119,6 +21202,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           onГотово={() => { setПочтаОткрыта(false); onClose(); }}
         />
         <ImageCropModal file={avatarCropFile} shape="circle" onCancel={() => setAvatarCropFile(null)} onConfirm={handleAvatarCropConfirm} />
+        <КонфеттиЗалп включено={залп} onКонец={() => setЗалп(false)} />
       </div>
     );
     return typeof document !== "undefined" ? createPortal(экран, document.body) : экран;
