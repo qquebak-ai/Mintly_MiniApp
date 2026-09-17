@@ -11147,20 +11147,24 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
         {/* Сверху — запас под шапку Telegram: там висят часы и кнопка
             «Закрыть», и аватар уходил прямо под них. */}
         <div style={{ padding: `${insetTop + 18}px 18px 10px` }}>
-          <span
-            className="flex items-center justify-center"
-            style={{
-              width: 62, height: 62, borderRadius: "50%", overflow: "hidden",
-              background: аватар ? `center/cover no-repeat url(${аватар})` : T.surfaceHi,
-              border: ОБОД_ЛИЦА,
-            }}
-          >
-            {!аватар && accountCreated && profile && profile.nickname && (
-              <БукваАватара ник={profile.nickname} size={62} />
-            )}
-          </span>
-          <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 800, marginTop: 14, letterSpacing: "-0.02em" }}>
-            {ник}
+          {/* Имя рядом с лицом, а не под ним: строка «@ник» короткая, и
+              столбиком она оставляла половину ширины меню пустой. */}
+          <div className="flex items-center" style={{ gap: 12 }}>
+            <span
+              className="flex items-center justify-center flex-shrink-0"
+              style={{
+                width: 72, height: 72, borderRadius: "50%", overflow: "hidden",
+                background: аватар ? `center/cover no-repeat url(${аватар})` : T.surfaceHi,
+                border: ОБОД_ЛИЦА,
+              }}
+            >
+              {!аватар && accountCreated && profile && profile.nickname && (
+                <БукваАватара ник={profile.nickname} size={72} />
+              )}
+            </span>
+            <div className="truncate" style={{ flex: 1, minWidth: 0, fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
+              {ник}
+            </div>
           </div>
           {!accountCreated && (
             <button
@@ -11210,7 +11214,7 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
       <span
         className={грузится ? "fx-skeleton" : undefined}
         style={{
-          width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
+          width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
           border: ОБОД_ЛИЦА, overflow: "hidden",
           // Пока картинки нет — ровный тёмный кружок, а не серое пятно с
           // чужим значком внутри. А пока неизвестно, есть ли она вообще,
@@ -11220,7 +11224,7 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
         }}
       >
         {!грузится && !аватар && (accountCreated && profile && profile.nickname
-          ? <БукваАватара ник={profile.nickname} size={38} />
+          ? <БукваАватара ник={profile.nickname} size={46} />
           : <User size={17} color={T.muted} />)}
       </span>
       {/* Без аккаунта имени нет. Раньше на его месте стояло «Mintly» —
