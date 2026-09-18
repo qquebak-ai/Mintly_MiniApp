@@ -1598,6 +1598,18 @@ const ПЕРЕЛИВ_КНОПКИ_ТОРГИ = {
   backgroundSize: "124% 100%",
   animation: "кнопкаПереливается 5.5s ease-in-out infinite",
 };
+/* Кнопки первого и последнего баннера берут цвет своего неба: тёмный
+   графит остальных кнопок на фиолетовом фоне читался заплаткой. */
+const ПЕРЕЛИВ_КНОПКИ_ЗАПУСК = {
+  background: "linear-gradient(112deg, #3C0A86 0%, #6C16E1 26%, #C79BFF 50%, #6C16E1 74%, #3C0A86 100%)",
+  backgroundSize: "230% 100%",
+  animation: "кнопкаПереливается 5.5s ease-in-out infinite",
+};
+const ПЕРЕЛИВ_КНОПКИ_МАГАЗИН = {
+  background: "linear-gradient(112deg, #4C1D95 0%, #7C3AED 26%, #C08BFF 50%, #7C3AED 74%, #4C1D95 100%)",
+  backgroundSize: "230% 100%",
+  animation: "кнопкаПереливается 5.5s ease-in-out infinite",
+};
 /* Любую кнопочную краску можно пустить волной: полотно вдвое шире
    кнопки, и градиент медленно ходит от края к краю. Это тот же приём,
    что у главной кнопки, — просто вынесенный, чтобы им пользовались все
@@ -12045,8 +12057,10 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
                     ? { ...ПЕРЕЛИВ_КНОПКИ_СЕТИ, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#0098EA", 0.42)}` }
                     : б.сцена === "торговля"
                     ? { ...ПЕРЕЛИВ_КНОПКИ_ТОРГИ, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#0FA85A", 0.28)}, 0 8px 24px ${hexA("#FF4D6A", 0.24)}` }
+                    : б.сцена === "магазин"
+                    ? { ...ПЕРЕЛИВ_КНОПКИ_МАГАЗИН, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#C08BFF", 0.38)}` }
                     : б.сцена
-                      ? { ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#8E2DE2", 0.45)}` }
+                      ? { ...ПЕРЕЛИВ_КНОПКИ_ЗАПУСК, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#8E2DE2", 0.45)}` }
                       : { background: T.ice, color: T.bg }),
                 }}
               >
