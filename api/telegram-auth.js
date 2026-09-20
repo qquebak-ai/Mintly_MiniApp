@@ -254,6 +254,88 @@ async function resolveInviter(admin, startParam, telegramId, userId) {
   return found;
 }
 
+/* Живая проверка «занято ли имя и почта» для экрана создания аккаунта.
+ *
+ * Спрашивать базу прямо из браузера нельзя: у гостя строки профилей
+ * закрыты политиками, и запрос без ошибки возвращает пустой список — то
+ * есть «свободно» про любое имя и любую почту. Именно поэтому рамка
+ * загоралась зелёным у занятых. Здесь ключ сервисный, политик нет.
+ *
+ * Ответ по каждому полю: true — занято, false — свободно, null — узнать
+ * не вышло. Про «не вышло» приложение не говорит «свободно».
+ * Подпись Telegram обязательна, счётчик свой и просторный: проверка идёт
+ * на ходу, пока человек печатает. */
+const CHECK_WINDOW_MS = 60 * 1000;
+const CHECK_MAX = 90;
+const checkHits = new Map();
+function checkLimited(key) {
+  const now = Date.now();
+  const hits = (checkHits.get(key) || []).filter((t) => now - t < CHECK_WINDOW_MS);
+  hits.push(now);
+  checkHits.set(key, hits);
+  if (checkHits.size > 5000) {
+    for (const [k, v] of checkHits) {
+      if (!v.length || now - v[v.length - 1] > CHECK_WINDOW_MS) checkHits.delete(k);
+    }
+  }
+  return hits.length > CHECK_MAX;
+}
+
+// Подстановочные знаки ILIKE в имени и адресе — обычные символы.
+const экранировать = (строка) => строка.replace(/[%_\\]/g, "\\$&");
+
+async function проверитьДоступность(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
+  if (!BOT_TOKEN || !SUPABASE_URL || !SERVICE_ROLE_KEY) return res.status(500).json({ error: "server_not_configured" });
+  let body;
+  try {
+    body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+  } catch (err) {
+    return fail(res, 400, "bad_body", err && err.message);
+  }
+  if (typeof body.initData !== "string" || body.initData.length > MAX_INIT_DATA_LEN) {
+    return fail(res, 400, "bad_init_data", "missing or oversized initData");
+  }
+  const checked = verifyInitData(body.initData);
+  if (!checked.user) return fail(res, 401, "invalid_init_data", checked.reason);
+  if (checkLimited(`chk:${checked.user.id}`) || checkLimited(`chkip:${clientKey(req)}`)) {
+    res.setHeader("Retry-After", "30");
+    return res.status(429).json({ error: "too_many_requests" });
+  }
+
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const запрос = body.check && typeof body.check === "object" ? body.check : {};
+  const ответ = {};
+
+  if (typeof запрос.nickname === "string") {
+    const ник = запрос.nickname.trim();
+    if (NICKNAME_RE.test(ник)) {
+      const { data, error } = await admin.from("profiles").select("id").ilike("nickname", экранировать(ник)).limit(1);
+      ответ.nickname_taken = error ? null : !!(data && data.length);
+    }
+  }
+
+  if (typeof запрос.email === "string") {
+    const почта = запрос.email.trim().toLowerCase();
+    if (почта.length <= 254 && /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(почта)) {
+      // Адрес мог осесть в профиле (создан через Google или введён на
+      // этом экране раньше) и в самой авторизации — смотрим в оба места.
+      let занята = null;
+      const { data, error } = await admin.from("profiles").select("id").ilike("email", экранировать(почта)).limit(1);
+      if (!error) занята = !!(data && data.length);
+      if (занята !== true) {
+        // Функция из supabase_mail_taken.sql. Нет её в базе — не беда,
+        // остаётся ответ по профилям.
+        const { data: р, error: рErr } = await admin.rpc("mail_taken", { p_email: почта });
+        if (!рErr && typeof р === "boolean") занята = р;
+      }
+      ответ.email_taken = занята;
+    }
+  }
+
+  return res.status(200).json(ответ);
+}
+
 export default async function handler(req, res) {
   // Вход не только через Telegram: здесь же живут Phantom и заведение
   // профиля после Google или почты. Отдельным файлом их не сделать —
@@ -263,6 +345,7 @@ export default async function handler(req, res) {
   if (действие === "nonce") return выдатьNonce(req, res);
   if (действие === "phantom") return входФантомом(req, res);
   if (действие === "profile") return завестиПрофиль(req, res);
+  if (действие === "available") return проверитьДоступность(req, res);
 
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
