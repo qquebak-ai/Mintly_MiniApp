@@ -22189,17 +22189,17 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           aria-hidden
           className="авт-шапка flex flex-col"
           style={{
-            position: "absolute", left: 24, right: 24, gap: 5, pointerEvents: "none",
+            position: "absolute", left: 24, right: 24, gap: 7, pointerEvents: "none",
             top: "calc(var(--tg-inset-top, 0px) + 30px)",
           }}
         >
           <span style={{
-            fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 300, letterSpacing: "0.3em",
+            fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 300, letterSpacing: "0.3em",
           }}>
             <ИмяПоБуквам текст="MINTLY" шаг={64} задержка={первыйПоказ ? ЖДАТЬ_ЗАСТАВКУ + 140 : 0} />
           </span>
           <span style={{
-            fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.38)", fontSize: 12, fontWeight: 600,
+            fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.42)", fontSize: 13.5, fontWeight: 600,
           }}>
             {t("authHeadLead")}
           </span>
