@@ -451,14 +451,39 @@ export default async function handler(req, res) {
         wallet_address: null,
       },
     });
+    /* «Уже есть» — обычный путь: человек возвращается, и заводить
+       нечего. Прочие отказы бывают разовыми: база отвечает «Database
+       error creating new user» и на пустом месте, под нагрузкой или на
+       секундном сбое. Не сдаёмся сразу — пробуем ещё раз, а окончательно
+       решает generateLink ниже: если пользователь всё-таки появился, вход
+       продолжается как ни в чём не бывало. */
     if (createErr && !/already|exists|registered/i.test(createErr.message || "")) {
-      return fail(res, 500, "create_user_failed", createErr.message);
+      console.error("[telegram-auth] createUser:", createErr.message);
+      await new Promise((r) => setTimeout(r, 400));
+      const { error: ещёРаз } = await admin.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        user_metadata: {
+          telegram_id: tgUser.id,
+          nickname: wantedNickname(body) || "",
+          bio: "",
+          avatar_url: null,
+          emoji: null,
+          wallet_address: null,
+        },
+      });
+      if (ещёРаз && !/already|exists|registered/i.test(ещёРаз.message || "")) {
+        console.error("[telegram-auth] createUser (вторая попытка):", ещёРаз.message);
+      }
     }
 
     // generateLink и создаёт одноразовый токен входа, и возвращает самого
     // пользователя — так мы узнаём его id, не перебирая список.
     const { data: link, error: linkErr } = await admin.auth.admin.generateLink({ type: "magiclink", email });
     if (linkErr || !link?.properties?.hashed_token || !link?.user?.id) {
+      // Сюда доходит и неудавшееся заведение: пользователя нет, и войти
+      // некому. Отдельного кода не заводим — снаружи это одно и то же
+      // «не получилось, попробуй ещё раз».
       return fail(res, 500, "link_failed", linkErr && linkErr.message);
     }
 
