@@ -2759,37 +2759,30 @@ function GlobalStyle() {
         100% { transform: translateX(0)     scale(1.15); }
       }
       .точки-спутник { animation: точкиСпутник 1.25s ease-in-out infinite; }
-      /* Заставка. Имя проступает по центру чёрного и одновременно
-         расходится в разрядку — будто буквы встают по местам, а не
-         подставляются готовой строкой. Подпись приходит следом, снизу.
-         Держится, пока поверхность внизу ждёт своей очереди, и
-         растворяется вверх ровно в тот миг, когда та идёт вверх. */
-      @keyframes знакПроступает {
-        from { opacity: 0; letter-spacing: 0.04em; transform: translateY(10px); }
-        to   { opacity: 1; letter-spacing: 0.34em; transform: translateY(0); }
-      }
-      @keyframes знакГаснет {
-        from { opacity: 1; transform: translateY(0); }
-        to   { opacity: 0; transform: translateY(-14px); }
-      }
-      .авт-заставка {
-        animation: знакГаснет 340ms cubic-bezier(0.4, 0, 1, 1) backwards;
-        animation-delay: calc(var(--авт-ждать, 0ms) - 240ms);
-      }
-      .авт-заставка > .авт-знак {
-        animation: знакПроступает 820ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+      /* Заставка. Имя не подставляется готовым: буквы проступают одна за
+         другой слева направо, будто строку набирают. Уходит она тем же
+         порядком — каждая буква гаснет, сдвигаясь вправо, — и ровно то
+         же движение повторяется потом в углу шапки. */
+      @keyframes букваУходитВправо {
+        from { opacity: 1; transform: translateX(0); }
+        to   { opacity: 0; transform: translateX(16px); }
       }
       .авт-заставка > .авт-подпись {
-        animation: авт-всплыв 560ms cubic-bezier(0.22, 1, 0.36, 1) 360ms backwards;
+        animation: авт-всплыв 560ms cubic-bezier(0.22, 1, 0.36, 1) 420ms backwards;
       }
-      /* Имя в шапке — то же, но мелкое и в углу: не переезжает из
-         середины, а проступает заново, пока поверхность идёт вверх. */
-      .авт-шапка > * { animation: авт-всплыв 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
-      .авт-шапка > *:nth-child(1) { animation-delay: calc(var(--авт-ждать, 0ms) + 140ms); }
-      .авт-шапка > *:nth-child(2) { animation-delay: calc(var(--авт-ждать, 0ms) + 250ms); }
+      .авт-заставка.уходит > .авт-подпись {
+        animation: букваУходитВправо 280ms cubic-bezier(0.4, 0, 1, 1) both;
+      }
+      /* Подпись под именем в шапке: имя набирается по буквам само, а ей
+         хватает обычного выхода снизу. */
+      .авт-шапка > *:nth-child(2) {
+        animation: авт-всплыв 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+        animation-delay: calc(var(--авт-ждать, 0ms) + 560ms);
+      }
       @media (prefers-reduced-motion: reduce) {
         .авт-лист, .авт-стопка > *, .авт-стопка > button,
-        .авт-заставка, .авт-заставка > *, .авт-шапка > * { animation: none !important; }
+        .авт-заставка, .авт-заставка > *, .авт-заставка > * > *,
+        .авт-шапка > *, .авт-шапка > * > * { animation: none !important; }
         .точки-спутник { animation: none; }
       }
       /* Окна и листы приходят снизу, а не разрастаются из центра: так
@@ -14565,6 +14558,36 @@ function СлоиТкани() {
  * готовый абзац, поставленный кадром. Разбивку держим по словам: если
  * пустить в строку одни буквы, браузер начнёт переносить их посреди
  * слова. */
+/* Имя по буквам.
+ *
+ * Каждая буква проступает чуть позже соседней слева — строка читается
+ * так, будто её набирают, а не подставляют готовой. Уход идёт тем же
+ * порядком: буква гаснет, сдвигаясь вправо, и строка «сдувается» в ту
+ * же сторону, в какую появлялась.
+ *
+ * Пробел отдаём неразрывным: обычный между inline-block схлопывается,
+ * и слова слипаются. */
+function ИмяПоБуквам({ текст, шаг = 70, задержка = 0, уходит = false, шагУхода = 46 }) {
+  return (
+    <>
+      {[...String(текст || "")].map((буква, i) => (
+        <span
+          key={i}
+          style={{
+            display: "inline-block",
+            animation: уходит
+              ? "букваУходитВправо 280ms cubic-bezier(0.4, 0, 1, 1) both"
+              : "букваПроступает 300ms ease-out both",
+            animationDelay: `${уходит ? i * шагУхода : задержка + i * шаг}ms`,
+          }}
+        >
+          {буква === " " ? " " : буква}
+        </span>
+      ))}
+    </>
+  );
+}
+
 function НабраннаяСтрока({ текст, шаг = 22 }) {
   const слова = String(текст || "").split(" ");
   let номер = -1;
@@ -21887,13 +21910,17 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
      места: её уход и выезд листа — одно движение, а не два подряд. */
   const ЖДАТЬ_ЗАСТАВКУ = 1500;
   const [заставка, setЗаставка] = useState(true);
+  // Буквы уходят вправо заранее: к мигу, когда трогается поверхность,
+  // имя посередине уже стёрто, и два движения не накладываются.
+  const [уходитЗаставка, setУходитЗаставка] = useState(false);
   useEffect(() => {
-    if (!open) { setПервыйПоказ(true); setЗаставка(true); return undefined; }
-    const сн = setTimeout(() => setЗаставка(false), ЖДАТЬ_ЗАСТАВКУ);
+    if (!open) { setПервыйПоказ(true); setЗаставка(true); setУходитЗаставка(false); return undefined; }
+    const ух = setTimeout(() => setУходитЗаставка(true), 1150);
+    const сн = setTimeout(() => { setЗаставка(false); setУходитЗаставка(false); }, 1760);
     // Сбрасываем задержки позже конца всех выходов: переменную читает
     // уже идущая анимация, и смена на полпути дёрнула бы её назад.
     const т = setTimeout(() => setПервыйПоказ(false), 3200);
-    return () => { clearTimeout(сн); clearTimeout(т); };
+    return () => { clearTimeout(ух); clearTimeout(сн); clearTimeout(т); };
   }, [open]);
   const [authTab, setAuthTab] = useState(isEdit ? "create" : mode); // "login" | "create"
   const [serverError, setServerError] = useState("");
@@ -21925,13 +21952,13 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     setПочтаВвод("");
     setПочтаБеда("");
     const высота = typeof window !== "undefined" ? window.innerHeight || 844 : 844;
-    /* Пятая часть экрана, но не меньше ста пятидесяти точек и не больше
-       двухсот. Над кромкой стоит имя с подписью, и прежняя восьмая часть
+    /* Чуть больше трети экрана — столько же занимает чёрное поле в
+       образце. Над кромкой стоит имя с подписью, и прежняя восьмая часть
        прятала их под дугу. Считается один раз и дальше не меняется: с
        клавиатурой окно становится вдвое ниже, и карточка должна целиком
        помещаться над ней — иначе кнопка «Создать аккаунт» уходит под
        клавиатуру, а двигать карточку нельзя, это и есть тот прыжок. */
-    setОтступСверху(Math.round(Math.min(Math.max(высота * 0.21, 150), 200)));
+    setОтступСверху(Math.round(Math.min(Math.max(высота * 0.35, 240), 310)));
     setTgNick("");
     setTgNickTouched(false);
     setЕстьАккаунт(null);
@@ -22114,7 +22141,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
        вверх и уходит за край. Строится как SVG во всю ширину с вьюбоксом
        той же пропорции, поэтому на любой ширине не искажается. Внизу
        под нею сплошная заливка. */
-    const ВЫСОТА_КРОМКИ = 0.3175;
+    const ВЫСОТА_КРОМКИ = 0.78;
+    /* Самая низкая точка дуги — не край картинки: под нею идёт сплошная
+       заливка. От этой доли и считается, где начинать содержимое. */
+    const ПРОГИБ_КРОМКИ = 0.727;
     const ширинаОкна = "min(100vw, 520px)";
     const экран = (
       <div
@@ -22131,19 +22161,19 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         {первыйПоказ && заставка && (
           <div
             aria-hidden
-            className="авт-заставка flex flex-col items-center"
+            className={`авт-заставка flex flex-col items-center${уходитЗаставка ? " уходит" : ""}`}
             style={{
               position: "absolute", left: 0, right: 0, top: "50%",
               transform: "translateY(-50%)", gap: 12, pointerEvents: "none",
             }}
           >
-            <span className="авт-знак" style={{
+            <span style={{
               fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 300,
               /* Правый отступ гасит разрядку последней буквы: без него
                  строка стоит не по центру, а сдвинутой влево. */
               letterSpacing: "0.34em", paddingLeft: "0.34em",
             }}>
-              MINTLY
+              <ИмяПоБуквам текст="MINTLY" уходит={уходитЗаставка} />
             </span>
             <span className="авт-подпись" style={{
               fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.42)", fontSize: 13, fontWeight: 600,
@@ -22166,7 +22196,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           <span style={{
             fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 300, letterSpacing: "0.3em",
           }}>
-            MINTLY
+            <ИмяПоБуквам текст="MINTLY" шаг={64} задержка={первыйПоказ ? ЖДАТЬ_ЗАСТАВКУ + 140 : 0} />
           </span>
           <span style={{
             fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.38)", fontSize: 12, fontWeight: 600,
@@ -22179,7 +22209,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           aria-hidden
           style={{
             position: "absolute", left: 0, right: 0, bottom: 0, pointerEvents: "none",
-            top: `calc(var(--tg-inset-top, 0px) + ${отступСверху - 30}px - ${ширинаОкна} * ${ВЫСОТА_КРОМКИ})`,
+            top: `calc(var(--tg-inset-top, 0px) + ${отступСверху - 16}px - ${ширинаОкна} * ${ПРОГИБ_КРОМКИ})`,
           }}
         >
           <svg
@@ -22187,7 +22217,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             preserveAspectRatio="none"
             style={{ display: "block", flexShrink: 0, width: "100%", height: `calc(${ширинаОкна} * ${ВЫСОТА_КРОМКИ})` }}
           >
-            <path d={`M0 0.198 Q0.5 0.5115 1 0 L1 ${ВЫСОТА_КРОМКИ} L0 ${ВЫСОТА_КРОМКИ} Z`} fill={T.surface} />
+            <path d={`M0 0.67 C0.25 0.78 0.58 0.78 1 0.3 L1 ${ВЫСОТА_КРОМКИ} L0 ${ВЫСОТА_КРОМКИ} Z`} fill={T.surface} />
           </svg>
           <div style={{ flex: 1, marginTop: -1, background: T.surface }} />
         </div>
