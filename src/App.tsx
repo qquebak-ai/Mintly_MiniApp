@@ -22540,7 +22540,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
        шагах и прижата к низу: без этого аватарка в девяносто шесть точек
        и конверт в сорок шесть ставили поле с кнопкой на разные уровни, и
        при переходе между шагами вся страница прыгала. */
-    const ВЕРХ_КАРТОЧКИ = 206;
+    const ВЕРХ_КАРТОЧКИ = 178;
     const ВЫСОТА_КРОМКИ = 0.78;
     /* Самая низкая точка дуги — не край картинки: под нею идёт сплошная
        заливка. От этой доли и считается, где начинать содержимое. */
@@ -22659,14 +22659,6 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 800, letterSpacing: "0.3em",
           }}>
             <ИмяПоБуквам текст="MINTLY" шаг={64} задержка={первыйПоказ ? ЖДАТЬ_ЗАСТАВКУ + 140 : 0} />
-          </span>
-          <span style={{
-            fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.42)", fontSize: 13.5, fontWeight: 600,
-          }}>
-            <СтрокаИзЗнаков
-              текст={t("authHeadLead")}
-              задержка={первыйПоказ ? ЖДАТЬ_ЗАСТАВКУ + 760 : 120}
-            />
           </span>
         </div>
         {/* Дуга и карточка — один кусок: под клавиатуру они уезжают
