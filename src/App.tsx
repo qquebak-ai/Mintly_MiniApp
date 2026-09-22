@@ -2676,14 +2676,46 @@ function GlobalStyle() {
          полоса выходит плоской и на широкой плашке почти не видна, а
          размытая читается как отблеск на стекле — сразу понятно, что
          место живое и содержимое вот-вот появится. */
-      .fx-skeleton { position: relative; overflow: hidden; background: ${T.surfaceHi}; }
-      .fx-skeleton::after {
-        content: ""; position: absolute; top: -50%; bottom: -50%; left: 0; width: 55%;
-        background: linear-gradient(90deg, transparent, ${T.ice}2E 42%, ${T.ice}52 50%, ${T.ice}2E 58%, transparent);
-        filter: blur(12px);
-        animation: shimmer 1.5s linear infinite;
+      .fx-skeleton {
+        position: relative; overflow: hidden;
+        /* Молочное стекло вместо серой плашки: три пятна света под общей
+           белой заливкой, и все они медленно расходятся. Пятна заданы
+           фоном, а не слоями: заглушек на экране бывает по три десятка,
+           и лишний узел в каждой обошёлся бы дороже, чем стоит. */
+        background:
+          radial-gradient(58% 78% at 10% 8%,   #C2D9FF 0%, rgba(194, 217, 255, 0) 62%),
+          radial-gradient(52% 70% at 92% 20%,  #FFD5E9 0%, rgba(255, 213, 233, 0) 64%),
+          radial-gradient(46% 62% at 44% 108%, #C9EEDF 0%, rgba(201, 238, 223, 0) 62%),
+          linear-gradient(168deg, #FBFCFE 0%, #EDF1F6 100%);
+        background-size: 190% 190%, 190% 190%, 190% 190%, 100% 100%;
+        background-position: 0% 0%, 100% 0%, 50% 100%, 0 0;
+        animation: стеклоПлывёт 19s ease-in-out infinite alternate;
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset;
       }
-      @media (prefers-reduced-motion: reduce) { .fx-skeleton::after { animation: none; } }
+      @keyframes стеклоПлывёт {
+        from { background-position: 0% 0%, 100% 0%, 50% 100%, 0 0; }
+        to   { background-position: 24% 16%, 74% 6%, 30% 82%, 0 0; }
+      }
+      /* Знаки ложатся ровно в границы плашки: кегль считается от её
+         высоты, строка набирается впритык, без пробелов, и обрезается по
+         краю — поэтому узор стоит точно на месте прежнего блюра. */
+      .fx-знаки {
+        position: absolute; inset: 0; display: flex; flex-direction: column;
+        justify-content: center; align-items: stretch; overflow: hidden;
+        font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+        color: #7C8797; opacity: 0.34; pointer-events: none;
+        letter-spacing: 0; white-space: pre;
+      }
+      .fx-знаки i { font-style: normal; display: block; }
+      .fx-знаки em {
+        font-style: normal; color: #46536A;
+        animation: знакМигнул 420ms ease-out both;
+      }
+      @keyframes знакМигнул { from { opacity: 1; } to { opacity: 0.5; } }
+      @media (prefers-reduced-motion: reduce) {
+        .fx-skeleton { animation: none; }
+        .fx-знаки em { animation: none; }
+      }
       /* Пока данные едут, на их месте стоит то же самое, но не в фокусе:
          размытые строки той же высоты. Пустой экран читается поломкой, а
          размытая заготовка — «сейчас будет», и подмена данных не двигает
@@ -2699,6 +2731,13 @@ function GlobalStyle() {
         0%, 100% { opacity: 0.4; }
         50%      { opacity: 0.65; }
       }
+      /* Под блюром уже лежат заглушки — размывать их незачем: узор из
+         знаков сам говорит, что место занято и ждёт данных. Хуже того,
+         filter: blur размазывает содержимое за границы блока, и с тех
+         пор, как плашки стали светлыми, их хвосты вылезали на чёрное
+         поле рядом с карточками. Блюр остаётся только там, где под ним
+         настоящий текст. */
+      .fx-грузится:has(.fx-skeleton) { filter: none; opacity: 1; animation: none; }
       @media (prefers-reduced-motion: reduce) { .fx-грузится { animation: none; } }
       .fx-chip { transition: border-color ${EASE}, background ${EASE}, color ${EASE}, transform ${SPRING}; }
       .fx-chip:active { transition: border-color ${EASE}, background ${EASE}, color ${EASE}, transform ${PRESS}; }
@@ -12284,6 +12323,141 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
    сейчас оживёт. */
 function ПлашкаБлока({ h, radius = 20 }) {
   return <div aria-hidden className="fx-skeleton" style={{ width: "100%", height: h, borderRadius: radius }} />;
+}
+
+/* Живые знаки в заглушках.
+ *
+ * Пока данные едут, на их месте стоит молочное стекло, а по нему идёт
+ * узор из одних знаков — скобок, слэшей, стрелок. Слов там нет намеренно:
+ * текст в заглушке читается, а читать нечего, и глаз цепляется за него
+ * вместо того, чтобы ждать. Знаки же узнаются как код и не просят себя
+ * разбирать.
+ *
+ * Узор не дорисовывается разметкой в тридцати восьми местах, а
+ * насаживается на класс: все заглушки приложения уже помечены
+ * .fx-skeleton, и одна развеска покрывает их разом — включая те, что
+ * появятся завтра.
+ *
+ * Меняются знаки местами, а не подставляются новые: состав строки
+ * постоянен, поэтому плашка не мерцает плотностью и не дёргается. */
+const ЗНАКИ_ПАРЫ = ["</>", "=>", "::", "{}", "[]", "()", "<>", "||", "&&", "/*", "*/", "!=", ">=", "++", ".."];
+const ЗНАКИ_ОДИН = "<>{}[]()/\\_;:=~|#*&?!$+-.^%@".split("");
+const ТАКТ_ЗНАКОВ = 55;
+
+function узорЗнаков(длина) {
+  let из = "";
+  while (из.length < длина) {
+    из += Math.random() < 0.38
+      ? ЗНАКИ_ПАРЫ[(Math.random() * ЗНАКИ_ПАРЫ.length) | 0]
+      : ЗНАКИ_ОДИН[(Math.random() * ЗНАКИ_ОДИН.length) | 0];
+  }
+  return из.slice(0, длина);
+}
+
+const экранЗнака = (з) => (з === "&" ? "&amp;" : з === "<" ? "&lt;" : з === ">" ? "&gt;" : з);
+
+// Строку перерисовываем целиком: знаков в ней два-три десятка, и склейка
+// строки дешевле, чем возня с отдельными узлами под каждый знак.
+function начертить(поле, ряды, яркие) {
+  const дети = поле.children;
+  for (let i = 0; i < ряды.length; i += 1) {
+    if (!дети[i]) continue;
+    const ярко = яркие && яркие[i];
+    let html = "";
+    for (let j = 0; j < ряды[i].length; j += 1) {
+      html += ярко === j ? `<em>${экранЗнака(ряды[i][j])}</em>` : экранЗнака(ряды[i][j]);
+    }
+    дети[i].innerHTML = html;
+  }
+}
+
+/* Кегль — от высоты плашки, число знаков — от ширины: узор обязан лечь
+   ровно в её границы, иначе он читается как текст поверх, а не как сама
+   плашка. Моноширинный знак шире своего кегля примерно в 0,6 раза —
+   отсюда и счёт. */
+function наполнитьПлашку(плашка) {
+  const ш = плашка.clientWidth;
+  const в = плашка.clientHeight;
+  if (!ш || !в) return;
+  const кегль = в <= 20 ? Math.max(7, Math.min(13, Math.round(в * 0.82))) : 11;
+  const шагСтроки = Math.round(кегль * 1.26);
+  const строк = Math.max(1, Math.floor((в - 2) / шагСтроки));
+  const вСтроке = Math.ceil(ш / (кегль * 0.6)) + 1;
+
+  let поле = плашка.querySelector(":scope > .fx-знаки");
+  if (!поле) {
+    поле = document.createElement("span");
+    поле.className = "fx-знаки";
+    поле.setAttribute("aria-hidden", "true");
+    плашка.appendChild(поле);
+  }
+  поле.style.fontSize = `${кегль}px`;
+  поле.style.lineHeight = `${шагСтроки}px`;
+  поле.textContent = "";
+  const ряды = [];
+  for (let i = 0; i < строк; i += 1) {
+    поле.appendChild(document.createElement("i"));
+    ряды.push(узорЗнаков(вСтроке).split(""));
+  }
+  плашка.__ряды = ряды;
+  плашка.__мера = `${ш}x${в}`;
+  начертить(поле, ряды, null);
+}
+
+function завестиЗнаки() {
+  if (typeof document === "undefined" || завестиЗнаки.пущено) return () => {};
+  завестиЗнаки.пущено = true;
+  let живые = [];
+
+  // Обход раз в полсекунды: заглушки приходят и уходят вместе с данными,
+  // а держать наблюдателя за всем деревом ради этого — дороже.
+  const обход = setInterval(() => {
+    /* Осиротевшие узоры. Класс заглушки снимается в тот миг, когда
+       данные пришли, — а узор внутри остаётся, и вместе с классом
+       пропадают и обрезка по краю, и точка отсчёта: знаки уезжают из
+       плашки и рисуются поверх страницы. Снимаем их сами. */
+    document.querySelectorAll(".fx-знаки").forEach((узор) => {
+      const дом = узор.parentElement;
+      if (!дом || !дом.classList.contains("fx-skeleton")) {
+        if (дом) { дом.__ряды = null; дом.__мера = null; }
+        узор.remove();
+      }
+    });
+    живые = Array.prototype.filter.call(
+      document.querySelectorAll(".fx-skeleton"),
+      (э) => э.clientWidth > 0 && э.clientHeight > 0
+    );
+    живые.forEach((э) => {
+      if (э.__мера !== `${э.clientWidth}x${э.clientHeight}`) наполнитьПлашку(э);
+    });
+  }, 500);
+
+  const такт = setInterval(() => {
+    if (!живые.length) return;
+    // Не больше трёх плашек за такт: на экране их бывает три десятка, и
+    // перерисовывать все разом незачем — глаз всё равно видит одну.
+    const сколько = Math.min(3, живые.length);
+    for (let к = 0; к < сколько; к += 1) {
+      const п = живые[(Math.random() * живые.length) | 0];
+      const ряды = п && п.__ряды;
+      const поле = п && п.querySelector(":scope > .fx-знаки");
+      if (!ряды || !поле || !ряды.length) continue;
+      const a = (Math.random() * ряды.length) | 0;
+      const b = (Math.random() * ряды.length) | 0;
+      if (!ряды[a].length || !ряды[b].length) continue;
+      const i = (Math.random() * ряды[a].length) | 0;
+      const j = (Math.random() * ряды[b].length) | 0;
+      const т = ряды[a][i];
+      ряды[a][i] = ряды[b][j];
+      ряды[b][j] = т;
+      const яркие = {};
+      яркие[a] = i;
+      яркие[b] = j;
+      начертить(поле, ряды, яркие);
+    }
+  }, ТАКТ_ЗНАКОВ);
+
+  return () => { clearInterval(обход); clearInterval(такт); завестиЗнаки.пущено = false; };
 }
 
 function HomeView({
@@ -23373,6 +23547,10 @@ const FEE_PERCENT = 0.01; // 1% комиссии
     rocketTimers.current = [setTimeout(() => setRocketFlying(false), ROCKET_FLIGHT_MS + 60)];
   }
   useEffect(() => () => rocketTimers.current.forEach(clearTimeout), []);
+  // Узор из знаков во всех заглушках приложения. Заводится один раз и
+  // сам находит плашки по классу — дорисовывать его в каждом месте
+  // разметки не нужно.
+  useEffect(() => завестиЗнаки(), []);
   // Анимацию тянем заранее, в фоне: к моменту запуска токена она должна
   // быть готова, иначе полёт начнётся с задержкой на загрузку.
   useEffect(() => {
