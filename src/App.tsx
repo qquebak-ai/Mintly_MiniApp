@@ -22143,6 +22143,19 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
    * клавиатурой. */
   const стопкаRef = useRef(null);
   const шапкаRef = useRef(null);
+  /* Верхнее поле Telegram снимаем числом один раз, при открытии.
+     Переменная --tg-inset-top живая: Telegram пересчитывает свои поля,
+     когда выезжает клавиатура, и окно, привязанное к ней, прыгало вслед
+     за каждым таким пересчётом. */
+  const [верхОкна, setВерхОкна] = useState(0);
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return;
+    const проба = document.createElement("div");
+    проба.style.cssText = "position:absolute;top:0;left:0;width:0;height:var(--tg-inset-top, 0px);pointer-events:none;";
+    document.body.appendChild(проба);
+    setВерхОкна(Math.round(проба.getBoundingClientRect().height));
+    проба.remove();
+  }, [open]);
   const [подъём, setПодъём] = useState(0);
   const подъёмЖивой = useRef(0);
   useEffect(() => { подъёмЖивой.current = подъём; }, [подъём]);
@@ -22498,7 +22511,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             position: "absolute", left: 24, right: 24, gap: 7, pointerEvents: "none",
             // Поверх всего: имя не должно скрываться за уехавшей карточкой.
             zIndex: 2,
-            top: "calc(var(--tg-inset-top, 0px) + 30px)",
+            top: верхОкна + 30,
           }}
         >
           <span style={{
@@ -22530,7 +22543,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           aria-hidden
           style={{
             position: "absolute", left: 0, right: 0, bottom: 0, pointerEvents: "none",
-            top: `calc(var(--tg-inset-top, 0px) + ${отступСверху - 16}px - ${ширинаОкна} * ${ПРОГИБ_КРОМКИ})`,
+            top: `calc(${верхОкна + отступСверху - 16}px - ${ширинаОкна} * ${ПРОГИБ_КРОМКИ})`,
           }}
         >
           <svg
@@ -22548,7 +22561,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           onClick={(e) => e.stopPropagation()}
           style={{
             position: "absolute", left: 0, right: 0, bottom: 0, margin: "0 auto",
-            top: `calc(${отступСверху}px + var(--tg-inset-top, 0px))`,
+            top: верхОкна + отступСверху,
             width: "calc(100% - 40px)", maxWidth: 352,
             padding: "26px 22px 22px", gap: 14,
             /* Своей прокрутки у окна нет: полоса сбоку читалась как
@@ -26569,15 +26582,10 @@ function mapTokenRow(row) {
         <PinLockScreen pin={pinCode} profile={profile} onUnlock={() => setPinLocked(false)} onForgot={forgotPin} />
       )}
 
-      {/* Чёрная ширма до входа.
-       *
-       * Окно создания открывается не сразу: сперва спрашиваем сервер, есть
-       * ли аккаунт, и только с ответом решаем, что показать. Этот
-       * промежуток человек видел как вспышку главной — лента, баннеры,
-       * кошелёк, — а следом на них падало окно входа. Держим чёрное поле,
-       * пока ответа нет и пока окно не встало на место: из чёрного оно и
-       * выходит своей заставкой. */}
-      <ЧёрнаяШирма видна={!authChecked || (!accountCreated && !profileModalOpen && !сразуВКошелёк)} />
+      {/* Пока аккаунта нет, под окном входа стоит чёрное поле: главную
+          мимо него не видно ни на кадр, сколько бы ни занял ответ
+          сервера и в каком бы порядке ни пришли флаги. */}
+      <ЧёрнаяШирма видна={!authChecked || (!accountCreated && !сразуВКошелёк)} />
 
       <AuthModal open={profileModalOpen} onСоздан={() => setЗалпНаГлавной(true)} onClose={() => { setProfileModalOpen(false); setLookFocus(null); }} onSubmit={submitProfile} initial={profile} mode={profileModalMode} walletAddress={walletAddress} onChangeNickname={changeNickname} cosmetics={cosmetics} owned={owned} onEquip={equipCosmetic} lookFocus={lookFocus} />
       <SettingsPanel
