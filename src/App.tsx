@@ -22130,6 +22130,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   /* Ниже, чем просит одна только кромка: над нею стоит имя с подписью,
      и при прежних 112 они упирались в дугу. */
   const [отступСверху, setОтступСверху] = useState(176);
+  /* У дуги своя высота, отвязанная от карточки: содержимое подняли выше,
+     а кромка должна остаться там, где стояла. */
+  const [отступДуги, setОтступДуги] = useState(295);
   /* Первые полторы секунды после открытия содержимое ждёт, пока
      поверхность сядет; при переходе между шагами ждать уже некого, и
      задержка почти нулевая. */
@@ -22277,6 +22280,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
        «Создать аккаунт» уходит под клавиатуру, а двигать карточку
        нельзя, это и есть тот прыжок. */
     setОтступСверху(Math.round(Math.min(Math.max(высота * 0.21, 145), 195)));
+    setОтступДуги(Math.round(Math.min(Math.max(высота * 0.35, 240), 310)));
     setTgNick("");
     setTgNickTouched(false);
     setЕстьАккаунт(null);
@@ -22544,7 +22548,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           aria-hidden
           style={{
             position: "absolute", left: 0, right: 0, bottom: 0, pointerEvents: "none",
-            top: `calc(${верхОкна + отступСверху - 16}px - ${ширинаОкна} * ${ПРОГИБ_КРОМКИ})`,
+            top: `calc(${верхОкна + отступДуги - 16}px - ${ширинаОкна} * ${ПРОГИБ_КРОМКИ})`,
           }}
         >
           <svg
