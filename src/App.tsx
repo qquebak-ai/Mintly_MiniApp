@@ -335,7 +335,7 @@ const STR = {
     authSignInCta: "Войти",
     // Строки заставки: имя посередине чёрного и то же имя в шапке.
     authSplashLead: "Мемкоины на TON и Solana",
-    authHeadLead: "Пара секунд — и аккаунт твой",
+    authHeadLead: "Начни прямо сейчас",
     createTitle: "Создай аккаунт",
     createLead: "Создай уникальный юзернейм",
     createCta: "Создать аккаунт",
@@ -347,7 +347,12 @@ const STR = {
     createdBody: "Осталось одно. Привяжи почту: ею подтверждается вывод, и через неё возвращают аккаунт, если пропадёт доступ к Telegram.",
     addMail: "Добавить почту",
     laterBtn: "Позже",
-    createMailLead: "Введи почту — на неё придёт код подтверждения",
+    createMailLead: "Укажи свою почту для регистрации",
+    // Кнопка окна входа отдельно от вывода: там «Далее» ведёт к следующему
+    // шагу перевода, и общий ключ связал бы два разных места.
+    authNext: "Продолжить",
+    authMailHint: "Введите email",
+    authClear: "Очистить поле",
     createdMailSent: "Письмо с кодом ушло на {mail}. Введи код — и почта привязана.",
     createdMailSaved: "Почта {mail} привязана к аккаунту. Подтвердите её в настройках.",
     mailLinkFailed: "Почту привязать не вышло: {msg}. Можно повторить.",
@@ -1015,7 +1020,7 @@ const STR = {
     withdrawCodeConfirm: "Confirm",
     authSignInCta: "Sign in",
     authSplashLead: "Memecoins on TON and Solana",
-    authHeadLead: "A couple of seconds and it is yours",
+    authHeadLead: "Start right now",
     createTitle: "Create your account",
     createLead: "Pick a unique username",
     createCta: "Create account",
@@ -1027,7 +1032,10 @@ const STR = {
     createdBody: "One thing left. Add an email: it confirms withdrawals and brings the account back if you lose access to Telegram.",
     addMail: "Add email",
     laterBtn: "Later",
-    createMailLead: "Enter your email — the confirmation code goes there",
+    createMailLead: "Add your email to sign up",
+    authNext: "Continue",
+    authMailHint: "Enter email",
+    authClear: "Clear the field",
     createdMailSent: "The code went to {mail}. Enter it and the email is linked.",
     createdMailSaved: "{mail} is attached to the account. Confirm it in settings.",
     mailLinkFailed: "Couldn't link the email: {msg}. You can try again.",
@@ -21594,21 +21602,34 @@ function ЗнакиОжидания({ size = 17 }) {
   );
 }
 
-function ИндикаторПроверки({ ждём = false, свободно = false, занято = false, size = 17 }) {
+function ИндикаторПроверки({ ждём = false, свободно = false, занято = false, size = 17, onОчистить = null }) {
   const видно = ждём || свободно || занято;
+  /* Крестик — не просто ответ, а и выход из него: занятый адрес всё
+     равно придётся стирать, и тянуться за этим к клавиатуре незачем.
+     Внешне ничего не меняется — та же метка на том же месте, только
+     нажимается. */
+  const жмётся = занято && typeof onОчистить === "function";
+  const общий = {
+    display: "flex", flexShrink: 0, width: size + 1, height: size + 1,
+    alignItems: "center", justifyContent: "center",
+    color: занято ? T.down : свободно ? T.up : T.muted,
+    opacity: видно ? 1 : 0,
+    transform: видно ? "scale(1)" : "scale(0.6)",
+    transition: `opacity 320ms ease, transform ${SPRING}, color 320ms ease`,
+  };
+  const начинка = занято ? <X size={size} strokeWidth={3} />
+    : свободно ? <Check size={size} strokeWidth={3} />
+    : <ЗнакиОжидания size={size} />;
+  if (!жмётся) return <span aria-hidden style={общий}>{начинка}</span>;
   return (
-    <span aria-hidden style={{
-      display: "flex", flexShrink: 0, width: size + 1, height: size + 1,
-      alignItems: "center", justifyContent: "center",
-      color: занято ? T.down : свободно ? T.up : T.muted,
-      opacity: видно ? 1 : 0,
-      transform: видно ? "scale(1)" : "scale(0.6)",
-      transition: `opacity 320ms ease, transform ${SPRING}, color 320ms ease`,
-    }}>
-      {занято ? <X size={size} strokeWidth={3} />
-        : свободно ? <Check size={size} strokeWidth={3} />
-        : <ЗнакиОжидания size={size} />}
-    </span>
+    <button
+      type="button"
+      aria-label={t("authClear")}
+      onClick={() => { haptic("light"); onОчистить(); }}
+      style={{ ...общий, padding: 0, border: "none", background: "transparent", cursor: "pointer" }}
+    >
+      {начинка}
+    </button>
   );
 }
 
@@ -22619,7 +22640,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                       value={почтаВвод}
                       onChange={(e) => { setПочтаВвод(e.target.value); setПочтаБеда(""); }}
                       type="email"
-                      placeholder="you@mail.com"
+                      placeholder={t("authMailHint")}
                       spellCheck={false}
                       autoCapitalize="off"
                       autoCorrect="off"
@@ -22632,6 +22653,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                       ждём={почтаПроверяется || почтаЖдём}
                       свободно={почтаСвободна}
                       занято={почтаНеСвободна || !!почтаБеда}
+                      onОчистить={() => { setПочтаВвод(""); setПочтаБеда(""); }}
                     />
                   </div>
                   <СтатусПроверки
@@ -22669,7 +22691,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 занята={почтаЖдём}
                 готова={почтаГодна}
               >
-                {t("withdrawNext")}
+                {t("authNext")}
               </ЖидкаяКнопка>
 
               {!внутриTelegram && (
@@ -22797,7 +22819,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                         color: T.ice, fontFamily: monoFont, fontSize: 16, fontWeight: 700,
                       }}
                     />
-                    <ИндикаторПроверки ждём={никПроверяется} свободно={никСвободен} занято={никНеСвободен} />
+                    <ИндикаторПроверки ждём={никПроверяется} свободно={никСвободен} занято={никНеСвободен} onОчистить={() => { setTgNick(""); setTgError(""); }} />
                   </div>
                   {tgNickTouched && !никФормат ? (
                     <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, paddingLeft: 4, minHeight: 18 }}>
