@@ -21555,18 +21555,40 @@ async function никЗанят(ник) {
   return typeof о.nickname_taken === "boolean" ? о.nickname_taken : null;
 }
 
-/* Галочка справа в поле: появляется, когда база подтвердила, что имя
-   свободно. Место под неё занято всегда — поле не дёргается. */
-function ИндикаторПроверки({ готово }) {
+/* Знак справа в поле. Пока база думает — крутятся те же скобки и
+   стрелки, что стоят вместо строк на других экранах; ответ пришёл —
+   на их месте галочка или крестик. Размер и выход одни на все три:
+   поле не дёргается, а знак не подставляется рывком. */
+function ЗнакиОжидания({ size = 17 }) {
+  const [знаки, setЗнаки] = useState(() => узорЗнаков(2));
+  useEffect(() => {
+    const т = setInterval(() => setЗнаки(узорЗнаков(2)), 90);
+    return () => clearInterval(т);
+  }, []);
+  return (
+    <span style={{
+      fontFamily: monoFont, fontSize: size - 3, fontWeight: 700,
+      color: T.muted, letterSpacing: 0, lineHeight: 1,
+    }}>
+      {знаки}
+    </span>
+  );
+}
+
+function ИндикаторПроверки({ ждём = false, свободно = false, занято = false, size = 17 }) {
+  const видно = ждём || свободно || занято;
   return (
     <span aria-hidden style={{
-      display: "flex", flexShrink: 0, width: 18, height: 18, alignItems: "center", justifyContent: "center",
-      color: T.up,
-      opacity: готово ? 1 : 0,
-      transform: готово ? "scale(1)" : "scale(0.6)",
-      transition: `opacity 320ms ease, transform ${SPRING}`,
+      display: "flex", flexShrink: 0, width: size + 1, height: size + 1,
+      alignItems: "center", justifyContent: "center",
+      color: занято ? T.down : свободно ? T.up : T.muted,
+      opacity: видно ? 1 : 0,
+      transform: видно ? "scale(1)" : "scale(0.6)",
+      transition: `opacity 320ms ease, transform ${SPRING}, color 320ms ease`,
     }}>
-      <Check size={17} strokeWidth={3} />
+      {занято ? <X size={size} strokeWidth={3} />
+        : свободно ? <Check size={size} strokeWidth={3} />
+        : <ЗнакиОжидания size={size} />}
     </span>
   );
 }
@@ -21582,11 +21604,10 @@ function СтатусПроверки({ проверяем, итог, текст
   const известно = итог === true || итог === false;
   return (
     <div aria-live="polite" style={{ minHeight: 18, display: "flex", alignItems: "center", paddingLeft: 4 }}>
-      {проверяем ? (
-        <span className="fx-грузится" aria-hidden style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, fontWeight: 700 }}>
-          {текстСвободно}
-        </span>
-      ) : известно ? (
+      {/* Пока база думает, здесь пусто: о том, что ответ едет, говорит
+          знак справа в самом поле, и вторая такая же метка под ним
+          только дублировала бы её. */}
+      {проверяем ? null : известно ? (
         <span
           key={итог ? "занято" : "свободно"}
           style={{
@@ -22093,6 +22114,18 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   /* Первые полторы секунды после открытия содержимое ждёт, пока
      поверхность сядет; при переходе между шагами ждать уже некого, и
      задержка почти нулевая. */
+  /* Подъём под клавиатуру.
+   *
+   * Телефон поднимает клавиатуру поверх половины экрана, и поле ввода
+   * уходит под неё. Двигать одну карточку нельзя: чёрная шапка с дугой
+   * осталась бы на месте, и окно разъехалось бы надвое. Поэтому едут оба
+   * слоя разом и с одной скоростью — окно просто целиком сдвигается
+   * вверх ровно настолько, чтобы нижний край содержимого встал над
+   * клавиатурой. */
+  const стопкаRef = useRef(null);
+  const [подъём, setПодъём] = useState(0);
+  const подъёмЖивой = useRef(0);
+  useEffect(() => { подъёмЖивой.current = подъём; }, [подъём]);
   const [первыйПоказ, setПервыйПоказ] = useState(true);
   /* Заставка живёт ровно до того мига, когда поверхность трогается с
      места: её уход и выезд листа — одно движение, а не два подряд. */
@@ -22109,6 +22142,47 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     // уже идущая анимация, и смена на полпути дёрнула бы её назад.
     const т = setTimeout(() => setПервыйПоказ(false), 3200);
     return () => { clearTimeout(ух); clearTimeout(сн); clearTimeout(т); };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) { setПодъём(0); return undefined; }
+    if (typeof window === "undefined") return undefined;
+    const окно = window.visualViewport || null;
+    const пересчитать = () => {
+      const узел = стопкаRef.current;
+      if (!узел) return;
+      const видно = окно ? окно.height : window.innerHeight;
+      // Низ содержимого считаем без нынешнего сдвига: иначе каждая
+      // пересборка прибавляла бы к нему прошлый подъём.
+      const место = узел.getBoundingClientRect();
+      const низ = место.bottom + подъёмЖивой.current;
+      // Выше верхней кромки окно не поднимаем: спасая нижнее поле, оно
+      // срезало бы заголовок, а это та же беда с другого конца.
+      const предел = Math.max(0, Math.round(место.top + подъёмЖивой.current - 10));
+      setПодъём(Math.min(Math.max(0, Math.round(низ + 18 - видно)), предел));
+    };
+    пересчитать();
+    const т = setTimeout(пересчитать, 60);
+    /* Содержимое меняется вместе с шагом — и высота вместе с ним.
+       Наблюдатель за размером точнее списка зависимостей: он ловит и
+       смену шага, и приход ошибки под полем, и ничего не требует знать
+       о том, что именно поменялось. */
+    const глаз = typeof ResizeObserver !== "undefined" ? new ResizeObserver(пересчитать) : null;
+    if (глаз && стопкаRef.current) глаз.observe(стопкаRef.current);
+    if (окно) {
+      окно.addEventListener("resize", пересчитать);
+      окно.addEventListener("scroll", пересчитать);
+    }
+    window.addEventListener("resize", пересчитать);
+    return () => {
+      clearTimeout(т);
+      if (глаз) глаз.disconnect();
+      if (окно) {
+        окно.removeEventListener("resize", пересчитать);
+        окно.removeEventListener("scroll", пересчитать);
+      }
+      window.removeEventListener("resize", пересчитать);
+    };
   }, [open]);
   const [authTab, setAuthTab] = useState(isEdit ? "create" : mode); // "login" | "create"
   const [serverError, setServerError] = useState("");
@@ -22398,6 +22472,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           style={{
             position: "absolute", left: 0, right: 0, bottom: 0, pointerEvents: "none",
             top: `calc(var(--tg-inset-top, 0px) + ${отступСверху - 16}px - ${ширинаОкна} * ${ПРОГИБ_КРОМКИ})`,
+            transform: подъём ? `translateY(${-подъём}px)` : undefined,
+            transition: "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)",
           }}
         >
           <svg
@@ -22411,15 +22487,18 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         </div>
         <div
           className="авт-стопка flex flex-col"
+          ref={стопкаRef}
           onClick={(e) => e.stopPropagation()}
           style={{
             position: "absolute", left: 0, right: 0, bottom: 0, margin: "0 auto",
             top: `calc(${отступСверху}px + var(--tg-inset-top, 0px))`,
             width: "calc(100% - 40px)", maxWidth: 352,
             padding: "26px 22px 22px", gap: 14,
-            // Окно совсем низкое (клавиатура на маленьком экране) —
-            // листается внутри себя, а не обрезается.
-            overflowY: "auto",
+            /* Своей прокрутки у окна нет: полоса сбоку читалась как
+               отдельный список внутри карточки, а под клавиатуру окно
+               уезжает целиком — прокручивать в нём нечего. */
+            transform: подъём ? `translateY(${-подъём}px)` : undefined,
+            transition: "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)",
           }}
         >
           {шагВхода === "почта" ? (
@@ -22450,24 +22529,38 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
 
               {внутриTelegram && (
                 <div className="flex flex-col" style={{ gap: 6 }}>
-                  <input
-                    value={почтаВвод}
-                    onChange={(e) => { setПочтаВвод(e.target.value); setПочтаБеда(""); }}
-                    type="email"
-                    placeholder="you@mail.com"
-                    spellCheck={false}
-                    autoCapitalize="off"
-                    autoCorrect="off"
+                  {/* Знак ответа стоит в самом поле, как у имени: место
+                      под него занято всегда, поэтому поле не дёргается. */}
+                  <div
+                    className="flex items-center"
                     style={{
-                      width: "100%", padding: "15px 15px", borderRadius: 18,
+                      gap: 10, width: "100%", padding: "15px 15px", borderRadius: 18,
                       background: T.surfaceHi,
                       /* Зелёная — только когда база подтвердила, что почта
                          свободна; пока спрашиваем, рамка нейтральная. */
                       border: `1px solid ${почтаБеда || почтаНеСвободна ? T.down : (почтаСвободна ? T.up : "transparent")}`,
-                      color: T.ice, fontFamily: bodyFont, fontSize: 16, fontWeight: 700, outline: "none",
                       transition: "border-color 420ms cubic-bezier(0.22, 1, 0.36, 1)",
                     }}
-                  />
+                  >
+                    <input
+                      value={почтаВвод}
+                      onChange={(e) => { setПочтаВвод(e.target.value); setПочтаБеда(""); }}
+                      type="email"
+                      placeholder="you@mail.com"
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      style={{
+                        flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none",
+                        color: T.ice, fontFamily: bodyFont, fontSize: 16, fontWeight: 700,
+                      }}
+                    />
+                    <ИндикаторПроверки
+                      ждём={почтаПроверяется || почтаЖдём}
+                      свободно={почтаСвободна}
+                      занято={почтаНеСвободна || !!почтаБеда}
+                    />
+                  </div>
                   <СтатусПроверки
                     проверяем={почтаПроверяется}
                     итог={почтаПроверяема && typeof почтаОтвет === "boolean" ? почтаОтвет : undefined}
@@ -22631,7 +22724,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                         color: T.ice, fontFamily: monoFont, fontSize: 16, fontWeight: 700,
                       }}
                     />
-                    <ИндикаторПроверки готово={никСвободен} />
+                    <ИндикаторПроверки ждём={никПроверяется} свободно={никСвободен} занято={никНеСвободен} />
                   </div>
                   {tgNickTouched && !никФормат ? (
                     <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, paddingLeft: 4, minHeight: 18 }}>
