@@ -2676,44 +2676,28 @@ function GlobalStyle() {
          полоса выходит плоской и на широкой плашке почти не видна, а
          размытая читается как отблеск на стекле — сразу понятно, что
          место живое и содержимое вот-вот появится. */
-      .fx-skeleton {
-        position: relative; overflow: hidden;
-        /* Молочное стекло вместо серой плашки: три пятна света под общей
-           белой заливкой, и все они медленно расходятся. Пятна заданы
-           фоном, а не слоями: заглушек на экране бывает по три десятка,
-           и лишний узел в каждой обошёлся бы дороже, чем стоит. */
-        background:
-          radial-gradient(58% 78% at 10% 8%,   #C2D9FF 0%, rgba(194, 217, 255, 0) 62%),
-          radial-gradient(52% 70% at 92% 20%,  #FFD5E9 0%, rgba(255, 213, 233, 0) 64%),
-          radial-gradient(46% 62% at 44% 108%, #C9EEDF 0%, rgba(201, 238, 223, 0) 62%),
-          linear-gradient(168deg, #FBFCFE 0%, #EDF1F6 100%);
-        background-size: 190% 190%, 190% 190%, 190% 190%, 100% 100%;
-        background-position: 0% 0%, 100% 0%, 50% 100%, 0 0;
-        animation: стеклоПлывёт 19s ease-in-out infinite alternate;
-        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset;
-      }
-      @keyframes стеклоПлывёт {
-        from { background-position: 0% 0%, 100% 0%, 50% 100%, 0 0; }
-        to   { background-position: 24% 16%, 74% 6%, 30% 82%, 0 0; }
-      }
-      /* Знаки ложатся ровно в границы плашки: кегль считается от её
+      /* Заглушка — это сами знаки, и ничего кроме них: ни плашки, ни
+         подложки, ни блика. Серый прямоугольник говорил «тут пусто», а
+         строка знаков тем же цветом, что и обычный текст, говорит «тут
+         сейчас будет текст» — место занято ровно тем, что его займёт. */
+      .fx-skeleton { position: relative; overflow: hidden; background: transparent; }
+      /* Знаки ложатся ровно в границы места: кегль считается от его
          высоты, строка набирается впритык, без пробелов, и обрезается по
-         краю — поэтому узор стоит точно на месте прежнего блюра. */
+         краю — поэтому узор стоит точно там, где появится содержимое. */
       .fx-знаки {
         position: absolute; inset: 0; display: flex; flex-direction: column;
         justify-content: center; align-items: stretch; overflow: hidden;
         font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
-        color: #7C8797; opacity: 0.34; pointer-events: none;
+        color: ${T.muted}; opacity: 0.6; pointer-events: none;
         letter-spacing: 0; white-space: pre;
       }
       .fx-знаки i { font-style: normal; display: block; }
       .fx-знаки em {
-        font-style: normal; color: #46536A;
+        font-style: normal; color: ${T.ice};
         animation: знакМигнул 420ms ease-out both;
       }
-      @keyframes знакМигнул { from { opacity: 1; } to { opacity: 0.5; } }
+      @keyframes знакМигнул { from { opacity: 1; } to { opacity: 0.55; } }
       @media (prefers-reduced-motion: reduce) {
-        .fx-skeleton { animation: none; }
         .fx-знаки em { animation: none; }
       }
       /* Пока данные едут, на их месте стоит то же самое, но не в фокусе:
