@@ -22223,6 +22223,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
      когда выезжает клавиатура, и окно, привязанное к ней, прыгало вслед
      за каждым таким пересчётом. */
   const [верхОкна, setВерхОкна] = useState(0);
+  const [языкОткрыт, setЯзыкОткрыт] = useState(false);
   useEffect(() => {
     if (!open || typeof document === "undefined") return;
     const проба = document.createElement("div");
@@ -22587,28 +22588,60 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             это всё ещё одно окно, а не другой экран. */}
         {/* Язык выбирается здесь один раз и запоминается навсегда: до
             входа в настройки не попасть, а читать чужой язык на первом же
-            экране — худшее знакомство. Дальше он меняется только там. */}
-        <div style={{
-          position: "absolute", zIndex: 3, right: 22, top: верхОкна + 30,
-          display: "flex", gap: 2, padding: 3, borderRadius: 999,
-          background: "rgba(255, 255, 255, 0.06)", border: `1px solid ${T.line}`,
-        }}>
-          {["RU", "EN"].map((к) => (
-            <button
-              key={к}
-              onClick={() => { haptic("light"); onЯзык(к); }}
-              className="fx-tap"
-              style={{
-                padding: "5px 11px", borderRadius: 999, border: "none", cursor: "pointer",
-                background: язык === к ? T.ice : "transparent",
-                color: язык === к ? T.bg : T.muted,
-                fontFamily: displayFont, fontSize: 12, fontWeight: 800, letterSpacing: "0.04em",
-                transition: `background ${EASE}, color ${EASE}`,
-              }}
-            >
-              {к}
-            </button>
-          ))}
+            экране — худшее знакомство. Дальше он меняется только там.
+
+            Кружок с флагом, а не пара кнопок: на первом экране это не
+            выбор, а отметка «сейчас так» — нажал и поменял, если не так. */}
+        <div style={{ position: "absolute", zIndex: 3, right: 22, top: верхОкна + 28 }}>
+          <button
+            onClick={() => { haptic("light"); setЯзыкОткрыт((б) => !б); }}
+            className="fx-tap flex items-center justify-center"
+            aria-label={t("langTitle")}
+            style={{
+              width: 38, height: 38, borderRadius: "50%", padding: 0, cursor: "pointer",
+              background: "rgba(255, 255, 255, 0.07)", border: `1px solid ${T.line}`,
+              fontSize: 19, lineHeight: 1,
+            }}
+          >
+            {язык === "EN" ? "🇬🇧" : "🇷🇺"}
+          </button>
+
+          {языкОткрыт && (
+            <>
+              {/* Подложка во весь экран: нажатие мимо списка закрывает его,
+                  и не нужно ловить это на каждом элементе окна. */}
+              <div
+                onClick={() => setЯзыкОткрыт(false)}
+                style={{ position: "fixed", inset: 0, zIndex: 1 }}
+              />
+              <div
+                className="fx-view"
+                style={{
+                  position: "absolute", top: 46, right: 0, zIndex: 2,
+                  display: "flex", flexDirection: "column", gap: 2, padding: 4,
+                  borderRadius: 16, background: T.surface, border: `1px solid ${T.line}`,
+                  boxShadow: "0 12px 30px rgba(0, 0, 0, 0.5)", minWidth: 148,
+                }}
+              >
+                {[["RU", "🇷🇺", "Русский"], ["EN", "🇬🇧", "English"]].map(([код, флаг, имя]) => (
+                  <button
+                    key={код}
+                    onClick={() => { haptic("light"); onЯзык(код); setЯзыкОткрыт(false); }}
+                    className="fx-tap flex items-center"
+                    style={{
+                      gap: 9, padding: "9px 11px", borderRadius: 12, border: "none", cursor: "pointer",
+                      background: язык === код ? T.surfaceHi : "transparent",
+                      color: язык === код ? T.ice : T.muted,
+                      fontFamily: displayFont, fontSize: 14, fontWeight: 700, textAlign: "left",
+                    }}
+                  >
+                    <span style={{ fontSize: 17, lineHeight: 1 }}>{флаг}</span>
+                    {имя}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         <div
