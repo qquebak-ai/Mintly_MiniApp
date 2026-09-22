@@ -12315,6 +12315,25 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
    полупустые карточки с прочерками вместо чисел, а ровные серые
    прямоугольники той же формы: так видно раскладку и видно, что она
    сейчас оживёт. */
+/* Чёрная ширма до входа.
+ *
+ * Окно создания открывается не сразу: сперва спрашиваем сервер, есть ли
+ * аккаунт, и только с ответом решаем, что показать. Этот промежуток
+ * человек видел вспышкой главной — лента, баннеры, кошелёк, — на которую
+ * тут же падало окно входа.
+ *
+ * Порталом прямо в документ, как и само окно: экраны приложения
+ * приезжают с анимацией, а position: fixed внутри предка с transform
+ * считается от него, и ширма ездила вместе с экраном вместо того, чтобы
+ * накрыть его целиком. */
+function ЧёрнаяШирма({ видна }) {
+  if (!видна) return null;
+  const слой = (
+    <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: 59, background: "#000000" }} />
+  );
+  return typeof document !== "undefined" ? createPortal(слой, document.body) : слой;
+}
+
 function ПлашкаБлока({ h, radius = 20 }) {
   return <div aria-hidden className="fx-skeleton" style={{ width: "100%", height: h, borderRadius: radius }} />;
 }
@@ -22149,38 +22168,47 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     if (!open) { setПодъём(0); return undefined; }
     if (typeof window === "undefined") return undefined;
     const окно = window.visualViewport || null;
+    /* Всё меряем в неподвижных координатах — offsetTop, а не
+       getBoundingClientRect.
+       Прямоугольник уже включает наш собственный сдвиг, и пока идёт его
+       анимация, он промежуточный: расчёт получал смещённые числа,
+       выдавал новый подъём, тот снова двигал карточку — и она прыгала
+       рывками вслед за собственным движением. offsetTop про transform
+       не знает вовсе, поэтому опорные точки стоят намертво. */
+    const отВерха = (узел) => {
+      let сумма = 0;
+      let э = узел;
+      while (э && э !== document.body) { сумма += э.offsetTop; э = э.offsetParent; }
+      return сумма;
+    };
+
     const пересчитать = () => {
       const узел = стопкаRef.current;
       if (!узел) return;
       const видно = окно ? окно.height : window.innerHeight;
-      // Низ содержимого считаем без нынешнего сдвига: иначе каждая
-      // пересборка прибавляла бы к нему прошлый подъём.
-      const место = узел.getBoundingClientRect();
-      /* Низ берём у последнего элемента, а не у самой стопки: она тянется
-         до нижнего края окна, и её bottom — это всегда дно экрана, а
-         scrollHeight — та же дистанция. Подъём от такой величины уносил
-         окно за верх целиком. */
-      /* Якорь — поле ввода, а не всё содержимое. Поднимая карточку целиком,
-         вместе с кнопкой, окно уезжало под шапку Telegram: высоты для
-         всего сразу просто нет. Над клавиатурой держим то, во что
-         человек сейчас пишет, а кнопка спокойно уходит под неё —
-         нажимать её всё равно будут, закрыв клавиатуру. */
+      /* Якорь — поле ввода, а не всё содержимое: поднимая карточку
+         целиком, вместе с кнопкой, окно уезжало под шапку Telegram —
+         высоты для всего сразу просто нет. Над клавиатурой держим то, во
+         что человек сейчас пишет, а кнопка уходит под неё: нажимать её
+         всё равно будут, закрыв клавиатуру. */
       const живое = document.activeElement;
       const цель = (живое && узел.contains(живое) && /^(INPUT|TEXTAREA)$/.test(живое.tagName))
         ? живое
         : узел.querySelector("input, textarea");
-      const мераЦели = цель ? цель.getBoundingClientRect() : null;
       // Поле могло ещё не отрисоваться — тогда держим хвост содержимого.
-      const якорь = мераЦели && мераЦели.height > 0 ? цель : узел.lastElementChild;
-      const низ = (якорь ? якорь.getBoundingClientRect().bottom : место.top) + подъёмЖивой.current;
+      const якорь = цель && цель.offsetHeight > 0 ? цель : узел.lastElementChild;
+      const низ = якорь ? отВерха(якорь) + якорь.offsetHeight : отВерха(узел);
       /* Выше имени в углу карточка не поднимается: оно остаётся на месте
-         всегда, и наползать на него нечему. Спасая нижнее поле, окно
-         иначе съедало бы и заголовок, и само имя. */
+         всегда, и наползать на него нечему. */
       const шапка = шапкаRef.current;
-      const порог = шапка ? шапка.getBoundingClientRect().bottom + 24 : 0;
-      const предел = Math.max(0, Math.round(место.top + подъёмЖивой.current - порог));
-      setПодъём(Math.min(Math.max(0, Math.round(низ + 18 - видно)), предел));
+      const порог = шапка ? отВерха(шапка) + шапка.offsetHeight + 24 : 0;
+      const предел = Math.max(0, Math.round(отВерха(узел) - порог));
+      const надо = Math.min(Math.max(0, Math.round(низ + 18 - видно)), предел);
+      // Мелкая дрожь в пару точек — не повод трогать раскладку.
+      if (Math.abs(надо - подъёмЖивой.current) < 3) return;
+      setПодъём(надо);
     };
+
     пересчитать();
     const т = setTimeout(пересчитать, 60);
     /* Содержимое меняется вместе с шагом — и высота вместе с ним.
@@ -22189,18 +22217,12 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
        о том, что именно поменялось. */
     const глаз = typeof ResizeObserver !== "undefined" ? new ResizeObserver(пересчитать) : null;
     if (глаз && стопкаRef.current) глаз.observe(стопкаRef.current);
-    if (окно) {
-      окно.addEventListener("resize", пересчитать);
-      окно.addEventListener("scroll", пересчитать);
-    }
+    if (окно) окно.addEventListener("resize", пересчитать);
     window.addEventListener("resize", пересчитать);
     return () => {
       clearTimeout(т);
       if (глаз) глаз.disconnect();
-      if (окно) {
-        окно.removeEventListener("resize", пересчитать);
-        окно.removeEventListener("scroll", пересчитать);
-      }
+      if (окно) окно.removeEventListener("resize", пересчитать);
       window.removeEventListener("resize", пересчитать);
     };
   }, [open]);
@@ -26555,9 +26577,7 @@ function mapTokenRow(row) {
        * кошелёк, — а следом на них падало окно входа. Держим чёрное поле,
        * пока ответа нет и пока окно не встало на место: из чёрного оно и
        * выходит своей заставкой. */}
-      {(!authChecked || (!accountCreated && !profileModalOpen && !сразуВКошелёк)) && (
-        <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: 59, background: "#000000" }} />
-      )}
+      <ЧёрнаяШирма видна={!authChecked || (!accountCreated && !profileModalOpen && !сразуВКошелёк)} />
 
       <AuthModal open={profileModalOpen} onСоздан={() => setЗалпНаГлавной(true)} onClose={() => { setProfileModalOpen(false); setLookFocus(null); }} onSubmit={submitProfile} initial={profile} mode={profileModalMode} walletAddress={walletAddress} onChangeNickname={changeNickname} cosmetics={cosmetics} owned={owned} onEquip={equipCosmetic} lookFocus={lookFocus} />
       <SettingsPanel
