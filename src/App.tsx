@@ -353,6 +353,7 @@ const STR = {
     authNext: "Продолжить",
     authMailHint: "Введите email",
     authClear: "Очистить поле",
+    authStepLast: "Последний шаг",
     createdMailSent: "Письмо с кодом ушло на {mail}. Введи код — и почта привязана.",
     createdMailSaved: "Почта {mail} привязана к аккаунту. Подтвердите её в настройках.",
     mailLinkFailed: "Почту привязать не вышло: {msg}. Можно повторить.",
@@ -1036,6 +1037,7 @@ const STR = {
     authNext: "Continue",
     authMailHint: "Enter email",
     authClear: "Clear the field",
+    authStepLast: "Last step",
     createdMailSent: "The code went to {mail}. Enter it and the email is linked.",
     createdMailSaved: "{mail} is attached to the account. Confirm it in settings.",
     mailLinkFailed: "Couldn't link the email: {msg}. You can try again.",
@@ -22246,6 +22248,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   }, [open]);
   const [подъём, setПодъём] = useState(0);
   const подъёмЖивой = useRef(0);
+  // Прошлая видимая высота: по ней видно, клавиатура выезжает или уходит.
+  const прошлаяВысота = useRef(0);
   useEffect(() => { подъёмЖивой.current = подъём; }, [подъём]);
   const [первыйПоказ, setПервыйПоказ] = useState(true);
   /* Заставка живёт ровно до того мига, когда поверхность трогается с
@@ -22287,6 +22291,16 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
       const узел = стопкаRef.current;
       if (!узел) return;
       const видно = окно ? окно.height : window.innerHeight;
+      const всего = window.innerHeight || видно;
+      const было = прошлаяВысота.current;
+      прошлаяВысота.current = видно;
+      /* Клавиатура уходит — окно возвращается на место сразу, без
+         пересчёта. Высота растёт порциями, и по дороге попадались
+         значения, при которых подъём ещё нужен: окно успевало дёрнуться
+         вверх и только потом опуститься. */
+      if (было && видно > было + 2) { setПодъём(0); return; }
+      // Разницы в сотню точек клавиатура не делает — это полосы системы.
+      if (всего - видно < 120) { if (подъёмЖивой.current) setПодъём(0); return; }
       /* Якорь — поле ввода, а не всё содержимое: поднимая карточку
          целиком, вместе с кнопкой, окно уезжало под шапку Telegram —
          высоты для всего сразу просто нет. Над клавиатурой держим то, во
@@ -22867,13 +22881,15 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   className="fx-tap flex items-center justify-center"
                   style={{
                     position: "relative",
-                    width: 64, height: 64, borderRadius: "50%", flexShrink: 0, padding: 0, overflow: "hidden",
+                    width: 104, height: 104, borderRadius: "50%", flexShrink: 0, padding: 0, overflow: "hidden",
                     background: лицо ? `center/cover no-repeat url(${лицо})` : "transparent",
                     /* Пунктир — пока имя не сошлось с правилами: кружок сам
                        говорит, что здесь чего-то не хватает. Как только
                        загорается зелёная рамка поля, в кружке встаёт буква,
                        и кромка вокруг неё становится ровной. */
-                    border: лицо || никГоден ? ОБОД_ЛИЦА : "1.5px dashed rgba(0, 0, 0, 0.55)",
+                    /* Пунктир светлый: чёрный по чёрной шапке не виден вовсе, а
+                       кружок как раз на неё и заходит. */
+                    border: лицо || никГоден ? ОБОД_ЛИЦА : "1.5px dashed rgba(255, 255, 255, 0.3)",
                     transition: "border-color 260ms ease",
                   }}
                 >
@@ -22888,7 +22904,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                           opacity: никГоден ? 0 : 1, transition: "opacity 260ms ease",
                         }}
                       >
-                        <Plus size={22} strokeWidth={2.2} color={T.muted} />
+                        <Plus size={32} strokeWidth={2.2} color={T.muted} />
                       </span>
                       <span
                         style={{
@@ -22896,14 +22912,14 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                           opacity: никГоден ? 1 : 0, transition: "opacity 260ms ease",
                         }}
                       >
-                        <БукваАватара ник={ник} size={64} />
+                        <БукваАватара ник={ник} size={104} />
                       </span>
                     </>
                   )}
                 </button>
                 <div className="flex flex-col" style={{ gap: 6 }}>
                   <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
-                    <СтрокаИзЗнаков текст={t("authHeadLead")} задержка={160} />
+                    {t("authStepLast")}
                   </span>
                   <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
                     {!внутриTelegram ? t("createOutside") : t("createLead")}
