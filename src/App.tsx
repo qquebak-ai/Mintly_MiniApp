@@ -22445,6 +22445,17 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           </div>
         )}
 
+        {/* Всё окно — один кусок: шапка с именем, дуга и карточка. Под
+            клавиатуру они уезжают вместе, иначе карточка наползает на
+            имя, а дуга остаётся стоять. */}
+        <div
+          className="авт-сцена"
+          style={{
+            position: "absolute", inset: 0,
+            transform: подъём ? `translateY(${-подъём}px)` : undefined,
+            transition: "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
+        >
         {/* То же имя в углу чёрной шапки: над кромкой остаётся полоса
             чёрного, и пустой она выглядит недоделанной. */}
         <div
@@ -22472,8 +22483,6 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           style={{
             position: "absolute", left: 0, right: 0, bottom: 0, pointerEvents: "none",
             top: `calc(var(--tg-inset-top, 0px) + ${отступСверху - 16}px - ${ширинаОкна} * ${ПРОГИБ_КРОМКИ})`,
-            transform: подъём ? `translateY(${-подъём}px)` : undefined,
-            transition: "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)",
           }}
         >
           <svg
@@ -22497,8 +22506,6 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             /* Своей прокрутки у окна нет: полоса сбоку читалась как
                отдельный список внутри карточки, а под клавиатуру окно
                уезжает целиком — прокручивать в нём нечего. */
-            transform: подъём ? `translateY(${-подъём}px)` : undefined,
-            transition: "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)",
           }}
         >
           {шагВхода === "почта" ? (
@@ -22814,6 +22821,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               </button>
             </>
           )}
+        </div>
         </div>
 
         <ImageCropModal file={avatarCropFile} shape="circle" onCancel={() => setAvatarCropFile(null)} onConfirm={handleAvatarCropConfirm} />
@@ -26511,6 +26519,18 @@ function mapTokenRow(row) {
 
       {pinLocked && appSettings.pinEnabled && pinCode && (
         <PinLockScreen pin={pinCode} profile={profile} onUnlock={() => setPinLocked(false)} onForgot={forgotPin} />
+      )}
+
+      {/* Чёрная ширма до входа.
+       *
+       * Окно создания открывается не сразу: сперва спрашиваем сервер, есть
+       * ли аккаунт, и только с ответом решаем, что показать. Этот
+       * промежуток человек видел как вспышку главной — лента, баннеры,
+       * кошелёк, — а следом на них падало окно входа. Держим чёрное поле,
+       * пока ответа нет и пока окно не встало на место: из чёрного оно и
+       * выходит своей заставкой. */}
+      {(!authChecked || (!accountCreated && !profileModalOpen && !сразуВКошелёк)) && (
+        <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: 59, background: "#000000" }} />
       )}
 
       <AuthModal open={profileModalOpen} onСоздан={() => setЗалпНаГлавной(true)} onClose={() => { setProfileModalOpen(false); setLookFocus(null); }} onSubmit={submitProfile} initial={profile} mode={profileModalMode} walletAddress={walletAddress} onChangeNickname={changeNickname} cosmetics={cosmetics} owned={owned} onEquip={equipCosmetic} lookFocus={lookFocus} />
