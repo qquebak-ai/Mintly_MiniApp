@@ -22964,9 +22964,13 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                       style={{
                         position: "absolute", inset: -1, borderRadius: 19, pointerEvents: "none",
                         padding: 1,
-                        background: `linear-gradient(100deg, ${T.up} 0%, ${T.up} 44%, #FFFFFF 50%, ${T.up} 56%, ${T.up} 100%)`,
+                        /* Вся кромка из зелёных оттенков — от тёмного к
+                           мятному и обратно, — и они бегут по кругу.
+                           Белый блик посередине читался вспышкой поверх
+                           зелёного, будто рамку подсветили снаружи. */
+                        background: `linear-gradient(100deg, #0B6B3F 0%, ${T.up} 22%, #7DF3B8 38%, ${T.up} 54%, #0B6B3F 72%, ${T.up} 88%, #7DF3B8 100%)`,
                         backgroundSize: "300% 100%",
-                        animation: "бликБежит 4.6s linear infinite",
+                        animation: "бликБежит 5.4s linear infinite",
                         /* Вырезаем середину: остаётся ровно кромка в точку
                            толщиной. Без этого зелёным заливало всё поле —
                            градиент лежит под содержимым, а не вокруг него. */
