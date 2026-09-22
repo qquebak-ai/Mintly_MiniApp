@@ -22123,6 +22123,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
    * вверх ровно настолько, чтобы нижний край содержимого встал над
    * клавиатурой. */
   const стопкаRef = useRef(null);
+  const шапкаRef = useRef(null);
   const [подъём, setПодъём] = useState(0);
   const подъёмЖивой = useRef(0);
   useEffect(() => { подъёмЖивой.current = подъём; }, [подъём]);
@@ -22161,9 +22162,12 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
          окно за верх целиком. */
       const хвост = узел.lastElementChild;
       const низ = (хвост ? хвост.getBoundingClientRect().bottom : место.top) + подъёмЖивой.current;
-      // Выше верхней кромки окно не поднимаем: спасая нижнее поле, оно
-      // срезало бы заголовок, а это та же беда с другого конца.
-      const предел = Math.max(0, Math.round(место.top + подъёмЖивой.current - 10));
+      /* Выше имени в углу карточка не поднимается: оно остаётся на месте
+         всегда, и наползать на него нечему. Спасая нижнее поле, окно
+         иначе съедало бы и заголовок, и само имя. */
+      const шапка = шапкаRef.current;
+      const порог = шапка ? шапка.getBoundingClientRect().bottom + 24 : 0;
+      const предел = Math.max(0, Math.round(место.top + подъёмЖивой.current - порог));
       setПодъём(Math.min(Math.max(0, Math.round(низ + 18 - видно)), предел));
     };
     пересчитать();
@@ -22450,21 +22454,12 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           </div>
         )}
 
-        {/* Всё окно — один кусок: шапка с именем, дуга и карточка. Под
-            клавиатуру они уезжают вместе, иначе карточка наползает на
-            имя, а дуга остаётся стоять. */}
-        <div
-          className="авт-сцена"
-          style={{
-            position: "absolute", inset: 0,
-            transform: подъём ? `translateY(${-подъём}px)` : undefined,
-            transition: "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)",
-          }}
-        >
-        {/* То же имя в углу чёрной шапки: над кромкой остаётся полоса
-            чёрного, и пустой она выглядит недоделанной. */}
+        {/* Имя в углу стоит на месте всегда — и когда окно уезжает из-под
+            клавиатуры тоже: оно и есть та точка, по которой видно, что
+            это всё ещё одно окно, а не другой экран. */}
         <div
           aria-hidden
+          ref={шапкаRef}
           className="авт-шапка flex flex-col"
           style={{
             position: "absolute", left: 24, right: 24, gap: 7, pointerEvents: "none",
@@ -22482,6 +22477,19 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             {t("authHeadLead")}
           </span>
         </div>
+        {/* Дуга и карточка — один кусок: под клавиатуру они уезжают
+            вместе, иначе карточка отрывается от своей кромки. Движение
+            идёт вслед за самой клавиатурой: окно отдаёт высоту порциями,
+            и длинное собственное замедление здесь только отстаёт — от
+            него остался лишь сглаживающий хвост в одну десятую секунды. */}
+        <div
+          className="авт-сцена"
+          style={{
+            position: "absolute", inset: 0,
+            transform: подъём ? `translateY(${-подъём}px)` : undefined,
+            transition: "transform 110ms linear",
+          }}
+        >
         <div
           className="авт-лист flex flex-col"
           aria-hidden
