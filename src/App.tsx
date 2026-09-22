@@ -22159,6 +22159,10 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
   );
 }
 
+/* Круглые флаги для выбора языка. Лежат в public, поэтому едут вместе с
+   приложением и не зависят ни от шрифта системы, ни от чужого сервера. */
+const ФЛАГ_ЯЗЫКА = { RU: "/flags/ru.svg", EN: "/flags/gb.svg" };
+
 function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAddress, onChangeNickname, cosmetics = { frame: "none", card: "none" }, owned, onEquip, lookFocus = null, onСоздан = () => {}, язык = "RU", onЯзык = () => {} }) {
   const isEdit = mode === "edit";
   // Окно держится на экране, пока идёт анимация ухода: без этого оно
@@ -22600,10 +22604,14 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             style={{
               width: 38, height: 38, borderRadius: "50%", padding: 0, cursor: "pointer",
               background: "rgba(255, 255, 255, 0.07)", border: `1px solid ${T.line}`,
-              fontSize: 19, lineHeight: 1,
+              overflow: "hidden",
             }}
           >
-            {язык === "EN" ? "🇬🇧" : "🇷🇺"}
+            {/* Флаг картинкой, а не значком из набора эмодзи: тот рисуется
+                шрифтом системы, и на каждом телефоне выглядит по-своему —
+                где-то плоским прямоугольником, где-то вовсе буквами
+                страны. Круглые рисунки лежат рядом с приложением. */}
+            <img src={ФЛАГ_ЯЗЫКА[язык] || ФЛАГ_ЯЗЫКА.RU} alt="" width={26} height={26} style={{ display: "block", borderRadius: "50%" }} />
           </button>
 
           {языкОткрыт && (
@@ -22623,7 +22631,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   boxShadow: "0 12px 30px rgba(0, 0, 0, 0.5)", minWidth: 148,
                 }}
               >
-                {[["RU", "🇷🇺", "Русский"], ["EN", "🇬🇧", "English"]].map(([код, флаг, имя]) => (
+                {[["RU", "Русский"], ["EN", "English"]].map(([код, имя]) => (
                   <button
                     key={код}
                     onClick={() => { haptic("light"); onЯзык(код); setЯзыкОткрыт(false); }}
@@ -22635,7 +22643,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                       fontFamily: displayFont, fontSize: 14, fontWeight: 700, textAlign: "left",
                     }}
                   >
-                    <span style={{ fontSize: 17, lineHeight: 1 }}>{флаг}</span>
+                    <img src={ФЛАГ_ЯЗЫКА[код]} alt="" width={20} height={20} style={{ display: "block", borderRadius: "50%", flexShrink: 0 }} />
                     {имя}
                   </button>
                 ))}
