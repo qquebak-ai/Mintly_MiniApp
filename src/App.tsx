@@ -2676,11 +2676,21 @@ function GlobalStyle() {
          полоса выходит плоской и на широкой плашке почти не видна, а
          размытая читается как отблеск на стекле — сразу понятно, что
          место живое и содержимое вот-вот появится. */
-      /* Заглушка — это сами знаки, и ничего кроме них: ни плашки, ни
-         подложки, ни блика. Серый прямоугольник говорил «тут пусто», а
-         строка знаков тем же цветом, что и обычный текст, говорит «тут
-         сейчас будет текст» — место занято ровно тем, что его займёт. */
-      .fx-skeleton { position: relative; overflow: hidden; background: transparent; }
+      /* Крупные места — карта, график, карточка — остаются плашкой с
+         бегущим бликом: знаки там расползаются полем помех, а гладкая
+         поверхность честно показывает будущую форму. Знаки идут туда,
+         где появится строка текста: прямоугольник в её рост читался
+         вычеркнутым словом, а строка знаков — «тут сейчас будет текст». */
+      .fx-skeleton { position: relative; overflow: hidden; background: ${T.surfaceHi}; }
+      .fx-skeleton::after {
+        content: ""; position: absolute; top: -50%; bottom: -50%; left: 0; width: 55%;
+        background: linear-gradient(90deg, transparent, ${T.ice}2E 42%, ${T.ice}52 50%, ${T.ice}2E 58%, transparent);
+        filter: blur(12px);
+        animation: shimmer 1.5s linear infinite;
+      }
+      /* Под знаками ни подложки, ни блика: они сами и есть заглушка. */
+      .fx-skeleton[data-знаки] { background: transparent; }
+      .fx-skeleton[data-знаки]::after { content: none; }
       /* Знаки ложатся ровно в границы места: кегль считается от его
          высоты, строка набирается впритык, без пробелов, и обрезается по
          краю — поэтому узор стоит точно там, где появится содержимое. */
@@ -2698,7 +2708,7 @@ function GlobalStyle() {
       }
       @keyframes знакМигнул { from { opacity: 1; } to { opacity: 0.55; } }
       @media (prefers-reduced-motion: reduce) {
-        .fx-знаки em { animation: none; }
+        .fx-skeleton::after, .fx-знаки em { animation: none; }
       }
       /* Пока данные едут, на их месте стоит то же самое, но не в фокусе:
          размытые строки той же высоты. Пустой экран читается поломкой, а
@@ -12359,10 +12369,23 @@ function начертить(поле, ряды, яркие) {
    ровно в её границы, иначе он читается как текст поверх, а не как сама
    плашка. Моноширинный знак шире своего кегля примерно в 0,6 раза —
    отсюда и счёт. */
+// Знаки — только там, где появится строка текста. Крупный блок под карту
+// или график и круглое место под аватарку остаются плашкой: узор в них
+// читается полем помех, а не заготовкой содержимого.
+const ВЫСОТА_СТРОКИ = 32;
+
+function подЗнаки(плашка) {
+  const в = плашка.clientHeight;
+  if (!плашка.clientWidth || !в || в > ВЫСОТА_СТРОКИ) return false;
+  const радиус = parseFloat(getComputedStyle(плашка).borderTopLeftRadius) || 0;
+  return радиус < в / 2 - 0.5;
+}
+
 function наполнитьПлашку(плашка) {
   const ш = плашка.clientWidth;
   const в = плашка.clientHeight;
   if (!ш || !в) return;
+  плашка.setAttribute("data-знаки", "1");
   const кегль = в <= 20 ? Math.max(7, Math.min(13, Math.round(в * 0.82))) : 11;
   const шагСтроки = Math.round(кегль * 1.26);
   const строк = Math.max(1, Math.floor((в - 2) / шагСтроки));
@@ -12403,14 +12426,21 @@ function завестиЗнаки() {
     document.querySelectorAll(".fx-знаки").forEach((узор) => {
       const дом = узор.parentElement;
       if (!дом || !дом.classList.contains("fx-skeleton")) {
-        if (дом) { дом.__ряды = null; дом.__мера = null; }
+        if (дом) { дом.__ряды = null; дом.__мера = null; дом.removeAttribute("data-знаки"); }
         узор.remove();
       }
     });
-    живые = Array.prototype.filter.call(
-      document.querySelectorAll(".fx-skeleton"),
-      (э) => э.clientWidth > 0 && э.clientHeight > 0
-    );
+    // Место могло вырасти или сжаться — тогда узор пересобирается, а с
+    // крупного он снимается вовсе и возвращается обычная плашка.
+    Array.prototype.forEach.call(document.querySelectorAll(".fx-skeleton[data-знаки]"), (э) => {
+      if (подЗнаки(э)) return;
+      const узор = э.querySelector(":scope > .fx-знаки");
+      if (узор) узор.remove();
+      э.removeAttribute("data-знаки");
+      э.__ряды = null;
+      э.__мера = null;
+    });
+    живые = Array.prototype.filter.call(document.querySelectorAll(".fx-skeleton"), подЗнаки);
     живые.forEach((э) => {
       if (э.__мера !== `${э.clientWidth}x${э.clientHeight}`) наполнитьПлашку(э);
     });
