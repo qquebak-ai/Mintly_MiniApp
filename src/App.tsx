@@ -22532,6 +22532,11 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
        вверх и уходит за край. Строится как SVG во всю ширину с вьюбоксом
        той же пропорции, поэтому на любой ширине не искажается. Внизу
        под нею сплошная заливка. */
+    /* Шапка карточки — значок с заголовком — держит одну высоту на всех
+       шагах и прижата к низу: без этого аватарка в девяносто шесть точек
+       и конверт в сорок шесть ставили поле с кнопкой на разные уровни, и
+       при переходе между шагами вся страница прыгала. */
+    const ВЕРХ_КАРТОЧКИ = 206;
     const ВЫСОТА_КРОМКИ = 0.78;
     /* Самая низкая точка дуги — не край картинки: под нею идёт сплошная
        заливка. От этой доли и считается, где начинать содержимое. */
@@ -22651,7 +22656,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               {/* Шаг первый: почта. Ею подтверждается вывод и возвращается
                   аккаунт, если пропадёт доступ к телеграму, — поэтому
                   спрашиваем сразу, а не «когда-нибудь в настройках». */}
-              <div className="flex flex-col items-center text-center" style={{ gap: 12 }}>
+              <div className="flex flex-col items-center justify-end text-center" style={{ gap: 12, minHeight: ВЕРХ_КАРТОЧКИ }}>
                 {/* Конверт сам по себе, без кружка-подложки, и залит
                     перетекающей радугой.
 
@@ -22664,7 +22669,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 <span aria-hidden style={{ width: 46, height: 46, ...РАДУГА_КОНВЕРТА }} />
                 <div className="flex flex-col" style={{ gap: 6 }}>
                   <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
-                    {t("createTitle")}
+                    <СтрокаИзЗнаков текст={t("authHeadLead")} задержка={первыйПоказ ? ЖДАТЬ_ЗАСТАВКУ + 900 : 160} />
                   </span>
                   <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
                     {!внутриTelegram ? t("createOutside") : t("createMailLead")}
@@ -22765,14 +22770,14 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               {/* Аватарка выбирается сразу здесь: потом за этим пришлось
                   бы идти в правку профиля, а это первое, что человек про
                   себя решает. */}
-              <div className="flex flex-col items-center text-center" style={{ gap: 12 }}>
+              <div className="flex flex-col items-center justify-end text-center" style={{ gap: 12, minHeight: ВЕРХ_КАРТОЧКИ }}>
                 <input ref={avatarInputRef} type="file" accept="image/*" onChange={onPickAvatar} style={{ display: "none" }} />
                 <button
                   onClick={() => avatarInputRef.current && avatarInputRef.current.click()}
                   className="fx-tap flex items-center justify-center"
                   style={{
                     position: "relative",
-                    width: 96, height: 96, borderRadius: "50%", flexShrink: 0, padding: 0, overflow: "hidden",
+                    width: 64, height: 64, borderRadius: "50%", flexShrink: 0, padding: 0, overflow: "hidden",
                     background: лицо ? `center/cover no-repeat url(${лицо})` : "transparent",
                     /* Пунктир — пока имя не сошлось с правилами: кружок сам
                        говорит, что здесь чего-то не хватает. Как только
@@ -22793,7 +22798,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                           opacity: никГоден ? 0 : 1, transition: "opacity 260ms ease",
                         }}
                       >
-                        <Plus size={30} strokeWidth={2.2} color={T.muted} />
+                        <Plus size={22} strokeWidth={2.2} color={T.muted} />
                       </span>
                       <span
                         style={{
@@ -22801,14 +22806,14 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                           opacity: никГоден ? 1 : 0, transition: "opacity 260ms ease",
                         }}
                       >
-                        <БукваАватара ник={ник} size={96} />
+                        <БукваАватара ник={ник} size={64} />
                       </span>
                     </>
                   )}
                 </button>
                 <div className="flex flex-col" style={{ gap: 6 }}>
                   <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
-                    {t("createTitle")}
+                    <СтрокаИзЗнаков текст={t("authHeadLead")} задержка={160} />
                   </span>
                   <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
                     {!внутриTelegram ? t("createOutside") : t("createLead")}
