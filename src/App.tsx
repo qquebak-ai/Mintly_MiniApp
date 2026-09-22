@@ -22589,7 +22589,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           }}
         >
           <span style={{
-            fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 300, letterSpacing: "0.3em",
+            fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 800, letterSpacing: "0.3em",
           }}>
             <ИмяПоБуквам текст="MINTLY" шаг={64} задержка={первыйПоказ ? ЖДАТЬ_ЗАСТАВКУ + 140 : 0} />
           </span>
