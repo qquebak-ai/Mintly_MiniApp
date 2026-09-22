@@ -22596,7 +22596,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
 
             Кружок с флагом, а не пара кнопок: на первом экране это не
             выбор, а отметка «сейчас так» — нажал и поменял, если не так. */}
-        <div style={{ position: "absolute", zIndex: 3, right: 22, top: верхОкна + 28 }}>
+        <div style={{ position: "absolute", zIndex: 3, right: 22, top: верхОкна + 6 }}>
           <button
             onClick={() => { haptic("light"); setЯзыкОткрыт((б) => !б); }}
             className="fx-tap flex items-center justify-center"
@@ -22660,7 +22660,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             position: "absolute", left: 24, right: 24, gap: 7, pointerEvents: "none",
             // Поверх всего: имя не должно скрываться за уехавшей карточкой.
             zIndex: 2,
-            top: верхОкна + 30,
+            // Сразу под кнопкой Telegram: верхнее поле уже вычло и её, и
+            // полосу состояния, поэтому своего отступа нужен минимум.
+            top: верхОкна + 10,
           }}
         >
           <span style={{
