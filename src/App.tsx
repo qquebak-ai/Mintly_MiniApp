@@ -22160,8 +22160,19 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
          до нижнего края окна, и её bottom — это всегда дно экрана, а
          scrollHeight — та же дистанция. Подъём от такой величины уносил
          окно за верх целиком. */
-      const хвост = узел.lastElementChild;
-      const низ = (хвост ? хвост.getBoundingClientRect().bottom : место.top) + подъёмЖивой.current;
+      /* Якорь — поле ввода, а не всё содержимое. Поднимая карточку целиком,
+         вместе с кнопкой, окно уезжало под шапку Telegram: высоты для
+         всего сразу просто нет. Над клавиатурой держим то, во что
+         человек сейчас пишет, а кнопка спокойно уходит под неё —
+         нажимать её всё равно будут, закрыв клавиатуру. */
+      const живое = document.activeElement;
+      const цель = (живое && узел.contains(живое) && /^(INPUT|TEXTAREA)$/.test(живое.tagName))
+        ? живое
+        : узел.querySelector("input, textarea");
+      const мераЦели = цель ? цель.getBoundingClientRect() : null;
+      // Поле могло ещё не отрисоваться — тогда держим хвост содержимого.
+      const якорь = мераЦели && мераЦели.height > 0 ? цель : узел.lastElementChild;
+      const низ = (якорь ? якорь.getBoundingClientRect().bottom : место.top) + подъёмЖивой.current;
       /* Выше имени в углу карточка не поднимается: оно остаётся на месте
          всегда, и наползать на него нечему. Спасая нижнее поле, окно
          иначе съедало бы и заголовок, и само имя. */
@@ -22463,6 +22474,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           className="авт-шапка flex flex-col"
           style={{
             position: "absolute", left: 24, right: 24, gap: 7, pointerEvents: "none",
+            // Поверх всего: имя не должно скрываться за уехавшей карточкой.
+            zIndex: 2,
             top: "calc(var(--tg-inset-top, 0px) + 30px)",
           }}
         >
