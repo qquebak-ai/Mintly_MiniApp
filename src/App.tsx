@@ -2750,6 +2750,7 @@ function GlobalStyle() {
          же места, и рамка не дёргается заново при каждой прокрутке. */
       .fx-frozen, .fx-frozen * { animation-play-state: paused !important; }
       .fx-modal-back { animation: fadeIn 220ms ease-out both; }
+      .fx-modal-back.авт-без-проявления { animation: none; }
       /* Окно входа и создания аккаунта.
          Поверхность приезжает снизу с изогнутой кромкой — целиком,
          одной формой, как в образце: фигура не растёт и не
@@ -12340,11 +12341,13 @@ function снятьШирму() {
   if (typeof document === "undefined") return;
   const поле = document.getElementById("ширма");
   if (!поле) return;
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  /* Два кадра и ещё треть секунды: первый кадр отдаёт разметку, второй —
+     отрисовку, а запас держит поле, пока окно входа встаёт на место. */
+  requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
     поле.style.transition = "opacity 220ms ease";
     поле.style.opacity = "0";
     setTimeout(() => { if (поле.parentNode) поле.parentNode.removeChild(поле); }, 240);
-  }));
+  }, 320)));
 }
 
 function ПлашкаБлока({ h, radius = 20 }) {
@@ -22574,7 +22577,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     const ширинаОкна = "min(100vw, 520px)";
     const экран = (
       <div
-        className={`fx-modal-back${closing ? " fx-out" : ""}`}
+        /* Без проявления: окно входа выходит из чёрного поля, и пока оно
+           было полупрозрачным, сквозь него светилась главная — то самое
+           мелькание. Уход оставляем как есть. */
+        className={`fx-modal-back${closing ? " fx-out" : " авт-без-проявления"}`}
         style={{
           position: "fixed", inset: 0, zIndex: 60, background: "#000000", overflow: "hidden",
           "--авт-ждать": первыйПоказ ? `${ЖДАТЬ_ЗАСТАВКУ}ms` : "0ms",
