@@ -111,13 +111,20 @@
         сообщить("promise", (r && (r.stack || r.message)) || String(r || "отказ без причины"));
       });
     </script>
-    <script type="module" crossorigin src="/assets/index-thbPtcv8.js"></script>
+    <script type="module" crossorigin src="/assets/index-hVIJV84Y.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/react-DS-kCp2g.js">
     <link rel="modulepreload" crossorigin href="/assets/supabase-QBHRJHLH.js">
     <link rel="modulepreload" crossorigin href="/assets/icons-W_TV3a_Z.js">
     <link rel="stylesheet" crossorigin href="/assets/index-BBY16jOq.css">
   </head>
   <body>
+    <!-- Чёрное поле поверх всего, пока приложение не решило, что
+         показывать. Оно в разметке, а не в коде: пока грузится и
+         разбирается связка, React ещё ничего не нарисовал, а браузер уже
+         показывает страницу — и в этот зазор успевала мелькнуть главная.
+         Снимается из приложения, когда экран входа встал на место или
+         когда аккаунт нашёлся. -->
+    <div id="ширма" style="position:fixed;inset:0;z-index:2147483000;background:#000000;pointer-events:none"></div>
     <div id="root"></div>
     <script>
       // Приложение поднялось — метку перечитывания снимаем, иначе

@@ -12323,23 +12323,26 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
    полупустые карточки с прочерками вместо чисел, а ровные серые
    прямоугольники той же формы: так видно раскладку и видно, что она
    сейчас оживёт. */
-/* Чёрная ширма до входа.
+/* Чёрное поле до входа.
  *
- * Окно создания открывается не сразу: сперва спрашиваем сервер, есть ли
- * аккаунт, и только с ответом решаем, что показать. Этот промежуток
- * человек видел вспышкой главной — лента, баннеры, кошелёк, — на которую
- * тут же падало окно входа.
+ * Само поле лежит в разметке страницы (index.html): пока грузится и
+ * разбирается связка, React ещё ничего не нарисовал, а браузер уже
+ * показывает страницу — и в этот зазор успевала мелькнуть главная.
+ * Отсюда его только снимают, когда решение принято: либо экран входа
+ * встал на место, либо аккаунт нашёлся и показывать можно всё.
  *
- * Порталом прямо в документ, как и само окно: экраны приложения
- * приезжают с анимацией, а position: fixed внутри предка с transform
- * считается от него, и ширма ездила вместе с экраном вместо того, чтобы
- * накрыть его целиком. */
-function ЧёрнаяШирма({ видна }) {
-  if (!видна) return null;
-  const слой = (
-    <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: 59, background: "#000000" }} />
-  );
-  return typeof document !== "undefined" ? createPortal(слой, document.body) : слой;
+ * Снимаем через два кадра: первый отдаёт разметку, второй — отрисовку.
+ * Без этой отсрочки поле исчезало ровно на том кадре, где окно входа ещё
+ * не успело появиться. */
+function снятьШирму() {
+  if (typeof document === "undefined") return;
+  const поле = document.getElementById("ширма");
+  if (!поле) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    поле.style.transition = "opacity 220ms ease";
+    поле.style.opacity = "0";
+    setTimeout(() => { if (поле.parentNode) поле.parentNode.removeChild(поле); }, 240);
+  }));
 }
 
 function ПлашкаБлока({ h, radius = 20 }) {
@@ -22156,7 +22159,7 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
   );
 }
 
-function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAddress, onChangeNickname, cosmetics = { frame: "none", card: "none" }, owned, onEquip, lookFocus = null, onСоздан = () => {} }) {
+function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAddress, onChangeNickname, cosmetics = { frame: "none", card: "none" }, owned, onEquip, lookFocus = null, onСоздан = () => {}, язык = "RU", onЯзык = () => {} }) {
   const isEdit = mode === "edit";
   // Окно держится на экране, пока идёт анимация ухода: без этого оно
   // пропадало кадром, и закрытие читалось сбоем, а не действием.
@@ -22582,6 +22585,32 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         {/* Имя в углу стоит на месте всегда — и когда окно уезжает из-под
             клавиатуры тоже: оно и есть та точка, по которой видно, что
             это всё ещё одно окно, а не другой экран. */}
+        {/* Язык выбирается здесь один раз и запоминается навсегда: до
+            входа в настройки не попасть, а читать чужой язык на первом же
+            экране — худшее знакомство. Дальше он меняется только там. */}
+        <div style={{
+          position: "absolute", zIndex: 3, right: 22, top: верхОкна + 30,
+          display: "flex", gap: 2, padding: 3, borderRadius: 999,
+          background: "rgba(255, 255, 255, 0.06)", border: `1px solid ${T.line}`,
+        }}>
+          {["RU", "EN"].map((к) => (
+            <button
+              key={к}
+              onClick={() => { haptic("light"); onЯзык(к); }}
+              className="fx-tap"
+              style={{
+                padding: "5px 11px", borderRadius: 999, border: "none", cursor: "pointer",
+                background: язык === к ? T.ice : "transparent",
+                color: язык === к ? T.bg : T.muted,
+                fontFamily: displayFont, fontSize: 12, fontWeight: 800, letterSpacing: "0.04em",
+                transition: `background ${EASE}, color ${EASE}`,
+              }}
+            >
+              {к}
+            </button>
+          ))}
+        </div>
+
         <div
           aria-hidden
           ref={шапкаRef}
@@ -22749,6 +22778,24 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               >
                 {t("authNext")}
               </ЖидкаяКнопка>
+
+              {/* Аккаунт на этот телеграм уже заведён — тогда почта с
+                  именем не нужны вовсе, и весь путь сводится к одному
+                  нажатию. Мелкой строкой: это не главный ход, а выход для
+                  тех, кто здесь не впервые. */}
+              {естьАккаунт === true && (
+                <button
+                  onClick={создать}
+                  disabled={tgBusy}
+                  className="fx-tap w-full"
+                  style={{
+                    background: "transparent", border: "none", padding: "2px 0 0", cursor: "pointer",
+                    color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+                  }}
+                >
+                  {t("authSignInCta")}
+                </button>
+              )}
 
               {!внутриTelegram && (
                 <a
@@ -25948,6 +25995,18 @@ function mapTokenRow(row) {
     setProfileModalOpen(true);
   }, [authChecked, accountCreated, сразуВКошелёк]);
 
+  /* Чёрное поле из разметки держится, пока не решено, что показывать:
+     либо аккаунт нашёлся, либо экран входа уже стоит. Отдельный срок на
+     всякий случай — приложение не должно остаться чёрным, если ответа
+     так и не будет. */
+  useEffect(() => {
+    if (authChecked && (accountCreated || сразуВКошелёк || profileModalOpen)) снятьШирму();
+  }, [authChecked, accountCreated, сразуВКошелёк, profileModalOpen]);
+  useEffect(() => {
+    const т = setTimeout(снятьШирму, 9000);
+    return () => clearTimeout(т);
+  }, []);
+
   const [ждётПодписи, setЖдётПодписи] = useState(0);
   // Что именно покупаем — только для надписи на экране ожидания: сама
   // сумма уходит из ждётПодписи и обнуляется, как только подпись ушла.
@@ -26668,9 +26727,8 @@ function mapTokenRow(row) {
       {/* Пока аккаунта нет, под окном входа стоит чёрное поле: главную
           мимо него не видно ни на кадр, сколько бы ни занял ответ
           сервера и в каком бы порядке ни пришли флаги. */}
-      <ЧёрнаяШирма видна={!authChecked || (!accountCreated && !сразуВКошелёк)} />
 
-      <AuthModal open={profileModalOpen} onСоздан={() => setЗалпНаГлавной(true)} onClose={() => { setProfileModalOpen(false); setLookFocus(null); }} onSubmit={submitProfile} initial={profile} mode={profileModalMode} walletAddress={walletAddress} onChangeNickname={changeNickname} cosmetics={cosmetics} owned={owned} onEquip={equipCosmetic} lookFocus={lookFocus} />
+      <AuthModal open={profileModalOpen} язык={appSettings.language} onЯзык={(v) => updateAppSetting("language", v)} onСоздан={() => setЗалпНаГлавной(true)} onClose={() => { setProfileModalOpen(false); setLookFocus(null); }} onSubmit={submitProfile} initial={profile} mode={profileModalMode} walletAddress={walletAddress} onChangeNickname={changeNickname} cosmetics={cosmetics} owned={owned} onEquip={equipCosmetic} lookFocus={lookFocus} />
       <SettingsPanel
         item={settingsItem}
         onClose={() => setSettingsItem(null)}
