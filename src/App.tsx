@@ -22310,9 +22310,13 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
          что человек сейчас пишет, а кнопка уходит под неё: нажимать её
          всё равно будут, закрыв клавиатуру. */
       const живое = document.activeElement;
-      const цель = (живое && узел.contains(живое) && /^(INPUT|TEXTAREA)$/.test(живое.tagName))
-        ? живое
-        : узел.querySelector("input, textarea");
+      const вПоле = !!живое && узел.contains(живое) && /^(INPUT|TEXTAREA)$/.test(живое.tagName);
+      /* Без фокуса в поле поднимать нечего: клавиатуры нет. Это же и
+         самый надёжный признак того, что она уходит — высота окна
+         возвращается порциями и по дороге врёт, а фокус пропадает
+         сразу. */
+      if (!вПоле) { if (подъёмЖивой.current) setПодъём(0); return; }
+      const цель = живое;
       // Поле могло ещё не отрисоваться — тогда держим хвост содержимого.
       const якорь = цель && цель.offsetHeight > 0 ? цель : узел.lastElementChild;
       const низ = якорь ? отВерха(якорь) + якорь.offsetHeight : отВерха(узел);
@@ -22337,11 +22341,15 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     if (глаз && стопкаRef.current) глаз.observe(стопкаRef.current);
     if (окно) окно.addEventListener("resize", пересчитать);
     window.addEventListener("resize", пересчитать);
+    document.addEventListener("focusin", пересчитать);
+    document.addEventListener("focusout", пересчитать);
     return () => {
       clearTimeout(т);
       if (глаз) глаз.disconnect();
       if (окно) окно.removeEventListener("resize", пересчитать);
       window.removeEventListener("resize", пересчитать);
+      document.removeEventListener("focusin", пересчитать);
+      document.removeEventListener("focusout", пересчитать);
     };
   }, [open]);
   const [authTab, setAuthTab] = useState(isEdit ? "create" : mode); // "login" | "create"
