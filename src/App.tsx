@@ -333,6 +333,9 @@ const STR = {
     withdrawCodeNoMail: "К аккаунту не привязана почта — вывод недоступен",
     withdrawCodeConfirm: "Подтвердить",
     authSignInCta: "Войти",
+    // Строки заставки: имя посередине чёрного и то же имя в шапке.
+    authSplashLead: "Мемкоины на TON и Solana",
+    authHeadLead: "Пара секунд — и аккаунт твой",
     createTitle: "Создай аккаунт",
     createLead: "Создай уникальный юзернейм",
     createCta: "Создать аккаунт",
@@ -1011,6 +1014,8 @@ const STR = {
     withdrawCodeNoMail: "No email is linked to this account — withdrawals are off",
     withdrawCodeConfirm: "Confirm",
     authSignInCta: "Sign in",
+    authSplashLead: "Memecoins on TON and Solana",
+    authHeadLead: "A couple of seconds and it is yours",
     createTitle: "Create your account",
     createLead: "Pick a unique username",
     createCta: "Create account",
@@ -2715,6 +2720,9 @@ function GlobalStyle() {
       }
       .авт-лист {
         animation: листВыезжает 840ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+        /* При первом открытии поверхность ждёт заставку и идёт вверх
+           уже под уходящее имя; между шагами ждать некого. */
+        animation-delay: var(--авт-ждать, 0ms);
         will-change: transform;
       }
       .авт-стопка > * {
@@ -2751,8 +2759,37 @@ function GlobalStyle() {
         100% { transform: translateX(0)     scale(1.15); }
       }
       .точки-спутник { animation: точкиСпутник 1.25s ease-in-out infinite; }
+      /* Заставка. Имя проступает по центру чёрного и одновременно
+         расходится в разрядку — будто буквы встают по местам, а не
+         подставляются готовой строкой. Подпись приходит следом, снизу.
+         Держится, пока поверхность внизу ждёт своей очереди, и
+         растворяется вверх ровно в тот миг, когда та идёт вверх. */
+      @keyframes знакПроступает {
+        from { opacity: 0; letter-spacing: 0.04em; transform: translateY(10px); }
+        to   { opacity: 1; letter-spacing: 0.34em; transform: translateY(0); }
+      }
+      @keyframes знакГаснет {
+        from { opacity: 1; transform: translateY(0); }
+        to   { opacity: 0; transform: translateY(-14px); }
+      }
+      .авт-заставка {
+        animation: знакГаснет 340ms cubic-bezier(0.4, 0, 1, 1) backwards;
+        animation-delay: calc(var(--авт-ждать, 0ms) - 240ms);
+      }
+      .авт-заставка > .авт-знак {
+        animation: знакПроступает 820ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+      }
+      .авт-заставка > .авт-подпись {
+        animation: авт-всплыв 560ms cubic-bezier(0.22, 1, 0.36, 1) 360ms backwards;
+      }
+      /* Имя в шапке — то же, но мелкое и в углу: не переезжает из
+         середины, а проступает заново, пока поверхность идёт вверх. */
+      .авт-шапка > * { animation: авт-всплыв 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+      .авт-шапка > *:nth-child(1) { animation-delay: calc(var(--авт-ждать, 0ms) + 140ms); }
+      .авт-шапка > *:nth-child(2) { animation-delay: calc(var(--авт-ждать, 0ms) + 250ms); }
       @media (prefers-reduced-motion: reduce) {
-        .авт-лист, .авт-стопка > *, .авт-стопка > button { animation: none !important; }
+        .авт-лист, .авт-стопка > *, .авт-стопка > button,
+        .авт-заставка, .авт-заставка > *, .авт-шапка > * { animation: none !important; }
         .точки-спутник { animation: none; }
       }
       /* Окна и листы приходят снизу, а не разрастаются из центра: так
@@ -21839,15 +21876,24 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
      пересчитывается. В долях экрана (vh) он зависел от высоты окна, а
      Telegram укорачивает окно на высоту клавиатуры — и карточка прыгала
      вверх от каждого касания поля и обратно при закрытии клавиатуры. */
-  const [отступСверху, setОтступСверху] = useState(112);
+  /* Ниже, чем просит одна только кромка: над нею стоит имя с подписью,
+     и при прежних 112 они упирались в дугу. */
+  const [отступСверху, setОтступСверху] = useState(176);
   /* Первые полторы секунды после открытия содержимое ждёт, пока
      поверхность сядет; при переходе между шагами ждать уже некого, и
      задержка почти нулевая. */
   const [первыйПоказ, setПервыйПоказ] = useState(true);
+  /* Заставка живёт ровно до того мига, когда поверхность трогается с
+     места: её уход и выезд листа — одно движение, а не два подряд. */
+  const ЖДАТЬ_ЗАСТАВКУ = 1500;
+  const [заставка, setЗаставка] = useState(true);
   useEffect(() => {
-    if (!open) { setПервыйПоказ(true); return undefined; }
-    const т = setTimeout(() => setПервыйПоказ(false), 1800);
-    return () => clearTimeout(т);
+    if (!open) { setПервыйПоказ(true); setЗаставка(true); return undefined; }
+    const сн = setTimeout(() => setЗаставка(false), ЖДАТЬ_ЗАСТАВКУ);
+    // Сбрасываем задержки позже конца всех выходов: переменную читает
+    // уже идущая анимация, и смена на полпути дёрнула бы её назад.
+    const т = setTimeout(() => setПервыйПоказ(false), 3200);
+    return () => { clearTimeout(сн); clearTimeout(т); };
   }, [open]);
   const [authTab, setAuthTab] = useState(isEdit ? "create" : mode); // "login" | "create"
   const [serverError, setServerError] = useState("");
@@ -21879,12 +21925,13 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     setПочтаВвод("");
     setПочтаБеда("");
     const высота = typeof window !== "undefined" ? window.innerHeight || 844 : 844;
-    /* Восьмая часть экрана, но не меньше сорока четырёх точек и не больше
-       восьмидесяти восьми. Считается один раз и дальше не меняется: с
+    /* Пятая часть экрана, но не меньше ста пятидесяти точек и не больше
+       двухсот. Над кромкой стоит имя с подписью, и прежняя восьмая часть
+       прятала их под дугу. Считается один раз и дальше не меняется: с
        клавиатурой окно становится вдвое ниже, и карточка должна целиком
        помещаться над ней — иначе кнопка «Создать аккаунт» уходит под
        клавиатуру, а двигать карточку нельзя, это и есть тот прыжок. */
-    setОтступСверху(Math.round(Math.min(Math.max(высота * 0.08, 44), 88)));
+    setОтступСверху(Math.round(Math.min(Math.max(высота * 0.21, 150), 200)));
     setTgNick("");
     setTgNickTouched(false);
     setЕстьАккаунт(null);
@@ -22074,9 +22121,59 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         className={`fx-modal-back${closing ? " fx-out" : ""}`}
         style={{
           position: "fixed", inset: 0, zIndex: 60, background: "#000000", overflow: "hidden",
-          "--авт-задержка": первыйПоказ ? "520ms" : "40ms",
+          "--авт-ждать": первыйПоказ ? `${ЖДАТЬ_ЗАСТАВКУ}ms` : "0ms",
+          "--авт-задержка": первыйПоказ ? `${ЖДАТЬ_ЗАСТАВКУ + 520}ms` : "40ms",
         }}
       >
+        {/* Заставка — первое, что человек видит: чёрное поле и имя
+            посередине. Она же и объясняет паузу перед формой: пустой
+            экран без ничего читался бы как заминка. */}
+        {первыйПоказ && заставка && (
+          <div
+            aria-hidden
+            className="авт-заставка flex flex-col items-center"
+            style={{
+              position: "absolute", left: 0, right: 0, top: "50%",
+              transform: "translateY(-50%)", gap: 12, pointerEvents: "none",
+            }}
+          >
+            <span className="авт-знак" style={{
+              fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 300,
+              /* Правый отступ гасит разрядку последней буквы: без него
+                 строка стоит не по центру, а сдвинутой влево. */
+              letterSpacing: "0.34em", paddingLeft: "0.34em",
+            }}>
+              MINTLY
+            </span>
+            <span className="авт-подпись" style={{
+              fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.42)", fontSize: 13, fontWeight: 600,
+            }}>
+              {t("authSplashLead")}
+            </span>
+          </div>
+        )}
+
+        {/* То же имя в углу чёрной шапки: над кромкой остаётся полоса
+            чёрного, и пустой она выглядит недоделанной. */}
+        <div
+          aria-hidden
+          className="авт-шапка flex flex-col"
+          style={{
+            position: "absolute", left: 24, right: 24, gap: 5, pointerEvents: "none",
+            top: "calc(var(--tg-inset-top, 0px) + 30px)",
+          }}
+        >
+          <span style={{
+            fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 300, letterSpacing: "0.3em",
+          }}>
+            MINTLY
+          </span>
+          <span style={{
+            fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.38)", fontSize: 12, fontWeight: 600,
+          }}>
+            {t("authHeadLead")}
+          </span>
+        </div>
         <div
           className="авт-лист flex flex-col"
           aria-hidden
