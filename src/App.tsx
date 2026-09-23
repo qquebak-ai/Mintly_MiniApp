@@ -2256,16 +2256,36 @@ function GlobalStyle() {
       }
       .клетка-вспышка { animation: клеткаВспышка 2.6s ease-out both; }
       @media (prefers-reduced-motion: reduce) { .клетка-вспышка { display: none; } }
-      /* Блик на заливке ползунка запуска. */
+      /* Блик на заливке ползунка запуска.
+         Едет не сам блик, а прозрачная рама во всю ширину заливки: её
+         сдвиг в процентах — это ровно путь от левого края до ручки, и
+         анимация целиком на видеокарте (transform), без пересчёта
+         раскладки. Сам блик внутри рамы — полоса постоянной ширины в
+         точках, поэтому на короткой и длинной заливке он одинаковый.
+         Края полосы мягкие, в несколько ступеней, а смешение «экран»
+         высветляет синий, а не кладёт поверх белую плёнку. После прохода
+         — пауза: непрерывный бег утомляет. */
       @keyframes дорожкаБлик {
-        0%   { transform: translateX(-100%); }
-        70%, 100% { transform: translateX(260%); }
+        0%   { transform: translate3d(0, 0, 0); }
+        62%  { transform: translate3d(100%, 0, 0); }
+        100% { transform: translate3d(100%, 0, 0); }
       }
       .дорожка-блик {
-        position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
-        animation: дорожкаБлик 2s cubic-bezier(0.45, 0, 0.25, 1) infinite;
-        pointer-events: none;
+        position: absolute; inset: 0; pointer-events: none;
+        will-change: transform;
+        animation: дорожкаБлик 2.6s cubic-bezier(0.55, 0.05, 0.25, 1) infinite;
+      }
+      .дорожка-блик::before {
+        content: ""; position: absolute; top: 0; bottom: 0; left: -84px; width: 84px;
+        background: linear-gradient(90deg,
+          rgba(255,255,255,0) 0%,
+          rgba(255,255,255,0.06) 22%,
+          rgba(255,255,255,0.28) 40%,
+          rgba(255,255,255,0.62) 50%,
+          rgba(255,255,255,0.28) 60%,
+          rgba(255,255,255,0.06) 78%,
+          rgba(255,255,255,0) 100%);
+        mix-blend-mode: screen;
       }
       @media (prefers-reduced-motion: reduce) { .дорожка-блик { display: none; } }
       /* Умная смена текста: общие знаки остаются и доезжают на новое
@@ -7138,10 +7158,10 @@ function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, фо
           transition: тянут ? `min-width 260ms ${пружина}` : `width 220ms cubic-bezier(0.22, 1, 0.36, 1), background-size 220ms cubic-bezier(0.22, 1, 0.36, 1), min-width 260ms ${пружина}`,
           overflow: "hidden",
         }}>
-          {/* Блик бежит по заливке слева направо; чем больше сумма, тем
-              чаще он проходит — дорожка будто разгоняется. */}
+          {/* Блик бежит по заливке слева направо; с суммой он чуть
+              ускоряется — едва заметно, чтобы не суетиться. */}
           {радуга && доля > 0.01 && (
-            <span aria-hidden className="дорожка-блик" style={{ animationDuration: `${(2.8 - 1.9 * доля).toFixed(2)}s` }} />
+            <span aria-hidden className="дорожка-блик" style={{ animationDuration: `${(2.6 - 0.35 * доля).toFixed(2)}s` }} />
           )}
         </div>
         <div style={{
