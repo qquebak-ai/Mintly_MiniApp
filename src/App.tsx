@@ -12467,18 +12467,11 @@ const БАННЕРЫ = [
  * выглядят как отрендеренные, а не нарисованные примитивами; всё, что
  * можно было сделать светом, сделано светом, а не обводками. */
 function СценаЗапуска() {
-  const СИРЕНЬ = "#C79BFF", ФИОЛЕТ = "#8E2DE2";
   return (
     <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
       {/* Небо — ровный чёрный: никакого зарева, весь свет теперь только
           от самих предметов сцены (планеты, ракеты, вершины). */}
       <span style={{ position: "absolute", inset: 0, background: "#000000" }} />
-
-      {/* След орбиты: тонкая дуга, вдоль которой ракета и уходит. */}
-      <svg viewBox="0 0 360 150" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-        <path d="M120 165C186 118 250 78 360 52" stroke={СИРЕНЬ} strokeOpacity="0.22" strokeWidth="1" fill="none" />
-        <path d="M150 172C214 134 288 98 360 88" stroke="#FF3D8B" strokeOpacity="0.12" strokeWidth="1" fill="none" />
-      </svg>
 
       {/* Планета уходит за угол — кадр читается куском большой сцены. */}
       <img
@@ -12488,13 +12481,12 @@ function СценаЗапуска() {
           animation: "планетаКрутится 120s linear infinite",
         }}
       />
-      {/* Вершина с флагом — сама цель, без ракеты перед ней. */}
+      {/* Вершина с флагом — сама цель, без ракеты перед ней. Без
+          цветного свечения вокруг: фон должен остаться ровно чёрным, а
+          не фиолетовым по краям. */}
       <img
         src="/banner-mountain.webp" alt=""
-        style={{
-          position: "absolute", right: "-6%", bottom: "-14%", width: "52%", zIndex: 1,
-          filter: `drop-shadow(0 0 22px ${hexA(ФИОЛЕТ, 0.4)})`,
-        }}
+        style={{ position: "absolute", right: "-6%", bottom: "-14%", width: "52%", zIndex: 1 }}
       />
       {[
         /* Дорожки идут по всей ширине, а фазы разведены по кругу: иначе
