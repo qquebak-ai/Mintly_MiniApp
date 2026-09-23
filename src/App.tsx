@@ -23596,11 +23596,13 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             className={`авт-заставка flex flex-col items-center${уходитЗаставка ? " уходит" : ""}`}
             style={{
               position: "absolute", left: 0, right: 0, top: "50%",
-              transform: "translateY(-50%)", gap: 12, pointerEvents: "none",
+              transform: "translateY(-50%)", gap: 16, pointerEvents: "none",
             }}
           >
             <span style={{
-              fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 300,
+              // Размеры — те же, что у заставки в index.html: окно входа
+              // продолжает её, и любое расхождение видно как скачок.
+              fontFamily: displayFont, color: T.ice, fontSize: 44, fontWeight: 300,
               /* Правый отступ гасит разрядку последней буквы: без него
                  строка стоит не по центру, а сдвинутой влево. */
               letterSpacing: "0.34em", paddingLeft: "0.34em",
@@ -23608,7 +23610,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               <ИмяПоБуквам текст="MINTLY" уходит={уходитЗаставка} задержка={-уже} />
             </span>
             <span className="авт-подпись" style={{
-              fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.42)", fontSize: 13, fontWeight: 600,
+              fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.42)", fontSize: 18, fontWeight: 600,
               ...(уходитЗаставка ? null : { animationDelay: `${420 - уже}ms` }),
             }}>
               {t("authSplashLead")}
