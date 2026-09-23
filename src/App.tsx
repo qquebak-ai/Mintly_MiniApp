@@ -8248,6 +8248,21 @@ function ЗначокОбмен({ size = 22, color = "#FFFFFF", strokeWidth = 1.
   );
 }
 
+function ЗначокРакета({ size = 22, color = "#FFFFFF", strokeWidth = 1.8 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      {/* Корпус и стабилизаторы по бокам, факел снизу — тот же
+          росчерк, что и на баннере запуска, только в одну линию. */}
+      <path d="M12 2.6c2.4 1.9 3.8 4.7 3.8 8.2 0 2.4-.7 4.4-1.6 6l-4.4 0c-.9-1.6-1.6-3.6-1.6-6 0-3.5 1.4-6.3 3.8-8.2Z" />
+      <circle cx="12" cy="10.4" r="1.6" />
+      <path d="M9.8 15.4 6.8 17v-3.2Z" />
+      <path d="M14.2 15.4 17.2 17v-3.2Z" />
+      <path d="M10.2 18.8c.5 1 1 1.6 1.8 1.6s1.3-.6 1.8-1.6" />
+    </svg>
+  );
+}
+
 function ЗначокСтолбики({ size = 22, color = "#FFFFFF", strokeWidth = 1.8 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -28579,8 +28594,8 @@ function mapTokenRow(row) {
             // Под клавиатурой панели не видно — без анимации, как будто
             // клавиатура просто её закрыла.
             visibility: клавиатура ? "hidden" : "visible",
-            width: "auto", maxWidth: 420, gap: 6,
-            padding: 7,
+            width: "auto", maxWidth: 420, gap: 8,
+            padding: 9,
             borderRadius: 999,
             // Панель просто чёрная и прозрачная: под ней видно, что список
             // продолжается, а цвет ничего не добавляет к значкам.
@@ -28595,31 +28610,35 @@ function mapTokenRow(row) {
         >
           {/* Профиля в панели нет: туда ходят за своими делами, а не
               переключаются между ним и рынком. Вход — по аватарке в углу
-              главной, как это устроено везде. */}
+              главной, как это устроено везде. Запуск — не раздел, а
+              действие, но без него панель называла не все места, куда
+              ведёт приложение, — добавлен тем же кружком, только не
+              подсвечивается: у него нет своего «текущего» экрана. */}
           {[
             { id: "home", label: t("navHome"), icon: ЗначокДом },
-            { id: "shop", label: t("navShop"), icon: ЗначокСумка },
             { id: "mempad", label: t("navMempad"), icon: ЗначокОбмен },
+            { id: "create", label: t("navCreate"), icon: ЗначокРакета },
+            { id: "shop", label: t("navShop"), icon: ЗначокСумка },
             { id: "wallet", label: t("navWallet"), icon: ЗначокСтолбики },
           ].map(({ id, label, icon: Icon, locked }) => {
-            const active = tab === id;
+            const active = id !== "create" && tab === id;
             return (
               <button
                 key={id}
                 // Отклик отдаём сразу, до перерисовки: тяжёлый экран
                 // строится десятую долю секунды, и без него кажется, что
                 // нажатие не прошло — человек жмёт второй раз.
-                onClick={() => { haptic("light"); goTab(id); }}
+                onClick={() => { haptic("light"); if (id === "create") openCreate(); else goTab(id); }}
                 className="fx-tap flex items-center justify-center"
                 style={{
                   position: "relative", border: "none", padding: 0,
-                  width: 48, height: 48, borderRadius: "50%",
+                  width: 58, height: 58, borderRadius: "50%",
                   background: active ? "#FFFFFF" : "transparent",
                   transition: `background ${EASE}`,
                 }}
               >
                 <Icon
-                  size={22}
+                  size={26}
                   strokeWidth={active ? 2 : 1.8}
                   color={active ? "#14151A" : "#9B9FA9"}
                 />
