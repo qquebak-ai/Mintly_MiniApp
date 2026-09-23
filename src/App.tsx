@@ -11120,11 +11120,14 @@ function КарточкаСВыдвижкой({ title, tokens, onOpen, delay = 0
     const el = корень.current;
     if (!el || typeof IntersectionObserver === "undefined") { setОткрыта(true); return; }
     let таймер = null;
+    /* Выезжает один раз, когда карточка впервые показалась. Раньше она
+       пряталась и выезжала заново на каждом проходе прокрутки, и при
+       открытии главной дёргалась туда-обратно. */
     const н = new IntersectionObserver(([з]) => {
-      clearTimeout(таймер);
-      if (з.isIntersecting) таймер = setTimeout(() => setОткрыта(true), delay);
-      else setОткрыта(false);
-    }, { threshold: 0.55 });
+      if (!з.isIntersecting) return;
+      таймер = setTimeout(() => setОткрыта(true), delay);
+      н.disconnect();
+    }, { threshold: 0.35 });
     н.observe(el);
     return () => { clearTimeout(таймер); н.disconnect(); };
   }, [delay]);
@@ -11155,15 +11158,19 @@ function КарточкаСВыдвижкой({ title, tokens, onOpen, delay = 0
 
       {/* Выдвижка: из-под карточки, с лёгкой отдачей в конце — как
           пружина у оригинала, только без библиотеки анимаций. */}
-      <div style={{ display: "grid", gridTemplateRows: открыта ? "1fr" : "0fr", transition: "grid-template-rows 480ms cubic-bezier(.22,1,.36,1)" }}>
-        <div style={{ overflow: "hidden", minHeight: 0 }}>
+      {/* Место под выдвижку занято сразу — анимируется только сдвиг и
+          прозрачность, на видеокарте. Прежде раскрывалась сама высота
+          (grid-template-rows), и на телефоне это шло рывками: каждый кадр
+          пересчитывал раскладку всей главной. */}
+      <div style={{ overflow: "hidden" }}>
           <div
             className="flex flex-col"
             style={{
               gap: 2,
-              transform: открыта ? "translateY(0)" : "translateY(-30px)",
-              opacity: открыта ? 1 : 0.2,
-              transition: "transform 620ms cubic-bezier(.34,1.56,.64,1), opacity 380ms ease",
+              transform: открыта ? "translate3d(0, 0, 0)" : "translate3d(0, -30px, 0)",
+              opacity: открыта ? 1 : 0,
+              transition: "transform 620ms cubic-bezier(.34,1.56,.64,1), opacity 420ms ease",
+              willChange: "transform, opacity",
             }}
           >
             {!tokens.length && (
@@ -11180,7 +11187,6 @@ function КарточкаСВыдвижкой({ title, tokens, onOpen, delay = 0
               </button>
             ))}
           </div>
-        </div>
       </div>
     </div>
   );
