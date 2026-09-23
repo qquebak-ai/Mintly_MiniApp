@@ -20422,8 +20422,10 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   /* Из механик осталась одна: обратный выкуп и живой график со страницы
      запуска убраны — график стал настройкой чата, а не обещанием
      токена. У прежних токенов их значки остаются на месте. */
-  const [механики, setМеханики] = useState({ fair_start: true });
-  const [замок, setЗамок] = useState("milestones");
+  /* Механики запуска и замок создателя убраны со страницы: токен
+     запускается без них. Прежние токены свои отметки сохраняют. */
+  const механики = {};
+  const замок = "none";
   const [logoCropFile, setLogoCropFile] = useState(null);
   const logoInputRef = useRef(null);
   const bannerInputRef = useRef(null);
@@ -20524,8 +20526,6 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
 
   function resetForm() {
     setForm({ name: "", ticker: "", buyAmount: "", desc: "", tg: "", x: "", site: "" });
-    setМеханики({ fair_start: true });
-    setЗамок("milestones");
     setCategory(null);
     setLogoUrl(null);
     setLogoFile(null);
@@ -20692,20 +20692,11 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             </>
           );
         })()}
-        <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.5, marginTop: 6 }}>
-          {t("initialBuyHint")}
-        </p>
         {(() => {
           const buyNum = parseFloat(form.buyAmount.replace(",", "."));
           const rate = вSolana ? solUsd() : tonUsd();
           const minBuyTon = rate > 0 ? MIN_LAUNCH_USD / rate : 0;
-          if (!Number.isFinite(buyNum) || buyNum <= 0) {
-            return (
-              <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.5 }}>
-                {t("launchAmountNote")}
-              </p>
-            );
-          }
+          if (!Number.isFinite(buyNum) || buyNum <= 0) return null;
           const минимумНужен = вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED;
           let беда = null;
           if (минимумНужен && rate > 0 && buyNum * rate < MIN_LAUNCH_USD) {
@@ -20756,75 +20747,6 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             </>
           );
         })()}
-      </div>
-
-      {/* Механики запуска. Всё, что здесь включено, видно покупателю на
-          странице токена — иначе обещание ничего не стоит. */}
-      <div>
-        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, marginBottom: 8 }}>
-          {t("mechTitle")}
-        </div>
-        <div className="flex flex-col" style={{ gap: 8 }}>
-          {МЕХАНИКИ_ЗАПУСКА.map((м) => (
-            <ПереключательМеханики
-              key={м.key}
-              item={м}
-              включено={!!механики[м.key]}
-              onToggle={() => setМеханики((б) => ({ ...б, [м.key]: !б[м.key] }))}
-            />
-          ))}
-        </div>
-
-        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, margin: "16px 0 6px" }}>
-          {t("lockTitle")}
-        </div>
-        {/* Сперва — что это вообще такое. Раньше стояли три слова без
-            объяснения, и выбирать приходилось наугад. */}
-        <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.5, marginBottom: 10 }}>
-          {t("lockIntro")}
-        </p>
-        <div className="flex flex-col" style={{ gap: 8 }}>
-          {ЗАМКИ_СОЗДАТЕЛЯ.map((з) => {
-            const выбран = замок === з.key;
-            return (
-              <button
-                key={з.key}
-                onClick={() => { haptic("light"); setЗамок(з.key); }}
-                className="fx-tap w-full flex items-start"
-                style={{
-                  gap: 11, padding: "12px 14px", borderRadius: 18, textAlign: "left",
-                  background: выбран ? hexA("#8E2DE2", 0.16) : T.surface,
-                  border: `1px solid ${выбран ? hexA("#B15CFF", 0.55) : T.line}`,
-                  transition: `background ${EASE}, border-color ${EASE}`,
-                }}
-              >
-                {/* Кружок выбора: три варианта — это выбор одного из
-                    трёх, а не три независимых переключателя. */}
-                <span
-                  aria-hidden
-                  style={{
-                    width: 18, height: 18, borderRadius: "50%", marginTop: 1, flexShrink: 0,
-                    border: `2px solid ${выбран ? "#B15CFF" : T.lineHi}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}
-                >
-                  {выбран && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#B15CFF" }} />}
-                </span>
-                <span className="flex-1 min-w-0">
-                  <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
-                    {t(з.tKey)}
-                  </span>
-                  <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 3 }}>
-                    {t(з.описание)}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <p style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, lineHeight: 1.45, marginTop: 8 }}>
-          {t("lockHint")}
-        </p>
       </div>
 
       {!connected && (
