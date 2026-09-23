@@ -24,7 +24,9 @@ export const ССЫЛКА_ПРИЛОЖЕНИЯ = `https://t.me/${ОСНОВНО�
 /* У бота уведомлений своё приложение — страница уведомлений (notify.html):
    журнал писем и переключатели. Основное приложение открывается только
    из основного бота. */
-export const АДРЕС_ПРИЛОЖЕНИЯ = `${(process.env.APP_URL || "https://www.mintly.company").replace(/\/$/, "")}/notify.html`;
+// Только www: у голого mintly.company сертификат на другое имя, и
+// Telegram открывал бы пустой экран.
+export const АДРЕС_ПРИЛОЖЕНИЯ = (process.env.TRADING_APP_URL || "https://www.mintly.company/notify.html").trim();
 export const КНОПКА_ПРИЛОЖЕНИЯ = { inline_keyboard: [[{ text: "Уведомления", web_app: { url: АДРЕС_ПРИЛОЖЕНИЯ } }]] };
 
 // Виды уведомлений — их можно выключать по отдельности в приложении бота.
