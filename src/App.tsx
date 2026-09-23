@@ -2219,6 +2219,19 @@ function GlobalStyle() {
       @keyframes кнопкаПереливается { from { background-position: 0% 50%; } to { background-position: 0% 50%; } }
       @keyframes букваЦветёт { from { background-position: 0% 50%; } to { background-position: 0% 50%; } }
       }
+      /* Умная смена текста: общие знаки остаются и доезжают на новое
+         место, новые проступают из размытия сверху, по очереди слева
+         направо. Размытие сходит дольше, чем прозрачность, — отсюда
+         мягкий «проявляющийся» хвост. */
+      @keyframes умнВход {
+        0%   { opacity: 0; filter: blur(0.16em); transform: translateY(-0.32em); }
+        45%  { opacity: 1; }
+        100% { opacity: 1; filter: blur(0); transform: none; }
+      }
+      .умн-знак { display: inline-block; white-space: pre; }
+      .умн-знак.нов { animation: умнВход 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+      .умн-поле::placeholder { color: ${T.faint}; -webkit-text-fill-color: ${T.faint}; opacity: 1; }
+      @media (prefers-reduced-motion: reduce) { .умн-знак.нов { animation: none; } }
       /* Смена числа: цифры не подменяются молча, а коротко вспыхивают
          цветом движения и подскакивают. Так видно, что цена только что
          изменилась, даже если смотришь не туда. */
@@ -6825,27 +6838,130 @@ function разобратьТост(сообщение) {
   return { вид, заголовок: отказ ? t("toastFail") : подсказка ? t("toastNote") : t("toastDone"), текст: строка };
 }
 
-/* Число, которое меняется на глазах.
+/* Умный текст: при смене строки общие знаки не пропадают, а доезжают
+ * на новое место, и появляются только те, которых раньше не было.
  *
- * Ключ — само значение: React пересоздаёт узел, и анимация проигрывается
- * заново на каждой смене. Направление берём по прошлому значению —
- * подорожало или подешевело, — и от него зависит цвет вспышки. */
-function ЖивоеЧисло({ значение, текст, className = "", style = {} }) {
-  const прошлое = useRef(значение);
-  const вверх = useRef(true);
-  if (Number.isFinite(значение) && Number.isFinite(прошлое.current) && значение !== прошлое.current) {
-    вверх.current = значение > прошлое.current;
+ * Общие знаки ищем наибольшей общей подпоследовательностью: у «$3.09» и
+ * «$1.47» это «$» и «.», у «sun.» и «mon.» — «n.». Сдвиг делаем
+ * переворотом (FLIP): меряем место до и после и проигрываем разницу. */
+let счётчикУмныхЗнаков = 0;
+function разложитьЗнаки(прошлые, текст) {
+  const новые = Array.from(String(текст == null ? "" : текст));
+  const n = прошлые.length, m = новые.length;
+  const итог = новые.map((ch) => ({ ch, key: `з${++счётчикУмныхЗнаков}`, нов: true }));
+  // Для длинных строк сравнение не нужно: это не число и не слово.
+  if (!n || !m || n * m > 6400) return итог;
+  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i -= 1) {
+    for (let j = m - 1; j >= 0; j -= 1) {
+      dp[i][j] = прошлые[i].ch === новые[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
   }
-  useEffect(() => { прошлое.current = значение; }, [значение]);
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (прошлые[i].ch === новые[j]) { итог[j] = { ch: новые[j], key: прошлые[i].key, нов: false }; i += 1; j += 1; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) i += 1;
+    else j += 1;
+  }
+  return итог;
+}
+
+function УмныйТекст({ text, className = "", style = {}, шаг = 42 }) {
+  const строка = String(text == null ? "" : text);
+  const знакиRef = useRef(null);
+  const былаRef = useRef(null);
+  if (знакиRef.current === null) {
+    // Первое появление не анимируем: иначе при открытии экрана
+    // проступало бы всё сразу.
+    знакиRef.current = Array.from(строка).map((ch) => ({ ch, key: `з${++счётчикУмныхЗнаков}`, нов: false }));
+    былаRef.current = строка;
+  } else if (былаRef.current !== строка) {
+    знакиRef.current = разложитьЗнаки(знакиRef.current, строка);
+    былаRef.current = строка;
+  }
+  const знаки = знакиRef.current;
+  const корень = useRef(null);
+  const места = useRef(new Map());
+
+  useLayoutEffect(() => {
+    const el = корень.current;
+    if (!el) return;
+    const новыеМеста = new Map();
+    const узлы = el.children;
+    for (let k = 0; k < узлы.length; k += 1) {
+      const у = узлы[k];
+      const ключ = у.dataset.k;
+      const x = у.getBoundingClientRect().left;
+      новыеМеста.set(ключ, x);
+      const было = места.current.get(ключ);
+      if (было != null && Math.abs(было - x) > 0.5 && у.dataset.n !== "1") {
+        у.style.transition = "none";
+        у.style.transform = `translateX(${было - x}px)`;
+        void у.offsetWidth;
+        у.style.transition = "transform 560ms cubic-bezier(0.22, 1, 0.36, 1)";
+        у.style.transform = "";
+      }
+    }
+    места.current = новыеМеста;
+  });
+
+  let номер = 0;
   return (
-    <span
-      key={текст}
-      className={className}
-      style={{ display: "inline-block", animation: `${вверх.current ? "числоВверх" : "числоВниз"} 460ms cubic-bezier(0.22, 1, 0.36, 1)`, ...style }}
-    >
-      {текст}
+    <span ref={корень} className={className} style={{ display: "inline-block", whiteSpace: "pre", ...style }}>
+      {знаки.map((з) => (
+        <span
+          key={з.key}
+          data-k={з.key}
+          data-n={з.нов ? "1" : "0"}
+          className={з.нов ? "умн-знак нов" : "умн-знак"}
+          style={з.нов ? { animationDelay: `${(номер++) * шаг}ms` } : undefined}
+        >
+          {з.ch}
+        </span>
+      ))}
     </span>
   );
+}
+
+/* Поле ввода, в котором каждый набранный знак проступает так же, как в
+ * умном тексте. Настоящее поле остаётся на месте — с кареткой, выделением
+ * и клавиатурой, — только его буквы прозрачны, а поверх лежат наши. */
+function ПолеСЖивымТекстом({ value, style = {}, className = "", ...rest }) {
+  const поле = useRef(null);
+  const слой = useRef(null);
+  const сдвинуть = () => {
+    if (поле.current && слой.current) слой.current.style.transform = `translateX(${-поле.current.scrollLeft}px)`;
+  };
+  useLayoutEffect(сдвинуть);
+  const { color, fontFamily, fontSize, fontWeight, letterSpacing, ...обёртка } = style;
+  const шрифт = { fontFamily, fontSize, fontWeight, letterSpacing };
+  return (
+    <div style={{ position: "relative", display: "flex", alignItems: "center", overflow: "hidden", ...обёртка }}>
+      <input
+        ref={поле}
+        value={value}
+        {...rest}
+        onScroll={сдвинуть}
+        onSelect={сдвинуть}
+        onKeyUp={сдвинуть}
+        className={`умн-поле ${className}`}
+        style={{
+          width: "100%", minWidth: 0, padding: 0, margin: 0, background: "transparent", border: "none", outline: "none",
+          color: "transparent", WebkitTextFillColor: "transparent", caretColor: color, fontKerning: "none", fontVariantLigatures: "none", ...шрифт,
+        }}
+      />
+      <div aria-hidden="true" style={{ position: "absolute", left: 0, top: 0, bottom: 0, display: "flex", alignItems: "center", pointerEvents: "none", overflow: "visible" }}>
+        <div ref={слой} style={{ color, ...шрифт, whiteSpace: "pre", fontKerning: "none", fontVariantLigatures: "none" }}>
+          <УмныйТекст text={value} шаг={0} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Число, которое меняется на глазах: та же умная смена, что у текста. */
+function ЖивоеЧисло({ текст, className = "", style = {} }) {
+  return <УмныйТекст text={текст} className={className} style={style} />;
 }
 
 function Toast({ toast, insetTop = 0, onClose = () => {} }) {
@@ -10397,10 +10513,10 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
                 Пока его нет, капитализация равна нулю — показываем то,
                 что известно и без него: собранное кривой. */}
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
-              {tok.mcapNum > 0 ? fmtUSD(tok.mcapNum) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`}
+              <УмныйТекст text={tok.mcapNum > 0 ? fmtUSD(tok.mcapNum) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`} />
             </div>
             <div style={{ fontFamily: monoFont, color: растёт ? T.up : T.down, fontSize: 12.5, marginTop: 2 }}>
-              {растёт ? "+" : ""}{(tok.change || 0).toFixed(1)}%
+              <УмныйТекст text={`${растёт ? "+" : ""}${(tok.change || 0).toFixed(1)}%`} />
             </div>
           </div>
         </div>
@@ -10432,7 +10548,7 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
               <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>
                 {tf("homeAlmostLeft", { left: fmtTon(Math.max(0, tok.graduationTon - tok.raisedTon)) })}
               </span>
-              <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 13, fontWeight: 700 }}>{pct.toFixed(0)}%</span>
+              <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 13, fontWeight: 700 }}><УмныйТекст text={`${pct.toFixed(0)}%`} /></span>
             </div>
           </div>
         )}
@@ -10672,7 +10788,7 @@ function ВДвижении({ tokens = [], onOpen, onAll }) {
               <div className="flex-1 min-w-0">
                 <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>${tok.ticker}</div>
                 <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 12, marginTop: 2 }}>
-                  {tok.mcapNum > 0 ? fmtUSD(tok.mcapNum) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`}
+                  <УмныйТекст text={tok.mcapNum > 0 ? fmtUSD(tok.mcapNum) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`} />
                 </div>
               </div>
               <MiniChart
@@ -10688,7 +10804,7 @@ function ВДвижении({ tokens = [], onOpen, onAll }) {
                 length={20}
               />
               <span style={{ fontFamily: monoFont, color: растёт ? T.up : T.down, fontSize: 13, fontWeight: 700, width: 58, textAlign: "right", flexShrink: 0 }}>
-                {растёт ? "+" : ""}{(tok.change || 0).toFixed(1)}%
+                <УмныйТекст text={`${растёт ? "+" : ""}${(tok.change || 0).toFixed(1)}%`} />
               </span>
             </button>
           );
@@ -15743,7 +15859,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
      показывать одну из них значило врать про остаток: человек видел
      ноль SOL и считал, что кошелёк пуст, пока на нём лежал GRAM. */
   const всегоВДолларах = солНаКошельке * курсSol + тонНаКошельке * tonPriceUsd;
-  const итог = useCountUp(всегоВДолларах, 900, !!адресВнутри);
+  // Без счётчика: сумма сменяется умным текстом — общие цифры стоят,
+  // новые проступают из размытия.
+  const итог = адресВнутри ? всегоВДолларах : 0;
   const short = адресВнутри ? `${адресВнутри.slice(0, 4)}…${адресВнутри.slice(-4)}` : "";
 
   function скопироватьАдрес() {
@@ -16000,8 +16118,8 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             const [цел, дроб] = (Math.floor(Math.max(0, итог) * 100) / 100).toFixed(2).split(".");
             return (
               <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#FFFFFF" }}>
-                ${Number(цел).toLocaleString("ru-RU")}
-                <span style={{ color: hexA("#FFFFFF", 0.55) }}>{`,${дроб}`}</span>
+                <УмныйТекст text={`$${Number(цел).toLocaleString("ru-RU")}`} />
+                <УмныйТекст text={`,${дроб}`} style={{ color: hexA("#FFFFFF", 0.55) }} />
               </span>
             );
           })()}
@@ -16015,7 +16133,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             minHeight: 24,
           }}
         >
-          {`${fmtСумма(солНаКошельке)} SOL · ${fmtСумма(тонНаКошельке)} ${ТИКЕР_TON}`}
+          <УмныйТекст text={`${fmtСумма(солНаКошельке)} SOL · ${fmtСумма(тонНаКошельке)} ${ТИКЕР_TON}`} />
         </span>
         {/* Мягкая кромка: рисунок сходит на нет у самого края, и карта
             не выглядит обрезанной по линейке.
@@ -16114,10 +16232,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
               </span>
               <span className="flex flex-col items-end" style={{ gap: 2, flexShrink: 0 }}>
                 <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                  {монета.сколько.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                  <УмныйТекст text={монета.сколько.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} />
                 </span>
                 <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
-                  {монета.курс > 0 ? `≈ $${(монета.сколько * монета.курс).toFixed(2)}` : "—"}
+                  <УмныйТекст text={монета.курс > 0 ? `≈ $${(монета.сколько * монета.курс).toFixed(2)}` : "—"} />
                 </span>
               </span>
             </div>
@@ -17794,7 +17912,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           <div className="flex items-end justify-between gap-3">
             <div>
               <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 600, letterSpacing: "-0.01em" }}>
-                {fmtUSD(стоимостьПозиции)}
+                <УмныйТекст text={fmtUSD(стоимостьПозиции)} />
               </div>
               <div style={{ fontFamily: monoFont, color: T.faint, fontSize: 12.5, marginTop: 2 }}>
                 {fmtCoin(позиция)} ${token.ticker}
@@ -18958,13 +19076,13 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
               {/* Крошечный выход не округляем в ноль: «≈ 0 SOL» читается
                   как «ничего не дадут», хотя монеты придут — просто их
                   меньше, чем показывают четыре знака. */}
-              {amount > 0
+              <УмныйТекст text={amount > 0
                 ? (isBuy
                   ? `≈ ${estimate.toLocaleString("ru-RU", { maximumFractionDigits: 0 })} ${token.ticker}`
                   : (estimate > 0 && estimate < 0.0001
                     ? `< 0,0001 ${монета}`
                     : `≈ ${estimate.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`))
-                : "—"}
+                : "—"} />
             </span>
           </div>
         </div>
@@ -19944,7 +20062,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             <div className="flex items-center justify-between rounded-[20px] px-3.5 py-2.5" style={{ background: ink(0.06), border: `1px solid ${ink(0.2)}` }}>
               <span style={{ fontFamily: bodyFont, color: T.electric, fontSize: 13 }}>{t("youWillGet")}</span>
               <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 14, fontWeight: 600 }}>
-                {tokens.toLocaleString("ru-RU")} {(form.ticker.trim() || "TOKEN").toUpperCase()} · {pct.toFixed(pct < 1 ? 3 : 1)}% {t("supplyShare")}
+                <УмныйТекст text={`${tokens.toLocaleString("ru-RU")} ${(form.ticker.trim() || "TOKEN").toUpperCase()} · ${pct.toFixed(pct < 1 ? 3 : 1)}% ${t("supplyShare")}`} />
               </span>
             </div>
           );
@@ -22952,7 +23070,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                       transition: "border-color 420ms cubic-bezier(0.22, 1, 0.36, 1)",
                     }}
                   >
-                    <input
+                    <ПолеСЖивымТекстом
                       value={почтаВвод}
                       onChange={(e) => { setПочтаВвод(e.target.value); setПочтаБеда(""); }}
                       type="email"
@@ -23143,7 +23261,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                       }}
                     />
                     <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 16, fontWeight: 700 }}>@</span>
-                    <input
+                    <ПолеСЖивымТекстом
                       value={tgNick}
                       onChange={(e) => { setTgNick(e.target.value.replace(/[^A-Za-z0-9_.]/g, "")); setTgNickTouched(true); setTgError(""); }}
                       // Без примера имени: собачка слева и так говорит, что
