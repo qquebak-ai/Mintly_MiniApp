@@ -111,7 +111,7 @@
         сообщить("promise", (r && (r.stack || r.message)) || String(r || "отказ без причины"));
       });
     </script>
-    <script type="module" crossorigin src="/assets/index-3Ggn3Bx6.js"></script>
+    <script type="module" crossorigin src="/assets/index-Do0-Pxe9.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/react-DS-kCp2g.js">
     <link rel="modulepreload" crossorigin href="/assets/supabase-QBHRJHLH.js">
     <link rel="modulepreload" crossorigin href="/assets/icons-W_TV3a_Z.js">
@@ -138,6 +138,9 @@
       /* До старта всё спрятано и стоит: анимация идёт только тогда, когда
          окно правда видно (класс «идёт» ставит скрипт ниже). */
       #ширма:not(.идёт):not(.уходит) .имя b, #ширма:not(.идёт):not(.уходит) .подпись { opacity: 0; }
+      /* Своим слоем: пока грузится связка, основной поток занят, и без
+         этого буквы проступали рывками. */
+      #ширма .имя b, #ширма .подпись { will-change: opacity, transform; }
       #ширма .имя b { font-weight: inherit; display: inline-block; }
       #ширма.идёт .имя b { animation: ширмаБуква 300ms ease-out both; }
       #ширма.идёт .имя b:nth-child(1) { animation-delay: 0ms; }

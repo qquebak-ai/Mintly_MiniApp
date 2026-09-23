@@ -12712,8 +12712,14 @@ function снятьШирму({ уйти = false } = {}) {
        Имя с подписью убираем сразу, чтобы два одинаковых слова не легли
        друг на друга, пока поле дотлевает. Два кадра и треть секунды:
        поле держится, пока окно встаёт на место. */
-    поле.querySelectorAll(".имя, .подпись").forEach((э) => э.remove());
-    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(погасить, 320)));
+    /* Окно продолжает ту же анимацию с того же места (см. сдвигЗаставки
+       в окне входа), поэтому поле просто убираем, как только окно
+       нарисовано: под ним ровно то же самое, и подмены не видно. Раньше
+       буквы стирались сразу, а чёрное поле ещё треть секунды закрывало
+       окно — имя пропадало и проступало заново. */
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (поле.parentNode) поле.parentNode.removeChild(поле);
+    }));
     return;
   }
 
@@ -15230,6 +15236,9 @@ function ИмяПоБуквам({ текст, шаг = 70, задержка = 0,
           key={i}
           style={{
             display: "inline-block",
+            // Отдельный слой: пока приложение грузится, основной поток
+            // занят, и без него буквы проступали рывками.
+            willChange: "opacity, transform",
             animation: уходит
               ? "букваУходитВправо 280ms cubic-bezier(0.4, 0, 1, 1) both"
               : "букваПроступает 300ms ease-out both",
@@ -22635,15 +22644,28 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const [первыйПоказ, setПервыйПоказ] = useState(true);
   /* Заставка живёт ровно до того мига, когда поверхность трогается с
      места: её уход и выезд листа — одно движение, а не два подряд. */
-  const ЖДАТЬ_ЗАСТАВКУ = 1500;
+  /* Заставка окна — продолжение той, что уже идёт на поле из index.html,
+     а не новая. Раньше окно запускало её с нуля, и человек видел, как
+     имя проступает второй раз. Теперь окно встаёт на то же место той же
+     анимации: все задержки сдвинуты на прошедшее с её начала время.
+     Меряем один раз, в миг открытия. */
+  const сдвигЗаставки = useRef(null);
+  if (!open) сдвигЗаставки.current = null;
+  else if (сдвигЗаставки.current === null) {
+    const поле = typeof document !== "undefined" ? document.getElementById("ширма") : null;
+    const старт = typeof window !== "undefined" ? window.__ширмаСтарт : 0;
+    сдвигЗаставки.current = поле && старт ? Math.max(0, Date.now() - старт) : 0;
+  }
+  const уже = сдвигЗаставки.current || 0;
+  const ЖДАТЬ_ЗАСТАВКУ = Math.max(0, 1500 - уже);
   const [заставка, setЗаставка] = useState(true);
   // Буквы уходят вправо заранее: к мигу, когда трогается поверхность,
   // имя посередине уже стёрто, и два движения не накладываются.
   const [уходитЗаставка, setУходитЗаставка] = useState(false);
   useEffect(() => {
     if (!open) { setПервыйПоказ(true); setЗаставка(true); setУходитЗаставка(false); return undefined; }
-    const ух = setTimeout(() => setУходитЗаставка(true), 1150);
-    const сн = setTimeout(() => { setЗаставка(false); setУходитЗаставка(false); }, 1760);
+    const ух = setTimeout(() => setУходитЗаставка(true), Math.max(0, 1150 - уже));
+    const сн = setTimeout(() => { setЗаставка(false); setУходитЗаставка(false); }, Math.max(610, 1760 - уже));
     // Сбрасываем задержки позже конца всех выходов: переменную читает
     // уже идущая анимация, и смена на полпути дёрнула бы её назад.
     const т = setTimeout(() => setПервыйПоказ(false), 3200);
@@ -22991,10 +23013,11 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                  строка стоит не по центру, а сдвинутой влево. */
               letterSpacing: "0.34em", paddingLeft: "0.34em",
             }}>
-              <ИмяПоБуквам текст="MINTLY" уходит={уходитЗаставка} />
+              <ИмяПоБуквам текст="MINTLY" уходит={уходитЗаставка} задержка={-уже} />
             </span>
             <span className="авт-подпись" style={{
               fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.42)", fontSize: 13, fontWeight: 600,
+              ...(уходитЗаставка ? null : { animationDelay: `${420 - уже}ms` }),
             }}>
               {t("authSplashLead")}
             </span>
