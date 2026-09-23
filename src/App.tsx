@@ -7024,11 +7024,19 @@ function ПолеСЖивымТекстом({ value, style = {}, className = "",
  * значением и едет вместе с ней. Отпустил — всё возвращается в покой.
  * Своя разметка вместо <input type="range">: у встроенного на iOS
  * ручку не увеличить и пузырь не прицепить. */
-function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, формат = (v) => String(v), ariaLabel }) {
+function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, формат = (v) => String(v), единица = "", ariaLabel }) {
   const дорожка = useRef(null);
   const [тянут, setТянут] = useState(false);
+  /* Пока палец на ручке, значение живёт только здесь, в ползунке и его
+     пузыре. Наружу оно уходит один раз — когда палец убрали: иначе
+     каждая строка страницы, что зависит от суммы, пересчитывалась на
+     каждый шаг, и цифры в ней летали. */
+  const [живое, setЖивое] = useState(value);
+  const живоеRef = useRef(value);
+  useEffect(() => { if (!тянут) { setЖивое(value); живоеRef.current = value; } }, [value, тянут]);
   const прошлыйШаг = useRef(null);
-  const доля = max > min ? Math.min(1, Math.max(0, (value - min) / (max - min))) : 0;
+  const сейчас = тянут ? живое : value;
+  const доля = max > min ? Math.min(1, Math.max(0, (сейчас - min) / (max - min))) : 0;
 
   const поставить = (clientX) => {
     const el = дорожка.current;
@@ -7044,7 +7052,9 @@ function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, фо
         try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.(); } catch (e) { /* старый клиент */ }
       }
       прошлыйШаг.current = v;
-      onChange && onChange(Math.min(max, Math.max(min, v)));
+      const итог = Math.min(max, Math.max(min, v));
+      живоеRef.current = итог;
+      setЖивое(итог);
     }
   };
 
@@ -7056,7 +7066,11 @@ function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, фо
     поставить(e.clientX);
   };
   const вести = (e) => { if (тянут) поставить(e.clientX); };
-  const кончить = () => setТянут(false);
+  const кончить = () => {
+    if (!тянут) return;
+    setТянут(false);
+    if (живоеRef.current !== value) onChange && onChange(живоеRef.current);
+  };
 
   const пружина = "cubic-bezier(0.34, 1.56, 0.64, 1)";
   const ручка = тянут ? 24 : 14;
@@ -7067,7 +7081,7 @@ function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, фо
       aria-label={ariaLabel}
       aria-valuemin={min}
       aria-valuemax={max}
-      aria-valuenow={value}
+      aria-valuenow={сейчас}
       onPointerDown={начать}
       onPointerMove={вести}
       onPointerUp={кончить}
@@ -7111,7 +7125,10 @@ function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, фо
             transition: `opacity 200ms ease, transform 320ms ${пружина}`,
             pointerEvents: "none",
           }}>
-            <УмныйТекст text={формат(value)} шаг={0} />
+            {/* Цифры сменяются на месте, без полёта знаков: они меняются
+                на каждом шаге пальца. Единица стоит справа намертво. */}
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>{формат(сейчас)}</span>
+            {единица ? <span style={{ marginLeft: 4, opacity: 0.7 }}>{единица}</span> : null}
           </div>
         </div>
       </div>
@@ -7166,6 +7183,19 @@ function КнопкаДействия({ Значок, подпись, onClick, �
         </span>
       )}
     </div>
+  );
+}
+
+/* Строка, в которой анимируются только числа. Длинную фразу целиком
+ * умному тексту отдавать нельзя: он держит её одной строкой без
+ * переносов. Поэтому слова остаются обычным текстом, а каждое число —
+ * отдельным умным текстом на своём месте. */
+function ТекстСЧислами({ text }) {
+  const части = String(text == null ? "" : text).split(/(\d(?:[\d\u00a0\u202f.,]*\d)?)/);
+  return (
+    <>
+      {части.map((ч, i) => (i % 2 ? <УмныйТекст key={i} text={ч} /> : <React.Fragment key={i}>{ч}</React.Fragment>))}
+    </>
   );
 }
 
@@ -20441,20 +20471,21 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           const поКошельку = остатокСети != null ? Math.floor(Math.max(0, остатокСети - ЗАПАС_ЗАПУСКА) / шаг) * шаг : 0;
           const верх = поКошельку > 0 ? Number(поКошельку.toFixed(2)) : (вSolana ? 2 : 50);
           const сейчас = Math.min(верх, Number.isFinite(суммаПокупки) ? суммаПокупки : 0);
-          const подпись = (v) => `${v.toLocaleString("ru-RU", { maximumFractionDigits: вSolana ? 2 : 1 })} ${единица}`;
+          const число = (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: вSolana ? 2 : 1 });
           const плохо = touched && (вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED) && (вSolana ? solUsd() : tonUsd()) > 0
             && !(сейчас * (вSolana ? solUsd() : tonUsd()) >= MIN_LAUNCH_USD);
           return (
             <>
               <span style={{ fontFamily: bodyFont, color: плохо ? T.down : T.muted, fontSize: 13 }}>
-                {t("launchAmountLabel")}: <УмныйТекст text={подпись(сейчас)} />
+                {t("launchAmountLabel")}: <УмныйТекст text={число(сейчас)} /> {единица}
               </span>
               <Ползунок
                 value={сейчас}
                 min={0}
                 max={верх}
                 step={шаг}
-                формат={подпись}
+                формат={число}
+                единица={единица}
                 ariaLabel={t("launchAmountLabel")}
                 onChange={(v) => setForm((f) => ({ ...f, buyAmount: v > 0 ? String(v) : "" }))}
               />
@@ -20479,17 +20510,17 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           if (минимумНужен && rate > 0 && buyNum * rate < MIN_LAUNCH_USD) {
             return (
               <p style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, lineHeight: 1.5 }}>
-                {trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: minBuyTon.toFixed(вSolana ? 3 : 2), unit: вSolana ? "SOL" : ТИКЕР_TON })}
+                <ТекстСЧислами text={trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: minBuyTon.toFixed(вSolana ? 3 : 2), unit: вSolana ? "SOL" : ТИКЕР_TON })} />
               </p>
             );
           }
           if (нехватка) {
             return (
               <p style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, lineHeight: 1.5 }}>
-                {trf("launchNotEnough", {
+                <ТекстСЧислами text={trf("launchNotEnough", {
                   have: `${(остатокСети || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${вSolana ? "SOL" : ТИКЕР_TON}`,
                   need: `${(buyNum + ЗАПАС_ЗАПУСКА).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${вSolana ? "SOL" : ТИКЕР_TON}`,
-                })}
+                })} />
               </p>
             );
           }
@@ -20498,7 +20529,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             <div className="flex items-center justify-between rounded-[20px] px-3.5 py-2.5" style={{ background: ink(0.06), border: `1px solid ${ink(0.2)}` }}>
               <span style={{ fontFamily: bodyFont, color: T.electric, fontSize: 13 }}>{t("youWillGet")}</span>
               <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 14, fontWeight: 600 }}>
-                <УмныйТекст text={`${tokens.toLocaleString("ru-RU")} ${(form.ticker.trim() || "TOKEN").toUpperCase()} · ${pct.toFixed(pct < 1 ? 3 : 1)}% ${t("supplyShare")}`} />
+                <ТекстСЧислами text={`${tokens.toLocaleString("ru-RU")} ${(form.ticker.trim() || "TOKEN").toUpperCase()} · ${pct.toFixed(pct < 1 ? 3 : 1)}% ${t("supplyShare")}`} />
               </span>
             </div>
           );
