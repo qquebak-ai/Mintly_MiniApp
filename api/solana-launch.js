@@ -241,7 +241,29 @@ function инструкцияМетаданных({ mint, payer, name, symbol, u
 let блокПамять = { hash: null, ts: 0, вПути: null };
 const БЛОК_ЖИВЁТ_МС = 2000;
 
-async function свежийБлок(connection) {
+/* Тёплый блок. Пока в приложении идут сделки (последнее обращение —
+   меньше минуты назад), блок обновляется сам раз в полторы секунды, и
+   сделка берёт его из памяти, не дожидаясь узла вовсе. Минута тишины —
+   обновление останавливается: публичный узел не любит лишних вопросов. */
+let последнееОбращение = 0;
+let тёплыйТаймер = null;
+export function прогретьБлок() {
+  последнееОбращение = Date.now();
+  if (тёплыйТаймер || !Connection) return;
+  const connection = new Connection(RPC, "confirmed");
+  const освежить = () => {
+    блокПамять.ts = 0;
+    свежийБлок(connection, true).catch(() => {});
+  };
+  освежить();
+  тёплыйТаймер = setInterval(() => {
+    if (Date.now() - последнееОбращение > 60000) { clearInterval(тёплыйТаймер); тёплыйТаймер = null; return; }
+    освежить();
+  }, 1500);
+}
+
+async function свежийБлок(connection, изПрогрева = false) {
+  if (!изПрогрева) прогретьБлок();
   if (блокПамять.hash && Date.now() - блокПамять.ts < БЛОК_ЖИВЁТ_МС) return блокПамять.hash;
   if (!блокПамять.вПути) {
     блокПамять.вПути = connection.getLatestBlockhash("confirmed")
@@ -695,6 +717,14 @@ export default async function handler(req, res) {
       if (!m) return res.status(404).json({ error: "not_found" });
       res.setHeader("Cache-Control", "public, max-age=60");
       return res.status(200).json(m);
+    }
+
+    /* Прогрев: приложение зовёт его, когда человек открыл запуск или
+       карточку токена, — к нажатию «купить» блок уже лежит в памяти. */
+    if (действие === "warm") {
+      await библиотеки();
+      прогретьБлок();
+      return res.status(204).end();
     }
 
     if (действие === "state") {

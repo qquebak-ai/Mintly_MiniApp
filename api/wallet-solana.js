@@ -440,7 +440,23 @@ async function подписатьИОтправить({ db, user, строка, 
     подписанная,
     { encoding: "base64", skipPreflight: true, preflightCommitment: "processed", maxRetries: 5 },
   ]);
-  const исход = await дождаться(подпись);
+  /* Повторная отправка той же транзакции, пока она не попала в блок.
+     Узел пересылает её лидеру один раз, а пакеты в загруженной сети
+     теряются; наш повтор раз в полторы секунды — бесплатный способ
+     попасть в ближайший блок, а не через один. Подпись та же, поэтому
+     дважды сделка пройти не может. */
+  let готово = false;
+  const повтор = setInterval(() => {
+    if (готово) return;
+    rpc("sendTransaction", [подписанная, { encoding: "base64", skipPreflight: true, maxRetries: 0 }]).catch(() => {});
+  }, 1500);
+  let исход;
+  try {
+    исход = await дождаться(подпись);
+  } finally {
+    готово = true;
+    clearInterval(повтор);
+  }
   if (исход === false) {
     // Узел принял транзакцию, а сеть её отклонила. Раньше об этом никто
     // не узнавал: подпись возвращалась как успех, приложение закрывало
@@ -456,7 +472,48 @@ async function подписатьИОтправить({ db, user, строка, 
 /* Чем кончилась транзакция: true — прошла, false — отклонена сетью,
    null — за отведённое время ответа нет (тогда считаем, что идёт: сеть
    иногда подтверждает и через минуту, а держать человека дольше нельзя). */
+/* Подписка на исход через WebSocket узла: он сам сообщает, когда
+   сделка обработана, — это быстрее любого опроса. Не вышло подключиться
+   — молча уступаем опросу. */
+const WS = (process.env.SOLANA_WS || RPC.replace(/^http/, "ws")).trim();
+function ждатьПоПодписке(подпись, мс) {
+  return new Promise((resolve) => {
+    if (typeof WebSocket === "undefined") return;
+    let сокет;
+    const закрыть = () => { try { сокет && сокет.close(); } catch { /* уже закрыт */ } };
+    const срок = setTimeout(закрыть, мс);
+    try {
+      сокет = new WebSocket(WS);
+    } catch { clearTimeout(срок); return; }
+    сокет.onopen = () => {
+      сокет.send(JSON.stringify({
+        jsonrpc: "2.0", id: 1, method: "signatureSubscribe",
+        params: [подпись, { commitment: "processed" }],
+      }));
+    };
+    сокет.onmessage = (e) => {
+      let м;
+      try { м = JSON.parse(String(e.data)); } catch { return; }
+      if (м.method !== "signatureNotification") return;
+      const значение = м.params && м.params.result && м.params.result.value;
+      clearTimeout(срок);
+      закрыть();
+      resolve(!(значение && значение.err));
+    };
+    сокет.onerror = () => { clearTimeout(срок); закрыть(); };
+  });
+}
+
+/* Ждём двумя путями разом — подпиской и опросом — и берём то, что
+   ответит первым. Подписка обычно на пару сотен миллисекунд раньше. */
 async function дождаться(подпись, мс = 20000) {
+  let решено = false;
+  const поПодписке = ждатьПоПодписке(подпись, мс).then((и) => { решено = true; return и; });
+  const опросом = опросИсхода(подпись, мс, () => решено);
+  return Promise.race([поПодписке, опросом]);
+}
+
+async function опросИсхода(подпись, мс, хватит) {
   const до = Date.now() + мс;
   // Первый вопрос — почти сразу: узел видит сделку уже через доли
   // секунды, и ждать до неё целый круг значит держать человека у
@@ -464,6 +521,8 @@ async function дождаться(подпись, мс = 20000) {
   let пауза = 250;
   while (Date.now() < до) {
     await new Promise((r) => setTimeout(r, пауза));
+    // Подписка уже ответила — дальше спрашивать незачем.
+    if (хватит && хватит()) return null;
     пауза = 300;
     const ответ = await rpc("getSignatureStatuses", [[подпись], { searchTransactionHistory: false }])
       .catch(() => null);

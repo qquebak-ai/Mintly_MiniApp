@@ -7282,6 +7282,15 @@ function ТекстСЧислами({ text }) {
   );
 }
 
+/* Прогрев сделки в Solana: сервер заранее берёт свежий блок, и нажатие
+ * «купить» не ждёт лишнего круга до узла. Ответ не нужен. */
+let прогретоВ = 0;
+function прогретьSolana() {
+  if (Date.now() - прогретоВ < 30000) return;
+  прогретоВ = Date.now();
+  import("./апи").then(({ апи }) => fetch(апи("/api/solana-launch?action=warm")).catch(() => {}));
+}
+
 /* Число, которое меняется на глазах: та же умная смена, что у текста. */
 function ЖивоеЧисло({ текст, className = "", style = {} }) {
   return <УмныйТекст text={текст} className={className} style={style} />;
@@ -17482,6 +17491,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   // Экран открывается на статистике: цифры рынка важнее ленты чужих
   // сделок, за ними сюда и заходят.
   const [tab, setTab] = useState("stats"); // stats | holders | feed | about
+  // Карточка токена Solana открыта — сделка, скорее всего, близко.
+  useEffect(() => { if (token && token.chain === "solana") прогретьSolana(); }, [token && token.chain]);
   // Какая из кнопок сделки сейчас отыгрывает цветовой отклик.
   const [вспышка, setВспышка] = useState(null);
   /* Что рисует график: цену или капитализацию.
@@ -20302,6 +20313,8 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   }, [вSolana, кривScolana]);
 
   const посчитатьВыход = (сумма) => (вSolana ? токеновЗаSol(сумма, кривScolana) : tokensForTon(сумма));
+  // Запуск в Solana открыт — просим сервер держать свежий блок наготове.
+  useEffect(() => { if (вSolana) прогретьSolana(); }, [вSolana]);
   /* Что станет с рынком после стартовой покупки: цена одной штуки и
      капитализация (цена × миллиард) — в монете сети. Кривая —
      произведение резервов, поэтому цена после покупки = резерв монеты²
