@@ -2752,21 +2752,22 @@ function GlobalStyle() {
       .fx-modal-back { animation: fadeIn 220ms ease-out both; }
       .fx-modal-back.авт-без-проявления { animation: none; }
       /* Окно входа и создания аккаунта.
-         Сначала — чистое чёрное поле с одним именем посередине; когда
-         оно уходит, на месте проступает поверхность с изогнутой кромкой,
-         а содержимое вырастает из неё по одному: каждому своя задержка,
-         снизу вверх по очереди. */
+         Поверхность приезжает снизу с изогнутой кромкой — целиком,
+         одной формой, как в образце: фигура не растёт и не
+         меняется, а едет вверх с сильным замедлением к концу. Пока
+         она садится, содержимое вырастает из неё по одному: каждому
+         своя задержка, снизу вверх по очереди. */
+      @keyframes листВыезжает { from { transform: translateY(112%); } to { transform: translateY(0); } }
       @keyframes авт-всплыв {
         from { opacity: 0; transform: translateY(16px); }
         to   { opacity: 1; transform: translateY(0); }
       }
-      /* Дуга не едет, а проступает на месте. Пока идёт заставка, экран
-         должен быть чистым чёрным полем с одним именем посередине —
-         выезжающая снизу поверхность спорила с ним за внимание. */
-      @keyframes листПроступает { from { opacity: 0; } to { opacity: 1; } }
       .авт-лист {
-        animation: листПроступает 460ms ease-out backwards;
+        animation: листВыезжает 840ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+        /* При первом открытии поверхность ждёт заставку и идёт вверх
+           уже под уходящее имя; между шагами ждать некого. */
         animation-delay: var(--авт-ждать, 0ms);
+        will-change: transform;
       }
       .авт-стопка > * {
         --н: 0;
@@ -12325,6 +12326,42 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
    полупустые карточки с прочерками вместо чисел, а ровные серые
    прямоугольники той же формы: так видно раскладку и видно, что она
    сейчас оживёт. */
+/* Заставка запуска для тех, у кого аккаунт уже есть.
+ *
+ * Новичку имя показывает само окно входа — там это часть знакомства.
+ * А тому, кто возвращается, окно не открывается вовсе, и приложение
+ * раньше начиналось сразу с ленты. Здесь то же чёрное поле и то же имя
+ * по буквам: одинаковое начало у всех, кто открыл приложение.
+ *
+ * Своего фона не рисует: под нею лежит поле из разметки, и снимается
+ * оно, когда имя договорит. */
+function ЗаставкаЗапуска({ видна }) {
+  if (!видна) return null;
+  const слой = (
+    <div
+      aria-hidden
+      className="flex flex-col items-center"
+      style={{
+        position: "fixed", left: 0, right: 0, top: "50%", transform: "translateY(-50%)",
+        zIndex: 2147483001, gap: 12, pointerEvents: "none",
+      }}
+    >
+      <span style={{
+        fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 300,
+        letterSpacing: "0.34em", paddingLeft: "0.34em",
+      }}>
+        <ИмяПоБуквам текст="MINTLY" />
+      </span>
+      <span style={{
+        fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.42)", fontSize: 13, fontWeight: 600,
+      }}>
+        {t("authSplashLead")}
+      </span>
+    </div>
+  );
+  return typeof document !== "undefined" ? createPortal(слой, document.body) : слой;
+}
+
 /* Чёрное поле до входа.
  *
  * Само поле лежит в разметке страницы (index.html): пока грузится и
@@ -26075,9 +26112,25 @@ function mapTokenRow(row) {
      либо аккаунт нашёлся, либо экран входа уже стоит. Отдельный срок на
      всякий случай — приложение не должно остаться чёрным, если ответа
      так и не будет. */
+  /* Тот, у кого аккаунт уже есть, тоже здоровается: чёрное поле держится,
+     пока имя договаривает, и только потом снимается. Новичку его
+     показывает само окно входа, и ждать там нечего. */
+  const [заставкаЗапуска, setЗаставкаЗапуска] = useState(false);
+  const здоровались = useRef(false);
   useEffect(() => {
-    if (authChecked && (accountCreated || сразуВКошелёк || profileModalOpen)) снятьШирму();
-  }, [authChecked, accountCreated, сразуВКошелёк, profileModalOpen]);
+    // Ждём ответа: пока неизвестно, есть ли аккаунт, на экране просто
+    // чёрное поле. Новичку имя покажет окно входа, и показывать его
+    // дважды незачем.
+    if (!authChecked || !accountCreated || здоровались.current) return undefined;
+    здоровались.current = true;
+    setЗаставкаЗапуска(true);
+    const т = setTimeout(() => setЗаставкаЗапуска(false), 1600);
+    return () => clearTimeout(т);
+  }, [authChecked, accountCreated]);
+  useEffect(() => {
+    if (!authChecked) return;
+    if (profileModalOpen || сразуВКошелёк || (accountCreated && здоровались.current && !заставкаЗапуска)) снятьШирму();
+  }, [authChecked, accountCreated, сразуВКошелёк, profileModalOpen, заставкаЗапуска]);
   useEffect(() => {
     const т = setTimeout(снятьШирму, 9000);
     return () => clearTimeout(т);
@@ -26803,6 +26856,10 @@ function mapTokenRow(row) {
       {/* Пока аккаунта нет, под окном входа стоит чёрное поле: главную
           мимо него не видно ни на кадр, сколько бы ни занял ответ
           сервера и в каком бы порядке ни пришли флаги. */}
+
+      {/* Имя на чёрном для тех, кто возвращается: у окна входа своё такое
+          же, и вместе они не показываются. */}
+      <ЗаставкаЗапуска видна={заставкаЗапуска && !profileModalOpen} />
 
       <AuthModal open={profileModalOpen} язык={appSettings.language} onЯзык={(v) => updateAppSetting("language", v)} onСоздан={() => setЗалпНаГлавной(true)} onClose={() => { setProfileModalOpen(false); setLookFocus(null); }} onSubmit={submitProfile} initial={profile} mode={profileModalMode} walletAddress={walletAddress} onChangeNickname={changeNickname} cosmetics={cosmetics} owned={owned} onEquip={equipCosmetic} lookFocus={lookFocus} />
       <SettingsPanel
