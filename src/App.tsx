@@ -2245,6 +2245,15 @@ function GlobalStyle() {
         animation: сияниеКруг 5.2s linear infinite;
       }
       @media (prefers-reduced-motion: reduce) { .кнопка-сияние > span > span { animation: none; } }
+      /* Квадрат в сетке: загорается сразу, держится и медленно гаснет. */
+      @keyframes клеткаВспышка {
+        0%   { opacity: 0; }
+        8%   { opacity: 0.62; }
+        45%  { opacity: 0.5; }
+        100% { opacity: 0; }
+      }
+      .клетка-вспышка { animation: клеткаВспышка 2.6s ease-out both; }
+      @media (prefers-reduced-motion: reduce) { .клетка-вспышка { display: none; } }
       /* Умная смена текста: общие знаки остаются и доезжают на новое
          место, новые проступают из размытия сверху, по очереди слева
          направо. Размытие сходит дольше, чем прозрачность, — отсюда
@@ -10252,6 +10261,86 @@ function NetworkSlider({ value, onChange, ширина = 168, высота = 38 
   );
 }
 
+/* Фон из клеток: тонкая сетка, гаснущая к краям, и цветные квадраты,
+ * которые вспыхивают в случайных клетках и медленно тают. Квадраты
+ * рождаются сами, без касания, — фон живёт, но не требует внимания.
+ * Пока карточка не на экране, новых не заводим. */
+const ЦВЕТА_КЛЕТОК = [
+  ["#12A874", "#0B5E43"], ["#C8254F", "#7A1631"], ["#D98416", "#8A4F0B"],
+  ["#8A3FD1", "#4E2479"], ["#2F46B8", "#1A276A"], ["#6B3A26", "#3A1F14"],
+];
+function ФонКлеток({ клетка = 26 }) {
+  const корень = useRef(null);
+  const [размер, setРазмер] = useState({ ш: 0, в: 0 });
+  const [кубы, setКубы] = useState([]);
+  const виден = useRef(false);
+
+  useEffect(() => {
+    const el = корень.current;
+    if (!el) return undefined;
+    const мерить = () => setРазмер({ ш: el.clientWidth, в: el.clientHeight });
+    мерить();
+    const ро = typeof ResizeObserver !== "undefined" ? new ResizeObserver(мерить) : null;
+    if (ро) ро.observe(el);
+    const ио = typeof IntersectionObserver !== "undefined"
+      ? new IntersectionObserver(([з]) => { виден.current = з.isIntersecting; })
+      : null;
+    if (ио) ио.observe(el); else виден.current = true;
+    return () => { if (ро) ро.disconnect(); if (ио) ио.disconnect(); };
+  }, []);
+
+  const столбцов = Math.ceil(размер.ш / клетка);
+  const рядов = Math.ceil(размер.в / клетка);
+  useEffect(() => {
+    if (!столбцов || !рядов) return undefined;
+    let номер = 0;
+    const т = setInterval(() => {
+      if (!виден.current) return;
+      const сколько = Math.random() < 0.35 ? 2 : 1;
+      const новые = Array.from({ length: сколько }, () => ({
+        id: ++номер,
+        x: (Math.random() * столбцов) | 0,
+        y: (Math.random() * рядов) | 0,
+        цвет: ЦВЕТА_КЛЕТОК[(Math.random() * ЦВЕТА_КЛЕТОК.length) | 0],
+      }));
+      // Держим не больше десятка: старые к этому времени уже истаяли.
+      setКубы((было) => [...было, ...новые].slice(-10));
+    }, 520);
+    return () => clearInterval(т);
+  }, [столбцов, рядов]);
+
+  const линия = "rgba(255,255,255,0.07)";
+  return (
+    <span
+      ref={корень}
+      aria-hidden
+      style={{
+        position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden",
+        // Края гаснут: сетка проступает из темноты к середине и в неё же уходит.
+        WebkitMaskImage: "radial-gradient(ellipse 72% 90% at 50% 50%, #000 30%, transparent 100%)",
+        maskImage: "radial-gradient(ellipse 72% 90% at 50% 50%, #000 30%, transparent 100%)",
+      }}
+    >
+      {кубы.map((к) => (
+        <span
+          key={к.id}
+          className="клетка-вспышка"
+          style={{
+            position: "absolute", left: к.x * клетка, top: к.y * клетка, width: клетка, height: клетка,
+            background: `linear-gradient(135deg, ${к.цвет[0]} 0%, ${к.цвет[1]} 100%)`,
+          }}
+        />
+      ))}
+      <span style={{
+        position: "absolute", inset: 0,
+        backgroundImage: `linear-gradient(${линия} 1px, transparent 1px), linear-gradient(90deg, ${линия} 1px, transparent 1px)`,
+        backgroundSize: `${клетка}px ${клетка}px`,
+        backgroundPosition: "-1px -1px",
+      }} />
+    </span>
+  );
+}
+
 /* Витрина «в центре внимания».
  *
  * У токена с биржи есть своя шапка — та же, что рисуют на DexScreener,
@@ -10339,7 +10428,8 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
       className="fx-tap w-full flex items-center text-left"
       style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface, border: "none", position: "relative", overflow: "hidden" }}
     >
-      <SpotlightAura src={token.logoUrl} ticker={token.ticker} />
+      {/* Фон витрины — сетка с вспыхивающими клетками. */}
+      <ФонКлеток />
       <span style={{ position: "relative", zIndex: 1 }}>
         <TokenAvatar size={44} tone={рост ? "up" : "down"} src={token.logoUrl} />
       </span>
@@ -12943,9 +13033,7 @@ function завестиЗнаки() {
   завестиЗнаки.пущено = true;
   let живые = [];
 
-  // Обход раз в полсекунды: заглушки приходят и уходят вместе с данными,
-  // а держать наблюдателя за всем деревом ради этого — дороже.
-  const обход = setInterval(() => {
+  const пройти = () => {
     /* Осиротевшие узоры. Класс заглушки снимается в тот миг, когда
        данные пришли, — а узор внутри остаётся, и вместе с классом
        пропадают и обрезка по краю, и точка отсчёта: знаки уезжают из
@@ -12971,7 +13059,39 @@ function завестиЗнаки() {
     живые.forEach((э) => {
       if (э.__мера !== `${э.clientWidth}x${э.clientHeight}`) наполнитьПлашку(э);
     });
-  }, 500);
+  };
+
+  /* Раньше узор насаживался только обходом раз в полсекунды, и первые
+     мгновения новая заглушка стояла плашкой с размытым бликом — при
+     загрузке вместо кода сначала мелькал блюр. Теперь заглушку ловит
+     наблюдатель в том же кадре, до отрисовки. Смотрим только на то, что
+     касается заглушек: узор сам перерисовывается двадцать раз в секунду,
+     и реагировать на каждую его правку незачем. Смена style у предка —
+     это показ скрытой вкладки: там заглушки были без размера. */
+  let ждёт = false;
+  const заглушкаВнутри = (у) => у && у.nodeType === 1
+    && (у.classList.contains("fx-skeleton") || !!у.querySelector(".fx-skeleton"));
+  const наблюдатель = typeof MutationObserver !== "undefined" ? new MutationObserver((записи) => {
+    if (ждёт) return;
+    for (const з of записи) {
+      const цель = з.target;
+      if (цель.nodeType === 1 && цель.closest(".fx-знаки")) continue;
+      const нужно = з.type === "attributes"
+        ? (з.attributeName === "class" ? цель.classList.contains("fx-skeleton") : заглушкаВнутри(цель))
+        : Array.prototype.some.call(з.addedNodes, заглушкаВнутри);
+      if (нужно) {
+        ждёт = true;
+        queueMicrotask(() => { ждёт = false; пройти(); });
+        return;
+      }
+    }
+  }) : null;
+  if (наблюдатель) {
+    наблюдатель.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style"] });
+  }
+  пройти();
+  // Обход остаётся страховкой: место могло сменить размер без правки DOM.
+  const обход = setInterval(пройти, 500);
 
   const такт = setInterval(() => {
     if (!живые.length) return;
@@ -12998,7 +13118,7 @@ function завестиЗнаки() {
     }
   }, ТАКТ_ЗНАКОВ);
 
-  return () => { clearInterval(обход); clearInterval(такт); завестиЗнаки.пущено = false; };
+  return () => { clearInterval(обход); clearInterval(такт); if (наблюдатель) наблюдатель.disconnect(); завестиЗнаки.пущено = false; };
 }
 
 function HomeView({
@@ -24542,7 +24662,8 @@ const FEE_PERCENT = 0.01; // 1% комиссии
   // Узор из знаков во всех заглушках приложения. Заводится один раз и
   // сам находит плашки по классу — дорисовывать его в каждом месте
   // разметки не нужно.
-  useEffect(() => завестиЗнаки(), []);
+  // До первой отрисовки: иначе первый кадр заглушек — плашки с бликом.
+  useLayoutEffect(() => завестиЗнаки(), []);
   // Анимацию тянем заранее, в фоне: к моменту запуска токена она должна
   // быть готова, иначе полёт начнётся с задержкой на загрузку.
   useEffect(() => {
