@@ -53,12 +53,19 @@ export async function ктоВTelegram(telegramId, { свежо = false } = {}) 
   if (!свежо && было && Date.now() - было.ts < 60000) return было;
   const db = служебнаяБаза();
   if (!db) return null;
-  const { data } = await db.from("profiles").select("id").eq("telegram_id", telegramId).maybeSingle();
-  if (!data || !data.id) return null;
-  const { data: u } = await db.auth.admin.getUserById(data.id);
-  const запись = { ts: Date.now(), userId: data.id, мета: (u && u.user && u.user.user_metadata) || {} };
-  память.set(ключ, запись);
-  return запись;
+  /* Профилей с одним telegram_id бывает несколько: удалённый аккаунт
+     оставляет строку, а новый заводит свою. Одиночный запрос на двух
+     строках отвечал ошибкой, и бот говорил «создай аккаунт» человеку с
+     аккаунтом. Берём все и выбираем тот, у которого жив пользователь. */
+  const { data: строки } = await db.from("profiles").select("id").eq("telegram_id", telegramId).limit(10);
+  for (const с of строки || []) {
+    const { data: u } = await db.auth.admin.getUserById(с.id);
+    if (!u || !u.user) continue;
+    const запись = { ts: Date.now(), userId: с.id, мета: u.user.user_metadata || {} };
+    память.set(ключ, запись);
+    return запись;
+  }
+  return null;
 }
 
 // Дописать метаданные человеку, не затирая остальные поля.
