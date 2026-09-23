@@ -8248,19 +8248,12 @@ function ЗначокОбмен({ size = 22, color = "#FFFFFF", strokeWidth = 1.
   );
 }
 
+/* Свой росчерк здесь не прижился — по силуэту его не узнать за долю
+   секунды, а иконка раздела должна читаться с одного взгляда. Берём
+   готовую ракету Lucide: тем же значком уже подписаны достижение за
+   первый запуск и «создал» в истории — узнаваемость та же, что и там. */
 function ЗначокРакета({ size = 22, color = "#FFFFFF", strokeWidth = 1.8 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-      {/* Корпус и стабилизаторы по бокам, факел снизу — тот же
-          росчерк, что и на баннере запуска, только в одну линию. */}
-      <path d="M12 2.6c2.4 1.9 3.8 4.7 3.8 8.2 0 2.4-.7 4.4-1.6 6l-4.4 0c-.9-1.6-1.6-3.6-1.6-6 0-3.5 1.4-6.3 3.8-8.2Z" />
-      <circle cx="12" cy="10.4" r="1.6" />
-      <path d="M9.8 15.4 6.8 17v-3.2Z" />
-      <path d="M14.2 15.4 17.2 17v-3.2Z" />
-      <path d="M10.2 18.8c.5 1 1 1.6 1.8 1.6s1.3-.6 1.8-1.6" />
-    </svg>
-  );
+  return <Rocket size={size} color={color} strokeWidth={strokeWidth} />;
 }
 
 function ЗначокСтолбики({ size = 22, color = "#FFFFFF", strokeWidth = 1.8 }) {
@@ -10853,22 +10846,9 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
             {t("navMempad")}
           </h1>
         ) : <ПлашкаЧисла width={118} height={26} radius={8} />}
-        {/* Лупа отсюда убрана: она ничего не делала — поиск по токенам
-            живёт в самой ленте. Запуск стоит в обеих сетях: в Solana
-            программа развёрнута, и запускать там есть чем. */}
-        {разделГотов ? (
-          <button
-            onClick={onLaunch}
-            className="fx-tap flex items-center gap-1.5"
-            style={{
-              padding: "8px 14px", borderRadius: 10,
-              ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, border: "none",
-              fontFamily: displayFont, fontSize: 13.5, fontWeight: 600,
-            }}
-          >
-            <Rocket size={14} strokeWidth={1.8} /> {t("mempadLaunchToken")}
-          </button>
-        ) : <ПлашкаЧисла width={148} height={34} radius={10} />}
+        {/* Кнопки запуска здесь больше нет: он теперь только с баннера
+            главной и из нижней навигации — второй одинаковый вход рядом
+            только спорил с ними за внимание. */}
       </div>
 
       {/* Сеть — ползунком: рынок меняется движением, а не случайным
@@ -28621,7 +28601,7 @@ function mapTokenRow(row) {
             { id: "shop", label: t("navShop"), icon: ЗначокСумка },
             { id: "wallet", label: t("navWallet"), icon: ЗначокСтолбики },
           ].map(({ id, label, icon: Icon, locked }) => {
-            const active = id !== "create" && tab === id;
+            const active = id === "create" ? view === "create" : tab === id;
             return (
               <button
                 key={id}
