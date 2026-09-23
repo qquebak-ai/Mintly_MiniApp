@@ -23275,7 +23275,7 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
     return () => { живо = false; document.removeEventListener("visibilitychange", при); };
   }, [accountCreated, userId]);
   const открытьБота = () => {
-    const ссылка = "https://t.me/MintlyTradingBot?start=app";
+    const ссылка = "https://t.me/MintlyTrading_bot?start=app";
     const wa = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
     if (wa && wa.openTelegramLink) wa.openTelegramLink(ссылка);
     else window.open(ссылка, "_blank");
