@@ -126,14 +126,10 @@ async function состояниеКривой(tok) {
 
 async function tell(chatId, text) {
   if (!chatId) return false;
-  const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
-  });
-  // Человек мог не начинать диалог с ботом или заблокировать его —
-  // это нормальный исход, а не сбой расписания.
-  return res.ok;
+  // Человек мог не начинать диалог с ботом, заблокировать его или
+  // выключить уведомления (/off) — это нормальный исход, а не сбой.
+  const { уведомить } = await import("./_trading.js");
+  return уведомить(chatId, text);
 }
 
 const fmt = (n) => (n >= 100 ? n.toFixed(0) : n >= 10 ? n.toFixed(1) : n.toFixed(2));

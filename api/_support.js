@@ -174,27 +174,11 @@ export async function deliverAnswer(admin, { userId, telegramId, text, adminName
   });
   if (error) return { ok: false, error: "store_failed", detail: error.message };
 
-  /* Ответ человеку — уведомление, а все уведомления идут только ботом
-     MintlyTrading: основной бот ничего сам не пишет. Кнопка — ссылкой на
-     приложение основного бота: мини-приложение, открытое из чужого бота,
-     не прошло бы вход. */
+  // Ответ человеку — уведомление, а они идут только ботом MintlyTrading.
   let доставлено = false;
-  const ТОРГОВЫЙ = (process.env.TRADING_BOT_TOKEN || "").trim();
-  if (telegramId && ТОРГОВЫЙ) {
-    const бот = String(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "").trim();
-    const прил = String(process.env.TG_APP || "Mintly").trim();
-    const res = await fetch(`https://api.telegram.org/bot${ТОРГОВЫЙ}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: telegramId,
-        text: `💬 <b>Поддержка Mintly</b>\n\n${esc(чистый)}`,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-        reply_markup: { inline_keyboard: [[{ text: "Открыть Mintly", url: `https://t.me/${бот}/${прил}` }]] },
-      }),
-    }).then((r) => r.json()).catch(() => null);
-    доставлено = !!(res && res.ok);
+  if (telegramId) {
+    const { уведомить } = await import("./_trading.js");
+    доставлено = await уведомить(telegramId, `💬 <b>Поддержка Mintly</b>\n\n${esc(чистый)}`);
   }
   // Недоставленная личка — не сбой: человек мог не начинать диалог с
   // ботом или заблокировать его. В приложении ответ он всё равно увидит.

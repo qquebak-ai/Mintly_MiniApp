@@ -295,11 +295,9 @@ async function сообщить(db, user_id, текст) {
   try {
     const { data } = await db.from("profiles").select("telegram_id").eq("id", user_id).maybeSingle();
     if (!data || !data.telegram_id) return;
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: data.telegram_id, text: текст, parse_mode: "HTML", disable_web_page_preview: true }),
-    });
+    // Через общий отправитель: он помнит, не выключил ли человек уведомления.
+    const { уведомить } = await import("./_trading.js");
+    await уведомить(data.telegram_id, текст);
   } catch { /* бот молчит — это не повод отменять саму операцию */ }
 }
 

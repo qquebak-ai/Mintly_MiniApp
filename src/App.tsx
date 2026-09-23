@@ -23263,18 +23263,46 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
      когда человек нажимает у него «Старт»; перечитываем, когда приложение
      снова на экране — человек как раз вернулся из бота. */
   const [ботЕсть, setБотЕсть] = useState(true);
+  const проверкаБота = useRef(null);
   useEffect(() => {
     if (!accountCreated || !userId) { setБотЕсть(true); return undefined; }
     let живо = true;
-    const проверить = () => supabase.auth.getUser().then(({ data }) => {
-      if (живо) setБотЕсть(!!(data && data.user && data.user.user_metadata && data.user.user_metadata.trading_bot));
-    }, () => {});
+    /* Спрашиваем сервер, а он — сам Telegram: подключён бот, только если
+       человек запускал его. Метаданные в сессии приложения обновляются не
+       сразу, поэтому по ним колокольчик не узнавал, что бот уже запущен. */
+    const проверить = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const токен = data && data.session && data.session.access_token;
+        if (!токен) return;
+        const { апи } = await import("./апи");
+        const r = await fetch(апи("/api/trading-bot?action=status"), { headers: { Authorization: `Bearer ${токен}` } });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (живо) setБотЕсть(!!j.connected);
+        return !!j.connected;
+      } catch { return undefined; }
+    };
+    проверкаБота.current = проверить;
     проверить();
-    const при = () => { if (document.visibilityState === "visible") setTimeout(проверить, 800); };
+    const при = () => { if (document.visibilityState === "visible") проверить(); };
     document.addEventListener("visibilitychange", при);
-    return () => { живо = false; document.removeEventListener("visibilitychange", при); };
+    window.addEventListener("focus", при);
+    return () => {
+      живо = false;
+      document.removeEventListener("visibilitychange", при);
+      window.removeEventListener("focus", при);
+    };
   }, [accountCreated, userId]);
   const открытьБота = () => {
+    // Пока человек в боте, приложение переспрашивает раз в две секунды:
+    // возврат из чата событием видимости приходит не всегда.
+    let раз = 0;
+    const опрос = setInterval(async () => {
+      раз += 1;
+      const да = проверкаБота.current ? await проверкаБота.current() : false;
+      if (да || раз > 45) clearInterval(опрос);
+    }, 2000);
     const ссылка = "https://t.me/MintlyTrading_bot?start=app";
     const wa = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
     if (wa && wa.openTelegramLink) wa.openTelegramLink(ссылка);
