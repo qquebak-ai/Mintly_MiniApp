@@ -6959,6 +6959,106 @@ function ПолеСЖивымТекстом({ value, style = {}, className = "",
   );
 }
 
+/* Ползунок: в покое — тонкая нитка с маленькой ручкой; под пальцем
+ * нитка толстеет, ручка вырастает, а над ней всплывает пузырь со
+ * значением и едет вместе с ней. Отпустил — всё возвращается в покой.
+ * Своя разметка вместо <input type="range">: у встроенного на iOS
+ * ручку не увеличить и пузырь не прицепить. */
+function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, формат = (v) => String(v), ariaLabel }) {
+  const дорожка = useRef(null);
+  const [тянут, setТянут] = useState(false);
+  const прошлыйШаг = useRef(null);
+  const доля = max > min ? Math.min(1, Math.max(0, (value - min) / (max - min))) : 0;
+
+  const поставить = (clientX) => {
+    const el = дорожка.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const д = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    const сырое = min + д * (max - min);
+    const знаков = Math.max(0, (String(step).split(".")[1] || "").length);
+    const v = Number((Math.round(сырое / step) * step).toFixed(знаков));
+    if (v !== прошлыйШаг.current) {
+      // Лёгкий щелчок на каждом шаге — как у колёсика в iOS.
+      if (прошлыйШаг.current != null) {
+        try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.(); } catch (e) { /* старый клиент */ }
+      }
+      прошлыйШаг.current = v;
+      onChange && onChange(Math.min(max, Math.max(min, v)));
+    }
+  };
+
+  const начать = (e) => {
+    e.preventDefault();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* уже захвачен */ }
+    прошлыйШаг.current = value;
+    setТянут(true);
+    поставить(e.clientX);
+  };
+  const вести = (e) => { if (тянут) поставить(e.clientX); };
+  const кончить = () => setТянут(false);
+
+  const пружина = "cubic-bezier(0.34, 1.56, 0.64, 1)";
+  const ручка = тянут ? 24 : 14;
+  return (
+    <div
+      role="slider"
+      tabIndex={0}
+      aria-label={ariaLabel}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      onPointerDown={начать}
+      onPointerMove={вести}
+      onPointerUp={кончить}
+      onPointerCancel={кончить}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowRight" || e.key === "ArrowUp") onChange && onChange(Math.min(max, Number((value + step).toFixed(6))));
+        if (e.key === "ArrowLeft" || e.key === "ArrowDown") onChange && onChange(Math.max(min, Number((value - step).toFixed(6))));
+      }}
+      style={{ position: "relative", height: 36, display: "flex", alignItems: "center", touchAction: "none", cursor: "pointer", outline: "none", WebkitTapHighlightColor: "transparent" }}
+    >
+      <div
+        ref={дорожка}
+        style={{
+          position: "relative", width: "100%", height: тянут ? 8 : 4, borderRadius: 999,
+          background: T.surfaceHi, transition: `height 260ms ${пружина}`,
+        }}
+      >
+        <div style={{
+          position: "absolute", left: 0, top: 0, bottom: 0, width: `${доля * 100}%`, minWidth: тянут ? 8 : 4,
+          borderRadius: 999, background: "#E9E9EC",
+          transition: тянут ? `min-width 260ms ${пружина}` : `width 220ms cubic-bezier(0.22, 1, 0.36, 1), min-width 260ms ${пружина}`,
+        }} />
+        <div style={{
+          position: "absolute", top: "50%", left: `${доля * 100}%`,
+          width: ручка, height: ручка, borderRadius: "50%", background: "#FFFFFF",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+          transform: `translate(-${доля * 100}%, -50%)`,
+          transition: тянут
+            ? `width 300ms ${пружина}, height 300ms ${пружина}`
+            : `width 300ms ${пружина}, height 300ms ${пружина}, left 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 220ms cubic-bezier(0.22, 1, 0.36, 1)`,
+        }}>
+          {/* Пузырь со значением: всплывает снизу и чуть растёт, пока
+              палец на ручке. */}
+          <div style={{
+            position: "absolute", left: "50%", bottom: "calc(100% + 8px)",
+            padding: "4px 9px", borderRadius: 9, background: "#2A2B30",
+            color: "#FFFFFF", fontFamily: monoFont, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
+            opacity: тянут ? 1 : 0,
+            transform: `translateX(-50%) translateY(${тянут ? 0 : 6}px) scale(${тянут ? 1 : 0.8})`,
+            transformOrigin: "50% 100%",
+            transition: `opacity 200ms ease, transform 320ms ${пружина}`,
+            pointerEvents: "none",
+          }}>
+            <УмныйТекст text={формат(value)} шаг={0} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* Число, которое меняется на глазах: та же умная смена, что у текста. */
 function ЖивоеЧисло({ текст, className = "", style = {} }) {
   return <УмныйТекст text={текст} className={className} style={style} />;
@@ -19818,16 +19918,6 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   }, [черновик]);
 
   function set(key) { return (e) => setForm(f => ({ ...f, [key]: e.target.value })); }
-  // Разделитель допускается ровно один: без этого в поле набиралось
-  // «0,1,2», а parseFloat от такого — не число, и запуск молча упирался
-  // в «введите сумму». Запятая приводится к точке сразу, чтобы значение
-  // в состоянии всегда годилось для разбора.
-  function setBuyAmount(e) {
-    const raw = String(e.target.value).replace(/[^0-9.,]/g, "").replace(/,/g, ".");
-    const [head, ...rest] = raw.split(".");
-    const cleaned = (rest.length ? `${head}.${rest.join("")}` : head).slice(0, 12);
-    setForm((f) => ({ ...f, buyAmount: cleaned }));
-  }
   function onPickLogo(e) {
     const file = e.target.files && e.target.files[0];
     e.target.value = ""; // allow re-picking the same file later
@@ -20005,26 +20095,36 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
-          {t("launchAmountLabel")} ({вSolana ? "SOL" : ТИКЕР_TON})
-        </span>
-        <div className="flex items-center gap-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surface, border: `1px solid ${touched && (вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED) && (вSolana ? solUsd() : tonUsd()) > 0 && !(parseFloat(form.buyAmount.replace(",", ".")) * (вSolana ? solUsd() : tonUsd()) >= MIN_LAUNCH_USD) ? T.down : T.line}` }}>
-          <input
-            value={form.buyAmount}
-            onChange={setBuyAmount}
-            placeholder="10"
-            inputMode="decimal"
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            enterKeyHint="done"
-            // Высота строки задаётся явно: без неё каретка наследует
-            // межстрочный интервал от родителя и рисуется выше самого
-            // текста.
-            style={{ fontFamily: displayFont, fontWeight: 700, color: T.ice, fontSize: 17.5, lineHeight: "20px", height: 20, background: "transparent", border: "none", outline: "none", flex: 1, minWidth: 0, padding: 0 }}
-          />
-          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 14.5 }}>{вSolana ? "SOL" : ТИКЕР_TON}</span>
-        </div>
+        {/* Сумму задают ползунком, а не клавиатурой: верх шкалы — весь
+            кошелёк за вычетом запаса на комиссию, поэтому выставить
+            больше, чем есть, нельзя. Пока остатка не знаем — шкала по
+            умолчанию, и нехватку подскажет строка ниже. */}
+        {(() => {
+          const единица = вSolana ? "SOL" : ТИКЕР_TON;
+          const шаг = вSolana ? 0.01 : 0.1;
+          const поКошельку = остатокСети != null ? Math.floor(Math.max(0, остатокСети - ЗАПАС_ЗАПУСКА) / шаг) * шаг : 0;
+          const верх = поКошельку > 0 ? Number(поКошельку.toFixed(2)) : (вSolana ? 2 : 50);
+          const сейчас = Math.min(верх, Number.isFinite(суммаПокупки) ? суммаПокупки : 0);
+          const подпись = (v) => `${v.toLocaleString("ru-RU", { maximumFractionDigits: вSolana ? 2 : 1 })} ${единица}`;
+          const плохо = touched && (вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED) && (вSolana ? solUsd() : tonUsd()) > 0
+            && !(сейчас * (вSolana ? solUsd() : tonUsd()) >= MIN_LAUNCH_USD);
+          return (
+            <>
+              <span style={{ fontFamily: bodyFont, color: плохо ? T.down : T.muted, fontSize: 13 }}>
+                {t("launchAmountLabel")}: <УмныйТекст text={подпись(сейчас)} />
+              </span>
+              <Ползунок
+                value={сейчас}
+                min={0}
+                max={верх}
+                step={шаг}
+                формат={подпись}
+                ariaLabel={t("launchAmountLabel")}
+                onChange={(v) => setForm((f) => ({ ...f, buyAmount: v > 0 ? String(v) : "" }))}
+              />
+            </>
+          );
+        })()}
         <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.5, marginTop: 6 }}>
           {t("initialBuyHint")}
         </p>
