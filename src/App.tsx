@@ -24649,6 +24649,17 @@ function LeafIcon({ size = 14, color = T.electric, kind = 0 }) {
 const ROCKET_NOSE_OFFSET = 50;
 const ROCKET_TOUCH_TOP = -ROCKET_NOSE_OFFSET;
 
+// Поднимает ли это поле клавиатуру: ввод текста — да, кнопка, галочка
+// или поле только для чтения — нет.
+function сКлавиатурой(э) {
+  if (!э || э.nodeType !== 1) return false;
+  if (э.isContentEditable) return true;
+  if (э.tagName === "TEXTAREA") return !э.readOnly;
+  if (э.tagName !== "INPUT" || э.readOnly || э.disabled) return false;
+  if ((э.getAttribute("inputmode") || "") === "none") return false;
+  return !/^(button|submit|reset|checkbox|radio|file|range|color|hidden|image)$/i.test(э.type || "text");
+}
+
 function useTelegramViewport() {
   const [height, setHeight] = useState(
     typeof window !== "undefined" ? window.innerHeight : 720
@@ -24677,7 +24688,16 @@ function useTelegramViewport() {
 
       const update = () => {
         const h = tg.viewportStableHeight || tg.viewportHeight || window.innerHeight;
-        setHeight(h);
+        /* Пока открыта клавиатура, окно не ужимаем. Telegram сообщает
+           новую высоту уже после того, как клавиатура выехала: вся
+           раскладка перестраивалась под меньшее окно, прокрутка
+           сдвигалась, и страница прыгала. Клавиатура просто ложится
+           поверх, а высота вернётся к своей, когда её уберут. */
+        if (сКлавиатурой(document.activeElement)) {
+          setHeight((было) => Math.max(было, h));
+        } else {
+          setHeight(h);
+        }
         // Два разных отступа, и их надо складывать, а не выбирать один:
         // safeAreaInset — это железо телефона (чёлка, статус-бар),
         // contentSafeAreaInset — собственная шапка Telegram над окном
@@ -24699,6 +24719,10 @@ function useTelegramViewport() {
       };
       update();
       tg.onEvent && tg.onEvent("viewportChanged", update);
+      // Клавиатуру убрали — высота должна вернуться к настоящей: событие
+      // окна к этому времени могло уже пройти.
+      const послеКлавиатуры = () => setTimeout(() => { if (!сКлавиатурой(document.activeElement)) update(); }, 350);
+      document.addEventListener("focusout", послеКлавиатуры);
       tg.onEvent && tg.onEvent("safeAreaChanged", update);
       tg.onEvent && tg.onEvent("contentSafeAreaChanged", update);
       // Переход на целую страницу приходит отдельным событием: отступы
@@ -24706,6 +24730,7 @@ function useTelegramViewport() {
       tg.onEvent && tg.onEvent("fullscreenChanged", update);
       return () => {
         tg.offEvent && tg.offEvent("viewportChanged", update);
+        document.removeEventListener("focusout", послеКлавиатуры);
         tg.offEvent && tg.offEvent("safeAreaChanged", update);
         tg.offEvent && tg.offEvent("contentSafeAreaChanged", update);
         tg.offEvent && tg.offEvent("fullscreenChanged", update);
@@ -24838,14 +24863,6 @@ const FEE_PERCENT = 0.01; // 1% комиссии
      галочка или поле только для чтения. */
   const [клавиатура, setКлавиатура] = useState(false);
   useEffect(() => {
-    const сКлавиатурой = (э) => {
-      if (!э || э.nodeType !== 1) return false;
-      if (э.isContentEditable) return true;
-      if (э.tagName === "TEXTAREA") return !э.readOnly;
-      if (э.tagName !== "INPUT" || э.readOnly || э.disabled) return false;
-      if ((э.getAttribute("inputmode") || "") === "none") return false;
-      return !/^(button|submit|reset|checkbox|radio|file|range|color|hidden|image)$/i.test(э.type || "text");
-    };
     const проверить = () => setКлавиатура(сКлавиатурой(document.activeElement));
     const вне = () => setTimeout(проверить, 0);
     document.addEventListener("focusin", проверить);
