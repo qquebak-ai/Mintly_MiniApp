@@ -6914,13 +6914,36 @@ function УмныйТекст({ text, className = "", style = {}, шаг = 42 })
     if (!el) return;
     const новыеМеста = new Map();
     const узлы = el.children;
+    /* Метку «новый» снимаем, как только знак проступил, а в скрытой
+       вкладке — сразу. Иначе она оставалась на знаке навсегда, и
+       браузер заново проигрывал проступание при каждом показе вкладки:
+       вкладки прячутся через display: none, а после него анимации
+       начинаются с начала. Так цифры кошелька «проявлялись» при каждом
+       его открытии. */
+    const видно = el.getClientRects().length > 0;
+    const погасить = (у, з) => {
+      з.нов = false;
+      у.classList.remove("нов");
+      у.dataset.n = "0";
+      у.style.animationDelay = "";
+    };
     for (let k = 0; k < узлы.length; k += 1) {
       const у = узлы[k];
       const ключ = у.dataset.k;
+      if (у.dataset.n === "1") {
+        const з = знаки.find((x) => x.key === ключ);
+        if (з) {
+          if (!видно) погасить(у, з);
+          else if (!у.__ждёт) {
+            у.__ждёт = true;
+            у.addEventListener("animationend", () => погасить(у, з), { once: true });
+          }
+        }
+      }
       const x = у.getBoundingClientRect().left;
       новыеМеста.set(ключ, x);
       const было = места.current.get(ключ);
-      if (было != null && Math.abs(было - x) > 0.5 && у.dataset.n !== "1") {
+      if (видно && было != null && Math.abs(было - x) > 0.5 && у.dataset.n !== "1") {
         у.style.transition = "none";
         у.style.transform = `translateX(${было - x}px)`;
         void у.offsetWidth;
@@ -6928,7 +6951,9 @@ function УмныйТекст({ text, className = "", style = {}, шаг = 42 })
         у.style.transform = "";
       }
     }
-    места.current = новыеМеста;
+    // В скрытой вкладке мест нет — все знаки «стоят» в нуле, и сравнение
+    // с ними потом гнало бы цифры через весь экран.
+    места.current = видно ? новыеМеста : new Map();
   });
 
   let номер = 0;
