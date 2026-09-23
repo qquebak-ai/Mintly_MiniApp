@@ -2742,6 +2742,15 @@ function GlobalStyle() {
       }
       /* Строка набирается по букве: каждая проступает чуть позже
          предыдущей, и текст читается слева направо, как его пишут. */
+      @keyframes свечаВстаёт { from { opacity: 0; transform: scaleY(0); } to { opacity: 1; transform: scaleY(1); } }
+      .заставка-свеча {
+        position: relative; display: block; width: 7px; border-radius: 2px;
+        background: rgba(255, 255, 255, 0.24); transform-origin: 50% 100%; will-change: transform, opacity;
+      }
+      .заставка-свеча::before {
+        content: ""; position: absolute; left: 3px; width: 1px; top: -9px; bottom: -6px;
+        background: rgba(255, 255, 255, 0.16);
+      }
       @keyframes букваПроступает {
         from { opacity: 0; }
         to   { opacity: 1; }
@@ -15755,6 +15764,33 @@ function СтрокаИзЗнаков({ текст, шаг = 52, задержк�
   );
 }
 
+/* Свечи внизу заставки — продолжение тех, что в index.html: те же
+ * высоты, тот же шаг, тот же сдвиг по времени. Окно входа встаёт на
+ * место заставки на середине её анимации, поэтому задержки сдвинуты на
+ * «уже» — прошедшее с её начала время. */
+const ВЫСОТЫ_СВЕЧЕЙ = [22, 30, 26, 38, 34, 46, 40, 52, 48, 44, 58, 54, 64, 60, 70, 66, 76, 72, 84, 80];
+function СвечиЗаставки({ уже = 0, уходит = false }) {
+  return (
+    <div aria-hidden style={{
+      position: "absolute", left: 0, right: 0, bottom: "calc(env(safe-area-inset-bottom, 0px) + 64px)",
+      display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 7, height: 96, pointerEvents: "none",
+    }}>
+      {ВЫСОТЫ_СВЕЧЕЙ.map((h, i) => (
+        <i
+          key={i}
+          className="заставка-свеча"
+          style={{
+            height: Math.round(h * 0.62),
+            animation: уходит
+              ? `букваУходитВправо 360ms cubic-bezier(0.4, 0, 1, 1) ${i * 15}ms both`
+              : `свечаВстаёт 460ms cubic-bezier(0.22, 1, 0.36, 1) ${150 + i * 75 - уже}ms both`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function ИмяПоБуквам({ текст, шаг = 130, задержка = 0, уходит = false, шагУхода = 60 }) {
   return (
     <>
@@ -23640,6 +23676,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         {/* Заставка — первое, что человек видит: чёрное поле и имя
             посередине. Она же и объясняет паузу перед формой: пустой
             экран без ничего читался бы как заминка. */}
+        {первыйПоказ && заставка && <СвечиЗаставки уже={уже} уходит={уходитЗаставка} />}
         {первыйПоказ && заставка && (
           <div
             aria-hidden

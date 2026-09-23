@@ -161,10 +161,64 @@
       @keyframes ширмаВсплыв { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes ширмаВправо { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(16px); } }
       @media (prefers-reduced-motion: reduce) { #ширма * { animation: none !important; } }
+      /* Свечи внизу заставки: светло-серые, встают слева направо по
+         очереди, как график, который рисуется на глазах. Числа — те же,
+         что у СвечиЗаставки в приложении: окно входа их продолжает. */
+      #ширма .свечи { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
+                      display: flex; justify-content: center; align-items: flex-end; gap: 7px; height: 96px; pointer-events: none; }
+      #ширма .свечи i { position: relative; display: block; width: 7px; border-radius: 2px;
+                        background: rgba(255, 255, 255, 0.24); transform-origin: 50% 100%; will-change: transform, opacity; }
+      #ширма .свечи i::before { content: ""; position: absolute; left: 3px; width: 1px; top: -9px; bottom: -6px;
+                                background: rgba(255, 255, 255, 0.16); }
+      #ширма:not(.идёт):not(.уходит) .свечи i { opacity: 0; }
+      #ширма.идёт .свечи i { animation: ширмаСвеча 460ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+      #ширма.уходит .свечи i { animation: ширмаВправо 360ms cubic-bezier(0.4, 0, 1, 1) both; }
+      @keyframes ширмаСвеча { from { opacity: 0; transform: scaleY(0); } to { opacity: 1; transform: scaleY(1); } }
+      #ширма.идёт .свечи i:nth-child(1) { animation-delay: 150ms; }
+      #ширма.уходит .свечи i:nth-child(1) { animation-delay: 0ms; }
+      #ширма.идёт .свечи i:nth-child(2) { animation-delay: 225ms; }
+      #ширма.уходит .свечи i:nth-child(2) { animation-delay: 15ms; }
+      #ширма.идёт .свечи i:nth-child(3) { animation-delay: 300ms; }
+      #ширма.уходит .свечи i:nth-child(3) { animation-delay: 30ms; }
+      #ширма.идёт .свечи i:nth-child(4) { animation-delay: 375ms; }
+      #ширма.уходит .свечи i:nth-child(4) { animation-delay: 45ms; }
+      #ширма.идёт .свечи i:nth-child(5) { animation-delay: 450ms; }
+      #ширма.уходит .свечи i:nth-child(5) { animation-delay: 60ms; }
+      #ширма.идёт .свечи i:nth-child(6) { animation-delay: 525ms; }
+      #ширма.уходит .свечи i:nth-child(6) { animation-delay: 75ms; }
+      #ширма.идёт .свечи i:nth-child(7) { animation-delay: 600ms; }
+      #ширма.уходит .свечи i:nth-child(7) { animation-delay: 90ms; }
+      #ширма.идёт .свечи i:nth-child(8) { animation-delay: 675ms; }
+      #ширма.уходит .свечи i:nth-child(8) { animation-delay: 105ms; }
+      #ширма.идёт .свечи i:nth-child(9) { animation-delay: 750ms; }
+      #ширма.уходит .свечи i:nth-child(9) { animation-delay: 120ms; }
+      #ширма.идёт .свечи i:nth-child(10) { animation-delay: 825ms; }
+      #ширма.уходит .свечи i:nth-child(10) { animation-delay: 135ms; }
+      #ширма.идёт .свечи i:nth-child(11) { animation-delay: 900ms; }
+      #ширма.уходит .свечи i:nth-child(11) { animation-delay: 150ms; }
+      #ширма.идёт .свечи i:nth-child(12) { animation-delay: 975ms; }
+      #ширма.уходит .свечи i:nth-child(12) { animation-delay: 165ms; }
+      #ширма.идёт .свечи i:nth-child(13) { animation-delay: 1050ms; }
+      #ширма.уходит .свечи i:nth-child(13) { animation-delay: 180ms; }
+      #ширма.идёт .свечи i:nth-child(14) { animation-delay: 1125ms; }
+      #ширма.уходит .свечи i:nth-child(14) { animation-delay: 195ms; }
+      #ширма.идёт .свечи i:nth-child(15) { animation-delay: 1200ms; }
+      #ширма.уходит .свечи i:nth-child(15) { animation-delay: 210ms; }
+      #ширма.идёт .свечи i:nth-child(16) { animation-delay: 1275ms; }
+      #ширма.уходит .свечи i:nth-child(16) { animation-delay: 225ms; }
+      #ширма.идёт .свечи i:nth-child(17) { animation-delay: 1350ms; }
+      #ширма.уходит .свечи i:nth-child(17) { animation-delay: 240ms; }
+      #ширма.идёт .свечи i:nth-child(18) { animation-delay: 1425ms; }
+      #ширма.уходит .свечи i:nth-child(18) { animation-delay: 255ms; }
+      #ширма.идёт .свечи i:nth-child(19) { animation-delay: 1500ms; }
+      #ширма.уходит .свечи i:nth-child(19) { animation-delay: 270ms; }
+      #ширма.идёт .свечи i:nth-child(20) { animation-delay: 1575ms; }
+      #ширма.уходит .свечи i:nth-child(20) { animation-delay: 285ms; }
     </style>
     <div id="ширма">
       <div class="имя"><b>M</b><b>I</b><b>N</b><b>T</b><b>L</b><b>Y</b></div>
       <div class="подпись">Мемкоины на TON и Solana</div>
+      <div class="свечи"><i style="height:14px"></i><i style="height:19px"></i><i style="height:16px"></i><i style="height:24px"></i><i style="height:21px"></i><i style="height:29px"></i><i style="height:25px"></i><i style="height:32px"></i><i style="height:30px"></i><i style="height:27px"></i><i style="height:36px"></i><i style="height:33px"></i><i style="height:40px"></i><i style="height:37px"></i><i style="height:43px"></i><i style="height:41px"></i><i style="height:47px"></i><i style="height:45px"></i><i style="height:52px"></i><i style="height:50px"></i></div>
     </div>
     <script>
       // Подпись на выбранном языке.
