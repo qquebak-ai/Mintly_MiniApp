@@ -470,7 +470,7 @@ const STR = {
     heroFee: "1% на сделку",
     mempadSpotlight: "В центре внимания",
     mempadLaunchToken: "Запустить токен",
-    tickerBought: "купил", tickerSold: "продал", tickerLaunched: "запущен",
+    tickerBought: "купил", tickerSold: "продал", tickerLaunched: "запущен", tickerCreated: "создал",
     // В ленте говорим о токене, а не о том, кто нажал кнопку: «купили на».
     tickerBoughtFor: "купили на", tickerSoldFor: "продали на",
     sinceJustNow: "только что", sinceMin: "м", sinceHour: "ч", mempadFilterNew: "Новые", mempadFilterTrend: "Трендовые", mempadFilterHot: "Горячие", mempadFilterSoon: "Скоро на бирже", mempadFilterVol: "По обороту", mempadFilterBluming: "В росте", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Создать токен", homeActionMempad: "Мемпад", homeActionProfile: "Профиль",
@@ -1161,7 +1161,7 @@ const STR = {
     heroFee: "1% per trade",
     mempadSpotlight: "Spotlight",
     mempadLaunchToken: "Launch token",
-    tickerBought: "bought", tickerSold: "sold", tickerLaunched: "launched",
+    tickerBought: "bought", tickerSold: "sold", tickerLaunched: "launched", tickerCreated: "created",
     tickerBoughtFor: "bought for", tickerSoldFor: "sold for",
     sinceJustNow: "just now", sinceMin: "m", sinceHour: "h", mempadFilterNew: "New", mempadFilterTrend: "Trending", mempadFilterHot: "Hot", mempadFilterSoon: "Almost listed", mempadFilterVol: "By volume", mempadFilterBluming: "Bluming", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Launch token", homeActionMempad: "Mempad", homeActionProfile: "Profile",
     feedTitle: "Right now",
@@ -12071,7 +12071,7 @@ function монетаСделки(с) {
    старых сделок адрес не сохранялся, и по нему сеть было не узнать.
    Если связь читать нельзя — берём без неё, лишь бы список не пропал. */
 async function сделкиСсетью(userId, предел) {
-  const поля = "id, ticker, side, ton_amount, token_amount, created_at, token_address";
+  const поля = "id, ticker, side, ton_amount, token_amount, created_at, token_address, token_id";
   const сЖивой = await supabase
     .from("trades")
     .select(`${поля}, tokens ( chain )`)
@@ -15472,11 +15472,42 @@ function ДействиеКошелька({ icon: Icon, label, onClick }) {
 // Ключ строки истории: подпись, если она есть, иначе собственный id.
 const c_id = (с) => String((с && с.id) || "");
 
+/* Свои запуски: id токена → когда создан. Нужны истории, чтобы отличить
+   стартовую покупку от обычной: в базе обе лежат покупкой, а человек
+   этот токен не купил — он его создал. */
+function useМоиЗапуски(userId, тик = 0) {
+  const [запуски, setЗапуски] = useState(() => new Map());
+  useEffect(() => {
+    if (!userId) { setЗапуски(new Map()); return undefined; }
+    let живо = true;
+    supabase.from("tokens").select("id, created_at").eq("owner_id", userId).then(({ data }) => {
+      if (!живо || !data) return;
+      setЗапуски(new Map(data.map((р) => [String(р.id), new Date(р.created_at).getTime()])));
+    }, () => {});
+    return () => { живо = false; };
+  }, [userId, тик]);
+  return запуски;
+}
+
+// Стартовая покупка — первая покупка своего токена в первые минуты после
+// его создания.
+function этоЗапуск(с, запуски, ряд) {
+  if (!с || с.side !== "buy" || !с.token_id) return false;
+  const создан = запуски.get(String(с.token_id));
+  if (!создан) return false;
+  const когда = new Date(с.created_at).getTime();
+  if (!(когда - создан < 10 * 60 * 1000)) return false;
+  // Если покупок этого токена у человека несколько — запуск только самая ранняя.
+  return !ряд.some((д) => д !== с && д.side === "buy" && String(д.token_id) === String(с.token_id)
+    && new Date(д.created_at).getTime() < когда);
+}
+
 function ИсторияКошелька({ userId, тик = 0, безЗаголовка = false, предел = 12 }) {
   /* Только что сделанный перевод список подмешивает сам: своя копия
      лежит в памяти вкладки и исчезает, когда та же операция приходит с
      сервера — они сходятся по подписи. */
   const ряд = useСделки(userId, предел, тик);
+  const запуски = useМоиЗапуски(userId, тик);
 
   /* Страница истории открывается раньше, чем приходят строки. Пустой
      лист в этот миг выглядел поломкой, поэтому на их месте стоят
@@ -15525,6 +15556,7 @@ function ИсторияКошелька({ userId, тик = 0, безЗаголо
             // Расход — всё, кроме продажи: покупка, запуск токена, вывод,
             // свод излишков. Приход бывает только у продажи.
             const покупка = !этоПриход(с);
+            const создал = этоЗапуск(с, запуски, ряд);
             return (
               /* Ни подложки, ни разделителей: серая плитка под каждой
                  строкой спорила с чёрным фоном, а линия резала список на
@@ -15546,6 +15578,8 @@ function ИсторияКошелька({ userId, тик = 0, безЗаголо
                 >
                   {обмен
                     ? <Repeat size={17} strokeWidth={2.4} color="#C79BFF" />
+                    : создал
+                      ? <Rocket size={17} strokeWidth={2.2} color={T.electric} />
                     : покупка
                       ? <ArrowDownRight size={17} strokeWidth={2.4} color={КОШ_ПАДЕНИЕ_ТЕКСТ} />
                       : <ArrowUpRight size={17} strokeWidth={2.4} color={КОШ_ПРИХОД_ТЕКСТ} />}
@@ -15555,7 +15589,7 @@ function ИсторияКошелька({ userId, тик = 0, безЗаголо
                     {обмен
                       ? `${t("swapTitle")} ${String(с.ticker || "").replace("→", " → ")}`
                       : этоСделка(с)
-                        ? `${покупка ? t("tickerBought") : t("tickerSold")} $${String(с.ticker || "?").toUpperCase()}`
+                        ? `${создал ? t("tickerCreated") : покупка ? t("tickerBought") : t("tickerSold")} $${String(с.ticker || "?").toUpperCase()}`
                         : названиеОперации(с)}
                   </div>
                   <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 2 }}>{fmtSince(с.created_at)}</div>
