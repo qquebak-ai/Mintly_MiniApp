@@ -2801,7 +2801,10 @@ function GlobalStyle() {
         animation: shimmer 1.5s linear infinite;
       }
       /* Под знаками ни подложки, ни блика: они сами и есть заглушка. */
-      .fx-skeleton[data-знаки] { background: transparent; }
+      .fx-skeleton[data-знаки] { background: transparent; overflow: visible; }
+      /* Узор шире плашки не бывает, а выше — может: режем только по
+         бокам. */
+      .fx-skeleton[data-знаки] > .fx-знаки { clip-path: inset(-100% 0 -100% 0); overflow: visible; }
       .fx-skeleton[data-знаки]::after { content: none; }
       /* Знаки ложатся ровно в границы места: кегль считается от его
          высоты, строка набирается впритык, без пробелов, и обрезается по
@@ -13210,8 +13213,12 @@ const ВЫСОТА_СТРОКИ = 32;
 
 function подЗнаки(плашка) {
   const в = плашка.clientHeight;
-  if (!плашка.clientWidth || !в || в > ВЫСОТА_СТРОКИ) return false;
+  const ш = плашка.clientWidth;
+  if (!ш || !в || в > ВЫСОТА_СТРОКИ) return false;
   const радиус = parseFloat(getComputedStyle(плашка).borderTopLeftRadius) || 0;
+  // Тонкая скруглённая полоска — тоже строка текста (подпись под
+  // именем), а не круг: круг — это аватарка, у неё ширина с высоту.
+  if (в <= 16 && ш > в * 2.5) return true;
   return радиус < в / 2 - 0.5;
 }
 
@@ -13237,7 +13244,10 @@ function наполнитьПлашку(плашка) {
   const в = плашка.clientHeight;
   if (!ш || !в) return;
   плашка.setAttribute("data-знаки", "1");
-  const кегль = в <= 20 ? Math.max(7, Math.min(13, Math.round(в * 0.82))) : 11;
+  /* Знаки крупнее самой плашки: в рост тонкой полоски они выходили
+     мелкой рябью, которую не разглядеть. Кегль — как у настоящей строки
+     текста, а по высоте узор свободно выходит за плашку. */
+  const кегль = в <= 20 ? Math.max(13, Math.min(17, Math.round(в * 1.35))) : 15;
   const шагСтроки = Math.round(кегль * 1.26);
   const строк = Math.max(1, Math.floor((в - 2) / шагСтроки));
   /* Знаков в строке — ровно столько, сколько помещается целиком: раньше
