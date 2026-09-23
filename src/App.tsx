@@ -13623,15 +13623,17 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
       onTouchEnd={конецЖеста}
       onTouchCancel={конецЖеста}
       style={{
-        position: "fixed", inset: 0, zIndex: 400, background: T.bg,
+        /* Лист начинается там, где его ручка, — под шапкой Telegram, а не
+           у самого верха экрана: над ним видна затемнённая страница, и
+           сразу понятно, что это лист, который смахивают вниз. */
+        position: "fixed", top: insetTop, left: 0, right: 0, bottom: 0, zIndex: 400, background: T.bg,
         display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto",
-        // Сверху — запас под шапку Telegram (часы и «Закрыть» лежат прямо
-        // на приложении), снизу — под системную полосу.
-        paddingTop: insetTop, paddingBottom: insetBottom,
+        // Снизу — запас под системную полосу.
+        paddingBottom: insetBottom,
         overflow: "hidden",
         transform: уходит ? "translateY(100%)" : `translateY(${тяга}px)`,
         transition: жест.current ? "none" : `transform ${УХОД_ЛИСТА}ms cubic-bezier(0.22, 0.85, 0.25, 1)`,
-        borderTopLeftRadius: тяга > 0 ? 22 : 0, borderTopRightRadius: тяга > 0 ? 22 : 0,
+        borderTopLeftRadius: 22, borderTopRightRadius: 22,
         /* Сам лист не полупрозрачный: сквозь него не должно просвечивать
            ничего — страница позади показывается там, где лист уже уехал,
            а не сквозь него. */
