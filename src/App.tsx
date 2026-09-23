@@ -15724,10 +15724,10 @@ function МастерФразы({
           <div className="flex flex-col items-center text-center" style={{ gap: 14, paddingTop: 34 }}>
             <Wallet size={36} color={T.electric} strokeWidth={1.6} />
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
-              <ТекстИзКода текст={t("walletMakeTitle")} шаг={38} голова={5} />
+              {t("walletMakeTitle")}
             </span>
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600, lineHeight: 1.55 }}>
-              <ТекстИзКода текст={t("walletMakeBody")} задержка={420} />
+              <ТекстИзКода текст={t("walletMakeBody")} задержка={120} />
             </span>
             {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
           </div>
