@@ -17990,10 +17990,28 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       } catch { поток = null; }
     }
 
+    /* Кривая TON — тот же приём, но через tonapi: сервер держит одну
+       подписку на счёт кривой и толкает карточку при каждой сделке, а
+       она сразу перечитывает ряд. Нет ключа на сервере — поток не
+       откроется, и остаётся обычный опрос. */
+    let тонПоток = null;
+    if (curveChart && !curveSol && token.curveAddress && typeof EventSource !== "undefined") {
+      try {
+        let последнийТолчок = 0;
+        тонПоток = new EventSource(апи(`/api/ton-stream?address=${encodeURIComponent(token.curveAddress)}`));
+        тонПоток.onmessage = () => {
+          if (cancelled || Date.now() - последнийТолчок < 600) return;
+          последнийТолчок = Date.now();
+          refresh();
+        };
+      } catch { тонПоток = null; }
+    }
+
     return () => {
       cancelled = true;
       clearInterval(iv);
       if (поток) { try { поток.close(); } catch { /* уже закрыт */ } }
+      if (тонПоток) { try { тонПоток.close(); } catch { /* уже закрыт */ } }
       if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", своя);
       if (abort) abort.abort();
     };
