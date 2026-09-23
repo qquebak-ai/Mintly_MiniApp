@@ -15362,6 +15362,91 @@ function ИмяПоБуквам({ текст, шаг = 70, задержка = 0,
   );
 }
 
+/* Текст, который выходит из кода.
+ *
+ * Перед раскрытыми буквами бежит короткая «голова» из знаков кода — они
+ * перебираются на месте, а позади неё остаётся готовый текст; движение
+ * слева направо, как у набора. Под каждым знаком лежит настоящая буква
+ * (прозрачная), поэтому строка с самого начала сложена по своим местам
+ * и не перескакивает по ходу. Проигрывается один раз на текст. */
+function ТекстИзКода({ текст, шаг = 18, голова = 7, задержка = 0, тик = 55 }) {
+  const буквы = useMemo(() => [...String(текст || "")], [текст]);
+  const всего = буквы.length + голова;
+  const [открыто, setОткрыто] = useState(() => (СТРОКИ_УЖЕ_БЫЛИ.has(текст) ? всего : -1));
+  const [, дрожь] = useState(0);
+  /* Вкладки собираются заранее и прячутся, поэтому стартуем не при
+     сборке, а когда строка правда показалась на экране — иначе текст
+     успевал выйти из кода в скрытой вкладке, и человек видел готовое. */
+  const корень = useRef(null);
+  const [виден, setВиден] = useState(false);
+  useEffect(() => {
+    const el = корень.current;
+    if (!el || typeof IntersectionObserver === "undefined") { setВиден(true); return undefined; }
+    const н = new IntersectionObserver(([з]) => { if (з.isIntersecting) { setВиден(true); н.disconnect(); } });
+    н.observe(el);
+    return () => н.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (СТРОКИ_УЖЕ_БЫЛИ.has(текст)) { setОткрыто(всего); return undefined; }
+    setОткрыто(-1);
+    if (!виден) return undefined;
+    let ход = null;
+    const старт = setTimeout(() => {
+      setОткрыто(0);
+      ход = setInterval(() => {
+        setОткрыто((н) => {
+          if (н >= всего) { clearInterval(ход); СТРОКИ_УЖЕ_БЫЛИ.add(текст); return н; }
+          return н + 1;
+        });
+      }, шаг);
+    }, задержка);
+    return () => { clearTimeout(старт); if (ход) clearInterval(ход); };
+  }, [текст, всего, шаг, задержка, виден]);
+
+  useEffect(() => {
+    if (открыто >= всего || открыто < 0) return undefined;
+    const т = setInterval(() => дрожь((н) => н + 1), тик);
+    return () => clearInterval(т);
+  }, [открыто, всего, тик]);
+
+  // Буква i: раскрыта, если голова уже прошла её; знак — если голова на
+  // ней; иначе пока пусто.
+  const вид = (i) => {
+    const готово = открыто - голова;
+    if (i < готово) return "буква";
+    if (открыто >= 0 && i < открыто) return "знак";
+    return "пусто";
+  };
+  const слова = String(текст || "").split(" ");
+  let номер = -1;
+  return (
+    <span ref={корень}>
+      {слова.map((слово, w) => (
+        <React.Fragment key={w}>
+          <span style={{ display: "inline-block", whiteSpace: "nowrap" }}>
+            {[...слово].map((буква, j) => {
+              номер += 1;
+              const в = вид(номер);
+              return (
+                <span key={j} style={{ position: "relative", display: "inline-block" }}>
+                  <span style={{ color: в === "буква" ? undefined : "transparent" }}>{буква}</span>
+                  {в === "знак" && (
+                    <span aria-hidden style={{ position: "absolute", left: 0, right: 0, top: 0, textAlign: "center", opacity: 0.6 }}>
+                      {узорЗнаков(1)}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </span>
+          {w < слова.length - 1 ? (() => { номер += 1; return " "; })() : null}
+        </React.Fragment>
+      ))}
+    </span>
+  );
+}
+
 function НабраннаяСтрока({ текст, шаг = 22 }) {
   const слова = String(текст || "").split(" ");
   let номер = -1;
@@ -15639,10 +15724,10 @@ function МастерФразы({
           <div className="flex flex-col items-center text-center" style={{ gap: 14, paddingTop: 34 }}>
             <Wallet size={36} color={T.electric} strokeWidth={1.6} />
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
-              {t("walletMakeTitle")}
+              <ТекстИзКода текст={t("walletMakeTitle")} шаг={38} голова={5} />
             </span>
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600, lineHeight: 1.55 }}>
-              <НабраннаяСтрока текст={t("walletMakeBody")} />
+              <ТекстИзКода текст={t("walletMakeBody")} задержка={420} />
             </span>
             {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
           </div>
