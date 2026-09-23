@@ -48,6 +48,17 @@ export async function tgТорговый(метод, тело) {
   }
 }
 
+async function поМетаданным(db, telegramId) {
+  for (let страница = 1; страница <= 20; страница += 1) {
+    const { data, error } = await db.auth.admin.listUsers({ page: страница, perPage: 1000 });
+    if (error || !data || !data.users || !data.users.length) return null;
+    const u = data.users.find((x) => x.user_metadata && String(x.user_metadata.telegram_id) === String(telegramId));
+    if (u) return u.id;
+    if (data.users.length < 1000) return null;
+  }
+  return null;
+}
+
 // Профиль по Telegram и его метаданные — с минутной памятью.
 const память = new Map(); // telegramId -> { ts, userId, мета }
 export async function ктоВTelegram(telegramId, { свежо = false } = {}) {
@@ -60,7 +71,17 @@ export async function ктоВTelegram(telegramId, { свежо = false } = {}) 
      оставляет строку, а новый заводит свою. Одиночный запрос на двух
      строках отвечал ошибкой, и бот говорил «создай аккаунт» человеку с
      аккаунтом. Берём все и выбираем тот, у которого жив пользователь. */
-  const { data: строки } = await db.from("profiles").select("id").eq("telegram_id", telegramId).limit(10);
+  let { data: строки } = await db.from("profiles").select("id").eq("telegram_id", telegramId).limit(10);
+  /* У профиля telegram_id мог остаться пустым (его заводил триггер базы).
+     Тогда ищем по привязке в самом пользователе — она стоит всегда — и
+     заодно доклеиваем её в профиль, чтобы в следующий раз найти сразу. */
+  if (!строки || !строки.length) {
+    const найден = await поМетаданным(db, telegramId);
+    if (найден) {
+      await db.from("profiles").update({ telegram_id: telegramId }).eq("id", найден).is("telegram_id", null);
+      строки = [{ id: найден }];
+    }
+  }
   for (const с of строки || []) {
     const { data: u } = await db.auth.admin.getUserById(с.id);
     if (!u || !u.user) continue;

@@ -513,6 +513,13 @@ export default async function handler(req, res) {
     if (profile && profile.telegram_id != null && String(profile.telegram_id) !== String(tgUser.id)) {
       return fail(res, 409, "account_conflict", `profile telegram_id ${profile.telegram_id} != ${tgUser.id}`);
     }
+    /* Профиль заводит триггер базы в момент создания пользователя — ещё
+       до нашей записи ниже, и telegram_id в нём оставался пустым. По
+       нему ищут человека бот уведомлений и приглашения, поэтому
+       доклеиваем, когда привязка подтверждена метаданными. */
+    if (profile && profile.telegram_id == null && boundId != null && String(boundId) === String(tgUser.id)) {
+      await admin.from("profiles").update({ telegram_id: tgUser.id }).eq("id", userId).is("telegram_id", null);
+    }
     if (boundId == null && profile && profile.telegram_id == null) {
       // Пользователь с таким адресом есть, но ни в метаданных, ни в
       // профиле привязки нет — значит его завели не мы. Молча
