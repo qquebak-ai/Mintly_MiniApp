@@ -12490,17 +12490,9 @@ function СценаЗапуска() {
   const СИРЕНЬ = "#C79BFF", ФИОЛЕТ = "#8E2DE2";
   return (
     <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-      {/* Небо: к правому верхнему углу оно светлеет — там планета, и
-          свет идёт от неё. */}
-      <span style={{
-        position: "absolute", inset: 0,
-        background: `radial-gradient(120% 130% at 86% 6%, ${hexA(ФИОЛЕТ, 0.42)} 0%, ${hexA("#3A1470", 0.28)} 34%, #0C0818 70%, #07060C 100%)`,
-      }} />
-      <span style={{
-        position: "absolute", right: "-6%", top: "-30%", width: "62%", aspectRatio: "1 / 1", borderRadius: "50%",
-        background: `radial-gradient(circle, ${hexA(ФИОЛЕТ, 0.55)} 0%, ${hexA(ФИОЛЕТ, 0)} 68%)`,
-      }} />
-
+      {/* Небо — ровный чёрный: никакого зарева, весь свет теперь только
+          от самих предметов сцены (планеты, ракеты, вершины). */}
+      <span style={{ position: "absolute", inset: 0, background: "#000000" }} />
 
       {/* След орбиты: тонкая дуга, вдоль которой ракета и уходит. */}
       <svg viewBox="0 0 360 150" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
@@ -12514,6 +12506,15 @@ function СценаЗапуска() {
         style={{
           position: "absolute", right: "-13%", top: "-58%", width: "46%", zIndex: 0,
           animation: "планетаКрутится 120s linear infinite",
+        }}
+      />
+      {/* Вершина с флагом — цель, к которой летит ракета. Стоит у самого
+          правого края, ракета проходит перед ней. */}
+      <img
+        src="/banner-mountain.webp" alt=""
+        style={{
+          position: "absolute", right: "-6%", bottom: "-14%", width: "52%", zIndex: 1,
+          filter: `drop-shadow(0 0 22px ${hexA(ФИОЛЕТ, 0.4)})`,
         }}
       />
       <img
