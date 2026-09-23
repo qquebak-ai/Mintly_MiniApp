@@ -19,9 +19,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ОСНОВНОЙ_БОТ = String(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "").trim();
 const ПРИЛОЖЕНИЕ = String(process.env.TG_APP || "Mintly").trim();
-// Кнопка ведёт в приложение основного бота: мини-приложение, открытое
-// из чужого бота, не прошло бы вход.
 export const ССЫЛКА_ПРИЛОЖЕНИЯ = `https://t.me/${ОСНОВНОЙ_БОТ}/${ПРИЛОЖЕНИЕ}`;
+/* Кнопка открывает приложение прямо из этого бота (web_app): вход его
+   подпись принимает наравне с основным ботом. Ссылка на приложение
+   основного бота вела на его старый адрес и открывала серый экран. */
+export const АДРЕС_ПРИЛОЖЕНИЯ = (process.env.APP_URL || "https://www.mintly.company").replace(/\/$/, "");
+export const КНОПКА_ПРИЛОЖЕНИЯ = { inline_keyboard: [[{ text: "Открыть Mintly", web_app: { url: АДРЕС_ПРИЛОЖЕНИЯ } }]] };
 
 let база = null;
 export function служебнаяБаза() {
@@ -92,7 +95,7 @@ export async function уведомить(chatId, текст) {
     text: текст,
     parse_mode: "HTML",
     disable_web_page_preview: true,
-    reply_markup: { inline_keyboard: [[{ text: "Открыть Mintly", url: ССЫЛКА_ПРИЛОЖЕНИЯ }]] },
+    reply_markup: КНОПКА_ПРИЛОЖЕНИЯ,
   });
   return !!(ответ && ответ.ok);
 }

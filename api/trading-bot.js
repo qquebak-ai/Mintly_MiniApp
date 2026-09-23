@@ -20,7 +20,7 @@
  */
 
 import crypto from "node:crypto";
-import { ТОКЕН_ТОРГОВОГО, tgТорговый, отметить, ктоВTelegram, служебнаяБаза, ССЫЛКА_ПРИЛОЖЕНИЯ } from "./_trading.js";
+import { ТОКЕН_ТОРГОВОГО, tgТорговый, отметить, ктоВTelegram, служебнаяБаза, КНОПКА_ПРИЛОЖЕНИЯ, АДРЕС_ПРИЛОЖЕНИЯ } from "./_trading.js";
 
 const СЕКРЕТ_ВЫКЛАДКИ = process.env.DEPLOY_SECRET || "";
 // Секрет вебхука выводим из токена: отдельная переменная не нужна, а
@@ -29,7 +29,7 @@ const СЕКРЕТ_ВЕБХУКА = ТОКЕН_ТОРГОВОГО
   ? crypto.createHash("sha256").update(`mintly-trading:${ТОКЕН_ТОРГОВОГО}`).digest("hex").slice(0, 48)
   : "";
 
-const КНОПКА = { inline_keyboard: [[{ text: "Открыть Mintly", url: ССЫЛКА_ПРИЛОЖЕНИЯ }]] };
+const КНОПКА = КНОПКА_ПРИЛОЖЕНИЯ;
 
 const ТЕКСТЫ = {
   ru: {
@@ -91,6 +91,8 @@ export default async function handler(req, res) {
       description: "Уведомления Mintly: покупки твоих токенов, выход на биржу, пополнения и выводы кошелька, ответы поддержки.",
     });
     await tgТорговый("setMyShortDescription", { short_description: "Уведомления о твоих токенах и кошельке Mintly" });
+    // Кнопка меню у поля ввода — сразу в приложение.
+    await tgТорговый("setChatMenuButton", { menu_button: { type: "web_app", text: "Mintly", web_app: { url: АДРЕС_ПРИЛОЖЕНИЯ } } });
     return res.status(200).json(вебхук || { ok: false });
   }
 
