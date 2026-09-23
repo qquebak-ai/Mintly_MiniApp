@@ -30,6 +30,22 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
 
 const корень = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+/* Ключ tonapi, которому сервис отказал («origin is banned», 401), не
+   должен ронять весь TON: без ключа те же запросы проходят, только с
+   меньшим лимитом. Поэтому любой запрос к tonapi, отбитый 401 с ключом,
+   тут же повторяется без него — одна страховка на все обработчики,
+   вместо правки в каждом. Поток (sse) не трогаем: ему ключ нужен. */
+const родной = globalThis.fetch;
+globalThis.fetch = async (адрес, настройки = {}) => {
+  const ответ = await родной(адрес, настройки);
+  const строка = String(адрес && адрес.url ? адрес.url : адрес);
+  if (ответ.status !== 401 || !/tonapi\.io\//.test(строка) || /\/sse\//.test(строка)) return ответ;
+  const заголовки = new Headers(настройки.headers || {});
+  if (!заголовки.has("authorization")) return ответ;
+  заголовки.delete("authorization");
+  return родной(адрес, { ...настройки, headers: заголовки });
+};
 const ПОРТ = Number(process.env.PORT) || 8080;
 
 /* Кому разрешено обращаться. Браузер спросит об этом на каждом запросе с
