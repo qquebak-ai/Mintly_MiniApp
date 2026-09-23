@@ -2322,6 +2322,11 @@ function GlobalStyle() {
         to   { opacity: 1; transform: none; }
       }
       .колокол-панель { animation: колоколВыход 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+      @keyframes колоколУход {
+        from { opacity: 1; transform: none; }
+        to   { opacity: 0; transform: translate3d(0, -6px, 0) scale(0.92); }
+      }
+      .колокол-панель-уход { animation: колоколУход 200ms cubic-bezier(0.4, 0, 1, 1) both; }
       .умн-градиент > .умн-знак {
         background: inherit; -webkit-background-clip: text; background-clip: text;
         -webkit-text-fill-color: transparent; color: transparent;
@@ -23282,15 +23287,13 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
         <>
           {/* Нажатие мимо панели закрывает её. */}
           <div onClick={() => закрытьПанель()} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
-          <div className={панельУходит ? undefined : "колокол-панель"} style={{
+          {/* Уход — своей анимацией, а не переходом: переход от значений
+              анимации появления не запускается, и панель пропадала разом. */}
+          <div className={панельУходит ? "колокол-панель-уход" : "колокол-панель"} style={{
             position: "absolute", top: 50, right: 0, zIndex: 31,
             width: "min(340px, calc(100vw - 32px))", padding: 8, borderRadius: 22,
             background: T.surface, boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
             transformOrigin: "calc(100% - 21px) -8px",
-            ...(панельУходит ? {
-              opacity: 0, transform: "translate3d(0, -6px, 0) scale(0.92)",
-              transition: "opacity 200ms ease, transform 200ms cubic-bezier(0.4, 0, 1, 1)",
-            } : null),
           }}>
       <button
         onClick={() => { закрытьПанель(() => setОткрыт(true)); haptic("light"); }}
