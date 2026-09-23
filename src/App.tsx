@@ -718,6 +718,7 @@ const STR = {
     firstAccountFirst: "Сначала создай аккаунт",
     connectWalletContinue: "Подключи TON-кошелёк, чтобы продолжить",
     addressCopied: "Адрес скопирован",
+    actShare: "Поделиться", actEdit: "Изменить", actCopy: "Адрес", actCopied: "Скопировано",
     verifyRequestSent: "Заявка отправлена на проверку",
     profileVerified: "Профиль верифицирован",
     logOutShort: "Выйти",
@@ -1403,6 +1404,7 @@ const STR = {
     firstAccountFirst: "Create an account first",
     connectWalletContinue: "Connect a TON wallet to continue",
     addressCopied: "Address copied",
+    actShare: "Share", actEdit: "Edit", actCopy: "Address", actCopied: "Copied",
     verifyRequestSent: "Request sent for review",
     profileVerified: "Profile verified",
     logOutShort: "Log out",
@@ -7055,6 +7057,56 @@ function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, фо
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* Кнопка действия: тёмная плашка с тонкой рамкой, значок и слово.
+ * После нажатия над ней всплывает подсказка — «Скопировано» и т. п. —
+ * и через секунду тает: тост внизу экрана для такой мелочи слишком
+ * далеко от пальца. */
+function КнопкаДействия({ Значок, подпись, onClick, подсказка = null }) {
+  const [видна, setВидна] = useState(false);
+  const таймер = useRef(null);
+  useEffect(() => () => clearTimeout(таймер.current), []);
+  return (
+    <div style={{ position: "relative", flex: "1 1 auto", minWidth: 0 }}>
+      <button
+        onClick={(e) => {
+          onClick && onClick(e);
+          if (подсказка) {
+            setВидна(true);
+            clearTimeout(таймер.current);
+            таймер.current = setTimeout(() => setВидна(false), 1200);
+          }
+        }}
+        className="fx-tap flex items-center justify-center w-full"
+        style={{
+          gap: 7, height: 36, padding: "0 12px", borderRadius: 12,
+          background: T.bg, border: `1px solid ${T.lineHi}`,
+          color: T.ice, fontFamily: bodyFont, fontSize: 14.5, fontWeight: 500, whiteSpace: "nowrap",
+        }}
+      >
+        <Значок size={15} color={T.ice} strokeWidth={2} />
+        {подпись}
+      </button>
+      {подсказка && (
+        <span
+          aria-live="polite"
+          style={{
+            position: "absolute", left: "50%", bottom: "calc(100% + 8px)",
+            padding: "5px 10px", borderRadius: 9, background: T.ice, color: T.bg,
+            fontFamily: bodyFont, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap",
+            opacity: видна ? 1 : 0,
+            transform: `translateX(-50%) translateY(${видна ? 0 : 6}px) scale(${видна ? 1 : 0.85})`,
+            transformOrigin: "50% 100%",
+            transition: "opacity 180ms ease, transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+            pointerEvents: "none",
+          }}
+        >
+          {подсказка}
+        </span>
+      )}
     </div>
   );
 }
@@ -17612,11 +17664,13 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   // Telegram не разворачивает.
   const [shareOpen, setShareOpen] = useState(false);
   function handleShare() { haptic("light"); setShareOpen(true); }
-  function copyContract() {
+  function copyContract({ тихо = false } = {}) {
     if (!token.tokenAddress) return;
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(token.tokenAddress).catch(() => {});
-      showToast(tr("addressCopied"));
+      haptic("light");
+      // У кнопки «Копировать» своя подсказка над пальцем — тост не нужен.
+      if (!тихо) showToast(tr("addressCopied"));
     }
   }
 
@@ -17924,6 +17978,16 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12 }}>
             {fmtAge(token.createdAt) || ""}{token.dexName ? ` · ${token.dexName}` : ""}
           </span>
+        </div>
+
+        {/* Действия с токеном — одним рядом под адресом: поделиться,
+            изменить (только своему) и скопировать адрес. */}
+        <div className="flex items-center" style={{ gap: 8 }}>
+          <КнопкаДействия Значок={Share2} подпись={tr("actShare")} onClick={handleShare} />
+          {onManage && <КнопкаДействия Значок={Pencil} подпись={tr("actEdit")} onClick={() => onManage(token)} />}
+          {token.tokenAddress && (
+            <КнопкаДействия Значок={Copy} подпись={tr("actCopy")} onClick={() => copyContract({ тихо: true })} подсказка={tr("actCopied")} />
+          )}
         </div>
 
       </div>
