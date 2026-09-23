@@ -621,6 +621,7 @@ const STR = {
     launchAmountLabel: "Сумма для запуска",
     launchAmountNote: "На эту сумму сразу после запуска будут выкуплены первые токены — это стартовая ликвидность и первая цена токена.",
     youWillGet: "Ты получишь ≈",
+    launchPriceAfter: "Цена после покупки", launchMcapAfter: "Капитализация после", launchGraduates: "Порог взят — кривая закроется, и токен сразу уйдёт на биржу",
     supplyShare: "выпуска",
     connectToConfirm: "Подключи кошелёк TON, чтобы подтвердить эмиссию",
     launchTokenCta: "Запустить токен",
@@ -1307,6 +1308,7 @@ const STR = {
     launchAmountLabel: "Launch amount",
     launchAmountNote: "This amount buys the first tokens right after launch — it's the starting liquidity and initial price.",
     youWillGet: "You'll get ≈",
+    launchPriceAfter: "Price after the buy", launchMcapAfter: "Market cap after", launchGraduates: "Threshold reached — the curve closes and the token lists right away",
     supplyShare: "of supply",
     connectToConfirm: "Connect a TON wallet to confirm the mint",
     launchTokenCta: "Launch token",
@@ -20220,6 +20222,31 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   }, [вSolana, кривScolana]);
 
   const посчитатьВыход = (сумма) => (вSolana ? токеновЗаSol(сумма, кривScolana) : tokensForTon(сумма));
+  /* Что станет с рынком после стартовой покупки: цена одной штуки и
+     капитализация (цена × миллиард) — в монете сети. Кривая —
+     произведение резервов, поэтому цена после покупки = резерв монеты²
+     ÷ произведение. И закроется ли кривая: покупка могла взять порог. */
+  const итогПокупки = (сумма) => {
+    const n = Math.max(0, Number(сумма) || 0);
+    if (!(n > 0)) return null;
+    if (вSolana) {
+      const к = кривScolana;
+      if (!к || !(к.virtualSol > 0) || !(к.virtualTokens > 0)) return null;
+      const ед = Math.pow(10, Number(к.decimals) || 6);
+      const вошло = n * 1e9 * (1 - (Number(к.feeBps) || 0) / 10000);
+      const x = Number(к.virtualSol) + вошло;
+      const y = (Number(к.virtualSol) * Number(к.virtualTokens)) / x;
+      const цена = (x / 1e9) / (y / ед);
+      return { цена, кап: цена * TOKEN_FIXED_SUPPLY, закроется: вошло >= (Number(к.graduationSol) || Infinity) };
+    }
+    const vTon = Number(CURVE_PARAMS.virtualTon) / 1e9;
+    const vTok = Number(CURVE_PARAMS.virtualTokens) / 1e9;
+    const вошло = n * (1 - Number(CURVE_PARAMS.feeBps) / 10000);
+    const x = vTon + вошло;
+    const y = (vTon * vTok) / x;
+    const цена = x / y;
+    return { цена, кап: цена * TOKEN_FIXED_SUPPLY, закроется: вошло >= Number(CURVE_PARAMS.graduationTon) / 1e9 };
+  };
 
   const [остатокСети, setОстатокСети] = useState(null);
   useEffect(() => {
@@ -20481,10 +20508,12 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         {(() => {
           const единица = вSolana ? "SOL" : ТИКЕР_TON;
           const шаг = вSolana ? 0.01 : 0.1;
-          /* Верх шкалы — выкуп почти всего, что кривая продаёт (99,9 %):
-             стартовой покупкой можно забрать запуск целиком. Ровно 100 %
-             контракт не примет — сделка сверх остатка отвергается, —
-             поэтому берём чуть меньше и округляем вниз. Хватит ли денег,
+          /* Верх шкалы — та же логика, что у самой кривой: покупка, которая
+             берёт порог листинга (1500 GRAM в TON, 35 SOL в Solana). На
+             нём кривая закрывается и уходит в пул, а капитализация выходит
+             ровно той, что задумана под листинг. Если порог стоит у самого
+             потолка продажи (так в Solana), упираемся в 99,9 % запаса:
+             сделку сверх остатка контракт отвергает. Хватит ли денег,
              подскажет строка под ползунком. */
           const ДОЛЯ_ВЕРХА = 0.999;
           const верхПоКривой = (() => {
@@ -20492,17 +20521,19 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
               const к = кривScolana;
               if (!к || !(к.virtualSol > 0) || !(к.virtualTokens > 0) || !(к.tokensForSale > 0)) return 0;
               const хочу = к.tokensForSale * ДОЛЯ_ВЕРХА;
-              const чистыми = (к.virtualSol * хочу) / (к.virtualTokens - хочу) / 1e9;
-              return чистыми / (1 - (Number(к.feeBps) || 0) / 10000);
+              const потолок = (к.virtualSol * хочу) / (к.virtualTokens - хочу) / 1e9;
+              const порог = (Number(к.graduationSol) || Infinity) / 1e9;
+              return Math.min(потолок, порог) / (1 - (Number(к.feeBps) || 0) / 10000);
             }
             const vTon = Number(CURVE_PARAMS.virtualTon) / 1e9;
             const vTok = Number(CURVE_PARAMS.virtualTokens) / 1e9;
             const хочу = (Number(CURVE_PARAMS.tokensForSale) / 1e9) * ДОЛЯ_ВЕРХА;
-            const чистыми = (vTon * хочу) / (vTok - хочу);
-            return чистыми / (1 - Number(CURVE_PARAMS.feeBps) / 10000);
+            const потолок = (vTon * хочу) / (vTok - хочу);
+            const порог = Number(CURVE_PARAMS.graduationTon) / 1e9;
+            return Math.min(потолок, порог) / (1 - Number(CURVE_PARAMS.feeBps) / 10000);
           })();
           const верх = верхПоКривой > 0
-            ? Number((Math.floor(верхПоКривой / шаг) * шаг).toFixed(2))
+            ? Number((Math.ceil(верхПоКривой / шаг - 1e-9) * шаг).toFixed(2))
             : (вSolana ? 2 : 50);
           const сейчас = Math.min(верх, Number.isFinite(суммаПокупки) ? суммаПокупки : 0);
           const число = (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: вSolana ? 2 : 1 });
@@ -20542,15 +20573,15 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             );
           }
           const минимумНужен = вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED;
+          let беда = null;
           if (минимумНужен && rate > 0 && buyNum * rate < MIN_LAUNCH_USD) {
-            return (
+            беда = (
               <p style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, lineHeight: 1.5 }}>
                 <ТекстСЧислами text={trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: minBuyTon.toFixed(вSolana ? 3 : 2), unit: вSolana ? "SOL" : ТИКЕР_TON })} />
               </p>
             );
-          }
-          if (нехватка) {
-            return (
+          } else if (нехватка) {
+            беда = (
               <p style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, lineHeight: 1.5 }}>
                 <ТекстСЧислами text={trf("launchNotEnough", {
                   have: `${(остатокСети || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${вSolana ? "SOL" : ТИКЕР_TON}`,
@@ -20560,13 +20591,35 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             );
           }
           const { tokens, pct } = посчитатьВыход(buyNum);
-          return (
-            <div className="flex items-center justify-between rounded-[20px] px-3.5 py-2.5" style={{ background: ink(0.06), border: `1px solid ${ink(0.2)}` }}>
-              <span style={{ fontFamily: bodyFont, color: T.electric, fontSize: 13 }}>{t("youWillGet")}</span>
-              <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 14, fontWeight: 600 }}>
-                <ТекстСЧислами text={`${tokens.toLocaleString("ru-RU")} ${(form.ticker.trim() || "TOKEN").toUpperCase()} · ${pct.toFixed(pct < 1 ? 3 : 1)}% ${t("supplyShare")}`} />
-              </span>
+          const после = итогПокупки(buyNum);
+          const единицаСети = вSolana ? "SOL" : ТИКЕР_TON;
+          // В долларах, если курс уже есть; иначе — в монете сети.
+          const деньги = (v, мелко) => (rate > 0
+            ? (мелко ? fmtPrice(v * rate) : fmtUSD(v * rate))
+            : `${v.toLocaleString("ru-RU", { maximumSignificantDigits: 4 })} ${единицаСети}`);
+          const строка = (подпись, значение) => (
+            <div className="flex items-center justify-between" style={{ gap: 10 }}>
+              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{подпись}</span>
+              <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 13, fontWeight: 600 }}><ТекстСЧислами text={значение} /></span>
             </div>
+          );
+          return (
+            <>
+              {беда}
+              <div className="flex flex-col rounded-[20px] px-3.5 py-2.5" style={{ gap: 8, background: ink(0.06), border: `1px solid ${ink(0.2)}` }}>
+                <div className="flex items-center justify-between" style={{ gap: 10 }}>
+                  <span style={{ fontFamily: bodyFont, color: T.electric, fontSize: 13 }}>{t("youWillGet")}</span>
+                  <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 14, fontWeight: 600, textAlign: "right" }}>
+                    <ТекстСЧислами text={`${tokens.toLocaleString("ru-RU")} ${(form.ticker.trim() || "TOKEN").toUpperCase()} · ${pct.toFixed(pct < 1 ? 3 : 1)}% ${t("supplyShare")}`} />
+                  </span>
+                </div>
+                {после && строка(t("launchPriceAfter"), деньги(после.цена, true))}
+                {после && строка(t("launchMcapAfter"), деньги(после.кап, false))}
+                {после && после.закроется && (
+                  <span style={{ fontFamily: bodyFont, color: T.up, fontSize: 12, lineHeight: 1.45 }}>{t("launchGraduates")}</span>
+                )}
+              </div>
+            </>
           );
         })()}
       </div>
