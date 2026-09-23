@@ -7119,7 +7119,8 @@ function ПолеСЖивымТекстом({ value, style = {}, className = "",
   return (
     // Обёртка занимает место поля: по умолчанию тянется на всю ширину и
     // сжимается в ряду с соседями — как тянулось бы само поле.
-    <div style={{ position: "relative", display: многострочное ? "block" : "flex", flex: "1 1 auto", width: "100%", minWidth: 0, ...Object.fromEntries(Object.entries(обёртка).filter(([, з]) => з !== undefined)) }}>
+    // Без flex-роста: в колонке он растягивал поле на весь экран.
+    <div style={{ position: "relative", display: многострочное ? "block" : "flex", width: "100%", minWidth: 0, ...Object.fromEntries(Object.entries(обёртка).filter(([, з]) => з !== undefined)) }}>
       <Тег
         ref={поле}
         value={value}
