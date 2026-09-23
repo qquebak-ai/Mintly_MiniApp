@@ -494,6 +494,9 @@ const STR = {
     homeAlmostSub: "Ближе всех к выходу на DEX",
     homeAlmostLeft: "осталось {left} GRAM",
     homeAlmostEmpty: "Пока никто не набрал заметную часть пути. Запусти токен — будешь первым.",
+    homeEmptyShort: "Пока пусто", homeFeedQuiet: "Пока тихо — сделки появятся здесь",
+    homeMovingEmpty: "Пока ничего не движется — первые сделки появятся здесь.",
+    homeTopEmpty: "Рейтинг появится после первых запусков.",
     emptyFilter: "По этому фильтру пока пусто — попробуй другой или загляни позже.", catMemes: "Мемы", catUtility: "Утилиты", catGames: "Игры", catAI: "AI", catSocial: "Соц",
     linkCopied: "Ссылка скопирована",
     tokenLinkCopied: "Ссылка на токен скопирована",
@@ -1181,6 +1184,9 @@ const STR = {
     homeAlmostSub: "Closest to hitting a DEX",
     homeAlmostLeft: "{left} GRAM to go",
     homeAlmostEmpty: "Nobody is far along yet. Launch a token and be the first.",
+    homeEmptyShort: "Nothing yet", homeFeedQuiet: "Quiet for now — trades will show up here",
+    homeMovingEmpty: "Nothing is moving yet — the first trades will show up here.",
+    homeTopEmpty: "The ranking appears after the first launches.",
     emptyFilter: "Nothing here for this filter yet — try another or check back later.", catMemes: "Memes", catUtility: "Utility", catGames: "Games", catAI: "AI", catSocial: "Social",
     linkCopied: "Link copied",
     tokenLinkCopied: "Token link copied",
@@ -10979,6 +10985,26 @@ function useTicker(target, duration = 800) {
    биржу считает функция базы, запуски за сутки — она же.
    Счётчика «онлайн» здесь больше нет: он рисовался случайными числами,
    и, раз заметив это, человек перестал бы верить и остальным. */
+/* Пустой виджет главной. Раньше пустые блоки просто исчезали, и на
+ * главной оставался один баннер — казалось, что приложение не
+ * догрузилось. Теперь блок стоит на месте с заголовком и строкой о том,
+ * что здесь появится. */
+function ПустойВиджет({ заголовок, текст, действие = null }) {
+  return (
+    <section>
+      <div className="flex items-baseline justify-between" style={{ marginBottom: 8 }}>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+          {заголовок}
+        </span>
+        {действие}
+      </div>
+      <div className="rounded-[20px]" style={{ padding: "16px 16px", background: T.surface }}>
+        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5 }}>{текст}</div>
+      </div>
+    </section>
+  );
+}
+
 function ГлавныйТокен({ tokens = [], onOpen }) {
   const выбор = useMemo(() => {
     const наКривой = (tokens || [])
@@ -10990,7 +11016,7 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
     return крупный ? { tok: крупный, pct: null } : null;
   }, [tokens]);
 
-  if (!выбор) return null;
+  if (!выбор) return <ПустойВиджет заголовок={t("homeAlmostTitle")} текст={t("homeAlmostEmpty")} />;
   const { tok, pct } = выбор;
   const растёт = (tok.change || 0) >= 0;
 
@@ -11128,6 +11154,9 @@ function КарточкаСВыдвижкой({ title, tokens, onOpen, delay = 0
               transition: "transform 620ms cubic-bezier(.34,1.56,.64,1), opacity 380ms ease",
             }}
           >
+            {!tokens.length && (
+              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, padding: "7px 2px" }}>{t("homeEmptyShort")}</span>
+            )}
             {tokens.map((tok) => (
               <button
                 key={tok.id}
@@ -11164,7 +11193,7 @@ function ЖивыеКарточки({ tokens = [], onOpen }) {
     return { почти, свежие };
   }, [tokens]);
 
-  if (!почти.length && !свежие.length) return null;
+  // Пустые карточки тоже стоят: у каждой своя подпись «пока пусто».
 
   const шкала = (tok) => {
     const pct = tok.graduationTon > 0 ? Math.min(100, (tok.raisedTon / tok.graduationTon) * 100) : 0;
@@ -11199,9 +11228,9 @@ function ЖивыеКарточки({ tokens = [], onOpen }) {
   };
 
   return (
-    <section className="grid" style={{ gridTemplateColumns: почти.length && свежие.length ? "1fr 1fr" : "1fr", gap: 10, alignItems: "start" }}>
-      {почти.length > 0 && <КарточкаСВыдвижкой title={t("homeNextTitle")} tokens={почти} onOpen={onOpen} строка={шкала} />}
-      {свежие.length > 0 && <КарточкаСВыдвижкой title={t("homeFreshTitle")} tokens={свежие} onOpen={onOpen} строка={свежая} delay={140} />}
+    <section className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "start" }}>
+      <КарточкаСВыдвижкой title={t("homeNextTitle")} tokens={почти} onOpen={onOpen} строка={шкала} />
+      <КарточкаСВыдвижкой title={t("homeFreshTitle")} tokens={свежие} onOpen={onOpen} строка={свежая} delay={140} />
     </section>
   );
 }
@@ -11229,7 +11258,15 @@ function БегущаяЛента() {
     return () => { брошено = true; clearInterval(t); };
   }, []);
 
-  if (!items || !items.length) return null;
+  // Сделок ещё нет — строка всё равно стоит, но тихая, без бега.
+  if (!items || !items.length) {
+    return (
+      <div className="flex items-center" style={{ gap: 8, height: 20 }}>
+        <span style={{ width: 5, height: 5, borderRadius: "50%", background: T.faint }} />
+        <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5 }}>{t("homeFeedQuiet")}</span>
+      </div>
+    );
+  }
 
   /* Говорим о токене, а не о том, кто нажал кнопку: у половины строк
      имени всё равно нет, и вместо него стоял прочерк. */
@@ -11272,7 +11309,19 @@ function ВДвижении({ tokens = [], onOpen, onAll }) {
     // сейчас что-то происходит, а крупнейшие и так на виду.
     .sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0))
     .slice(0, 4), [tokens]);
-  if (!ряд.length) return null;
+  if (!ряд.length) {
+    return (
+      <ПустойВиджет
+        заголовок={t("homeMoving")}
+        текст={t("homeMovingEmpty")}
+        действие={(
+          <button onClick={onAll} className="fx-tap" style={{ background: "transparent", border: "none", padding: 0, fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>
+            {t("homePopularAll")}
+          </button>
+        )}
+      />
+    );
+  }
 
   return (
     <section>
@@ -11363,7 +11412,7 @@ function ТопСтрока({ onOpenToken, onOpenProfile, live = [] }) {
     return покривой.size ? ряд.slice().sort((a, b) => (Number(b.raised) || 0) - (Number(a.raised) || 0)) : ряд;
   }, [data, live]);
 
-  if (!токены.length) return null;
+  if (!токены.length) return <ПустойВиджет заголовок={t("topTitle")} текст={t("homeTopEmpty")} />;
   const видимые = раскрыт ? токены : токены.slice(0, 1);
 
   return (
