@@ -11065,8 +11065,11 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
         <div className="flex items-center" style={{ gap: 12, position: "relative" }}>
           <TokenAvatar size={46} tone={растёт ? "up" : "down"} src={tok.logoUrl} />
           <div className="flex-1 min-w-0">
-            <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 700, letterSpacing: "-0.01em" }}>
-              ${tok.ticker}
+            <div className="flex items-center truncate" style={{ gap: 6 }}>
+              <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 700, letterSpacing: "-0.01em" }}>
+                ${tok.ticker}
+              </span>
+              <ПометкаТест сеть={tok.network} />
             </div>
             <div className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2 }}>{tok.name}</div>
           </div>
@@ -11243,7 +11246,10 @@ function ЖивыеКарточки({ tokens = [], onOpen }) {
     return (
       <>
         <div className="flex items-baseline justify-between" style={{ gap: 6 }}>
-          <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${tok.ticker}</span>
+          <span className="flex items-center truncate" style={{ gap: 4 }}>
+            <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${tok.ticker}</span>
+            <ПометкаТест сеть={tok.network} size={8} />
+          </span>
           <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 12, fontWeight: 700, flexShrink: 0 }}><ТекстСЧислами text={pct.toFixed(0)} />%</span>
         </div>
         <div style={{ height: 4, borderRadius: 2, background: T.surfaceHi, overflow: "hidden", marginTop: 5 }}>
@@ -11259,7 +11265,10 @@ function ЖивыеКарточки({ tokens = [], onOpen }) {
     return (
       <>
         <div className="flex items-baseline justify-between" style={{ gap: 6 }}>
-          <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${tok.ticker}</span>
+          <span className="flex items-center truncate" style={{ gap: 4 }}>
+            <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${tok.ticker}</span>
+            <ПометкаТест сеть={tok.network} size={8} />
+          </span>
           <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11, flexShrink: 0 }}>{fmtAge(tok.createdAt) || ""}</span>
         </div>
         <div className="flex items-baseline justify-between" style={{ gap: 6, marginTop: 3 }}>
@@ -11389,7 +11398,10 @@ function ВДвижении({ tokens = [], onOpen, onAll }) {
             >
               <TokenAvatar size={36} tone={растёт ? "up" : "down"} src={tok.logoUrl} />
               <div className="flex-1 min-w-0">
-                <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>${tok.ticker}</div>
+                <div className="flex items-center truncate" style={{ gap: 5 }}>
+                  <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>${tok.ticker}</span>
+                  <ПометкаТест сеть={tok.network} size={8.5} />
+                </div>
                 <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 12, marginTop: 2 }}>
                   <УмныйТекст text={tok.mcapNum > 0 ? fmtUSD(tok.mcapNum) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`} />
                 </div>
@@ -11485,7 +11497,10 @@ function ТопСтрока({ onOpenToken, onOpenProfile, live = [] }) {
                 значка у токена без логотипа оставался пустой кружок. */}
             <TokenAvatar size={34} src={э.logo_url} />
             <div className="flex-1 min-w-0">
-              <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>${э.ticker}</div>
+              <div className="flex items-center truncate" style={{ gap: 5 }}>
+                <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>${э.ticker}</span>
+                <ПометкаТест сеть={э.network} size={8.5} />
+              </div>
               <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 11.5, marginTop: 2 }}>
                 <ТекстСЧислами text={э.graduated
                   ? t(э.dexPoolAddress ? "topOnDex" : "topClosing")
@@ -13470,14 +13485,16 @@ function HomeView({
   onOpenMyProfile, onOpenAchievements, профильГрузится = false, тик = 0, грузится = false,
   insetTop = 0, insetBottom = 0, достиженияГотовы = true,
 }) {
-  // Главная — витрина площадки: сводка, токен дня, движение, топ. Монетам
-  // из пробной сети там не место — их цена ничего не значит, а сводка по
-  // ним показывала бы оборот, которого не было. В мемпаде они остаются,
-  // с пометкой.
+  /* Главная — витрина площадки: сводка, токен дня, движение, топ.
+     Раньше сюда пускали только mainnet, и пока Solana целиком в devnet,
+     главная стояла пустой — там, где на самом деле шла вся жизнь
+     площадки. Теперь берём те же сети, что показывает мемпад
+     (ВИДИМЫЕ_СЕТИ), а пробные помечены значком «тест» — так же, как в
+     мемпаде. */
   const боевые = React.useMemo(
     // Токен, у которого стартовая покупка ещё не прошла, на главную не
     // попадает вовсе: там нет ни автора, ни оправдания нулям.
-    () => curveTokens.filter((t) => !пробнаяСеть(t && t.network) && запускСостоялся(t)),
+    () => curveTokens.filter((t) => ВИДИМЫЕ_СЕТИ.includes(t && t.network) && запускСостоялся(t)),
     [curveTokens],
   );
 
