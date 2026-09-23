@@ -12593,16 +12593,6 @@ function HomeView({
         <div className="fx-view flex flex-col" style={{ gap: 26 }}>
           <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
           <БегущаяЛента />
-          <МоиДела
-            myTokens={myTokens}
-            achievements={achievements}
-            достиженияГотовы={достиженияГотовы}
-            userId={userId}
-            onGoCreate={onGoCreate}
-            onOpenToken={onOpenToken}
-            onOpenAchievements={onOpenAchievements}
-            тик={тик}
-          />
           <ГлавныйТокен tokens={боевые} onOpen={onOpenToken} />
           <ВДвижении tokens={боевые} onOpen={onOpenToken} onAll={() => onGoTab("mempad")} />
           <ТопСтрока onOpenToken={onOpenToken} onOpenProfile={onOpenProfile} live={боевые} />
