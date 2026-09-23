@@ -2917,10 +2917,10 @@ function GlobalStyle() {
         to   { opacity: 0; transform: translateX(16px); }
       }
       .авт-заставка > .авт-подпись {
-        animation: авт-всплыв 560ms cubic-bezier(0.22, 1, 0.36, 1) 420ms backwards;
+        animation: авт-всплыв 800ms cubic-bezier(0.22, 1, 0.36, 1) 820ms backwards;
       }
       .авт-заставка.уходит > .авт-подпись {
-        animation: букваУходитВправо 280ms cubic-bezier(0.4, 0, 1, 1) both;
+        animation: букваУходитВправо 360ms cubic-bezier(0.4, 0, 1, 1) both;
       }
       /* Подпись под именем в шапке: имя набирается по буквам само, а ей
          хватает обычного выхода снизу. */
@@ -13146,8 +13146,8 @@ function снятьШирму({ уйти = false } = {}) {
     setTimeout(() => {
       поле.classList.remove("идёт");
       поле.classList.add("уходит");
-      setTimeout(погасить, 520);
-    }, Math.max(0, 1150 - прошло));
+      setTimeout(погасить, 680);
+    }, Math.max(0, 2300 - прошло));
   };
   доУхода();
 }
@@ -15705,7 +15705,7 @@ function СтрокаИзЗнаков({ текст, шаг = 52, задержк�
   );
 }
 
-function ИмяПоБуквам({ текст, шаг = 70, задержка = 0, уходит = false, шагУхода = 46 }) {
+function ИмяПоБуквам({ текст, шаг = 130, задержка = 0, уходит = false, шагУхода = 60 }) {
   return (
     <>
       {[...String(текст || "")].map((буква, i) => (
@@ -15717,8 +15717,8 @@ function ИмяПоБуквам({ текст, шаг = 70, задержка = 0,
             // занят, и без него буквы проступали рывками.
             willChange: "opacity, transform",
             animation: уходит
-              ? "букваУходитВправо 280ms cubic-bezier(0.4, 0, 1, 1) both"
-              : "букваПроступает 300ms ease-out both",
+              ? "букваУходитВправо 360ms cubic-bezier(0.4, 0, 1, 1) both"
+              : "букваПроступает 520ms ease-out both",
             animationDelay: `${уходит ? i * шагУхода : задержка + i * шаг}ms`,
           }}
         >
@@ -23249,18 +23249,18 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     сдвигЗаставки.current = поле && старт ? Math.max(0, Date.now() - старт) : 0;
   }
   const уже = сдвигЗаставки.current || 0;
-  const ЖДАТЬ_ЗАСТАВКУ = Math.max(0, 1500 - уже);
+  const ЖДАТЬ_ЗАСТАВКУ = Math.max(0, 2700 - уже);
   const [заставка, setЗаставка] = useState(true);
   // Буквы уходят вправо заранее: к мигу, когда трогается поверхность,
   // имя посередине уже стёрто, и два движения не накладываются.
   const [уходитЗаставка, setУходитЗаставка] = useState(false);
   useEffect(() => {
     if (!open) { setПервыйПоказ(true); setЗаставка(true); setУходитЗаставка(false); return undefined; }
-    const ух = setTimeout(() => setУходитЗаставка(true), Math.max(0, 1150 - уже));
-    const сн = setTimeout(() => { setЗаставка(false); setУходитЗаставка(false); }, Math.max(610, 1760 - уже));
+    const ух = setTimeout(() => setУходитЗаставка(true), Math.max(0, 2300 - уже));
+    const сн = setTimeout(() => { setЗаставка(false); setУходитЗаставка(false); }, Math.max(760, 3100 - уже));
     // Сбрасываем задержки позже конца всех выходов: переменную читает
     // уже идущая анимация, и смена на полпути дёрнула бы её назад.
-    const т = setTimeout(() => setПервыйПоказ(false), 3200);
+    const т = setTimeout(() => setПервыйПоказ(false), 5200);
     return () => { clearTimeout(ух); clearTimeout(сн); clearTimeout(т); };
   }, [open]);
 
@@ -23611,7 +23611,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             </span>
             <span className="авт-подпись" style={{
               fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.42)", fontSize: 16, fontWeight: 600,
-              ...(уходитЗаставка ? null : { animationDelay: `${420 - уже}ms` }),
+              ...(уходитЗаставка ? null : { animationDelay: `${820 - уже}ms` }),
             }}>
               {t("authSplashLead")}
             </span>

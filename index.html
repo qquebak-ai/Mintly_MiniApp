@@ -137,26 +137,26 @@
          этого буквы проступали рывками. */
       #ширма .имя b, #ширма .подпись { will-change: opacity, transform; }
       #ширма .имя b { font-weight: inherit; display: inline-block; }
-      #ширма.идёт .имя b { animation: ширмаБуква 300ms ease-out both; }
+      #ширма.идёт .имя b { animation: ширмаБуква 520ms ease-out both; }
       #ширма.идёт .имя b:nth-child(1) { animation-delay: 0ms; }
-      #ширма.идёт .имя b:nth-child(2) { animation-delay: 70ms; }
-      #ширма.идёт .имя b:nth-child(3) { animation-delay: 140ms; }
-      #ширма.идёт .имя b:nth-child(4) { animation-delay: 210ms; }
-      #ширма.идёт .имя b:nth-child(5) { animation-delay: 280ms; }
-      #ширма.идёт .имя b:nth-child(6) { animation-delay: 350ms; }
+      #ширма.идёт .имя b:nth-child(2) { animation-delay: 130ms; }
+      #ширма.идёт .имя b:nth-child(3) { animation-delay: 260ms; }
+      #ширма.идёт .имя b:nth-child(4) { animation-delay: 390ms; }
+      #ширма.идёт .имя b:nth-child(5) { animation-delay: 520ms; }
+      #ширма.идёт .имя b:nth-child(6) { animation-delay: 650ms; }
       #ширма .подпись { font-family: 'Nunito', 'Jost', -apple-system, sans-serif;
                         color: rgba(255, 255, 255, 0.42); font-size: 16px; font-weight: 600; }
-      #ширма.идёт .подпись { animation: ширмаВсплыв 560ms cubic-bezier(0.22, 1, 0.36, 1) 420ms backwards; }
+      #ширма.идёт .подпись { animation: ширмаВсплыв 800ms cubic-bezier(0.22, 1, 0.36, 1) 820ms backwards; }
       /* Уход: буквы по очереди гаснут, сдвигаясь вправо, подпись — вместе
          с первой. Класс ставит приложение, когда готово показаться. */
-      #ширма.уходит .имя b { animation: ширмаВправо 280ms cubic-bezier(0.4, 0, 1, 1) both; }
+      #ширма.уходит .имя b { animation: ширмаВправо 360ms cubic-bezier(0.4, 0, 1, 1) both; }
       #ширма.уходит .имя b:nth-child(1) { animation-delay: 0ms; }
-      #ширма.уходит .имя b:nth-child(2) { animation-delay: 46ms; }
-      #ширма.уходит .имя b:nth-child(3) { animation-delay: 92ms; }
-      #ширма.уходит .имя b:nth-child(4) { animation-delay: 138ms; }
-      #ширма.уходит .имя b:nth-child(5) { animation-delay: 184ms; }
-      #ширма.уходит .имя b:nth-child(6) { animation-delay: 230ms; }
-      #ширма.уходит .подпись { animation: ширмаВправо 280ms cubic-bezier(0.4, 0, 1, 1) both; }
+      #ширма.уходит .имя b:nth-child(2) { animation-delay: 60ms; }
+      #ширма.уходит .имя b:nth-child(3) { animation-delay: 120ms; }
+      #ширма.уходит .имя b:nth-child(4) { animation-delay: 180ms; }
+      #ширма.уходит .имя b:nth-child(5) { animation-delay: 240ms; }
+      #ширма.уходит .имя b:nth-child(6) { animation-delay: 300ms; }
+      #ширма.уходит .подпись { animation: ширмаВправо 360ms cubic-bezier(0.4, 0, 1, 1) both; }
       @keyframes ширмаБуква { from { opacity: 0; } to { opacity: 1; } }
       @keyframes ширмаВсплыв { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes ширмаВправо { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(16px); } }
