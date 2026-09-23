@@ -7026,135 +7026,12 @@ function ПолеСЖивымТекстом({ value, style = {}, className = "",
  * значением и едет вместе с ней. Отпустил — всё возвращается в покой.
  * Своя разметка вместо <input type="range">: у встроенного на iOS
  * ручку не увеличить и пузырь не прицепить. */
-const ЗАПАС_ВСПЫШКИ = 28;
+/* Цвета дорожки ползунка запуска, слева направо. Градиент растянут на
+ * всю длину шкалы, а видна только заполненная часть — поэтому чем дальше
+ * ползунок, тем больше цветов открывается. */
+const ЦВЕТА_ДОРОЖКИ = ["#6C7CFF", "#8A3FD1", "#D0357A", "#F0643A", "#F2B233", "#3DCB7A", "#2FB8D9"];
 
-/* Бегущий свет на ползунке: дорожка остаётся тонкой, а по заполненной
- * части слева направо бегут световые импульсы с хвостом и ныряют под
- * ручку. Чем больше сумма, тем их больше и тем быстрее они летят —
- * размер стартовой покупки видно по тому, как «разгоняется» дорожка. */
-function ВолнаПолзунка({ доля, тянут }) {
-  const холст = useRef(null);
-  const сейчас = useRef({ доля, тянут });
-  сейчас.current = { доля, тянут };
-
-  useEffect(() => {
-    const к = холст.current;
-    if (!к) return undefined;
-    const ctx = к.getContext("2d");
-    const тихо = typeof window !== "undefined" && window.matchMedia
-      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let виден = true;
-    const ио = typeof IntersectionObserver !== "undefined"
-      ? new IntersectionObserver(([з]) => { виден = з.isIntersecting; }) : null;
-    if (ио) ио.observe(к);
-    let кадр = 0;
-    let прошлое = performance.now();
-    let живость = 0;
-    let доСледующего = 0;
-    const импульсы = [];
-    const вспышки = [];
-
-    const рисовать = (мс) => {
-      кадр = requestAnimationFrame(рисовать);
-      const dt = Math.min(0.05, (мс - прошлое) / 1000);
-      прошлое = мс;
-      if (!виден) return;
-      const { доля: д, тянут: т } = сейчас.current;
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      // Холст шире заполненной части на запас справа: вспышка у ручки
-      // расходится за её край и не должна обрезаться.
-      const полно = к.clientWidth, в = к.clientHeight;
-      const ш = полно - ЗАПАС_ВСПЫШКИ;
-      if (!полно || !в) return;
-      if (к.width !== Math.round(полно * dpr) || к.height !== Math.round(в * dpr)) {
-        к.width = Math.round(полно * dpr);
-        к.height = Math.round(в * dpr);
-      }
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, полно, в);
-      if (!(д > 0.002) || ш < 8 || тихо) { импульсы.length = 0; вспышки.length = 0; return; }
-
-      живость += (д - живость) * Math.min(1, dt * 4);
-      const скорость = 70 + 420 * живость;           // точек в секунду
-      const интервал = 0.75 - 0.6 * живость;          // между импульсами, с
-      const хвост = 30 + 60 * живость;
-      const толщина = т ? 8 : 4;
-      const середина = в / 2;
-
-      доСледующего -= dt;
-      if (доСледующего <= 0) {
-        импульсы.push({ x: -4, яркость: 0.8 + Math.random() * 0.2, дошёл: false });
-        доСледующего = интервал * (0.6 + Math.random() * 0.8);
-      }
-
-      ctx.globalCompositeOperation = "lighter";
-      const пятно = (x, радиус, альфа) => {
-        const г = ctx.createRadialGradient(x, середина, 0, x, середина, радиус);
-        г.addColorStop(0, `rgba(255,255,255,${альфа})`);
-        г.addColorStop(0.3, `rgba(160,170,255,${альфа * 0.55})`);
-        г.addColorStop(1, "rgba(108,124,255,0)");
-        ctx.fillStyle = г;
-        ctx.fillRect(x - радиус, середина - радиус, радиус * 2, радиус * 2);
-      };
-
-      for (let i = импульсы.length - 1; i >= 0; i -= 1) {
-        const и = импульсы[i];
-        и.x += скорость * dt;
-        const зад = и.x - хвост;
-        if (зад > ш) { импульсы.splice(i, 1); continue; }
-        /* Хвост рисуется целиком по своей длине и обрезается краем:
-           голова уходит под ручку, а хвост дотекает до неё сам, с той же
-           скоростью. Раньше гас весь импульс разом, ещё не дойдя. */
-        const гр = ctx.createLinearGradient(зад, 0, и.x, 0);
-        гр.addColorStop(0, "rgba(108,124,255,0)");
-        гр.addColorStop(0.65, `rgba(140,152,255,${0.75 * и.яркость})`);
-        гр.addColorStop(1, `rgba(255,255,255,${0.95 * и.яркость})`);
-        ctx.fillStyle = гр;
-        const от = Math.max(0, зад), до = Math.min(ш, и.x);
-        if (до > от) ctx.fillRect(от, середина - толщина / 2, до - от, толщина);
-
-        if (и.x <= ш) {
-          // Голова: яркое ядро и широкое мягкое свечение вокруг.
-          // На старте свечение разгорается: иначе его половина срезалась
-          // левым краем холста ровной вертикальной чертой.
-          const разгон = Math.max(0, Math.min(1, и.x / 22));
-          пятно(и.x, 20, 0.22 * и.яркость * разгон);
-          пятно(и.x, 11, 0.9 * и.яркость * разгон);
-        } else if (!и.дошёл) {
-          // Дошёл до ручки — там вспыхивает и расходится кольцо света.
-          и.дошёл = true;
-          вспышки.push({ возраст: 0, сила: и.яркость });
-        }
-      }
-
-      for (let i = вспышки.length - 1; i >= 0; i -= 1) {
-        const в_ = вспышки[i];
-        в_.возраст += dt;
-        const ход = в_.возраст / 0.55;
-        if (ход >= 1) { вспышки.splice(i, 1); continue; }
-        const гаснет = 1 - ход;
-        пятно(ш, 10 + 16 * ход, 0.75 * в_.сила * гаснет * гаснет);
-      }
-      ctx.globalCompositeOperation = "source-over";
-    };
-    кадр = requestAnimationFrame(рисовать);
-    return () => { cancelAnimationFrame(кадр); if (ио) ио.disconnect(); };
-  }, []);
-
-  return (
-    <canvas
-      ref={холст}
-      aria-hidden
-      style={{
-        position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
-        width: `calc(${доля * 100}% + ${ЗАПАС_ВСПЫШКИ}px)`, height: 44, pointerEvents: "none",
-        transition: тянут ? "none" : "width 220ms cubic-bezier(0.22, 1, 0.36, 1)",
-      }}
-    />
-  );
-}
-
-function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, формат = (v) => String(v), единица = "", ariaLabel, кривизна = 1, волна = false }) {
+function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, формат = (v) => String(v), единица = "", ariaLabel, кривизна = 1, радуга = false }) {
   const дорожка = useRef(null);
   const [тянут, setТянут] = useState(false);
   /* Пока палец на ручке, значение живёт только здесь, в ползунке и его
@@ -7237,12 +7114,15 @@ function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, фо
       >
         <div style={{
           position: "absolute", left: 0, top: 0, bottom: 0, width: `${доля * 100}%`, minWidth: тянут ? 8 : 4,
-          // С бегущим светом заливка приглушена: по белой дорожке
-          // светлые импульсы были бы не видны.
-          borderRadius: 999, background: волна ? "rgba(233,233,236,0.28)" : "#E9E9EC",
-          transition: тянут ? `min-width 260ms ${пружина}` : `width 220ms cubic-bezier(0.22, 1, 0.36, 1), min-width 260ms ${пружина}`,
+          borderRadius: 999,
+          // Радуга: градиент длиной во всю шкалу, заливка — окно в него.
+          // Ширина фона считается от заливки, поэтому делим на долю.
+          background: радуга ? `linear-gradient(90deg, ${ЦВЕТА_ДОРОЖКИ.join(", ")})` : "#E9E9EC",
+          backgroundSize: радуга ? `${100 / Math.max(доля, 0.02)}% 100%` : undefined,
+          backgroundPosition: "left center",
+          backgroundRepeat: "no-repeat",
+          transition: тянут ? `min-width 260ms ${пружина}` : `width 220ms cubic-bezier(0.22, 1, 0.36, 1), background-size 220ms cubic-bezier(0.22, 1, 0.36, 1), min-width 260ms ${пружина}`,
         }} />
-        {волна && <ВолнаПолзунка доля={доля} тянут={тянут} />}
         <div style={{
           position: "absolute", top: "50%", left: `${доля * 100}%`,
           width: ручка, height: ручка, borderRadius: "50%", background: "#FFFFFF",
@@ -20672,7 +20552,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
                 формат={число}
                 единица={единица}
                 кривизна={3}
-                волна
+                радуга
                 ariaLabel={t("launchAmountLabel")}
                 onChange={(v) => setForm((f) => ({ ...f, buyAmount: v > 0 ? String(v) : "" }))}
               />
