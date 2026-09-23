@@ -2316,6 +2316,12 @@ function GlobalStyle() {
         100% { opacity: 1; filter: blur(0); }
       }
       .умн-знак-строка { white-space: pre-wrap; }
+      /* Панель колокольчика раскрывается из него самого. */
+      @keyframes колоколВыход {
+        from { opacity: 0; transform: translate3d(0, -6px, 0) scale(0.92); }
+        to   { opacity: 1; transform: none; }
+      }
+      .колокол-панель { animation: колоколВыход 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
       .умн-градиент > .умн-знак {
         background: inherit; -webkit-background-clip: text; background-clip: text;
         -webkit-text-fill-color: transparent; color: transparent;
@@ -23247,6 +23253,12 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
   }, [accountCreated, userId, открыт]);
 
   const [панель, setПанель] = useState(false);
+  // Закрытие не обрывает панель: она сжимается к колокольчику и тает.
+  const [панельУходит, setПанельУходит] = useState(false);
+  const закрытьПанель = (потом) => {
+    setПанельУходит(true);
+    setTimeout(() => { setПанель(false); setПанельУходит(false); if (потом) потом(); }, 200);
+  };
   if (!черновик) return null;
 
   /* Сама просьба больше не висит на главной: справа от имени стоит
@@ -23255,7 +23267,7 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
   return (
     <div style={{ position: "relative" }}>
       <button
-        onClick={() => { setПанель((б) => !б); haptic("light"); }}
+        onClick={() => { if (панель) закрытьПанель(); else setПанель(true); haptic("light"); }}
         aria-label={t("mailConfirmRow")}
         className="fx-tap flex items-center justify-center"
         style={{ position: "relative", width: 42, height: 42, borderRadius: 999, background: T.surface, border: "none" }}
@@ -23269,14 +23281,19 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
       {панель && (
         <>
           {/* Нажатие мимо панели закрывает её. */}
-          <div onClick={() => setПанель(false)} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
-          <div className="fx-reveal" style={{
+          <div onClick={() => закрытьПанель()} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
+          <div className={панельУходит ? undefined : "колокол-панель"} style={{
             position: "absolute", top: 50, right: 0, zIndex: 31,
             width: "min(340px, calc(100vw - 32px))", padding: 8, borderRadius: 22,
             background: T.surface, boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
+            transformOrigin: "calc(100% - 21px) -8px",
+            ...(панельУходит ? {
+              opacity: 0, transform: "translate3d(0, -6px, 0) scale(0.92)",
+              transition: "opacity 200ms ease, transform 200ms cubic-bezier(0.4, 0, 1, 1)",
+            } : null),
           }}>
       <button
-        onClick={() => { setПанель(false); setОткрыт(true); haptic("light"); }}
+        onClick={() => { закрытьПанель(() => setОткрыт(true)); haptic("light"); }}
         className="fx-tap w-full flex items-center"
         style={{
           gap: 12, padding: "13px 14px", borderRadius: 20,
