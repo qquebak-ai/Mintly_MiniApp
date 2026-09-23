@@ -27776,7 +27776,6 @@ function mapTokenRow(row) {
   const [viewedUserId, setViewedUserId] = useState(null);
   function openUserProfile(id) { if (!id) return; setViewedUserId(id); setView("user"); }
   function backFromUserProfile() { уйтиСоСтраницы(() => setView(token ? "token" : tab)); }
-  function backFromCreate() { уйтиСоСтраницы(() => setView(tab)); }
   function backFromAchievements() { уйтиСоСтраницы(() => setView(откудаДостижения)); }
   function backFromProfile() { уйтиСоСтраницы(() => goTab("home")); }
 
@@ -27806,7 +27805,11 @@ function mapTokenRow(row) {
     if (назадФразы) return назадФразы;
     if (view === "user") return backFromUserProfile;
     if (view === "token") return backFromToken;
-    if (view === "create") return backFromCreate;
+    // Запуск токена стрелку не отдаёт вовсе — как окно PIN и сам ход
+    // запуска: форма легко теряется на середине, и уйти с нее одним
+    // случайным нажатием не должно получаться. Выход — своей кнопкой
+    // «Отмена»/навигацией внизу, а не системной стрелкой Telegram.
+    if (view === "create") return null;
     /* Профиль в капсуле не живёт: в него приходят из меню, и без стрелки
        Telegram предлагал единственный выход — «Закрыть», то есть выйти из
        приложения целиком. */
