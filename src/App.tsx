@@ -2221,6 +2221,20 @@ function GlobalStyle() {
       @keyframes кнопкаПереливается { from { background-position: 0% 50%; } to { background-position: 0% 50%; } }
       @keyframes букваЦветёт { from { background-position: 0% 50%; } to { background-position: 0% 50%; } }
       }
+      /* Сияние за кнопкой: круговой градиент (зелёный, синий, белый,
+         оранжевый) размыт в облако и вращается за 5,2 с. Угол крутится
+         через @property — у градиента нет своей анимации поворота, а
+         вращать сам слой нельзя: он вытянутый и заходил бы углами. */
+      @property --сияние-угол { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+      @keyframes сияниеКруг { to { --сияние-угол: 360deg; } }
+      .кнопка-сияние {
+        position: absolute; inset: -2px -4px; border-radius: 999px; z-index: -1; pointer-events: none;
+        background: conic-gradient(from var(--сияние-угол), #22C55E, #2563EB, #D4D4D8, #F97316, #22C55E);
+        filter: blur(14px);
+        animation: сияниеКруг 5.2s linear infinite;
+        transition: opacity 600ms ease;
+      }
+      @media (prefers-reduced-motion: reduce) { .кнопка-сияние { animation: none; } }
       /* Умная смена текста: общие знаки остаются и доезжают на новое
          место, новые проступают из размытия сверху, по очереди слева
          направо. Размытие сходит дольше, чем прозрачность, — отсюда
@@ -14391,7 +14405,7 @@ function КлавишаЦифры({ знак, onНажать, onУдержани
    сквозь неё туда-сюда, а размытие с порогом по прозрачности слепляет
    их в каплю. Рисуется внутри SVG и фильтр стоит на группе внутри
    него: на обычных элементах Safari фильтры по ссылке не применяет. */
-function ТочкиЗагрузки({ видно }) {
+function ТочкиЗагрузки({ видно, цвет = "#FFFFFF" }) {
   return (
     <span
       aria-hidden
@@ -14409,7 +14423,7 @@ function ТочкиЗагрузки({ видно }) {
             <feColorMatrix in="размыто" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -11" />
           </filter>
         </defs>
-        <g filter="url(#mintly-goo)" fill="#FFFFFF">
+        <g filter="url(#mintly-goo)" fill={цвет}>
           <circle cx="0" cy="0" r="11.5" />
           <circle className={видно ? "точки-спутник" : undefined} cx="0" cy="0" r="8" />
         </g>
@@ -14424,43 +14438,52 @@ function ТочкиЗагрузки({ видно }) {
  * внутри бегают две слипающиеся точки; пришёл ответ — кнопка вновь
  * растягивается, а надпись возвращается. Высоту держит невидимая
  * надпись, поэтому ничего вокруг не двигается. */
-function ЖидкаяКнопка({ onClick, disabled = false, занята = false, готова = false, children }) {
+function ЖидкаяКнопка({ onClick, disabled = false, занята = false, готова = false, сияние = false, children }) {
+  /* Кнопка белая: на чёрном окне входа это самое яркое пятно, и глаз
+     сразу находит, куда жать. Пока жать нельзя — серая, как раньше.
+     Сияние — размытый круговой градиент за кнопкой, который медленно
+     вращается; включается, только когда кнопку уже можно нажать. */
+  const белая = готова || занята;
   return (
     <div className="flex justify-center" style={{ width: "100%" }}>
-      <button
-        onClick={onClick}
-        disabled={disabled || занята}
-        className="fx-tap flex items-center justify-center"
-        style={{
-          position: "relative", overflow: "hidden",
-          width: занята ? "34%" : "100%",
-          padding: "16px 0", borderRadius: 999, border: "none",
-          background: T.surfaceHi,
-          color: готова ? PRISM_TEXT : T.muted,
-          fontFamily: displayFont, fontWeight: 800, fontSize: 16,
-          // Сжатие начинается, когда надпись уже погасла (0,1 с).
-          transition: занята
-            ? "width 250ms cubic-bezier(0.22, 1, 0.36, 1) 100ms, color 320ms ease"
-            : "width 300ms cubic-bezier(0.22, 1, 0.36, 1), color 320ms ease",
-        }}
-      >
-        {/* Заливка лежит отдельным слоем и проявляется, когда кнопку
-            можно нажать: у градиента нет переходов, и без этого она
-            загоралась бы рывком. В ожидании остаётся включённой:
-            серым кнопка не мигает. */}
-        <span aria-hidden style={{
-          position: "absolute", inset: 0, borderRadius: 999, ...ВОЛНА(ЦВЕТ_ВХОДА),
-          pointerEvents: "none", opacity: готова || занята ? 1 : 0, transition: "opacity 320ms ease",
-        }} />
-        <span style={{
-          position: "relative", whiteSpace: "nowrap",
-          opacity: занята ? 0 : 1,
-          transition: занята ? "opacity 100ms ease" : "opacity 200ms ease 160ms",
-        }}>
-          {children}
-        </span>
-        <ТочкиЗагрузки видно={занята} />
-      </button>
+      <div style={{
+        position: "relative", isolation: "isolate",
+        width: занята ? "34%" : "100%",
+        // Сжатие начинается, когда надпись уже погасла (0,1 с).
+        transition: занята
+          ? "width 250ms cubic-bezier(0.22, 1, 0.36, 1) 100ms"
+          : "width 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+      }}>
+        {сияние && <span aria-hidden className="кнопка-сияние" style={{ opacity: готова || занята ? 0.8 : 0 }} />}
+        <button
+          onClick={onClick}
+          disabled={disabled || занята}
+          className="fx-tap flex items-center justify-center"
+          style={{
+            position: "relative", overflow: "hidden", width: "100%",
+            padding: "16px 0", borderRadius: 999, border: "none",
+            background: T.surfaceHi,
+            color: белая ? "#0B0B0C" : T.muted,
+            fontFamily: displayFont, fontWeight: 800, fontSize: 16,
+            transition: "color 320ms ease",
+          }}
+        >
+          {/* Белая заливка — отдельным слоем, чтобы проявляться плавно,
+              а не загораться рывком. В ожидании остаётся включённой. */}
+          <span aria-hidden style={{
+            position: "absolute", inset: 0, borderRadius: 999, background: "#EDEDEF",
+            pointerEvents: "none", opacity: белая ? 1 : 0, transition: "opacity 320ms ease",
+          }} />
+          <span style={{
+            position: "relative", whiteSpace: "nowrap",
+            opacity: занята ? 0 : 1,
+            transition: занята ? "opacity 100ms ease" : "opacity 200ms ease 160ms",
+          }}>
+            {children}
+          </span>
+          <ТочкиЗагрузки видно={занята} цвет="#0B0B0C" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -23490,6 +23513,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 disabled={!можно}
                 занята={tgBusy || ждём}
                 готова={можно}
+                сияние
               >
                 {входБезНика ? t("authSignInCta") : t("createCta")}
               </ЖидкаяКнопка>
