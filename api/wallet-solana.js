@@ -1066,7 +1066,11 @@ export default async function handler(req, res) {
       const имя = String(тело.name || "").trim();
       const тикер = String(тело.ticker || "").trim().toUpperCase();
       const взнос = Math.max(0, Number(тело.buySol) || 0);
-      if (!имя || !тикер) return res.status(400).json({ error: "bad_request" });
+      // Латиница — как и в api/solana-launch.js: имя и тикер уходят в
+      // метаданные контракта, форма режет ввод сама, здесь подстраховка.
+      if (!имя || !тикер || !/^[A-Za-z0-9 .,'&-]{1,40}$/.test(имя) || !/^[A-Za-z0-9]{1,12}$/.test(тикер)) {
+        return res.status(400).json({ error: "bad_request" });
+      }
 
       const оп = await начать(db, user, { дело: "launch", сумма: взнос, ключЗапроса, ip });
       if (оп.повтор) return res.status(200).json({ signature: оп.signature, repeat: true });

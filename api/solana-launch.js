@@ -782,7 +782,13 @@ export default async function handler(req, res) {
     if (действие === "launch") {
       const имя = String(тело.name || "").trim();
       const тикер = String(тело.ticker || "").trim().toUpperCase();
-      if (!имя || !тикер) return res.status(400).json({ error: "bad_request" });
+      // Латиница: имя и тикер уходят в метаданные контракта, их читает
+      // кошелёк при подписи и биржа при листинге — не всякий алфавит
+      // там переживает круглый путь. Форма уже режет ввод сама, здесь —
+      // подстраховка на случай прямого запроса мимо неё.
+      if (!имя || !тикер || !/^[A-Za-z0-9 .,'&-]{1,40}$/.test(имя) || !/^[A-Za-z0-9]{1,12}$/.test(тикер)) {
+        return res.status(400).json({ error: "bad_request" });
+      }
       const хост = req.headers["x-forwarded-host"] || req.headers.host || "";
       const итог = await собратьЗапуск({
         wallet: тело.wallet,

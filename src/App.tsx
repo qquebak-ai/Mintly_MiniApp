@@ -20851,7 +20851,19 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
     onЧерновикПринят();
   }, [черновик]);
 
-  function set(key) { return (e) => setForm(f => ({ ...f, [key]: e.target.value })); }
+  /* Имя и тикер уходят в контракт как есть — их читает кошелёк при
+     подписи и биржа при листинге, и там кириллица (или любой другой
+     алфавит) половине из них не по зубам. Отсекаем на вводе, а не на
+     отправке: человек видит сразу, что не прошло, а не после того, как
+     заполнил всю форму. */
+  function set(key) {
+    return (e) => {
+      let v = e.target.value;
+      if (key === "name") v = v.replace(/[^A-Za-z0-9 .,'&-]/g, "");
+      else if (key === "ticker") v = v.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+      setForm(f => ({ ...f, [key]: v }));
+    };
+  }
   function onPickLogo(e) {
     const file = e.target.files && e.target.files[0];
     e.target.value = ""; // allow re-picking the same file later
