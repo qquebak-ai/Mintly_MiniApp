@@ -20947,9 +20947,13 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   // прокручиваемый контейнер экрана. Раньше к ней добавлялись ещё сто
   // сорок точек, и под кнопкой запуска оставалась пустая половина экрана.
   return (
-    <div className="fx-view flex flex-col gap-7" style={{ position: "relative", isolation: "isolate" }}>
+    <div className="fx-view flex flex-col gap-7" style={{ position: "relative", isolation: "isolate", paddingTop: 8 }}>
       <div>
-        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 20.5, fontWeight: 700 }}>{t("launchTokenTitle")}</div>
+        {/* Заголовок — тем же кеглем и начертанием, что у прочих
+            разделов (Главная, Мемпад, Кошелёк): раньше стоял мельче и
+            без отступа сверху, и переход между вкладками читался
+            прыжком. */}
+        <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>{t("launchTokenTitle")}</h1>
         <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 2 }}>
           {вSolana ? t("launchTokenSubSol") : t("launchTokenSub")}
         </div>
