@@ -13468,12 +13468,12 @@ function HomeView({
           профиль: они узнавались первыми, и над полем плашек висела одна
           готовая строка — будто загрузилось только «я», а остальное
           сломалось. */}
-      <ШапкаГлавной profile={profile} accountCreated={accountCreated} onOpenMyProfile={onOpenMyProfile} грузится={профильГрузится || вПлашках} />
-
-      {/* Почта, названная при создании аккаунта, ждёт подтверждения — и
-          просьба стоит первой строкой главной, а не в настройках, куда
-          никто не заходит. */}
-      <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} />
+      {/* Справа от имени — колокольчик: там просьба подтвердить почту,
+          пока она не подтверждена. */}
+      <div className="flex items-center justify-between" style={{ gap: 12 }}>
+        <ШапкаГлавной profile={profile} accountCreated={accountCreated} onOpenMyProfile={onOpenMyProfile} грузится={профильГрузится || вПлашках} />
+        <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} />
+      </div>
       {/* Баннеры ждут вместе со всеми: живая карусель посреди плашек
           выглядела так, будто остальной экран сломался. */}
       {вПлашках ? (
@@ -23204,12 +23204,37 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
     return () => { живо = false; };
   }, [accountCreated, userId, открыт]);
 
+  const [панель, setПанель] = useState(false);
   if (!черновик) return null;
 
+  /* Сама просьба больше не висит на главной: справа от имени стоит
+     колокольчик с красной точкой, а плашка «подтверди почту» лежит в его
+     панели. Почта подтверждена — пропадает и колокольчик. */
   return (
-    <>
+    <div style={{ position: "relative" }}>
       <button
-        onClick={() => { setОткрыт(true); haptic("light"); }}
+        onClick={() => { setПанель((б) => !б); haptic("light"); }}
+        aria-label={t("mailConfirmRow")}
+        className="fx-tap flex items-center justify-center"
+        style={{ position: "relative", width: 42, height: 42, borderRadius: 999, background: T.surface, border: "none" }}
+      >
+        <Bell size={19} color={T.ice} strokeWidth={1.9} />
+        <span aria-hidden style={{
+          position: "absolute", top: 8, right: 9, width: 9, height: 9, borderRadius: "50%",
+          background: "#FF3B4E", boxShadow: `0 0 0 2px ${T.surface}`,
+        }} />
+      </button>
+      {панель && (
+        <>
+          {/* Нажатие мимо панели закрывает её. */}
+          <div onClick={() => setПанель(false)} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
+          <div className="fx-reveal" style={{
+            position: "absolute", top: 50, right: 0, zIndex: 31,
+            width: "min(340px, calc(100vw - 32px))", padding: 8, borderRadius: 22,
+            background: T.surface, boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
+          }}>
+      <button
+        onClick={() => { setПанель(false); setОткрыт(true); haptic("light"); }}
         className="fx-tap w-full flex items-center"
         style={{
           gap: 12, padding: "13px 14px", borderRadius: 20,
@@ -23231,6 +23256,9 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
         </span>
         <ChevronRight size={16} color={T.faint} />
       </button>
+          </div>
+        </>
+      )}
       <ЭкранПочты
         открыт={открыт}
         почтаЗаранее={черновик}
@@ -23239,7 +23267,7 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
         onClose={() => setОткрыт(false)}
         onГотово={() => { setОткрыт(false); setЧерновик(""); }}
       />
-    </>
+    </div>
   );
 }
 
