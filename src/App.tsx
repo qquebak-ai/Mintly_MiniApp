@@ -28606,7 +28606,11 @@ function mapTokenRow(row) {
             { id: "shop", label: t("navShop"), icon: ЗначокСумка },
             { id: "wallet", label: t("navWallet"), icon: ЗначокСтолбики },
           ].map(({ id, label, icon: Icon, locked }) => {
-            const active = id === "create" ? view === "create" : tab === id;
+            // Запуск — поверх текущего раздела, а не переключение на
+            // него: если подсвечивать «создать» и сам раздел разом,
+            // получаются два выбранных кружка сразу. Пока открыт запуск,
+            // раздел под ним подсветку временно уступает.
+            const active = id === "create" ? view === "create" : tab === id && view !== "create";
             return (
               <button
                 key={id}
