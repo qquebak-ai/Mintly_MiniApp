@@ -11165,7 +11165,7 @@ function КарточкаСВыдвижкой({ title, tokens, onOpen, delay = 0
               </span>
             ))}
           </div>
-          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11.5, transition: "transform 420ms cubic-bezier(.34,1.56,.64,1)", transform: открыта ? "rotate(180deg)" : "none", display: "inline-block" }}>▾</span>
+          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 20, lineHeight: 1, transition: "transform 420ms cubic-bezier(.34,1.56,.64,1)", transform: открыта ? "rotate(180deg)" : "none", display: "inline-block" }}>▾</span>
         </div>
       </button>
 
@@ -11175,7 +11175,19 @@ function КарточкаСВыдвижкой({ title, tokens, onOpen, delay = 0
           прозрачность, на видеокарте. Прежде раскрывалась сама высота
           (grid-template-rows), и на телефоне это шло рывками: каждый кадр
           пересчитывал раскладку всей главной. */}
-      <div style={{ overflow: "hidden" }}>
+      <div style={{ overflow: "hidden", position: "relative" }}>
+        {/* Узкая размытая кромка сверху: выезжающий текст проходит сквозь
+            неё и проявляется из дымки, а не вырезается ровной линией. */}
+        <span aria-hidden style={{
+          position: "absolute", left: 0, right: 0, top: 0, height: 22, zIndex: 1, pointerEvents: "none",
+          backdropFilter: "blur(5px)", WebkitBackdropFilter: "blur(5px)",
+          // Дымка нужна только на выезде: когда текст встал, она тает и
+          // не мутит его верх.
+          opacity: открыта ? 0 : 1,
+          transition: открыта ? "opacity 320ms ease 520ms" : "opacity 120ms ease",
+          WebkitMaskImage: "linear-gradient(180deg, #000 0%, #000 35%, transparent 100%)",
+          maskImage: "linear-gradient(180deg, #000 0%, #000 35%, transparent 100%)",
+        }} />
           <div
             className="flex flex-col"
             style={{
