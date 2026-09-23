@@ -2270,13 +2270,16 @@ function GlobalStyle() {
         62%  { transform: translate3d(100%, 0, 0); }
         100% { transform: translate3d(100%, 0, 0); }
       }
+      /* Рама шире заливки на ширину блика слева: сдвиг на 100 % уводит
+         блик целиком за правый край — под ручку, — а не обрывает его
+         на полпути, как раньше. */
       .дорожка-блик {
-        position: absolute; inset: 0; pointer-events: none;
+        position: absolute; top: 0; bottom: 0; left: -84px; right: 0; pointer-events: none;
         will-change: transform;
         animation: дорожкаБлик 2.6s cubic-bezier(0.55, 0.05, 0.25, 1) infinite;
       }
       .дорожка-блик::before {
-        content: ""; position: absolute; top: 0; bottom: 0; left: -84px; width: 84px;
+        content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 84px;
         background: linear-gradient(90deg,
           rgba(255,255,255,0) 0%,
           rgba(255,255,255,0.06) 22%,
@@ -6983,10 +6986,13 @@ function УмныйТекст({ text, className = "", style = {}, шаг = 42 })
           }
         }
       }
-      const x = у.getBoundingClientRect().left;
+      // Место — внутри самой строки, а не на экране: прокрутка, смена
+      // вкладки или сдвиг карточки иначе давали разницу в сотни точек, и
+      // цифры летели через всю страницу.
+      const x = у.offsetLeft;
       новыеМеста.set(ключ, x);
       const было = места.current.get(ключ);
-      if (видно && было != null && Math.abs(было - x) > 0.5 && у.dataset.n !== "1") {
+      if (видно && было != null && Math.abs(было - x) > 0.5 && Math.abs(было - x) < 160 && у.dataset.n !== "1") {
         у.style.transition = "none";
         у.style.transform = `translateX(${было - x}px)`;
         void у.offsetWidth;
@@ -7001,7 +7007,7 @@ function УмныйТекст({ text, className = "", style = {}, шаг = 42 })
 
   let номер = 0;
   return (
-    <span ref={корень} className={className} style={{ display: "inline-block", whiteSpace: "pre", ...style }}>
+    <span ref={корень} className={className} style={{ display: "inline-block", whiteSpace: "pre", position: "relative", ...style }}>
       {знаки.map((з) => (
         <span
           key={з.key}
@@ -7067,7 +7073,23 @@ const ЦВЕТА_ДОРОЖКИ = ["#262A6B", "#3440A8", "#4F5DE8", "#6C7CFF", "
 
 function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, формат = (v) => String(v), единица = "", ariaLabel, кривизна = 1, радуга = false }) {
   const дорожка = useRef(null);
+  const корень = useRef(null);
   const [тянут, setТянут] = useState(false);
+  /* Касание ползунка целиком наше. Слушатели React пассивные, и
+     отменить в них прокрутку нельзя — поэтому вешаем свои: без этого
+     движение пальца вниз по ползунку Telegram забирал себе и сворачивал
+     приложение. */
+  useEffect(() => {
+    const el = корень.current;
+    if (!el) return undefined;
+    const стоп = (e) => { if (e.cancelable) e.preventDefault(); };
+    el.addEventListener("touchstart", стоп, { passive: false });
+    el.addEventListener("touchmove", стоп, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", стоп);
+      el.removeEventListener("touchmove", стоп);
+    };
+  }, []);
   /* Пока палец на ручке, значение живёт только здесь, в ползунке и его
      пузыре. Наружу оно уходит один раз — когда палец убрали: иначе
      каждая строка страницы, что зависит от суммы, пересчитывалась на
@@ -7123,6 +7145,7 @@ function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, фо
   const ручка = тянут ? 24 : 14;
   return (
     <div
+      ref={корень}
       role="slider"
       tabIndex={0}
       aria-label={ariaLabel}
@@ -19771,7 +19794,10 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
     const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
     if (!tg || !tg.disableVerticalSwipes) return undefined;
     try { tg.disableVerticalSwipes(); } catch (e) { /* старый клиент */ }
-    return () => { try { tg.enableVerticalSwipes(); } catch (e) { /* старый клиент */ } };
+    /* На выходе жест не возвращаем: во всём приложении он выключен.
+       Раньше кадрирование логотипа включало его обратно, и после него
+       ползунок суммы, потянутый вниз, сворачивал Telegram. */
+    return () => { try { tg.disableVerticalSwipes(); } catch (e) { /* старый клиент */ } };
   }, [file]);
 
   const scale = baseScale * zoom;

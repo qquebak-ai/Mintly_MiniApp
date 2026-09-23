@@ -238,23 +238,59 @@ async function кошелёк(db, user, набор) {
   return строка;
 }
 
+/* Запрос к узлу сети — с повтором и сроком.
+   Публичный узел (особенно тестовой сети) то отвечает «слишком часто»,
+   то думает по десять секунд. Раньше любой такой сбой превращался в
+   ноль на балансе, а зависший ответ держал человека без конца. Теперь:
+   срок на попытку, и до трёх попыток на перегрузку и сетевой сбой. */
 async function rpc(method, params) {
-  const res = await fetch(RPC, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
-  if (!res.ok) throw new Error(`rpc ${res.status}`);
-  const json = await res.json();
-  if (json.error) throw new Error(json.error.message || "rpc");
-  return json.result;
+  let последняя;
+  for (let попытка = 0; попытка < 3; попытка += 1) {
+    if (попытка) await new Promise((r) => setTimeout(r, 350 * попытка));
+    const стоп = new AbortController();
+    const таймер = setTimeout(() => стоп.abort(), 8000);
+    try {
+      const res = await fetch(RPC, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+        signal: стоп.signal,
+      });
+      if (res.status === 429 || res.status >= 500) { последняя = new Error(`rpc ${res.status}`); continue; }
+      if (!res.ok) throw new Error(`rpc ${res.status}`);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message || "rpc");
+      return json.result;
+    } catch (e) {
+      последняя = e;
+      // Ошибка самого метода не лечится повтором — только сетевая.
+      if (e && !/abort|fetch|network|ECONN|rpc 429|rpc 5/i.test(String(e.name) + String(e.message))) throw e;
+    } finally {
+      clearTimeout(таймер);
+    }
+  }
+  throw последняя || new Error("rpc");
 }
 
 /* Сколько на кошельке. Спрашиваем сеть: свой учёт разошёлся бы с ней при
-   первом же переводе мимо приложения. */
+   первом же переводе мимо приложения.
+   Узел не ответил — берём последнее, что он говорил по этому адресу, а
+   не ноль: ноль на карточке при пяти SOL на кошельке пугает сильнее,
+   чем чуть устаревшее число. */
+const последнийБаланс = new Map();
+async function балансИзСети(адрес) {
+  try {
+    const b = await rpc("getBalance", [адрес]);
+    const v = Number((b && b.value) || 0) / LAMPORTS;
+    последнийБаланс.set(адрес, v);
+    return v;
+  } catch {
+    return последнийБаланс.has(адрес) ? последнийБаланс.get(адрес) : null;
+  }
+}
 async function баланс(адрес) {
-  const b = await rpc("getBalance", [адрес]).catch(() => null);
-  return Number((b && b.value) || 0) / LAMPORTS;
+  const v = await балансИзСети(адрес);
+  return v == null ? 0 : v;
 }
 
 async function сообщить(db, user_id, текст) {
@@ -849,9 +885,11 @@ export default async function handler(req, res) {
 
     if (действие === "state") {
       res.setHeader("Cache-Control", "no-store");
-      const [есть, выведено] = await Promise.all([баланс(строка.address), выведеноЗаСутки(db, user)]);
+      const [есть, выведено] = await Promise.all([балансИзСети(строка.address), выведеноЗаСутки(db, user)]);
       return res.status(200).json({
         address: строка.address,
+        // null — сеть не ответила и прежнего числа нет: интерфейс тогда
+        // держит то, что уже показывал, а не рисует ноль.
         sol: есть,
         payout: строка.payout_address || null,
         pending: строка.payout_pending || null,

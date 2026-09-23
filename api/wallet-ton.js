@@ -189,17 +189,24 @@ async function подписант(строка, набор, user) {
   return { пара, контракт, client, кошелёк: client.open(контракт) };
 }
 
+// Последний ответ по адресу: на сбой узла — он, а не ноль (см. Solana).
+const последнийБаланс = new Map();
 async function баланс(адрес) {
-  try {
-    const res = await fetch(`${TONAPI}/v2/accounts/${адрес}`, {
-      headers: TONAPI_KEY ? { Authorization: `Bearer ${TONAPI_KEY}` } : {},
-    });
-    if (!res.ok) return 0;
-    const j = await res.json();
-    return (Number(j.balance) || 0) / 1e9;
-  } catch {
-    return 0;
+  for (let попытка = 0; попытка < 2; попытка += 1) {
+    try {
+      const res = await fetch(`${TONAPI}/v2/accounts/${адрес}`, {
+        headers: TONAPI_KEY ? { Authorization: `Bearer ${TONAPI_KEY}` } : {},
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.status === 404) { последнийБаланс.set(адрес, 0); return 0; }
+      if (!res.ok) { await new Promise((r) => setTimeout(r, 400)); continue; }
+      const j = await res.json();
+      const v = (Number(j.balance) || 0) / 1e9;
+      последнийБаланс.set(адрес, v);
+      return v;
+    } catch { /* повторим */ }
   }
+  return последнийБаланс.get(адрес) || 0;
 }
 
 /* Жетонный кошелёк владельца для конкретного жетона: адрес и остаток.

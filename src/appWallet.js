@@ -70,6 +70,8 @@ export async function внутреннийДоступен() {
    вывода, ожидающая привязка, порог автовывода и остаток суточного
    лимита. Возвращает null, если человек не вошёл или кошелёк выключен —
    вызывающий код тогда просто идёт прежним путём. */
+let прежнееSol = null;
+let прежнееСостояние = null;
 export async function состояниеВнутреннего() {
   if (!(await внутреннийДоступен())) return null;
   // Кошелёк привязан к аккаунту: без входа его нет и быть не может.
@@ -77,8 +79,16 @@ export async function состояниеВнутреннего() {
   // нет, было нельзя ни человеку, ни нам.
   if (!(await токен())) return { нуженВход: true };
   try {
-    return await запрос("/api/wallet-solana?action=state");
+    const св = await запрос("/api/wallet-solana?action=state");
+    // Сеть не ответила (sol: null) — держим прежнее число, а не ноль.
+    if (св && св.sol == null) св.sol = прежнееSol != null ? прежнееSol : null;
+    if (св && св.sol != null) прежнееSol = св.sol;
+    if (св) прежнееСостояние = св;
+    return св;
   } catch (e) {
+    // Сбой запроса — отдаём прежнее состояние, если оно было: карточка
+    // не должна обнуляться из-за одного неудачного опроса.
+    if (прежнееСостояние) return прежнееСостояние;
     return { ошибка: String((e && e.message) || e).slice(0, 120) };
   }
 }
@@ -101,12 +111,16 @@ export async function внутреннийTONДоступен() {
   return включёнTON;
 }
 
+let прежнееTON = null;
 export async function состояниеВнутреннегоTON() {
   if (!(await внутреннийTONДоступен())) return null;
   if (!(await токен())) return { нуженВход: true };
   try {
-    return await запрос("/api/wallet-ton?action=state");
+    const св = await запрос("/api/wallet-ton?action=state");
+    if (св) прежнееTON = св;
+    return св;
   } catch (e) {
+    if (прежнееTON) return прежнееTON;
     return { ошибка: String((e && e.message) || e).slice(0, 120) };
   }
 }
