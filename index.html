@@ -120,25 +120,56 @@
          Снимается из приложения, когда экран входа встал на место или
          когда аккаунт нашёлся. -->
     <style>
-      /* Имя на поле ожидания. Буквы проступают одна за другой — то же
-         движение, что и в самом приложении, но чистым CSS: связка к
-         этому времени ещё не загружена, а смотреть на пустое чёрное
-         поле человеку нечего. */
+      /* Заставка на поле ожидания — один в один та, что открывает окно
+         входа: имя по центру, буквы проступают слева направо, подпись
+         поднимается следом, а уходят буквы тем же порядком, сдвигаясь
+         вправо. Всё чистым CSS: связка к этому времени ещё не загружена.
+         Числа сняты с приложения (ИмяПоБуквам, .авт-заставка) — менять
+         их нужно в обоих местах сразу. */
       #ширма { position: fixed; inset: 0; z-index: 2147483000; background: #000; pointer-events: none;
-               display: flex; align-items: center; justify-content: center; }
-      #ширма .имя { font-family: 'Nunito', system-ui, sans-serif; color: #F5F7FA;
+               display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+      #ширма .имя { font-family: 'Nunito', 'Jost', 'Segoe UI', sans-serif; color: #F5F7FA;
                     font-size: 25px; font-weight: 300; letter-spacing: 0.34em; padding-left: 0.34em; }
-      #ширма .имя b { font-weight: inherit; display: inline-block; opacity: 0;
-                      animation: буква 300ms ease-out forwards; }
-      #ширма .имя b:nth-child(1) { animation-delay: 60ms; }
-      #ширма .имя b:nth-child(2) { animation-delay: 124ms; }
-      #ширма .имя b:nth-child(3) { animation-delay: 188ms; }
-      #ширма .имя b:nth-child(4) { animation-delay: 252ms; }
-      #ширма .имя b:nth-child(5) { animation-delay: 316ms; }
-      #ширма .имя b:nth-child(6) { animation-delay: 380ms; }
-      @keyframes буква { to { opacity: 1; } }
+      #ширма .имя b { font-weight: inherit; display: inline-block;
+                      animation: ширмаБуква 300ms ease-out both; }
+      #ширма .имя b:nth-child(1) { animation-delay: 0ms; }
+      #ширма .имя b:nth-child(2) { animation-delay: 70ms; }
+      #ширма .имя b:nth-child(3) { animation-delay: 140ms; }
+      #ширма .имя b:nth-child(4) { animation-delay: 210ms; }
+      #ширма .имя b:nth-child(5) { animation-delay: 280ms; }
+      #ширма .имя b:nth-child(6) { animation-delay: 350ms; }
+      #ширма .подпись { font-family: 'Nunito', 'Jost', -apple-system, sans-serif;
+                        color: rgba(255, 255, 255, 0.42); font-size: 13px; font-weight: 600;
+                        animation: ширмаВсплыв 560ms cubic-bezier(0.22, 1, 0.36, 1) 420ms backwards; }
+      /* Уход: буквы по очереди гаснут, сдвигаясь вправо, подпись — вместе
+         с первой. Класс ставит приложение, когда готово показаться. */
+      #ширма.уходит .имя b { animation: ширмаВправо 280ms cubic-bezier(0.4, 0, 1, 1) both; }
+      #ширма.уходит .имя b:nth-child(1) { animation-delay: 0ms; }
+      #ширма.уходит .имя b:nth-child(2) { animation-delay: 46ms; }
+      #ширма.уходит .имя b:nth-child(3) { animation-delay: 92ms; }
+      #ширма.уходит .имя b:nth-child(4) { animation-delay: 138ms; }
+      #ширма.уходит .имя b:nth-child(5) { animation-delay: 184ms; }
+      #ширма.уходит .имя b:nth-child(6) { animation-delay: 230ms; }
+      #ширма.уходит .подпись { animation: ширмаВправо 280ms cubic-bezier(0.4, 0, 1, 1) both; }
+      @keyframes ширмаБуква { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes ширмаВсплыв { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes ширмаВправо { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(16px); } }
+      @media (prefers-reduced-motion: reduce) { #ширма * { animation: none !important; } }
     </style>
-    <div id="ширма"><div class="имя"><b>M</b><b>I</b><b>N</b><b>T</b><b>L</b><b>Y</b></div></div>
+    <div id="ширма">
+      <div class="имя"><b>M</b><b>I</b><b>N</b><b>T</b><b>L</b><b>Y</b></div>
+      <div class="подпись">Мемкоины на TON и Solana</div>
+    </div>
+    <script>
+      // Подпись на выбранном языке и миг старта: от него приложение
+      // отсчитывает, когда буквам пора уходить.
+      window.__ширмаСтарт = Date.now();
+      try {
+        if (localStorage.getItem("mintly_language") === "EN") {
+          document.querySelector("#ширма .подпись").textContent = "Memecoins on TON and Solana";
+        }
+      } catch (e) { /* хранилище закрыто — остаётся русская */ }
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
