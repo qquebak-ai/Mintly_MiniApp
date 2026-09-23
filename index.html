@@ -167,9 +167,12 @@
       #ширма .свечи { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
                       display: flex; justify-content: center; align-items: flex-end; gap: 7px; height: 96px; pointer-events: none; }
       #ширма .свечи i { position: relative; display: block; width: 7px; border-radius: 2px;
-                        background: rgba(255, 255, 255, 0.24); transform-origin: 50% 100%; will-change: transform, opacity; }
-      #ширма .свечи i::before { content: ""; position: absolute; left: 3px; width: 1px; top: -9px; bottom: -6px;
-                                background: rgba(255, 255, 255, 0.16); }
+                        background: #3E3E41; transform-origin: 50% 100%; will-change: transform, opacity; }
+      /* Фитили — только над и под телом, не сквозь него: полупрозрачный
+         фитиль просвечивал через тело тёмной тенью. Цвета сплошные. */
+      #ширма .свечи i::before, #ширма .свечи i::after { content: ""; position: absolute; left: 3px; width: 1px; background: #2B2B2E; }
+      #ширма .свечи i::before { top: -9px; height: 9px; }
+      #ширма .свечи i::after { bottom: -6px; height: 6px; }
       #ширма:not(.идёт):not(.уходит) .свечи i { opacity: 0; }
       #ширма.идёт .свечи i { animation: ширмаСвеча 460ms cubic-bezier(0.22, 1, 0.36, 1) both; }
       #ширма.уходит .свечи i { animation: ширмаВправо 360ms cubic-bezier(0.4, 0, 1, 1) both; }

@@ -2745,12 +2745,14 @@ function GlobalStyle() {
       @keyframes свечаВстаёт { from { opacity: 0; transform: scaleY(0); } to { opacity: 1; transform: scaleY(1); } }
       .заставка-свеча {
         position: relative; display: block; width: 7px; border-radius: 2px;
-        background: rgba(255, 255, 255, 0.24); transform-origin: 50% 100%; will-change: transform, opacity;
+        background: #3E3E41; transform-origin: 50% 100%; will-change: transform, opacity;
       }
-      .заставка-свеча::before {
-        content: ""; position: absolute; left: 3px; width: 1px; top: -9px; bottom: -6px;
-        background: rgba(255, 255, 255, 0.16);
+      /* Фитили — над и под телом, не сквозь него: иначе просвечивали тенью. */
+      .заставка-свеча::before, .заставка-свеча::after {
+        content: ""; position: absolute; left: 3px; width: 1px; background: #2B2B2E;
       }
+      .заставка-свеча::before { top: -9px; height: 9px; }
+      .заставка-свеча::after { bottom: -6px; height: 6px; }
       @keyframes букваПроступает {
         from { opacity: 0; }
         to   { opacity: 1; }
