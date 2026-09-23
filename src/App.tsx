@@ -2302,8 +2302,21 @@ function GlobalStyle() {
       }
       .умн-знак { display: inline-block; white-space: pre; }
       .умн-знак.нов { animation: умнВход 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+      /* В многострочном поле знак строчный: сдвиг сбил бы переносы, поэтому
+         он только проступает из размытия, не смещаясь. */
+      @keyframes умнВходСтрока {
+        0%   { opacity: 0; filter: blur(0.16em); }
+        45%  { opacity: 1; }
+        100% { opacity: 1; filter: blur(0); }
+      }
+      .умн-знак-строка { white-space: pre-wrap; }
+      .умн-градиент > .умн-знак {
+        background: inherit; -webkit-background-clip: text; background-clip: text;
+        -webkit-text-fill-color: transparent; color: transparent;
+      }
+      .умн-знак-строка.нов { animation: умнВходСтрока 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
       .умн-поле::placeholder { color: ${T.faint}; -webkit-text-fill-color: ${T.faint}; opacity: 1; }
-      @media (prefers-reduced-motion: reduce) { .умн-знак.нов { animation: none; } }
+      @media (prefers-reduced-motion: reduce) { .умн-знак.нов, .умн-знак-строка.нов { animation: none; } }
       /* Смена числа: цифры не подменяются молча, а коротко вспыхивают
          цветом движения и подскакивают. Так видно, что цена только что
          изменилась, даже если смотришь не туда. */
@@ -3126,7 +3139,7 @@ function ChangeBadge({ value, size = "sm" }) {
       }}
     >
       {up ? <ArrowUpRight size={size === "sm" ? 12 : 14} /> : <ArrowDownRight size={size === "sm" ? 12 : 14} />}
-      {Math.abs(value).toFixed(1)}%
+      <ТекстСЧислами text={Math.abs(value).toFixed(1)} />%
     </span>
   );
 }
@@ -6857,7 +6870,7 @@ function StatChip({ icon: Icon, label, value }) {
     <div className="fx-chip flex items-center gap-2 rounded-[20px] px-3 py-2" style={{ background: T.surface, border: "none" }}>
       <Icon size={14} color={T.muted} />
       <div>
-        <div style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, lineHeight: 1.1 }}>{value}</div>
+        <div style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, lineHeight: 1.1 }}><ТекстСЧислами text={value} /></div>
         <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 11 }}>{label}</div>
       </div>
     </div>
@@ -6938,7 +6951,7 @@ function разложитьЗнаки(прошлые, текст) {
   return итог;
 }
 
-function УмныйТекст({ text, className = "", style = {}, шаг = 42 }) {
+function УмныйТекст({ text, className = "", style = {}, шаг = 42, строкой = false }) {
   const строка = String(text == null ? "" : text);
   const знакиRef = useRef(null);
   const былаRef = useRef(null);
@@ -6954,6 +6967,23 @@ function УмныйТекст({ text, className = "", style = {}, шаг = 42 })
   const знаки = знакиRef.current;
   const корень = useRef(null);
   const места = useRef(new Map());
+
+  /* Родитель залит градиентом по буквам (background-clip: text): у знаков
+     свой блок, и заливка сквозь них не проходит — цифры стали бы
+     невидимыми. Тогда берём градиент родителя на себя и раздаём знакам. */
+  useLayoutEffect(() => {
+    const el = корень.current;
+    const род = el && el.parentElement;
+    if (!род || el.classList.contains("умн-градиент")) return;
+    const cs = getComputedStyle(род);
+    const клип = cs.webkitBackgroundClip || cs.backgroundClip;
+    if (клип !== "text" || !cs.backgroundImage || cs.backgroundImage === "none") return;
+    el.classList.add("умн-градиент");
+    el.style.backgroundImage = cs.backgroundImage;
+    el.style.backgroundSize = cs.backgroundSize;
+    el.style.backgroundPosition = cs.backgroundPosition;
+    el.style.animation = cs.animation;
+  }, []);
 
   useLayoutEffect(() => {
     const el = корень.current;
@@ -6992,7 +7022,7 @@ function УмныйТекст({ text, className = "", style = {}, шаг = 42 })
       const x = у.offsetLeft;
       новыеМеста.set(ключ, x);
       const было = места.current.get(ключ);
-      if (видно && было != null && Math.abs(было - x) > 0.5 && Math.abs(было - x) < 160 && у.dataset.n !== "1") {
+      if (!строкой && видно && было != null && Math.abs(было - x) > 0.5 && Math.abs(было - x) < 160 && у.dataset.n !== "1") {
         у.style.transition = "none";
         у.style.transform = `translateX(${было - x}px)`;
         void у.offsetWidth;
@@ -7007,13 +7037,13 @@ function УмныйТекст({ text, className = "", style = {}, шаг = 42 })
 
   let номер = 0;
   return (
-    <span ref={корень} className={className} style={{ display: "inline-block", whiteSpace: "pre", position: "relative", ...style }}>
+    <span ref={корень} className={className} style={строкой ? { whiteSpace: "pre-wrap", ...style } : { display: "inline-block", whiteSpace: "pre", position: "relative", ...style }}>
       {знаки.map((з) => (
         <span
           key={з.key}
           data-k={з.key}
           data-n={з.нов ? "1" : "0"}
-          className={з.нов ? "умн-знак нов" : "умн-знак"}
+          className={строкой ? (з.нов ? "умн-знак-строка нов" : "умн-знак-строка") : (з.нов ? "умн-знак нов" : "умн-знак")}
           style={з.нов ? { animationDelay: `${(номер++) * шаг}ms` } : undefined}
         >
           {з.ch}
@@ -7025,36 +7055,94 @@ function УмныйТекст({ text, className = "", style = {}, шаг = 42 })
 
 /* Поле ввода, в котором каждый набранный знак проступает так же, как в
  * умном тексте. Настоящее поле остаётся на месте — с кареткой, выделением
- * и клавиатурой, — только его буквы прозрачны, а поверх лежат наши. */
-function ПолеСЖивымТекстом({ value, style = {}, className = "", ...rest }) {
+ * и клавиатурой, — только его буквы прозрачны, а поверх лежат наши.
+ *
+ * Подходит к любому полю: слой с буквами не знает его стилей заранее, а
+ * снимает их с самого поля (отступы, рамку, выравнивание, шрифт), поэтому
+ * буквы ложатся ровно туда, где их нарисовало бы поле. Многострочное поле
+ * (как="textarea") переносит строки так же, как само поле; там знаки
+ * проступают без сдвига — сдвиг сбил бы переносы. Пароль не трогаем:
+ * слой показал бы то, что поле прячет. */
+const СВОЙСТВА_СЛОЯ = [
+  "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+  "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
+  "fontFamily", "fontSize", "fontWeight", "fontStyle", "letterSpacing", "lineHeight",
+  "textAlign", "textIndent", "textTransform", "wordSpacing",
+];
+function ПолеСЖивымТекстом({ value, style = {}, className = "", как = "input", onScroll, onSelect, onKeyUp, ...rest }) {
   const поле = useRef(null);
   const слой = useRef(null);
+  const [мерка, setМерка] = useState(null);
+  const многострочное = как === "textarea";
+  const пароль = rest.type === "password";
+
   const сдвинуть = () => {
-    if (поле.current && слой.current) слой.current.style.transform = `translateX(${-поле.current.scrollLeft}px)`;
+    const п = поле.current, с = слой.current;
+    if (!п || !с) return;
+    с.style.transform = многострочное
+      ? `translateY(${-п.scrollTop}px)`
+      : `translateX(${-п.scrollLeft}px)`;
   };
   useLayoutEffect(сдвинуть);
-  const { color, fontFamily, fontSize, fontWeight, letterSpacing, ...обёртка } = style;
-  const шрифт = { fontFamily, fontSize, fontWeight, letterSpacing };
+  useLayoutEffect(() => {
+    const п = поле.current;
+    if (!п) return undefined;
+    const снять = () => {
+      const cs = getComputedStyle(п);
+      const м = {};
+      for (const к of СВОЙСТВА_СЛОЯ) м[к] = cs[к];
+      м.color = cs.caretColor && cs.caretColor !== "auto" ? cs.caretColor : (style.color || T.ice);
+      setМерка(м);
+    };
+    снять();
+    const ро = typeof ResizeObserver !== "undefined" ? new ResizeObserver(снять) : null;
+    if (ро) ро.observe(п);
+    return () => { if (ро) ро.disconnect(); };
+  }, []);
+
+  // Цвет букв поля — у нашего слоя; само поле рисует только каретку.
+  const цвет = style.color || T.ice;
+  const Тег = многострочное ? "textarea" : "input";
+  const { flex, flexGrow, flexShrink, flexBasis, width, minWidth, maxWidth, margin, marginTop, marginBottom, marginLeft, marginRight, alignSelf, ...своё } = style;
+  const обёртка = { flex, flexGrow, flexShrink, flexBasis, width, minWidth, maxWidth, margin, marginTop, marginBottom, marginLeft, marginRight, alignSelf };
+  const вызвать = (ф, e) => { сдвинуть(); if (ф) ф(e); };
+
   return (
-    <div style={{ position: "relative", display: "flex", alignItems: "center", overflow: "hidden", ...обёртка }}>
-      <input
+    // Обёртка занимает место поля: по умолчанию тянется на всю ширину и
+    // сжимается в ряду с соседями — как тянулось бы само поле.
+    <div style={{ position: "relative", display: многострочное ? "block" : "flex", flex: "1 1 auto", width: "100%", minWidth: 0, ...Object.fromEntries(Object.entries(обёртка).filter(([, з]) => з !== undefined)) }}>
+      <Тег
         ref={поле}
         value={value}
         {...rest}
-        onScroll={сдвинуть}
-        onSelect={сдвинуть}
-        onKeyUp={сдвинуть}
+        onScroll={(e) => вызвать(onScroll, e)}
+        onSelect={(e) => вызвать(onSelect, e)}
+        onKeyUp={(e) => вызвать(onKeyUp, e)}
         className={`умн-поле ${className}`}
         style={{
-          width: "100%", minWidth: 0, padding: 0, margin: 0, background: "transparent", border: "none", outline: "none",
-          color: "transparent", WebkitTextFillColor: "transparent", caretColor: color, fontKerning: "none", fontVariantLigatures: "none", ...шрифт,
+          ...своё,
+          width: "100%", minWidth: 0, boxSizing: "border-box",
+          fontKerning: "none", fontVariantLigatures: "none",
+          ...(пароль ? null : { color: "transparent", WebkitTextFillColor: "transparent", caretColor: цвет }),
         }}
       />
-      <div aria-hidden="true" style={{ position: "absolute", left: 0, top: 0, bottom: 0, display: "flex", alignItems: "center", pointerEvents: "none", overflow: "visible" }}>
-        <div ref={слой} style={{ color, ...шрифт, whiteSpace: "pre", fontKerning: "none", fontVariantLigatures: "none" }}>
-          <УмныйТекст text={value} шаг={0} />
+      {!пароль && мерка && (
+        <div aria-hidden="true" style={{
+          position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden",
+          ...мерка, borderStyle: "solid", borderColor: "transparent", boxSizing: "border-box",
+          fontKerning: "none", fontVariantLigatures: "none", color: цвет,
+          ...(многострочное
+            ? { whiteSpace: "pre-wrap", overflowWrap: "break-word" }
+            : {
+              display: "flex", alignItems: "center", whiteSpace: "pre",
+              justifyContent: мерка.textAlign === "center" ? "center" : мерка.textAlign === "right" || мерка.textAlign === "end" ? "flex-end" : "flex-start",
+            }),
+        }}>
+          <div ref={слой} style={многострочное ? null : { whiteSpace: "pre" }}>
+            <УмныйТекст text={value} шаг={0} строкой={многострочное} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -7274,6 +7362,8 @@ function КнопкаДействия({ Значок, подпись, onClick, �
  * переносов. Поэтому слова остаются обычным текстом, а каждое число —
  * отдельным умным текстом на своём месте. */
 function ТекстСЧислами({ text }) {
+  // Не строка и не число (разметка, пусто) — отдаём как есть.
+  if (typeof text !== "string" && typeof text !== "number") return text == null ? null : text;
   const части = String(text == null ? "" : text).split(/(\d(?:[\d\u00a0\u202f.,]*\d)?)/);
   return (
     <>
@@ -7647,7 +7737,7 @@ const HoldersBadge = React.memo(function HoldersBadge({ tokenAddress, testnet = 
       {/* Прочерк, а не мерцающая плашка: карточка к этому времени уже на
           экране, и второй слой загрузки поверх готовой строки читается
           как рябь. Счётчик дописывается на месте прочерка. */}
-      {count == null ? "—" : count.toLocaleString("ru-RU")}
+      <ТекстСЧислами text={count == null ? "—" : count.toLocaleString("ru-RU")} />
     </span>
   );
 });
@@ -7946,7 +8036,7 @@ function ПометкаТест({ сеть, size = 10 }) {
 function ЧислоКарточки({ подпись, значение, цвет }) {
   return (
     <div className="min-w-0">
-      <div className="truncate" style={{ fontFamily: monoFont, color: цвет || T.ice, fontSize: 13, fontWeight: 600 }}>{значение}</div>
+      <div className="truncate" style={{ fontFamily: monoFont, color: цвет || T.ice, fontSize: 13, fontWeight: 600 }}><ТекстСЧислами text={значение} /></div>
       <div className="truncate" style={{ fontFamily: bodyFont, color: T.faint, fontSize: 10.5, marginTop: 1 }}>{подпись}</div>
     </div>
   );
@@ -8040,9 +8130,14 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
             показывает сам график на странице токена. */}
 
         <div className="text-right flex-shrink-0">
-          <div style={{ fontFamily: monoFont, fontSize: 15, fontWeight: 700, ...текстГрадиентом(рост ? ГРАДИЕНТ_РОСТА : ГРАДИЕНТ_ПАДЕНИЯ) }}>{fmtUSD(tok.mcapNum)}</div>
+          {/* Градиент по буквам кладётся на сам умный текст: у знаков
+              свой блок, и заливка родителя сквозь них не проходит —
+              цифры оставались невидимыми. */}
+          <div style={{ fontFamily: monoFont, fontSize: 15, fontWeight: 700 }}>
+            <УмныйТекст text={fmtUSD(tok.mcapNum)} className="умн-градиент" style={текстГрадиентом(рост ? ГРАДИЕНТ_РОСТА : ГРАДИЕНТ_ПАДЕНИЯ)} />
+          </div>
           <div style={{ fontFamily: monoFont, color: рост ? T.up : T.down, fontSize: 12.5, marginTop: 3 }}>
-            {рост ? "+" : ""}{(tok.change || 0).toFixed(1)}%
+            {рост ? "+" : ""}<ТекстСЧислами text={(tok.change || 0).toFixed(1)} />%
           </div>
         </div>
       </div>
@@ -9031,7 +9126,7 @@ function TrustPanel({ token, testnet = false, holders = null }) {
       {rows.map(([label, value, color]) => (
         <div key={label} className="flex items-center justify-between" style={{ padding: "3px 0" }}>
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{label}</span>
-          <span style={{ fontFamily: monoFont, color, fontSize: 13, fontWeight: 700 }}>{value}</span>
+          <span style={{ fontFamily: monoFont, color, fontSize: 13, fontWeight: 700 }}><ТекстСЧислами text={value} /></span>
         </div>
       ))}
       {!wallet ? (
@@ -9079,7 +9174,7 @@ function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false }) {
       <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{tr("gradTitle")}</span>
         <span style={{ fontFamily: monoFont, color: done ? T.up : T.ice, fontSize: 13, fontWeight: 700 }}>
-          {done ? tr("gradDone") : `${pct.toFixed(0)}%`}
+          <ТекстСЧислами text={done ? tr("gradDone") : `${pct.toFixed(0)}%`} />
         </span>
       </div>
       <div style={{ height: 6, borderRadius: 3, background: T.surfaceHi, overflow: "hidden" }}>
@@ -9087,14 +9182,14 @@ function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false }) {
       </div>
       <div className="flex items-center justify-between" style={{ marginTop: 7 }}>
         <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 12 }}>
-          {fmtTon(raisedTon)} / {fmtTon(targetTon)} {ТИКЕР_TON}
+          <ТекстСЧислами text={`${fmtTon(raisedTon)} / ${fmtTon(targetTon)}`} /> {ТИКЕР_TON}
         </span>
         {!done && (
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>{trf("gradLeft", { left: fmtTon(left) })}</span>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}><ТекстСЧислами text={trf("gradLeft", { left: fmtTon(left) })} /></span>
         )}
       </div>
       <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.45, marginTop: 8 }}>
-        {trf("gradNote", { target: fmtTon(targetTon) })}
+        <ТекстСЧислами text={trf("gradNote", { target: fmtTon(targetTon) })} />
       </p>
     </div>
   );
@@ -10498,7 +10593,7 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
     <>
       <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 600 }}>${token.ticker}</span>
       <span style={{ fontFamily: monoFont, color: рост ? T.up : T.down, fontSize: 13 }}>
-        {рост ? "+" : ""}{(token.change || 0).toFixed(1)}%
+        {рост ? "+" : ""}<ТекстСЧислами text={(token.change || 0).toFixed(1)} />%
       </span>
     </>
   );
@@ -10535,7 +10630,7 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
           <span className="flex-1 min-w-0" style={{ display: "block" }}>
             <span className="flex items-center" style={{ gap: 8 }}>{подписи}</span>
             <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 1 }}>
-              {fmtUSD(token.mcapNum)} · ${token.vol}
+              <ТекстСЧислами text={fmtUSD(token.mcapNum)} /> · ${token.vol}
             </span>
           </span>
           {точки}
@@ -10558,7 +10653,7 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
       <span className="flex-1 min-w-0" style={{ position: "relative", zIndex: 1, display: "block" }}>
         <span className="flex items-center" style={{ gap: 8 }}>{подписи}</span>
         <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 3 }}>
-          {fmtUSD(token.mcapNum)} · ${token.vol}
+          <ТекстСЧислами text={fmtUSD(token.mcapNum)} /> · ${token.vol}
         </span>
       </span>
       {точки}
@@ -10959,7 +11054,7 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
             </div>
             <div className="flex items-baseline justify-between" style={{ marginTop: 7 }}>
               <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>
-                {tf("homeAlmostLeft", { left: fmtTon(Math.max(0, tok.graduationTon - tok.raisedTon)) })}
+                <ТекстСЧислами text={tf("homeAlmostLeft", { left: fmtTon(Math.max(0, tok.graduationTon - tok.raisedTon)) })} />
               </span>
               <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 13, fontWeight: 700 }}><УмныйТекст text={`${pct.toFixed(0)}%`} /></span>
             </div>
@@ -11074,12 +11169,12 @@ function ЖивыеКарточки({ tokens = [], onOpen }) {
       <>
         <div className="flex items-baseline justify-between" style={{ gap: 6 }}>
           <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${tok.ticker}</span>
-          <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{pct.toFixed(0)}%</span>
+          <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 12, fontWeight: 700, flexShrink: 0 }}><ТекстСЧислами text={pct.toFixed(0)} />%</span>
         </div>
         <div style={{ height: 4, borderRadius: 2, background: T.surfaceHi, overflow: "hidden", marginTop: 5 }}>
           <div style={{ width: `${pct}%`, height: "100%", background: PRISM, borderRadius: 2 }} />
         </div>
-        <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 11, marginTop: 4 }}>{tok.price > 0 ? fmtPrice(tok.price) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`}</div>
+        <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 11, marginTop: 4 }}><ТекстСЧислами text={tok.price > 0 ? fmtPrice(tok.price) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`} /></div>
       </>
     );
   };
@@ -11093,8 +11188,8 @@ function ЖивыеКарточки({ tokens = [], onOpen }) {
           <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11, flexShrink: 0 }}>{fmtAge(tok.createdAt) || ""}</span>
         </div>
         <div className="flex items-baseline justify-between" style={{ gap: 6, marginTop: 3 }}>
-          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11 }}>{tok.price > 0 ? fmtPrice(tok.price) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`}</span>
-          <span style={{ fontFamily: monoFont, color: растёт ? T.up : T.down, fontSize: 11, fontWeight: 700 }}>{растёт ? "+" : ""}{(tok.change || 0).toFixed(1)}%</span>
+          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11 }}><ТекстСЧислами text={tok.price > 0 ? fmtPrice(tok.price) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`} /></span>
+          <span style={{ fontFamily: monoFont, color: растёт ? T.up : T.down, fontSize: 11, fontWeight: 700 }}>{растёт ? "+" : ""}<ТекстСЧислами text={(tok.change || 0).toFixed(1)} />%</span>
         </div>
       </>
     );
@@ -11297,13 +11392,13 @@ function ТопСтрока({ onOpenToken, onOpenProfile, live = [] }) {
             <div className="flex-1 min-w-0">
               <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>${э.ticker}</div>
               <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 11.5, marginTop: 2 }}>
-                {э.graduated
+                <ТекстСЧислами text={э.graduated
                   ? t(э.dexPoolAddress ? "topOnDex" : "topClosing")
-                  : tf("topRaised", { ton: fmtTon(Number(э.raised) || 0) })}
+                  : tf("topRaised", { ton: fmtTon(Number(э.raised) || 0) })} />
               </div>
             </div>
             {э.mcapNum > 0 && (
-              <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 13.5, fontWeight: 700, flexShrink: 0 }}>{fmtUSD(э.mcapNum)}</span>
+              <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 13.5, fontWeight: 700, flexShrink: 0 }}><ТекстСЧислами text={fmtUSD(э.mcapNum)} /></span>
             )}
           </button>
         ))}
@@ -11333,7 +11428,7 @@ function ТопСтрока({ onOpenToken, onOpenProfile, live = [] }) {
               <div className="flex-1 min-w-0">
                 <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13.5, fontWeight: 700 }}>{э.nickname || "—"}</div>
                 <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 11.5, marginTop: 2 }}>
-                  {tf("topLaunched", { n: э.launched, ton: fmtTon(Number(э.raised) || 0) })}
+                  <ТекстСЧислами text={tf("topLaunched", { n: э.launched, ton: fmtTon(Number(э.raised) || 0) })} />
                 </div>
               </div>
             </button>
@@ -11452,7 +11547,7 @@ function СтрокаНастройки({ item, значение, метка, п
         {t(item.tKey)}
       </span>
       {значение && (
-        <span className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, maxWidth: 120 }}>{значение}</span>
+        <span className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, maxWidth: 120 }}><ТекстСЧислами text={значение} /></span>
       )}
       {метка > 0 && (
         <span style={{
@@ -11493,7 +11588,7 @@ function ЭкранНастроек({ открыт, onClose, profile, accountCre
           style={{ gap: 10, padding: "12px 14px", borderRadius: 18, background: T.surfaceHi, marginBottom: 14 }}
         >
           <Search size={17} color={T.faint} />
-          <input
+          <ПолеСЖивымТекстом
             value={запрос}
             onChange={(e) => setЗапрос(e.target.value)}
             placeholder={t("searchPlaceholder")}
@@ -12174,7 +12269,7 @@ function МояАктивность({ userId, тик = 0 }) {
                     : названиеОперации(с)}
                 </span>
                 <span style={{ fontFamily: monoFont, fontSize: 12.5, color: приход ? T.up : T.down, whiteSpace: "nowrap" }}>
-                  {приход ? "+" : "−"}{fmtСумма(Number(с.ton_amount) || 0)} {монетаСделки(с)}
+                  {приход ? "+" : "−"}<ТекстСЧислами text={fmtСумма(Number(с.ton_amount) || 0)} /> {монетаСделки(с)}
                 </span>
                 <span style={{ fontFamily: monoFont, fontSize: 11.5, color: T.faint, whiteSpace: "nowrap" }}>
                   {fmtSince(с.created_at)}
@@ -14094,7 +14189,7 @@ function ЭкранВывода({
           </div>
           <div className="flex items-center" style={{ gap: 8 }}>
             <div style={{ flex: 1, position: "relative", display: "flex" }}>
-              <input
+              <ПолеСЖивымТекстом
                 value={адрес}
                 onChange={(e) => setАдрес(e.target.value)}
                 placeholder={сеть === "ton" ? "UQ…" : "5x…"}
@@ -14168,7 +14263,7 @@ function ЭкранВывода({
               заносит кошелёк биржи заранее, не собираясь выводить сейчас. */}
           {добавляем && !адресГоден && (
             <div className="flex flex-col" style={{ gap: 8, animation: "меткаПришла 200ms ease-out both" }}>
-              <input
+              <ПолеСЖивымТекстом
                 value={новый}
                 onChange={(e) => setНовый(e.target.value)}
                 placeholder={сеть === "ton" ? "UQ…" : "5x…"}
@@ -14181,7 +14276,7 @@ function ЭкранВывода({
                 }}
               />
               <div className="flex items-center" style={{ gap: 8 }}>
-                <input
+                <ПолеСЖивымТекстом
                   value={метка}
                   onChange={(e) => setМетка(e.target.value)}
                   placeholder={t("bookNamePlaceholder")}
@@ -14274,7 +14369,7 @@ function ЭкранВывода({
             </span>
           </div>
 
-          <input
+          <ПолеСЖивымТекстом
             value={код}
             onChange={(e) => { setКод(e.target.value.replace(/\D/g, "").slice(0, 6)); setКодБеда(""); }}
             inputMode="numeric"
@@ -14305,7 +14400,7 @@ function ЭкранВывода({
 
           <div className="flex flex-col" style={{ marginTop: "auto", gap: 3, paddingBottom: 4 }}>
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
-              {fmtСумма(монет)} {единицаСети}
+              <ТекстСЧислами text={fmtСумма(монет)} /> {единицаСети}
             </span>
             <span className="truncate" style={{ fontFamily: monoFont, color: T.faint, fontSize: 12 }}>{короткий}</span>
           </div>
@@ -14400,9 +14495,9 @@ function ЭкранВывода({
           />
         </button>
         <span style={{ marginTop: 10, fontFamily: monoFont, color: T.faint, fontSize: 14 }}>
-          {вДолларах
+          <ТекстСЧислами text={вДолларах
             ? `${fmtСумма(курсСети2 > 0 ? набрано / курсСети2 : 0)} ${единицаСети}`
-            : `$${вДеньгах.toFixed(2)}`}
+            : `$${вДеньгах.toFixed(2)}`} />
         </span>
       </div>
 
@@ -14412,13 +14507,13 @@ function ЭкранВывода({
           действие только путала. */}
       <div className="flex flex-col" style={{ padding: "0 18px 12px", flexShrink: 0, gap: 3 }}>
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>
-          {единицаСети} <span style={{ color: T.muted, fontWeight: 500 }}>· {fmtСумма(свободно)} ({`$${(свободно * курсСети2).toFixed(2)}`})</span>
+          {единицаСети} <span style={{ color: T.muted, fontWeight: 500 }}>· <ТекстСЧислами text={`${fmtСумма(свободно)} ($${(свободно * курсСети2).toFixed(2)})`} /></span>
         </span>
         {/* Почему доступно меньше, чем на кошельке: предел, а не деньги.
             Без этой строки «100%» выглядела ошибкой счёта. */}
         {упёрлисьВПредел && (
           <span style={{ fontFamily: bodyFont, color: T.warning, fontSize: 12.5 }}>
-            {tf("withdrawLimitHint", { left: `${fmtСумма(пределЗаСутки)} ${единицаСети}` })}
+            <ТекстСЧислами text={tf("withdrawLimitHint", { left: `${fmtСумма(пределЗаСутки)} ${единицаСети}` })} />
           </span>
         )}
       </div>
@@ -14605,15 +14700,11 @@ function АнимСумма({
               animation: "нольУходит 200ms ease-out both",
             }}>{пусто}</span>
           )}
-          {знаки.map((с, i) => (
-            <span
-              key={`${i}:${с}:${пустая ? "п" : "ц"}`}
-              style={{
-                display: "inline-block", whiteSpace: "pre",
-                animation: пустая ? "none" : "цифраВходит 190ms cubic-bezier(0.2, 0.9, 0.25, 1) both",
-              }}
-            >{с}</span>
-          ))}
+          {/* Набранная сумма — умным текстом: новая цифра проступает из
+              размытия, общие стоят на месте. Пустое поле — просто ноль. */}
+          {пустая
+            ? знаки.map((с, i) => <span key={`п${i}`} style={{ display: "inline-block", whiteSpace: "pre" }}>{с}</span>)
+            : <УмныйТекст text={текст} шаг={0} />}
         </span>
         {единица ? <span style={{ marginLeft: "0.28em" }}>{единица}</span> : null}
       </span>
@@ -15025,7 +15116,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
               transition: `color ${EASE}`,
               animation: нехватка ? "строкаВходит 260ms ease-out both" : "none",
             }}>
-              {нехватка ? t("swapNotEnough") : `${t("swapAvailable")}: ${свободно.toFixed(4)} SOL`}
+              <ТекстСЧислами text={нехватка ? t("swapNotEnough") : `${t("swapAvailable")}: ${свободно.toFixed(4)} SOL`} />
             </div>
           )}
         </div>
@@ -15379,7 +15470,7 @@ function ИсторияКошелька({ userId, тик = 0, безЗаголо
                   fontVariantNumeric: "tabular-nums",
                   color: обмен ? T.ice : покупка ? КОШ_ПАДЕНИЕ_ТЕКСТ : КОШ_ПРИХОД_ТЕКСТ,
                 }}>
-                  {обмен ? "" : покупка ? "−" : "+"}{fmtСумма(Number(с.ton_amount) || 0)}
+                  {обмен ? "" : покупка ? "−" : "+"}<ТекстСЧислами text={fmtСумма(Number(с.ton_amount) || 0)} />
                   {обмен ? "" : ` ${монетаСделки(с)}`}
                 </div>
               </div>
@@ -16839,7 +16930,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
                   </div>
                   <div className="text-right">
                     <div style={{ fontFamily: monoFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>
-                      {fmtCompact(amount)}
+                      <ТекстСЧислами text={fmtCompact(amount)} />
                     </div>
                     <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 11.5 }}>
                       ${String(tok.ticker || "").toUpperCase()}
@@ -17004,7 +17095,7 @@ function TokenComments({ tokenId, currentUserId, onNeedAuth, onOpenProfile, show
 
       {currentUserId ? (
         <div className="flex items-end gap-2">
-          <textarea
+          <ПолеСЖивымТекстом как="textarea"
             value={draft}
             onChange={(e) => setDraft(e.target.value.slice(0, 400))}
             placeholder={t("commentPlaceholder")}
@@ -17341,7 +17432,7 @@ function ЧатТокена({ tokenId, свой = false, currentUserId, onNeedAu
           </div>
 
           <div className="flex items-center" style={{ gap: 8, marginTop: 10 }}>
-            <input
+            <ПолеСЖивымТекстом
               value={черновик}
               onChange={(e) => setЧерновик(e.target.value.slice(0, 400))}
               onKeyDown={(e) => { if (e.key === "Enter") отправить(); }}
@@ -17477,7 +17568,7 @@ function КарточкаСтрок({ заголовок, строки }) {
             style={{ gap: 12, padding: "13px 0", borderTop: i ? `1px solid ${T.line}` : "none" }}
           >
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 600 }}>{подпись}</span>
-            <span style={{ fontFamily: monoFont, color: цвет || T.muted, fontSize: 14 }}>{значение}</span>
+            <span style={{ fontFamily: monoFont, color: цвет || T.muted, fontSize: 14 }}><ТекстСЧислами text={значение} /></span>
           </div>
         ))}
       </div>
@@ -18474,7 +18565,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             const плюс = итог >= 0;
             return (
               <span style={{ fontFamily: monoFont, fontSize: 12.5, color: плюс ? T.up : T.down }}>
-                {плюс ? "+" : "−"}{fmtUSD(Math.abs(итог))}
+                {плюс ? "+" : "−"}<ТекстСЧислами text={fmtUSD(Math.abs(итог))} />
               </span>
             );
           })()}
@@ -18491,7 +18582,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
                 <УмныйТекст text={fmtUSD(стоимостьПозиции)} />
               </div>
               <div style={{ fontFamily: monoFont, color: T.faint, fontSize: 12.5, marginTop: 2 }}>
-                {fmtCoin(позиция)} ${token.ticker}
+                <ТекстСЧислами text={fmtCoin(позиция)} /> ${token.ticker}
               </div>
             </div>
           </div>
@@ -18555,9 +18646,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               {tr(рынокОткрыт ? "gradListedTitle" : "gradClosedTitle")}
             </div>
             <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5, marginTop: 3 }}>
-              {рынокОткрыт
+              <ТекстСЧислами text={рынокОткрыт
                 ? tr("gradListedBody")
-                : trf("gradClosedBody", { target: fmtTon(Number(curve.graduationTon) / 1e9) })}
+                : trf("gradClosedBody", { target: fmtTon(Number(curve.graduationTon) / 1e9) })} />
             </p>
           </div>
         </div>
@@ -18629,7 +18720,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               style={{ padding: "13px 0", borderBottom: `1px solid ${T.line}` }}
             >
               <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{подпись}</span>
-              <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 600 }}>{значение}</span>
+              <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 600 }}><ТекстСЧислами text={значение} /></span>
             </div>
           ))}
         </div>
@@ -18639,7 +18730,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         <div className="fx-swap flex flex-col" style={{ gap: 14 }}>
           <div className="flex items-baseline" style={{ gap: 8 }}>
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 600 }}>
-              {держателейВсего == null ? "—" : держателейВсего.toLocaleString("ru-RU")}
+              <ТекстСЧислами text={держателейВсего == null ? "—" : держателейВсего.toLocaleString("ru-RU")} />
             </span>
             <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 13 }}>{tr("statHolders")}</span>
           </div>
@@ -18683,7 +18774,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
                     <div style={{ width: `${Math.min(100, Math.max(2, h.доля || 0))}%`, height: "100%", background: T.electric }} />
                   </div>
                   <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 12.5, width: 48, textAlign: "right", flexShrink: 0 }}>
-                    {(h.доля || 0).toFixed(1)}%
+                    <ТекстСЧислами text={(h.доля || 0).toFixed(1)} />%
                   </span>
                 </div>
               ))}
@@ -19610,7 +19701,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           </span>
         </div>
         <div className="flex items-center gap-2 rounded-[20px] px-3.5 py-3 mt-1.5" style={{ background: T.bg, border: `1px solid ${overMax ? T.rose : T.line}` }}>
-          <input
+          <ПолеСЖивымТекстом
             value={amountStr}
             onChange={(e) => setAmountStr(e.target.value.replace(/[^0-9.,]/g, ""))}
             placeholder="0.00"
@@ -19675,16 +19766,16 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
         </div>
 
         <div className="flex flex-col gap-1.5" style={{ marginTop: 14, fontFamily: monoFont, fontSize: 12, color: T.muted }}>
-          <div className="flex justify-between"><span>{t("rate")}</span><span style={{ color: T.ice }}>{fmtPrice(token.price)} / ${token.ticker}</span></div>
+          <div className="flex justify-between"><span>{t("rate")}</span><span style={{ color: T.ice }}><ТекстСЧислами text={fmtPrice(token.price)} /> / ${token.ticker}</span></div>
           {/* Комиссию платят монетой той сети, где идёт сделка. В Solana
               к ней добавляется разовая аренда счёта под новый токен —
               её берут один раз и возвращают, когда счёт закрывают. */}
           <div className="flex justify-between"><span>{t("networkFee")}</span><span style={{ color: T.ice }}>
-            {соло
+            <ТекстСЧислами text={соло
               ? `≈0.003 SOL${solPriceUsd > 0 ? ` ($${(0.003 * solPriceUsd).toFixed(2)})` : ""}`
-              : `${NETWORK_FEE_TON} TON ($${feeUsd.toFixed(2)})`}
+              : `${NETWORK_FEE_TON} TON ($${feeUsd.toFixed(2)})`} />
           </span></div>
-          <div className="flex justify-between"><span>{t("minReceive")}</span><span style={{ color: T.ice }}>{amount > 0 ? (isBuy ? `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 0 })} ${token.ticker}` : `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`) : "—"}</span></div>
+          <div className="flex justify-between"><span>{t("minReceive")}</span><span style={{ color: T.ice }}><ТекстСЧислами text={amount > 0 ? (isBuy ? `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 0 })} ${token.ticker}` : `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`) : "—"} /></span></div>
         </div>
 
         <button onClick={handleConfirm} disabled={!canConfirm} className="fx-tap w-full rounded-[20px] py-3 mt-5" style={{
@@ -19731,7 +19822,7 @@ function Field({ label, placeholder, area, value, onChange, type = "text", icon:
         {Icon && (
           <Icon size={14} color={T.muted} style={{ position: "absolute", left: 11, pointerEvents: "none" }} />
         )}
-        <Comp
+        <ПолеСЖивымТекстом как={area ? "textarea" : "input"}
           placeholder={placeholder}
           rows={area ? 3 : undefined}
           value={value}
@@ -20186,7 +20277,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
               <span style={{ fontFamily: monoFont, fontSize: 13, color: T.ice, textAlign: "right" }}>
                 {result.buyAmount} {result.chain === "solana" ? "SOL" : ТИКЕР_TON}<br />
                 <span style={{ fontSize: 11.5, color: T.muted }}>
-                  {(Number(result.buyTokens) || 0).toLocaleString("ru-RU")} ${result.ticker} · {(Number(result.buyPct) || 0).toFixed((Number(result.buyPct) || 0) < 1 ? 3 : 1)}%
+                  <ТекстСЧислами text={(Number(result.buyTokens) || 0).toLocaleString("ru-RU")} /> ${result.ticker} · <ТекстСЧислами text={(Number(result.buyPct) || 0).toFixed((Number(result.buyPct) || 0) < 1 ? 3 : 1)} />%
                 </span>
               </span>
             </div>
@@ -20781,7 +20872,7 @@ function MyTokenCard({ t, onOpen }) {
           <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11 }}>${t.ticker}</span>
           <ПометкаТест сеть={t.network} size={9.5} />
         </div>
-        <div style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17.5, color: T.turquoise, marginTop: 2 }}>{fmtUSD(t.mcapNum)}</div>
+        <div style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17.5, color: T.turquoise, marginTop: 2 }}><ТекстСЧислами text={fmtUSD(t.mcapNum)} /></div>
         <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 11.5, marginTop: 2 }}>{tr("liqShort")} ${t.liq} · {holdersCount == null ? "—" : holdersCount.toLocaleString("ru-RU")} {tr("holdersShort")} · {tr("volShort")} {t.vol}</div>
       </div>
       <ChevronRight size={16} color={T.muted} style={{ flexShrink: 0 }} />
@@ -21323,7 +21414,7 @@ function SupportChat({ accountCreated, showToast, onRead }) {
         background: T.surface,
       }}>
         <div className="flex items-end gap-2">
-          <textarea
+          <ПолеСЖивымТекстом как="textarea"
             value={draft}
             onChange={(e) => setDraft(e.target.value.slice(0, 2000))}
             placeholder={t("supportPlaceholder")}
@@ -21397,7 +21488,7 @@ function ReferralShare({ showToast }) {
     <div className="mt-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surfaceHi, border: "none" }}>
       <div className="flex items-center justify-between">
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("refVolume")}</span>
-        <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>{fmtTon(оборот)} TON</span>
+        <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 15, fontWeight: 700 }}><ТекстСЧислами text={fmtTon(оборот)} /> TON</span>
       </div>
       <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.45, marginTop: 6 }}>
         {t("refShareNote")}
@@ -21576,7 +21667,7 @@ function ПодключениеX({ showToast }) {
           style={{ gap: 6, padding: "11px 12px", borderRadius: 14, background: T.surface }}
         >
           <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 14.5 }}>@</span>
-          <input
+          <ПолеСЖивымТекстом
             value={ник}
             onChange={(e) => { setНик(e.target.value); setБеда(""); }}
             placeholder={t("xHandlePlaceholder")}
@@ -21657,7 +21748,7 @@ function ПодключениеX({ showToast }) {
       {рукойОткрыто && (
         <div className="flex flex-col" style={{ gap: 10, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45 }}>{t("xManualHint")}</span>
-          <input
+          <ПолеСЖивымТекстом
             value={ссылка}
             onChange={(e) => { setСсылка(e.target.value); setБеда(""); }}
             placeholder={t("xPostUrl")}
@@ -22897,7 +22988,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
         ) : (
           <>
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>{t("mail2faHint")}</span>
-            <input
+            <ПолеСЖивымТекстом
               value={почта}
               onChange={(e) => { if (заперта) return; setПочта(e.target.value); setБеда(""); }}
               readOnly={заперта}
