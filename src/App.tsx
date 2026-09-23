@@ -11055,7 +11055,7 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
 
       <button
         onClick={() => onOpen && onOpen(tok)}
-        className="fx-card fx-tap w-full text-left rounded-[24px]"
+        className="fx-card fx-tap fx-inert w-full text-left rounded-[24px]"
         style={{ position: "relative", overflow: "hidden", padding: 16, background: T.surface, border: "none" }}
       >
         {/* Подложка берёт цвет из самого логотипа — у каждого токена
@@ -11150,7 +11150,7 @@ function КарточкаСВыдвижкой({ title, tokens, onOpen, delay = 0
     <div ref={корень} className="flex flex-col min-w-0" style={{ gap: 8 }}>
       <button
         onClick={() => setОткрыта((о) => !о)}
-        className="fx-tap w-full text-left rounded-[24px]"
+        className="fx-tap fx-inert w-full text-left rounded-[24px]"
         style={{ position: "relative", overflow: "hidden", height: 132, padding: 14, background: T.surface, border: "none", display: "flex", flexDirection: "column", justifyContent: "space-between" }}
       >
         <SpotlightAura src={первый && первый.logoUrl} ticker={первый && первый.ticker} />
@@ -11205,7 +11205,7 @@ function КарточкаСВыдвижкой({ title, tokens, onOpen, delay = 0
               <button
                 key={tok.id}
                 onClick={() => onOpen && onOpen(tok)}
-                className="fx-tap w-full text-left"
+                className="fx-tap fx-inert w-full text-left"
                 style={{ background: "transparent", border: "none", padding: "7px 2px" }}
               >
                 {строка(tok)}
@@ -11384,7 +11384,7 @@ function ВДвижении({ tokens = [], onOpen, onAll }) {
             <button
               key={tok.id}
               onClick={() => onOpen && onOpen(tok)}
-              className="fx-card fx-tap w-full flex items-center text-left"
+              className="fx-card fx-tap fx-inert w-full flex items-center text-left"
               style={{ gap: 12, padding: "12px 0", background: "transparent", border: "none", animationDelay: `${i * 40}ms` }}
             >
               <TokenAvatar size={36} tone={растёт ? "up" : "down"} src={tok.logoUrl} />
@@ -11477,7 +11477,7 @@ function ТопСтрока({ onOpenToken, onOpenProfile, live = [] }) {
           <button
             key={э.id || i}
             onClick={() => onOpenToken && onOpenToken(э)}
-            className="fx-card fx-tap w-full flex items-center text-left"
+            className="fx-card fx-tap fx-inert w-full flex items-center text-left"
             style={{ gap: 12, padding: "10px 0", background: "transparent", border: "none", animationDelay: `${i * 40}ms` }}
           >
             <span style={{ fontFamily: monoFont, color: i === 0 ? T.electric : T.faint, fontSize: 13, fontWeight: 700, width: 14, flexShrink: 0 }}>{i + 1}</span>
@@ -11508,7 +11508,7 @@ function ТопСтрока({ onOpenToken, onOpenProfile, live = [] }) {
             <button
               key={э.id || i}
               onClick={() => onOpenProfile && onOpenProfile(э.id)}
-              className="fx-tap w-full flex items-center text-left"
+              className="fx-tap fx-inert w-full flex items-center text-left"
               style={{ gap: 12, padding: "9px 0", background: "transparent", border: "none" }}
             >
               <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 13, fontWeight: 700, width: 14, flexShrink: 0 }}>{i + 1}</span>
@@ -13057,7 +13057,7 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
             key={б.id}
             onClick={() => открыть(б)}
             role="button"
-            className="fx-tap"
+            className="fx-tap fx-inert"
             style={{
               position: "relative", flex: "0 0 100%", scrollSnapAlign: "center",
               borderRadius: 20, overflow: "hidden", padding: "20px 18px",
@@ -13541,6 +13541,77 @@ function HomeView({
    меньшее движение не читается как движение, за большее — начинает
    раздражать. */
 const УХОД_ЛИСТА = 400;
+
+/* Свайп вниз для закрытия — общий жест для окон, которым не подошла
+   готовая ЭкранСнизу (у них своя раскладка карточки). Раньше в каждом
+   таком окне тот же обработчик набирался заново — здесь один раз. */
+function useСвайпЛиста(активен, onClose) {
+  const [тяга, setТяга] = useState(0);
+  const [уходит, setУходит] = useState(false);
+  const жест = useRef(null);
+
+  useLayoutEffect(() => { if (активен) { setТяга(0); setУходит(false); } }, [активен]);
+
+  useEffect(() => {
+    if (!активен) return;
+    const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    if (!tg || !tg.disableVerticalSwipes) return;
+    try { tg.disableVerticalSwipes(); } catch { /* старый клиент */ }
+    return () => { try { tg.disableVerticalSwipes(); } catch { /* старый клиент */ } };
+  }, [активен]);
+
+  const закрыть = useCallback(() => {
+    setУходит(true);
+    setTimeout(() => onClose(), УХОД_ЛИСТА);
+  }, [onClose]);
+
+  function прокрученныйПредок(эл) {
+    for (let у = эл; у && у !== document.body; у = у.parentElement) {
+      const с = getComputedStyle(у);
+      if (/(auto|scroll)/.test(с.overflowY) && у.scrollTop > 2) return true;
+    }
+    return false;
+  }
+  function началоЖеста(e) {
+    const т = e.touches && e.touches[0];
+    if (!т) return;
+    if (e.target instanceof Element && прокрученныйПредок(e.target)) return;
+    if (e.target instanceof Element && e.target.closest("[data-без-жеста]")) return;
+    жест.current = { y0: т.clientY, тянем: false };
+  }
+  function ходЖеста(e) {
+    const ж = жест.current;
+    const т = e.touches && e.touches[0];
+    if (!ж || !т) return;
+    const dy = т.clientY - ж.y0;
+    if (!ж.тянем && dy < 8) return;
+    ж.тянем = true;
+    const ход = Math.max(0, dy);
+    setТяга(ход);
+    ж.путь = ход;
+    const т1 = performance.now();
+    if (ж.т0) ж.скорость = (ход - (ж.прошлый || 0)) / Math.max(1, т1 - ж.т0);
+    ж.т0 = т1;
+    ж.прошлый = ход;
+  }
+  function конецЖеста() {
+    const ж = жест.current;
+    жест.current = null;
+    if (!ж || !ж.тянем) return;
+    const высота = typeof window !== "undefined" ? window.innerHeight : 800;
+    if ((ж.путь || 0) > высота * 0.16 || ((ж.скорость || 0) > 0.55 && (ж.путь || 0) > 40)) {
+      haptic("light");
+      закрыть();
+      return;
+    }
+    setТяга(0);
+  }
+
+  return {
+    тяга, уходит, жест,
+    handlers: { onTouchStart: началоЖеста, onTouchMove: ходЖеста, onTouchEnd: конецЖеста, onTouchCancel: конецЖеста },
+  };
+}
 
 function ЭкранСнизу({ открыт, onClose, заголовок = "", insetTop = 0, insetBottom = 0, жестВыключен = false, children }) {
   const [уходит, setУходит] = useState(false);
@@ -16690,6 +16761,36 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   // Без счётчика: сумма сменяется умным текстом — общие цифры стоят,
   // новые проступают из размытия.
   const итог = адресВнутри ? всегоВДолларах : 0;
+
+  /* Всё ли пришло. Ноль, показанный до ответа сети, человек читает как
+     «деньги пропали», поэтому до полной загрузки — обоих остатков и
+     обоих курсов — суммы стоят в размытии. null от сервера значит «сеть
+     не ответила», а не «пусто». Потолок в полминуты — чтобы сломавшийся
+     источник курса не прятал кошелёк навсегда. */
+  const сетьЗнает = (с, поле) => с === null || !!(с && (с.нуженВход || (!с.ошибка && с[поле] != null)));
+  const [терпение, setТерпение] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setТерпение(true), 30000);
+    return () => clearTimeout(id);
+  }, []);
+  const всёЗагружено = терпение || (
+    сетьЗнает(внутр, "sol") && сетьЗнает(внутрTON, "ton")
+    && (солНаКошельке <= 0 || курсSol > 0)
+    && (тонНаКошельке <= 0 || tonPriceUsd > 0)
+    && holdingsReady
+  );
+  // Пока чего-то нет — переспрашиваем часто, а не раз в 15 секунд.
+  useEffect(() => {
+    if (всёЗагружено) return undefined;
+    const id = setInterval(() => { обновитьВнутренний(); }, 2500);
+    return () => clearInterval(id);
+  }, [всёЗагружено, обновитьВнутренний]);
+  const туман = {
+    filter: всёЗагружено ? "blur(0px)" : "blur(9px)",
+    WebkitFilter: всёЗагружено ? "blur(0px)" : "blur(9px)",
+    opacity: всёЗагружено ? 1 : 0.75,
+    transition: "filter .55s ease, -webkit-filter .55s ease, opacity .55s ease",
+  };
   const short = адресВнутри ? `${адресВнутри.slice(0, 4)}…${адресВнутри.slice(-4)}` : "";
 
   function скопироватьАдрес() {
@@ -16945,7 +17046,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             // больше, чем на кошельке есть.
             const [цел, дроб] = (Math.floor(Math.max(0, итог) * 100) / 100).toFixed(2).split(".");
             return (
-              <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#FFFFFF" }}>
+              <span style={{ fontFamily: displayFont, fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#FFFFFF", ...туман }}>
                 <УмныйТекст text={`$${Number(цел).toLocaleString("ru-RU")}`} />
                 <УмныйТекст text={`,${дроб}`} style={{ color: hexA("#FFFFFF", 0.55) }} />
               </span>
@@ -16961,7 +17062,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             minHeight: 24,
           }}
         >
-          <УмныйТекст text={`${fmtСумма(солНаКошельке)} SOL · ${fmtСумма(тонНаКошельке)} ${ТИКЕР_TON}`} />
+          <span style={туман}><УмныйТекст text={`${fmtСумма(солНаКошельке)} SOL · ${fmtСумма(тонНаКошельке)} ${ТИКЕР_TON}`} /></span>
         </span>
         {/* Мягкая кромка: рисунок сходит на нет у самого края, и карта
             не выглядит обрезанной по линейке.
@@ -17058,7 +17159,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
                   {монета.тикер}
                 </span>
               </span>
-              <span className="flex flex-col items-end" style={{ gap: 2, flexShrink: 0 }}>
+              <span className="flex flex-col items-end" style={{ gap: 2, flexShrink: 0, ...туман }}>
                 <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
                   <УмныйТекст text={монета.сколько.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} />
                 </span>
@@ -23431,6 +23532,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   // Окно держится на экране, пока идёт анимация ухода: без этого оно
   // пропадало кадром, и закрытие читалось сбоем, а не действием.
   const [видно, closing] = useClosing(open);
+  /* Смахнуть вниз можно только «Редактировать профиль»: у создания
+     аккаунта и входа закрытие уже переспрашивает или ведёт назад по
+     своим шагам, и лишний жест там всё бы запутал. */
+  const { тяга: тягаЛиста, уходит: уходитЛистом, жест: жестЛиста, handlers: жестЛистаО } = useСвайпЛиста(open && isEdit, onClose);
   /* Пока идёт создание аккаунта, «Закрыть» в шапке Telegram сначала
      переспрашивает. Назад отсюда не выйти (стрелка спрятана), и без
      вопроса случайное нажатие выбрасывало человека из приложения с
@@ -24465,7 +24570,24 @@ async function uploadAvatarIfNeeded(userId) {
 
   return (
     <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ ...SHEET_BACK, zIndex: 60 }} onClick={onClose}>
-      <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={sheetCard(22)}>
+      <div
+        className={`fx-modal-card${isEdit && (уходитЛистом || тягаЛиста > 0) ? " fx-no-anim" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+        {...(isEdit ? жестЛистаО : null)}
+        style={sheetCard(22, isEdit ? {
+          transform: уходитЛистом ? "translateY(110%)" : `translateY(${тягаЛиста}px)`,
+          transition: жестЛиста.current ? "none" : `transform ${УХОД_ЛИСТА}ms cubic-bezier(0.22, 0.85, 0.25, 1)`,
+          touchAction: "pan-y",
+        } : {})}
+      >
+        {/* Полоска сверху — только у «Редактировать профиль»: у неё,
+            в отличие от входа и создания аккаунта, закрытие ничего не
+            переспрашивает, и смахнуть окно можно спокойно. */}
+        {isEdit && (
+          <div className="flex justify-center" style={{ marginBottom: 8, marginTop: -6 }}>
+            <span aria-hidden style={{ width: 40, height: 4, borderRadius: 999, background: hexA(T.ice, 0.16) }} />
+          </div>
+        )}
         <div className="flex items-center justify-between" style={{ marginBottom: isEdit ? 4 : 14 }}>
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700 }}>
             {isEdit ? t("editProfile") : t("accountLabel")}

@@ -117,6 +117,8 @@ export async function состояниеВнутреннегоTON() {
   if (!(await токен())) return { нуженВход: true };
   try {
     const св = await запрос("/api/wallet-ton?action=state");
+    // Сеть не ответила (ton: null) — держим прежнее число, а не ноль.
+    if (св && св.ton == null && прежнееTON && прежнееTON.ton != null) св.ton = прежнееTON.ton;
     if (св) прежнееTON = св;
     return св;
   } catch (e) {

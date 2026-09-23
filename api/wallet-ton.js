@@ -191,7 +191,7 @@ async function подписант(строка, набор, user) {
 
 // Последний ответ по адресу: на сбой узла — он, а не ноль (см. Solana).
 const последнийБаланс = new Map();
-async function баланс(адрес) {
+async function балансИзСети(адрес) {
   for (let попытка = 0; попытка < 2; попытка += 1) {
     try {
       const res = await fetch(`${TONAPI}/v2/accounts/${адрес}`, {
@@ -206,7 +206,15 @@ async function баланс(адрес) {
       return v;
     } catch { /* повторим */ }
   }
-  return последнийБаланс.get(адрес) || 0;
+  // Сеть не ответила и прежнего числа нет — null: ноль на карточке при
+  // деньгах на кошельке хуже, чем честное «ещё не знаем».
+  return последнийБаланс.has(адрес) ? последнийБаланс.get(адрес) : null;
+}
+// Для проверок перед тратой неизвестное — ноль: тратить то, чего не
+// видно, нельзя.
+async function баланс(адрес) {
+  const v = await балансИзСети(адрес);
+  return v == null ? 0 : v;
 }
 
 /* Жетонный кошелёк владельца для конкретного жетона: адрес и остаток.
@@ -324,7 +332,7 @@ export default async function handler(req, res) {
 
     if (действие === "state") {
       res.setHeader("Cache-Control", "no-store");
-      const [есть, выведено] = await Promise.all([баланс(строка.address), выведеноЗаСутки(db, user)]);
+      const [есть, выведено] = await Promise.all([балансИзСети(строка.address), выведеноЗаСутки(db, user)]);
       return res.status(200).json({
         address: строка.address,
         ton: есть,
