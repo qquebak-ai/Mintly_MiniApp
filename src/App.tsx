@@ -7024,7 +7024,7 @@ function ПолеСЖивымТекстом({ value, style = {}, className = "",
  * значением и едет вместе с ней. Отпустил — всё возвращается в покой.
  * Своя разметка вместо <input type="range">: у встроенного на iOS
  * ручку не увеличить и пузырь не прицепить. */
-function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, формат = (v) => String(v), единица = "", ariaLabel }) {
+function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, формат = (v) => String(v), единица = "", ariaLabel, кривизна = 1 }) {
   const дорожка = useRef(null);
   const [тянут, setТянут] = useState(false);
   /* Пока палец на ручке, значение живёт только здесь, в ползунке и его
@@ -7036,16 +7036,22 @@ function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, фо
   useEffect(() => { if (!тянут) { setЖивое(value); живоеRef.current = value; } }, [value, тянут]);
   const прошлыйШаг = useRef(null);
   const сейчас = тянут ? живое : value;
-  const доля = max > min ? Math.min(1, Math.max(0, (сейчас - min) / (max - min))) : 0;
+  /* Шкала может быть неравномерной: при кривизне больше единицы начало
+     растянуто, и мелкие суммы выставляются так же точно, как крупные,
+     хотя верх шкалы в сотни раз больше обычной покупки. */
+  const вДолю = (v) => (max > min ? Math.pow(Math.min(1, Math.max(0, (v - min) / (max - min))), 1 / кривизна) : 0);
+  const изДоли = (д) => min + Math.pow(д, кривизна) * (max - min);
+  const доля = вДолю(сейчас);
 
   const поставить = (clientX) => {
     const el = дорожка.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const д = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
-    const сырое = min + д * (max - min);
+    // У правого края — ровно верх шкалы, без округления вверх за него.
+    const сырое = д >= 0.999 ? max : изДоли(д);
     const знаков = Math.max(0, (String(step).split(".")[1] || "").length);
-    const v = Number((Math.round(сырое / step) * step).toFixed(знаков));
+    const v = сырое === max ? max : Number((Math.round(сырое / step) * step).toFixed(знаков));
     if (v !== прошлыйШаг.current) {
       // Лёгкий щелчок на каждом шаге — как у колёсика в iOS.
       if (прошлыйШаг.current != null) {
@@ -20475,8 +20481,29 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         {(() => {
           const единица = вSolana ? "SOL" : ТИКЕР_TON;
           const шаг = вSolana ? 0.01 : 0.1;
-          const поКошельку = остатокСети != null ? Math.floor(Math.max(0, остатокСети - ЗАПАС_ЗАПУСКА) / шаг) * шаг : 0;
-          const верх = поКошельку > 0 ? Number(поКошельку.toFixed(2)) : (вSolana ? 2 : 50);
+          /* Верх шкалы — выкуп почти всего, что кривая продаёт (99,9 %):
+             стартовой покупкой можно забрать запуск целиком. Ровно 100 %
+             контракт не примет — сделка сверх остатка отвергается, —
+             поэтому берём чуть меньше и округляем вниз. Хватит ли денег,
+             подскажет строка под ползунком. */
+          const ДОЛЯ_ВЕРХА = 0.999;
+          const верхПоКривой = (() => {
+            if (вSolana) {
+              const к = кривScolana;
+              if (!к || !(к.virtualSol > 0) || !(к.virtualTokens > 0) || !(к.tokensForSale > 0)) return 0;
+              const хочу = к.tokensForSale * ДОЛЯ_ВЕРХА;
+              const чистыми = (к.virtualSol * хочу) / (к.virtualTokens - хочу) / 1e9;
+              return чистыми / (1 - (Number(к.feeBps) || 0) / 10000);
+            }
+            const vTon = Number(CURVE_PARAMS.virtualTon) / 1e9;
+            const vTok = Number(CURVE_PARAMS.virtualTokens) / 1e9;
+            const хочу = (Number(CURVE_PARAMS.tokensForSale) / 1e9) * ДОЛЯ_ВЕРХА;
+            const чистыми = (vTon * хочу) / (vTok - хочу);
+            return чистыми / (1 - Number(CURVE_PARAMS.feeBps) / 10000);
+          })();
+          const верх = верхПоКривой > 0
+            ? Number((Math.floor(верхПоКривой / шаг) * шаг).toFixed(2))
+            : (вSolana ? 2 : 50);
           const сейчас = Math.min(верх, Number.isFinite(суммаПокупки) ? суммаПокупки : 0);
           const число = (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: вSolana ? 2 : 1 });
           const плохо = touched && (вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED) && (вSolana ? solUsd() : tonUsd()) > 0
@@ -20493,6 +20520,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
                 step={шаг}
                 формат={число}
                 единица={единица}
+                кривизна={3}
                 ariaLabel={t("launchAmountLabel")}
                 onChange={(v) => setForm((f) => ({ ...f, buyAmount: v > 0 ? String(v) : "" }))}
               />
