@@ -8253,7 +8253,13 @@ function ЗначокОбмен({ size = 22, color = "#FFFFFF", strokeWidth = 1.
    готовую ракету Lucide: тем же значком уже подписаны достижение за
    первый запуск и «создал» в истории — узнаваемость та же, что и там. */
 function ЗначокРакета({ size = 22, color = "#FFFFFF", strokeWidth = 1.8 }) {
-  return <Rocket size={size} color={color} strokeWidth={strokeWidth} />;
+  // Готовый значок Lucide рисован носом на северо-восток — доворачиваем
+  // его на сорок пять градусов, чтобы ракета смотрела строго вверх.
+  return (
+    <span style={{ display: "inline-flex", transform: "rotate(-45deg)" }}>
+      <Rocket size={size} color={color} strokeWidth={strokeWidth} />
+    </span>
+  );
 }
 
 function ЗначокСтолбики({ size = 22, color = "#FFFFFF", strokeWidth = 1.8 }) {
