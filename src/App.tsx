@@ -7026,7 +7026,105 @@ function ПолеСЖивымТекстом({ value, style = {}, className = "",
  * значением и едет вместе с ней. Отпустил — всё возвращается в покой.
  * Своя разметка вместо <input type="range">: у встроенного на iOS
  * ручку не увеличить и пузырь не прицепить. */
-function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, формат = (v) => String(v), единица = "", ariaLabel, кривизна = 1 }) {
+/* Волна на ползунке: закрученная лента, как спираль, видимая сбоку.
+ * Две кромки ходят синусом в противофазе, между ними — полоски, чей свет
+ * зависит от того, какой стороной лента повёрнута к глазу: лицевая
+ * светлая, изнанка уходит в фиолетовый. Так плоский канвас читается
+ * объёмом. Чем больше сумма, тем быстрее и выше крутится лента — размер
+ * стартовой покупки чувствуется ещё до цифр. К краям лента сходит на
+ * нет: слева она выходит из дорожки, справа ныряет под ручку. */
+function ВолнаПолзунка({ доля, тянут }) {
+  const холст = useRef(null);
+  const сейчас = useRef({ доля, тянут });
+  сейчас.current = { доля, тянут };
+
+  useEffect(() => {
+    const к = холст.current;
+    if (!к) return undefined;
+    const ctx = к.getContext("2d");
+    const тихо = typeof window !== "undefined" && window.matchMedia
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let виден = true;
+    const ио = typeof IntersectionObserver !== "undefined"
+      ? new IntersectionObserver(([з]) => { виден = з.isIntersecting; }) : null;
+    if (ио) ио.observe(к);
+    let кадр = 0;
+    let фаза = 0;
+    let прошлое = performance.now();
+    let размах = 0;
+    const рисовать = (сейчасМс) => {
+      кадр = requestAnimationFrame(рисовать);
+      const dt = Math.min(0.05, (сейчасМс - прошлое) / 1000);
+      прошлое = сейчасМс;
+      if (!виден) return;
+      const { доля: д, тянут: т } = сейчас.current;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const ш = к.clientWidth, в = к.clientHeight;
+      if (!ш || !в) return;
+      if (к.width !== Math.round(ш * dpr) || к.height !== Math.round(в * dpr)) {
+        к.width = Math.round(ш * dpr);
+        к.height = Math.round(в * dpr);
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, ш, в);
+      if (!(д > 0.002)) return;
+      // Скорость и высота — от доли шкалы; высота догоняет плавно, чтобы
+      // лента не прыгала при смене суммы.
+      const скорость = 1.4 + 10 * д;
+      const цельРазмаха = Math.min(в / 2 - 1.5, (2.5 + 8 * д) * (т ? 1.15 : 1));
+      размах += (цельРазмаха - размах) * Math.min(1, dt * 6);
+      if (!тихо) фаза += скорость * dt;
+      const середина = в / 2;
+      const частота = 0.085;
+      const шаг = 1.5;
+      for (let x = 0; x <= ш; x += шаг) {
+        const края = Math.min(1, x / 18, (ш - x) / 14);
+        const огиб = края <= 0 ? 0 : края * края * (3 - 2 * края);
+        const θ = x * частота - фаза;
+        const sin = Math.sin(θ), cos = Math.cos(θ);
+        const полу = размах * огиб * sin;
+        // Свет: лицевая сторона белая, изнанка — фиолетовая.
+        const свет = 0.5 + 0.5 * cos;
+        const r = Math.round(108 + (245 - 108) * свет);
+        const g = Math.round(124 + (246 - 124) * свет);
+        const b = Math.round(255 + (250 - 255) * свет);
+        ctx.fillStyle = `rgba(${r},${g},${b},${0.35 + 0.55 * огиб})`;
+        const верх = середина - Math.abs(полу);
+        ctx.fillRect(x, верх, шаг + 0.4, Math.max(0.8, Math.abs(полу) * 2));
+      }
+      // Кромки ленты — тонкие блики, ярче там, где кромка ближе к глазу.
+      for (let сторона = 0; сторона < 2; сторона += 1) {
+        ctx.beginPath();
+        for (let x = 0; x <= ш; x += шаг) {
+          const края = Math.min(1, x / 18, (ш - x) / 14);
+          const огиб = края <= 0 ? 0 : края * края * (3 - 2 * края);
+          const θ = x * частота - фаза + (сторона ? Math.PI : 0);
+          const y = середина + размах * огиб * Math.sin(θ);
+          if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = сторона ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.8)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    };
+    кадр = requestAnimationFrame(рисовать);
+    return () => { cancelAnimationFrame(кадр); if (ио) ио.disconnect(); };
+  }, []);
+
+  return (
+    <canvas
+      ref={холст}
+      aria-hidden
+      style={{
+        position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
+        width: `${доля * 100}%`, height: 26, pointerEvents: "none",
+        transition: тянут ? "none" : "width 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+      }}
+    />
+  );
+}
+
+function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, формат = (v) => String(v), единица = "", ariaLabel, кривизна = 1, волна = false }) {
   const дорожка = useRef(null);
   const [тянут, setТянут] = useState(false);
   /* Пока палец на ручке, значение живёт только здесь, в ползунке и его
@@ -7112,6 +7210,7 @@ function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, фо
           borderRadius: 999, background: "#E9E9EC",
           transition: тянут ? `min-width 260ms ${пружина}` : `width 220ms cubic-bezier(0.22, 1, 0.36, 1), min-width 260ms ${пружина}`,
         }} />
+        {волна && <ВолнаПолзунка доля={доля} тянут={тянут} />}
         <div style={{
           position: "absolute", top: "50%", left: `${доля * 100}%`,
           width: ручка, height: ручка, borderRadius: "50%", background: "#FFFFFF",
@@ -20552,6 +20651,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
                 формат={число}
                 единица={единица}
                 кривизна={3}
+                волна
                 ariaLabel={t("launchAmountLabel")}
                 onChange={(v) => setForm((f) => ({ ...f, buyAmount: v > 0 ? String(v) : "" }))}
               />
