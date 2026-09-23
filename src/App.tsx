@@ -2748,11 +2748,11 @@ function GlobalStyle() {
         background: #3E3E41; transform-origin: 50% 100%; will-change: transform, opacity;
       }
       /* Фитили — над и под телом, не сквозь него: иначе просвечивали тенью. */
-      .заставка-свеча::before, .заставка-свеча::after {
+      .заставка-свеча.в::before, .заставка-свеча.н::after {
         content: ""; position: absolute; left: 3px; width: 1px; background: #2B2B2E;
       }
-      .заставка-свеча::before { top: -9px; height: 9px; }
-      .заставка-свеча::after { bottom: -6px; height: 6px; }
+      .заставка-свеча.в::before { top: -9px; height: 9px; }
+      .заставка-свеча.н::after { bottom: -6px; height: 6px; }
       @keyframes букваПроступает {
         from { opacity: 0; }
         to   { opacity: 1; }
@@ -15771,6 +15771,8 @@ function СтрокаИзЗнаков({ текст, шаг = 52, задержк�
  * место заставки на середине её анимации, поэтому задержки сдвинуты на
  * «уже» — прошедшее с её начала время. */
 const ВЫСОТЫ_СВЕЧЕЙ = [22, 30, 26, 38, 34, 46, 40, 52, 48, 44, 58, 54, 64, 60, 70, 66, 76, 72, 84, 80];
+// Фитили: 1 — сверху, 2 — снизу, 3 — оба, 0 — нет. Тот же набор, что в index.html.
+const ФИТИЛИ_СВЕЧЕЙ = [1,  0,  3,  2,  0,  1,  1,  3,  0,  2,  1,  0,  2,  3,  0,  1,  2,  0,  3,  1];
 function СвечиЗаставки({ уже = 0, уходит = false }) {
   return (
     <div aria-hidden style={{
@@ -15780,7 +15782,7 @@ function СвечиЗаставки({ уже = 0, уходит = false }) {
       {ВЫСОТЫ_СВЕЧЕЙ.map((h, i) => (
         <i
           key={i}
-          className="заставка-свеча"
+          className={`заставка-свеча${ФИТИЛИ_СВЕЧЕЙ[i] & 1 ? " в" : ""}${ФИТИЛИ_СВЕЧЕЙ[i] & 2 ? " н" : ""}`}
           style={{
             height: Math.round(h * 0.62),
             animation: уходит

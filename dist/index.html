@@ -111,7 +111,7 @@
         сообщить("promise", (r && (r.stack || r.message)) || String(r || "отказ без причины"));
       });
     </script>
-    <script type="module" crossorigin src="/assets/index-DWqNuvgT.js"></script>
+    <script type="module" crossorigin src="/assets/index-ASkMPpyX.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/react-DS-kCp2g.js">
     <link rel="modulepreload" crossorigin href="/assets/supabase-QBHRJHLH.js">
     <link rel="modulepreload" crossorigin href="/assets/icons-BxtscEuy.js">
@@ -175,9 +175,11 @@
                         background: #3E3E41; transform-origin: 50% 100%; will-change: transform, opacity; }
       /* Фитили — только над и под телом, не сквозь него: полупрозрачный
          фитиль просвечивал через тело тёмной тенью. Цвета сплошные. */
-      #ширма .свечи i::before, #ширма .свечи i::after { content: ""; position: absolute; left: 3px; width: 1px; background: #2B2B2E; }
-      #ширма .свечи i::before { top: -9px; height: 9px; }
-      #ширма .свечи i::after { bottom: -6px; height: 6px; }
+      /* Фитиль есть не у каждой: у одних сверху, у других снизу, где-то
+         оба, где-то ни одного — как на живом графике. Набор постоянный. */
+      #ширма .свечи i.в::before, #ширма .свечи i.н::after { content: ""; position: absolute; left: 3px; width: 1px; background: #2B2B2E; }
+      #ширма .свечи i.в::before { top: -9px; height: 9px; }
+      #ширма .свечи i.н::after { bottom: -6px; height: 6px; }
       #ширма:not(.идёт):not(.уходит) .свечи i { opacity: 0; }
       #ширма.идёт .свечи i { animation: ширмаСвеча 460ms cubic-bezier(0.22, 1, 0.36, 1) both; }
       #ширма.уходит .свечи i { animation: ширмаВправо 360ms cubic-bezier(0.4, 0, 1, 1) both; }
@@ -226,7 +228,7 @@
     <div id="ширма">
       <div class="имя"><b>M</b><b>I</b><b>N</b><b>T</b><b>L</b><b>Y</b></div>
       <div class="подпись">Мемкоины на TON и Solana</div>
-      <div class="свечи"><i style="height:14px"></i><i style="height:19px"></i><i style="height:16px"></i><i style="height:24px"></i><i style="height:21px"></i><i style="height:29px"></i><i style="height:25px"></i><i style="height:32px"></i><i style="height:30px"></i><i style="height:27px"></i><i style="height:36px"></i><i style="height:33px"></i><i style="height:40px"></i><i style="height:37px"></i><i style="height:43px"></i><i style="height:41px"></i><i style="height:47px"></i><i style="height:45px"></i><i style="height:52px"></i><i style="height:50px"></i></div>
+      <div class="свечи"><i class="в" style="height:14px"></i><i style="height:19px"></i><i class="в н" style="height:16px"></i><i class="н" style="height:24px"></i><i style="height:21px"></i><i class="в" style="height:29px"></i><i class="в" style="height:25px"></i><i class="в н" style="height:32px"></i><i style="height:30px"></i><i class="н" style="height:27px"></i><i class="в" style="height:36px"></i><i style="height:33px"></i><i class="н" style="height:40px"></i><i class="в н" style="height:37px"></i><i style="height:43px"></i><i class="в" style="height:41px"></i><i class="н" style="height:47px"></i><i style="height:45px"></i><i class="в н" style="height:52px"></i><i class="в" style="height:50px"></i></div>
     </div>
     <script>
       // Подпись на выбранном языке.
