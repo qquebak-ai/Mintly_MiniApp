@@ -20563,19 +20563,6 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   // сорок точек, и под кнопкой запуска оставалась пустая половина экрана.
   return (
     <div className="fx-view flex flex-col gap-7" style={{ position: "relative", isolation: "isolate" }}>
-      {/* Полотно уходит за края колонки: страница начинается цветом, а
-          не сразу строками. */}
-      {/* Низ полотна растворяется маской: плывущий цвет доходил до
-          обреза, и под полупрозрачной карточкой ниже была видна резкая
-          горизонтальная граница. */}
-      <span aria-hidden style={{
-        position: "absolute", left: -16, right: -16, top: -20, height: 260, zIndex: -1, overflow: "hidden", isolation: "isolate", pointerEvents: "none",
-        WebkitMaskImage: "linear-gradient(180deg, #000 45%, transparent 100%)",
-        maskImage: "linear-gradient(180deg, #000 45%, transparent 100%)",
-      }}>
-        <span style={{ position: "absolute", inset: "-25%", background: КОШ_ПОЛОТНО, animation: "полотноПлывёт 32s ease-in-out infinite", willChange: "transform" }} />
-        <span style={{ position: "absolute", inset: 0, background: КОШ_ПОЛОТНО_МГЛА }} />
-      </span>
       <div>
         <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 20.5, fontWeight: 700 }}>{t("launchTokenTitle")}</div>
         <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 2 }}>
