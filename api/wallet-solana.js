@@ -36,7 +36,7 @@
  *   APP_WALLET_CAP      — с какого остатка предупреждать (по умолчанию 2).
  *   SIGNER_URL, SIGNER_TOKEN — внешняя служба подписи (необязательно).
  *   SOLANA_RPC, SOLANA_CURVE_PROGRAM, SOLANA_FEE_ACCOUNT.
- *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TELEGRAM_BOT_TOKEN, CRON_SECRET.
+ *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TRADING_BOT_TOKEN, CRON_SECRET.
  */
 
 import crypto from "node:crypto";
@@ -49,7 +49,9 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RPC = process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com";
 const КРИВАЯ_ПРОГРАММА = (process.env.SOLANA_CURVE_PROGRAM || "").trim();
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+// Уведомления идут только отдельным ботом MintlyTrading: основной бот —
+// для входа и команд, а сделки и деньги — в своём тихом канале.
+const BOT_TOKEN = (process.env.TRADING_BOT_TOKEN || "").trim();
 const CRON_SECRET = process.env.CRON_SECRET;
 const SIGNER_URL = (process.env.SIGNER_URL || "").trim();
 const SIGNER_TOKEN = (process.env.SIGNER_TOKEN || "").trim();

@@ -359,6 +359,7 @@ const STR = {
     mailLinkFailed: "Почту привязать не вышло: {msg}. Можно повторить.",
     mailConfirmRow: "Подтверди почту",
     mailConfirmHint: "Пройди проверку",
+    botNotifyRow: "Подключи уведомления", botNotifyHint: "Бот MintlyTrading — сделки и кошелёк",
     enterCode: "Ввести код",
     enterApp: "Войти в приложение",
     openInTelegram: "Открыть в Telegram",
@@ -1050,6 +1051,7 @@ const STR = {
     mailLinkFailed: "Couldn't link the email: {msg}. You can try again.",
     mailConfirmRow: "Confirm your email",
     mailConfirmHint: "Complete the check",
+    botNotifyRow: "Turn on notifications", botNotifyHint: "MintlyTrading bot — trades and wallet",
     enterCode: "Enter the code",
     enterApp: "Enter the app",
     openInTelegram: "Open in Telegram",
@@ -23257,6 +23259,28 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
     return () => { живо = false; };
   }, [accountCreated, userId, открыт]);
 
+  /* Подключён ли бот уведомлений MintlyTrading. Отметку ставит сам бот,
+     когда человек нажимает у него «Старт»; перечитываем, когда приложение
+     снова на экране — человек как раз вернулся из бота. */
+  const [ботЕсть, setБотЕсть] = useState(true);
+  useEffect(() => {
+    if (!accountCreated || !userId) { setБотЕсть(true); return undefined; }
+    let живо = true;
+    const проверить = () => supabase.auth.getUser().then(({ data }) => {
+      if (живо) setБотЕсть(!!(data && data.user && data.user.user_metadata && data.user.user_metadata.trading_bot));
+    }, () => {});
+    проверить();
+    const при = () => { if (document.visibilityState === "visible") setTimeout(проверить, 800); };
+    document.addEventListener("visibilitychange", при);
+    return () => { живо = false; document.removeEventListener("visibilitychange", при); };
+  }, [accountCreated, userId]);
+  const открытьБота = () => {
+    const ссылка = "https://t.me/MintlyTradingBot?start=app";
+    const wa = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    if (wa && wa.openTelegramLink) wa.openTelegramLink(ссылка);
+    else window.open(ссылка, "_blank");
+  };
+
   const [панель, setПанель] = useState(false);
   // Закрытие не обрывает панель: она сжимается к колокольчику и тает.
   const [панельУходит, setПанельУходит] = useState(false);
@@ -23264,7 +23288,7 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
     setПанельУходит(true);
     setTimeout(() => { setПанель(false); setПанельУходит(false); if (потом) потом(); }, 200);
   };
-  if (!черновик) return null;
+  if (!черновик && ботЕсть) return null;
 
   /* Сама просьба больше не висит на главной: справа от имени стоит
      колокольчик с красной точкой, а плашка «подтверди почту» лежит в его
@@ -23295,6 +23319,29 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
             background: T.surface, boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
             transformOrigin: "calc(100% - 21px) -8px",
           }}>
+      <div className="flex flex-col" style={{ gap: 8 }}>
+      {!ботЕсть && (
+        <button
+          onClick={() => { закрытьПанель(открытьБота); haptic("light"); }}
+          className="fx-tap w-full flex items-center"
+          style={{
+            gap: 12, padding: "13px 14px", borderRadius: 20,
+            background: hexA(T.electric, 0.1), border: `1px solid ${hexA(T.electric, 0.28)}`,
+          }}
+        >
+          <span className="flex items-center justify-center flex-shrink-0" style={{
+            width: 36, height: 36, borderRadius: 999, background: hexA(T.electric, 0.16), color: T.electric,
+          }}>
+            <Bell size={17} />
+          </span>
+          <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 800 }}>{t("botNotifyRow")}</span>
+            <span className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("botNotifyHint")}</span>
+          </span>
+          <ChevronRight size={16} color={T.faint} />
+        </button>
+      )}
+      {черновик && (
       <button
         onClick={() => { закрытьПанель(() => setОткрыт(true)); haptic("light"); }}
         className="fx-tap w-full flex items-center"
@@ -23318,6 +23365,8 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
         </span>
         <ChevronRight size={16} color={T.faint} />
       </button>
+      )}
+      </div>
           </div>
         </>
       )}

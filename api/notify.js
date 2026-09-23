@@ -12,7 +12,7 @@
 //
 // Нужные переменные окружения (Vercel → Project Settings → Environment
 // Variables), все серверные, без префикса VITE_:
-//   TELEGRAM_BOT_TOKEN        — токен бота из @BotFather
+//   TRADING_BOT_TOKEN         — токен бота MintlyTrading из @BotFather
 //   SUPABASE_URL              — тот же URL, что и во VITE_SUPABASE_URL
 //   SUPABASE_SERVICE_ROLE_KEY — service_role ключ проекта Supabase
 //   CRON_SECRET               — любая длинная строка; Vercel сам шлёт её
@@ -38,7 +38,9 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+// Уведомления идут только отдельным ботом MintlyTrading: основной бот —
+// для входа и команд, а сделки и деньги — в своём тихом канале.
+const BOT_TOKEN = (process.env.TRADING_BOT_TOKEN || "").trim();
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const CRON_SECRET = process.env.CRON_SECRET;
