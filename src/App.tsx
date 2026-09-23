@@ -24828,6 +24828,33 @@ const FEE_PERCENT = 0.01; // 1% комиссии
   // разметки не нужно.
   // До первой отрисовки: иначе первый кадр заглушек — плашки с бликом.
   useLayoutEffect(() => завестиЗнаки(), []);
+
+  /* Открыта ли клавиатура. Telegram при её появлении ужимает окно, и
+     панель разделов, привязанная к нижнему краю, выезжала вверх вместе с
+     ним и ложилась поверх полей. Панель должна стоять на своём месте —
+     под клавиатурой, — поэтому, пока та открыта, панель просто не
+     показываем: сдвигать её некуда, её закрывает клавиатура. Судим по
+     фокусу: поле с клавиатурой — это ввод текста, а не кнопка,
+     галочка или поле только для чтения. */
+  const [клавиатура, setКлавиатура] = useState(false);
+  useEffect(() => {
+    const сКлавиатурой = (э) => {
+      if (!э || э.nodeType !== 1) return false;
+      if (э.isContentEditable) return true;
+      if (э.tagName === "TEXTAREA") return !э.readOnly;
+      if (э.tagName !== "INPUT" || э.readOnly || э.disabled) return false;
+      if ((э.getAttribute("inputmode") || "") === "none") return false;
+      return !/^(button|submit|reset|checkbox|radio|file|range|color|hidden|image)$/i.test(э.type || "text");
+    };
+    const проверить = () => setКлавиатура(сКлавиатурой(document.activeElement));
+    const вне = () => setTimeout(проверить, 0);
+    document.addEventListener("focusin", проверить);
+    document.addEventListener("focusout", вне);
+    return () => {
+      document.removeEventListener("focusin", проверить);
+      document.removeEventListener("focusout", вне);
+    };
+  }, []);
   // Анимацию тянем заранее, в фоне: к моменту запуска токена она должна
   // быть готова, иначе полёт начнётся с задержкой на загрузку.
   useEffect(() => {
@@ -28013,6 +28040,9 @@ function mapTokenRow(row) {
           // без свечения вокруг него.
           style={{
             position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: insetBottom + 6, zIndex: 5,
+            // Под клавиатурой панели не видно — без анимации, как будто
+            // клавиатура просто её закрыла.
+            visibility: клавиатура ? "hidden" : "visible",
             width: "auto", maxWidth: 420, gap: 6,
             padding: 7,
             borderRadius: 999,
