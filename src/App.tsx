@@ -489,6 +489,8 @@ const STR = {
     statRaised: "GRAM в токенах",
     statGraduated: "вышли на биржу",
     homeAlmostTitle: "Почти на бирже",
+    homeNextTitle: "Следующие на биржу",
+    homeFreshTitle: "Только что запущены",
     homeAlmostSub: "Ближе всех к выходу на DEX",
     homeAlmostLeft: "осталось {left} GRAM",
     homeAlmostEmpty: "Пока никто не набрал заметную часть пути. Запусти токен — будешь первым.",
@@ -1172,6 +1174,8 @@ const STR = {
     statRaised: "TON in tokens",
     statGraduated: "reached a DEX",
     homeAlmostTitle: "Almost listed",
+    homeNextTitle: "Next to list",
+    homeFreshTitle: "Just launched",
     homeAlmostSub: "Closest to hitting a DEX",
     homeAlmostLeft: "{left} GRAM to go",
     homeAlmostEmpty: "Nobody is far along yet. Launch a token and be the first.",
@@ -10437,6 +10441,144 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
   );
 }
 
+/* Две карточки с выдвижкой: «Почти на бирже» и «Только что запущены».
+ *
+ * Взяты с карточек, у которых описание выезжает при наведении, но
+ * наведения на телефоне нет — поэтому выдвижка выезжает сама, когда
+ * карточка въезжает в экран, и прячется, когда уходит: так движение
+ * повторяется при каждом возвращении к ней. Тап переключает вручную. */
+function КарточкаСВыдвижкой({ title, tokens, onOpen, delay = 0, строка }) {
+  const корень = useRef(null);
+  const [открыта, setОткрыта] = useState(false);
+
+  useEffect(() => {
+    const el = корень.current;
+    if (!el || typeof IntersectionObserver === "undefined") { setОткрыта(true); return; }
+    let таймер = null;
+    const н = new IntersectionObserver(([з]) => {
+      clearTimeout(таймер);
+      if (з.isIntersecting) таймер = setTimeout(() => setОткрыта(true), delay);
+      else setОткрыта(false);
+    }, { threshold: 0.55 });
+    н.observe(el);
+    return () => { clearTimeout(таймер); н.disconnect(); };
+  }, [delay]);
+
+  const первый = tokens[0];
+  return (
+    <div ref={корень} className="flex flex-col min-w-0" style={{ gap: 8 }}>
+      <button
+        onClick={() => setОткрыта((о) => !о)}
+        className="fx-tap w-full text-left rounded-[24px]"
+        style={{ position: "relative", overflow: "hidden", height: 132, padding: 14, background: T.surface, border: "none", display: "flex", flexDirection: "column", justifyContent: "space-between" }}
+      >
+        <SpotlightAura src={первый && первый.logoUrl} ticker={первый && первый.ticker} />
+        <div style={{ position: "relative", fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.15, textWrap: "balance" }}>
+          {title}
+        </div>
+        <div className="flex items-center justify-between" style={{ position: "relative" }}>
+          <div className="flex">
+            {tokens.map((tok, i) => (
+              <span key={tok.id} style={{ marginLeft: i ? -10 : 0, borderRadius: "50%", boxShadow: `0 0 0 2px ${T.surface}`, zIndex: 3 - i, display: "flex" }}>
+                <TokenAvatar size={30} src={tok.logoUrl} />
+              </span>
+            ))}
+          </div>
+          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11.5, transition: "transform 420ms cubic-bezier(.34,1.56,.64,1)", transform: открыта ? "rotate(180deg)" : "none", display: "inline-block" }}>▾</span>
+        </div>
+      </button>
+
+      {/* Выдвижка: из-под карточки, с лёгкой отдачей в конце — как
+          пружина у оригинала, только без библиотеки анимаций. */}
+      <div style={{ display: "grid", gridTemplateRows: открыта ? "1fr" : "0fr", transition: "grid-template-rows 480ms cubic-bezier(.22,1,.36,1)" }}>
+        <div style={{ overflow: "hidden", minHeight: 0 }}>
+          <div
+            className="flex flex-col"
+            style={{
+              gap: 2,
+              transform: открыта ? "translateY(0)" : "translateY(-30px)",
+              opacity: открыта ? 1 : 0.2,
+              transition: "transform 620ms cubic-bezier(.34,1.56,.64,1), opacity 380ms ease",
+            }}
+          >
+            {tokens.map((tok) => (
+              <button
+                key={tok.id}
+                onClick={() => onOpen && onOpen(tok)}
+                className="fx-tap w-full text-left"
+                style={{ background: "transparent", border: "none", padding: "7px 2px" }}
+              >
+                {строка(tok)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ЖивыеКарточки({ tokens = [], onOpen }) {
+  const { почти, свежие } = useMemo(() => {
+    const все = tokens || [];
+    // Главный токен над этим блоком уже показывает самого близкого к
+    // бирже — здесь его не повторяем.
+    const наКривой = все
+      .filter((tok) => tok.curveAddress && tok.graduationTon > 0 && tok.raisedTon < tok.graduationTon)
+      .map((tok) => ({ tok, pct: (tok.raisedTon / tok.graduationTon) * 100 }))
+      .sort((a, b) => b.pct - a.pct);
+    const выше80 = наКривой.slice(1).filter((x) => x.pct >= 80);
+    const почти = (выше80.length ? выше80 : наКривой.slice(1)).slice(0, 3).map((x) => x.tok);
+    const свежие = все
+      .filter((tok) => tok.createdAt)
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 3);
+    return { почти, свежие };
+  }, [tokens]);
+
+  if (!почти.length && !свежие.length) return null;
+
+  const шкала = (tok) => {
+    const pct = tok.graduationTon > 0 ? Math.min(100, (tok.raisedTon / tok.graduationTon) * 100) : 0;
+    return (
+      <>
+        <div className="flex items-baseline justify-between" style={{ gap: 6 }}>
+          <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${tok.ticker}</span>
+          <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{pct.toFixed(0)}%</span>
+        </div>
+        <div style={{ height: 4, borderRadius: 2, background: T.surfaceHi, overflow: "hidden", marginTop: 5 }}>
+          <div style={{ width: `${pct}%`, height: "100%", background: PRISM, borderRadius: 2 }} />
+        </div>
+        <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 11, marginTop: 4 }}>{tok.price > 0 ? fmtPrice(tok.price) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`}</div>
+      </>
+    );
+  };
+
+  const свежая = (tok) => {
+    const растёт = (tok.change || 0) >= 0;
+    return (
+      <>
+        <div className="flex items-baseline justify-between" style={{ gap: 6 }}>
+          <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${tok.ticker}</span>
+          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11, flexShrink: 0 }}>{fmtAge(tok.createdAt) || ""}</span>
+        </div>
+        <div className="flex items-baseline justify-between" style={{ gap: 6, marginTop: 3 }}>
+          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11 }}>{tok.price > 0 ? fmtPrice(tok.price) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`}</span>
+          <span style={{ fontFamily: monoFont, color: растёт ? T.up : T.down, fontSize: 11, fontWeight: 700 }}>{растёт ? "+" : ""}{(tok.change || 0).toFixed(1)}%</span>
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <section className="grid" style={{ gridTemplateColumns: почти.length && свежие.length ? "1fr 1fr" : "1fr", gap: 10, alignItems: "start" }}>
+      {почти.length > 0 && <КарточкаСВыдвижкой title={t("homeNextTitle")} tokens={почти} onOpen={onOpen} строка={шкала} />}
+      {свежие.length > 0 && <КарточкаСВыдвижкой title={t("homeFreshTitle")} tokens={свежие} onOpen={onOpen} строка={свежая} delay={140} />}
+    </section>
+  );
+}
+
 /* Бегущая строка сделок.
  *
  * Раньше те же события лежали списком в восемь карточек и занимали
@@ -12594,6 +12736,7 @@ function HomeView({
           <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
           <БегущаяЛента />
           <ГлавныйТокен tokens={боевые} onOpen={onOpenToken} />
+          <ЖивыеКарточки tokens={боевые} onOpen={onOpenToken} />
           <ВДвижении tokens={боевые} onOpen={onOpenToken} onAll={() => onGoTab("mempad")} />
           <ТопСтрока onOpenToken={onOpenToken} onOpenProfile={onOpenProfile} live={боевые} />
         </div>
