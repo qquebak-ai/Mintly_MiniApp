@@ -111,7 +111,7 @@
         сообщить("promise", (r && (r.stack || r.message)) || String(r || "отказ без причины"));
       });
     </script>
-    <script type="module" crossorigin src="/assets/index-Csw08Shl.js"></script>
+    <script type="module" crossorigin src="/assets/index-B2Vdnpad.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/react-DS-kCp2g.js">
     <link rel="modulepreload" crossorigin href="/assets/supabase-QBHRJHLH.js">
     <link rel="modulepreload" crossorigin href="/assets/icons-W_TV3a_Z.js">
@@ -124,7 +124,26 @@
          показывает страницу — и в этот зазор успевала мелькнуть главная.
          Снимается из приложения, когда экран входа встал на место или
          когда аккаунт нашёлся. -->
-    <div id="ширма" style="position:fixed;inset:0;z-index:2147483000;background:#000000;pointer-events:none"></div>
+    <style>
+      /* Имя на поле ожидания. Буквы проступают одна за другой — то же
+         движение, что и в самом приложении, но чистым CSS: связка к
+         этому времени ещё не загружена, а смотреть на пустое чёрное
+         поле человеку нечего. */
+      #ширма { position: fixed; inset: 0; z-index: 2147483000; background: #000; pointer-events: none;
+               display: flex; align-items: center; justify-content: center; }
+      #ширма .имя { font-family: 'Nunito', system-ui, sans-serif; color: #F5F7FA;
+                    font-size: 25px; font-weight: 300; letter-spacing: 0.34em; padding-left: 0.34em; }
+      #ширма .имя b { font-weight: inherit; display: inline-block; opacity: 0;
+                      animation: буква 300ms ease-out forwards; }
+      #ширма .имя b:nth-child(1) { animation-delay: 60ms; }
+      #ширма .имя b:nth-child(2) { animation-delay: 124ms; }
+      #ширма .имя b:nth-child(3) { animation-delay: 188ms; }
+      #ширма .имя b:nth-child(4) { animation-delay: 252ms; }
+      #ширма .имя b:nth-child(5) { animation-delay: 316ms; }
+      #ширма .имя b:nth-child(6) { animation-delay: 380ms; }
+      @keyframes буква { to { opacity: 1; } }
+    </style>
+    <div id="ширма"><div class="имя"><b>M</b><b>I</b><b>N</b><b>T</b><b>L</b><b>Y</b></div></div>
     <div id="root"></div>
     <script>
       // Приложение поднялось — метку перечитывания снимаем, иначе

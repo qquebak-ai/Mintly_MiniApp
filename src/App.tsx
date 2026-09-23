@@ -12326,42 +12326,6 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
    полупустые карточки с прочерками вместо чисел, а ровные серые
    прямоугольники той же формы: так видно раскладку и видно, что она
    сейчас оживёт. */
-/* Заставка запуска для тех, у кого аккаунт уже есть.
- *
- * Новичку имя показывает само окно входа — там это часть знакомства.
- * А тому, кто возвращается, окно не открывается вовсе, и приложение
- * раньше начиналось сразу с ленты. Здесь то же чёрное поле и то же имя
- * по буквам: одинаковое начало у всех, кто открыл приложение.
- *
- * Своего фона не рисует: под нею лежит поле из разметки, и снимается
- * оно, когда имя договорит. */
-function ЗаставкаЗапуска({ видна }) {
-  if (!видна) return null;
-  const слой = (
-    <div
-      aria-hidden
-      className="flex flex-col items-center"
-      style={{
-        position: "fixed", left: 0, right: 0, top: "50%", transform: "translateY(-50%)",
-        zIndex: 2147483001, gap: 12, pointerEvents: "none",
-      }}
-    >
-      <span style={{
-        fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 300,
-        letterSpacing: "0.34em", paddingLeft: "0.34em",
-      }}>
-        <ИмяПоБуквам текст="MINTLY" />
-      </span>
-      <span style={{
-        fontFamily: bodyFont, color: "rgba(255, 255, 255, 0.42)", fontSize: 13, fontWeight: 600,
-      }}>
-        {t("authSplashLead")}
-      </span>
-    </div>
-  );
-  return typeof document !== "undefined" ? createPortal(слой, document.body) : слой;
-}
-
 /* Чёрное поле до входа.
  *
  * Само поле лежит в разметке страницы (index.html): пока грузится и
@@ -12377,6 +12341,11 @@ function снятьШирму() {
   if (typeof document === "undefined") return;
   const поле = document.getElementById("ширма");
   if (!поле) return;
+  /* Имя убираем сразу, а само поле — плавно. Окно входа показывает своё
+     имя ровно там же, и пока поле дотлевает, два одинаковых слова
+     лежали бы друг на друге. */
+  const имя = поле.querySelector(".имя");
+  if (имя) имя.remove();
   /* Два кадра и ещё треть секунды: первый кадр отдаёт разметку, второй —
      отрисовку, а запас держит поле, пока окно входа встаёт на место. */
   requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
@@ -26115,21 +26084,17 @@ function mapTokenRow(row) {
   /* Тот, у кого аккаунт уже есть, тоже здоровается: чёрное поле держится,
      пока имя договаривает, и только потом снимается. Новичку его
      показывает само окно входа, и ждать там нечего. */
-  const [заставкаЗапуска, setЗаставкаЗапуска] = useState(false);
-  const здоровались = useRef(false);
+  /* Имя показывает само поле ожидания — оно лежит в разметке и рисуется
+     до того, как загрузится связка. Держим его ещё мгновение после
+     ответа, чтобы буквы успели договорить. */
+  const [заставкаЗапуска, setЗаставкаЗапуска] = useState(true);
   useEffect(() => {
-    // Ждём ответа: пока неизвестно, есть ли аккаунт, на экране просто
-    // чёрное поле. Новичку имя покажет окно входа, и показывать его
-    // дважды незачем.
-    if (!authChecked || !accountCreated || здоровались.current) return undefined;
-    здоровались.current = true;
-    setЗаставкаЗапуска(true);
-    const т = setTimeout(() => setЗаставкаЗапуска(false), 1600);
+    const т = setTimeout(() => setЗаставкаЗапуска(false), 1100);
     return () => clearTimeout(т);
-  }, [authChecked, accountCreated]);
+  }, []);
   useEffect(() => {
     if (!authChecked) return;
-    if (profileModalOpen || сразуВКошелёк || (accountCreated && здоровались.current && !заставкаЗапуска)) снятьШирму();
+    if (profileModalOpen || сразуВКошелёк || (accountCreated && !заставкаЗапуска)) снятьШирму();
   }, [authChecked, accountCreated, сразуВКошелёк, profileModalOpen, заставкаЗапуска]);
   useEffect(() => {
     const т = setTimeout(снятьШирму, 9000);
@@ -26856,10 +26821,6 @@ function mapTokenRow(row) {
       {/* Пока аккаунта нет, под окном входа стоит чёрное поле: главную
           мимо него не видно ни на кадр, сколько бы ни занял ответ
           сервера и в каком бы порядке ни пришли флаги. */}
-
-      {/* Имя на чёрном для тех, кто возвращается: у окна входа своё такое
-          же, и вместе они не показываются. */}
-      <ЗаставкаЗапуска видна={заставкаЗапуска && !profileModalOpen} />
 
       <AuthModal open={profileModalOpen} язык={appSettings.language} onЯзык={(v) => updateAppSetting("language", v)} onСоздан={() => setЗалпНаГлавной(true)} onClose={() => { setProfileModalOpen(false); setLookFocus(null); }} onSubmit={submitProfile} initial={profile} mode={profileModalMode} walletAddress={walletAddress} onChangeNickname={changeNickname} cosmetics={cosmetics} owned={owned} onEquip={equipCosmetic} lookFocus={lookFocus} />
       <SettingsPanel
