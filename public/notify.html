@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#000000" />
+    <title>Mintly · Уведомления</title>
+    <link rel="icon" type="image/png" href="/mascot.png" />
+    <!-- Приложение бота уведомлений MintlyTrading. Своё, отдельное от
+         основного: журнал писем бота и переключатели, что присылать.
+         Вход — подписью этого бота, без аккаунта основного приложения. -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+      @font-face { font-family: 'Nunito'; font-weight: 400; font-display: swap; src: url('/fonts/nunito-400-cyrillic.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+      @font-face { font-family: 'Nunito'; font-weight: 400; font-display: swap; src: url('/fonts/nunito-400-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212; }
+      @font-face { font-family: 'Nunito'; font-weight: 600; font-display: swap; src: url('/fonts/nunito-600-cyrillic.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+      @font-face { font-family: 'Nunito'; font-weight: 600; font-display: swap; src: url('/fonts/nunito-600-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212; }
+      @font-face { font-family: 'Nunito'; font-weight: 700; font-display: swap; src: url('/fonts/nunito-700-cyrillic.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+      @font-face { font-family: 'Nunito'; font-weight: 700; font-display: swap; src: url('/fonts/nunito-700-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212; }
+      @font-face { font-family: 'Nunito'; font-weight: 800; font-display: swap; src: url('/fonts/nunito-800-cyrillic.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+      @font-face { font-family: 'Nunito'; font-weight: 800; font-display: swap; src: url('/fonts/nunito-800-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212; }
+
+      :root { --bg: #000; --surface: #0A0B0E; --surfaceHi: #101216; --line: #1A1D24; --ice: #F5F7FA;
+              --muted: #8B929D; --faint: #5F6670; --electric: #6C7CFF; --up: #00E96B; --down: #FF3B47; }
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      html, body { margin: 0; background: var(--bg); color: var(--ice); font-family: 'Nunito', -apple-system, sans-serif; }
+      body { min-height: 100vh; }
+      #ширма { position: fixed; inset: 0; z-index: 2147483000; background: #000; pointer-events: none;
+               display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+      #ширма .имя { font-family: 'Nunito', 'Jost', 'Segoe UI', sans-serif; color: #F5F7FA;
+                    font-size: 38px; font-weight: 300; letter-spacing: 0.34em; padding-left: 0.34em; }
+      /* До старта всё спрятано и стоит: анимация идёт только тогда, когда
+         окно правда видно (класс «идёт» ставит скрипт ниже). */
+      #ширма:not(.идёт):not(.уходит) .имя b, #ширма:not(.идёт):not(.уходит) .подпись { opacity: 0; }
+      /* Своим слоем: пока грузится связка, основной поток занят, и без
+         этого буквы проступали рывками. */
+      #ширма .имя b, #ширма .подпись { will-change: opacity, transform; }
+      #ширма .имя b { font-weight: inherit; display: inline-block; }
+      #ширма.идёт .имя b { animation: ширмаБуква 520ms ease-out both; }
+      #ширма.идёт .имя b:nth-child(1) { animation-delay: 0ms; }
+      #ширма.идёт .имя b:nth-child(2) { animation-delay: 130ms; }
+      #ширма.идёт .имя b:nth-child(3) { animation-delay: 260ms; }
+      #ширма.идёт .имя b:nth-child(4) { animation-delay: 390ms; }
+      #ширма.идёт .имя b:nth-child(5) { animation-delay: 520ms; }
+      #ширма.идёт .имя b:nth-child(6) { animation-delay: 650ms; }
+      #ширма .подпись { font-family: 'Nunito', 'Jost', -apple-system, sans-serif;
+                        color: rgba(255, 255, 255, 0.42); font-size: 16px; font-weight: 600; }
+      #ширма.идёт .подпись { animation: ширмаВсплыв 800ms cubic-bezier(0.22, 1, 0.36, 1) 820ms backwards; }
+      /* Уход: буквы по очереди гаснут, сдвигаясь вправо, подпись — вместе
+         с первой. Класс ставит приложение, когда готово показаться. */
+      #ширма.уходит .имя b { animation: ширмаВправо 360ms cubic-bezier(0.4, 0, 1, 1) both; }
+      #ширма.уходит .имя b:nth-child(1) { animation-delay: 0ms; }
+      #ширма.уходит .имя b:nth-child(2) { animation-delay: 60ms; }
+      #ширма.уходит .имя b:nth-child(3) { animation-delay: 120ms; }
+      #ширма.уходит .имя b:nth-child(4) { animation-delay: 180ms; }
+      #ширма.уходит .имя b:nth-child(5) { animation-delay: 240ms; }
+      #ширма.уходит .имя b:nth-child(6) { animation-delay: 300ms; }
+      #ширма.уходит .подпись { animation: ширмаВправо 360ms cubic-bezier(0.4, 0, 1, 1) both; }
+      @keyframes ширмаБуква { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes ширмаВсплыв { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes ширмаВправо { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(16px); } }
+      @media (prefers-reduced-motion: reduce) { #ширма * { animation: none !important; } }
+      /* Свечи внизу заставки: светло-серые, встают слева направо по
+         очереди, как график, который рисуется на глазах. Числа — те же,
+         что у СвечиЗаставки в приложении: окно входа их продолжает. */
+      #ширма .свечи { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
+                      display: flex; justify-content: center; align-items: flex-end; gap: 7px; height: 96px; pointer-events: none; }
+      #ширма .свечи i { position: relative; display: block; width: 7px; border-radius: 2px;
+                        background: #3E3E41; transform-origin: 50% 100%; will-change: transform, opacity; }
+      /* Фитили — только над и под телом, не сквозь него: полупрозрачный
+         фитиль просвечивал через тело тёмной тенью. Цвета сплошные. */
+      /* Фитиль есть не у каждой: у одних сверху, у других снизу, где-то
+         оба, где-то ни одного — как на живом графике. Набор постоянный. */
+      #ширма .свечи i.в::before, #ширма .свечи i.н::after { content: ""; position: absolute; left: 3px; width: 1px; background: #2B2B2E; }
+      #ширма .свечи i.в::before { top: -9px; height: 9px; }
+      #ширма .свечи i.н::after { bottom: -6px; height: 6px; }
+      #ширма:not(.идёт):not(.уходит) .свечи i { opacity: 0; }
+      #ширма.идёт .свечи i { animation: ширмаСвеча 460ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+      #ширма.уходит .свечи i { animation: ширмаВправо 360ms cubic-bezier(0.4, 0, 1, 1) both; }
+      @keyframes ширмаСвеча { from { opacity: 0; transform: scaleY(0); } to { opacity: 1; transform: scaleY(1); } }
+      #ширма.идёт .свечи i:nth-child(1) { animation-delay: 150ms; }
+      #ширма.уходит .свечи i:nth-child(1) { animation-delay: 0ms; }
+      #ширма.идёт .свечи i:nth-child(2) { animation-delay: 225ms; }
+      #ширма.уходит .свечи i:nth-child(2) { animation-delay: 15ms; }
+      #ширма.идёт .свечи i:nth-child(3) { animation-delay: 300ms; }
+      #ширма.уходит .свечи i:nth-child(3) { animation-delay: 30ms; }
+      #ширма.идёт .свечи i:nth-child(4) { animation-delay: 375ms; }
+      #ширма.уходит .свечи i:nth-child(4) { animation-delay: 45ms; }
+      #ширма.идёт .свечи i:nth-child(5) { animation-delay: 450ms; }
+      #ширма.уходит .свечи i:nth-child(5) { animation-delay: 60ms; }
+      #ширма.идёт .свечи i:nth-child(6) { animation-delay: 525ms; }
+      #ширма.уходит .свечи i:nth-child(6) { animation-delay: 75ms; }
+      #ширма.идёт .свечи i:nth-child(7) { animation-delay: 600ms; }
+      #ширма.уходит .свечи i:nth-child(7) { animation-delay: 90ms; }
+      #ширма.идёт .свечи i:nth-child(8) { animation-delay: 675ms; }
+      #ширма.уходит .свечи i:nth-child(8) { animation-delay: 105ms; }
+      #ширма.идёт .свечи i:nth-child(9) { animation-delay: 750ms; }
+      #ширма.уходит .свечи i:nth-child(9) { animation-delay: 120ms; }
+      #ширма.идёт .свечи i:nth-child(10) { animation-delay: 825ms; }
+      #ширма.уходит .свечи i:nth-child(10) { animation-delay: 135ms; }
+      #ширма.идёт .свечи i:nth-child(11) { animation-delay: 900ms; }
+      #ширма.уходит .свечи i:nth-child(11) { animation-delay: 150ms; }
+      #ширма.идёт .свечи i:nth-child(12) { animation-delay: 975ms; }
+      #ширма.уходит .свечи i:nth-child(12) { animation-delay: 165ms; }
+      #ширма.идёт .свечи i:nth-child(13) { animation-delay: 1050ms; }
+      #ширма.уходит .свечи i:nth-child(13) { animation-delay: 180ms; }
+      #ширма.идёт .свечи i:nth-child(14) { animation-delay: 1125ms; }
+      #ширма.уходит .свечи i:nth-child(14) { animation-delay: 195ms; }
+      #ширма.идёт .свечи i:nth-child(15) { animation-delay: 1200ms; }
+      #ширма.уходит .свечи i:nth-child(15) { animation-delay: 210ms; }
+      #ширма.идёт .свечи i:nth-child(16) { animation-delay: 1275ms; }
+      #ширма.уходит .свечи i:nth-child(16) { animation-delay: 225ms; }
+      #ширма.идёт .свечи i:nth-child(17) { animation-delay: 1350ms; }
+      #ширма.уходит .свечи i:nth-child(17) { animation-delay: 240ms; }
+      #ширма.идёт .свечи i:nth-child(18) { animation-delay: 1425ms; }
+      #ширма.уходит .свечи i:nth-child(18) { animation-delay: 255ms; }
+      #ширма.идёт .свечи i:nth-child(19) { animation-delay: 1500ms; }
+      #ширма.уходит .свечи i:nth-child(19) { animation-delay: 270ms; }
+      #ширма.идёт .свечи i:nth-child(20) { animation-delay: 1575ms; }
+      #ширма.уходит .свечи i:nth-child(20) { animation-delay: 285ms; }
+
+      /* Подпись «Уведомления» — последней из всего: после букв и свечей. */
+      #ширма.идёт .подпись { animation: ширмаВсплыв 800ms cubic-bezier(0.22, 1, 0.36, 1) 2050ms backwards; }
+
+      #прил { padding: calc(var(--tg-content-safe-area-inset-top, 0px) + var(--tg-safe-area-inset-top, 0px) + 18px) 16px calc(env(safe-area-inset-bottom, 0px) + 28px);
+              max-width: 480px; margin: 0 auto; opacity: 0; transform: translateY(14px);
+              transition: opacity 520ms ease, transform 620ms cubic-bezier(0.22, 1, 0.36, 1); }
+      #прил.видно { opacity: 1; transform: none; }
+      h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin: 6px 0 4px; }
+      .подзаголовок { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 0 0 22px; }
+      .раздел { color: var(--muted); font-size: 12.5px; letter-spacing: 0.04em; text-transform: uppercase; margin: 26px 0 10px; }
+      .карта { background: var(--surface); border-radius: 22px; overflow: hidden; }
+      .ряд { display: flex; align-items: center; gap: 12px; padding: 15px 16px; }
+      .ряд + .ряд { border-top: 1px solid var(--line); }
+      .значок { width: 36px; height: 36px; border-radius: 999px; background: rgba(108,124,255,0.14);
+                display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 17px; }
+      .текст { flex: 1; min-width: 0; }
+      .имя-ряда { font-size: 15px; font-weight: 700; }
+      .пояснение { color: var(--muted); font-size: 12.5px; margin-top: 2px; line-height: 1.4; }
+      .тумблер { position: relative; width: 50px; height: 30px; border-radius: 999px; background: var(--surfaceHi);
+                 border: none; flex-shrink: 0; transition: background 260ms ease; cursor: pointer; padding: 0; }
+      .тумблер::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%;
+                        background: #fff; transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+      .тумблер.вкл { background: var(--electric); }
+      .тумблер.вкл::after { transform: translateX(20px); }
+      .тумблер:disabled { opacity: 0.4; }
+      .запись { padding: 14px 16px; }
+      .запись + .запись { border-top: 1px solid var(--line); }
+      .запись-текст { font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+      .запись-когда { color: var(--faint); font-size: 12px; margin-top: 4px; }
+      .пусто { color: var(--muted); font-size: 13.5px; padding: 18px 16px; line-height: 1.5; }
+      .кнопка { display: block; width: 100%; margin-top: 18px; padding: 16px 0; border-radius: 999px; border: none;
+                background: #EDEDEF; color: #0B0B0C; font: 800 16px 'Nunito', sans-serif; cursor: pointer; }
+      @media (prefers-reduced-motion: reduce) { #прил { transition: none; } }
+    </style>
+  </head>
+  <body>
+    <div id="ширма">
+      <div class="имя"><b>M</b><b>I</b><b>N</b><b>T</b><b>L</b><b>Y</b></div>
+      <div class="подпись">Уведомления</div>
+      <div class="свечи"><i class="в" style="height:14px"></i><i style="height:19px"></i><i class="в н" style="height:16px"></i><i class="н" style="height:24px"></i><i style="height:21px"></i><i class="в" style="height:29px"></i><i class="в" style="height:25px"></i><i class="в н" style="height:32px"></i><i style="height:30px"></i><i class="н" style="height:27px"></i><i class="в" style="height:36px"></i><i style="height:33px"></i><i class="н" style="height:40px"></i><i class="в н" style="height:37px"></i><i style="height:43px"></i><i class="в" style="height:41px"></i><i class="н" style="height:47px"></i><i style="height:45px"></i><i class="в н" style="height:52px"></i><i class="в" style="height:50px"></i></div>
+    </div>
+
+    <main id="прил"></main>
+
+    <script>
+      /* Всё приложение — одна страница без сборки: ей не нужны ни связка
+         основного приложения, ни его вход. */
+      var tg = window.Telegram && window.Telegram.WebApp;
+      try { tg && tg.ready(); tg && tg.expand(); tg && tg.setHeaderColor && tg.setHeaderColor("#000000"); tg && tg.setBackgroundColor && tg.setBackgroundColor("#000000"); tg && tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) {}
+      var EN = !!(tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code && tg.initDataUnsafe.user.language_code.indexOf("ru") !== 0);
+      if (EN) document.querySelector("#ширма .подпись").textContent = "Notifications";
+      var Т = EN ? {
+        title: "Notifications", sub: "Everything the MintlyTrading bot sends you — and what to send.",
+        all: "All notifications", allHint: "One switch for everything below",
+        what: "What to send", recent: "Recent",
+        trade: ["Trades on your tokens", "Buys and progress to listing"],
+        listing: ["Listing", "When a curve closes and moves to a DEX"],
+        wallet: ["Wallet", "Deposits and withdrawals"],
+        support: ["Support", "Replies from the Mintly team"],
+        empty: "Nothing yet — notifications will show up here.",
+        noAccount: "Create a Mintly account first — then notifications will come here.",
+        openMain: "Open Mintly", error: "Couldn't load. Try again later.",
+        ago: { now: "just now", m: "m", h: "h", d: "d" },
+      } : {
+        title: "Уведомления", sub: "Всё, что присылает бот MintlyTrading, — и что присылать.",
+        all: "Все уведомления", allHint: "Один переключатель на всё ниже",
+        what: "Что присылать", recent: "Последние",
+        trade: ["Сделки по твоим токенам", "Покупки и путь к бирже"],
+        listing: ["Выход на биржу", "Когда кривая закрылась и ушла в пул"],
+        wallet: ["Кошелёк", "Пополнения и выводы"],
+        support: ["Поддержка", "Ответы команды Mintly"],
+        empty: "Пока ничего не приходило — уведомления появятся здесь.",
+        noAccount: "Сначала создай аккаунт в Mintly — тогда уведомления будут приходить сюда.",
+        openMain: "Открыть Mintly", error: "Не получилось загрузить. Попробуй позже.",
+        ago: { now: "только что", m: " мин", h: " ч", d: " д" },
+      };
+      var ЗНАЧКИ = { trade: "📈", listing: "🚀", wallet: "👛", support: "💬" };
+      var ВИДЫ = ["trade", "listing", "wallet", "support"];
+      var состояние = null;
+
+      function когда(iso) {
+        var с = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+        if (с < 60) return Т.ago.now;
+        if (с < 3600) return Math.floor(с / 60) + Т.ago.m;
+        if (с < 86400) return Math.floor(с / 3600) + Т.ago.h;
+        return Math.floor(с / 86400) + Т.ago.d;
+      }
+      function экран(html) { document.getElementById("прил").innerHTML = html; }
+      function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+      function нарисовать() {
+        var с = состояние;
+        if (!с) { экран('<h1>' + Т.title + '</h1><p class="подзаголовок">' + Т.error + '</p>'); return; }
+        if (!с.account) {
+          экран('<h1>' + Т.title + '</h1><p class="подзаголовок">' + Т.noAccount + '</p>' +
+            '<button class="кнопка" id="вМинтли">' + Т.openMain + '</button>');
+          document.getElementById("вМинтли").onclick = function () {
+            var ссылка = "https://t.me/MintlyAppbot";
+            if (tg && tg.openTelegramLink) tg.openTelegramLink(ссылка); else window.open(ссылка, "_blank");
+          };
+          return;
+        }
+        var ряды = ВИДЫ.map(function (в) {
+          return '<div class="ряд"><div class="значок">' + ЗНАЧКИ[в] + '</div><div class="текст"><div class="имя-ряда">' + Т[в][0] +
+            '</div><div class="пояснение">' + Т[в][1] + '</div></div><button class="тумблер' + (с.types[в] ? " вкл" : "") +
+            '" data-вид="' + в + '"' + (с.muted ? " disabled" : "") + ' aria-label="' + Т[в][0] + '"></button></div>';
+        }).join("");
+        var журнал = (с.log || []).length
+          ? с.log.map(function (з) {
+              return '<div class="запись"><div class="запись-текст">' + (ЗНАЧКИ[з.вид] || "🔔") + " " + esc(з.текст) + '</div><div class="запись-когда">' + когда(з.at) + '</div></div>';
+            }).join("")
+          : '<div class="пусто">' + Т.empty + '</div>';
+        экран(
+          '<h1>' + Т.title + '</h1><p class="подзаголовок">' + Т.sub + '</p>' +
+          '<div class="карта"><div class="ряд"><div class="значок">🔔</div><div class="текст"><div class="имя-ряда">' + Т.all +
+          '</div><div class="пояснение">' + Т.allHint + '</div></div><button class="тумблер' + (с.muted ? "" : " вкл") + '" id="всё" aria-label="' + Т.all + '"></button></div></div>' +
+          '<div class="раздел">' + Т.what + '</div><div class="карта">' + ряды + '</div>' +
+          '<div class="раздел">' + Т.recent + '</div><div class="карта">' + журнал + '</div>'
+        );
+        document.getElementById("всё").onclick = function () { поменять({ muted: !с.muted }); };
+        Array.prototype.forEach.call(document.querySelectorAll("[data-вид]"), function (кн) {
+          кн.onclick = function () { var т = {}; т[кн.getAttribute("data-вид")] = !с.types[кн.getAttribute("data-вид")]; поменять({ types: т }); };
+        });
+      }
+
+      function запрос(действие, тело) {
+        return fetch("https://api.mintly.company/api/trading-bot?action=" + действие, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.assign({ initData: (tg && tg.initData) || "" }, тело || {})),
+        }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+      }
+      function поменять(правка) {
+        // Переключатель откликается сразу, сервер подтверждает следом.
+        if (typeof правка.muted === "boolean") состояние.muted = правка.muted;
+        if (правка.types) for (var к in правка.types) состояние.types[к] = правка.types[к];
+        try { tg && tg.HapticFeedback && tg.HapticFeedback.selectionChanged(); } catch (e) {}
+        нарисовать();
+        запрос("set", правка).then(function (о) { if (о && о.account) { состояние = о; нарисовать(); } });
+      }
+
+      /* Заставка: та же, что у основного приложения, — буквы, свечи и
+         последней подпись. Данные грузятся параллельно; экран выходит,
+         когда отыграла заставка и пришёл ответ. */
+      var поле = document.getElementById("ширма");
+      var старт = Date.now();
+      requestAnimationFrame(function () { requestAnimationFrame(function () { поле.classList.add("идёт"); }); });
+      var данные = запрос("app");
+      данные.then(function (о) {
+        состояние = о;
+        var ждать = Math.max(0, 3000 - (Date.now() - старт));
+        setTimeout(function () {
+          поле.classList.remove("идёт");
+          поле.classList.add("уходит");
+          setTimeout(function () {
+            поле.style.transition = "opacity 260ms ease"; поле.style.opacity = "0";
+            нарисовать();
+            requestAnimationFrame(function () { document.getElementById("прил").classList.add("видно"); });
+            setTimeout(function () { поле.remove(); }, 280);
+          }, 620);
+        }, ждать);
+      });
+    </script>
+  </body>
+</html>

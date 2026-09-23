@@ -12,6 +12,7 @@
  * SUPABASE_SERVICE_ROLE_KEY, TG_BOT, TG_APP.
  */
 
+import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 export const ТОКЕН_ТОРГОВОГО = (process.env.TRADING_BOT_TOKEN || "").trim();
@@ -20,11 +21,14 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ОСНОВНОЙ_БОТ = String(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "").trim();
 const ПРИЛОЖЕНИЕ = String(process.env.TG_APP || "Mintly").trim();
 export const ССЫЛКА_ПРИЛОЖЕНИЯ = `https://t.me/${ОСНОВНОЙ_БОТ}/${ПРИЛОЖЕНИЕ}`;
-/* Кнопка открывает приложение прямо из этого бота (web_app): вход его
-   подпись принимает наравне с основным ботом. Ссылка на приложение
-   основного бота вела на его старый адрес и открывала серый экран. */
-export const АДРЕС_ПРИЛОЖЕНИЯ = (process.env.APP_URL || "https://www.mintly.company").replace(/\/$/, "");
-export const КНОПКА_ПРИЛОЖЕНИЯ = { inline_keyboard: [[{ text: "Открыть Mintly", web_app: { url: АДРЕС_ПРИЛОЖЕНИЯ } }]] };
+/* У бота уведомлений своё приложение — страница уведомлений (notify.html):
+   журнал писем и переключатели. Основное приложение открывается только
+   из основного бота. */
+export const АДРЕС_ПРИЛОЖЕНИЯ = `${(process.env.APP_URL || "https://www.mintly.company").replace(/\/$/, "")}/notify.html`;
+export const КНОПКА_ПРИЛОЖЕНИЯ = { inline_keyboard: [[{ text: "Уведомления", web_app: { url: АДРЕС_ПРИЛОЖЕНИЯ } }]] };
+
+// Виды уведомлений — их можно выключать по отдельности в приложении бота.
+export const ВИДЫ = ["trade", "listing", "wallet", "support"];
 
 let база = null;
 export function служебнаяБаза() {
@@ -103,13 +107,18 @@ export async function отметить(telegramId, поля) {
   return мета;
 }
 
-/* Одно уведомление. Выключил — молчим; бот не запущен или заблокирован —
-   Telegram откажет, и это нормальный исход, а не сбой. */
-export async function уведомить(chatId, текст) {
+/* Одно уведомление. Выключено целиком или этот вид — молчим; бот не
+   запущен или заблокирован — Telegram откажет, и это нормальный исход.
+   Доставленное пишем в журнал человека (последние 40): его показывает
+   приложение бота. */
+export async function уведомить(chatId, текст, вид = "trade") {
   if (!ТОКЕН_ТОРГОВОГО || !chatId) return false;
+  let кто = null;
   try {
-    const кто = await ктоВTelegram(chatId);
-    if (кто && кто.мета && кто.мета.trading_mute) return false;
+    кто = await ктоВTelegram(chatId);
+    const м = (кто && кто.мета) || {};
+    if (м.trading_mute) return false;
+    if (м.trading_types && м.trading_types[вид] === false) return false;
   } catch { /* не узнали — лучше сказать, чем промолчать */ }
   const ответ = await tgТорговый("sendMessage", {
     chat_id: chatId,
@@ -118,5 +127,30 @@ export async function уведомить(chatId, текст) {
     disable_web_page_preview: true,
     reply_markup: КНОПКА_ПРИЛОЖЕНИЯ,
   });
-  return !!(ответ && ответ.ok);
+  const ок = !!(ответ && ответ.ok);
+  if (ок && кто) {
+    const журнал = Array.isArray(кто.мета.trading_log) ? кто.мета.trading_log : [];
+    const запись = { вид, текст: String(текст).replace(/<[^>]+>/g, "").slice(0, 400), at: new Date().toISOString() };
+    await отметить(chatId, { trading_log: [запись, ...журнал].slice(0, 40) }).catch(() => {});
+  }
+  return ок;
+}
+
+/* Подпись приложения бота уведомлений: та же проверка Telegram, но
+   ключом этого бота. Основное приложение её не принимает — у каждого
+   бота своё приложение. */
+export function проверитьПодпись(initData, срокСек = 24 * 3600) {
+  if (!ТОКЕН_ТОРГОВОГО || typeof initData !== "string" || !initData) return null;
+  const п = new URLSearchParams(initData);
+  const hash = п.get("hash");
+  if (!hash) return null;
+  п.delete("hash");
+  const строка = [...п.keys()].sort().map((к) => `${к}=${п.get(к)}`).join("\n");
+  const ключ = crypto.createHmac("sha256", "WebAppData").update(ТОКЕН_ТОРГОВОГО).digest();
+  const счёт = crypto.createHmac("sha256", ключ).update(строка).digest("hex");
+  const a = Buffer.from(счёт), b = Buffer.from(hash);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  const когда = Number(п.get("auth_date") || 0);
+  if (!когда || Date.now() / 1000 - когда > срокСек) return null;
+  try { return JSON.parse(п.get("user") || "null"); } catch { return null; }
 }

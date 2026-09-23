@@ -77,18 +77,12 @@ function verifyInitData(initData) {
     .map((key) => `${key}=${params.get(key)}`)
     .join("\n");
 
-  /* Приложение открывают из двух наших ботов: основного и бота
-     уведомлений MintlyTrading (кнопка «Открыть Mintly» в его письмах).
-     Подпись у каждого своя — принимаем любую из двух. */
-  const сходится = (токен) => {
-    if (!токен) return false;
-    const secretKey = crypto.createHmac("sha256", "WebAppData").update(токен).digest();
-    const computed = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
-    const a = Buffer.from(computed, "utf8");
-    const b = Buffer.from(hash, "utf8");
-    return a.length === b.length && crypto.timingSafeEqual(a, b);
-  };
-  if (!сходится(BOT_TOKEN) && !сходится((process.env.TRADING_BOT_TOKEN || "").trim())) {
+  const secretKey = crypto.createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
+  const computed = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
+
+  const a = Buffer.from(computed, "utf8");
+  const b = Buffer.from(hash, "utf8");
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
     // Подпись не сошлась — почти всегда это чужой или испорченный
     // TELEGRAM_BOT_TOKEN.
     return { reason: "bad_signature" };

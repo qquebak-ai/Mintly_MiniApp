@@ -20,7 +20,7 @@
  */
 
 import crypto from "node:crypto";
-import { ТОКЕН_ТОРГОВОГО, tgТорговый, отметить, ктоВTelegram, служебнаяБаза, КНОПКА_ПРИЛОЖЕНИЯ, АДРЕС_ПРИЛОЖЕНИЯ } from "./_trading.js";
+import { ТОКЕН_ТОРГОВОГО, tgТорговый, отметить, ктоВTelegram, служебнаяБаза, КНОПКА_ПРИЛОЖЕНИЯ, АДРЕС_ПРИЛОЖЕНИЯ, ВИДЫ, проверитьПодпись } from "./_trading.js";
 
 const СЕКРЕТ_ВЫКЛАДКИ = process.env.DEPLOY_SECRET || "";
 // Секрет вебхука выводим из токена: отдельная переменная не нужна, а
@@ -92,7 +92,7 @@ export default async function handler(req, res) {
     });
     await tgТорговый("setMyShortDescription", { short_description: "Уведомления о твоих токенах и кошельке Mintly" });
     // Кнопка меню у поля ввода — сразу в приложение.
-    await tgТорговый("setChatMenuButton", { menu_button: { type: "web_app", text: "Mintly", web_app: { url: АДРЕС_ПРИЛОЖЕНИЯ } } });
+    await tgТорговый("setChatMenuButton", { menu_button: { type: "web_app", text: "Уведомления", web_app: { url: АДРЕС_ПРИЛОЖЕНИЯ } } });
     return res.status(200).json(вебхук || { ok: false });
   }
 
@@ -112,6 +112,39 @@ export default async function handler(req, res) {
     const мета = user.user_metadata || {};
     if (подключён && !мета.trading_bot) await отметить(tgId, { trading_bot: true }).catch(() => {});
     return res.status(200).json({ connected: подключён, muted: !!мета.trading_mute });
+  }
+
+  /* Приложение бота: состояние и переключатели. Вход — подписью этого
+     бота (initData), без сессии основного приложения. */
+  if (действие === "app" || действие === "set") {
+    res.setHeader("Cache-Control", "no-store");
+    const тело = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    const tgUser = проверитьПодпись(String(тело.initData || ""));
+    if (!tgUser || !tgUser.id) return res.status(401).json({ error: "bad_init_data" });
+    const аккаунт = await ктоВTelegram(tgUser.id, { свежо: true });
+    if (!аккаунт) return res.status(200).json({ account: false });
+    let мета = аккаунт.мета || {};
+    if (действие === "set") {
+      const правка = {};
+      if (typeof тело.muted === "boolean") правка.trading_mute = тело.muted;
+      if (тело.types && typeof тело.types === "object") {
+        const виды = { ...(мета.trading_types || {}) };
+        for (const в of ВИДЫ) if (typeof тело.types[в] === "boolean") виды[в] = тело.types[в];
+        правка.trading_types = виды;
+      }
+      мета = (await отметить(tgUser.id, { trading_bot: true, ...правка })) || мета;
+    } else if (!мета.trading_bot) {
+      // Открыл приложение бота — значит бот у него есть.
+      мета = (await отметить(tgUser.id, { trading_bot: true })) || мета;
+    }
+    const виды = {};
+    for (const в of ВИДЫ) виды[в] = !(мета.trading_types && мета.trading_types[в] === false);
+    return res.status(200).json({
+      account: true,
+      muted: !!мета.trading_mute,
+      types: виды,
+      log: Array.isArray(мета.trading_log) ? мета.trading_log : [],
+    });
   }
 
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });

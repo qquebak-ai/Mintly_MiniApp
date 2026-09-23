@@ -297,7 +297,7 @@ async function сообщить(db, user_id, текст) {
     if (!data || !data.telegram_id) return;
     // Через общий отправитель: он помнит, не выключил ли человек уведомления.
     const { уведомить } = await import("./_trading.js");
-    await уведомить(data.telegram_id, текст);
+    await уведомить(data.telegram_id, текст, "wallet");
   } catch { /* бот молчит — это не повод отменять саму операцию */ }
 }
 

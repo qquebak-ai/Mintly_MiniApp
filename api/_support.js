@@ -178,7 +178,7 @@ export async function deliverAnswer(admin, { userId, telegramId, text, adminName
   let доставлено = false;
   if (telegramId) {
     const { уведомить } = await import("./_trading.js");
-    доставлено = await уведомить(telegramId, `💬 <b>Поддержка Mintly</b>\n\n${esc(чистый)}`);
+    доставлено = await уведомить(telegramId, `💬 <b>Поддержка Mintly</b>\n\n${esc(чистый)}`, "support");
   }
   // Недоставленная личка — не сбой: человек мог не начинать диалог с
   // ботом или заблокировать его. В приложении ответ он всё равно увидит.
