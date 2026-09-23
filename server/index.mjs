@@ -395,7 +395,11 @@ if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.CURVES_LOOP !== "0") {
  * вызывается изнутри, и секрет заведомо тот же самый. */
 const ШАГ_ВЕСТЕЙ_МС = Number(process.env.NOTIFY_INTERVAL_MS) || 10 * 60 * 1000;
 
-if (process.env.TELEGRAM_BOT_TOKEN && process.env.NOTIFY_LOOP !== "0") {
+// Рассылку шлёт бот MintlyTrading — его и проверяем. Раньше условие
+// смотрело на токен основного бота: тот на сервере есть всегда, и цикл
+// заводился исправно, но каждый раз падал внутри — /api/notify без
+// TRADING_BOT_TOKEN отвечает 500, и об этом никто не узнавал.
+if (process.env.TRADING_BOT_TOKEN && process.env.NOTIFY_LOOP !== "0") {
   const весть = async () => {
     try {
       const ф = await обработчик("/api/notify");

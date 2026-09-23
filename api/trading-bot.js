@@ -72,6 +72,39 @@ export default async function handler(req, res) {
   if (!ТОКЕН_ТОРГОВОГО) return res.status(503).json({ error: "no_trading_bot_token" });
   const действие = String((req.query && req.query.action) || "");
 
+  /* Разовая проверка: почему рассылка молчит. Не трогает ничего чужого —
+     только смотрит на переменные окружения и один раз сама вызывает
+     /api/notify, как это делает внутренний цикл сервера, и показывает,
+     что тот ответил. Тем же секретом, что и «setup». */
+  if (действие === "debug") {
+    const данный = String((req.headers && req.headers.authorization) || "").replace(/^Bearer\s+/i, "").trim();
+    if (!СЕКРЕТ_ВЫКЛАДКИ || данный !== СЕКРЕТ_ВЫКЛАДКИ) return res.status(401).json({ error: "bad_secret" });
+    const env = {
+      TRADING_BOT_TOKEN: !!process.env.TRADING_BOT_TOKEN,
+      TELEGRAM_BOT_TOKEN: !!process.env.TELEGRAM_BOT_TOKEN,
+      CRON_SECRET: !!process.env.CRON_SECRET,
+      NOTIFY_LOOP: process.env.NOTIFY_LOOP ?? null,
+      NOTIFY_INTERVAL_MS: process.env.NOTIFY_INTERVAL_MS ?? null,
+    };
+    let notify = null;
+    try {
+      const mod = await import("./notify.js");
+      let код = null; let тело = null;
+      const поддельныйRes = {
+        status(c) { код = c; return this; },
+        json(b) { тело = b; return this; },
+      };
+      await mod.default(
+        { method: "POST", headers: { authorization: `Bearer ${process.env.CRON_SECRET || ""}` } },
+        поддельныйRes,
+      );
+      notify = { код, тело };
+    } catch (e) {
+      notify = { ошибка: String((e && e.message) || e).slice(0, 300) };
+    }
+    return res.status(200).json({ env, notify });
+  }
+
   if (действие === "setup") {
     const данный = String((req.headers && req.headers.authorization) || "").replace(/^Bearer\s+/i, "").trim();
     if (!СЕКРЕТ_ВЫКЛАДКИ || данный !== СЕКРЕТ_ВЫКЛАДКИ) return res.status(401).json({ error: "bad_secret" });
