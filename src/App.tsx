@@ -13099,7 +13099,14 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
             </>
             )}
 
-            <div style={{ position: "relative", zIndex: 1, maxWidth: "72%" }}>
+            <div style={{
+              position: "relative", zIndex: 1, maxWidth: "72%",
+              // Только на первом баннере: заголовок поднят к самому
+              // верху карточки, а кнопка ниже стоит на прежнем месте —
+              // её положение задаёт отдельный блок, эта поправка его не
+              // трогает.
+              marginTop: б.id === "launch" ? -10 : 0,
+            }}>
               {(б.строки[язык] || б.строки.RU).map((строка, i) => (
                 <div key={i} style={{ fontFamily: displayFont, fontSize: б.кегль || 23, fontWeight: 800, color: T.ice, letterSpacing: "-0.02em", lineHeight: 1.18 }}>
                   {разбитьПоВыделениям(строка, б.выделения, язык)}
