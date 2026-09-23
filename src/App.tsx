@@ -13488,11 +13488,13 @@ function HomeView({
         /* Содержимое проявляется на месте плашек, а не подменяет их
            кадром: подмена читалась так, будто экран моргнул. */
         <div className="fx-view flex flex-col" style={{ gap: 26 }}>
-          <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
           <БегущаяЛента />
           <ГлавныйТокен tokens={боевые} onOpen={onOpenToken} />
           <ЖивыеКарточки tokens={боевые} onOpen={onOpenToken} />
           <ВДвижении tokens={боевые} onOpen={onOpenToken} onAll={() => onGoTab("mempad")} />
+          {/* Баннеры — предпоследним блоком: главная открывается рынком, а
+              не рекламой своих же разделов. */}
+          <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
           <ТопСтрока onOpenToken={onOpenToken} onOpenProfile={onOpenProfile} live={боевые} />
         </div>
       )}
