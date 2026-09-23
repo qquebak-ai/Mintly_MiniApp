@@ -130,17 +130,20 @@
                display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
       #ширма .имя { font-family: 'Nunito', 'Jost', 'Segoe UI', sans-serif; color: #F5F7FA;
                     font-size: 25px; font-weight: 300; letter-spacing: 0.34em; padding-left: 0.34em; }
-      #ширма .имя b { font-weight: inherit; display: inline-block;
-                      animation: ширмаБуква 300ms ease-out both; }
-      #ширма .имя b:nth-child(1) { animation-delay: 0ms; }
-      #ширма .имя b:nth-child(2) { animation-delay: 70ms; }
-      #ширма .имя b:nth-child(3) { animation-delay: 140ms; }
-      #ширма .имя b:nth-child(4) { animation-delay: 210ms; }
-      #ширма .имя b:nth-child(5) { animation-delay: 280ms; }
-      #ширма .имя b:nth-child(6) { animation-delay: 350ms; }
+      /* До старта всё спрятано и стоит: анимация идёт только тогда, когда
+         окно правда видно (класс «идёт» ставит скрипт ниже). */
+      #ширма:not(.идёт):not(.уходит) .имя b, #ширма:not(.идёт):not(.уходит) .подпись { opacity: 0; }
+      #ширма .имя b { font-weight: inherit; display: inline-block; }
+      #ширма.идёт .имя b { animation: ширмаБуква 300ms ease-out both; }
+      #ширма.идёт .имя b:nth-child(1) { animation-delay: 0ms; }
+      #ширма.идёт .имя b:nth-child(2) { animation-delay: 70ms; }
+      #ширма.идёт .имя b:nth-child(3) { animation-delay: 140ms; }
+      #ширма.идёт .имя b:nth-child(4) { animation-delay: 210ms; }
+      #ширма.идёт .имя b:nth-child(5) { animation-delay: 280ms; }
+      #ширма.идёт .имя b:nth-child(6) { animation-delay: 350ms; }
       #ширма .подпись { font-family: 'Nunito', 'Jost', -apple-system, sans-serif;
-                        color: rgba(255, 255, 255, 0.42); font-size: 13px; font-weight: 600;
-                        animation: ширмаВсплыв 560ms cubic-bezier(0.22, 1, 0.36, 1) 420ms backwards; }
+                        color: rgba(255, 255, 255, 0.42); font-size: 13px; font-weight: 600; }
+      #ширма.идёт .подпись { animation: ширмаВсплыв 560ms cubic-bezier(0.22, 1, 0.36, 1) 420ms backwards; }
       /* Уход: буквы по очереди гаснут, сдвигаясь вправо, подпись — вместе
          с первой. Класс ставит приложение, когда готово показаться. */
       #ширма.уходит .имя b { animation: ширмаВправо 280ms cubic-bezier(0.4, 0, 1, 1) both; }
@@ -161,14 +164,39 @@
       <div class="подпись">Мемкоины на TON и Solana</div>
     </div>
     <script>
-      // Подпись на выбранном языке и миг старта: от него приложение
-      // отсчитывает, когда буквам пора уходить.
-      window.__ширмаСтарт = Date.now();
+      // Подпись на выбранном языке.
       try {
         if (localStorage.getItem("mintly_language") === "EN") {
           document.querySelector("#ширма .подпись").textContent = "Memecoins on TON and Solana";
         }
       } catch (e) { /* хранилище закрыто — остаётся русская */ }
+
+      /* Telegram держит окно скрытым, пока страница не скажет ready(), а
+         приложение говорит это, лишь когда загрузится. Заставка к тому
+         времени успевала отыграть в невидимом окне, и человек видел уже
+         готовое слово или вовсе пустоту. Поэтому ready() — сразу, а сама
+         анимация стартует на первом кадре, который правда нарисован. */
+      try { window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.ready(); } catch (e) {}
+
+      (function () {
+        var поле = document.getElementById("ширма");
+        var пущено = false;
+        function пуск() {
+          if (пущено || !поле) return;
+          пущено = true;
+          window.__ширмаСтарт = Date.now();
+          поле.classList.add("идёт");
+        }
+        function ждатьКадр() {
+          if (document.visibilityState === "hidden") return;
+          requestAnimationFrame(function () { requestAnimationFrame(пуск); });
+        }
+        // Шрифт даём догрузиться, но недолго: подмена начертания посреди
+        // анимации заметнее, чем пара сотых задержки.
+        var шрифты = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+        Promise.race([шрифты, new Promise(function (r) { setTimeout(r, 350); })]).then(ждатьКадр);
+        document.addEventListener("visibilitychange", ждатьКадр);
+      })();
     </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
