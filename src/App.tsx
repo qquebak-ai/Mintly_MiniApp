@@ -16269,12 +16269,10 @@ function МастерФразы({
                              пикселей на телефоне, без размытого края), так
                              что кнопка не дёргается при смене цвета. */
                           border: `2px solid ${верно ? T.up : ошибка ? T.down : серое ? hexA(T.ice, 0.88) : "transparent"}`,
-                          boxShadow: верно ? `0 0 0 3px ${hexA(T.up, 0.14)}`
-                            : ошибка ? `0 0 0 3px ${hexA(T.down, 0.14)}`
-                            : "0 0 0 0 transparent",
+                          // Ореола нет: только сама рамка, ровно по краю.
                           background: T.surface, color: T.ice,
                           fontFamily: bodyFont, fontSize: 14.5, fontWeight: 700,
-                          transition: "border-color 420ms ease, box-shadow 420ms ease",
+                          transition: "border-color 420ms ease",
                         }}
                       >
                         {слова[и]}
@@ -19777,7 +19775,11 @@ function Field({ label, placeholder, area, value, onChange, type = "text", icon:
             border: `1px solid ${error ? T.down : focus ? T.electric : T.line}`, outline: "none",
             resize: area ? "none" : undefined,
             paddingLeft: Icon ? 32 : 12, paddingRight: isPassword ? 34 : 12,
-            boxShadow: focus ? `0 0 0 3px ${glow(0.14)}` : "none",
+            /* Без ореола вокруг: полупрозрачное кольцо на тёмном фоне
+               читалось вторым, размытым контуром, и край выглядел
+               неровным. Фокус — только чёткая рамка, утолщённая внутрь
+               на полточки, поэтому она строго повторяет край поля. */
+            boxShadow: focus && !error ? `inset 0 0 0 0.5px ${T.electric}` : "none",
             transition: `border-color ${EASE}, box-shadow ${EASE}`,
           }}
         />
@@ -22891,9 +22893,9 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
                       : (код[i] ? T.lineHi : T.line)}`,
                     /* Код набран — зелёное загорается по окошкам слева
                        направо: одна волна вместо шести рамок разом. */
-                    boxShadow: полон ? `0 0 0 3px ${hexA(T.up, 0.16)}` : "0 0 0 0 transparent",
+                    // Ореола нет: зелёная рамка сама говорит, что код принят.
                     color: T.ice, fontFamily: monoFont, fontSize: 25, fontWeight: 700,
-                    transition: "border-color 260ms ease, box-shadow 260ms ease",
+                    transition: "border-color 260ms ease",
                     transitionDelay: полон ? `${i * ВОЛНА_ШАГ}ms` : "0ms",
                   }}
                 >
