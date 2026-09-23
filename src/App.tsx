@@ -2222,19 +2222,29 @@ function GlobalStyle() {
       @keyframes букваЦветёт { from { background-position: 0% 50%; } to { background-position: 0% 50%; } }
       }
       /* Сияние за кнопкой: круговой градиент (зелёный, синий, белый,
-         оранжевый) размыт в облако и вращается за 5,2 с. Угол крутится
-         через @property — у градиента нет своей анимации поворота, а
-         вращать сам слой нельзя: он вытянутый и заходил бы углами. */
-      @property --сияние-угол { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
-      @keyframes сияниеКруг { to { --сияние-угол: 360deg; } }
+         оранжевый) размыт в облако и вращается за 5,2 с.
+         Слоёв три, и это не прихоть. Внешний только размывает и лежит с
+         запасом по краям: в WebKit размытие обрезается по рамке самого
+         элемента, и прежний вариант давал на iPhone чёткий прямоугольник
+         вокруг кнопки. Средний — пилюля по форме кнопки, режет лишнее.
+         Внутренний — большой квадрат с градиентом, который вращается
+         обычным transform: так работает везде, без @property. */
+      @keyframes сияниеКруг { to { transform: translate(-50%, -50%) rotate(360deg); } }
       .кнопка-сияние {
-        position: absolute; inset: -2px -4px; border-radius: 999px; z-index: -1; pointer-events: none;
-        background: conic-gradient(from var(--сияние-угол), #22C55E, #2563EB, #D4D4D8, #F97316, #22C55E);
-        filter: blur(14px);
-        animation: сияниеКруг 5.2s linear infinite;
-        transition: opacity 600ms ease;
+        position: absolute; inset: -26px -28px; z-index: -1; pointer-events: none;
+        padding: 24px; filter: blur(14px); transition: opacity 600ms ease;
       }
-      @media (prefers-reduced-motion: reduce) { .кнопка-сияние { animation: none; } }
+      .кнопка-сияние > span {
+        position: relative; display: block; width: 100%; height: 100%;
+        border-radius: 999px; overflow: hidden;
+      }
+      .кнопка-сияние > span > span {
+        position: absolute; left: 50%; top: 50%; width: 140%; aspect-ratio: 1;
+        transform: translate(-50%, -50%);
+        background: conic-gradient(#22C55E, #2563EB, #D4D4D8, #F97316, #22C55E);
+        animation: сияниеКруг 5.2s linear infinite;
+      }
+      @media (prefers-reduced-motion: reduce) { .кнопка-сияние > span > span { animation: none; } }
       /* Умная смена текста: общие знаки остаются и доезжают на новое
          место, новые проступают из размытия сверху, по очереди слева
          направо. Размытие сходит дольше, чем прозрачность, — отсюда
@@ -14454,7 +14464,7 @@ function ЖидкаяКнопка({ onClick, disabled = false, занята = fa
           ? "width 250ms cubic-bezier(0.22, 1, 0.36, 1) 100ms"
           : "width 300ms cubic-bezier(0.22, 1, 0.36, 1)",
       }}>
-        {сияние && <span aria-hidden className="кнопка-сияние" style={{ opacity: готова || занята ? 0.8 : 0 }} />}
+        {сияние && <span aria-hidden className="кнопка-сияние" style={{ opacity: готова || занята ? 0.8 : 0 }}><span><span /></span></span>}
         <button
           onClick={onClick}
           disabled={disabled || занята}
