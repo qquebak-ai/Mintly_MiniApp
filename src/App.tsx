@@ -26946,7 +26946,12 @@ function mapTokenRow(row) {
           </KeepAlive>
           </div>
           <KeepAlive show={view === "wallet"}>
+            {/* Ключ по хозяину: со сменой аккаунта раздел пересоздаётся
+                начисто. Без него в нём оставались адреса и остатки
+                прежнего — человек заводил новый аккаунт и видел на нём
+                чужой кошелёк, хотя в базе у него ничего нет. */}
             <WalletView
+              key={userId || "гость"}
               скинКарты={cosmetics.wallet}
               connected={connected}
               walletAddress={walletAddress}
