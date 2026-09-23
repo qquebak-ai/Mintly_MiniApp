@@ -2256,6 +2256,18 @@ function GlobalStyle() {
       }
       .клетка-вспышка { animation: клеткаВспышка 2.6s ease-out both; }
       @media (prefers-reduced-motion: reduce) { .клетка-вспышка { display: none; } }
+      /* Блик на заливке ползунка запуска. */
+      @keyframes дорожкаБлик {
+        0%   { transform: translateX(-100%); }
+        70%, 100% { transform: translateX(260%); }
+      }
+      .дорожка-блик {
+        position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+        animation: дорожкаБлик 2s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+        pointer-events: none;
+      }
+      @media (prefers-reduced-motion: reduce) { .дорожка-блик { display: none; } }
       /* Умная смена текста: общие знаки остаются и доезжают на новое
          место, новые проступают из размытия сверху, по очереди слева
          направо. Размытие сходит дольше, чем прозрачность, — отсюда
@@ -7124,7 +7136,14 @@ function Ползунок({ value, min = 0, max = 1, step = 0.01, onChange, фо
           backgroundPosition: "left center",
           backgroundRepeat: "no-repeat",
           transition: тянут ? `min-width 260ms ${пружина}` : `width 220ms cubic-bezier(0.22, 1, 0.36, 1), background-size 220ms cubic-bezier(0.22, 1, 0.36, 1), min-width 260ms ${пружина}`,
-        }} />
+          overflow: "hidden",
+        }}>
+          {/* Блик бежит по заливке слева направо; чем больше сумма, тем
+              чаще он проходит — дорожка будто разгоняется. */}
+          {радуга && доля > 0.01 && (
+            <span aria-hidden className="дорожка-блик" style={{ animationDuration: `${(2.8 - 1.9 * доля).toFixed(2)}s` }} />
+          )}
+        </div>
         <div style={{
           position: "absolute", top: "50%", left: `${доля * 100}%`,
           width: ручка, height: ручка, borderRadius: "50%", background: "#FFFFFF",
