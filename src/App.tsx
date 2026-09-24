@@ -24249,7 +24249,11 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   шесть окошек с зелёной волной, тот же статус-текст, та
                   же ссылка «отправить заново», та же своя клавиатура —
                   системная закрыла бы половину окошек. */}
-              <div className="flex flex-col items-center justify-end text-center" style={{ gap: 12, minHeight: ВЕРХ_КАРТОЧКИ }}>
+              {/* Ниже, чем у почты/ника: там резерв под общую высоту шагов
+                  (ВЕРХ_КАРТОЧКИ), а здесь ни аватарки, ни длинного текста
+                  нет — с тем же отступом иконка с заголовком повисали в
+                  пустоте над окошками кода. */}
+              <div className="flex flex-col items-center justify-end text-center" style={{ gap: 12, minHeight: 92 }}>
                 <span aria-hidden style={{ width: 46, height: 46, ...РАДУГА_КОНВЕРТА }} />
                 <div className="flex flex-col" style={{ gap: 6 }}>
                   <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
