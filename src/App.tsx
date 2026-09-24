@@ -16793,7 +16793,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <section
         onPointerDown={волнаОт}
         style={{
-          position: "relative", overflow: "hidden", borderRadius: 24, padding: "16px 18px 18px",
+          position: "relative", overflow: "hidden", borderRadius: 24, padding: "26px 18px 30px",
           /* Обрезка по скруглению у iOS не держится, если внутри что-то
              ходит (блик, волны, ткань): дети вылезают за угол квадратом.
              Отдельный слой и маска по кругу возвращают обрезку. */
