@@ -11121,12 +11121,19 @@ function ЖивыеКарточки({ tokens = [], onOpen }) {
             <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${tok.ticker}</span>
             <ПометкаТест сеть={tok.network} size={8} />
           </span>
-          <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 12, fontWeight: 700, flexShrink: 0 }}><ТекстСЧислами text={pct.toFixed(0)} />%</span>
+          {/* Мкап — сразу за названием: он же и обновляется на глазах,
+              на каждую чужую сделку (см. поток ?all=1 у App). */}
+          {tok.mcapNum > 0 && (
+            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 12, fontWeight: 700, flexShrink: 0 }}><ТекстСЧислами text={fmtUSD(tok.mcapNum)} /></span>
+          )}
         </div>
         <div style={{ height: 4, borderRadius: 2, background: T.surfaceHi, overflow: "hidden", marginTop: 5 }}>
           <div style={{ width: `${pct}%`, height: "100%", background: PRISM, borderRadius: 2 }} />
         </div>
-        <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 11, marginTop: 4 }}><ТекстСЧислами text={tok.price > 0 ? fmtPrice(tok.price) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`} /></div>
+        <div className="flex items-baseline justify-between" style={{ gap: 6, marginTop: 4 }}>
+          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11 }}><ТекстСЧислами text={tok.price > 0 ? fmtPrice(tok.price) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`} /></span>
+          <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 11, fontWeight: 700, flexShrink: 0 }}><ТекстСЧислами text={pct.toFixed(0)} />%</span>
+        </div>
       </>
     );
   };
@@ -11140,7 +11147,11 @@ function ЖивыеКарточки({ tokens = [], onOpen }) {
             <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${tok.ticker}</span>
             <ПометкаТест сеть={tok.network} size={8} />
           </span>
-          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11, flexShrink: 0 }}>{fmtAge(tok.createdAt) || ""}</span>
+          {/* Мкап — сразу за названием, живой: та же логика, что у шкалы
+              выше. */}
+          {tok.mcapNum > 0 && (
+            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 12, fontWeight: 700, flexShrink: 0 }}><ТекстСЧислами text={fmtUSD(tok.mcapNum)} /></span>
+          )}
         </div>
         <div className="flex items-baseline justify-between" style={{ gap: 6, marginTop: 3 }}>
           <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11 }}><ТекстСЧислами text={tok.price > 0 ? fmtPrice(tok.price) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`} /></span>
