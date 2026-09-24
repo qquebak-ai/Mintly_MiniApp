@@ -10446,7 +10446,17 @@ function ФонКлеток({ клетка = 26 }) {
     const ро = typeof ResizeObserver !== "undefined" ? new ResizeObserver(мерить) : null;
     if (ро) ро.observe(el);
     const ио = typeof IntersectionObserver !== "undefined"
-      ? new IntersectionObserver(([з]) => { виден.current = з.isIntersecting; })
+      ? new IntersectionObserver(([з]) => {
+          виден.current = з.isIntersecting;
+          // Уходя с вкладки, гасим клетки сразу, а не оставляем их
+          // догорать за кадром: вкладка прячется через display:none, а
+          // WebKit на таком переключении не всегда доигрывает
+          // CSS-анимацию с того места, где остановил, — иногда
+          // перезапускает её с начала. Вернувшись, человек видел вспышку
+          // клеток, которые уже должны были погаснуть, — это и читалось
+          // как «лагает». Пустой список гарантирует чистый старт.
+          if (!з.isIntersecting) setКубы([]);
+        })
       : null;
     if (ио) ио.observe(el); else виден.current = true;
     return () => { if (ро) ро.disconnect(); if (ио) ио.disconnect(); };
