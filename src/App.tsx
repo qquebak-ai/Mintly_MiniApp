@@ -13,7 +13,7 @@ import {
 import { useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { Address, beginCell, toNano } from "@ton/core";
 import { supabase } from "./supabaseClient";
-import { апи } from "./апи";
+import { апи, запрос } from "./апи";
 import {
   CURVE_PARAMS,
   CURVE_TOTAL_SUPPLY,
@@ -11002,25 +11002,30 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
 /* Курс монеты (цена, суточное изменение, кривая) по CoinGecko
    market_chart. Кеш общий на всё приложение — обе карточки просят раз в
    несколько минут, а не при каждой перерисовке главной. */
-const КЕШ_КУРСА_МОНЕТЫ = new Map(); // coingeckoId -> { at, points, price, change24 }
-const КУРС_МОНЕТЫ_TTL_МС = 5 * 60 * 1000;
+const КЕШ_КУРСА_МОНЕТЫ = new Map(); // "sol" | "gram" -> { at, points, price, change24 }
+const КУРС_МОНЕТЫ_TTL_МС = 60 * 1000;
+let курсМонетЗапрос = null;
 
-async function получитьКурсМонеты(coingeckoId) {
-  const кеш = КЕШ_КУРСА_МОНЕТЫ.get(coingeckoId);
+/* Курс идёт через свой сервер (api/market-rates.js), а не прямо в
+   CoinGecko: источник рубит частые запросы отказом 429, и с телефонов
+   разных людей карточка оставалась пустой. Сервер спрашивает источник
+   сам, раз в несколько минут, и отдаёт готовое всем сразу — оба тикера
+   одним запросом, чтобы не дёргать дверь дважды. */
+async function получитьКурсМонеты(ключ) {
+  const кеш = КЕШ_КУРСА_МОНЕТЫ.get(ключ);
   if (кеш && Date.now() - кеш.at < КУРС_МОНЕТЫ_TTL_МС) return кеш;
-  const res = await fetch(`https://api.coingecko.com/api/v3/coins/${coingeckoId}/market_chart?vs_currency=usd&days=1`);
-  const json = await res.json();
-  const points = ((json && json.prices) || []).map(([t, p]) => ({ t, p }));
-  const price = points.length ? points[points.length - 1].p : 0;
-  const первая = points.length ? points[0].p : 0;
-  const итог = {
-    at: Date.now(),
-    points,
-    price,
-    change24: первая > 0 ? ((price - первая) / первая) * 100 : 0,
-  };
-  КЕШ_КУРСА_МОНЕТЫ.set(coingeckoId, итог);
-  return итог;
+  if (!курсМонетЗапрос) {
+    курсМонетЗапрос = запрос(апи("market-rates"))
+      .then((res) => res.json())
+      .finally(() => { курсМонетЗапрос = null; });
+  }
+  const json = await курсМонетЗапрос;
+  for (const к of ["sol", "gram"]) {
+    const д = json && json[к];
+    if (!д) continue;
+    КЕШ_КУРСА_МОНЕТЫ.set(к, { at: Date.now(), points: д.points || [], price: д.price || 0, change24: д.change24 || 0 });
+  }
+  return КЕШ_КУРСА_МОНЕТЫ.get(ключ) || null;
 }
 
 function fmtКурс(p) {
@@ -11030,14 +11035,14 @@ function fmtКурс(p) {
 
 /* Карточка курса — цена монеты (SOL / GRAM) с суточным изменением и
    простой кривой без делений и подписей, просто ход цены за сутки. */
-function КартаКурсаМонеты({ title, coingeckoId }) {
-  const [данные, setДанные] = useState(() => КЕШ_КУРСА_МОНЕТЫ.get(coingeckoId) || null);
+function КартаКурсаМонеты({ title, монета }) {
+  const [данные, setДанные] = useState(() => КЕШ_КУРСА_МОНЕТЫ.get(монета) || null);
 
   useEffect(() => {
     let живо = true;
-    получитьКурсМонеты(coingeckoId).then((д) => { if (живо) setДанные(д); }).catch(() => {});
+    получитьКурсМонеты(монета).then((д) => { if (живо) setДанные(д); }).catch(() => {});
     return () => { живо = false; };
-  }, [coingeckoId]);
+  }, [монета]);
 
   const растёт = (данные && данные.change24) >= 0;
   const цвет = растёт ? T.up : T.down;
@@ -11085,9 +11090,7 @@ function КартаКурсаМонеты({ title, coingeckoId }) {
             </div>
           </div>
         </>
-      ) : (
-        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("homeEmptyShort")}</div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -11095,8 +11098,8 @@ function КартаКурсаМонеты({ title, coingeckoId }) {
 function ЖивыеКарточки() {
   return (
     <section className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "start" }}>
-      <КартаКурсаМонеты title="SOL" coingeckoId="solana" />
-      <КартаКурсаМонеты title={ТИКЕР_TON} coingeckoId="the-open-network" />
+      <КартаКурсаМонеты title="SOL" монета="sol" />
+      <КартаКурсаМонеты title={ТИКЕР_TON} монета="gram" />
     </section>
   );
 }
