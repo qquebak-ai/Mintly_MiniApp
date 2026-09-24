@@ -11181,7 +11181,7 @@ function КартаКурсаМонеты({ title, монета }) {
   return (
     <div
       className="fx-card fx-card-static w-full rounded-[24px]"
-      style={{ position: "relative", overflow: "hidden", height: 132, padding: 14, background: T.surface, display: "flex", flexDirection: "column", justifyContent: "space-between" }}
+      style={{ position: "relative", overflow: "hidden", height: 132, padding: 14, background: T.surface, display: "flex", flexDirection: "column" }}
     >
       {/* Тот же фон, что у витрины «В центре внимания»: сетка с
           вспыхивающими клетками — здесь она не привязана к токену, но
@@ -11192,24 +11192,16 @@ function КартаКурсаМонеты({ title, монета }) {
         {title}
       </div>
 
-      <div
-        style={{
-          position: "relative",
-          zIndex: 1,
-          filter: готово ? "blur(0px)" : "blur(9px)",
-          opacity: готово ? 1 : 0.45,
-          transition: "filter 480ms ease, opacity 480ms ease",
-        }}
-      >
-        {путь && (
-          <svg
-            aria-hidden viewBox="0 0 100 44" preserveAspectRatio="none"
-            style={{ position: "absolute", left: 0, right: 0, bottom: 20, width: "100%", height: 34, opacity: 0.6 }}
-          >
-            <path d={путь} fill="none" stroke={цвет} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-          </svg>
-        )}
-        <div style={{ position: "relative" }}>
+      {/* Цена — сразу под названием, а не внизу карточки: кривая лежит
+          отдельным слоем и на её место не смотрит. */}
+      <div style={{ position: "relative", zIndex: 1, marginTop: 4 }}>
+        <div
+          style={{
+            filter: готово ? "blur(0px)" : "blur(9px)",
+            opacity: готово ? 1 : 0.45,
+            transition: "filter 480ms ease, opacity 480ms ease",
+          }}
+        >
           <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800 }}>
             <ТекстСЧислами text={fmtКурс(цена)} />
           </div>
@@ -11218,6 +11210,19 @@ function КартаКурсаМонеты({ title, монета }) {
           </div>
         </div>
       </div>
+
+      {путь && (
+        <svg
+          aria-hidden viewBox="0 0 100 44" preserveAspectRatio="none"
+          style={{
+            position: "absolute", left: 0, right: 0, bottom: 14, width: "100%", height: 34, opacity: 0.6,
+            filter: готово ? "blur(0px)" : "blur(9px)",
+            transition: "filter 480ms ease",
+          }}
+        >
+          <path d={путь} fill="none" stroke={цвет} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        </svg>
+      )}
     </div>
   );
 }
