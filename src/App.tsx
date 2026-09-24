@@ -16564,13 +16564,17 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     if (!т) return;
     const dx = т.clientX - ж.x0;
     const dy = т.clientY - ж.y0;
-    if (dx > 60 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+    if (Math.abs(dx) <= 60 || Math.abs(dx) <= Math.abs(dy) * 1.4) return;
+    // Лицевая сторона: свайп слева направо переворачивает карту.
+    // Обратная: только справа налево возвращает её — тот же жест в
+    // обратную сторону, а не повтор в ту же.
+    if (!переворотКарты && dx > 0) {
       haptic("light");
-      // Тот же жест в ту же сторону — карта переворачивается обратно,
-      // а не второй раз вперёд.
-      if (переворотКарты) { setПереворотКарты(false); return; }
       setСогласенНаОбороте(false);
       setПереворотКарты(true);
+    } else if (переворотКарты && dx < 0) {
+      haptic("light");
+      setПереворотКарты(false);
     }
   }
   function отменитьОборот() {
@@ -16814,7 +16818,13 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         onTouchEnd={концаСвайпаКарты}
         onTouchCancel={() => { жестКарты.current = null; }}
         style={{
-          position: "relative", overflow: "hidden", borderRadius: 24, padding: "26px 18px 30px",
+          position: "relative", overflow: "hidden", borderRadius: 24, padding: "30px 18px 34px",
+          // minHeight — не просто «покрупнее»: без явной высоты
+          // marginTop: auto у чипа ниже не от чего было отталкиваться
+          // (в контейнере без заданной высоты авто-отступ не забирает
+          // пустое место, брать неоткуда), и карта сама сжималась под
+          // размер надписи и суммы, как ни увеличивай паддинг.
+          minHeight: 210,
           // Надпись и сумма держатся вместе вверху, а чип с монетами
           // прижат к низу отдельным marginTop: auto — так между надписью
           // и суммой нет лишнего зазора, а вся пустая высота карты уходит
@@ -16959,13 +16969,18 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           position: "absolute", inset: 0, borderRadius: 24, overflow: "hidden",
           backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
           transform: "rotateY(180deg)",
+          // Та же маска, что у лицевой стороны: без неё скругление на iOS
+          // не держит анимированную заливку внутри, и кнопки снизу
+          // вылезали прямоугольным краем за пределы карты.
+          isolation: "isolate",
+          WebkitMaskImage: "-webkit-radial-gradient(white, black)",
           // Тот же градиент, что на лицевой стороне, только без бликов и
           // волн — ровный медленный перелив, без рамки и без серой
           // подложки поверх.
           background: видКарты.fill,
           backgroundSize: видКарты.size || "320% 320%",
           animation: "картаПереливается 16s ease-in-out infinite",
-          display: "flex", flexDirection: "column", gap: 7, padding: "16px 16px",
+          display: "flex", flexDirection: "column", gap: 6, padding: "14px 15px",
         }}
       >
         <div className="flex items-center" style={{ gap: 8 }}>
