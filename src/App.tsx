@@ -11033,14 +11033,44 @@ function fmtКурс(p) {
   return "$" + p.toFixed(p >= 1 ? 2 : 4);
 }
 
+// Сколько точек оставить на кривой. Источник отдаёт пятиминутную свечу —
+// это почти три сотни точек на сутки, и прямыми отрезками между ними
+// линия дрожит и на глаз слипается в одну кляксу там, где цена топталась
+// на месте. Кривой этого не нужно: она показывает ход цены, а не каждую
+// свечу, — крупные бакеты сглаживают дрожь и оставляют только движение.
+const ТОЧЕК_НА_КРИВОЙ = 28;
+
+/* Сжать точки в бакеты усреднением. Бакетов меньше, чем точек, — линия
+   идёт от среднего к среднему, а не скачет по каждому шуму источника. */
+function сгладить(pts, бакетов) {
+  if (pts.length <= бакетов) return pts;
+  const итог = [];
+  const шаг = pts.length / бакетов;
+  for (let i = 0; i < бакетов; i++) {
+    const от = Math.floor(i * шаг), до = Math.max(от + 1, Math.floor((i + 1) * шаг));
+    const срез = pts.slice(от, до);
+    const среднее = срез.reduce((s, p) => s + p.p, 0) / срез.length;
+    итог.push({ t: срез[срез.length - 1].t, p: среднее });
+  }
+  return итог;
+}
+
 /* Карточка курса — цена монеты (SOL / GRAM) с суточным изменением и
    простой кривой без делений и подписей, просто ход цены за сутки. */
 function КартаКурсаМонеты({ title, монета }) {
   const [данные, setДанные] = useState(() => КЕШ_КУРСА_МОНЕТЫ.get(монета) || null);
+  const [готово, setГотово] = useState(() => {
+    const кеш = КЕШ_КУРСА_МОНЕТЫ.get(монета);
+    return !!(кеш && кеш.price > 0);
+  });
 
   useEffect(() => {
     let живо = true;
-    const обновить = () => получитьКурсМонеты(монета).then((д) => { if (живо) setДанные(д); }).catch(() => {});
+    const обновить = () => получитьКурсМонеты(монета).then((д) => {
+      if (!живо) return;
+      setДанные(д);
+      if (д && д.price > 0) setГотово(true);
+    }).catch(() => {});
     обновить();
     const таймер = setInterval(обновить, 5000);
     return () => { живо = false; clearInterval(таймер); };
@@ -11050,8 +11080,9 @@ function КартаКурсаМонеты({ title, монета }) {
   const цвет = растёт ? T.up : T.down;
 
   const путь = useMemo(() => {
-    const pts = (данные && данные.points) || [];
-    if (pts.length < 2) return "";
+    const исходные = (данные && данные.points) || [];
+    if (исходные.length < 2) return "";
+    const pts = сгладить(исходные, ТОЧЕК_НА_КРИВОЙ);
     const H = 44;
     // Отступ по бокам: конечная точка иначе стоит ровно на краю viewBox,
     // и скруглённый колпачок штриха срезается обводкой карточки — с
@@ -11073,26 +11104,31 @@ function КартаКурсаМонеты({ title, монета }) {
         {title}
       </div>
 
-      {данные && данные.price > 0 ? (
-        <>
-          {путь && (
-            <svg
-              aria-hidden viewBox="0 0 100 44" preserveAspectRatio="none"
-              style={{ position: "absolute", left: 0, right: 0, bottom: 18, width: "100%", height: 40, opacity: 0.6 }}
-            >
-              <path d={путь} fill="none" stroke={цвет} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-            </svg>
-          )}
-          <div style={{ position: "relative" }}>
-            <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800 }}>
-              <ТекстСЧислами text={fmtКурс(данные.price)} />
-            </div>
-            <div style={{ fontFamily: monoFont, color: цвет, fontSize: 12, fontWeight: 700, marginTop: 2 }}>
-              {растёт ? "+" : ""}<ТекстСЧислами text={данные.change24.toFixed(2)} />%
-            </div>
+      <div
+        style={{
+          position: "relative",
+          filter: готово ? "blur(0px)" : "blur(9px)",
+          opacity: готово ? 1 : 0.45,
+          transition: "filter 480ms ease, opacity 480ms ease",
+        }}
+      >
+        {путь && (
+          <svg
+            aria-hidden viewBox="0 0 100 44" preserveAspectRatio="none"
+            style={{ position: "absolute", left: 0, right: 0, bottom: 20, width: "100%", height: 34, opacity: 0.6 }}
+          >
+            <path d={путь} fill="none" stroke={цвет} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          </svg>
+        )}
+        <div style={{ position: "relative" }}>
+          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800 }}>
+            <ТекстСЧислами text={fmtКурс(данные ? данные.price : 0)} />
           </div>
-        </>
-      ) : null}
+          <div style={{ fontFamily: monoFont, color: готово ? цвет : T.muted, fontSize: 12, fontWeight: 700, marginTop: 2 }}>
+            {готово ? `${растёт ? "+" : ""}${данные.change24.toFixed(2)}%` : "0.00%"}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
