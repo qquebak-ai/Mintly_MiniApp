@@ -10262,7 +10262,6 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
           <span style={{ fontFamily: monoFont, fontSize: 14, fontWeight: 600, color: T.ice }}>{coins}</span>
         </button>
       </div>
-      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, marginTop: -8 }}>{t("shopCoinsHint")}</p>
 
       <div className="grid grid-cols-2 gap-2.5" key={tab}>
         {items.map((item) => {
@@ -20772,9 +20771,6 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   return (
     <div className="fx-view flex flex-col gap-7" style={{ position: "relative", isolation: "isolate", paddingTop: 8 }}>
       <div>
-        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
-          {вSolana ? t("launchTokenSubSol") : t("launchTokenSub")}
-        </div>
         {/* Сеть выбирается тем же ползунком, что и в мемпаде: это один и
             тот же выбор рынка, и выглядеть он должен одинаково. */}
         {solДоступен && (
