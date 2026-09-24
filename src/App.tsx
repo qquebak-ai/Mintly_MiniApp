@@ -11112,13 +11112,19 @@ function КартаКурсаМонеты({ title, монета }) {
       className="fx-card fx-card-static w-full rounded-[24px]"
       style={{ position: "relative", overflow: "hidden", height: 132, padding: 14, background: T.surface, display: "flex", flexDirection: "column", justifyContent: "space-between" }}
     >
-      <div style={{ position: "relative", fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.01em" }}>
+      {/* Тот же фон, что у витрины «В центре внимания»: сетка с
+          вспыхивающими клетками — здесь она не привязана к токену, но
+          выглядит и живёт точно так же. */}
+      <ФонКлеток />
+
+      <div style={{ position: "relative", zIndex: 1, fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.01em" }}>
         {title}
       </div>
 
       <div
         style={{
           position: "relative",
+          zIndex: 1,
           filter: готово ? "blur(0px)" : "blur(9px)",
           opacity: готово ? 1 : 0.45,
           transition: "filter 480ms ease, opacity 480ms ease",
