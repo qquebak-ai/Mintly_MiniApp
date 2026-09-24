@@ -13392,8 +13392,13 @@ function завестиЗнаки() {
 function HomeView({ onGoTab, onGoCreate }) {
   // Главная сведена к двум блокам: баннеры и курс — всё остальное
   // (сводка, лента, токен дня, движение, топ) убрано по просьбе.
+  // Заголовок — на том же месте, где у остальных разделов (см. h1 в
+  // MempadView): верх экрана, до всего содержимого.
   return (
     <div className="flex flex-col" style={{ gap: 26, paddingTop: 8, paddingBottom: 40 }}>
+      <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>
+        {t("navHome")}
+      </h1>
       <div className="fx-view flex flex-col" style={{ gap: 26 }}>
         <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
         <ЖивыеКарточки />
