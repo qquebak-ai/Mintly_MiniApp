@@ -4834,7 +4834,12 @@ async function fetchCurveMarket(curveAddress, jettonMaster, testnet, rateArg = 0
   // Цена сутки назад — состояние кривой после последней сделки до окна.
   // Если сделок до окна не было, кривая стояла на стартовой цене.
   const before = list.filter((tr) => tr.time < dayAgo);
-  const prevReal = before.length ? before[before.length - 1].realTon : 0n;
+  // Если до окна сделок не было (токен младше суток), точка отсчёта —
+  // сразу после самой первой сделки кривой, а не нулевой резерв: первая
+  // сделка почти всегда стартовая покупка создателя, и любого её размера
+  // достаточно, чтобы «раздача самому себе» читалась огромным движением
+  // цены за сутки, хотя рынок ещё не открылся.
+  const prevReal = before.length ? before[before.length - 1].realTon : (list.length ? list[0].realTon : 0n);
   const prevPrice = curvePriceFromReserve(prevReal, params);
 
   return {
