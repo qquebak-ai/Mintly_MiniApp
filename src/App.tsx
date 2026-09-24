@@ -20499,7 +20499,7 @@ function ПереключательМеханики({ item, включено, on
   );
 }
 
-function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCreateProfile, onLaunch, solДоступен = false, черновик = null, onЧерновикПринят = () => {} }) {
+function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCreateProfile, onLaunch, solДоступен = false, черновик = null, onЧерновикПринят = () => {}, authChecked = true }) {
   const [form, setForm] = useState({ name: "", ticker: "", buyAmount: "", desc: "", tg: "", x: "", site: "" });
   /* Число над ползунком тоже можно набрать рукой — не у всех палец
      достаточно точен, чтобы попасть в нужную сотую. Ползунок при этом
@@ -20747,8 +20747,19 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   }
 
   if (!unlocked) {
+    // Пока не пришёл ответ о самом аккаунте, «закрыто» — не факт, а
+    // предположение: аккаунт может оказаться заведённым секунду спустя.
+    // На это время экран стоит размыто, а не утверждает раньше времени.
     return (
-      <div className="fx-view flex flex-col items-center justify-center text-center gap-3" style={{ minHeight: "70%", paddingTop: 40 }}>
+      <div
+        className="fx-view flex flex-col items-center justify-center text-center gap-3"
+        style={{
+          minHeight: "70%", paddingTop: 40,
+          filter: authChecked ? "blur(0px)" : "blur(9px)",
+          opacity: authChecked ? 1 : 0.45,
+          transition: "filter 480ms ease, opacity 480ms ease",
+        }}
+      >
         <MintlyFrame size={64} glow={`${T.violet}55`}><Lock size={26} color={T.violet} /></MintlyFrame>
         <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 18.5, fontWeight: 700, marginTop: 6 }}>{t("padClosedTitle")}</div>
         <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, maxWidth: 280 }}>
@@ -28544,6 +28555,7 @@ function mapTokenRow(row) {
               unlocked={accountCreated && connected}
               accountCreated={accountCreated}
               connected={connected}
+              authChecked={authChecked}
               onOpenCreateProfile={openCreateProfile}
               onLaunch={handleLaunchRequest}
               solДоступен={solЗапуск}
