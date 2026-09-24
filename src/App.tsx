@@ -11045,12 +11045,16 @@ function КартаКурсаМонеты({ title, coingeckoId }) {
   const путь = useMemo(() => {
     const pts = (данные && данные.points) || [];
     if (pts.length < 2) return "";
-    const W = 100, H = 44;
+    const H = 44;
+    // Отступ по бокам: конечная точка иначе стоит ровно на краю viewBox,
+    // и скруглённый колпачок штриха срезается обводкой карточки — с
+    // отступом последняя точка сама остаётся видна целиком.
+    const ОТСТУП = 4, W = 100 - ОТСТУП * 2;
     const values = pts.map((p) => p.p);
     const max = Math.max(...values), min = Math.min(...values);
     const диапазон = (max - min) || 1;
     const шаг = W / (pts.length - 1);
-    return pts.map((p, i) => `${i === 0 ? "M" : "L"}${(i * шаг).toFixed(1)},${(H - ((p.p - min) / диапазон) * H).toFixed(1)}`).join(" ");
+    return pts.map((p, i) => `${i === 0 ? "M" : "L"}${(ОТСТУП + i * шаг).toFixed(1)},${(H - ((p.p - min) / диапазон) * H).toFixed(1)}`).join(" ");
   }, [данные]);
 
   return (
@@ -11067,7 +11071,7 @@ function КартаКурсаМонеты({ title, coingeckoId }) {
           {путь && (
             <svg
               aria-hidden viewBox="0 0 100 44" preserveAspectRatio="none"
-              style={{ position: "absolute", left: 0, right: 0, bottom: 40, width: "100%", height: 48, opacity: 0.6 }}
+              style={{ position: "absolute", left: 0, right: 0, bottom: 30, width: "100%", height: 58, opacity: 0.6 }}
             >
               <path d={путь} fill="none" stroke={цвет} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
             </svg>
