@@ -24208,7 +24208,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                     color: логинИдёт ? T.faint : T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
                   }}
                 >
-                  {логинИдёт ? t("mail2faSending") : t("authSignInCta")}
+                  {t("authSignInCta")}
                 </button>
               )}
 
@@ -24291,9 +24291,11 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   </span>
                 ))}
               </div>
-              <span className="text-center" style={{ fontFamily: bodyFont, color: логинОшибка ? T.down : T.faint, fontSize: 12.5 }}>
-                {логинОшибка || (логинИдёт ? t("mail2faSending") : t("mail2faWaiting"))}
-              </span>
+              {логинОшибка && (
+                <span className="text-center" style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>
+                  {логинОшибка}
+                </span>
+              )}
               <button
                 onClick={отправитьКодВхода}
                 disabled={логинИдёт}
