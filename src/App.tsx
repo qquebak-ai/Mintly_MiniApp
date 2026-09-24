@@ -16471,6 +16471,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       setФразаОткрыта(false);
       setУходФразы(false);
       setПриходКошелька(true);
+      // Карта возвращается лицом вперёд: иначе после выхода из мастера
+      // она стояла бы к экрану обратной стороной, а обратная сторона
+      // не нарисована (backfaceVisibility: hidden) — карта была бы
+      // просто пустой.
+      setПереворотКарты(false);
       уходФразыИдёт.current = false;
       действие();
       setTimeout(() => setПриходКошелька(false), 300);
@@ -16538,6 +16543,34 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     setВолны((было) => [...было, { id, x: т.clientX - блок.left, y: т.clientY - блок.top }]);
     setTimeout(() => setВолны((было) => было.filter((в) => в.id !== id)), 900);
+  }
+
+  /* Свайп слева направо по карте — короткая дорога к секретной фразе:
+     карта переворачивается по-настоящему, 3D-разворотом, и за ней
+     открывается тот же мастер с предупреждением и галочкой, что и по
+     пункту меню — слова сами по себе за один жест не показываем, это
+     ключ ко всем деньгам, и случайный свайп не должен его открывать. */
+  const ПЕРЕВОРОТ_КАРТЫ_МС = 420;
+  const [переворотКарты, setПереворотКарты] = useState(false);
+  const жестКарты = useRef(null);
+  function началоСвайпаКарты(e) {
+    const т = e.touches && e.touches[0];
+    if (!т) return;
+    жестКарты.current = { x0: т.clientX, y0: т.clientY };
+  }
+  function концаСвайпаКарты(e) {
+    const ж = жестКарты.current;
+    жестКарты.current = null;
+    if (!ж || переворотКарты) return;
+    const т = e.changedTouches && e.changedTouches[0];
+    if (!т) return;
+    const dx = т.clientX - ж.x0;
+    const dy = т.clientY - ж.y0;
+    if (dx > 60 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+      haptic("light");
+      setПереворотКарты(true);
+      setTimeout(() => setФразаОткрыта(true), ПЕРЕВОРОТ_КАРТЫ_МС);
+    }
   }
 
   const [внутрTON, setВнутрTON] = useState(null);
@@ -16755,7 +16788,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       {/* Карта баланса. Сумма читается одним взглядом: целые рубли
           крупно и белым, копейки приглушены — так глаз не спотыкается о
           мелкую часть, которая на решение не влияет. */}
-      <div ref={кореньКарты} style={{ position: "relative", margin: "0 16px", isolation: "isolate" }}>
+      <div ref={кореньКарты} style={{ position: "relative", margin: "0 16px", isolation: "isolate", perspective: 1000 }}>
       {/* Три волны вдогонку друг другу: пока одна растворяется, следующая
           только отходит от края — получается непрерывное дыхание, а не
           мигание. */}
@@ -16792,6 +16825,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       ))}
       <section
         onPointerDown={волнаОт}
+        onTouchStart={началоСвайпаКарты}
+        onTouchEnd={концаСвайпаКарты}
+        onTouchCancel={() => { жестКарты.current = null; }}
         style={{
           position: "relative", overflow: "hidden", borderRadius: 24, padding: "26px 18px 30px",
           // Надпись и сумма держатся вместе вверху, а чип с монетами
@@ -16799,6 +16835,13 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // и суммой нет лишнего зазора, а вся пустая высота карты уходит
           // в один отступ перед чипом, а не размазывается поровну.
           display: "flex", flexDirection: "column",
+          // Разворот по свайпу: обратная сторона не нарисована — за то
+          // время, что карта успевает довернуться до ребра, экран уже
+          // сменяется на мастер секретной фразы, и пустая обратная
+          // сторона попросту не успевает показаться.
+          transform: переворотКарты ? "rotateY(180deg)" : "rotateY(0deg)",
+          transition: `transform ${ПЕРЕВОРОТ_КАРТЫ_МС}ms cubic-bezier(0.45, 0, 0.55, 1)`,
+          backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
           /* Обрезка по скруглению у iOS не держится, если внутри что-то
              ходит (блик, волны, ткань): дети вылезают за угол квадратом.
              Отдельный слой и маска по кругу возвращают обрезку. */
