@@ -11192,30 +11192,29 @@ function КартаКурсаМонеты({ title, монета }) {
         {title}
       </div>
 
-      {/* Цена — сразу под названием, а не внизу карточки: кривая лежит
-          отдельным слоем и на её место не смотрит. */}
-      <div style={{ position: "relative", zIndex: 1, marginTop: 4 }}>
-        <div
-          style={{
-            filter: готово ? "blur(0px)" : "blur(9px)",
-            opacity: готово ? 1 : 0.45,
-            transition: "filter 480ms ease, opacity 480ms ease",
-          }}
-        >
-          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800 }}>
-            <ТекстСЧислами text={fmtКурс(цена)} />
-          </div>
-          <div style={{ fontFamily: monoFont, color: готово ? цвет : T.muted, fontSize: 12, fontWeight: 700, marginTop: 2 }}>
-            {готово ? `${растёт ? "+" : ""}${change24.toFixed(2)}%` : "0.00%"}
-          </div>
+      {/* Цена — сразу под названием. Процент — отдельно, внизу карточки,
+          под кривой: цвет тот же, что у кривой, и он остаётся первым, на
+          что падает взгляд снизу. */}
+      <div
+        style={{
+          position: "relative", zIndex: 1, marginTop: 4,
+          filter: готово ? "blur(0px)" : "blur(9px)",
+          opacity: готово ? 1 : 0.45,
+          transition: "filter 480ms ease, opacity 480ms ease",
+        }}
+      >
+        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800 }}>
+          <ТекстСЧислами text={fmtКурс(цена)} />
         </div>
       </div>
+
+      <div style={{ flex: 1 }} />
 
       {путь && (
         <svg
           aria-hidden viewBox="0 0 100 44" preserveAspectRatio="none"
           style={{
-            position: "absolute", left: 0, right: 0, bottom: 14, width: "100%", height: 34, opacity: 0.6,
+            position: "absolute", left: 0, right: 0, bottom: 28, width: "100%", height: 30, opacity: 0.6,
             filter: готово ? "blur(0px)" : "blur(9px)",
             transition: "filter 480ms ease",
           }}
@@ -11223,6 +11222,18 @@ function КартаКурсаМонеты({ title, монета }) {
           <path d={путь} fill="none" stroke={цвет} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         </svg>
       )}
+
+      <div
+        style={{
+          position: "relative", zIndex: 1,
+          fontFamily: monoFont, color: готово ? цвет : T.muted, fontSize: 12, fontWeight: 700,
+          filter: готово ? "blur(0px)" : "blur(9px)",
+          opacity: готово ? 1 : 0.45,
+          transition: "filter 480ms ease, opacity 480ms ease",
+        }}
+      >
+        {готово ? `${растёт ? "+" : ""}${change24.toFixed(2)}%` : "0.00%"}
+      </div>
     </div>
   );
 }
