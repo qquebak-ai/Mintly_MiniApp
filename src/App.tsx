@@ -13144,8 +13144,8 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
               <span
                 className="fx-tap"
                 style={{
-                  display: "inline-block", padding: "10px 18px", borderRadius: 999,
-                  fontFamily: displayFont, fontSize: 14, fontWeight: 700,
+                  display: "inline-block", padding: "13px 22px", borderRadius: 999,
+                  fontFamily: displayFont, fontSize: 15.5, fontWeight: 800,
                   ...(б.сцена === "кошелёк"
                     ? { ...ПЕРЕЛИВ_КНОПКИ_СЕТИ, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#0098EA", 0.42)}` }
                     : б.сцена === "торговля"
