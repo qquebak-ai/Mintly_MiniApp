@@ -413,6 +413,7 @@ const STR = {
     secretRowHint: "Копия не сделана",
     secretDoneTitle: "Резервная копия сделана",
     secretShowRow: "Показать секретную фразу",
+    secretShowShort: "Показать",
     secretManualTitle: "Вручную",
     secretManualBody: "Создайте резервную копию своего кошелька вручную, записав секретную фразу.",
     secretManualCta: "Сделать копию вручную",
@@ -1105,6 +1106,7 @@ const STR = {
     secretRowHint: "No backup yet",
     secretDoneTitle: "Backup is done",
     secretShowRow: "Show the secret phrase",
+    secretShowShort: "Show",
     secretManualTitle: "Manually",
     secretManualBody: "Back up your wallet by hand: write the secret phrase down.",
     secretManualCta: "Back up manually",
@@ -16554,8 +16556,28 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   function началоСвайпаКарты(e) {
     const т = e.touches && e.touches[0];
     if (!т) return;
-    жестКарты.current = { x0: т.clientX, y0: т.clientY };
+    жестКарты.current = { x0: т.clientX, y0: т.clientY, тянем: false };
   }
+  /* Пока жест явно горизонтальный, страница не должна ещё и скроллиться
+     вертикально следом за пальцем — от этого она дёргалась вверх-вниз.
+     React вешает touchmove пассивным слушателем, где preventDefault не
+     работает, поэтому слушатель здесь свой, напрямую на элементе. */
+  useEffect(() => {
+    const el = кореньКарты.current;
+    if (!el) return undefined;
+    const onMove = (e) => {
+      const ж = жестКарты.current;
+      if (!ж) return;
+      const т = e.touches && e.touches[0];
+      if (!т) return;
+      const dx = т.clientX - ж.x0;
+      const dy = т.clientY - ж.y0;
+      if (!ж.тянем && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) ж.тянем = true;
+      if (ж.тянем) e.preventDefault();
+    };
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, []);
   function концаСвайпаКарты(e) {
     const ж = жестКарты.current;
     жестКарты.current = null;
@@ -16818,7 +16840,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         onTouchEnd={концаСвайпаКарты}
         onTouchCancel={() => { жестКарты.current = null; }}
         style={{
-          position: "relative", overflow: "hidden", borderRadius: 24, padding: "30px 18px 34px",
+          position: "relative", overflow: "hidden", borderRadius: 24, padding: "20px 18px 34px",
           // minHeight — не просто «покрупнее»: без явной высоты
           // marginTop: auto у чипа ниже не от чего было отталкиваться
           // (в контейнере без заданной высоты авто-отступ не забирает
@@ -16900,7 +16922,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         )}
 
         <div className="flex items-center justify-between" style={{ position: "relative", gap: 10 }}>
-          <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.72), fontSize: 13 }}>
+          <span style={{ fontFamily: displayFont, color: hexA("#FFFFFF", 0.85), fontSize: 16, fontWeight: 700 }}>
             {t("walletBalanceLabel")}
           </span>
         </div>
@@ -17035,7 +17057,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
               fontFamily: displayFont, fontSize: 12, fontWeight: 700,
             }}
           >
-            {t("secretShowRow")}
+            {t("secretShowShort")}
           </button>
         </div>
       </div>
