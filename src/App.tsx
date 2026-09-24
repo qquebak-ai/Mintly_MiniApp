@@ -11169,18 +11169,6 @@ function КартаКурсаМонеты({ title, монета }) {
           <path d={путь} fill="none" stroke={цвет} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         </svg>
       )}
-
-      <div
-        style={{
-          position: "relative", zIndex: 1,
-          fontFamily: monoFont, color: готово ? цвет : T.muted, fontSize: 12, fontWeight: 700,
-          filter: готово ? "blur(0px)" : "blur(9px)",
-          opacity: готово ? 1 : 0.45,
-          transition: "filter 480ms ease, opacity 480ms ease",
-        }}
-      >
-        {готово ? `${растёт ? "+" : ""}${change24.toFixed(2)}%` : "0.00%"}
-      </div>
     </div>
   );
 }
@@ -11899,19 +11887,17 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
         </span>
       ) : (
       <span>
-        {accountCreated && profile && profile.nickname && (
+        {accountCreated && profile && profile.nickname ? (
           <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em" }}>
             {profile.nickname}
           </span>
+        ) : (
+          // Подтекста под именем больше нет — но без имени эта строка
+          // единственная, и её нужно оставить: иначе кнопка входа пустая.
+          <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 600 }}>
+            {t("accountNotCreated")}
+          </span>
         )}
-        <span style={{
-          display: "block", fontFamily: accountCreated ? bodyFont : displayFont,
-          color: accountCreated ? T.muted : T.ice,
-          fontSize: accountCreated ? 12.5 : 17, fontWeight: accountCreated ? 400 : 600,
-          marginTop: accountCreated ? 1 : 0,
-        }}>
-          {accountCreated ? t("homeHello") : t("accountNotCreated")}
-        </span>
       </span>
       )}
     </button>
@@ -13389,16 +13375,22 @@ function завестиЗнаки() {
   return () => { clearInterval(обход); clearInterval(такт); if (наблюдатель) наблюдатель.disconnect(); завестиЗнаки.пущено = false; };
 }
 
-function HomeView({ onGoTab, onGoCreate }) {
-  // Главная сведена к двум блокам: баннеры и курс — всё остальное
-  // (сводка, лента, токен дня, движение, топ) убрано по просьбе.
-  // Заголовок — на том же месте, где у остальных разделов (см. h1 в
-  // MempadView): верх экрана, до всего содержимого.
+function HomeView({
+  onGoTab, onGoCreate, profile = null, accountCreated = false, userId = null,
+  onOpenMyProfile, профильГрузится = false, грузится = false, insetTop = 0, insetBottom = 0,
+}) {
+  // Главная сведена к баннерам и курсу — сводка, лента, токен дня,
+  // движение и топ убраны по просьбе. Заголовок и шапка (аватар, ник,
+  // колокольчик) — на прежнем месте, вверху экрана.
   return (
     <div className="flex flex-col" style={{ gap: 26, paddingTop: 8, paddingBottom: 40 }}>
       <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>
         {t("navHome")}
       </h1>
+      <div className="flex items-center justify-between" style={{ gap: 12 }}>
+        <ШапкаГлавной profile={profile} accountCreated={accountCreated} onOpenMyProfile={onOpenMyProfile} грузится={профильГрузится || грузится} />
+        <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} />
+      </div>
       <div className="fx-view flex flex-col" style={{ gap: 26 }}>
         <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
         <ЖивыеКарточки />
