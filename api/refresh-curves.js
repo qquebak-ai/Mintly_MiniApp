@@ -54,9 +54,9 @@ const BATCH = 30;
 
 // Параметры кривой по умолчанию — на случай, если контракт их не отдал.
 // Те же значения, что в src/curveConfig.js.
-const DEFAULT_VIRTUAL_TON = 1000n * 1000000000n;
-const DEFAULT_VIRTUAL_TOKENS = 1000000000n * 1000000000n;
-const DEFAULT_FEE_BPS = 100n;
+export const DEFAULT_VIRTUAL_TON = 1000n * 1000000000n;
+export const DEFAULT_VIRTUAL_TOKENS = 1000000000n * 1000000000n;
+export const DEFAULT_FEE_BPS = 100n;
 const DEFAULT_SUPPLY = 1000000000; // миллиард, весь выпуск
 
 // Газ, который кривая удерживает из каждой покупки (CURVE_GAS_BUY_OVERHEAD).
@@ -89,7 +89,7 @@ async function состояниеПула(address) {
   }
 }
 
-async function tonapi(path, init) {
+export async function tonapi(path, init) {
   const заголовки = TONAPI_KEY ? { Authorization: `Bearer ${TONAPI_KEY}` } : undefined;
   try {
     const res = await fetch(`${TONAPI}${path}`, { ...(init || {}), headers: { ...(init && init.headers), ...заголовки } });
@@ -106,7 +106,7 @@ async function tonapi(path, init) {
 
 /* Состояние кривой. Порядок полей задан структурой CurveData в
    контракте: менять нельзя, не поправив в приложении и в api/notify.js. */
-async function состояние(address) {
+export async function состояние(address) {
   // Обычным GET, как в api/notify.js: этот путь уже проверен на боевых
   // вызовах, и незачем иметь два разных способа спросить одно и то же.
   const json = await tonapi(`/v2/blockchain/accounts/${address}/methods/data`);
@@ -134,7 +134,7 @@ function opCode(msg) {
 
 /* Цена одного токена в TON: отношение резервов, а не отдельное поле
    контракта. */
-function цена(realTon, params) {
+export function цена(realTon, params) {
   const резервTon = params.virtualTon + realTon;
   const резервТокенов = (params.virtualTon * params.virtualTokens) / резервTon;
   if (резервТокенов <= 0n) return 0;

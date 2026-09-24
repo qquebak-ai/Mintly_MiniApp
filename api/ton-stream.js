@@ -22,12 +22,33 @@ const ПУЛЬС_МС = 20000;
 
 const кривые = new Map(); // адрес -> { зрители:Set, стоп:AbortController|null, попытка }
 
+/* Зрители общего потока: списки токенов (мемпад, главная), где важна
+   любая кривая, а не одна конкретная. Тот же приём, что у curve-stream.js
+   для Solana. */
+const общие = new Set();
+
 // Адрес TON в любом из двух видов: сырой «0:…» или дружественный.
 const адресОк = (s) => typeof s === "string"
   && (/^-?\d:[0-9a-fA-F]{64}$/.test(s) || /^[A-Za-z0-9_-]{48}$/.test(s));
 
 function написать(res, событие) {
   try { res.write(`data: ${JSON.stringify(событие)}\n\n`); } catch { /* зритель ушёл */ }
+}
+
+/* Свежая цена — сразу после своей сделки.
+ *
+ * Кривая TON не шлёт итог сделки инлайн, как Solana: узнать новую цену
+ * можно только отдельным запросом к её состоянию. api/wallet-ton.js
+ * делает этот запрос сам, сразу после отправки перевода, и зовёт эту
+ * функцию — она толкает результат всем, кто слушает список (мемпад,
+ * главная) и конкретно эту кривую (открытая карточка токена), не
+ * дожидаясь ни минутного обхода, ни следующего опроса. */
+export function протолкнутьЦену(address, { price, raised, graduation, graduated }) {
+  if (!адресОк(address) || !(price > 0)) return;
+  const событие = { address, price, raised, graduation, graduated: !!graduated, at: Math.floor(Date.now() / 1000) };
+  const запись = кривые.get(address);
+  if (запись) for (const res of запись.зрители) написать(res, { tx: null, ...событие });
+  for (const res of общие) написать(res, событие);
 }
 
 async function слушать(адрес, запись) {
@@ -69,9 +90,9 @@ async function слушать(адрес, запись) {
 }
 
 export default async function handler(req, res) {
+  const все = String((req.query && req.query.all) || "") === "1";
   const адрес = String((req.query && req.query.address) || "").trim();
-  if (!адресОк(адрес)) return res.status(400).json({ error: "bad_address" });
-  if (!КЛЮЧ) return res.status(503).json({ error: "no_tonapi_key" });
+  if (!все && !адресОк(адрес)) return res.status(400).json({ error: "bad_address" });
 
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
   res.setHeader("Cache-Control", "no-store, no-transform");
@@ -79,6 +100,24 @@ export default async function handler(req, res) {
   res.setHeader("X-Accel-Buffering", "no");
   if (res.flushHeaders) res.flushHeaders();
   res.write(": ok\n\n");
+
+  /* Общий поток толкается только своими сделками (api/wallet-ton.js) —
+     ключ tonapi для него не нужен, поэтому его отсутствие не блокирует
+     этот режим, в отличие от подписки на конкретную кривую ниже. */
+  if (все) {
+    общие.add(res);
+    const пульс = setInterval(() => { try { res.write(": пульс\n\n"); } catch { /* ушёл */ } }, ПУЛЬС_МС);
+    const закрыть = () => {
+      clearInterval(пульс);
+      общие.delete(res);
+      try { res.end(); } catch { /* уже закрыт */ }
+    };
+    req.on("close", закрыть);
+    req.on("error", закрыть);
+    return;
+  }
+
+  if (!КЛЮЧ) return res.status(503).json({ error: "no_tonapi_key" });
 
   let запись = кривые.get(адрес);
   if (!запись) {

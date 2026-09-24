@@ -26031,6 +26031,45 @@ function mapTokenRow(row) {
     return () => { try { поток.close(); } catch { /* уже закрыт */ } };
   }, []);
 
+  /* То же самое для TON: api/wallet-ton.js толкает сюда свежую цену
+     сразу после своей покупки/продажи (api/ton-stream.js?all=1), не
+     дожидаясь минутного обхода — лента и «мои» правятся на глазах. */
+  useEffect(() => {
+    if (typeof EventSource === "undefined") return undefined;
+    let поток = null;
+    try {
+      поток = new EventSource(апи("/api/ton-stream?all=1"));
+    } catch {
+      return undefined;
+    }
+    поток.onmessage = (e) => {
+      let с = null;
+      try { с = JSON.parse(e.data); } catch { return; }
+      if (!с || !с.address || !(с.price > 0)) return;
+      const курс = tonPriceUsd > 0 ? tonPriceUsd : tonUsd();
+      const подставить = (prev) => {
+        let тронуто = false;
+        const следующий = prev.map((tok) => {
+          if (tok.curveAddress !== с.address) return tok;
+          тронуто = true;
+          return {
+            ...tok,
+            priceTon: с.price,
+            price: курс > 0 ? с.price * курс : tok.price,
+            mcapNum: курс > 0 ? с.price * курс * 1_000_000_000 : tok.mcapNum,
+            raisedTon: с.raised,
+            graduationTon: с.graduation,
+            graduated: !!с.graduated,
+          };
+        });
+        return тронуто ? следующий : prev;
+      };
+      setCommunityTokens(подставить);
+      setMyTokens(подставить);
+    };
+    return () => { try { поток.close(); } catch { /* уже закрыт */ } };
+  }, [tonPriceUsd]);
+
   /* Логотипы, которых нет в базе.
    *
    * У токенов, запущенных до того, как приложение стало брать ссылку

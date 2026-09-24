@@ -309,6 +309,51 @@ async function сообщить(db, user_id, текст) {
   } catch { /* бот молчит — это не повод отменять саму операцию */ }
 }
 
+/* Живая цена в мемпаде и на главной — сразу после своей сделки, а не на
+   следующем минутном обходе. Перевод отправлен, но сеть подтверждает
+   его не мгновенно (см. комментарий у setTimeout ниже по файлу про
+   баланс) — тем же двум с половиной секундам даём кривой время дойти
+   до нового состояния, читаем его и толкаем всем, кто слушает
+   api/ton-stream.js?all=1: обоим спискам сразу, без ожидания опроса.
+   Отдельно от ответа человеку — та сделка уже закрыта, эта работа
+   только для чужих экранов. */
+async function подтолкнутьЦену(tokenId, curveAddress) {
+  if (!curveAddress) return;
+  await new Promise((r) => setTimeout(r, 2500));
+  try {
+    const { состояние, цена, DEFAULT_VIRTUAL_TON, DEFAULT_VIRTUAL_TOKENS } = await import("./refresh-curves.js");
+    const st = await состояние(curveAddress);
+    // Кривая закрылась ровно на этой сделке — цена переезжает в пул, а
+    // читать его здесь не будем: редкий случай, минутный обход дочитает.
+    if (!st || st.graduated) return;
+    const params = { virtualTon: st.virtualTon || DEFAULT_VIRTUAL_TON, virtualTokens: st.virtualTokens || DEFAULT_VIRTUAL_TOKENS };
+    const свежаяЦена = цена(st.realTon, params);
+    if (!(свежаяЦена > 0)) return;
+
+    const db = admin();
+    if (db) {
+      await db.from("curve_cache").update({
+        price_ton: свежаяЦена,
+        real_ton: Number(st.realTon) / 1e9,
+        graduation_ton: Number(st.graduationTon) / 1e9,
+        tokens_sold: Number(st.tokensSold) / 1e9,
+        graduated: false,
+        updated_at: new Date().toISOString(),
+      }).eq("token_id", tokenId);
+    }
+
+    const { протолкнутьЦену } = await import("./ton-stream.js");
+    протолкнутьЦену(curveAddress, {
+      price: свежаяЦена,
+      raised: Number(st.realTon) / 1e9,
+      graduation: Number(st.graduationTon) / 1e9,
+      graduated: false,
+    });
+  } catch (err) {
+    console.warn("[wallet-ton] не удалось протолкнуть цену:", err && err.message);
+  }
+}
+
 async function записать(db, user, kind, amount, hash) {
   await db.from("wallet_ops").insert({
     user_id: user.id, chain: "ton", kind, amount, signature: hash || null,
@@ -403,6 +448,10 @@ export default async function handler(req, res) {
 
       await завершить(db, оп.id, `seqno:${seqno}`);
       res.setHeader("Cache-Control", "no-store");
+      // Только пока сделка идёт по самой кривой: адрес рынка — это пул
+      // биржи, если токен уже закрылся, а состояние() умеет читать
+      // только контракт кривой.
+      if (!(кеш && кеш.graduated)) подтолкнутьЦену(tokenId, токен.curve_address).catch(() => {});
       return res.status(200).json({ ok: true, seqno });
     }
 
@@ -480,6 +529,7 @@ export default async function handler(req, res) {
 
       await завершить(db, опПродажи.id, `seqno:${seqno}`);
       res.setHeader("Cache-Control", "no-store");
+      if (!(кеш && кеш.graduated)) подтолкнутьЦену(tokenId, токен.curve_address).catch(() => {});
       return res.status(200).json({ ok: true, seqno });
     }
 
