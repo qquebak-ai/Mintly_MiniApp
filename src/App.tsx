@@ -21099,8 +21099,13 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           return (
             <>
               {суммаВводится ? (
-                <span className="flex items-center" style={{ gap: 6 }}>
-                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("launchAmountLabel")}:</span>
+                // Никакой рамки и подсветки: строка выглядит ровно так
+                // же, как в режиме просмотра, только число теперь можно
+                // стереть и напечатать своё. Число и единица — тем же
+                // кеглем и промежутком, что были у обычного текста,
+                // никакого лишнего зазора между ними.
+                <span className="flex items-baseline" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
+                  {t("launchAmountLabel")}:&nbsp;
                   <input
                     // Клавиатура числовая, а точку и запятую пускаем сами:
                     // на части телефонов запятая — единственный десятичный
@@ -21110,12 +21115,13 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
                     onChange={(e) => setСуммаЧерновик(e.target.value.replace(/[^0-9.,]/g, ""))}
                     onBlur={применитьСумму}
                     onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                    size={Math.max(1, суммаЧерновик.length || 1)}
                     style={{
-                      width: 64, background: "transparent", border: "none", borderBottom: `1px solid ${T.electric}`,
-                      fontFamily: bodyFont, color: T.ice, fontSize: 13, fontWeight: 700, padding: "0 0 1px",
+                      width: "auto", maxWidth: 90, background: "transparent", border: "none", outline: "none",
+                      fontFamily: "inherit", color: T.ice, fontSize: "inherit", fontWeight: 700, padding: 0, margin: 0,
                     }}
                   />
-                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{единица}</span>
+                  &nbsp;{единица}
                 </span>
               ) : (
                 <button
