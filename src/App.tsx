@@ -13389,74 +13389,15 @@ function завестиЗнаки() {
   return () => { clearInterval(обход); clearInterval(такт); if (наблюдатель) наблюдатель.disconnect(); завестиЗнаки.пущено = false; };
 }
 
-function HomeView({
-  onGoTab, onGoCreate, curveTokens = [], onOpenToken, onOpenProfile,
-  profile = null, accountCreated = false, myTokens = [], achievements = [], userId = null,
-  onOpenMyProfile, onOpenAchievements, профильГрузится = false, тик = 0, грузится = false,
-  insetTop = 0, insetBottom = 0, достиженияГотовы = true,
-}) {
-  /* Главная — витрина площадки: сводка, токен дня, движение, топ.
-     Раньше сюда пускали только mainnet, и пока Solana целиком в devnet,
-     главная стояла пустой — там, где на самом деле шла вся жизнь
-     площадки. Теперь берём те же сети, что показывает мемпад
-     (ВИДИМЫЕ_СЕТИ), а пробные помечены значком «тест» — так же, как в
-     мемпаде. */
-  const боевые = React.useMemo(
-    // Токен, у которого стартовая покупка ещё не прошла, на главную не
-    // попадает вовсе: там нет ни автора, ни оправдания нулям.
-    () => curveTokens.filter((t) => ВИДИМЫЕ_СЕТИ.includes(t && t.network) && запускСостоялся(t)),
-    [curveTokens],
-  );
-
-  /* Страховка по времени: экран стоит плашками, пока едет лента, но не
-     дольше нескольких секунд — иначе при молчащем источнике главная не
-     открылась бы вовсе. */
-  const [ждёмДольше, setЖдёмДольше] = useState(false);
-  useEffect(() => {
-    const id = setTimeout(() => setЖдёмДольше(true), 6000);
-    return () => clearTimeout(id);
-  }, []);
-  const вПлашках = грузится && !ждёмДольше;
-
+function HomeView({ onGoTab, onGoCreate }) {
+  // Главная сведена к двум блокам: баннеры и курс — всё остальное
+  // (сводка, лента, токен дня, движение, топ) убрано по просьбе.
   return (
-    // Запас снизу — под закреплённую кнопку: в конце прокрутки она
-    // должна висеть над пустотой, а не над последней строкой топа.
     <div className="flex flex-col" style={{ gap: 26, paddingTop: 8, paddingBottom: 40 }}>
-      {/* Аватарка с именем ждут вместе со всем экраном, а не только свой
-          профиль: они узнавались первыми, и над полем плашек висела одна
-          готовая строка — будто загрузилось только «я», а остальное
-          сломалось. */}
-      {/* Справа от имени — колокольчик: там просьба подтвердить почту,
-          пока она не подтверждена. */}
-      <div className="flex items-center justify-between" style={{ gap: 12 }}>
-        <ШапкаГлавной profile={profile} accountCreated={accountCreated} onOpenMyProfile={onOpenMyProfile} грузится={профильГрузится || вПлашках} />
-        <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} />
+      <div className="fx-view flex flex-col" style={{ gap: 26 }}>
+        <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
+        <ЖивыеКарточки />
       </div>
-      {/* Баннеры ждут вместе со всеми: живая карусель посреди плашек
-          выглядела так, будто остальной экран сломался. */}
-      {вПлашках ? (
-        <>
-          <ПлашкаБлока h={150} radius={20} />
-          <ПлашкаБлока h={46} radius={999} />
-          <ПлашкаБлока h={168} />
-          <ПлашкаБлока h={196} radius={24} />
-          <ПлашкаБлока h={190} />
-        </>
-      ) : (
-        /* Содержимое проявляется на месте плашек, а не подменяет их
-           кадром: подмена читалась так, будто экран моргнул. */
-        <div className="fx-view flex flex-col" style={{ gap: 26 }}>
-          <БегущаяЛента />
-          <ГлавныйТокен tokens={боевые} onOpen={onOpenToken} />
-          <ЖивыеКарточки />
-          <ВДвижении tokens={боевые} onOpen={onOpenToken} onAll={() => onGoTab("mempad")} />
-          {/* Баннеры — предпоследним блоком: главная открывается рынком, а
-              не рекламой своих же разделов. */}
-          <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
-          <ТопСтрока onOpenToken={onOpenToken} onOpenProfile={onOpenProfile} live={боевые} />
-        </div>
-      )}
-
     </div>
   );
 }
