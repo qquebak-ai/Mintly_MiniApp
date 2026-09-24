@@ -1698,12 +1698,14 @@ const FACET = "polygon(18% 0%, 100% 0%, 100% 82%, 82% 100%, 0% 100%, 0% 18%)";
    Отдельного моноширинного нет намеренно: он выглядел бы заплаткой
    посреди геометрического гротеска, а ровные столбцы цифр даёт
    табличная разметка — она включена глобально ниже, в GlobalStyle. */
-/* Nunito по дизайн-плану: округлый, дружелюбный — интерфейс мемпада, а
-   не банковского терминала. Jost остаётся запасным на случай, если файл
-   шрифта не доехал: он ближе всех по пропорциям. */
-const displayFont = "'Nunito', 'Jost', 'Segoe UI', sans-serif";
-const bodyFont = "'Nunito', 'Jost', -apple-system, sans-serif";
-const monoFont = "'Nunito', 'Jost', 'Courier New', monospace";
+/* MintlyUI — Onest на обычных весах, Nunito на жирных (см. index.css):
+   строже и техничнее прежнего сплошного Nunito, а всё, что уже набрано
+   полужирным и жирным по приложению, не сдвинулось ни на пиксель. Jost
+   остаётся запасным на случай, если файл шрифта не доехал: он ближе
+   всех по пропорциям. */
+const displayFont = "'MintlyUI', 'Jost', 'Segoe UI', sans-serif";
+const bodyFont = "'MintlyUI', 'Jost', -apple-system, sans-serif";
+const monoFont = "'MintlyUI', 'Jost', 'Courier New', monospace";
 
 /* Motion stays quiet: no overshoot/bounce, 200–300ms, ease-out. */
 const SPRING = "240ms cubic-bezier(0.16, 1, 0.3, 1)";

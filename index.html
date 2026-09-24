@@ -133,7 +133,7 @@
          их нужно в обоих местах сразу. */
       #ширма { position: fixed; inset: 0; z-index: 2147483000; background: #000; pointer-events: none;
                display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
-      #ширма .имя { font-family: 'Nunito', 'Jost', 'Segoe UI', sans-serif; color: #F5F7FA;
+      #ширма .имя { font-family: 'MintlyUI', 'Jost', 'Segoe UI', sans-serif; color: #F5F7FA;
                     font-size: 38px; font-weight: 300; letter-spacing: 0.34em; padding-left: 0.34em; }
       /* До старта всё спрятано и стоит: анимация идёт только тогда, когда
          окно правда видно (класс «идёт» ставит скрипт ниже). */
@@ -149,7 +149,7 @@
       #ширма.идёт .имя b:nth-child(4) { animation-delay: 390ms; }
       #ширма.идёт .имя b:nth-child(5) { animation-delay: 520ms; }
       #ширма.идёт .имя b:nth-child(6) { animation-delay: 650ms; }
-      #ширма .подпись { font-family: 'Nunito', 'Jost', -apple-system, sans-serif;
+      #ширма .подпись { font-family: 'MintlyUI', 'Jost', -apple-system, sans-serif;
                         color: rgba(255, 255, 255, 0.42); font-size: 16px; font-weight: 600; }
       #ширма.идёт .подпись { animation: ширмаВсплыв 800ms cubic-bezier(0.22, 1, 0.36, 1) 820ms backwards; }
       /* Уход: буквы по очереди гаснут, сдвигаясь вправо, подпись — вместе
