@@ -53,32 +53,58 @@ async function получитьКривую(coingeckoId) {
   }
 }
 
-// Обе монеты — одним запросом: /simple/price принимает список ids через
-// запятую, и это тот же один вызов источника, что для одной монеты.
-const кешЦены = new Map(); // "sol" | "gram" -> { price, change24 }
+/* Живая цена. CoinGecko здесь не годится сама по себе: его /simple/price
+   у себя обновляется раз в минуту-другую, и опрашивать его чаще —
+   спрашивать одно и то же число. Настоящий тик за тиком даёт биржевой
+   тикер — Kraken отдаёт последнюю сделку по обеим монетам одним
+   запросом и не просит ключа. CoinGecko остаётся запасным источником на
+   случай, если Kraken недоступен из сети самого сервера. */
+const KRAKEN_ПАРА = { sol: "SOLUSD", gram: "TONUSD" };
+
+const кешЦены = new Map(); // "sol" | "gram" -> цена
 let ценаAt = 0;
-let сердитсяЦенаДо = 0;
 let ценаЗапрос = null;
 
-async function запроситьЦену() {
-  const ids = Object.values(МОНЕТЫ).join(",");
-  const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`, { headers: ЗАГОЛОВКИ });
-  if (res.status === 429) { сердитсяЦенаДо = Date.now() + ПАУЗА_ПОСЛЕ_ОТКАЗА_МС; throw new Error("429"); }
+async function сКракена() {
+  const res = await fetch(`https://api.kraken.com/0/public/Ticker?pair=${Object.values(KRAKEN_ПАРА).join(",")}`, { headers: ЗАГОЛОВКИ });
   if (!res.ok) throw new Error(String(res.status));
   const json = await res.json();
-  for (const [ключ, id] of Object.entries(МОНЕТЫ)) {
-    const d = json && json[id];
-    if (!d || !(Number(d.usd) > 0)) continue;
-    кешЦены.set(ключ, { price: Number(d.usd), change24: Number(d.usd_24h_change) || 0 });
+  if (json.error && json.error.length) throw new Error(json.error.join(","));
+  const итог = {};
+  for (const [ключ, пара] of Object.entries(KRAKEN_ПАРА)) {
+    const d = json.result && json.result[пара];
+    const цена = Number(d && d.c && d.c[0]);
+    if (цена > 0) итог[ключ] = цена;
   }
-  ценаAt = Date.now();
+  if (!Object.keys(итог).length) throw new Error("пусто");
+  return итог;
+}
+
+async function сCoinGecko() {
+  const ids = Object.values(МОНЕТЫ).join(",");
+  const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`, { headers: ЗАГОЛОВКИ });
+  if (!res.ok) throw new Error(String(res.status));
+  const json = await res.json();
+  const итог = {};
+  for (const [ключ, id] of Object.entries(МОНЕТЫ)) {
+    const цена = Number(json && json[id] && json[id].usd);
+    if (цена > 0) итог[ключ] = цена;
+  }
+  if (!Object.keys(итог).length) throw new Error("пусто");
+  return итог;
 }
 
 async function получитьЦену() {
   if (Date.now() - ценаAt < TTL_ЦЕНЫ_МС) return;
-  if (сердитсяЦенаДо > Date.now()) return;
   if (!ценаЗапрос) {
-    ценаЗапрос = запроситьЦену().catch(() => {}).finally(() => { ценаЗапрос = null; });
+    ценаЗапрос = (async () => {
+      let итог = null;
+      try { итог = await сКракена(); } catch { итог = null; }
+      if (!итог) { try { итог = await сCoinGecko(); } catch { итог = null; } }
+      if (!итог) return;
+      for (const [ключ, цена] of Object.entries(итог)) кешЦены.set(ключ, цена);
+      ценаAt = Date.now();
+    })().finally(() => { ценаЗапрос = null; });
   }
   await ценаЗапрос;
 }
@@ -87,17 +113,16 @@ export default async function handler(req, res) {
   const [sol, gram] = await Promise.all([получитьКривую(МОНЕТЫ.sol), получитьКривую(МОНЕТЫ.gram)]);
   await получитьЦену();
 
-  // Свежая цена перекрывает ту, что легла в кривую при её последнем
-  // обновлении, — кривая может быть пятиминутной давности, а число
-  // рядом с ней должно быть сиюминутным.
+  // Суточный процент считается от точки отсчёта, которую даёт кривая
+  // (у неё честный скользящий период в сутки), а не от цены самого
+  // тикера — Kraken отдаёт только цену, без суточного изменения.
   const собрать = (базовый, ключ) => {
     const свежая = кешЦены.get(ключ);
-    if (!базовый && !свежая) return null;
-    return {
-      points: (базовый && базовый.points) || [],
-      price: (свежая && свежая.price) || (базовый && базовый.price) || 0,
-      change24: свежая ? свежая.change24 : (базовый && базовый.change24) || 0,
-    };
+    if (!базовый && свежая == null) return null;
+    const якорь = базовый && базовый.price > 0 ? базовый.price / (1 + (базовый.change24 || 0) / 100) : null;
+    const price = свежая != null ? свежая : (базовый && базовый.price) || 0;
+    const change24 = якорь && price > 0 ? ((price - якорь) / якорь) * 100 : (базовый && базовый.change24) || 0;
+    return { points: (базовый && базовый.points) || [], price, change24 };
   };
 
   res.setHeader("Cache-Control", "public, max-age=2");
