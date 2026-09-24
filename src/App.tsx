@@ -16558,23 +16558,18 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     if (!т) return;
     жестКарты.current = { x0: т.clientX, y0: т.clientY, тянем: false };
   }
-  /* Пока жест явно горизонтальный, страница не должна ещё и скроллиться
-     вертикально следом за пальцем — от этого она дёргалась вверх-вниз.
-     React вешает touchmove пассивным слушателем, где preventDefault не
-     работает, поэтому слушатель здесь свой, напрямую на элементе. */
+  /* Страница не должна двигаться, пока палец ведёт по карте. На iOS
+     preventDefault отменяет скролл только у самого первого touchmove
+     жеста — если ждать, пока направление подтвердится горизонтальным,
+     скролл успевает стартовать раньше и preventDefault на него уже не
+     действует. Поэтому глушим скролл с первого же движения, без
+     проверки угла: жест на карте целиком принадлежит карте. React
+     вешает touchmove пассивным слушателем, где preventDefault не
+     работает вовсе, поэтому слушатель здесь свой, напрямую на элементе. */
   useEffect(() => {
     const el = кореньКарты.current;
     if (!el) return undefined;
-    const onMove = (e) => {
-      const ж = жестКарты.current;
-      if (!ж) return;
-      const т = e.touches && e.touches[0];
-      if (!т) return;
-      const dx = т.clientX - ж.x0;
-      const dy = т.clientY - ж.y0;
-      if (!ж.тянем && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) ж.тянем = true;
-      if (ж.тянем) e.preventDefault();
-    };
+    const onMove = (e) => { if (жестКарты.current) e.preventDefault(); };
     el.addEventListener("touchmove", onMove, { passive: false });
     return () => el.removeEventListener("touchmove", onMove);
   }, []);
@@ -16840,7 +16835,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         onTouchEnd={концаСвайпаКарты}
         onTouchCancel={() => { жестКарты.current = null; }}
         style={{
-          position: "relative", overflow: "hidden", borderRadius: 24, padding: "20px 18px 34px",
+          position: "relative", overflow: "hidden", borderRadius: 24, padding: "12px 18px 16px",
           // minHeight — не просто «покрупнее»: без явной высоты
           // marginTop: auto у чипа ниже не от чего было отталкиваться
           // (в контейнере без заданной высоты авто-отступ не забирает
@@ -16947,10 +16942,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         <span
           className="inline-flex items-center"
           style={{
-            position: "relative", marginTop: "auto", alignSelf: "flex-start", padding: "5px 11px", borderRadius: 999,
+            position: "relative", marginTop: "auto", alignSelf: "flex-start", padding: "8px 14px", borderRadius: 999,
             background: hexA("#FFFFFF", 0.18), color: "#FFFFFF",
-            fontFamily: monoFont, fontSize: 12.5, fontWeight: 700,
-            minHeight: 24,
+            fontFamily: monoFont, fontSize: 14.5, fontWeight: 700,
+            minHeight: 30,
           }}
         >
           <span style={туман}><УмныйТекст text={`${fmtСумма(солНаКошельке)} SOL · ${fmtСумма(тонНаКошельке)} ${ТИКЕР_TON}`} /></span>
@@ -17041,7 +17036,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             className="fx-tap"
             style={{
               flex: 1, padding: "9px 0", borderRadius: 13, border: `1px solid ${hexA("#FFFFFF", 0.35)}`,
-              background: "transparent", color: "#FFFFFF", fontFamily: displayFont, fontSize: 12, fontWeight: 700,
+              background: "transparent", color: "#FFFFFF", fontFamily: displayFont, fontSize: 14, fontWeight: 700,
             }}
           >
             {t("cancel")}
@@ -17054,7 +17049,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
               flex: 1, padding: "9px 0", borderRadius: 13, border: "none",
               background: согласенНаОбороте ? "#FFFFFF" : hexA("#FFFFFF", 0.16),
               color: согласенНаОбороте ? "#1A0B33" : hexA("#FFFFFF", 0.55),
-              fontFamily: displayFont, fontSize: 12, fontWeight: 700,
+              fontFamily: displayFont, fontSize: 14, fontWeight: 700,
             }}
           >
             {t("secretShowShort")}
