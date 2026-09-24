@@ -28624,7 +28624,7 @@ function mapTokenRow(row) {
               onOpenLook={openLookFromShop}
               onEquip={equipCosmetic}
               achievementsReady={achievementsReady}
-              onOpenAchievements={() => открытьДостижения("home")}
+              onOpenAchievements={() => открытьДостижения("shop")}
               showToast={showToast}
               accountCreated={accountCreated}
               onOpenLogin={openLoginProfile}
