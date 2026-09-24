@@ -9890,41 +9890,51 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
         // невидимые плитки не считаются вовсе; размер задан заранее,
         // чтобы полоса прокрутки не прыгала.
         contentVisibility: "auto",
-        containIntrinsicSize: "190px 210px",
+        containIntrinsicSize: kind === "wallet" ? "190px 234px" : "190px 210px",
       }}
     >
       {/* Некупленное не гасим прозрачностью: предмет видно целиком, на
-          то он и витрина, а что он ещё не твой — сказано ценой. */}
+          то он и витрина, а что он ещё не твой — сказано ценой.
+          У вида карты своей серой подложки больше нет — карта сама
+          крупная, и рамка вокруг только мешала её разглядеть. */}
       <div style={{
-        position: "relative", width: "100%", height: 104, borderRadius: 16, overflow: "hidden",
-        background: T.surface,
-        border: `1px solid ${equipped ? T.electric : T.line}`,
+        position: "relative", width: "100%", height: kind === "wallet" ? 128 : 104, borderRadius: 16, overflow: "hidden",
+        background: kind === "wallet" ? "transparent" : T.surface,
+        border: kind === "wallet" ? "none" : `1px solid ${equipped ? T.electric : T.line}`,
         // Второй контур внутрь: снаружи его срезал бы overflow плитки, а
         // так надетое видно с одного взгляда и по краю ничего не торчит.
-        boxShadow: equipped ? `inset 0 0 0 1px ${hexA(T.electric, 0.45)}` : "none",
+        boxShadow: kind !== "wallet" && equipped ? `inset 0 0 0 1px ${hexA(T.electric, 0.45)}` : "none",
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
         {kind === "card" && <ProfileCardBg cardId={item.id} height={96} radius={16} showcase />}
         {kind === "wallet" ? (
           /* Скин карты показываем самой картой: кружок аватарки тут
-             ничего не объясняет, а маленькая карта баланса — сразу всё. */
-          <div style={{
-            position: "relative", zIndex: 1, width: "82%", height: 62, borderRadius: 12,
-            overflow: "hidden",
-            background: item.ткань ? "#131319" : item.fill,
-            backgroundSize: item.ткань ? undefined : (item.size || "320% 320%"),
-            // Ткань не переливается: плетение едет отдельным слоем.
-            animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
-            boxShadow: `0 8px 22px ${hexA(item.glow || "#7C3AED", 0.35)}`,
-            padding: "9px 10px", textAlign: "left",
-          }}>
-            {item.ткань && <СлойКарбона fill={item.fill} size={item.size} />}
-            {item.ткань && <СлоиТкани />}
-            <div style={{ fontFamily: bodyFont, fontSize: 8.5, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
-            <div style={{ fontFamily: displayFont, fontSize: 15, fontWeight: 700, color: "#FFFFFF", marginTop: 2 }}>
-              12,40 <span style={{ fontSize: 9, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
+             ничего не объясняет, а маленькая карта баланса — сразу всё.
+             Свечение позади — размытая копия той же заливки на той же
+             анимации, поэтому цвет за картой ходит вместе с цветом на
+             самой карте, как в кошельке. */
+          <>
+            <span aria-hidden style={{
+              position: "absolute", inset: 8, borderRadius: 14,
+              background: item.fill, backgroundSize: item.size || "320% 320%",
+              animation: "картаПереливается 9s ease-in-out infinite",
+              filter: "blur(16px)", opacity: 0.65, transform: "translateZ(0)",
+            }} />
+            <div style={{
+              position: "relative", zIndex: 1, width: "94%", height: 88, borderRadius: 14,
+              overflow: "hidden",
+              background: item.fill,
+              backgroundSize: item.size || "320% 320%",
+              animation: "картаПереливается 9s ease-in-out infinite",
+              boxShadow: `0 8px 22px ${hexA(item.glow || "#7C3AED", 0.35)}`,
+              padding: "11px 13px", textAlign: "left",
+            }}>
+              <div style={{ fontFamily: bodyFont, fontSize: 9.5, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
+              <div style={{ fontFamily: displayFont, fontSize: 17, fontWeight: 700, color: "#FFFFFF", marginTop: 3 }}>
+                12,40 <span style={{ fontSize: 10, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
+              </div>
             </div>
-          </div>
+          </>
         ) : (
           <div style={{ position: "relative", zIndex: 1 }}>
             {/* Внутри рамки — просто чёрный кружок: витрина про сам
@@ -15600,17 +15610,6 @@ const WALLET_SKINS = [
   {
     id: "solana", label: { RU: "Солана", EN: "Solana" }, price: 220,
     fill: "linear-gradient(120deg, #9945FF 0%, #7A3DF5 35%, #19FB9B 100%)", glow: "#14F195",
-  },
-  {
-    id: "carbon", label: { RU: "Карбон", EN: "Carbon" }, price: 120,
-    /* Тот же снимок ткани, что лежит задником на баннере магазина:
-       градиентами плетение не собирается — ни бликов на жгутах, ни
-       того, как нить ныряет под соседнюю. */
-    fill: 'url("/banner-shop-bg-v2.webp")',
-    // «cover» для СлояКарбона — знак, что это снимок, а не плитка.
-    size: "cover",
-    ткань: true,
-    glow: "#5A5A6B",
   },
   {
     id: "magma", label: { RU: "Магма", EN: "Magma" }, price: 360,
