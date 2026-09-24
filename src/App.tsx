@@ -23845,6 +23845,13 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
       setЛогинИдёт(true);
       setЛогинОшибка("");
       try {
+        // Отметки снимаем до подтверждения, а не после: verifyOtp сам
+        // поднимает событие о входе, и обработчик читает их сразу же —
+        // если он увидит «человек вышел вручную», профиль не загрузится,
+        // и после настоящего, только что подтверждённого входа приложение
+        // покажет «Аккаунт не создан».
+        markSignedOut(false);
+        markSeenSession();
         const { error } = await supabase.auth.verifyOtp({ email: почтаЧистая, token: код, type: "email" });
         if (error) throw error;
         haptic("success");
