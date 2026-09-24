@@ -16559,13 +16559,16 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   function концаСвайпаКарты(e) {
     const ж = жестКарты.current;
     жестКарты.current = null;
-    if (!ж || переворотКарты) return;
+    if (!ж) return;
     const т = e.changedTouches && e.changedTouches[0];
     if (!т) return;
     const dx = т.clientX - ж.x0;
     const dy = т.clientY - ж.y0;
     if (dx > 60 && Math.abs(dx) > Math.abs(dy) * 1.4) {
       haptic("light");
+      // Тот же жест в ту же сторону — карта переворачивается обратно,
+      // а не второй раз вперёд.
+      if (переворотКарты) { setПереворотКарты(false); return; }
       setСогласенНаОбороте(false);
       setПереворотКарты(true);
     }
@@ -16949,51 +16952,59 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           его экрану предупреждения. */}
       <div
         aria-hidden={!переворотКарты}
+        onTouchStart={началоСвайпаКарты}
+        onTouchEnd={концаСвайпаКарты}
+        onTouchCancel={() => { жестКарты.current = null; }}
         style={{
           position: "absolute", inset: 0, borderRadius: 24, overflow: "hidden",
           backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
           transform: "rotateY(180deg)",
-          background: T.surfaceHi, border: `1px solid ${T.lineHi}`,
-          display: "flex", flexDirection: "column", gap: 10, padding: "20px 18px",
+          // Тот же градиент, что на лицевой стороне, только без бликов и
+          // волн — ровный медленный перелив, без рамки и без серой
+          // подложки поверх.
+          background: видКарты.fill,
+          backgroundSize: видКарты.size || "320% 320%",
+          animation: "картаПереливается 16s ease-in-out infinite",
+          display: "flex", flexDirection: "column", gap: 7, padding: "16px 16px",
         }}
       >
-        <div className="flex items-center" style={{ gap: 10 }}>
+        <div className="flex items-center" style={{ gap: 8 }}>
           <span className="flex items-center justify-center flex-shrink-0" style={{
-            width: 34, height: 34, borderRadius: "50%", background: hexA("#F5A623", 0.16), color: "#F5A623",
+            width: 26, height: 26, borderRadius: "50%", background: hexA("#FFFFFF", 0.18), color: "#FFFFFF",
           }}>
-            <AlertTriangle size={18} strokeWidth={2.4} />
+            <AlertTriangle size={14} strokeWidth={2.4} />
           </span>
-          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 800, letterSpacing: "-0.01em" }}>
+          <span style={{ fontFamily: displayFont, color: "#FFFFFF", fontSize: 13.5, fontWeight: 800, letterSpacing: "-0.01em" }}>
             {t("safetyTitle")}
           </span>
         </div>
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45 }}>
+        <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.78), fontSize: 11, lineHeight: 1.35 }}>
           {t("secretManualBody")}
         </span>
         <button
           onClick={() => setСогласенНаОбороте((б) => !б)}
           className="fx-tap flex items-center text-left"
-          style={{ gap: 10, background: "transparent", border: "none", padding: 0 }}
+          style={{ gap: 8, background: "transparent", border: "none", padding: 0 }}
         >
           <span className="flex items-center justify-center flex-shrink-0" style={{
-            width: 20, height: 20, borderRadius: 7,
-            background: согласенНаОбороте ? T.up : "transparent",
-            border: согласенНаОбороте ? "none" : `2px solid ${T.lineHi}`,
-            color: "#04120A",
+            width: 17, height: 17, borderRadius: 6,
+            background: согласенНаОбороте ? "#FFFFFF" : "transparent",
+            border: согласенНаОбороте ? "none" : `2px solid ${hexA("#FFFFFF", 0.5)}`,
+            color: "#1A0B33",
           }}>
-            {согласенНаОбороте && <Check size={13} strokeWidth={3.4} />}
+            {согласенНаОбороте && <Check size={11} strokeWidth={3.4} />}
           </span>
-          <span style={{ fontFamily: bodyFont, color: T.ice, fontSize: 12.5, fontWeight: 600, lineHeight: 1.35 }}>
-            {t("safetyAgree")} <span style={{ color: "#F5A623" }}>{t("safetyAgreeLoss")}</span>
+          <span style={{ fontFamily: bodyFont, color: "#FFFFFF", fontSize: 11, fontWeight: 600, lineHeight: 1.25 }}>
+            {t("safetyAgree")} {t("safetyAgreeLoss")}
           </span>
         </button>
-        <div className="flex" style={{ gap: 8, marginTop: "auto" }}>
+        <div className="flex" style={{ gap: 7, marginTop: "auto" }}>
           <button
             onClick={отменитьОборот}
             className="fx-tap"
             style={{
-              flex: 1, padding: "12px 0", borderRadius: 16, border: "none",
-              background: T.surface, color: T.ice, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+              flex: 1, padding: "9px 0", borderRadius: 13, border: `1px solid ${hexA("#FFFFFF", 0.35)}`,
+              background: "transparent", color: "#FFFFFF", fontFamily: displayFont, fontSize: 12, fontWeight: 700,
             }}
           >
             {t("cancel")}
@@ -17003,11 +17014,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             disabled={!согласенНаОбороте}
             className="fx-tap"
             style={{
-              flex: 1, padding: "12px 0", borderRadius: 16, border: "none",
-              background: согласенНаОбороте ? T.electric : T.surface,
-              color: согласенНаОбороте ? "#FFFFFF" : T.faint,
-              fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
-              opacity: согласенНаОбороте ? 1 : 0.7,
+              flex: 1, padding: "9px 0", borderRadius: 13, border: "none",
+              background: согласенНаОбороте ? "#FFFFFF" : hexA("#FFFFFF", 0.16),
+              color: согласенНаОбороте ? "#1A0B33" : hexA("#FFFFFF", 0.55),
+              fontFamily: displayFont, fontSize: 12, fontWeight: 700,
             }}
           >
             {t("secretShowRow")}
