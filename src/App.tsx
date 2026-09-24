@@ -16511,6 +16511,27 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   // его в бегущие обои.
   const ткань = !!видКарты.ткань;
 
+  /* Вкладка прячется через display:none, и на таком переключении WebKit
+     не всегда доигрывает CSS-анимацию с того места, где остановил —
+     карта возвращалась с застывшим переливом навсегда, а не просто
+     паузой. Явный remount вместо надежды на паузу/возобновление: при
+     каждом возврате на вкладку и при каждой смене вида перерисовываем
+     слои с нуля, и анимация гарантированно идёт заново. */
+  const кореньКарты = useRef(null);
+  const [ключОжива, setКлючОжива] = useState(0);
+  useEffect(() => {
+    const el = кореньКарты.current;
+    if (!el || typeof IntersectionObserver === "undefined") return undefined;
+    let быланевидна = false;
+    const ио = new IntersectionObserver(([з]) => {
+      if (з.isIntersecting && быланевидна) setКлючОжива((к) => к + 1);
+      быланевидна = !з.isIntersecting;
+    });
+    ио.observe(el);
+    return () => ио.disconnect();
+  }, []);
+  const ключПереливаКарты = `${скинКарты}-${ключОжива}`;
+
   function волнаОт(e) {
     const блок = e.currentTarget.getBoundingClientRect();
     const т = e.touches && e.touches[0] ? e.touches[0] : e;
@@ -16734,7 +16755,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       {/* Карта баланса. Сумма читается одним взглядом: целые рубли
           крупно и белым, копейки приглушены — так глаз не спотыкается о
           мелкую часть, которая на решение не влияет. */}
-      <div style={{ position: "relative", margin: "0 16px", isolation: "isolate" }}>
+      <div ref={кореньКарты} style={{ position: "relative", margin: "0 16px", isolation: "isolate" }}>
       {/* Три волны вдогонку друг другу: пока одна растворяется, следующая
           только отходит от края — получается непрерывное дыхание, а не
           мигание. */}
@@ -16751,7 +16772,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           пятно — этого различия больше нет. */}
       {[0, 1.4, 2.8].map((задержка) => (
         <span
-          key={задержка}
+          key={`${ключПереливаКарты}-${задержка}`}
           aria-hidden
           style={{
             position: "absolute", inset: 0, borderRadius: 24,
@@ -16788,7 +16809,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             Mintly, у которого поверх ещё бегут отдельные кольца, карта
             стояла с застывшей заливкой. Маска и перелив на разных
             элементах друг другу не мешают. */}
-        <span aria-hidden style={{
+        <span key={ключПереливаКарты} aria-hidden style={{
           position: "absolute", inset: 0,
           // Оттенков больше, чем нужно для простого градиента: розовый,
           // сиреневый, синий и почти чёрный ходят друг за другом, и
@@ -16815,7 +16836,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             }}
           />
         ))}
-        <div aria-hidden style={{
+        <div key={ключПереливаКарты} aria-hidden style={{
           position: "absolute", top: -70, left: -90, width: 260, height: 320,
           background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.13)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
           transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
