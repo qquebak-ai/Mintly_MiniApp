@@ -25261,6 +25261,13 @@ function useTelegramViewport() {
   const [height, setHeight] = useState(
     typeof window !== "undefined" ? window.innerHeight : 720
   );
+  // Настоящая, не замороженная высота — та же, что Telegram сообщает
+  // прямо сейчас. height выше держится за старое число, пока открыта
+  // клавиатура (не прыгает раскладка); эта переменная нужна только
+  // чтобы посчитать, сколько места клавиатура забрала себе.
+  const [живаяВысота, setЖиваяВысота] = useState(
+    typeof window !== "undefined" ? window.innerHeight : 720
+  );
   const [insetBottom, setInsetBottom] = useState(0);
   const [insetTop, setInsetTop] = useState(0);
   // Отдельно от суммарного отступа: это отступ железа телефона (чёлка
@@ -25290,6 +25297,7 @@ function useTelegramViewport() {
            раскладка перестраивалась под меньшее окно, прокрутка
            сдвигалась, и страница прыгала. Клавиатура просто ложится
            поверх, а высота вернётся к своей, когда её уберут. */
+        setЖиваяВысота(h);
         if (сКлавиатурой(document.activeElement)) {
           setHeight((было) => Math.max(было, h));
         } else {
@@ -25362,7 +25370,11 @@ function useTelegramViewport() {
     root.style.setProperty("--tg-inset-top", `max(${insetTop}px, env(safe-area-inset-top, 0px))`);
   }, [insetBottom, insetTop]);
 
-  return { height, insetBottom, insetTop, deviceTop, fullscreen, ready };
+  // Сколько места забрала клавиатура: разница между замороженной и
+  // настоящей высотой. Пока клавиатуры нет, обе высоты равны и запас
+  // нулевой — эта строка ничего не меняет вне клавиатуры.
+  const клавиатураВысота = Math.max(0, height - живаяВысота);
+  return { height, insetBottom, insetTop, deviceTop, fullscreen, ready, клавиатураВысота };
 }
 
 /* ---------------------------------------------------------
@@ -25432,7 +25444,7 @@ const FEE_PERCENT = 0.01; // 1% комиссии
       else window.sessionStorage.removeItem(ОТКРЫТЫЙ_ТОКЕН);
     } catch { /* приватный режим */ }
   }, []);
-  const { height, insetBottom, insetTop } = useTelegramViewport();
+  const { height, insetBottom, insetTop, клавиатураВысота } = useTelegramViewport();
   const device = useDevice();
   const rocketVariant = typeof window !== "undefined" && /[?&]rocket=outline/.test(window.location.search) ? "outline" : "default";
   // Полёт ракеты после удачного запуска токена.
@@ -28464,7 +28476,12 @@ function mapTokenRow(row) {
           // стоит. Ленты при этом перезапрашивались с нуля.
           // Запас под капсулу: она висит над прокруткой, и последняя
           // строка списка должна уходить из-под неё целиком.
-          paddingBottom: 96 + insetBottom }}>
+          // Пока открыта клавиатура, добавляем ровно её высоту: высота
+          // окна заморожена (см. useTelegramViewport), и без этого запаса
+          // прокрутка упиралась в старый низ страницы — то, что ушло под
+          // клавиатуру снизу, было уже не долистать. Не бесконечно, а
+          // ровно на столько, сколько клавиатура реально забрала.
+          paddingBottom: 96 + insetBottom + (клавиатура ? клавиатураВысота : 0) }}>
           {/* Поля страниц. Кошелёк из этой обёртки исключён: его нижняя
               страница обязана упираться в край экрана, а свои отступы
               она держит сама. */}
