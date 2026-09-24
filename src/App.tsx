@@ -2048,7 +2048,6 @@ function GlobalStyle() {
       .вст-тихо:active { opacity: 0.6; }
       @keyframes spin360 { from{ transform: rotate(0deg); } to{ transform: rotate(360deg); } }
       @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
-      @keyframes scaleIn { from{opacity:0; transform:scale(0.92);} to{opacity:1; transform:scale(1);} }
       @keyframes страницаСнизу { from { opacity: 0; transform: translateY(34px); } to { opacity: 1; transform: none; } }
       /* Сцены на баннерах: свечи растут, монеты плавают, лист качается,
          ракета взлетает. Периоды разные, чтобы соседние баннеры не
@@ -2351,16 +2350,6 @@ function GlobalStyle() {
       /* Смена числа: цифры не подменяются молча, а коротко вспыхивают
          цветом движения и подскакивают. Так видно, что цена только что
          изменилась, даже если смотришь не туда. */
-      @keyframes числоВверх {
-        0%   { color: ${СВЕЧА_РОСТ}; transform: translateY(4px); }
-        45%  { color: ${СВЕЧА_РОСТ}; transform: translateY(-1px); }
-        100% { color: inherit; transform: none; }
-      }
-      @keyframes числоВниз {
-        0%   { color: ${СВЕЧА_ПАДЕНИЕ}; transform: translateY(-4px); }
-        45%  { color: ${СВЕЧА_ПАДЕНИЕ}; transform: translateY(1px); }
-        100% { color: inherit; transform: none; }
-      }
       /* Волна от нажатия: расходится из точки касания и гаснет. */
       @keyframes волнаОтНажатия {
         from { transform: translate(-50%, -50%) scale(0); opacity: 0.34; }
@@ -2721,6 +2710,12 @@ function GlobalStyle() {
       @keyframes spotlightRotateRev { from{ transform: rotate(360deg); } to{ transform: rotate(0deg); } }
       @keyframes spotlightPulse { 0%,100%{ opacity:0.45; transform:scale(1); } 50%{ opacity:0.85; transform:scale(1.06); } }
       @keyframes spotlightOrbit { from{ transform: rotate(0deg) translateX(var(--orbit-r)) rotate(0deg); } to{ transform: rotate(360deg) translateX(var(--orbit-r)) rotate(-360deg); } }
+      /* Вращение и орбита — чистое движение без смысловой нагрузки:
+         при пониженной анимации гасим их, а дыхание кольца оставляем
+         (это цветовая/масштабная пульсация, а не перемещение). */
+      @media (prefers-reduced-motion: reduce) {
+        [style*="spotlightRotate"], [style*="spotlightRotateRev"], [style*="spotlightOrbit"] { animation: none !important; }
+      }
       @keyframes shake { 0%,100%{ transform:translateX(0); } 20%{ transform:translateX(-8px); } 40%{ transform:translateX(8px); } 60%{ transform:translateX(-6px); } 80%{ transform:translateX(6px); } }
       @keyframes heroRocketFlame { 0%,100%{ opacity:0.55; transform: scaleY(0.85) scaleX(0.9); } 50%{ opacity:1; transform: scaleY(1.15) scaleX(1.05); } }
       @keyframes heroRocketFloat { 0%,100%{ transform: translateY(0) rotate(-3deg); } 50%{ transform: translateY(-5px) rotate(3deg); } }
@@ -2731,7 +2726,7 @@ function GlobalStyle() {
          текстовую каретку внутри полей мимо строки — на айфоне она
          уезжала под поле. Конечный кадр здесь и так совпадает с обычным
          состоянием, так что визуально ничего не меняется. */
-      .fx-card { animation: fadeInUp 480ms cubic-bezier(0.16,1,0.3,1) backwards; transition: transform ${SPRING}, border-color ${EASE}, box-shadow ${EASE}; }
+      .fx-card { animation: fadeInUp 480ms cubic-bezier(0.16,1,0.3,1) backwards; transition: transform ${SPRING}, border-color ${EASE}, box-shadow ${EASE}; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
       .fx-card:active { transform: scale(0.98); transition: transform ${PRESS}; }
       /* Только для настоящей мыши. На тач-экране :hover прилипает после
          касания и не снимается до тапа в стороне, а !important перебивал
@@ -2739,7 +2734,7 @@ function GlobalStyle() {
       @media (hover: hover) and (pointer: fine) {
         .fx-card:hover { border-color: ${T.lineHi}; }
       }
-      .fx-tap { transition: transform ${SPRING}; }
+      .fx-tap { transition: transform ${SPRING}; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
       .fx-tap:active { transform: scale(0.96); transition: transform ${PRESS}; }
       /* Нажатие внутри виджета не должно вдавливать виджет целиком.
          Браузер считает нажатым не только то, на что нажали, но и всё,
@@ -2890,7 +2885,7 @@ function GlobalStyle() {
          настоящий текст. */
       .fx-грузится:has(.fx-skeleton) { filter: none; opacity: 1; animation: none; }
       @media (prefers-reduced-motion: reduce) { .fx-грузится { animation: none; } }
-      .fx-chip { transition: border-color ${EASE}, background ${EASE}, color ${EASE}, transform ${SPRING}; }
+      .fx-chip { transition: border-color ${EASE}, background ${EASE}, color ${EASE}, transform ${SPRING}; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
       .fx-chip:active { transition: border-color ${EASE}, background ${EASE}, color ${EASE}, transform ${PRESS}; }
       /* Замороженная плитка: всё внутри стоит. Анимации не снимаются, а
          ставятся на паузу — вернувшись на экран, они продолжают с того
@@ -2984,7 +2979,7 @@ function GlobalStyle() {
          Кривая с резким началом — рывок в сторону пальца, а не вязкое
          сползание. Ровно ${CLOSE_MS} мс: быстрее открытия, иначе окно
          кажется неотпускающим. */
-      .fx-out.fx-modal-back { animation: backdropOut ${CLOSE_MS}ms ease-in both; }
+      .fx-out.fx-modal-back { animation: backdropOut ${CLOSE_MS}ms ease-out both; }
       .fx-out .fx-modal-card, .fx-out.fx-modal-card { animation: sheetOut ${CLOSE_MS}ms cubic-bezier(0.4, 0, 0.9, 0.5) both; }
       /* Лист, уехавший из-под пальца, доигрывает уход сам. Общая
          анимация закрытия перебила бы его собственный сдвиг — она
@@ -3045,14 +3040,16 @@ function GlobalStyle() {
       .fx-avatar { transition: transform ${SPRING}; }
       .fx-avatar:active { transform: scale(0.96); transition: transform ${PRESS}; }
       .cta-launch { transition: transform ${SPRING}, opacity ${EASE}; }
-      .cta-launch:hover { opacity: 0.92; }
+      @media (hover: hover) and (pointer: fine) {
+        .cta-launch:hover { opacity: 0.92; }
+      }
       .cta-launch:active { transform: scale(0.98); transition: transform ${PRESS}; }
       .tf-btn { transition: background ${EASE}, color ${EASE}, transform ${SPRING}; }
       .tf-btn:active { transform: scale(0.92); transition: background ${EASE}, color ${EASE}, transform ${PRESS}; }
       /* none, а не contain: contain лишь запрещает утянуть за собой окно,
          но сам список всё равно отскакивает на резинке — и над контентом
          засвечивается фон. none убирает и отскок тоже. */
-      .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; overscroll-behavior: none; }
+      .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; overscroll-behavior: contain; }
       .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
     `}</style>
   );
@@ -9832,7 +9829,7 @@ function LeafLoader({ progress = null, size = 104, остановлен = false,
               glow={стоит ? i === остался : i % 2 === 0}
               качается={стоит && i === остался}
               стиль={стоит && i !== остался
-                ? { animation: `лентаГаснет ${УХОД_МС}ms ease-in ${(дальше - 1) * ЗАДЕРЖКА_МС}ms both` }
+                ? { animation: `лентаГаснет ${УХОД_МС}ms ease-out ${(дальше - 1) * ЗАДЕРЖКА_МС}ms both` }
                 : undefined}
             />
           );
@@ -11210,7 +11207,7 @@ function КарточкаСВыдвижкой({ title, tokens, onOpen, delay = 0
               gap: 2,
               transform: открыта ? "translate3d(0, 0, 0)" : "translate3d(0, -30px, 0)",
               opacity: открыта ? 1 : 0,
-              transition: "transform 620ms cubic-bezier(.34,1.56,.64,1), opacity 420ms ease",
+              transition: "transform 380ms cubic-bezier(.34,1.56,.64,1), opacity 320ms ease",
               willChange: "transform, opacity",
             }}
           >
@@ -14446,7 +14443,7 @@ function ЭкранВывода({
                 style={{
                   flex: 1, padding: "15px 44px 15px 14px", borderRadius: 16,
                   border: `1px solid ${беда ? T.down : (адресГоден ? T.up : T.line)}`,
-                  background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 13.5, outline: "none",
+                  background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 16, outline: "none",
                   transition: "border-color 200ms ease",
                 }}
               />
@@ -14519,7 +14516,7 @@ function ЭкранВывода({
                 autoCorrect="off"
                 style={{
                   padding: "13px 14px", borderRadius: 14, border: `1px solid ${T.line}`,
-                  background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 13, outline: "none",
+                  background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 16, outline: "none",
                 }}
               />
               <div className="flex items-center" style={{ gap: 8 }}>
@@ -14530,7 +14527,7 @@ function ЭкранВывода({
                   maxLength={24}
                   style={{
                     flex: 1, padding: "13px 14px", borderRadius: 14, border: `1px solid ${T.line}`,
-                    background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 13.5, outline: "none",
+                    background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 16, outline: "none",
                   }}
                 />
                 <button
@@ -17004,7 +17001,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           style={{
             position: "absolute", inset: 0, borderRadius: 24,
             pointerEvents: "none", zIndex: -1,
-            filter: "blur(26px)", WebkitFilter: "blur(26px)",
+            filter: "blur(20px)", WebkitFilter: "blur(20px)",
             opacity: 0.62,
             transform: "translateZ(0)",
           }}
@@ -17053,7 +17050,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
               position: "absolute", left: в.x, top: в.y, width: 460, height: 460, borderRadius: "50%",
               background: `radial-gradient(circle, ${hexA("#FFFFFF", 0.5)} 0%, ${hexA("#FFFFFF", 0)} 70%)`,
               pointerEvents: "none",
-              animation: "волнаОтНажатия 880ms cubic-bezier(0.22, 1, 0.36, 1) both",
+              animation: "волнаОтНажатия 300ms cubic-bezier(0.22, 1, 0.36, 1) both",
             }}
           />
         ))}
@@ -17786,7 +17783,7 @@ function ЧатТокена({ tokenId, свой = false, currentUserId, onNeedAu
               style={{
                 flex: 1, minWidth: 0, padding: "10px 12px", borderRadius: 14,
                 background: T.bg, border: "none", outline: "none",
-                fontFamily: bodyFont, fontSize: 15, color: T.ice,
+                fontFamily: bodyFont, fontSize: 16, color: T.ice,
                 opacity: состояние.canWrite ? 1 : 0.6,
               }}
             />
@@ -20716,8 +20713,10 @@ function ПереключательМеханики({ item, включено, on
         }}
       >
         <span style={{
-          position: "absolute", top: 3, left: включено ? 19 : 3, width: 18, height: 18, borderRadius: "50%",
-          background: включено ? "#FFFFFF" : T.muted, transition: `left ${SPRING}`,
+          position: "absolute", top: 3, left: 3, width: 18, height: 18, borderRadius: "50%",
+          background: включено ? "#FFFFFF" : T.muted,
+          transform: включено ? "translateX(16px)" : "translateX(0)",
+          transition: `transform ${SPRING}, background ${EASE}`,
         }} />
       </span>
     </button>
@@ -21509,8 +21508,10 @@ function ToggleSwitch({ on, onChange }) {
       }}
     >
       <div style={{
-        position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, borderRadius: "50%",
-        background: on ? PRISM_TEXT : T.muted, transition: `left ${SPRING}`,
+        position: "absolute", top: 2, left: 2, width: 18, height: 18, borderRadius: "50%",
+        background: on ? PRISM_TEXT : T.muted,
+        transform: on ? "translateX(18px)" : "translateX(0)",
+        transition: `transform ${SPRING}, background ${EASE}`,
       }} />
     </button>
   );
@@ -23176,7 +23177,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
         style={{
           flex: 1, minHeight: 0, padding: "0 18px", gap: 14,
           animation: уходит
-            ? `шагУходитВверх ${УХОД_ШАГА}ms ease-in forwards`
+            ? `шагУходитВверх ${УХОД_ШАГА}ms ease-out forwards`
             : "шагПриходитСнизу 280ms cubic-bezier(0.22, 1, 0.36, 1) both",
         }}
       >
@@ -23283,7 +23284,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
                 padding: "15px 14px", borderRadius: 16,
                 border: `1px solid ${беда ? T.down : (годна ? T.up : T.line)}`,
                 background: T.surface, color: заперта ? T.muted : T.ice,
-                fontFamily: bodyFont, fontSize: 15.5, outline: "none",
+                fontFamily: bodyFont, fontSize: 16, outline: "none",
                 transition: "border-color 200ms ease",
               }}
             />
