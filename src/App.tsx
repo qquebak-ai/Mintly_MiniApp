@@ -16794,10 +16794,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         onPointerDown={волнаОт}
         style={{
           position: "relative", overflow: "hidden", borderRadius: 24, padding: "26px 18px 30px",
-          // Карта выросла по высоте, а надпись, сумма и чип без этого
-          // жались к верху, оставляя пустоту внизу. Так они разложены на
-          // всю высоту, а не сгрудились в одном углу.
-          display: "flex", flexDirection: "column", justifyContent: "space-between",
+          // Надпись и сумма держатся вместе вверху, а чип с монетами
+          // прижат к низу отдельным marginTop: auto — так между надписью
+          // и суммой нет лишнего зазора, а вся пустая высота карты уходит
+          // в один отступ перед чипом, а не размазывается поровну.
+          display: "flex", flexDirection: "column",
           /* Обрезка по скруглению у iOS не держится, если внутри что-то
              ходит (блик, волны, ткань): дети вылезают за угол квадратом.
              Отдельный слой и маска по кругу возвращают обрезку. */
@@ -16890,7 +16891,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         <span
           className="inline-flex items-center"
           style={{
-            position: "relative", marginTop: 12, padding: "5px 11px", borderRadius: 999,
+            position: "relative", marginTop: "auto", alignSelf: "flex-start", padding: "5px 11px", borderRadius: 999,
             background: hexA("#FFFFFF", 0.18), color: "#FFFFFF",
             fontFamily: monoFont, fontSize: 12.5, fontWeight: 700,
             minHeight: 24,
