@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Mintly</title>
+  <defs>
+    <linearGradient id="mGrad" x1="0.15" y1="0.08" x2="0.85" y2="0.95">
+      <stop offset="0" stop-color="#C79BFF"/>
+      <stop offset="0.42" stop-color="#8E2DE2"/>
+      <stop offset="0.68" stop-color="#6C16E1"/>
+      <stop offset="1" stop-color="#3C0A86"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.46" r="0.55">
+      <stop offset="0" stop-color="#8E2DE2" stop-opacity="0.55"/>
+      <stop offset="0.55" stop-color="#6C16E1" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" fill="#000000"/>
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#glow)"/>
+  <path d="M245,745 L350,260 L520,610 L700,260 L790,745"
+        fill="none" stroke="url(#mGrad)" stroke-width="120"
+        stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/>
+</svg>
