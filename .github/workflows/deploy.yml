@@ -5,6 +5,10 @@
 # curl приходилось набирать руками на сервере после каждого изменения —
 # теперь его делает GitHub, как только коммит попал в main.
 #
+# Только www.mintly.company: у голого mintly.company сертификат на
+# другое имя (см. api/twitter.js) — curl на голый домен падает с TLS-
+# ошибкой ещё до health-проверки, и вся выкладка молча отваливается.
+#
 # Что нужно один раз: в настройках репозитория (Settings → Secrets and
 # variables → Actions → New repository secret) завести секрет
 # DEPLOY_SECRET с тем же значением, что стоит в /srv/mintly/.env.server.
@@ -37,7 +41,7 @@ jobs:
           # По этому числу видно, что служба перезапустилась: после
           # выкладки оно начинается заново. Без него «ok» говорит лишь о
           # том, что старая сборка ещё на месте.
-          echo "WAS_UPTIME=$(curl -sS https://mintly.company/api/health | jq -r '.uptime // 0')" >> "$GITHUB_ENV"
+          echo "WAS_UPTIME=$(curl -sS https://www.mintly.company/api/health | jq -r '.uptime // 0')" >> "$GITHUB_ENV"
 
       - name: Позвать выкладку
         env:
@@ -48,7 +52,7 @@ jobs:
             exit 1
           fi
           code=$(curl -sS -o /tmp/deploy-answer -w '%{http_code}' -X POST \
-            https://mintly.company/api/deploy \
+            https://www.mintly.company/api/deploy \
             -H "authorization: Bearer $DEPLOY_SECRET")
           cat /tmp/deploy-answer; echo
           # 202 — «принято, сборка пошла»: маршрут отвечает сразу, не
@@ -65,7 +69,7 @@ jobs:
           # меньше прежнего.
           for attempt in $(seq 1 20); do
             sleep 15
-            answer=$(curl -sS https://mintly.company/api/health || true)
+            answer=$(curl -sS https://www.mintly.company/api/health || true)
             echo "$answer"
             now=$(echo "$answer" | jq -r '.uptime // empty')
             ok=$(echo "$answer" | jq -r '.ok // false')
