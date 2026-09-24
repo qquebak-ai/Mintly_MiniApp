@@ -11161,26 +11161,22 @@ function КарточкаСВыдвижкой({ title, tokens, onOpen, delay = 0
   const первый = tokens[0];
   return (
     <div ref={корень} className="flex flex-col min-w-0" style={{ gap: 8 }}>
-      <button
-        onClick={() => setОткрыта((о) => !о)}
-        className="fx-tap fx-inert w-full text-left rounded-[24px]"
-        style={{ position: "relative", overflow: "hidden", height: 132, padding: 14, background: T.surface, border: "none", display: "flex", flexDirection: "column", justifyContent: "space-between" }}
+      <div
+        className="w-full text-left rounded-[24px]"
+        style={{ position: "relative", overflow: "hidden", height: 132, padding: 14, background: T.surface, display: "flex", flexDirection: "column", justifyContent: "space-between" }}
       >
         <SpotlightAura src={первый && первый.logoUrl} ticker={первый && первый.ticker} />
         <div style={{ position: "relative", fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.15, textWrap: "balance" }}>
           {title}
         </div>
-        <div className="flex items-center justify-between" style={{ position: "relative" }}>
-          <div className="flex">
-            {tokens.map((tok, i) => (
-              <span key={tok.id} style={{ marginLeft: i ? -10 : 0, borderRadius: "50%", boxShadow: `0 0 0 2px ${T.surface}`, zIndex: 3 - i, display: "flex" }}>
-                <TokenAvatar size={30} src={tok.logoUrl} />
-              </span>
-            ))}
-          </div>
-          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 20, lineHeight: 1, transition: "transform 420ms cubic-bezier(.34,1.56,.64,1)", transform: открыта ? "rotate(180deg)" : "none", display: "inline-block" }}>▾</span>
+        <div className="flex" style={{ position: "relative" }}>
+          {tokens.map((tok, i) => (
+            <span key={tok.id} style={{ marginLeft: i ? -10 : 0, borderRadius: "50%", boxShadow: `0 0 0 2px ${T.surface}`, zIndex: 3 - i, display: "flex" }}>
+              <TokenAvatar size={30} src={tok.logoUrl} />
+            </span>
+          ))}
         </div>
-      </button>
+      </div>
 
       {/* Выдвижка: из-под карточки, с лёгкой отдачей в конце — как
           пружина у оригинала, только без библиотеки анимаций. */}
