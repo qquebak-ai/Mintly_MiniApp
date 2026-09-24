@@ -13384,9 +13384,6 @@ function HomeView({
   // колокольчик) — на прежнем месте, вверху экрана.
   return (
     <div className="flex flex-col" style={{ gap: 26, paddingTop: 8, paddingBottom: 40 }}>
-      <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>
-        {t("navHome")}
-      </h1>
       <div className="flex items-center justify-between" style={{ gap: 12 }}>
         <ШапкаГлавной profile={profile} accountCreated={accountCreated} onOpenMyProfile={onOpenMyProfile} грузится={профильГрузится || грузится} />
         <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} />
