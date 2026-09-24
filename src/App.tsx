@@ -3186,128 +3186,6 @@ function ChangeBadge({ value, size = "sm" }) {
   );
 }
 
-// MiniChart used to be a full recharts <AreaChart> wrapped in a
-// <ResponsiveContainer> (which attaches a ResizeObserver) plus a live
-// Tooltip listening for pointer move — a lot of machinery for something
-// that's always drawn at one fixed pixel size (62×30 / 78×36) inside a
-// button that already navigates on tap. With 6+ of these mounted at once
-// in a scrolling list, that overhead was a real contributor to the scroll
-// stutter. This is a plain SVG path — same look, a fraction of the cost —
-// matching the approach already used for the main candlestick chart.
-const MiniChart = React.memo(function MiniChart({ base, seed, poolAddress, curveAddress, tokenAddress, positive, id, width = 78, height = 36, length = 22 }) {
-  const [closes, setCloses] = useState(null);
-  // Источник настоящей истории: пул на DEX или своя кривая. Если нет ни
-  // того ни другого, рисовать нечего — раньше здесь начиналась
-  // синтетика, теперь остаётся пустое место.
-  const source = poolAddress || curveAddress || null;
-  const [visible, setVisible] = useState(!source);
-  const elRef = useRef(null);
-
-  // Only fetch real candle history once the card actually scrolls into
-  // view. With 18+ cards in a feed, kicking off every request up front
-  // would mean 18 simultaneous calls on what might be a mobile connection.
-  useEffect(() => {
-    if (!source || visible) return;
-    const el = elRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") { setVisible(true); return; }
-    const io = new IntersectionObserver((entries) => {
-      if (entries[0]?.isIntersecting) { setVisible(true); io.disconnect(); }
-    }, { rootMargin: "200px" });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [source, visible]);
-
-  useEffect(() => {
-    if (!source || !visible) return;
-    let cancelled = false;
-    function load() {
-      const p = poolAddress
-        ? fetchSparkCloses(poolAddress, length, tokenAddress)
-        : fetchCurveSparkCloses(curveAddress, length);
-      p.then((res) => {
-        if (!cancelled && res) setCloses(res);
-      });
-    }
-    load();
-    // Cards can stay mounted a long time in the feed; periodically pull a
-    // fresh real shape (throttled by fetchSparkCloses's own TTL/cache, so
-    // this doesn't add extra network load beyond what the cache allows).
-    const iv = setInterval(load, SPARK_TTL_MS);
-    return () => { cancelled = true; clearInterval(iv); };
-  }, [source, poolAddress, curveAddress, visible, length]);
-
-  // Real pools: the fetched OHLCV shape is the true recent history, but it
-  // only actually refreshes every SPARK_TTL_MS — without this, the line
-  // would sit frozen in between even though the feed's price/mcap keeps
-  // arriving every 2.5s. Instead we scale that real shape by how much
-  // `base` (the live mcap from the current poll) has moved since the shape
-  // was last fetched, so the sparkline actually tracks live price changes
-  // rather than just wiggling in place. Demo tokens (no pool): fully
-  // synthetic, phase-shifted by the same shared tick so those aren't
-  // frozen either.
-  const fetchBaseRef = useRef(null);
-  useEffect(() => {
-    if (closes && closes.length > 1) {
-      fetchBaseRef.current = base || 1;
-    }
-  }, [closes]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const data = useMemo(() => {
-    // Только настоящие точки. Раньше поверх них подмешивалось
-    // синусоидальное дрожание «чтобы линия жила», а при отсутствии
-    // ответа рисовался целиком выдуманный ряд — по такому графику
-    // человек принимал решение о покупке.
-    if (closes && closes.length > 1) {
-      const fetchBase = fetchBaseRef.current || base || 1;
-      const ratio = fetchBase ? (base || fetchBase) / fetchBase : 1;
-      return closes.map((v, i) => ({ i, mcap: v * ratio }));
-    }
-    // У токена на кривой между сделками цена и правда стоит на месте,
-    // поэтому ровная линия — это правда, а не заглушка.
-    if (curveAddress && base > 0) {
-      return Array.from({ length }, (_, i) => ({ i, mcap: base }));
-    }
-    return null;
-  }, [closes, base, seed, length, curveAddress]);
-
-  // Настоящих точек нет — не рисуем ничего, только держим место, чтобы
-  // строка карточки не прыгала.
-  if (!data) {
-    return <div ref={elRef} style={{ width, height }} />;
-  }
-
-  const color = positive ? T.up : T.down;
-  const padX = 2, padTop = 4, padBottom = 2;
-  const plotW = width - padX * 2;
-  const plotH = height - padTop - padBottom;
-  const values = data.map(d => d.mcap);
-  const max = Math.max(...values), min = Math.min(...values);
-  const range = (max - min) || 1;
-  const step = values.length > 1 ? plotW / (values.length - 1) : 0;
-
-  const points = values.map((v, i) => [
-    padX + i * step,
-    padTop + (1 - (v - min) / range) * plotH,
-  ]);
-  const linePath = points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  const baseY = height - padBottom;
-  const areaPath = `${linePath} L${points[points.length - 1][0].toFixed(1)},${baseY} L${points[0][0].toFixed(1)},${baseY} Z`;
-  const gid = `spark-${id}`;
-
-  return (
-    <svg ref={elRef} width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: "block", overflow: "visible" }}>
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity={0.45} />
-          <stop offset="100%" stopColor={color} stopOpacity={0} />
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill={`url(#${gid})`} stroke="none" style={{ transition: "d 900ms ease-out" }} />
-      <path d={linePath} fill="none" stroke={color} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" style={{ transition: "d 900ms ease-out" }} />
-    </svg>
-  );
-});
-
 const TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1", "MN1"];
 /* Периоды на карточке монеты — человеческими словами, а не буквами
    терминала. «M15» ничего не говорит тому, кто зашёл посмотреть на
@@ -11096,24 +10974,6 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
           </div>
         </div>
 
-        {/* График во всю ширину карточки: он и есть довод смотреть
-            дальше. Ширину держит стиль, а не число в разметке, — иначе
-            на узком телефоне линия вылезала бы за край. */}
-        <div className="fx-spark" style={{ marginTop: 12, position: "relative" }}>
-          <MiniChart
-            id={`герой-${tok.id}`}
-            base={tok.mcapNum || tok.raisedTon || 0}
-            seed={tok.id}
-            poolAddress={tok.dexPoolAddress}
-            curveAddress={tok.curveAddress}
-            tokenAddress={tok.tokenAddress}
-            positive={растёт}
-            width={320}
-            height={76}
-            length={28}
-          />
-        </div>
-
         {pct != null && (
           <div style={{ position: "relative", marginTop: 12 }}>
             <div style={{ height: 5, borderRadius: 3, background: T.surfaceHi, overflow: "hidden" }}>
@@ -11412,18 +11272,6 @@ function ВДвижении({ tokens = [], onOpen, onAll }) {
                   <УмныйТекст text={tok.mcapNum > 0 ? fmtUSD(tok.mcapNum) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`} />
                 </div>
               </div>
-              <MiniChart
-                id={`движ-${tok.id}`}
-                base={tok.mcapNum || tok.raisedTon || 0}
-                seed={tok.id}
-                poolAddress={tok.dexPoolAddress}
-                curveAddress={tok.curveAddress}
-                tokenAddress={tok.tokenAddress}
-                positive={растёт}
-                width={62}
-                height={28}
-                length={20}
-              />
               <span style={{ fontFamily: monoFont, color: растёт ? T.up : T.down, fontSize: 13, fontWeight: 700, width: 58, textAlign: "right", flexShrink: 0 }}>
                 <УмныйТекст text={`${растёт ? "+" : ""}${(tok.change || 0).toFixed(1)}%`} />
               </span>
