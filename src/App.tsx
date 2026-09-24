@@ -23428,6 +23428,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   // Какая цифра сейчас под пальцем — растёт той же пружиной, что ручка
   // торгового ползунка под нажатием.
   const [нажатаЦифра, setНажатаЦифра] = useState(null);
+  // Повторная отправка — не раньше чем через 2 минуты после последней:
+  // тот же почтовый сервис на каждое письмо, спамить его незачем.
+  const [логинМожноПереотправить, setЛогинМожноПереотправить] = useState(true);
+  const переотправкаТаймерRef = useRef(null);
   // Кадр между шагами почта/код/ник: старое уходит вверх, новое приходит
   // снизу — та же пара keyframes, что у ЭкранПочты.
   const [уходитШагВхода, setУходитШагВхода] = useState(false);
@@ -23629,6 +23633,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     setЛогинКод("");
     setЛогинОшибка("");
     setУходитШагВхода(false);
+    setЛогинМожноПереотправить(true);
+    clearTimeout(переотправкаТаймерRef.current);
     const высота = typeof window !== "undefined" ? window.innerHeight || 844 : 844;
     /* Шестая часть экрана. Отсюда же едет и дуга — её верх
        отсчитывается от этого числа, — поэтому одной правкой поднимается
@@ -23817,6 +23823,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
        verifyOtp): shouldCreateUser: false — новый аккаунт этот вызов не
        заводит, только впускает в существующий. */
     async function отправитьКодВхода() {
+      if (!логинМожноПереотправить) return;
       setЛогинОшибка("");
       setЛогинКод("");
       setЛогинИдёт(true);
@@ -23829,6 +23836,11 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         // Уже на шаге кода — письмо просто ушло заново, шаг менять не нужно.
         if (шагВхода !== "код") сменитьШагВхода("код");
         haptic("light");
+        // Заново можно нажать не раньше чем через 2 минуты — и после
+        // самой первой отправки тоже, не только после повторных.
+        setЛогинМожноПереотправить(false);
+        clearTimeout(переотправкаТаймерRef.current);
+        переотправкаТаймерRef.current = setTimeout(() => setЛогинМожноПереотправить(true), 120000);
       } catch (e) {
         setЛогинОшибка(String((e && e.message) || "").slice(0, 140) || t("authMailUnknown"));
       } finally {
@@ -24305,11 +24317,12 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               )}
               <button
                 onClick={отправитьКодВхода}
-                disabled={логинИдёт}
+                disabled={логинИдёт || !логинМожноПереотправить}
                 className="fx-tap"
                 style={{
                   alignSelf: "center", padding: 0, border: "none", background: "transparent",
-                  color: логинИдёт ? T.faint : T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+                  color: (логинИдёт || !логинМожноПереотправить) ? T.faint : T.electric,
+                  fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
                 }}
               >
                 {t("authCodeResend")}
