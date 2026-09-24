@@ -16812,6 +16812,18 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
              Отдельный слой и маска по кругу возвращают обрезку. */
           isolation: "isolate",
           WebkitMaskImage: "-webkit-radial-gradient(white, black)",
+          border: "none",
+        }}
+      >
+        {/* Заливка — отдельным слоем, а не фоном самой section: WebKit
+            держит маску (WebkitMaskImage чуть выше) в отдельном
+            composited-слое и не перерисовывает его, когда под ней
+            меняется background-position, — на надетых видах, кроме
+            Mintly, у которого поверх ещё бегут отдельные кольца, карта
+            стояла с застывшей заливкой. Маска и перелив на разных
+            элементах друг другу не мешают. */}
+        <span aria-hidden style={{
+          position: "absolute", inset: 0,
           // Оттенков больше, чем нужно для простого градиента: розовый,
           // сиреневый, синий и почти чёрный ходят друг за другом, и
           // поверхность не повторяет один и тот же переход.
@@ -16822,9 +16834,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           animation: ткань
             ? "none"
             : `картаПереливается ${ходКарты.длительность}s ease-in-out ${ходКарты.сдвиг}s infinite`,
-          border: "none",
-        }}
-      >
+        }} />
         {ткань && <СлойКарбона fill={видКарты.fill} size={видКарты.size} />}
         {/* Волны от касаний — поверх заливки, но под текстом. */}
         {волны.map((в) => (
