@@ -13367,8 +13367,8 @@ function HomeView({
         <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} />
       </div>
       <div className="fx-view flex flex-col" style={{ gap: 26 }}>
-        <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
         <ЖивыеКарточки />
+        <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
       </div>
     </div>
   );
