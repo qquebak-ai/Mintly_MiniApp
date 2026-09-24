@@ -20722,6 +20722,12 @@ function ПереключательМеханики({ item, включено, on
 
 function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCreateProfile, onLaunch, solДоступен = false, черновик = null, onЧерновикПринят = () => {} }) {
   const [form, setForm] = useState({ name: "", ticker: "", buyAmount: "", desc: "", tg: "", x: "", site: "" });
+  /* Число над ползунком тоже можно набрать рукой — не у всех палец
+     достаточно точен, чтобы попасть в нужную сотую. Ползунок при этом
+     не отдельный: и он, и надпись читают одно и то же значение формы,
+     поэтому набранное число сразу двигает бегунок. */
+  const [суммаВводится, setСуммаВводится] = useState(false);
+  const [суммаЧерновик, setСуммаЧерновик] = useState("");
   // В какой сети запускать. Пока программа кривой в Solana не
   // развёрнута, выбора нет вовсе — предлагать действие, которое всё
   // равно не пройдёт, хуже, чем не предлагать его.
@@ -21085,11 +21091,42 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           const число = (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: вSolana ? 2 : 1 });
           const плохо = touched && (вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED) && (вSolana ? solUsd() : tonUsd()) > 0
             && !(сейчас * (вSolana ? solUsd() : tonUsd()) >= MIN_LAUNCH_USD);
+          const применитьСумму = () => {
+            const v = Math.max(0, Math.min(верх, parseFloat(суммаЧерновик.replace(",", ".")) || 0));
+            setForm((f) => ({ ...f, buyAmount: v > 0 ? String(v) : "" }));
+            setСуммаВводится(false);
+          };
           return (
             <>
-              <span style={{ fontFamily: bodyFont, color: плохо ? T.down : T.muted, fontSize: 13 }}>
-                {t("launchAmountLabel")}: <УмныйТекст text={число(сейчас)} /> {единица}
-              </span>
+              {суммаВводится ? (
+                <span className="flex items-center" style={{ gap: 6 }}>
+                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("launchAmountLabel")}:</span>
+                  <input
+                    // Клавиатура числовая, а точку и запятую пускаем сами:
+                    // на части телефонов запятая — единственный десятичный
+                    // разделитель, который умеет показать раскладка.
+                    type="text" inputMode="decimal" autoFocus
+                    value={суммаЧерновик}
+                    onChange={(e) => setСуммаЧерновик(e.target.value.replace(/[^0-9.,]/g, ""))}
+                    onBlur={применитьСумму}
+                    onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                    style={{
+                      width: 64, background: "transparent", border: "none", borderBottom: `1px solid ${T.electric}`,
+                      fontFamily: bodyFont, color: T.ice, fontSize: 13, fontWeight: 700, padding: "0 0 1px",
+                    }}
+                  />
+                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{единица}</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setСуммаЧерновик(сейчас > 0 ? String(сейчас) : ""); setСуммаВводится(true); }}
+                  className="fx-tap"
+                  style={{ background: "transparent", border: "none", padding: 0, fontFamily: bodyFont, color: плохо ? T.down : T.muted, fontSize: 13 }}
+                >
+                  {t("launchAmountLabel")}: <УмныйТекст text={число(сейчас)} /> {единица}
+                </button>
+              )}
               <Ползунок
                 value={сейчас}
                 min={0}
