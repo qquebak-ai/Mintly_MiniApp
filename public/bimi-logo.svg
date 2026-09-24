@@ -8,7 +8,7 @@
       <stop offset="0.68" stop-color="#6C16E1"/>
       <stop offset="1" stop-color="#3C0A86"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0.5" cy="0.46" r="0.55">
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.55">
       <stop offset="0" stop-color="#8E2DE2" stop-opacity="0.55"/>
       <stop offset="0.55" stop-color="#6C16E1" stop-opacity="0.2"/>
       <stop offset="1" stop-color="#000000" stop-opacity="0"/>
@@ -16,7 +16,7 @@
   </defs>
   <rect x="0" y="0" width="1024" height="1024" fill="#000000"/>
   <rect x="0" y="0" width="1024" height="1024" fill="url(#glow)"/>
-  <path d="M245,745 L350,260 L520,610 L700,260 L790,745"
+  <path d="M239.5,840 L344.5,355 L514.5,705 L694.5,355 L784.5,840"
         fill="none" stroke="url(#mGrad)" stroke-width="120"
         stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/>
 </svg>
