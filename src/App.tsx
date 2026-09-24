@@ -11099,9 +11099,13 @@ function КартаКурсаМонеты({ title, монета }) {
   }, [монета]);
 
   const цена = (данные && данные.price) || 0;
-  const change24 = (данные && данные.change24) || 0;
-  const растёт = change24 >= 0;
-  const цвет = растёт ? T.up : T.down;
+  // Округляем до того же знака, что и на экране: без этого сотая доля
+  // процента красила бы число в зелёный или красный, хотя на глаз там
+  // написано «0.00%».
+  const change24 = Math.round(((данные && данные.change24) || 0) * 100) / 100;
+  const ровно = change24 === 0;
+  const растёт = change24 > 0;
+  const цвет = ровно ? T.faint : (растёт ? T.up : T.down);
 
   const путь = useMemo(() => {
     const исходные = (данные && данные.points) || [];
@@ -11155,7 +11159,7 @@ function КартаКурсаМонеты({ title, монета }) {
         <svg
           aria-hidden viewBox="0 0 100 44" preserveAspectRatio="none"
           style={{
-            position: "absolute", left: 0, right: 0, bottom: 28, width: "100%", height: 30, opacity: 0.6,
+            position: "absolute", left: 0, right: 0, bottom: 28, width: "100%", height: 30,
             filter: готово ? "blur(0px)" : "blur(9px)",
             transition: "filter 480ms ease",
           }}
