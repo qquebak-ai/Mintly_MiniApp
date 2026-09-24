@@ -11076,7 +11076,7 @@ function КартаКурсаМонеты({ title, монета }) {
           {путь && (
             <svg
               aria-hidden viewBox="0 0 100 44" preserveAspectRatio="none"
-              style={{ position: "absolute", left: 0, right: 0, bottom: 30, width: "100%", height: 58, opacity: 0.6 }}
+              style={{ position: "absolute", left: 0, right: 0, bottom: 18, width: "100%", height: 40, opacity: 0.6 }}
             >
               <path d={путь} fill="none" stroke={цвет} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
             </svg>
