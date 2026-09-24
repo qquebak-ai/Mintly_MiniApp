@@ -9909,32 +9909,20 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
         {kind === "card" && <ProfileCardBg cardId={item.id} height={96} radius={16} showcase />}
         {kind === "wallet" ? (
           /* Скин карты показываем самой картой: кружок аватарки тут
-             ничего не объясняет, а маленькая карта баланса — сразу всё.
-             Свечение позади — размытая копия той же заливки на той же
-             анимации, поэтому цвет за картой ходит вместе с цветом на
-             самой карте, как в кошельке. */
-          <>
-            <span aria-hidden style={{
-              position: "absolute", inset: 8, borderRadius: 14,
-              background: item.fill, backgroundSize: item.size || "320% 320%",
-              animation: "картаПереливается 9s ease-in-out infinite",
-              filter: "blur(16px)", opacity: 0.65, transform: "translateZ(0)",
-            }} />
-            <div style={{
-              position: "relative", zIndex: 1, width: "94%", height: 88, borderRadius: 14,
-              overflow: "hidden",
-              background: item.fill,
-              backgroundSize: item.size || "320% 320%",
-              animation: "картаПереливается 9s ease-in-out infinite",
-              boxShadow: `0 8px 22px ${hexA(item.glow || "#7C3AED", 0.35)}`,
-              padding: "11px 13px", textAlign: "left",
-            }}>
-              <div style={{ fontFamily: bodyFont, fontSize: 9.5, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
-              <div style={{ fontFamily: displayFont, fontSize: 17, fontWeight: 700, color: "#FFFFFF", marginTop: 3 }}>
-                12,40 <span style={{ fontSize: 10, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
-              </div>
+             ничего не объясняет, а маленькая карта баланса — сразу всё. */
+          <div style={{
+            position: "relative", zIndex: 1, width: "94%", height: 88, borderRadius: 14,
+            overflow: "hidden",
+            background: item.fill,
+            backgroundSize: item.size || "320% 320%",
+            animation: "картаПереливается 9s ease-in-out infinite",
+            padding: "11px 13px", textAlign: "left",
+          }}>
+            <div style={{ fontFamily: bodyFont, fontSize: 9.5, color: hexA("#FFFFFF", 0.72) }}>{t("walletBalanceLabel")}</div>
+            <div style={{ fontFamily: displayFont, fontSize: 17, fontWeight: 700, color: "#FFFFFF", marginTop: 3 }}>
+              12,40 <span style={{ fontSize: 10, color: hexA("#FFFFFF", 0.7) }}>SOL</span>
             </div>
-          </>
+          </div>
         ) : (
           <div style={{ position: "relative", zIndex: 1 }}>
             {/* Внутри рамки — просто чёрный кружок: витрина про сам
@@ -15969,8 +15957,11 @@ function МастерФразы({
   showToast = () => {},
   insetTop = 0,
   insetBottom = 0,
+  // Открыто свайпом по карте — там уже показали короткое предупреждение
+  // с галочкой на обороте, вступительный экран здесь был бы повтором.
+  начальныйШаг = null,
 }) {
-  const [шаг, setШаг] = useState(режим === "фраза" ? "вручную" : "начало");
+  const [шаг, setШаг] = useState(начальныйШаг || (режим === "фраза" ? "вручную" : "начало"));
   const [слова, setСлова] = useState([]);
   const [идёт, setИдёт] = useState(false);
   const [беда, setБеда] = useState("");
@@ -16455,6 +16446,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
      показывает заведение; started && !ready — кошелёк работает, но копия
      не сделана, и наверху висит строка «Секретная фраза». */
   const [фразаОткрыта, setФразаОткрыта] = useState(false);
+  // Открыто свайпом по карте — вступительный экран мастера пропускаем,
+  // сразу на экран предупреждения: короткое такое же уже показали на
+  // обороте.
+  const [фразаЧерезКарту, setФразаЧерезКарту] = useState(false);
   /* Возврат из «Секретной фразы» — с уходом, как у прочих вложенных
      страниц: раньше экран пропадал кадром, и переход читался морганием,
      а не шагом назад. Кошелёк под ним приходит своим fx-view. */
@@ -16482,7 +16477,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     }, 170);
   }, []);
   // Пришли из меню по пункту «Секретная фраза» — открываем длинную дорогу.
-  useEffect(() => { if (запросФразы) setФразаОткрыта(true); }, [запросФразы]);
+  useEffect(() => { if (запросФразы) { setФразаЧерезКарту(false); setФразаОткрыта(true); } }, [запросФразы]);
   useEffect(() => { if (фраза && фраза.готово) setФразаОткрыта(false); }, [фраза]);
   const [обменОткрыт, setОбменОткрыт] = useState(false);
   const [получитьОткрыт, setПолучитьОткрыт] = useState(false);
@@ -16546,12 +16541,15 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   }
 
   /* Свайп слева направо по карте — короткая дорога к секретной фразе:
-     карта переворачивается по-настоящему, 3D-разворотом, и за ней
-     открывается тот же мастер с предупреждением и галочкой, что и по
-     пункту меню — слова сами по себе за один жест не показываем, это
-     ключ ко всем деньгам, и случайный свайп не должен его открывать. */
+     карта по-настоящему переворачивается в 3D, и на обороте сразу же,
+     без задержки, готовое предупреждение с галочкой и кнопками — не
+     чёрная сторона, ждущая, пока что-то загрузится. Сами 24 слова
+     свайп не показывает: это ключ ко всем деньгам, и нажатие на
+     «Показать» здесь ведёт в тот же проверенный мастер, только сразу
+     к экрану предупреждения, минуя вступление. */
   const ПЕРЕВОРОТ_КАРТЫ_МС = 420;
   const [переворотКарты, setПереворотКарты] = useState(false);
+  const [согласенНаОбороте, setСогласенНаОбороте] = useState(false);
   const жестКарты = useRef(null);
   function началоСвайпаКарты(e) {
     const т = e.touches && e.touches[0];
@@ -16568,9 +16566,18 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     const dy = т.clientY - ж.y0;
     if (dx > 60 && Math.abs(dx) > Math.abs(dy) * 1.4) {
       haptic("light");
+      setСогласенНаОбороте(false);
       setПереворотКарты(true);
-      setTimeout(() => setФразаОткрыта(true), ПЕРЕВОРОТ_КАРТЫ_МС);
     }
+  }
+  function отменитьОборот() {
+    haptic("light");
+    setПереворотКарты(false);
+  }
+  function показатьСОборота() {
+    haptic("light");
+    setФразаЧерезКарту(true);
+    setФразаОткрыта(true);
   }
 
   const [внутрTON, setВнутрTON] = useState(null);
@@ -16733,6 +16740,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <div className={уходФразы ? "fx-view-out" : "fx-view"}>
         <МастерФразы
           режим="фраза"
+          начальныйШаг={фразаЧерезКарту ? "безопасность" : null}
           записана={!!(фраза && фраза.готово)}
           когдаЗаписана={фраза && фраза.когда ? датаЗаписи(фраза.когда) : ""}
           insetTop={insetTop}
@@ -16789,40 +16797,14 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           крупно и белым, копейки приглушены — так глаз не спотыкается о
           мелкую часть, которая на решение не влияет. */}
       <div ref={кореньКарты} style={{ position: "relative", margin: "0 16px", isolation: "isolate", perspective: 1000 }}>
-      {/* Три волны вдогонку друг другу: пока одна растворяется, следующая
-          только отходит от края — получается непрерывное дыхание, а не
-          мигание. */}
-      {/* Цвет волны — не отдельный сиреневый, а сама заливка карты: тот
-          же градиент, тот же перелив, а видна из него только рамка
-          (маской вырезана середина). Поэтому у каждого края волна
-          ровно того оттенка, что у карты рядом, и меняется вместе с
-          ней. Свечение даёт filter, а не box-shadow: тень box-shadow
-          маска срезала бы вместе с серединой. */}
-      {/* Бегущие волны по краю — тем же градиентом, что на самой карте, и
-          на той же анимации: цвет свечения ходит вместе с цветом карты,
-          у любого вида, а не только у фирменного. Раньше так светились
-          только Mintly, у купленных видов было ровное статичное
-          пятно — этого различия больше нет. */}
-      {[0, 1.4, 2.8].map((задержка) => (
-        <span
-          key={`${ключПереливаКарты}-${задержка}`}
-          aria-hidden
-          style={{
-            position: "absolute", inset: 0, borderRadius: 24,
-            padding: 2,
-            background: видКарты.fill,
-            backgroundSize: видКарты.size || "320% 320%",
-            WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
-            WebkitMaskComposite: "xor",
-            mask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
-            maskComposite: "exclude",
-            filter: `drop-shadow(0 0 9px ${hexA(видКарты.glow, 0.5)})`,
-            pointerEvents: "none",
-            animation: `картаПереливается ${ходКарты.длительность}s ease-in-out ${ходКарты.сдвиг}s infinite,`
-              + ` ореолКарты 4.2s ease-out ${задержка}s infinite`,
-          }}
-        />
-      ))}
+      {/* Настоящий разворот в 3D: у обеих сторон общий родитель с
+          preserve-3d, и ребро карты по-честному видно на середине пути —
+          это не подмена одной картинки другой, а поворот объёма. */}
+      <div style={{
+        position: "relative", transformStyle: "preserve-3d",
+        transform: переворотКарты ? "rotateY(180deg)" : "rotateY(0deg)",
+        transition: `transform ${ПЕРЕВОРОТ_КАРТЫ_МС}ms cubic-bezier(0.65, 0, 0.35, 1)`,
+      }}>
       <section
         onPointerDown={волнаОт}
         onTouchStart={началоСвайпаКарты}
@@ -16835,12 +16817,8 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // и суммой нет лишнего зазора, а вся пустая высота карты уходит
           // в один отступ перед чипом, а не размазывается поровну.
           display: "flex", flexDirection: "column",
-          // Разворот по свайпу: обратная сторона не нарисована — за то
-          // время, что карта успевает довернуться до ребра, экран уже
-          // сменяется на мастер секретной фразы, и пустая обратная
-          // сторона попросту не успевает показаться.
-          transform: переворотКарты ? "rotateY(180deg)" : "rotateY(0deg)",
-          transition: `transform ${ПЕРЕВОРОТ_КАРТЫ_МС}ms cubic-bezier(0.45, 0, 0.55, 1)`,
+          // Лицевая сторона настоящего 3D-разворота: обратную сторону не
+          // видно, пока карта не довернулась мимо ребра.
           backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
           /* Обрезка по скруглению у iOS не держится, если внутри что-то
              ходит (блик, волны, ткань): дети вылезают за угол квадратом.
@@ -16963,6 +16941,80 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           }} />
         ))}
       </section>
+      {/* Обратная сторона. Не чёрная заглушка, ждущая загрузки, — тот же
+          компактный экран стоит здесь всегда, готовый, и просто
+          довёрнут на 180°: как только карта минует ребро, он уже на
+          месте. Сама фраза не читается ни здесь, ни где-либо ещё в этом
+          развороте — кнопка «Показать» ведёт в проверенный мастер, к
+          его экрану предупреждения. */}
+      <div
+        aria-hidden={!переворотКарты}
+        style={{
+          position: "absolute", inset: 0, borderRadius: 24, overflow: "hidden",
+          backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
+          transform: "rotateY(180deg)",
+          background: T.surfaceHi, border: `1px solid ${T.lineHi}`,
+          display: "flex", flexDirection: "column", gap: 10, padding: "20px 18px",
+        }}
+      >
+        <div className="flex items-center" style={{ gap: 10 }}>
+          <span className="flex items-center justify-center flex-shrink-0" style={{
+            width: 34, height: 34, borderRadius: "50%", background: hexA("#F5A623", 0.16), color: "#F5A623",
+          }}>
+            <AlertTriangle size={18} strokeWidth={2.4} />
+          </span>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 800, letterSpacing: "-0.01em" }}>
+            {t("safetyTitle")}
+          </span>
+        </div>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45 }}>
+          {t("secretManualBody")}
+        </span>
+        <button
+          onClick={() => setСогласенНаОбороте((б) => !б)}
+          className="fx-tap flex items-center text-left"
+          style={{ gap: 10, background: "transparent", border: "none", padding: 0 }}
+        >
+          <span className="flex items-center justify-center flex-shrink-0" style={{
+            width: 20, height: 20, borderRadius: 7,
+            background: согласенНаОбороте ? T.up : "transparent",
+            border: согласенНаОбороте ? "none" : `2px solid ${T.lineHi}`,
+            color: "#04120A",
+          }}>
+            {согласенНаОбороте && <Check size={13} strokeWidth={3.4} />}
+          </span>
+          <span style={{ fontFamily: bodyFont, color: T.ice, fontSize: 12.5, fontWeight: 600, lineHeight: 1.35 }}>
+            {t("safetyAgree")} <span style={{ color: "#F5A623" }}>{t("safetyAgreeLoss")}</span>
+          </span>
+        </button>
+        <div className="flex" style={{ gap: 8, marginTop: "auto" }}>
+          <button
+            onClick={отменитьОборот}
+            className="fx-tap"
+            style={{
+              flex: 1, padding: "12px 0", borderRadius: 16, border: "none",
+              background: T.surface, color: T.ice, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+            }}
+          >
+            {t("cancel")}
+          </button>
+          <button
+            onClick={показатьСОборота}
+            disabled={!согласенНаОбороте}
+            className="fx-tap"
+            style={{
+              flex: 1, padding: "12px 0", borderRadius: 16, border: "none",
+              background: согласенНаОбороте ? T.electric : T.surface,
+              color: согласенНаОбороте ? "#FFFFFF" : T.faint,
+              fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+              opacity: согласенНаОбороте ? 1 : 0.7,
+            }}
+          >
+            {t("secretShowRow")}
+          </button>
+        </div>
+      </div>
+      </div>
       </div>
 
       {/* Ряд действий — то, за чем в кошелёк заходят чаще всего.
