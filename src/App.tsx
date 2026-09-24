@@ -564,6 +564,8 @@ const STR = {
     logoUploaded: "Логотип загружен",
     xTitle: "Аккаунт в X",
     xHint: "Подтверждённый аккаунт виден всем, кто открывает твои токены: ссылку в профиль может вписать любой, а подтверждение — только владелец.",
+    xConnectCta: "Подключить",
+    xWaiting: "Жду возврата из X…",
     xPublish: "Открыть X с готовым постом",
     xPostUrl: "Ссылка на пост",
     xCheck: "Проверить",
@@ -1255,6 +1257,8 @@ const STR = {
     logoUploaded: "Logo uploaded",
     xTitle: "X account",
     xHint: "A verified account shows up for everyone who opens your tokens: anyone can paste a link, only the owner can verify it.",
+    xConnectCta: "Connect",
+    xWaiting: "Waiting for you to come back from X…",
     xPublish: "Open X with the post ready",
     xPostUrl: "Link to the post",
     xCheck: "Verify",
@@ -21905,28 +21909,20 @@ function ReferralShare({ showToast }) {
   );
 }
 
-/* Подключение аккаунта в X.
- *
- * Три шага и ни одного ключа: берём одноразовый код, человек публикует с
- * ним пост у себя, мы спрашиваем у X, кто автор этого поста. Ссылку в
- * профиль может вписать кто угодно — подтвердить может только тот, у кого
- * есть доступ к самому аккаунту.
+/* Подключение аккаунта в X — одной кнопкой, как у Phantom: «Подключить»
+ * сразу ведёт на сайт X, там человек входит и разрешает доступ своим
+ * же аккаунтом, а обратно возвращается уже подтверждённым. Ни ника, ни
+ * ручного поста никто больше не набирает.
  */
 function ПодключениеX({ showToast }) {
   const [состояние, setСостояние] = useState(null); // { handle } | null
   const [грузится, setГрузится] = useState(true);
-  const [ник, setНик] = useState("");
-  const [код, setКод] = useState("");
-  const [опубликовал, setОпубликовал] = useState(false);
+  const [подключаю, setПодключаю] = useState(false);
+  // Ждём, пока человек вернётся из браузера X — тогда переспрашиваем
+  // состояние сами, без лишней кнопки «я подключил».
+  const [ждёмВозврата, setЖдёмВозврата] = useState(false);
   const [проверяю, setПроверяю] = useState(false);
   const [беда, setБеда] = useState("");
-  // Запасной путь — ссылка на пост. Нужен редко: когда лента закрыта
-  // или X показывает свежий пост с задержкой в несколько минут.
-  const [рукойОткрыто, setРукойОткрыто] = useState(false);
-  const [ссылка, setСсылка] = useState("");
-
-  const чистыйНик = ник.trim().replace(/^@/, "");
-  const никОк = /^[A-Za-z0-9_]{1,15}$/.test(чистыйНик);
 
   async function запросX(действие, тело) {
     const { data } = await supabase.auth.getSession();
@@ -21951,78 +21947,53 @@ function ПодключениеX({ showToast }) {
     return () => { жив = false; };
   }, []);
 
-  const ОШИБКИ = {
-    bad_url: "xErrUrl", no_code: "xErrNoCode", code_expired: "xErrExpired",
-    x_silent: "xErrSilent", wrong_author: "xErrAuthor",
-    no_code_in_post: "xErrNoCodeInPost", taken: "xErrTaken",
-    no_post_yet: "xErrNoPostYet", no_account: "xErrNoAccount",
-  };
-
-  /* Один шаг вместо трёх: берём код, открываем X с готовым постом и
-     сразу ждём возвращения. Раньше человек жал «взять код», потом
-     «опубликовать», потом искал свой пост, копировал ссылку и вставлял
-     её к нам — четыре действия и переключение между приложениями. */
-  async function опубликовать() {
-    if (!никОк) { setБеда(t("xHandleBad")); return; }
+  /* «Подключить» — та же кнопка, что у Phantom: сервер готовит адрес
+     авторизации, а дальше человек весь разговор ведёт с самим X. Нам
+     остаётся только заметить, что он вернулся. */
+  async function подключить() {
     setБеда("");
-    let текущий = код;
-    if (!текущий) {
-      try {
-        const о = await запросX("code", {});
-        текущий = о.code;
-        setКод(текущий);
-      } catch {
-        setБеда(t("xErrSilent"));
-        return;
-      }
-    }
-    setОпубликовал(true);
-    const текст = trf("xPostText", { code: текущий });
-    const url = `https://x.com/intent/tweet?text=${encodeURIComponent(текст)}`;
-    const wa = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
-    if (wa && wa.openLink) wa.openLink(url);
-    else if (typeof window !== "undefined") window.open(url, "_blank", "noopener,noreferrer");
-  }
-
-  async function проверить(способ = "handle") {
-    if (проверяю) return;
-    if (способ === "handle" && !никОк) { setБеда(t("xHandleBad")); return; }
-    setПроверяю(true);
-    setБеда("");
+    setПодключаю(true);
     try {
-      const тело = способ === "handle" ? { handle: чистыйНик } : { url: ссылка.trim() };
-      const о = await запросX("verify", тело);
-      setСостояние({ handle: о.handle });
-      setКод("");
-      setСсылка("");
-      setОпубликовал(false);
-      showToast(t("xConnected"));
-    } catch (e) {
-      const ключ = ОШИБКИ[String(e && e.message)] || "xErrSilent";
-      setБеда(t(ключ));
+      const о = await запросX("start");
+      if (!о || !о.url) throw new Error("x_oauth_disabled");
+      setЖдёмВозврата(true);
+      const wa = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+      if (wa && wa.openLink) wa.openLink(о.url);
+      else if (typeof window !== "undefined") window.open(о.url, "_blank", "noopener,noreferrer");
+    } catch {
+      setБеда(t("xErrSilent"));
     } finally {
-      setПроверяю(false);
+      setПодключаю(false);
     }
   }
 
-  /* Возвращение из X — сам по себе сигнал: человек опубликовал пост и
-     пришёл обратно. Проверяем молча, чтобы ему не пришлось ничего
-     нажимать; не нашли — он увидит обычную кнопку и подсказку. */
+  /* Возвращение из X — сам по себе сигнал: человек авторизовался и
+     пришёл обратно. Переспрашиваем состояние молча, без лишней кнопки
+     «я подключил». Не нашли подключения — значит отменил или что-то не
+     сошлось на стороне X; беда тогда не своя, а его, и настаивать
+     нечем. */
   useEffect(() => {
-    if (!опубликовал || !код || !никОк || состояние) return undefined;
+    if (!ждёмВозврата || состояние) return undefined;
     if (typeof document === "undefined") return undefined;
-    const вернулся = () => { if (document.visibilityState === "visible") проверить("handle"); };
+    const вернулся = () => {
+      if (document.visibilityState !== "visible") return;
+      setЖдёмВозврата(false);
+      setПроверяю(true);
+      запросX("state")
+        .then((о) => {
+          if (о && о.handle) { setСостояние(о); showToast(t("xConnected")); }
+        })
+        .catch(() => {})
+        .finally(() => setПроверяю(false));
+    };
     document.addEventListener("visibilitychange", вернулся);
     return () => document.removeEventListener("visibilitychange", вернулся);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [опубликовал, код, никОк, состояние, чистыйНик]);
+  }, [ждёмВозврата, состояние]);
 
   async function отключить() {
     try {
       await запросX("unlink", {});
       setСостояние(null);
-      setКод("");
-      setОпубликовал(false);
     } catch {
       showToast(t("xErrSilent"));
     }
@@ -22054,70 +22025,27 @@ function ПодключениеX({ showToast }) {
     );
   }
 
-  const главнаяКнопка = опубликовал ? t("xPostedCta") : t("xPostCta");
+  // Пока ждём возврата из X, кнопка занята: второй запуск подряд заводил
+  // бы второе окно поверх первого.
+  const занята = подключаю || ждёмВозврата || проверяю;
+  const текстКнопки = ждёмВозврата || проверяю ? t("xWaiting") : t("xConnectCta");
 
   return (
     <div className="flex flex-col mt-2" style={{ gap: 14 }}>
       <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>{t("xHint")}</p>
 
-      <div className="flex flex-col" style={{ gap: 10, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("xHandleLabel")}</span>
-        <div
-          className="flex items-center"
-          style={{ gap: 6, padding: "11px 12px", borderRadius: 14, background: T.surface }}
-        >
-          <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 14.5 }}>@</span>
-          <ПолеСЖивымТекстом
-            value={ник}
-            onChange={(e) => { setНик(e.target.value); setБеда(""); }}
-            placeholder={t("xHandlePlaceholder")}
-            inputMode="text"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            style={{
-              flex: 1, minWidth: 0, background: "transparent", border: "none",
-              color: T.ice, fontFamily: monoFont, fontSize: 14.5, outline: "none",
-            }}
-          />
-          {никОк && <CheckCircle2 size={15} color={T.up} />}
-        </div>
-
-        <button
-          onClick={опубликовать}
-          disabled={!никОк}
-          className="fx-tap w-full rounded-[16px] py-2.5 flex items-center justify-center"
-          style={{
-            gap: 8,
-            ...(никОк ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surface }), border: "none",
-            fontFamily: displayFont, fontWeight: 700, fontSize: 14.5,
-            color: никОк ? PRISM_TEXT : T.faint,
-          }}
-        >
-          <Twitter size={14} color={никОк ? PRISM_TEXT : T.faint} /> {t("xPublish")}
-        </button>
-
-        {/* Кнопка появляется после того, как человек ушёл публиковать:
-            до этого проверять нечего. */}
-        {опубликовал && (
-          <button
-            onClick={() => проверить("handle")}
-            disabled={проверяю}
-            className="fx-tap w-full rounded-[16px] py-2.5"
-            style={{
-              background: T.surface, border: "none",
-              fontFamily: displayFont, fontWeight: 700, fontSize: 14.5,
-              color: T.ice, opacity: проверяю ? 0.6 : 1,
-            }}
-          >
-            {проверяю ? t("xWaitingPost") : главнаяКнопка}
-          </button>
-        )}
-
-        <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, lineHeight: 1.45 }}>
-          {код ? `${t("xAutoNote")} · ${код}` : t("xAutoNote")}
-        </span>
-      </div>
+      <button
+        onClick={подключить}
+        disabled={занята}
+        className={`fx-tap w-full rounded-[16px] py-3 flex items-center justify-center${занята ? " fx-busy" : ""}`}
+        style={{
+          gap: 8, ...ВОЛНА(ЦВЕТ_КНОПКИ), border: "none",
+          fontFamily: displayFont, fontWeight: 700, fontSize: 15, color: PRISM_TEXT,
+          opacity: занята ? 0.75 : 1,
+        }}
+      >
+        <Twitter size={15} color={PRISM_TEXT} /> {текстКнопки}
+      </button>
 
       {беда && (
         <div
@@ -22128,52 +22056,6 @@ function ПодключениеX({ showToast }) {
           }}
         >
           {беда}
-        </div>
-      )}
-
-      {/* Запасной путь — тот самый прежний способ со ссылкой. Он спрятан
-          под строкой: нужен он редко, а раньше занимал половину экрана
-          и читался как обязательный шаг. */}
-      <button
-        onClick={() => setРукойОткрыто((б) => !б)}
-        className="fx-tap"
-        style={{
-          alignSelf: "flex-start", background: "transparent", border: "none", padding: 0,
-          fontFamily: bodyFont, color: T.muted, fontSize: 13, textDecoration: "underline",
-        }}
-      >
-        {t("xManualToggle")}
-      </button>
-
-      {рукойОткрыто && (
-        <div className="flex flex-col" style={{ gap: 10, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45 }}>{t("xManualHint")}</span>
-          <ПолеСЖивымТекстом
-            value={ссылка}
-            onChange={(e) => { setСсылка(e.target.value); setБеда(""); }}
-            placeholder={t("xPostUrl")}
-            inputMode="url"
-            autoCapitalize="off"
-            autoCorrect="off"
-            style={{
-              width: "100%", padding: "11px 12px", borderRadius: 14,
-              background: T.surface, border: "none", color: T.ice,
-              fontFamily: monoFont, fontSize: 13.5, outline: "none",
-            }}
-          />
-          <button
-            onClick={() => проверить("url")}
-            disabled={проверяю || !ссылка.trim()}
-            className="fx-tap w-full rounded-[16px] py-2.5"
-            style={{
-              ...(ссылка.trim() ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surface }), border: "none",
-              fontFamily: displayFont, fontWeight: 700, fontSize: 14.5,
-              color: ссылка.trim() ? PRISM_TEXT : T.faint,
-              opacity: проверяю ? 0.6 : 1,
-            }}
-          >
-            {проверяю ? t("xChecking") : t("xCheck")}
-          </button>
         </div>
       )}
     </div>

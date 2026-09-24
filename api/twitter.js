@@ -22,9 +22,78 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import crypto from "node:crypto";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+/* Настоящее подключение X, как у Phantom: одна кнопка «Подключить»
+   сразу ведёт на сайт X, а не на ручной пост с кодом. Старый путь
+   (лента без ключей) ниже остаётся как запасной для тех, у кого
+   приложение X ещё не заведено (без X_CLIENT_ID кнопка недоступна).
+   PKCE — потому что secret здесь лежит на сервере, а X требует его для
+   confidential-клиента в любом случае; verifier добавляет второй слой,
+   так что даже перехваченный code без него бесполезен. */
+const X_CLIENT_ID = (process.env.X_CLIENT_ID || "").trim();
+const X_CLIENT_SECRET = (process.env.X_CLIENT_SECRET || "").trim();
+// Ровно этот адрес нужно внести в настройках приложения на
+// developer.x.com — X сверяет redirect_uri дословно.
+const X_REDIRECT_URI = (process.env.X_REDIRECT_URI || "https://api.mintly.company/api/twitter?action=callback").trim();
+// Куда вернуть человека после X — просто сайт: Telegram открывал сайт X
+// своим встроенным браузером, и обратно в приложение он выходит тем же
+// движением, каким туда попал (крестик/смахивание браузера).
+const ГЛАВНАЯ_СТРАНИЦА = (process.env.APP_URL || "https://www.mintly.company").replace(/\/$/, "");
+// Полчаса на туда-обратно с лишним запасом — потом строка мусор.
+const ЖИЗНЬ_STATE_МС = 30 * 60 * 1000;
+
+async function колбэкX(req, res, db) {
+  const { code, state, error: xОтказ } = req.query || {};
+  // Не через res.redirect — его здесь нет (см. дополнить() в
+  // server/index.mjs, повторяющую только часть Vercel-обвязки).
+  const назад = (статус) => {
+    res.statusCode = 302;
+    res.setHeader("Location", `${ГЛАВНАЯ_СТРАНИЦА}/?x=${статус}`);
+    res.end();
+  };
+  if (xОтказ || !code || !state) return назад("error");
+  try {
+    const { data: строка } = await db.from("x_oauth_state").select("*").eq("state", String(state)).maybeSingle();
+    if (строка) await db.from("x_oauth_state").delete().eq("state", String(state));
+    if (!строка || Date.now() - new Date(строка.created_at).getTime() > ЖИЗНЬ_STATE_МС) return назад("error");
+
+    const токенОтвет = await fetch("https://api.twitter.com/2/oauth2/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${Buffer.from(`${X_CLIENT_ID}:${X_CLIENT_SECRET}`).toString("base64")}`,
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code", code: String(code), redirect_uri: X_REDIRECT_URI,
+        code_verifier: строка.code_verifier, client_id: X_CLIENT_ID,
+      }),
+    });
+    const токен = await токенОтвет.json().catch(() => null);
+    if (!токенОтвет.ok || !токен || !токен.access_token) return назад("error");
+
+    const профильОтвет = await fetch("https://api.twitter.com/2/users/me", {
+      headers: { Authorization: `Bearer ${токен.access_token}` },
+    });
+    const профиль = await профильОтвет.json().catch(() => null);
+    const handle = профиль && профиль.data && профиль.data.username;
+    if (!профильОтвет.ok || !имяОк(handle)) return назад("error");
+
+    // Один аккаунт X — один профиль: у чужого его тут же снимаем, иначе
+    // второй вход тем же X-аккаунтом остался бы недоступен навсегда.
+    await db.from("profiles").update({ x_handle: null, x_verified_at: null }).ilike("x_handle", handle).neq("id", строка.user_id);
+    const { error } = await db.from("profiles").update({
+      x_handle: handle, x_verified_at: new Date().toISOString(), x_code: null, x_code_at: null,
+    }).eq("id", строка.user_id);
+    if (error) return назад("error");
+    return назад("ok");
+  } catch {
+    return назад("error");
+  }
+}
 
 // Сколько живёт код. Полчаса — с запасом на «напишу пост попозже», но не
 // настолько долго, чтобы код успел куда-то утечь и пригодиться.
@@ -144,11 +213,29 @@ export default async function handler(req, res) {
   if (!db) return res.status(503).json({ error: "not_configured" });
   const действие = String((req.query && req.query.action) || "");
 
+  // Колбэк — переход по ссылке с самого X, не запрос из приложения:
+  // своего входа при нём нет вовсе, кто есть кто узнаём по state.
+  if (действие === "callback") return колбэкX(req, res, db);
+
   const user = await хозяин(req, db);
   if (!user) return res.status(401).json({ error: "unauthorized" });
   res.setHeader("Cache-Control", "no-store");
 
   try {
+    if (действие === "start") {
+      if (!X_CLIENT_ID) return res.status(503).json({ error: "x_oauth_disabled" });
+      const state = crypto.randomBytes(16).toString("hex");
+      const verifier = crypto.randomBytes(32).toString("base64url");
+      const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
+      const { error } = await db.from("x_oauth_state").insert({ state, user_id: user.id, code_verifier: verifier });
+      if (error) return res.status(500).json({ error: "db", detail: error.message });
+      const параметры = new URLSearchParams({
+        response_type: "code", client_id: X_CLIENT_ID, redirect_uri: X_REDIRECT_URI,
+        scope: "users.read tweet.read", state, code_challenge: challenge, code_challenge_method: "S256",
+      });
+      return res.status(200).json({ url: `https://twitter.com/i/oauth2/authorize?${параметры}` });
+    }
+
     if (действие === "state") {
       const { data } = await db.from("profiles").select("x_handle, x_verified_at").eq("id", user.id).maybeSingle();
       return res.status(200).json({
