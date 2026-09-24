@@ -10200,7 +10200,6 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
   if (!accountCreated) {
     return (
       <div className="flex flex-col gap-4 pt-2">
-        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>{t("shopTitle")}</span>
         {/* Закрытая витрина — это состояние экрана, а не объект на нём:
             текст лежит прямо на фоне, карточка вокруг него только
             добавляла лишний слой. */}
@@ -10244,16 +10243,12 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
 
   return (
     <div className="flex flex-col gap-4 pt-2">
-      <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>{t("shopTitle")}</span>
       {/* Счётчик монет живёт только здесь: тратить их больше негде, а на
           остальных экранах он был бы просто цифрой без применения.
-          Стоит вровень с заголовком и выше не поднимается, а при
-          прокрутке остаётся у верхнего края — цены видно на любой высоте
-          витрины. Отрицательный отступ поднимает плашку на строку
-          заголовка: сама она — отдельный блок колонки, иначе прилипать
-          было бы не к чему. Подложка непрозрачная: под плашкой проезжают
+          Остаётся у верхнего края при прокрутке — цены видно на любой
+          высоте витрины. Подложка непрозрачная: под плашкой проезжают
           карточки. */}
-      <div style={{ position: "sticky", top: 4, zIndex: 5, alignSelf: "flex-end", marginTop: -46 }}>
+      <div style={{ position: "sticky", top: 4, zIndex: 5, alignSelf: "flex-end" }}>
         <button
           onClick={onOpenAchievements}
           className="fx-tap flex items-center gap-1.5 px-3 py-1.5"
@@ -10734,23 +10729,6 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
 
   return (
     <div className="flex flex-col" style={{ gap: 20, paddingTop: 8, paddingBottom: 16 }}>
-      {/* Шапка раздела: название, поиск и выбор сети — одной строкой и
-          двумя. Декоративная графика сети отсюда убрана: она занимала
-          треть экрана и ничего не сообщала. */}
-      {/* Раздел ждёт целиком, до последней мелочи: название, кнопка
-          запуска и ползунок сети тоже стоят плашками. Живая шапка над
-          пустым экраном читалась как «здесь всё, а ниже сломалось». */}
-      <div className="flex items-center justify-between">
-        {разделГотов ? (
-          <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>
-            {t("navMempad")}
-          </h1>
-        ) : <ПлашкаЧисла width={118} height={26} radius={8} />}
-        {/* Кнопки запуска здесь больше нет: он теперь только с баннера
-            главной и из нижней навигации — второй одинаковый вход рядом
-            только спорил с ними за внимание. */}
-      </div>
-
       {/* Сеть — ползунком: рынок меняется движением, а не случайным
           касанием по краю экрана. */}
       {разделГотов ? <NetworkSlider value={сеть} onChange={setСеть} /> : <ПлашкаЧисла width={168} height={38} radius={999} />}
@@ -16170,14 +16148,6 @@ function МастерФразы({
       padding: "8px 16px 0", gap: 16,
       minHeight: `calc(100vh - ${contentTopPad(insetTop) + 96 + insetBottom}px)`,
     }}>
-      {/* Заголовок раздела — только на первом экране заведения: дальше у
-          каждого шага свой, и два подряд читались бы как два экрана. */}
-      {шаг === "начало" && (
-        <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
-          {t("navWallet")}
-        </h1>
-      )}
-
       {шаг === "начало" ? (
         <>
           <div className="flex flex-col items-center text-center" style={{ gap: 14, paddingTop: 34 }}>
@@ -16753,18 +16723,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
        страница просто занимает всю ширину и упирается в край сама, без
        отрицательных отступов и пересчёта ширины окна. */
     <div className={`flex flex-col${приходКошелька ? " fx-view" : ""}`} style={{ paddingTop: 8 }}>
-      {/* Адреса в шапке нет: за ним ходят на «Получить», где он показан
-          целиком и кодом, а обрубок в углу только занимал место рядом с
-          заголовком.
-          Заголовок набран ровно так же, как в мемпаде: тот же кегль,
-          начертание и отступ сверху — иначе при переходе между
-          разделами название прыгает. */}
-      <div style={{ marginBottom: 14, padding: "0 16px" }}>
-        <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
-          {t("navWallet")}
-        </h1>
-      </div>
-
       {/* Карта баланса. Сумма читается одним взглядом: целые рубли
           крупно и белым, копейки приглушены — так глаз не спотыкается о
           мелкую часть, которая на решение не влияет. */}
@@ -20814,12 +20772,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   return (
     <div className="fx-view flex flex-col gap-7" style={{ position: "relative", isolation: "isolate", paddingTop: 8 }}>
       <div>
-        {/* Заголовок — тем же кеглем и начертанием, что у прочих
-            разделов (Главная, Мемпад, Кошелёк): раньше стоял мельче и
-            без отступа сверху, и переход между вкладками читался
-            прыжком. */}
-        <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>{t("launchTokenTitle")}</h1>
-        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 2 }}>
+        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
           {вSolana ? t("launchTokenSubSol") : t("launchTokenSub")}
         </div>
         {/* Сеть выбирается тем же ползунком, что и в мемпаде: это один и
