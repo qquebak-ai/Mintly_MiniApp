@@ -490,8 +490,6 @@ const STR = {
     statRaised: "GRAM в токенах",
     statGraduated: "вышли на биржу",
     homeAlmostTitle: "Почти на бирже",
-    homeNextTitle: "Следующие на биржу",
-    homeFreshTitle: "Только что запущены",
     homeAlmostSub: "Ближе всех к выходу на DEX",
     homeAlmostLeft: "осталось {left} GRAM",
     homeAlmostEmpty: "Пока никто не набрал заметную часть пути. Запусти токен — будешь первым.",
@@ -1183,8 +1181,6 @@ const STR = {
     statRaised: "TON in tokens",
     statGraduated: "reached a DEX",
     homeAlmostTitle: "Almost listed",
-    homeNextTitle: "Next to list",
-    homeFreshTitle: "Just launched",
     homeAlmostSub: "Closest to hitting a DEX",
     homeAlmostLeft: "{left} GRAM to go",
     homeAlmostEmpty: "Nobody is far along yet. Launch a token and be the first.",
@@ -11003,168 +10999,100 @@ function ГлавныйТокен({ tokens = [], onOpen }) {
  * наведения на телефоне нет — поэтому выдвижка выезжает сама, когда
  * карточка въезжает в экран, и прячется, когда уходит: так движение
  * повторяется при каждом возвращении к ней. Тап переключает вручную. */
-function КарточкаСВыдвижкой({ title, tokens, onOpen, delay = 0, строка }) {
-  const корень = useRef(null);
-  const [открыта, setОткрыта] = useState(false);
+/* Курс монеты (цена, суточное изменение, кривая) по CoinGecko
+   market_chart. Кеш общий на всё приложение — обе карточки просят раз в
+   несколько минут, а не при каждой перерисовке главной. */
+const КЕШ_КУРСА_МОНЕТЫ = new Map(); // coingeckoId -> { at, points, price, change24 }
+const КУРС_МОНЕТЫ_TTL_МС = 5 * 60 * 1000;
+
+async function получитьКурсМонеты(coingeckoId) {
+  const кеш = КЕШ_КУРСА_МОНЕТЫ.get(coingeckoId);
+  if (кеш && Date.now() - кеш.at < КУРС_МОНЕТЫ_TTL_МС) return кеш;
+  const res = await fetch(`https://api.coingecko.com/api/v3/coins/${coingeckoId}/market_chart?vs_currency=usd&days=1`);
+  const json = await res.json();
+  const points = ((json && json.prices) || []).map(([t, p]) => ({ t, p }));
+  const price = points.length ? points[points.length - 1].p : 0;
+  const первая = points.length ? points[0].p : 0;
+  const итог = {
+    at: Date.now(),
+    points,
+    price,
+    change24: первая > 0 ? ((price - первая) / первая) * 100 : 0,
+  };
+  КЕШ_КУРСА_МОНЕТЫ.set(coingeckoId, итог);
+  return итог;
+}
+
+function fmtКурс(p) {
+  if (!(p > 0)) return "—";
+  return "$" + p.toFixed(p >= 1 ? 2 : 4);
+}
+
+/* Карточка курса — цена монеты (SOL / GRAM) с суточным изменением и
+   простой кривой без делений и подписей, просто ход цены за сутки. */
+function КартаКурсаМонеты({ title, coingeckoId }) {
+  const [данные, setДанные] = useState(() => КЕШ_КУРСА_МОНЕТЫ.get(coingeckoId) || null);
 
   useEffect(() => {
-    const el = корень.current;
-    if (!el || typeof IntersectionObserver === "undefined") { setОткрыта(true); return; }
-    let таймер = null;
-    /* Выезжает один раз, когда карточка впервые показалась. Раньше она
-       пряталась и выезжала заново на каждом проходе прокрутки, и при
-       открытии главной дёргалась туда-обратно. */
-    const н = new IntersectionObserver(([з]) => {
-      if (!з.isIntersecting) return;
-      таймер = setTimeout(() => setОткрыта(true), delay);
-      н.disconnect();
-    }, { threshold: 0.35 });
-    н.observe(el);
-    return () => { clearTimeout(таймер); н.disconnect(); };
-  }, [delay]);
+    let живо = true;
+    получитьКурсМонеты(coingeckoId).then((д) => { if (живо) setДанные(д); }).catch(() => {});
+    return () => { живо = false; };
+  }, [coingeckoId]);
 
-  const первый = tokens[0];
+  const растёт = (данные && данные.change24) >= 0;
+  const цвет = растёт ? T.up : T.down;
+
+  const путь = useMemo(() => {
+    const pts = (данные && данные.points) || [];
+    if (pts.length < 2) return "";
+    const W = 100, H = 44;
+    const values = pts.map((p) => p.p);
+    const max = Math.max(...values), min = Math.min(...values);
+    const диапазон = (max - min) || 1;
+    const шаг = W / (pts.length - 1);
+    return pts.map((p, i) => `${i === 0 ? "M" : "L"}${(i * шаг).toFixed(1)},${(H - ((p.p - min) / диапазон) * H).toFixed(1)}`).join(" ");
+  }, [данные]);
+
   return (
-    <div ref={корень} className="flex flex-col min-w-0" style={{ gap: 8 }}>
-      <div
-        className="w-full text-left rounded-[24px]"
-        style={{ position: "relative", overflow: "hidden", height: 132, padding: 14, background: T.surface, display: "flex", flexDirection: "column", justifyContent: "space-between" }}
-      >
-        <SpotlightAura src={первый && первый.logoUrl} ticker={первый && первый.ticker} />
-        <div style={{ position: "relative", fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.15, textWrap: "balance" }}>
-          {title}
-        </div>
-        <div className="flex" style={{ position: "relative" }}>
-          {tokens.map((tok, i) => (
-            <span key={tok.id} style={{ marginLeft: i ? -10 : 0, borderRadius: "50%", boxShadow: `0 0 0 2px ${T.surface}`, zIndex: 3 - i, display: "flex" }}>
-              <TokenAvatar size={30} src={tok.logoUrl} />
-            </span>
-          ))}
-        </div>
+    <div
+      className="fx-card w-full rounded-[24px]"
+      style={{ position: "relative", overflow: "hidden", height: 132, padding: 14, background: T.surface, display: "flex", flexDirection: "column", justifyContent: "space-between" }}
+    >
+      <div style={{ position: "relative", fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.01em" }}>
+        {title}
       </div>
 
-      {/* Выдвижка: из-под карточки, с лёгкой отдачей в конце — как
-          пружина у оригинала, только без библиотеки анимаций. */}
-      {/* Место под выдвижку занято сразу — анимируется только сдвиг и
-          прозрачность, на видеокарте. Прежде раскрывалась сама высота
-          (grid-template-rows), и на телефоне это шло рывками: каждый кадр
-          пересчитывал раскладку всей главной. */}
-      <div style={{ overflow: "hidden", position: "relative" }}>
-        {/* Узкая размытая кромка сверху: выезжающий текст проходит сквозь
-            неё и проявляется из дымки, а не вырезается ровной линией. */}
-        <span aria-hidden style={{
-          position: "absolute", left: 0, right: 0, top: 0, height: 22, zIndex: 1, pointerEvents: "none",
-          backdropFilter: "blur(5px)", WebkitBackdropFilter: "blur(5px)",
-          // Дымка нужна только на выезде: когда текст встал, она тает и
-          // не мутит его верх.
-          opacity: открыта ? 0 : 1,
-          transition: открыта ? "opacity 320ms ease 520ms" : "opacity 120ms ease",
-          WebkitMaskImage: "linear-gradient(180deg, #000 0%, #000 35%, transparent 100%)",
-          maskImage: "linear-gradient(180deg, #000 0%, #000 35%, transparent 100%)",
-        }} />
-          <div
-            className="flex flex-col"
-            style={{
-              gap: 2,
-              transform: открыта ? "translate3d(0, 0, 0)" : "translate3d(0, -30px, 0)",
-              opacity: открыта ? 1 : 0,
-              transition: "transform 380ms cubic-bezier(.34,1.56,.64,1), opacity 320ms ease",
-              willChange: "transform, opacity",
-            }}
-          >
-            {!tokens.length && (
-              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, padding: "7px 2px" }}>{t("homeEmptyShort")}</span>
-            )}
-            {tokens.map((tok) => (
-              <button
-                key={tok.id}
-                onClick={() => onOpen && onOpen(tok)}
-                className="fx-tap fx-inert w-full text-left"
-                style={{ background: "transparent", border: "none", padding: "7px 2px" }}
-              >
-                {строка(tok)}
-              </button>
-            ))}
+      {данные && данные.price > 0 ? (
+        <>
+          {путь && (
+            <svg
+              aria-hidden viewBox="0 0 100 44" preserveAspectRatio="none"
+              style={{ position: "absolute", left: 0, right: 0, bottom: 40, width: "100%", height: 48, opacity: 0.6 }}
+            >
+              <path d={путь} fill="none" stroke={цвет} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            </svg>
+          )}
+          <div style={{ position: "relative" }}>
+            <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800 }}>
+              <ТекстСЧислами text={fmtКурс(данные.price)} />
+            </div>
+            <div style={{ fontFamily: monoFont, color: цвет, fontSize: 12, fontWeight: 700, marginTop: 2 }}>
+              {растёт ? "+" : ""}<ТекстСЧислами text={данные.change24.toFixed(2)} />%
+            </div>
           </div>
-      </div>
+        </>
+      ) : (
+        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("homeEmptyShort")}</div>
+      )}
     </div>
   );
 }
 
-function ЖивыеКарточки({ tokens = [], onOpen }) {
-  const { почти, свежие } = useMemo(() => {
-    const все = tokens || [];
-    // Главный токен над этим блоком уже показывает самого близкого к
-    // бирже — здесь его не повторяем.
-    const наКривой = все
-      .filter((tok) => tok.curveAddress && tok.graduationTon > 0 && tok.raisedTon < tok.graduationTon)
-      .map((tok) => ({ tok, pct: (tok.raisedTon / tok.graduationTon) * 100 }))
-      .sort((a, b) => b.pct - a.pct);
-    const выше80 = наКривой.slice(1).filter((x) => x.pct >= 80);
-    const почти = (выше80.length ? выше80 : наКривой.slice(1)).slice(0, 3).map((x) => x.tok);
-    const свежие = все
-      .filter((tok) => tok.createdAt)
-      .slice()
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 3);
-    return { почти, свежие };
-  }, [tokens]);
-
-  // Пустые карточки тоже стоят: у каждой своя подпись «пока пусто».
-
-  const шкала = (tok) => {
-    const pct = tok.graduationTon > 0 ? Math.min(100, (tok.raisedTon / tok.graduationTon) * 100) : 0;
-    return (
-      <>
-        <div className="flex items-baseline justify-between" style={{ gap: 6 }}>
-          <span className="flex items-center truncate" style={{ gap: 4 }}>
-            <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${tok.ticker}</span>
-            <ПометкаТест сеть={tok.network} size={8} />
-          </span>
-          {/* Мкап — сразу за названием: он же и обновляется на глазах,
-              на каждую чужую сделку (см. поток ?all=1 у App). */}
-          {tok.mcapNum > 0 && (
-            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 12, fontWeight: 700, flexShrink: 0 }}><ТекстСЧислами text={fmtUSD(tok.mcapNum)} /></span>
-          )}
-        </div>
-        <div style={{ height: 4, borderRadius: 2, background: T.surfaceHi, overflow: "hidden", marginTop: 5 }}>
-          <div style={{ width: `${pct}%`, height: "100%", background: PRISM, borderRadius: 2 }} />
-        </div>
-        <div className="flex items-baseline justify-between" style={{ gap: 6, marginTop: 4 }}>
-          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11 }}><ТекстСЧислами text={tok.price > 0 ? fmtPrice(tok.price) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`} /></span>
-          <span style={{ fontFamily: monoFont, color: T.electric, fontSize: 11, fontWeight: 700, flexShrink: 0 }}><ТекстСЧислами text={pct.toFixed(0)} />%</span>
-        </div>
-      </>
-    );
-  };
-
-  const свежая = (tok) => {
-    const растёт = (tok.change || 0) >= 0;
-    return (
-      <>
-        <div className="flex items-baseline justify-between" style={{ gap: 6 }}>
-          <span className="flex items-center truncate" style={{ gap: 4 }}>
-            <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${tok.ticker}</span>
-            <ПометкаТест сеть={tok.network} size={8} />
-          </span>
-          {/* Мкап — сразу за названием, живой: та же логика, что у шкалы
-              выше. */}
-          {tok.mcapNum > 0 && (
-            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 12, fontWeight: 700, flexShrink: 0 }}><ТекстСЧислами text={fmtUSD(tok.mcapNum)} /></span>
-          )}
-        </div>
-        <div className="flex items-baseline justify-between" style={{ gap: 6, marginTop: 3 }}>
-          <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11 }}><ТекстСЧислами text={tok.price > 0 ? fmtPrice(tok.price) : `${fmtTon(tok.raisedTon || 0)} ${ТИКЕР_TON}`} /></span>
-          <span style={{ fontFamily: monoFont, color: растёт ? T.up : T.down, fontSize: 11, fontWeight: 700 }}>{растёт ? "+" : ""}<ТекстСЧислами text={(tok.change || 0).toFixed(1)} />%</span>
-        </div>
-      </>
-    );
-  };
-
+function ЖивыеКарточки() {
   return (
     <section className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "start" }}>
-      <КарточкаСВыдвижкой title={t("homeNextTitle")} tokens={почти} onOpen={onOpen} строка={шкала} />
-      <КарточкаСВыдвижкой title={t("homeFreshTitle")} tokens={свежие} onOpen={onOpen} строка={свежая} delay={140} />
+      <КартаКурсаМонеты title="SOL" coingeckoId="solana" />
+      <КартаКурсаМонеты title={ТИКЕР_TON} coingeckoId="the-open-network" />
     </section>
   );
 }
@@ -13423,7 +13351,7 @@ function HomeView({
         <div className="fx-view flex flex-col" style={{ gap: 26 }}>
           <БегущаяЛента />
           <ГлавныйТокен tokens={боевые} onOpen={onOpenToken} />
-          <ЖивыеКарточки tokens={боевые} onOpen={onOpenToken} />
+          <ЖивыеКарточки />
           <ВДвижении tokens={боевые} onOpen={onOpenToken} onAll={() => onGoTab("mempad")} />
           {/* Баннеры — предпоследним блоком: главная открывается рынком, а
               не рекламой своих же разделов. */}
