@@ -2724,6 +2724,10 @@ function GlobalStyle() {
          состоянием, так что визуально ничего не меняется. */
       .fx-card { animation: fadeInUp 480ms cubic-bezier(0.16,1,0.3,1) backwards; transition: transform ${SPRING}, border-color ${EASE}, box-shadow ${EASE}; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
       .fx-card:active { transform: scale(0.98); transition: transform ${PRESS}; }
+      /* Карточка курса не открывает ничего по тапу — вдавливание её
+         только сбивало бы с толку, будто где-то есть экран, куда она
+         ведёт. Отклик снят точечно, только для неё. */
+      .fx-card.fx-card-static:active { transform: none; transition: none; }
       /* Только для настоящей мыши. На тач-экране :hover прилипает после
          касания и не снимается до тапа в стороне, а !important перебивал
          рамку выбранного предмета — выделение выглядело залипшим. */
@@ -11028,6 +11032,14 @@ async function получитьКурсМонеты(ключ) {
   return КЕШ_КУРСА_МОНЕТЫ.get(ключ) || null;
 }
 
+// Запрос уходит сразу, как только загрузился модуль, — раньше, чем
+// отрисуется хоть одна карточка. Пока человек долистает до главной,
+// ответ обычно уже лежит в кеше, и цифры показываются без блюра.
+if (typeof window !== "undefined") {
+  получитьКурсМонеты("sol").catch(() => {});
+  получитьКурсМонеты("gram").catch(() => {});
+}
+
 function fmtКурс(p) {
   if (!(p > 0)) return "—";
   return "$" + p.toFixed(p >= 1 ? 2 : 4);
@@ -11097,7 +11109,7 @@ function КартаКурсаМонеты({ title, монета }) {
 
   return (
     <div
-      className="fx-card w-full rounded-[24px]"
+      className="fx-card fx-card-static w-full rounded-[24px]"
       style={{ position: "relative", overflow: "hidden", height: 132, padding: 14, background: T.surface, display: "flex", flexDirection: "column", justifyContent: "space-between" }}
     >
       <div style={{ position: "relative", fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.01em" }}>
