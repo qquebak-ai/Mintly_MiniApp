@@ -384,6 +384,10 @@ const STR = {
     authNickTaken: "Такой юзернейм уже занят",
     authMailFits: "Почта подходит",
     authMailUsed: "Почта уже занята",
+    authLoginSending: "Отправляем код…",
+    authLoginCodeSent: "Код отправлен на {mail}",
+    authLoginCodeWrong: "Неверный или устаревший код",
+    authLoginConfirm: "Подтвердить",
     authNickFree: "Юзернейм свободен",
     authNickUsed: "Юзернейм уже занят",
     authMailServices: "Gmail, Mail.ru, Яндекс, Proton, iCloud, Outlook и другие крупные службы",
@@ -1078,6 +1082,10 @@ const STR = {
     authNickTaken: "That username is taken",
     authMailFits: "Email works",
     authMailUsed: "Email is already taken",
+    authLoginSending: "Sending the code…",
+    authLoginCodeSent: "Code sent to {mail}",
+    authLoginCodeWrong: "Wrong or expired code",
+    authLoginConfirm: "Confirm",
     authNickFree: "Username is available",
     authNickUsed: "Username is already taken",
     authMailServices: "Gmail, Mail.ru, Yandex, Proton, iCloud, Outlook and other major providers",
@@ -23416,6 +23424,14 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const [никПроверка, setНикПроверка] = useState({ имя: "", итог: null });
   // Идёт проверка после нажатия «Далее»: кнопка занята и повторно не нажимается.
   const [почтаЖдём, setПочтаЖдём] = useState(false);
+  /* Вход по коду — на случай, если введённая почта уже занята: значит,
+     аккаунт с ней уже есть, и вместо «придумай другую почту» нужен путь
+     войти в тот, существующий. Пароля у Telegram-аккаунтов нет — только
+     код на почту, той же механикой, что подтверждение вывода. */
+  const [логинШаг, setЛогинШаг] = useState("скрыт"); // скрыт | код
+  const [логинКод, setЛогинКод] = useState("");
+  const [логинИдёт, setЛогинИдёт] = useState(false);
+  const [логинОшибка, setЛогинОшибка] = useState("");
   /* Отступ карточки сверху считается один раз, при открытии, и дальше не
      пересчитывается. В долях экрана (vh) он зависел от высоты окна, а
      Telegram укорачивает окно на высоту клавиатуры — и карточка прыгала
@@ -23598,6 +23614,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     setШагВхода("почта");
     setПочтаВвод("");
     setПочтаБеда("");
+    setЛогинШаг("скрыт");
+    setЛогинКод("");
+    setЛогинОшибка("");
     const высота = typeof window !== "undefined" ? window.innerHeight || 844 : 844;
     /* Шестая часть экрана. Отсюда же едет и дуга — её верх
        отсчитывается от этого числа, — поэтому одной правкой поднимается
@@ -23776,6 +23795,47 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         поймать(err);
       } finally {
         setTgBusy(false);
+      }
+    }
+
+    /* Почта занята — значит, аккаунт с ней уже есть, а этот Telegram его
+       не узнаёт (другая связка или другое устройство). Пароля у таких
+       аккаунтов нет, только сама почта, поэтому вход — кодом, той же
+       механикой, что подтверждение вывода (supabase signInWithOtp /
+       verifyOtp): shouldCreateUser: false — новый аккаунт этот вызов не
+       заводит, только впускает в существующий. */
+    async function отправитьКодВхода() {
+      setЛогинОшибка("");
+      setЛогинИдёт(true);
+      try {
+        const { error } = await supabase.auth.signInWithOtp({
+          email: почтаЧистая,
+          options: { shouldCreateUser: false },
+        });
+        if (error) throw error;
+        setЛогинШаг("код");
+        haptic("light");
+      } catch (e) {
+        setЛогинОшибка(String((e && e.message) || "").slice(0, 140) || t("authMailUnknown"));
+      } finally {
+        setЛогинИдёт(false);
+      }
+    }
+
+    async function подтвердитьКодВхода() {
+      if (логинКод.trim().length !== 6) return;
+      setЛогинИдёт(true);
+      setЛогинОшибка("");
+      try {
+        const { error } = await supabase.auth.verifyOtp({ email: почтаЧистая, token: логинКод.trim(), type: "email" });
+        if (error) throw error;
+        haptic("success");
+        onClose();
+      } catch (e) {
+        setЛогинОшибка(t("authLoginCodeWrong"));
+        haptic("error");
+      } finally {
+        setЛогинИдёт(false);
       }
     }
 
@@ -24070,6 +24130,73 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               >
                 {t("authNext")}
               </ЖидкаяКнопка>
+
+              {/* Занятая почта — не тупик: аккаунт с ней уже есть, просто
+                  не на этом Telegram. Мелкая кнопка, а не отдельный шаг —
+                  это не то, ради чего человек сюда пришёл, а выход для
+                  тех немногих, кому он нужен. */}
+              {почтаНеСвободна && логинШаг === "скрыт" && (
+                <button
+                  onClick={отправитьКодВхода}
+                  disabled={логинИдёт}
+                  className="fx-tap w-full"
+                  style={{
+                    background: "transparent", border: "none", padding: "2px 0 0", cursor: "pointer",
+                    color: логинИдёт ? T.faint : T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+                  }}
+                >
+                  {логинИдёт ? t("authLoginSending") : t("authSignInCta")}
+                </button>
+              )}
+
+              {почтаНеСвободна && логинШаг === "код" && (
+                <div className="flex flex-col" style={{ gap: 8 }}>
+                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.4 }}>
+                    {tf("authLoginCodeSent", { mail: почтаЧистая })}
+                  </span>
+                  <ПолеСЖивымТекстом
+                    value={логинКод}
+                    onChange={(e) => { setЛогинКод(e.target.value.replace(/\D/g, "").slice(0, 6)); setЛогинОшибка(""); }}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="······"
+                    style={{
+                      padding: "13px 14px", borderRadius: 14, textAlign: "center",
+                      border: `1px solid ${логинОшибка ? T.down : T.line}`,
+                      background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 20,
+                      letterSpacing: "0.3em", outline: "none", transition: "border-color 200ms ease",
+                    }}
+                  />
+                  {логинОшибка && (
+                    <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, lineHeight: 1.4 }}>{логинОшибка}</span>
+                  )}
+                  <button
+                    onClick={подтвердитьКодВхода}
+                    disabled={логинИдёт || логинКод.trim().length !== 6}
+                    className="fx-tap w-full rounded-[16px]"
+                    style={{
+                      padding: "12px 0", border: "none",
+                      background: логинКод.trim().length === 6 ? T.electric : T.surfaceHi,
+                      color: логинКод.trim().length === 6 ? "#04120A" : T.faint,
+                      fontFamily: displayFont, fontWeight: 700, fontSize: 14,
+                      transition: "background 200ms ease, color 200ms ease",
+                    }}
+                  >
+                    {логинИдёт ? t("submittingText") : t("authLoginConfirm")}
+                  </button>
+                  <button
+                    onClick={отправитьКодВхода}
+                    disabled={логинИдёт}
+                    className="fx-tap"
+                    style={{
+                      alignSelf: "center", padding: 0, border: "none", background: "transparent",
+                      color: логинИдёт ? T.faint : T.muted, fontFamily: bodyFont, fontSize: 12, fontWeight: 600,
+                    }}
+                  >
+                    {t("withdrawCodeResend")}
+                  </button>
+                </div>
+              )}
 
               {/* Аккаунт на этот телеграм уже заведён — тогда почта с
                   именем не нужны вовсе, и весь путь сводится к одному
