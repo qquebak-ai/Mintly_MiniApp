@@ -111,7 +111,7 @@
         сообщить("promise", (r && (r.stack || r.message)) || String(r || "отказ без причины"));
       });
     </script>
-    <script type="module" crossorigin src="/assets/index-D9bZG0ps.js"></script>
+    <script type="module" crossorigin src="/assets/index-C00P3dGM.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/react-DS-kCp2g.js">
     <link rel="modulepreload" crossorigin href="/assets/supabase-QBHRJHLH.js">
     <link rel="modulepreload" crossorigin href="/assets/icons-BxtscEuy.js">
@@ -125,6 +125,11 @@
          Снимается из приложения, когда экран входа встал на место или
          когда аккаунт нашёлся. -->
     <style>
+      /* Само тело — тоже чёрное, ещё до поля: на редких устройствах
+         браузер успевает нарисовать пустую страницу на кадр раньше, чем
+         разберёт разметку ниже, и без этого правила тот кадр был бы
+         белым, а не чёрным. */
+      html, body { background: #000; margin: 0; }
       /* Заставка на поле ожидания — один в один та, что открывает окно
          входа: имя по центру, буквы проступают слева направо, подпись
          поднимается следом, а уходят буквы тем же порядком, сдвигаясь
