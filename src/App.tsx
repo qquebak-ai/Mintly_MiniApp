@@ -384,10 +384,6 @@ const STR = {
     authNickTaken: "Такой юзернейм уже занят",
     authMailFits: "Почта подходит",
     authMailUsed: "Почта уже занята",
-    authLoginSending: "Отправляем код…",
-    authLoginCodeSent: "Код отправлен на {mail}",
-    authLoginCodeWrong: "Неверный или устаревший код",
-    authLoginConfirm: "Подтвердить",
     authNickFree: "Юзернейм свободен",
     authNickUsed: "Юзернейм уже занят",
     authMailServices: "Gmail, Mail.ru, Яндекс, Proton, iCloud, Outlook и другие крупные службы",
@@ -1082,10 +1078,6 @@ const STR = {
     authNickTaken: "That username is taken",
     authMailFits: "Email works",
     authMailUsed: "Email is already taken",
-    authLoginSending: "Sending the code…",
-    authLoginCodeSent: "Code sent to {mail}",
-    authLoginCodeWrong: "Wrong or expired code",
-    authLoginConfirm: "Confirm",
     authNickFree: "Username is available",
     authNickUsed: "Username is already taken",
     authMailServices: "Gmail, Mail.ru, Yandex, Proton, iCloud, Outlook and other major providers",
@@ -23427,11 +23419,21 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   /* Вход по коду — на случай, если введённая почта уже занята: значит,
      аккаунт с ней уже есть, и вместо «придумай другую почту» нужен путь
      войти в тот, существующий. Пароля у Telegram-аккаунтов нет — только
-     код на почту, той же механикой, что подтверждение вывода. */
-  const [логинШаг, setЛогинШаг] = useState("скрыт"); // скрыт | код
+     код на почту, шаг вставлен вторым (сразу после «почта»), той же
+     раскладкой и той же анимацией перехода, что у виджета подтверждения
+     почты (ЭкранПочты) — окошки, зелёная волна, своя клавиатура. */
   const [логинКод, setЛогинКод] = useState("");
   const [логинИдёт, setЛогинИдёт] = useState(false);
   const [логинОшибка, setЛогинОшибка] = useState("");
+  // Кадр между шагами почта/код/ник: старое уходит вверх, новое приходит
+  // снизу — та же пара keyframes, что у ЭкранПочты.
+  const [уходитШагВхода, setУходитШагВхода] = useState(false);
+  const УХОД_ШАГА_ВХОДА = 200;
+  const ВОЛНА_ШАГ_ВХОДА = 70;
+  function сменитьШагВхода(новый) {
+    setУходитШагВхода(true);
+    setTimeout(() => { setШагВхода(новый); setУходитШагВхода(false); }, УХОД_ШАГА_ВХОДА);
+  }
   /* Отступ карточки сверху считается один раз, при открытии, и дальше не
      пересчитывается. В долях экрана (vh) он зависел от высоты окна, а
      Telegram укорачивает окно на высоту клавиатуры — и карточка прыгала
@@ -23614,9 +23616,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     setШагВхода("почта");
     setПочтаВвод("");
     setПочтаБеда("");
-    setЛогинШаг("скрыт");
     setЛогинКод("");
     setЛогинОшибка("");
+    setУходитШагВхода(false);
     const высота = typeof window !== "undefined" ? window.innerHeight || 844 : 844;
     /* Шестая часть экрана. Отсюда же едет и дуга — её верх
        отсчитывается от этого числа, — поэтому одной правкой поднимается
@@ -23806,6 +23808,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
        заводит, только впускает в существующий. */
     async function отправитьКодВхода() {
       setЛогинОшибка("");
+      setЛогинКод("");
       setЛогинИдёт(true);
       try {
         const { error } = await supabase.auth.signInWithOtp({
@@ -23813,7 +23816,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           options: { shouldCreateUser: false },
         });
         if (error) throw error;
-        setЛогинШаг("код");
+        // Уже на шаге кода — письмо просто ушло заново, шаг менять не нужно.
+        if (шагВхода !== "код") сменитьШагВхода("код");
         haptic("light");
       } catch (e) {
         setЛогинОшибка(String((e && e.message) || "").slice(0, 140) || t("authMailUnknown"));
@@ -23822,21 +23826,43 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
       }
     }
 
-    async function подтвердитьКодВхода() {
-      if (логинКод.trim().length !== 6) return;
+    // Код передаётся аргументом, а не берётся из состояния: набор идёт
+    // клавиатурой ниже, и к моменту, когда отложенный вызов сработает
+    // (после зелёной волны), state уже мог отрисоваться на кадр позже.
+    async function подтвердитьКодВхода(кодАргумент) {
+      const код = (кодАргумент ?? логинКод).trim();
+      if (код.length !== 6) return;
       setЛогинИдёт(true);
       setЛогинОшибка("");
       try {
-        const { error } = await supabase.auth.verifyOtp({ email: почтаЧистая, token: логинКод.trim(), type: "email" });
+        const { error } = await supabase.auth.verifyOtp({ email: почтаЧистая, token: код, type: "email" });
         if (error) throw error;
         haptic("success");
         onClose();
       } catch (e) {
-        setЛогинОшибка(t("authLoginCodeWrong"));
+        setЛогинОшибка(t("mail2faBadCode"));
         haptic("error");
       } finally {
         setЛогинИдёт(false);
       }
+    }
+
+    // Цифры набираются своей клавиатурой — как у подтверждения почты,
+    // и по той же причине: системная закрыла бы половину окошек. Шестая
+    // цифра сама уводит код на проверку, ждём только зелёную волну.
+    function цифраВхода(к) {
+      if (логинИдёт) return;
+      setЛогинОшибка("");
+      haptic("light");
+      if (к === "⌫") { setЛогинКод((было) => было.slice(0, -1)); return; }
+      if (!/^[0-9]$/.test(к)) return;
+      setЛогинКод((было) => {
+        const далее = было.length >= 6 ? было : было + к;
+        if (далее.length === 6) {
+          setTimeout(() => подтвердитьКодВхода(далее), ВОЛНА_ШАГ_ВХОДА * 6 + 200);
+        }
+        return далее;
+      });
     }
 
     /* Порталом прямо в документ, а не внутрь дерева приложения.
@@ -24032,6 +24058,19 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                уезжает целиком — прокручивать в нём нечего. */
           }}
         >
+          {/* Кадр между шагами (почта/код/ник/готово) — та же пара
+              keyframes и те же тайминги, что у окна подтверждения почты:
+              старый шаг уезжает вверх, новый приходит снизу. */}
+          <div
+            key={шагВхода}
+            className="flex flex-col"
+            style={{
+              gap: 14,
+              animation: уходитШагВхода
+                ? `шагУходитВверх ${УХОД_ШАГА_ВХОДА}ms ease-out forwards`
+                : "шагПриходитСнизу 280ms cubic-bezier(0.22, 1, 0.36, 1) both",
+            }}
+          >
           {шагВхода === "почта" ? (
             <>
               {/* Шаг первый: почта. Ею подтверждается вывод и возвращается
@@ -24134,8 +24173,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               {/* Занятая почта — не тупик: аккаунт с ней уже есть, просто
                   не на этом Telegram. Мелкая кнопка, а не отдельный шаг —
                   это не то, ради чего человек сюда пришёл, а выход для
-                  тех немногих, кому он нужен. */}
-              {почтаНеСвободна && логинШаг === "скрыт" && (
+                  тех немногих, кому он нужен. Нажатие сразу шлёт код и
+                  переводит на второй шаг — тот же самый, что у окна
+                  подтверждения почты. */}
+              {почтаНеСвободна && (
                 <button
                   onClick={отправитьКодВхода}
                   disabled={логинИдёт}
@@ -24145,57 +24186,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                     color: логинИдёт ? T.faint : T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
                   }}
                 >
-                  {логинИдёт ? t("authLoginSending") : t("authSignInCta")}
+                  {логинИдёт ? t("mail2faSending") : t("authSignInCta")}
                 </button>
-              )}
-
-              {почтаНеСвободна && логинШаг === "код" && (
-                <div className="flex flex-col" style={{ gap: 8 }}>
-                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.4 }}>
-                    {tf("authLoginCodeSent", { mail: почтаЧистая })}
-                  </span>
-                  <ПолеСЖивымТекстом
-                    value={логинКод}
-                    onChange={(e) => { setЛогинКод(e.target.value.replace(/\D/g, "").slice(0, 6)); setЛогинОшибка(""); }}
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    placeholder="······"
-                    style={{
-                      padding: "13px 14px", borderRadius: 14, textAlign: "center",
-                      border: `1px solid ${логинОшибка ? T.down : T.line}`,
-                      background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 20,
-                      letterSpacing: "0.3em", outline: "none", transition: "border-color 200ms ease",
-                    }}
-                  />
-                  {логинОшибка && (
-                    <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, lineHeight: 1.4 }}>{логинОшибка}</span>
-                  )}
-                  <button
-                    onClick={подтвердитьКодВхода}
-                    disabled={логинИдёт || логинКод.trim().length !== 6}
-                    className="fx-tap w-full rounded-[16px]"
-                    style={{
-                      padding: "12px 0", border: "none",
-                      background: логинКод.trim().length === 6 ? T.electric : T.surfaceHi,
-                      color: логинКод.trim().length === 6 ? "#04120A" : T.faint,
-                      fontFamily: displayFont, fontWeight: 700, fontSize: 14,
-                      transition: "background 200ms ease, color 200ms ease",
-                    }}
-                  >
-                    {логинИдёт ? t("submittingText") : t("authLoginConfirm")}
-                  </button>
-                  <button
-                    onClick={отправитьКодВхода}
-                    disabled={логинИдёт}
-                    className="fx-tap"
-                    style={{
-                      alignSelf: "center", padding: 0, border: "none", background: "transparent",
-                      color: логинИдёт ? T.faint : T.muted, fontFamily: bodyFont, fontSize: 12, fontWeight: 600,
-                    }}
-                  >
-                    {t("withdrawCodeResend")}
-                  </button>
-                </div>
               )}
 
               {/* Аккаунт на этот телеграм уже заведён — тогда почта с
@@ -24230,6 +24222,63 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   <Send size={14} /> {t("openInTelegram")}
                 </a>
               )}
+            </>
+          ) : шагВхода === "код" ? (
+            <>
+              {/* Второй шаг — вход, только когда почта уже занята. Взято
+                  целиком с окна подтверждения почты (ЭкранПочты): те же
+                  шесть окошек с зелёной волной, тот же статус-текст, та
+                  же ссылка «отправить заново», та же своя клавиатура —
+                  системная закрыла бы половину окошек. */}
+              <div className="flex flex-col items-center justify-end text-center" style={{ gap: 12, minHeight: ВЕРХ_КАРТОЧКИ }}>
+                <span aria-hidden style={{ width: 46, height: 46, ...РАДУГА_КОНВЕРТА }} />
+                <div className="flex flex-col" style={{ gap: 6 }}>
+                  <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
+                    {t("mailCodeTitle")}
+                  </span>
+                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
+                    {tf("mailCodeTo", { mail: почтаЧистая })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Шесть окошек вместо одного поля: видно, сколько знаков
+                  уже набрано и сколько осталось, а следующее место
+                  подсвечено. */}
+              <div className="flex" style={{ gap: 8 }}>
+                {Array.from({ length: 6 }, (_, i) => i).map((i) => (
+                  <span
+                    key={i}
+                    className="flex items-center justify-center"
+                    style={{
+                      flex: 1, minWidth: 0, height: 58, borderRadius: 14, background: T.surface,
+                      border: `1.5px solid ${логинОшибка ? T.down
+                        : (логинКод.length === 6 && !логинОшибка) ? T.up
+                        : логинКод.length === i ? hexA("#FFFFFF", 0.5)
+                        : (логинКод[i] ? T.lineHi : T.line)}`,
+                      color: T.ice, fontFamily: monoFont, fontSize: 25, fontWeight: 700,
+                      transition: "border-color 260ms ease",
+                      transitionDelay: (логинКод.length === 6 && !логинОшибка) ? `${i * ВОЛНА_ШАГ_ВХОДА}ms` : "0ms",
+                    }}
+                  >
+                    {логинКод[i] || ""}
+                  </span>
+                ))}
+              </div>
+              <span className="text-center" style={{ fontFamily: bodyFont, color: логинОшибка ? T.down : T.faint, fontSize: 12.5 }}>
+                {логинОшибка || (логинИдёт ? t("mail2faSending") : t("mail2faWaiting"))}
+              </span>
+              <button
+                onClick={отправитьКодВхода}
+                disabled={логинИдёт}
+                className="fx-tap"
+                style={{
+                  alignSelf: "center", padding: 0, border: "none", background: "transparent",
+                  color: логинИдёт ? T.faint : T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+                }}
+              >
+                {t("authCodeResend")}
+              </button>
             </>
           ) : шагВхода === "ник" ? (
             <>
@@ -24437,6 +24486,35 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 {t("enterApp")}
               </button>
             </>
+          )}
+          </div>
+
+          {/* Клавиатура шага «код» — своя, не системная: та же самая, что
+              у окна подтверждения почты, и по той же причине системная
+              закрыла бы половину окошек. Вне анимированной обёртки шага —
+              у ЭкранПочты она тоже отдельно, без слайда. */}
+          {шагВхода === "код" && (
+            <div data-без-жеста="1" style={{ padding: "4px 8px 0", flexShrink: 0 }}>
+              {[["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["", "0", "⌫"]].map((ряд, i) => (
+                <div key={i} className="flex">
+                  {ряд.map((к, j) => (
+                    <button
+                      key={к || `пусто${j}`}
+                      onClick={() => к && цифраВхода(к)}
+                      disabled={!к}
+                      className="fx-tap flex items-center justify-center"
+                      style={{
+                        flex: 1, padding: "14px 0", border: "none", background: "transparent",
+                        color: T.ice, fontFamily: displayFont, fontSize: 26, fontWeight: 600,
+                        opacity: к ? 1 : 0,
+                      }}
+                    >
+                      {к === "⌫" ? <ChevronLeft size={24} /> : к}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
           )}
         </div>
         </div>
