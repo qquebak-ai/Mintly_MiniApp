@@ -20781,15 +20781,12 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   // сорок точек, и под кнопкой запуска оставалась пустая половина экрана.
   return (
     <div className="fx-view flex flex-col gap-7" style={{ position: "relative", isolation: "isolate", paddingTop: 8 }}>
-      <div>
-        {/* Сеть выбирается тем же ползунком, что и в мемпаде: это один и
-            тот же выбор рынка, и выглядеть он должен одинаково. */}
-        {solДоступен && (
-          <div style={{ marginTop: 12 }}>
-            <NetworkSlider value={сетьЗапуска} onChange={setСетьЗапуска} />
-          </div>
-        )}
-      </div>
+      {/* Сеть выбирается тем же ползунком, что и в мемпаде: это один и
+          тот же выбор рынка, и выглядеть он должен одинаково. Пустой
+          обёртки здесь нет: без неё gap не добавляет фантомный отступ,
+          когда выбора сети ещё нет, и раздел начинается на том же
+          уровне, что «Главная» и «Мемпад». */}
+      {solДоступен && <NetworkSlider value={сетьЗапуска} onChange={setСетьЗапуска} />}
 
       {solЗакрыт && (
         <div className="rounded-[22px] p-4 flex flex-col" style={{ gap: 10, background: hexA(T.warning, 0.12) }}>
