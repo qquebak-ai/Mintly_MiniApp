@@ -23425,6 +23425,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const [логинКод, setЛогинКод] = useState("");
   const [логинИдёт, setЛогинИдёт] = useState(false);
   const [логинОшибка, setЛогинОшибка] = useState("");
+  // Какая цифра сейчас под пальцем — растёт той же пружиной, что ручка
+  // торгового ползунка под нажатием.
+  const [нажатаЦифра, setНажатаЦифра] = useState(null);
   // Кадр между шагами почта/код/ник: старое уходит вверх, новое приходит
   // снизу — та же пара keyframes, что у ЭкранПочты.
   const [уходитШагВхода, setУходитШагВхода] = useState(false);
@@ -24524,12 +24527,21 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                     <button
                       key={к || `пусто${j}`}
                       onClick={() => к && цифраВхода(к)}
+                      onPointerDown={() => к && setНажатаЦифра(к)}
+                      onPointerUp={() => setНажатаЦифра(null)}
+                      onPointerLeave={() => setНажатаЦифра(null)}
+                      onPointerCancel={() => setНажатаЦифра(null)}
                       disabled={!к}
-                      className="fx-tap flex items-center justify-center"
+                      className="flex items-center justify-center"
                       style={{
                         flex: 1, padding: "14px 0", border: "none", background: "transparent",
                         color: T.ice, fontFamily: displayFont, fontSize: 26, fontWeight: 600,
-                        opacity: к ? 1 : 0,
+                        opacity: к ? 1 : 0, touchAction: "manipulation",
+                        // Та же пружина, что растит ручку ползунка под
+                        // пальцем: цифра не вжимается, а слегка вырастает
+                        // и с лёгким перехлёстом садится обратно.
+                        transform: нажатаЦифра === к ? "scale(1.22)" : "scale(1)",
+                        transition: "transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1)",
                       }}
                     >
                       {к === "⌫" ? <ChevronLeft size={24} /> : к}
