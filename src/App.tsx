@@ -12538,7 +12538,7 @@ function СценаЗапуска() {
             animation: `звёздыЛетят ${з.d}s linear ${з.з}s infinite`,
           }}
         >
-          <img src="/banner-star.webp" alt="" style={{ width: "100%", display: "block", animation: `звездаКачается ${2.6 + i * 0.35}s ease-in-out infinite` }} />
+          <img src="/banner-star-v2.webp" alt="" style={{ width: "100%", display: "block", animation: `звездаКачается ${2.6 + i * 0.35}s ease-in-out infinite` }} />
         </span>
       ))}
 
@@ -12858,7 +12858,7 @@ function СценаМагазина() {
 
       {звёзды.map((з, i) => (
         <img
-          key={i} src="/banner-star.webp" alt=""
+          key={i} src="/banner-star-v2.webp" alt=""
           style={{
             position: "absolute", left: з.left, top: з.top, width: з.w,
             // Подъём с возвратом — тот же ход, что у звёзд на первом баннере.
