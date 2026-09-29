@@ -21195,7 +21195,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         })()}
       </div>
 
-      {!connected && (
+      {!connected && !вSolana && (
         <div className="rounded-[22px] p-4 flex items-center gap-2.5" style={{ background: ink(0.07), border: `1px solid ${ink(0.22)}` }}>
           <Wallet size={16} color={T.electric} />
           <span style={{ fontFamily: bodyFont, color: T.electric, fontSize: 14 }}>{t("connectToConfirm")}</span>
@@ -28760,7 +28760,9 @@ function mapTokenRow(row) {
               черновик={черновикЗапуска}
               onЧерновикПринят={() => setЧерновикЗапуска(null)}
               showToast={showToast}
-              unlocked={accountCreated && connected}
+              // TON-кошелёк приложения на сервере выключен (wallet-ton: enabled=false),
+              // а запуск в Solana работает — без кошелька TON мемпад не закрываем.
+              unlocked={accountCreated && (connected || solЗапуск)}
               accountCreated={accountCreated}
               connected={connected}
               authChecked={authChecked}
