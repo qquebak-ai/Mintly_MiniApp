@@ -76,18 +76,23 @@ def sprite(cw, ch, ground, st, variant):
         # полуовальным низом, алюминиевый обод, серая мягкая маска по краю,
         # вязаный ремешок по бокам головы, колёсико сверху справа и
         # светящиеся глаза Минти на стекле.
-        x0, x1, y0, y1 = ox + 8, ox + 27, eyes_y - 2, eyes_y + 4
-        w = x1 - x0
+        # форма по фото Vision Pro: вытянутая капсула со скруглёнными
+        # торцами и выемкой под нос снизу посередине
+        x0, x1, y0, y1 = ox + 7, ox + 28, eyes_y - 3, eyes_y + 4
+        mid = (x0 + x1) / 2
         cells = []
         for x in range(x0, x1 + 1):
-            t = (x - x0) / w
-            bottom = y1 - int(round(3.2 * (1 - (1 - (2 * t - 1) ** 2) ** 0.5)))
-            top = y0 + (1 if t < 0.03 or t > 0.97 else 0)
+            e = min(x - x0, x1 - x)                        # расстояние до торца
+            rnd = [3, 1, 1, 0][e] if e < 4 else 0            # скругление торцов
+            top = y0 + ([2, 1, 0, 0][e] if e < 4 else 0)
+            bottom = y1 - rnd
+            d = abs(x + 0.5 - mid - 0.5)
+            if d < 3.5: bottom -= [3, 3, 2, 1][int(d)]      # выемка под нос
             for y in range(top, bottom + 1): cells.append((x, y))
         cs = set(cells)
         edge = {c for c in cells if any((c[0] + a2, c[1] + b2) not in cs for a2, b2 in ((1, 0), (-1, 0), (0, 1), (0, -1)))}
         # вязаный ремешок: рубчики уходят за голову
-        for bx in (ox + 5, ox + 6, ox + 7, ox + 28, ox + 29, ox + 30):
+        for bx in (ox + 5, ox + 6, ox + 29, ox + 30):
             for y in range(eyes_y - 1, eyes_y + 3):
                 put(bx, y, "#9A9DA5" if (bx + y) % 2 else "#7D8088")
         # мягкая маска — серая кайма, выглядывает из-под обода
@@ -95,10 +100,17 @@ def sprite(cw, ch, ground, st, variant):
             for a2, b2 in ((0, 1), (-1, 0), (1, 0)):
                 q = (x + a2, y + b2)
                 if q not in cs: put(*q, "#5E6068")
-        # стекло: глубокий чёрный с отливом сверху
+        # стекло: глубокий чёрный, чуть светлее к краям
         for (x, y) in cells:
-            k = (y - y0) / (y1 - y0)
-            put(x, y, "#1C2033" if k < 0.25 else "#0E1120" if k < 0.7 else "#06070F")
+            e = min(x - x0, x1 - x)
+            put(x, y, "#161926" if e < 3 else "#0A0B12")
+        # широкий блик по верху стекла, как на фото
+        for x in range(x0 + 4, x1 - 3):
+            put(x, y0 + 1, "#4E5670" if abs(x - mid) > 5 else "#6C7592")
+        # камеры снизу по бокам от выемки
+        for cx2 in (x0 + 4, x0 + 6, x1 - 6, x1 - 4):
+            if (cx2, y1 - 1) in cs: put(cx2, y1 - 1, "#2C3244")
+            if (cx2, y1 - 2) in cs: put(cx2, y1 - 2, "#1A1E2B")
         # глаза на стекле (EyeSight): мятное свечение, моргают вместе с Минти
         blink = st.get("blink")
         for ex in (x0 + 4 + st.get("look", 0), x1 - 6 + st.get("look", 0)):
@@ -109,18 +121,16 @@ def sprite(cw, ch, ground, st, variant):
                     for gy in range(eyes_y - 1, eyes_y + 3):
                         if (gx, gy) in cs: put(gx, gy, "#18343A")
                 rect(ex, eyes_y, ex + 2, eyes_y + 1, "#7CF5E0"); put(ex, eyes_y, "#D8FFF7")
-        # блик изогнутого стекла: дуга сверху + бегущая полоса
-        for x in range(x0 + 3, x1 - 2): put(x, y0 + 1, "#3A4263")
         g = st.get("glint")
         if g is not None:
             bx = x0 + 3 + g * 6
             for d in range(0, 5):
                 for q in ((bx + d, y1 - 1 - d), (bx + d + 1, y1 - 1 - d)):
                     if q in cs and q not in edge: put(*q, "#DDE6FF")
-        # алюминиевый обод
-        for (x, y) in edge: put(x, y, "#C3C8D2" if y > y0 else "#EEF1F6")
-        # колёсико и кнопка сверху
-        rect(x1 - 3, y0 - 1, x1 - 2, y0 - 1, "#DDE1E8"); put(x0 + 3, y0 - 1, "#C3C8D2")
+        # прозрачный алюминиево-стеклянный обод: светлый сверху, серый снизу
+        for (x, y) in edge: put(x, y, "#D5DAE4" if y <= y0 + 1 else "#8C94A6")
+        # кнопка сверху слева, как на фото
+        rect(x0 + 1, y0 - 1, x0 + 2, y0, "#B9BFCC")
     else:
         h = 0 if st.get("blink") else 2
         for ex in (10, 23):
