@@ -15959,14 +15959,8 @@ function МастерФразы({
   showToast = () => {},
   insetTop = 0,
   insetBottom = 0,
-  // Открыто свайпом по карте — там уже показали короткое предупреждение
-  // с галочкой на обороте, вступительный экран здесь был бы повтором.
-  начальныйШаг = null,
-  // Согласие уже получено на обороте карты — слова запрашиваются сразу,
-  // без второго такого же предупреждения с галочкой здесь.
-  автопоказ = false,
 }) {
-  const [шаг, setШаг] = useState(начальныйШаг || (режим === "фраза" ? "вручную" : "начало"));
+  const [шаг, setШаг] = useState(режим === "фраза" ? "вручную" : "начало");
   const [слова, setСлова] = useState([]);
   const [идёт, setИдёт] = useState(false);
   const [беда, setБеда] = useState("");
@@ -16019,9 +16013,6 @@ function МастерФразы({
       setИдёт(false);
     }
   }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (автопоказ) показать(); }, []);
 
   /* Три слова наугад, к каждому — два чужих из той же записи. Свои же
      слова в подсказках честнее случайных: угадать по виду нельзя, а
@@ -16454,10 +16445,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
      показывает заведение; started && !ready — кошелёк работает, но копия
      не сделана, и наверху висит строка «Секретная фраза». */
   const [фразаОткрыта, setФразаОткрыта] = useState(false);
-  // Открыто свайпом по карте — вступительный экран мастера пропускаем,
-  // сразу на экран предупреждения: короткое такое же уже показали на
-  // обороте.
-  const [фразаЧерезКарту, setФразаЧерезКарту] = useState(false);
   /* Возврат из «Секретной фразы» — с уходом, как у прочих вложенных
      страниц: раньше экран пропадал кадром, и переход читался морганием,
      а не шагом назад. Кошелёк под ним приходит своим fx-view. */
@@ -16485,7 +16472,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     }, 170);
   }, []);
   // Пришли из меню по пункту «Секретная фраза» — открываем длинную дорогу.
-  useEffect(() => { if (запросФразы) { setФразаЧерезКарту(false); setФразаОткрыта(true); } }, [запросФразы]);
+  useEffect(() => { if (запросФразы) setФразаОткрыта(true); }, [запросФразы]);
   useEffect(() => { if (фраза && фраза.готово) setФразаОткрыта(false); }, [фраза]);
   const [обменОткрыт, setОбменОткрыт] = useState(false);
   const [получитьОткрыт, setПолучитьОткрыт] = useState(false);
@@ -16558,6 +16545,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const ПЕРЕВОРОТ_КАРТЫ_МС = 420;
   const [переворотКарты, setПереворотКарты] = useState(false);
   const [согласенНаОбороте, setСогласенНаОбороте] = useState(false);
+  // Слова — прямо на обороте карты, никакого перехода на другой экран:
+  // карта сама вырастает под них.
+  const [словаНаОбороте, setСловаНаОбороте] = useState(null);
+  const [загрузкаСлов, setЗагрузкаСлов] = useState(false);
+  const [бедаСлов, setБедаСлов] = useState("");
   const жестКарты = useRef(null);
   function началоСвайпаКарты(e) {
     const т = e.touches && e.touches[0];
@@ -16597,17 +16589,37 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       setПереворотКарты(true);
     } else if (переворотКарты && dx < 0) {
       haptic("light");
-      setПереворотКарты(false);
+      закрытьОборот();
     }
   }
-  function отменитьОборот() {
-    haptic("light");
+  function закрытьОборот() {
     setПереворотКарты(false);
+    // Слова остаются на обороте, только пока карта развёрнута: вернулась
+    // лицом вперёд — при следующем перевороте снова спросит согласия,
+    // а не покажет то, что уже показывала.
+    setСловаНаОбороте(null);
+    setБедаСлов("");
   }
   function показатьСОборота() {
+    if (загрузкаСлов) return;
     haptic("light");
-    setФразаЧерезКарту(true);
-    setФразаОткрыта(true);
+    setЗагрузкаСлов(true);
+    setБедаСлов("");
+    (async () => {
+      try {
+        const { показатьФразу } = await import("./appWallet");
+        const о = await показатьФразу();
+        const список = (о && о.words) || [];
+        if (список.length < 12) throw new Error("пусто");
+        setСловаНаОбороте(список);
+        haptic("light");
+      } catch (e) {
+        setБедаСлов(t("seedFailed"));
+        haptic("error");
+      } finally {
+        setЗагрузкаСлов(false);
+      }
+    })();
   }
 
   const [внутрTON, setВнутрTON] = useState(null);
@@ -16770,8 +16782,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       <div className={уходФразы ? "fx-view-out" : "fx-view"}>
         <МастерФразы
           режим="фраза"
-          начальныйШаг={фразаЧерезКарту ? "безопасность" : null}
-          автопоказ={фразаЧерезКарту}
           записана={!!(фраза && фраза.готово)}
           когдаЗаписана={фраза && фраза.когда ? датаЗаписи(фраза.когда) : ""}
           insetTop={insetTop}
@@ -16827,14 +16837,21 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       {/* Карта баланса. Сумма читается одним взглядом: целые рубли
           крупно и белым, копейки приглушены — так глаз не спотыкается о
           мелкую часть, которая на решение не влияет. */}
-      <div ref={кореньКарты} style={{ position: "relative", margin: "0 16px", isolation: "isolate", perspective: 1000 }}>
+      {/* touchAction: none — палец на карте не тянет за собой страницу
+          вверх-вниз: браузеру запрещён нативный скролл с этого элемента.
+          Надёжнее одного preventDefault, который на iOS успевает
+          опоздать к уже начавшемуся скроллу. */}
+      <div ref={кореньКарты} style={{ position: "relative", margin: "0 16px", isolation: "isolate", perspective: 1000, touchAction: "none" }}>
       {/* Настоящий разворот в 3D: у обеих сторон общий родитель с
           preserve-3d, и ребро карты по-честному видно на середине пути —
           это не подмена одной картинки другой, а поворот объёма. */}
       <div style={{
         position: "relative", transformStyle: "preserve-3d",
+        // Высота задана явно и общая для обеих сторон: с показанными
+        // словами карта вырастает, а не выносит их за край.
+        height: словаНаОбороте ? 330 : 210,
         transform: переворотКарты ? "rotateY(180deg)" : "rotateY(0deg)",
-        transition: `transform ${ПЕРЕВОРОТ_КАРТЫ_МС}ms cubic-bezier(0.65, 0, 0.35, 1)`,
+        transition: `transform ${ПЕРЕВОРОТ_КАРТЫ_МС}ms cubic-bezier(0.65, 0, 0.35, 1), height 380ms cubic-bezier(0.22, 1, 0.36, 1)`,
       }}>
       <section
         onPointerDown={волнаОт}
@@ -16842,13 +16859,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         onTouchEnd={концаСвайпаКарты}
         onTouchCancel={() => { жестКарты.current = null; }}
         style={{
-          position: "relative", overflow: "hidden", borderRadius: 24, padding: "12px 18px 16px",
-          // minHeight — не просто «покрупнее»: без явной высоты
-          // marginTop: auto у чипа ниже не от чего было отталкиваться
-          // (в контейнере без заданной высоты авто-отступ не забирает
-          // пустое место, брать неоткуда), и карта сама сжималась под
-          // размер надписи и суммы, как ни увеличивай паддинг.
-          minHeight: 210,
+          position: "absolute", inset: 0, overflow: "hidden", borderRadius: 24, padding: "12px 18px 16px",
+          // Высоту даёт родитель (см. выше): marginTop: auto у чипа
+          // берёт пустое место из неё.
           // Надпись и сумма держатся вместе вверху, а чип с монетами
           // прижат к низу отдельным marginTop: auto — так между надписью
           // и суммой нет лишнего зазора, а вся пустая высота карты уходит
@@ -17007,61 +17020,93 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           display: "flex", flexDirection: "column", gap: 6, padding: "14px 15px",
         }}
       >
-        <div className="flex items-center" style={{ gap: 8 }}>
-          <span className="flex items-center justify-center flex-shrink-0" style={{
-            width: 26, height: 26, borderRadius: "50%", background: hexA("#FFFFFF", 0.18), color: "#FFFFFF",
-          }}>
-            <AlertTriangle size={14} strokeWidth={2.4} />
-          </span>
-          <span style={{ fontFamily: displayFont, color: "#FFFFFF", fontSize: 13.5, fontWeight: 800, letterSpacing: "-0.01em" }}>
-            {t("safetyTitle")}
-          </span>
-        </div>
-        <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.78), fontSize: 11, lineHeight: 1.35 }}>
-          {t("secretManualBody")}
-        </span>
-        <button
-          onClick={() => setСогласенНаОбороте((б) => !б)}
-          className="fx-tap flex items-center text-left"
-          style={{ gap: 8, background: "transparent", border: "none", padding: 0 }}
-        >
-          <span className="flex items-center justify-center flex-shrink-0" style={{
-            width: 17, height: 17, borderRadius: 6,
-            background: согласенНаОбороте ? "#FFFFFF" : "transparent",
-            border: согласенНаОбороте ? "none" : `2px solid ${hexA("#FFFFFF", 0.5)}`,
-            color: "#1A0B33",
-          }}>
-            {согласенНаОбороте && <Check size={11} strokeWidth={3.4} />}
-          </span>
-          <span style={{ fontFamily: bodyFont, color: "#FFFFFF", fontSize: 11, fontWeight: 600, lineHeight: 1.25 }}>
-            {t("safetyAgree")} {t("safetyAgreeLoss")}
-          </span>
-        </button>
-        <div className="flex" style={{ gap: 7, marginTop: "auto" }}>
-          <button
-            onClick={отменитьОборот}
-            className="fx-tap"
-            style={{
-              flex: 1, padding: "9px 0", borderRadius: 13, border: `1px solid ${hexA("#FFFFFF", 0.35)}`,
-              background: "transparent", color: "#FFFFFF", fontFamily: displayFont, fontSize: 14, fontWeight: 700,
-            }}
-          >
-            {t("cancel")}
-          </button>
-          <button
-            onClick={показатьСОборота}
-            disabled={!согласенНаОбороте}
-            className="fx-tap"
-            style={{
-              flex: 1, padding: "9px 0", borderRadius: 13, border: "none",
-              background: согласенНаОбороте ? "#FFFFFF" : hexA("#FFFFFF", 0.16),
-              color: согласенНаОбороте ? "#1A0B33" : hexA("#FFFFFF", 0.55),
-              fontFamily: displayFont, fontSize: 14, fontWeight: 700,
-            }}
-          >
-            {t("secretShowShort")}
-          </button>
-        </div>
+        {словаНаОбороте ? (
+          <>
+            <span style={{ fontFamily: displayFont, color: "#FFFFFF", fontSize: 13.5, fontWeight: 800, letterSpacing: "-0.01em" }}>
+              {t("saveTitle")}
+            </span>
+            {/* Каждое слово — под своим номером, по четыре в ряд: двадцать
+                четыре слова должны уместиться на карте без прокрутки. */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "7px 8px" }}>
+              {словаНаОбороте.map((с, i) => (
+                <div key={i} className="flex flex-col" style={{ minWidth: 0, gap: 1 }}>
+                  <span style={{ fontFamily: monoFont, color: hexA("#FFFFFF", 0.6), fontSize: 10.5, fontWeight: 700 }}>{i + 1}</span>
+                  <span className="truncate" style={{ fontFamily: bodyFont, color: "#FFFFFF", fontSize: 13, fontWeight: 700 }}>{с}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={закрытьОборот}
+              className="fx-tap"
+              style={{
+                marginTop: "auto", padding: "10px 0", borderRadius: 13, border: "none",
+                background: "#FFFFFF", color: "#1A0B33", fontFamily: displayFont, fontSize: 14, fontWeight: 700,
+              }}
+            >
+              {t("doneClose")}
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center" style={{ gap: 8 }}>
+              <span className="flex items-center justify-center flex-shrink-0" style={{
+                width: 26, height: 26, borderRadius: "50%", background: hexA("#FFFFFF", 0.18), color: "#FFFFFF",
+              }}>
+                <AlertTriangle size={14} strokeWidth={2.4} />
+              </span>
+              <span style={{ fontFamily: displayFont, color: "#FFFFFF", fontSize: 13.5, fontWeight: 800, letterSpacing: "-0.01em" }}>
+                {t("safetyTitle")}
+              </span>
+            </div>
+            <span style={{ fontFamily: bodyFont, color: hexA("#FFFFFF", 0.78), fontSize: 11, lineHeight: 1.35 }}>
+              {t("secretManualBody")}
+            </span>
+            <button
+              onClick={() => setСогласенНаОбороте((б) => !б)}
+              className="fx-tap flex items-center text-left"
+              style={{ gap: 8, background: "transparent", border: "none", padding: 0 }}
+            >
+              <span className="flex items-center justify-center flex-shrink-0" style={{
+                width: 17, height: 17, borderRadius: 6,
+                background: согласенНаОбороте ? "#FFFFFF" : "transparent",
+                border: согласенНаОбороте ? "none" : `2px solid ${hexA("#FFFFFF", 0.5)}`,
+                color: "#1A0B33",
+              }}>
+                {согласенНаОбороте && <Check size={11} strokeWidth={3.4} />}
+              </span>
+              <span style={{ fontFamily: bodyFont, color: "#FFFFFF", fontSize: 11, fontWeight: 600, lineHeight: 1.25 }}>
+                {t("safetyAgree")} {t("safetyAgreeLoss")}
+              </span>
+            </button>
+            {бедаСлов && <span style={{ fontFamily: bodyFont, color: "#FFFFFF", fontSize: 11 }}>{бедаСлов}</span>}
+            <div className="flex" style={{ gap: 7, marginTop: "auto" }}>
+              <button
+                onClick={закрытьОборот}
+                className="fx-tap"
+                style={{
+                  flex: 1, padding: "9px 0", borderRadius: 13, border: `1px solid ${hexA("#FFFFFF", 0.35)}`,
+                  background: "transparent", color: "#FFFFFF", fontFamily: displayFont, fontSize: 14, fontWeight: 700,
+                }}
+              >
+                {t("cancel")}
+              </button>
+              <button
+                onClick={показатьСОборота}
+                disabled={!согласенНаОбороте || загрузкаСлов}
+                className="fx-tap"
+                style={{
+                  flex: 1, padding: "9px 0", borderRadius: 13, border: "none",
+                  background: согласенНаОбороте ? "#FFFFFF" : hexA("#FFFFFF", 0.16),
+                  color: согласенНаОбороте ? "#1A0B33" : hexA("#FFFFFF", 0.55),
+                  fontFamily: displayFont, fontSize: 14, fontWeight: 700,
+                  opacity: загрузкаСлов ? 0.6 : 1,
+                }}
+              >
+                {t("secretShowShort")}
+              </button>
+            </div>
+          </>
+        )}
       </div>
       </div>
       </div>
