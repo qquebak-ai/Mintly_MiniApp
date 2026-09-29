@@ -1,5 +1,5 @@
-# Минти v2: широкий мятный брусок, «ушки» по бокам, четыре ножки,
-# глаза — два чёрных квадрата, на макушке листик мяты. Крупный плоский
+# Минти v3: аксолотль в квадратном пиксельном стиле — голова-брусок,
+# перистые розовые жабры, хвост вбок, четыре лапки, глаза-квадраты, листик мяты.
 # пиксель, 3 тона + контур. Единица рисунка — полпикселя фона баннера.
 import json
 from PIL import Image
@@ -14,39 +14,55 @@ def sprite(cw, ch, ground, st, variant):
     def rect(x0, y0, x1, y1, c):
         for x in range(x0, x1 + 1):
             for y in range(y0, y1 + 1): put(x, y, c)
-    ox = cw // 2 - 18          # тело 36 полупикселей шириной с ушками
+    ox = cw // 2 - 18
     dy = st.get("dy", 0); bob = st.get("bob", 0); crouch = st.get("crouch", 0)
-    legs = st.get("legs", [0, 0, 0, 0])      # подъём каждой ножки
-    leg_len = 4 - crouch
-    by1 = ground - leg_len - 1 + dy + bob    # низ тела
-    by0 = by1 - 13 + crouch                  # верх тела
-    # ножки
-    for i, lx in enumerate((8, 12, 22, 26)):
-        lift = legs[i]
-        top = by1 + 1; bot = ground - lift + (dy if dy < 0 else 0)
-        rect(ox + lx, top, ox + lx + 1, max(top, bot), D)
-    # тело
-    rect(ox + 6, by0, ox + 29, by1, M)
-    rect(ox + 7, by0, ox + 28, by0, L); rect(ox + 6, by0 + 1, ox + 6, by1 - 1, L)
-    rect(ox + 7, by1, ox + 29, by1, D); rect(ox + 29, by0 + 1, ox + 29, by1, D)
-    for k in range(3): put(ox + 9 + k * 6, by0 + 2 + k, L)   # косые блики, как на горе
-    # ушки: у «привета» правое поднимается
-    ey0 = by0 + 4
-    rect(ox + 2, ey0, ox + 5, ey0 + 3, M); rect(ox + 2, ey0 + 3, ox + 5, ey0 + 3, D); rect(ox + 2, ey0, ox + 5, ey0, L)
-    ry = ey0 - st.get("wave", 0)
-    rect(ox + 30, ry, ox + 33, ry + 3, M); rect(ox + 30, ry + 3, ox + 33, ry + 3, D); rect(ox + 30, ry, ox + 33, ry, L)
-    if st.get("wave", 0) >= 3: rect(ox + 30, ry + 4, ox + 30, ey0 + 1, M)
+    legs = st.get("legs", [0, 0, 0, 0])
+    leg_len = 3 - min(crouch, 2)
+    by1 = ground - leg_len - 1 + dy + bob       # низ туловища
+    by0 = by1 - 14 + crouch                      # верх головы
+    hb = by0 + 9                                 # низ головы
+    GP, GL = "#FF8FC8", "#FFC4E4"                # жабры — розовый акцент аксолотля
+    # хвост вбок с плавником, виляет
+    wag = st.get("wag", 0)
+    rect(ox + 26, by1 - 3, ox + 31, by1 - 1, M); rect(ox + 32, by1 - 3 + wag, ox + 34, by1 - 2 + wag, M)
+    rect(ox + 27, by1 - 4, ox + 33, by1 - 4 + (1 if wag else 0), L); put(ox + 35, by1 - 3 + wag, L)
+    # лапки
+    for i, lx in enumerate((10, 13, 21, 24)):
+        if st.get("wave") and i == 3: continue
+        rect(ox + lx, by1 + 1, ox + lx + 1, ground - legs[i] + (dy if dy < 0 else 0), D)
+    # туловище (уже головы) и голова (широкий брусок)
+    rect(ox + 10, hb + 1, ox + 25, by1, M); rect(ox + 10, by1, ox + 25, by1, D); rect(ox + 25, hb + 1, ox + 25, by1, D)
+    rect(ox + 7, by0, ox + 28, hb, M)
+    rect(ox + 8, by0, ox + 27, by0, L); rect(ox + 7, by0 + 1, ox + 7, hb - 1, L)
+    rect(ox + 8, hb, ox + 28, hb, D); rect(ox + 28, by0 + 1, ox + 28, hb, D)
+    put(ox + 10, by0 + 2, L); put(ox + 11, by0 + 3, L)
+    # перистые жабры: по три ветки с каждой стороны головы, розовые
+    fl = st.get("gill", 0)
+    for k, gy in enumerate((by0 + 1, by0 + 4, by0 + 7)):
+        up = 1 - k   # верхние загнуты вверх, нижние вниз
+        for side in (-1, 1):
+            base = ox + (6 if side < 0 else 29)
+            tip = -2 * up + (fl if k != 1 else 0)
+            pts = [(0, 0), (1, 0), (2, -up), (3, -up), (4, tip), (5, tip - up)]
+            for i, (dx0, dy0) in enumerate(pts):
+                put(base + side * dx0, gy + dy0, GL if i >= 4 else GP)
+                if i <= 3: put(base + side * dx0, gy + dy0 + 1, "#E0609F")   # толщина ветки
+            put(base + side * 3, gy - up - 1, GL)                              # пёрышко
+    # «привет»: передняя лапка поднята сбоку
+    if st.get("wave"):
+        h = st["wave"]
+        rect(ox + 25, hb + 1 - h, ox + 28, hb + 4, O); rect(ox + 26, hb + 2 - h, ox + 27, hb + 3, D); rect(ox + 26, hb + 2 - h, ox + 27, hb + 2 - h, L)
     # глаза
-    eyes_y = by0 + 4
+    eyes_y = by0 + 3
     if variant == "glasses":
-        rect(ox + 9, eyes_y - 1, ox + 26, eyes_y + 2, EYE)
+        rect(ox + 8, eyes_y - 1, ox + 27, eyes_y + 2, EYE)
         g = st.get("glint")
         gx = ox + 11 + (0 if g is None else g * 3)
         put(gx, eyes_y, WH if g is not None else "#3A3F4A"); put(gx + 1, eyes_y - 1 + 1, "#3A3F4A")
         put(ox + 20 + (0 if g is None else g * 3), eyes_y, WH if g is not None else "#3A3F4A")
     else:
         h = 0 if st.get("blink") else 2
-        for ex in (11, 22):
+        for ex in (10, 23):
             rect(ox + ex, eyes_y + (1 if h == 0 else 0), ox + ex + 2, eyes_y + (1 if h == 0 else h), EYE)
     # макушка: листик мяты или корона
     top = by0 - 1
@@ -82,7 +98,7 @@ def save(frames, cw, ch, S, path):
 
 # ---- баннеры: неподвижный кадр, ноги ровно на опоре фона ----
 BW, BH = 40, 36                        # полупиксели = 20×18 пикселей фона
-banner = {"trade": (106, 27, "glasses", {"wave": 4}), "fast": (80, 39, "plain", {"legs": [2, 0, 0, 2], "bob": -1}), "shop": (73, 45, "crown", {})}
+banner = {"trade": (106, 27, "glasses", {"wave": 5}), "fast": (80, 39, "plain", {"legs": [2, 0, 0, 2], "bob": -1, "wag": 1}), "shop": (73, 45, "crown", {})}
 boxes = {}
 for name, (cx, ground, variant, st) in banner.items():
     save([sprite(BW, BH, BH - 2, st, variant)], BW, BH, 6, f"mintie-{name}.webp")
@@ -92,10 +108,10 @@ print(json.dumps(boxes))
 # ---- экран: 56×56 полупикселей в клетке 112px — ровно 2px на полупиксель ----
 PW = PH = 56; G = 50
 ANIMS = {
-    "idle": [{}, {"bob": 1}, {"bob": 1}, {}, {"blink": True, "glint": 1}, {"blink": True, "glint": 2}],
-    "jump": [{}, {"crouch": 2}, {"dy": -5, "legs": [1, 1, 1, 1]}, {"dy": -10, "legs": [2, 2, 2, 2], "wave": 2}, {"dy": -5}, {"crouch": 1}],
-    "wave": [{"wave": 3}, {"wave": 5}, {"wave": 7, "leaf": 1}, {"wave": 5}],
-    "run": [{"legs": [2, 0, 0, 2], "bob": -1}, {"legs": [0, 0, 0, 0]}, {"legs": [0, 2, 2, 0], "bob": -1}, {"legs": [0, 0, 0, 0], "leaf": 1}],
+    "idle": [{}, {"bob": 1, "gill": 1}, {"bob": 1, "gill": 1}, {}, {"blink": True, "glint": 1}, {"blink": True, "glint": 2}],
+    "jump": [{}, {"crouch": 2}, {"dy": -5, "legs": [1, 1, 1, 1], "gill": -1}, {"dy": -10, "legs": [2, 2, 2, 2], "gill": -1, "wag": 1}, {"dy": -5, "gill": 1}, {"crouch": 1, "gill": 1}],
+    "wave": [{"wave": 3}, {"wave": 5, "gill": 1}, {"wave": 7, "leaf": 1, "gill": 1}, {"wave": 5}],
+    "run": [{"legs": [2, 0, 0, 2], "bob": -1, "wag": 1}, {"legs": [0, 0, 0, 0]}, {"legs": [0, 2, 2, 0], "bob": -1, "wag": -1}, {"legs": [0, 0, 0, 0], "leaf": 1}],
 }
 for variant in ("glasses", "plain", "crown"):
     for a, frames in ANIMS.items():
