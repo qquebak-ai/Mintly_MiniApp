@@ -7,7 +7,15 @@ L, M, D, O = "#8FF7CF", "#3FD9A0", "#1E9E73", "#0B4A37"   # свет, тон, т
 EYE = "#06100C"; LEAF, LEAF2 = "#2EE87A", "#12A150"
 Y = ["#A87400", "#E8B400", "#FFD84A"]; WH = "#FFFFFF"
 
+# Поза по умолчанию — чуть вытянулся, «стоит»: жабры расправлены,
+# кончик хвоста выглядывает. Анимации задают отклонения от неё.
+ПОЗА = {"sq": -2, "tl": 2, "gill": -1}
+
 def sprite(cw, ch, ground, st, variant):
+    st = dict(st)
+    st["sq"] = ПОЗА["sq"] + st.get("sq", 0)
+    st["gill"] = max(-1, min(1, ПОЗА["gill"] + st.get("gill", 0)))
+    st["tl"] = max(ПОЗА["tl"], st.get("tl", [0, 2, 4, 8][st.get("tail", 0)]))
     px = {}
     def put(x, y, c):
         if 0 <= x < cw and 0 <= y < ch: px[(x, y)] = c
@@ -20,7 +28,7 @@ def sprite(cw, ch, ground, st, variant):
     leg_len = 3 - min(crouch, 2)
     by1 = ground - leg_len - 1 + dy + bob       # низ туловища
     sq = st.get("sq", 0)                         # >0 сплющен, <0 вытянут — резиновое тело
-    wx = max(-1, min(2, sq))                     # сплющился — стал шире
+    wx = max(-1, min(2, sq + 2))  # от позы по умолчанию: сплющился — шире                     # сплющился — стал шире
     by0 = by1 - 14 + crouch + sq                 # верх головы
     hb = by0 + 9 - (sq + 1) // 2                 # низ головы
     GP, GL = "#FF8FC8", "#FFC4E4"                # жабры — розовый акцент аксолотля
