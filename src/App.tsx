@@ -12954,7 +12954,7 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
                    баннере запуска: один предмет на ровном чёрном, без
                    сцены вокруг. */
                 <img
-                  src="/banner-candles.webp" alt="" aria-hidden
+                  src="/banner-candles-3d.webp" alt="" aria-hidden
                   style={{
                     position: "absolute", right: "-4%", top: "50%", width: "42%",
                     animation: "свечиПлывут 4.2s ease-in-out infinite",
@@ -16554,7 +16554,42 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
      свайп не показывает: это ключ ко всем деньгам, и нажатие на
      «Показать» здесь ведёт в тот же проверенный мастер, только сразу
      к экрану предупреждения, минуя вступление. */
-  const ПЕРЕВОРОТ_КАРТЫ_МС = 420;
+  const ПЕРЕВОРОТ_КАРТЫ_МС = 640;
+  // Толщина нарочно больше настоящей (≈3px на 210px высоты): на
+  // телефоне трёхпиксельный торец на наклоне просто не разглядеть.
+  const ТОЛЩИНА_КАРТЫ = 9, СЛОИ_ТОРЦА = 12;
+  const наклонКарты = useRef(null);
+  useEffect(() => {
+    const обёртка = наклонКарты.current, корень = кореньКарты.current;
+    if (!обёртка || !корень) return undefined;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+    let цель = 0, сейчас = 0, качка = 0, кадр = 0, прошлая = null, прошлоеВремя = 0;
+    const шаг = () => {
+      // Пружина без перелёта: к цели по экспоненте, качка от скорости
+      // гаснет сама — отпустил экран, и карта плавно встаёт ровно.
+      качка *= 0.86;
+      const итог = Math.max(-32, Math.min(32, цель + качка));
+      сейчас += (итог - сейчас) * 0.2;
+      обёртка.style.transform = `rotateX(${сейчас.toFixed(2)}deg) rotateY(${(-сейчас * 0.18).toFixed(2)}deg)`;
+      корень.style.setProperty("--наклон", сейчас.toFixed(2));
+      корень.style.setProperty("--наклонМодуль", Math.abs(сейчас).toFixed(2));
+      if (Math.abs(итог - сейчас) > 0.05 || Math.abs(качка) > 0.05) кадр = requestAnimationFrame(шаг);
+      else кадр = 0;
+    };
+    const приПрокрутке = (e) => {
+      const ц = e.target === document ? document.scrollingElement : e.target;
+      if (!ц || !ц.contains || !ц.contains(корень)) return;
+      const верх = ц.scrollTop || 0;
+      // Уезжая вверх, карта откидывается назад — открывается нижний торец.
+      цель = Math.min(28, верх / 5);
+      const т = performance.now();
+      if (прошлая !== null && т > прошлоеВремя) качка += Math.max(-6, Math.min(6, ((верх - прошлая) / (т - прошлоеВремя)) * 4));
+      прошлая = верх; прошлоеВремя = т;
+      if (!кадр) кадр = requestAnimationFrame(шаг);
+    };
+    window.addEventListener("scroll", приПрокрутке, { capture: true, passive: true });
+    return () => { window.removeEventListener("scroll", приПрокрутке, { capture: true }); if (кадр) cancelAnimationFrame(кадр); };
+  }, []);
   const [переворотКарты, setПереворотКарты] = useState(false);
   const [согласенНаОбороте, setСогласенНаОбороте] = useState(false);
   // Слова — прямо на обороте карты, никакого перехода на другой экран:
@@ -16853,7 +16888,12 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           вверх-вниз: браузеру запрещён нативный скролл с этого элемента.
           Надёжнее одного preventDefault, который на iOS успевает
           опоздать к уже начавшемуся скроллу. */}
-      <div ref={кореньКарты} style={{ position: "relative", margin: "0 16px", isolation: "isolate", perspective: 1000, touchAction: "none" }}>
+      <div ref={кореньКарты} style={{ position: "relative", margin: "0 16px", isolation: "isolate", perspective: 900, touchAction: "none" }}>
+      {/* Наклон от прокрутки: карта откидывается назад, пока уезжает
+          вверх, и чуть качается от скорости — тогда видно её толщину.
+          Трансформ пишется напрямую в стиль из requestAnimationFrame,
+          без перерисовки React на каждый кадр прокрутки. */}
+      <div ref={наклонКарты} style={{ position: "relative", transformStyle: "preserve-3d", willChange: "transform" }}>
       {/* Настоящий разворот в 3D: у обеих сторон общий родитель с
           preserve-3d, и ребро карты по-честному видно на середине пути —
           это не подмена одной картинки другой, а поворот объёма. */}
@@ -16863,8 +16903,21 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         // словами карта вырастает, а не выносит их за край.
         height: словаНаОбороте ? 330 : 210,
         transform: переворотКарты ? "rotateY(180deg)" : "rotateY(0deg)",
-        transition: `transform ${ПЕРЕВОРОТ_КАРТЫ_МС}ms cubic-bezier(0.65, 0, 0.35, 1), height 380ms cubic-bezier(0.22, 1, 0.36, 1)`,
+        // Лёгкий перелёт в конце: карта докручивается чуть дальше и
+        // садится на место — поворот читается весом, а не механикой.
+        transition: `transform ${ПЕРЕВОРОТ_КАРТЫ_МС}ms cubic-bezier(0.34, 1.32, 0.5, 1), height 380ms cubic-bezier(0.22, 1, 0.36, 1)`,
       }}>
+      {/* Толщина карты: стопка слоёв той же заливки между лицом и
+          оборотом. В лоб их закрывает лицо, а на наклоне и в
+          развороте они складываются в сплошной цветной торец. */}
+      {Array.from({ length: СЛОИ_ТОРЦА }, (_, i) => (
+        <span key={i} aria-hidden style={{
+          position: "absolute", inset: 0, borderRadius: 24, pointerEvents: "none",
+          transform: `translateZ(${(-ТОЛЩИНА_КАРТЫ / 2 + (ТОЛЩИНА_КАРТЫ * (i + 0.5)) / СЛОИ_ТОРЦА).toFixed(2)}px)`,
+          background: `linear-gradient(${hexA("#000000", 0.28)}, ${hexA("#000000", 0.28)}), ${видКарты.fill}`,
+          backgroundSize: `100% 100%, ${видКарты.size || "320% 320%"}`,
+        }} />
+      ))}
       <section
         onPointerDown={волнаОт}
         onTouchStart={началоСвайпаКарты}
@@ -16882,6 +16935,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // Лицевая сторона настоящего 3D-разворота: обратную сторону не
           // видно, пока карта не довернулась мимо ребра.
           backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
+          transform: `translateZ(${ТОЛЩИНА_КАРТЫ / 2}px)`,
           /* Обрезка по скруглению у iOS не держится, если внутри что-то
              ходит (блик, волны, ткань): дети вылезают за угол квадратом.
              Отдельный слой и маска по кругу возвращают обрезку. */
@@ -16928,6 +16982,14 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           position: "absolute", top: -70, left: -90, width: 260, height: 320,
           background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.13)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
           transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
+        }} />
+        {/* Отблеск наклона: полоса света едет по карте вслед за углом и
+            гаснет, когда карта встаёт ровно. */}
+        <span aria-hidden style={{
+          position: "absolute", left: "-20%", right: "-20%", top: "-60%", height: "120%", pointerEvents: "none",
+          background: `linear-gradient(180deg, ${hexA("#FFFFFF", 0)} 30%, ${hexA("#FFFFFF", 0.22)} 50%, ${hexA("#FFFFFF", 0)} 70%)`,
+          transform: "translateY(calc(var(--наклон, 0) * 3.2%))",
+          opacity: "calc(var(--наклонМодуль, 0) / 14)",
         }} />
         {/* Ткани свет достаётся отдельно: широкая мягкая полоса ходит
             поперёк плетения, как по капоту, и добавляет объёма там, где
@@ -17017,7 +17079,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         style={{
           position: "absolute", inset: 0, borderRadius: 24, overflow: "hidden",
           backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
-          transform: "rotateY(180deg)",
+          transform: `rotateY(180deg) translateZ(${ТОЛЩИНА_КАРТЫ / 2}px)`,
           // Та же маска, что у лицевой стороны: без неё скругление на iOS
           // не держит анимированную заливку внутри, и кнопки снизу
           // вылезали прямоугольным краем за пределы карты.
@@ -17119,6 +17181,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             </div>
           </>
         )}
+      </div>
       </div>
       </div>
       </div>
