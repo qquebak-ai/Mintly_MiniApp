@@ -25,7 +25,7 @@ def sprite(cw, ch, ground, st, variant):
     ox = cw // 2 - 18 + st.get("sx", 0)       # sx — покачивание вбок
     dy = st.get("dy", 0); bob = st.get("bob", 0); crouch = st.get("crouch", 0)
     legs = st.get("legs", [0, 0, 0, 0])
-    leg_len = 3 - min(crouch, 2)
+    leg_len = 0 if st.get("flat") else 3 - min(crouch, 2)   # flat — рухнул на пузо
     by1 = ground - leg_len - 1 + dy + bob       # низ туловища
     sq = st.get("sq", 0)                         # >0 сплющен, <0 вытянут — резиновое тело
     # бока раздаются едва-едва: на пиксель и только при сильном сжатии
@@ -42,9 +42,28 @@ def sprite(cw, ch, ground, st, variant):
         if tl >= 8:
             rect(ox + 32, by1 - 3 + wag, ox + 34, by1 - 2 + wag, M); put(ox + 35, by1 - 3 + wag, L)
     # лапки с пальчиками
+    sp = st.get("splay")          # лапы врастопырку, у каждой свой угол
     for i, lx in enumerate((10, 13, 21, 24)):
         if st.get("wave") and i == 3: continue
+        if st.get("flat"):
+            # упал плашмя: лапы торчат в стороны из-под пуза
+            side = -1 if i < 2 else 1
+            y = by1 - (1 if i in (1, 2) else 0)
+            x0 = ox + (9 if side < 0 else 26) + side * (0 if i in (1, 2) else 1)
+            for k in range(4): put(x0 + side * k, y, D)
+            put(x0 + side * 4, y, M); put(x0 + side * 4, y - 1, M)
+            continue
         bot = ground - legs[i] + (dy if dy < 0 else 0)
+        if sp:
+            d = sp[i]
+            n = bot - by1
+            for r in range(n):
+                x = ox + lx + (d * (r + 1)) // 2
+                put(x, by1 + 1 + r, D); put(x + 1, by1 + 1 + r, D)
+            xe = ox + lx + (d * n) // 2
+            for tx in (-1, 1, 2): put(xe + tx, bot, D)
+            put(xe - 1, bot, M); put(xe + 2, bot, M)
+            continue
         rect(ox + lx, by1 + 1, ox + lx + 1, bot, D)
         for tx in (-1, 1, 2): put(ox + lx + tx, bot, D)
         put(ox + lx - 1, bot, M); put(ox + lx + 2, bot, M)
@@ -187,6 +206,16 @@ def sprite(cw, ch, ground, st, variant):
             sz = 3 + big
             for x in range(sz): put(zx + x, yy, "#BFD8FF"); put(zx + x, yy + sz - 1, "#BFD8FF")
             for k in range(1, sz - 1): put(zx + sz - 1 - k, yy + k, "#BFD8FF")
+    # звёздочки кружат над головой — оглушён
+    sp_ = st.get("stars")
+    if sp_ is not None:
+        import math
+        for k in range(3):
+            a = math.radians(sp_ * 30 + k * 120)
+            x = int(round(ox + 17.5 + math.cos(a) * 11)); y = int(round(by0 - 5 + math.sin(a) * 2.5))
+            front = math.sin(a) > 0
+            c, c2 = ("#FFE45C", "#FFF6B8") if front else ("#C9A21C", "#E8C94A")
+            put(x, y, c2); put(x - 1, y, c); put(x + 1, y, c); put(x, y - 1, c); put(x, y + 1, c)
     # тень на земле
     sw = 12 if dy > -4 else 8
     for x in range(cw // 2 - sw, cw // 2 + sw):
@@ -224,33 +253,24 @@ def idle(i):  # 36 кадров = 3 с: вдох-выдох, взгляд в с�
     st["tl"] = [0, 0, 1, 2, 3, 4, 4, 3, 2, 1, 0][i - 26] if 26 <= i < 37 and i - 26 < 11 else 0
     if 30 <= i < 34: st["wag"] = 1 if i % 2 else 0
     return st
-def jump(i):  # 30 кадров: замах, толчок, полёт, шлепок — и еле устоял на ногах
-    if i >= 18:
-        # после приземления лапы подкашиваются то слева, то справа,
-        # тело качает — вот-вот упадёт, но выпрямляется и отряхивается
-        w = [
-            {"legs": [2, 2, 0, 0], "sx": -1, "look": -1, "sq": 1, "gill": 1},
-            {"legs": [2, 1, 0, 0], "sx": -2, "look": -1, "sq": 1, "gill": 1, "blink": True},
-            {"legs": [1, 0, 0, 0], "sx": -1, "look": -1},
-            {"legs": [0, 0, 1, 2], "sx": 1, "look": 1, "gill": -1},
-            {"legs": [0, 0, 2, 2], "sx": 2, "look": 1, "sq": 1, "gill": -1, "blink": True},
-            {"legs": [0, 0, 1, 1], "sx": 1, "look": 1},
-            {"legs": [1, 0, 0, 0], "sx": -1},
-            {"legs": [0, 0, 0, 1], "sx": 1},
-            {"sq": -1, "tl": 4},
-            {"sq": -1, "tl": 4, "wag": 1},
-            {"tl": 3, "wag": -1},
-            {"tl": 2},
-        ][i - 18]
-        return w
-    dys = [0, 0, 0, 0, -3, -7, -10, -12, -13, -13, -12, -9, -5, 0, 0, 0, 0, 0]
-    sqs = [0, 1, 2, 2, -2, -1, -1, 0, 0, 0, 0, -1, -1, 2, 1, -1, 0, 0]
-    st = {"dy": dys[i], "sq": sqs[i]}
-    if 4 <= i < 13: st["legs"] = [2, 2, 2, 2]; st["gill"] = -1 if i < 9 else 1
-    st["tl"] = [0, 0, 0, 1, 2, 4, 6, 8, 8, 8, 8, 6, 4, 2, 1, 0, 0, 0][i]
-    if 7 <= i < 11: st["wag"] = 1 if i % 2 else -1
-    if 8 <= i < 11: st["blink"] = True  # зажмурился от удовольствия
-    return st
+def jump(i):  # 36 кадров = 3 с: замах, полёт с потерей равновесия, шлёп на пузо, звёзды
+    if i < 4:
+        return [{}, {"sq": 1}, {"sq": 2}, {"sq": 2}][i]
+    if i < 15:
+        k = i - 4
+        dys = [-3, -7, -10, -12, -13, -13, -12, -10, -7, -4, -1][k]
+        # в воздухе его болтает, лапы разъезжаются кто куда
+        splays = [[-1, 0, 0, 1], [-2, -1, 1, 2], [-3, 1, -1, 3], [-2, 2, 0, 3], [-3, 0, 2, 2], [-1, -2, 2, 3],
+                  [-3, 1, -2, 1], [-2, 2, 1, 3], [-3, -1, 2, 2], [-2, 1, -1, 3], [-3, 0, 1, 3]][k]
+        return {"dy": dys, "sq": -1 if k < 3 else 0, "splay": splays, "sx": [0, -1, 1, -2, 2, -1, 1, -2, 1, -1, 2][k],
+                "legs": [2, 1, 2, 1] if k % 2 else [1, 2, 1, 2], "gill": 1 if k % 2 else -1,
+                "tl": [2, 4, 6, 8, 8, 8, 8, 6, 6, 4, 4][k], "wag": 1 if k % 2 else -1, "look": 1 if k % 3 == 0 else -1}
+    if i < 18:  # не успел подставить лапы — шлёп
+        return [{"flat": True, "sq": 3, "blink": True, "tl": 3}, {"flat": True, "sq": 2, "blink": True, "tl": 2},
+                {"flat": True, "sq": 2, "blink": True, "tl": 2}][i - 15]
+    if i < 32:  # лежит оглушённый, над головой кружат звёзды
+        return {"flat": True, "sq": 2, "blink": True, "stars": i - 18, "tl": 2, "gill": 1}
+    return [{"crouch": 1, "sq": 1}, {"sq": -1}, {}, {"blink": True}][i - 32]
 def alarm(i):  # 24 кадра = 2 с: заметил, что кто-то зашёл, — встрепенулся и разволновался
     if i < 4: return {"look": 1 if i >= 2 else 0}
     if i < 7: return {"dy": [-2, -3, -2][i - 4], "sq": -1, "gill": -1, "alarm": [1, 2, 2][i - 4], "tl": 4}
@@ -276,7 +296,7 @@ def walk(i):  # 24 кадра = 2 с: неспешный шаг, лапы по �
     st["gill"] = 1 if (i // 6) % 2 else 0
     st["leaf"] = 1 if (i // 4) % 2 else 0
     return st
-ANIMS = {"idle": seq(36, idle), "jump": seq(30, jump), "alarm": seq(24, alarm), "wake": seq(18, wake), "walk": seq(24, walk)}
+ANIMS = {"idle": seq(36, idle), "jump": seq(36, jump), "alarm": seq(24, alarm), "wake": seq(18, wake), "walk": seq(24, walk)}
 for variant in ("glasses", "plain", "crown"):
     for a, frames in ANIMS.items():
         save([sprite(PW, PH, G, st, variant) for st in frames], PW, PH, 4, f"mintie/mintie-{variant}-{a}.webp")
