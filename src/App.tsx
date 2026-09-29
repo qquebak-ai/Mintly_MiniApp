@@ -8195,15 +8195,15 @@ function КотПланета({ size = 120, glow = true, качается = true
         <div aria-hidden style={{
           position: "absolute", inset: "-18%", borderRadius: "50%",
           background: `radial-gradient(circle, ${hexA(T.electric, 0.28)} 0%, ${hexA(T.electric, 0)} 68%)`,
-          animation: "маскотСветит 4.5s ease-in-out infinite",
         }} />
       )}
+      {/* Маскот — Минти в позе по умолчанию, неподвижный. */}
       <img
-        src="/mascot.png"
+        src={`/mintie-icon.png?v=${ВЕРСИЯ_МИНТИ}`}
         alt=""
         width={size}
         height={size}
-        style={{ position: "relative", width: size, height: size, display: "block", animation: качается ? "маскотДышит 6s ease-in-out infinite" : "none" }}
+        style={{ position: "relative", width: size, height: size, display: "block", imageRendering: "pixelated" }}
       />
     </div>
   );
@@ -12301,7 +12301,7 @@ function МояАктивность({ userId, тик = 0 }) {
 /* Картинки из public сервер отдаёт с вечным кэшем (immutable), и
    Telegram держит старого Минти после перерисовки. Номер версии в адресе
    — повышать при каждой замене картинок маскота. */
-const ВЕРСИЯ_МИНТИ = 8;
+const ВЕРСИЯ_МИНТИ = 9;
 
 const БАННЕРЫ = [
   {
@@ -12458,12 +12458,12 @@ const ОБЛИКИ_МИНТИ = [
   { id: "crown", RU: "В короне", EN: "Crowned" },
 ];
 // 12 кадров в секунду: у дыхания 36 кадров с паузами и взглядом по
-// сторонам, у прыжка — замах, полёт и шлепок, у бега — две смены шага.
+// сторонам, у прыжка — замах, полёт и шлепок, у ходьбы — неспешный шаг.
 const АНИМАЦИИ_МИНТИ = [
   { id: "idle", RU: "Дыхание", EN: "Breathing", кадров: 36 },
   { id: "jump", RU: "Прыжок", EN: "Jump", кадров: 18 },
   { id: "wave", RU: "Привет", EN: "Wave", кадров: 16 },
-  { id: "run", RU: "Бег", EN: "Run", кадров: 12 },
+  { id: "walk", RU: "Ходьба", EN: "Walk", кадров: 24 },
 ].map((а) => ({ ...а, анимация: `минтиКадры ${(а.кадров / 12).toFixed(3)}s steps(${а.кадров}, jump-none) infinite` }));
 // На узком экране три клетки в ряд не влезут по 112px — тогда чуть мельче.
 const КЛЕТКА_МИНТИ = "min(112px, calc((100vw - 48px) / 3))";
@@ -15132,7 +15132,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
         .filter((р) => р.address && р.ticker)
         .map((р) => ({
           тикер: String(р.ticker).toUpperCase(), имя: t("swapAppToken"),
-          mint: р.address, знаки: 6, лого: р.logo_url || "/mascot.png",
+          mint: р.address, знаки: 6, лого: р.logo_url || `/mintie-icon.png?v=${ВЕРСИЯ_МИНТИ}`,
         }));
       // В тестовой сети знакомых монет нет вовсе, но GRAM есть всегда:
       // он живёт в своей цепочке, и обмен с ним идёт через казначейство.

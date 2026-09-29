@@ -28,7 +28,9 @@ def sprite(cw, ch, ground, st, variant):
     leg_len = 3 - min(crouch, 2)
     by1 = ground - leg_len - 1 + dy + bob       # низ туловища
     sq = st.get("sq", 0)                         # >0 сплющен, <0 вытянут — резиновое тело
-    wx = max(-1, min(2, sq + 2))  # от позы по умолчанию: сплющился — шире                     # сплющился — стал шире
+    # бока раздаются едва-едва: на пиксель и только при сильном сжатии
+    rel = sq - ПОЗА["sq"]
+    wx = 1 if rel >= 2 else (-1 if rel <= -2 else 0)                     # сплющился — стал шире
     by0 = by1 - 14 + crouch + sq                 # верх головы
     hb = by0 + 9 - (sq + 1) // 2                 # низ головы
     GP, GL = "#FF8FC8", "#FFC4E4"                # жабры — розовый акцент аксолотля
@@ -215,12 +217,25 @@ def wave(i):  # 16 кадров: лапка поднимается, машет, 
     st["tl"] = [0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 3, 2, 1, 0][i]
     if 4 <= i < 12: st["wag"] = 1 if i % 2 else 0; st["leaf"] = 1 if i % 4 < 2 else 0
     return {k: v for k, v in st.items() if v is not None}
-def run(i):  # 12 кадров: две полные смены шага, хвост виляет, жабры по ветру
-    ph = i % 6
-    legs = [[2, 0, 0, 2], [1, 0, 0, 1], [0, 0, 0, 0], [0, 2, 2, 0], [0, 1, 1, 0], [0, 0, 0, 0]][ph]
-    return {"legs": legs, "bob": -1 if ph in (0, 3) else 0, "sq": -1 if ph in (0, 3) else (1 if ph in (2, 5) else 0),
-            "tl": 6 + (1 if ph < 3 else 0), "wag": 1 if ph < 3 else -1, "gill": -1, "look": 1, "leaf": 1 if ph < 3 else 0}
-ANIMS = {"idle": seq(36, idle), "jump": seq(18, jump), "wave": seq(16, wave), "run": seq(12, run)}
+def walk(i):  # 24 кадра = 2 с: неспешный шаг, лапы по диагонали, как у настоящего зверя
+    lift = [0, 1, 2, 2, 1, 0]
+    order = [0, 2, 1, 3]                         # левая, правая внутренняя, левая внутренняя, правая
+    legs = [0, 0, 0, 0]
+    ph, k = divmod(i, 6)
+    legs[order[ph]] = lift[k]
+    st = {"legs": legs, "bob": -1 if k in (2, 3) else 0, "tl": 3 + (1 if (i // 3) % 2 else 0)}
+    st["gill"] = 1 if (i // 6) % 2 else 0
+    st["leaf"] = 1 if (i // 4) % 2 else 0
+    return st
+ANIMS = {"idle": seq(36, idle), "jump": seq(18, jump), "wave": seq(16, wave), "walk": seq(24, walk)}
 for variant in ("glasses", "plain", "crown"):
     for a, frames in ANIMS.items():
         save([sprite(PW, PH, G, st, variant) for st in frames], PW, PH, 4, f"mintie/mintie-{variant}-{a}.webp")
+
+# ---- иконка приложения: Минти в позе по умолчанию ----
+ic = sprite(56, 56, 50, {}, "plain")
+im = Image.new("RGBA", (576, 576), (0, 0, 0, 0))
+for (x, y), c in ic.items():
+    im.paste(tuple(int(c[k:k+2], 16) for k in (1, 3, 5)) + (255,), (8 + x * 10, 8 + (y - 4) * 10, 8 + (x + 1) * 10, 8 + (y - 3) * 10))
+im.save("mintie-icon.png")
+bg = Image.new("RGBA", (576, 576), (6, 5, 12, 255)); bg.alpha_composite(im); bg.convert("RGB").save("mintie-icon-bg.png")
