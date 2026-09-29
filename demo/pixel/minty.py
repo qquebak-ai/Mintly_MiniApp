@@ -55,11 +55,36 @@ def sprite(cw, ch, ground, st, variant):
     # глаза
     eyes_y = by0 + 3
     if variant == "glasses":
-        rect(ox + 8, eyes_y - 1, ox + 27, eyes_y + 2, EYE)
+        # очки-шлем в духе VR: широкое стекло с полуовальным низом,
+        # серебристая рамка, переливы на стекле, ремешок до краёв головы
+        x0, x1, y0, y1 = ox + 8, ox + 27, eyes_y - 2, eyes_y + 4
+        w = x1 - x0
+        cells = []
+        for x in range(x0, x1 + 1):
+            t = (x - x0) / w
+            # низ — половина овала: к краям стекло плавно поднимается
+            bottom = y1 - int(round(3.2 * (1 - (1 - (2 * t - 1) ** 2) ** 0.5)))
+            top = y0 + (1 if t < 0.03 or t > 0.97 else 0)
+            for y in range(top, bottom + 1): cells.append((x, y))
+        cs = set(cells)
+        for (x, y) in cells:
+            k = (y - y0) / (y1 - y0)
+            put(x, y, "#2B3150" if k < 0.3 else "#171B30" if k < 0.7 else "#0B0D1A")
+        # перелив по стеклу: фиолетовый к голубому
+        for (x, y) in cells:
+            if y == y0 + 1 and (x - x0) % 3 == 0: put(x, y, "#7A6BFF" if x < x0 + w / 2 else "#5FD4FF")
+        # бегущий блик — наискосок
         g = st.get("glint")
-        gx = ox + 11 + (0 if g is None else g * 3)
-        put(gx, eyes_y, WH if g is not None else "#3A3F4A"); put(gx + 1, eyes_y - 1 + 1, "#3A3F4A")
-        put(ox + 20 + (0 if g is None else g * 3), eyes_y, WH if g is not None else "#3A3F4A")
+        bx = x0 + 3 + (g if g is not None else 0) * 6
+        for d in range(0, 5):
+            for q in ((bx + d, y1 - d), (bx + d + 1, y1 - d)):
+                if q in cs: put(*q, "#DDE6FF" if g is not None else "#59638F")
+        # рамка
+        for (x, y) in cells:
+            if any((x + a2, y + b2) not in cs for a2, b2 in ((1, 0), (-1, 0), (0, 1), (0, -1))): put(x, y, "#C9D1E0")
+        for x in range(x0 + 2, x1 - 1): put(x, y0, "#EEF2FA")
+        # ремешок
+        rect(ox + 7, eyes_y - 1, ox + 7, eyes_y + 1, "#8A93A6"); rect(ox + 28, eyes_y - 1, ox + 28, eyes_y + 1, "#8A93A6")
     else:
         h = 0 if st.get("blink") else 2
         for ex in (10, 23):
