@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Mintly Showreel</title>
+<style>
+@font-face{font-family:'Onest';font-weight:100 650;src:url('assets/fonts/onest-cyrillic.woff2') format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Onest';font-weight:100 650;src:url('assets/fonts/onest-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+2000-206F,U+20AC,U+2122,U+2212}
+@font-face{font-family:'NunitoX';font-weight:800;src:url('assets/fonts/nunito-800-cyrillic.woff2') format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'NunitoX';font-weight:800;src:url('assets/fonts/nunito-800-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+2000-206F,U+20AC,U+2122,U+2212}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#07060d}
+#stage,#ui{position:absolute;inset:0}
+#ui{pointer-events:none;font-family:'Onest',sans-serif;color:#f4f2ff}
+.vig{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(3,2,8,.72) 100%)}
+#flash{position:absolute;inset:0;background:#e9dcff;opacity:0;mix-blend-mode:screen}
+#fade{position:absolute;inset:0;background:#000;opacity:0}
+#title{position:absolute;left:150px;top:390px;font-family:'NunitoX';font-weight:800;font-size:196px;letter-spacing:-.045em;line-height:1;white-space:nowrap}
+#title span{display:inline-block}
+#sub{position:absolute;left:158px;top:612px;font-size:40px;font-weight:400;color:#c9c1ee;letter-spacing:-.005em}
+#chip{position:absolute;left:96px;bottom:84px;display:flex;align-items:center;gap:18px;font-size:30px;font-weight:500;color:#e6e0ff}
+#chip b{font-family:'NunitoX';font-weight:800;font-size:22px;letter-spacing:.2em;text-transform:uppercase;color:#1a0b3a;background:#c9b6ff;padding:8px 16px 7px;border-radius:12px}
+#end{position:absolute;left:0;right:0;top:730px;text-align:center}
+#end .n{font-family:'NunitoX';font-weight:800;font-size:150px;letter-spacing:-.045em;line-height:1}
+#end .s{font-size:36px;color:#c9c1ee;margin-top:22px}
+#end .u{font-family:ui-monospace,Menlo,monospace;font-size:30px;color:#b9a8ff;margin-top:26px;letter-spacing:.04em}
+</style>
+<script type="importmap">
+{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="stage"></div>
+<div id="ui">
+  <div class="vig"></div>
+  <div id="title"></div>
+  <div id="sub">мемкоины на TON и Solana</div>
+  <div id="chip"><b id="chipTag"></b><span id="chipText"></span></div>
+  <div id="end"><div class="n">Mintly</div><div class="s">Telegram Mini App · TON · Solana</div><div class="u">mintly.company</div></div>
+  <div id="flash"></div>
+  <div id="fade"></div>
+</div>
+<script type="module" src="scene.js"></script>
+</body>
+</html>
