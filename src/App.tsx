@@ -11156,6 +11156,17 @@ function КартаКурсаМонеты({ title, монета }) {
           <path d={путь} fill="none" stroke={цвет} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         </svg>
       )}
+
+      <div
+        style={{
+          position: "relative", zIndex: 1, fontFamily: displayFont, color: цвет, fontSize: 13.5, fontWeight: 800,
+          filter: готово ? "blur(0px)" : "blur(9px)",
+          opacity: готово ? 1 : 0.45,
+          transition: "filter 480ms ease, opacity 480ms ease",
+        }}
+      >
+        <ТекстСЧислами text={`${растёт ? "+" : ""}${change24.toFixed(2)}%`} />
+      </div>
     </div>
   );
 }
