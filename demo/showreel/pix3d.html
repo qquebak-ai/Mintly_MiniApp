@@ -1,0 +1,84 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;overflow:hidden}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script></head>
+<body><script type="module">
+// Заготовки для пиксельных баннеров: объёмная сцена в оттенках серого с
+// мультяшной (ступенчатой) светотенью. Цвет и пиксели — потом, в pixelate.py.
+import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+const W = 820, H = 620, q = new URLSearchParams(location.search), SCENE = q.get("scene");
+const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+r.setSize(W, H); r.setClearColor(0x000000, 0); r.outputColorSpace = THREE.LinearSRGBColorSpace;
+document.body.appendChild(r.domElement);
+const sc = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(28, W / H, 0.1, 100);
+const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(-5, 7, 6); sc.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 0.55); fill.position.set(6, -2, 3); sc.add(fill);
+sc.add(new THREE.AmbientLight(0xffffff, 0.18));
+const grad = new THREE.DataTexture(new Uint8Array([40, 40, 40, 255, 95, 95, 95, 255, 160, 160, 160, 255, 225, 225, 225, 255, 255, 255, 255, 255]), 5, 1);
+grad.minFilter = grad.magFilter = THREE.NearestFilter; grad.needsUpdate = true;
+const toon = (g, emissive = 0) => new THREE.MeshToonMaterial({ color: new THREE.Color(g, g, g), gradientMap: grad, emissive: new THREE.Color(emissive, emissive, emissive) });
+const add = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); sc.add(m); return m; };
+function extrude(pts, depth, bevel = 0.08) {
+  const s = new THREE.Shape(); pts.forEach(([x, y], i) => (i ? s.lineTo(x, y) : s.moveTo(x, y)));
+  const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3 }); g.center(); return g;
+}
+function coin(r0, face = 0.8, emblem = null) {
+  const g = new THREE.Group();
+  const c = new THREE.Mesh(new THREE.CylinderGeometry(r0, r0, r0 * 0.28, 48), [toon(0.55), toon(face), toon(face)]);
+  c.rotation.x = Math.PI / 2; g.add(c);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(r0 * 0.8, r0 * 0.07, 8, 48), toon(0.35)); ring.position.z = r0 * 0.15; g.add(ring);
+  if (emblem) { const e = new THREE.Mesh(emblem, toon(1, 0.35)); e.position.z = r0 * 0.2; e.scale.setScalar(r0 * 0.55); g.add(e); }
+  sc.add(g); return g;
+}
+const BOLT = [[0.25, 1], [-0.45, -0.05], [0.02, -0.05], [-0.25, -1], [0.5, 0.18], [0.02, 0.18], [0.35, 1]];
+
+if (SCENE === "trade") {
+  cam.position.set(3.2, 2.2, 13); cam.lookAt(1.2, 0.2, 0);
+  const g = new THREE.Group(); sc.add(g); g.rotation.y = -0.45;
+  [[-1.4, -2.0, 1.3, 0.95], [0, -1.6, 2.1, 0.95], [1.4, -1.0, 1.3, 0.42], [2.8, -1.5, 3.6, 0.95]].forEach(([x, y0, h, c]) => {
+    const b = new THREE.Mesh(new RoundedBoxGeometry(0.95, h, 0.95, 4, 0.14), toon(c)); b.position.set(x, y0 + h / 2, 0); g.add(b);
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, h + 1.3, 12), toon(c * 0.8)); w.position.set(x, y0 + h / 2, 0); g.add(w);
+  });
+  // стрелка тренда — объёмная лента с наконечником
+  const path = [[-1.4, 0.55], [-0.6, 1.2], [0.8, 0.7], [2.3, 2.6]];
+  for (let i = 0; i < path.length - 1; i++) {
+    const [ax, ay] = path[i], [bx, by] = path[i + 1], len = Math.hypot(bx - ax, by - ay);
+    const seg = new THREE.Mesh(new RoundedBoxGeometry(len + 0.3, 0.3, 0.3, 3, 0.1), toon(1, 0.25));
+    seg.position.set((ax + bx) / 2, (ay + by) / 2, 0.9); seg.rotation.z = Math.atan2(by - ay, bx - ax); g.add(seg);
+  }
+  const head = new THREE.Mesh(extrude([[0, 0.55], [0.5, -0.35], [-0.5, -0.35]], 0.25), toon(1, 0.25));
+  head.position.set(2.45, 2.85, 0.9); head.rotation.z = -0.62; g.add(head);
+} else if (SCENE === "fast") {
+  cam.position.set(0.6, 0.4, 13); cam.lookAt(0.9, -0.1, 0);
+  const bolt = add(extrude(BOLT, 0.35, 0.1), toon(1, 0.3), 2.3, 0.2, 0); bolt.scale.setScalar(2.1); bolt.rotation.set(0.1, -0.5, -0.12);
+  const c = coin(1.05, 0.72, extrude(BOLT, 0.2, 0.05)); c.position.set(-0.6, -1.0, 0.8); c.rotation.set(0.15, 0.55, -0.1);
+  // след скорости — вытянутые бруски за монетой
+  [[-2.6, -0.4, 1.8, 0.75], [-3.0, -1.0, 2.4, 0.6], [-2.7, -1.6, 1.9, 0.5], [-3.3, -2.1, 1.3, 0.4]].forEach(([x, y, l, c0]) => {
+    const m = add(new RoundedBoxGeometry(l, 0.16, 0.16, 2, 0.06), toon(c0, 0.1), x, y, 0.8);
+  });
+} else if (SCENE === "shop") {
+  cam.position.set(3.5, 2.2, 14); cam.lookAt(1.0, -0.2, 0);
+  const g = new THREE.Group(); sc.add(g); g.rotation.y = -0.5; g.position.x = 1.6;
+  const body = new THREE.Mesh(new RoundedBoxGeometry(3.4, 2.4, 1.8, 3, 0.1), toon(0.7)); body.position.y = -1.0; g.add(body);
+  const win = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.2, 0.05), toon(0.12)); win.position.set(-0.55, -0.85, 0.91); g.add(win);
+  const glint = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.0, 0.05), toon(0.9, 0.3)); glint.position.set(-0.9, -0.85, 0.94); glint.rotation.z = -0.5; g.add(glint);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.7, 0.06), toon(0.3)); door.position.set(1.05, -1.35, 0.92); g.add(door);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), toon(1, 0.5)); knob.position.set(1.3, -1.35, 0.97); g.add(knob);
+  // полосатый навес с фестонами
+  for (let i = 0; i < 8; i++) {
+    const light = i % 2 === 0, x = -1.6 + 0.4 * i + 0.2;
+    const seg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.12, 1.1), toon(light ? 1 : 0.5, light ? 0.2 : 0)); seg.position.set(x, 0.55, 1.2); seg.rotation.x = 0.55; g.add(seg);
+    const sc2 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.12, 16, 1, false, 0, Math.PI), toon(light ? 1 : 0.5, light ? 0.2 : 0));
+    sc2.rotation.set(Math.PI / 2 + 0.55, 0, Math.PI / 2); sc2.position.set(x, 0.3, 1.66); g.add(sc2);
+  }
+  const roof = new THREE.Mesh(new RoundedBoxGeometry(3.7, 0.35, 2.0, 3, 0.1), toon(0.45)); roof.position.y = 0.95; g.add(roof);
+  const sign = new THREE.Mesh(new RoundedBoxGeometry(1.8, 0.7, 0.2, 3, 0.08), toon(0.35)); sign.position.set(0, 1.55, 0.3); g.add(sign);
+  const star = [];
+  for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? 0.18 : 0.42; star.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
+  const st = new THREE.Mesh(extrude(star, 0.12, 0.04), toon(1, 0.4)); st.position.set(0, 1.55, 0.45); g.add(st);
+  // карта кошелька — облик, который тут продают
+  const card = add(new RoundedBoxGeometry(1.9, 1.2, 0.1, 3, 0.1), toon(0.92, 0.1), -1.2, -1.9, 2.2); card.rotation.set(-0.2, 0.55, 0.28);
+  const stripe = add(new THREE.BoxGeometry(1.7, 0.16, 0.02), toon(0.35), -1.2, -1.9, 2.2); stripe.rotation.copy(card.rotation); stripe.translateY(0.25); stripe.translateZ(0.06);
+}
+r.render(sc, cam); window.ready = true;
+</script></body></html>

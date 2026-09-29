@@ -2071,10 +2071,6 @@ function GlobalStyle() {
          неподвижная, а сцена должна жить, как и у остальных баннеров.
          Отсчёт от центровки (-50%), не от нуля: иначе на каждом цикле
          картинку дёргало бы обратно на середину. */
-      @keyframes пиксельПлывёт {
-        0%, 100% { transform: translateY(-4px); }
-        50%      { transform: translateY(4px); }
-      }
       @keyframes свечиПлывут {
         0%, 100% { transform: translateY(calc(-50% - 5px)); }
         50%      { transform: translateY(calc(-50% + 5px)); }
@@ -12405,11 +12401,11 @@ function СценаПикселя({ src }) {
       <img
         src={src} alt=""
         style={{
-          // Ниже заголовка, в правом нижнем углу — как гора у первого
-          // баннера: длинные строки не наезжают на картинку.
-          position: "absolute", right: "4%", bottom: "6%", height: "62%", width: "auto", maxWidth: "44%", objectFit: "contain", objectPosition: "right bottom",
+          // Кадр во всю высоту справа, как гора у первого баннера; сама
+          // сцена внутри картинки прижата вправо-вниз, левый верх пуст —
+          // длинные строки заголовка на неё не наезжают. Без покачивания.
+          position: "absolute", right: 0, bottom: 0, height: "100%", width: "auto", maxWidth: "60%", objectFit: "contain", objectPosition: "right bottom",
           imageRendering: "pixelated",
-          animation: "пиксельПлывёт 4.2s ease-in-out infinite",
         }}
       />
       <span style={{
