@@ -276,7 +276,7 @@ def alarm(i):  # 24 кадра = 2 с: заметил, что кто-то заш
     if i < 7: return {"dy": [-2, -3, -2][i - 4], "sq": -1, "gill": -1, "alarm": [1, 2, 2][i - 4], "tl": 4}
     if i < 17:
         k = i - 7
-        return {"sx": 1 if k % 2 else -1, "gill": -1 if k % 2 else 1, "alarm": 1 + k % 2, "look": 1 if k % 4 < 2 else -1, "tl": 3, "wag": 1 if k % 2 else -1}
+        return {"gill": -1 if k % 2 else 1, "alarm": 1 + k % 2, "look": 1 if k % 4 < 2 else -1, "tl": 3, "wag": 1 if k % 2 else -1}
     if i < 21: return {"alarm": 1 if i % 2 else 0, "tl": 2, "gill": 0}
     return {"blink": i == 22}
 def wake(i):  # 18 кадров: спит, сопит — и вскакивает, когда открыли экран
