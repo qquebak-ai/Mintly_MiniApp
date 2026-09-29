@@ -1160,7 +1160,7 @@ export default async function handler(req, res) {
             import("./curve-stream.js").then(({ ожидаемаяСделка }) => ожидаемаяСделка(String(тело.mint), {
               продажа, sol: продажа ? 0 : сумма, tokens: продажа ? собрано.tokens : 0,
               // Ставка кривой: в мейннете процент, в тестовых сетях ноль.
-              feeBps: /devnet|testnet/.test(RPC) ? 0 : 100,
+              feeBps: 0,
             })).catch(() => {});
           },
         });

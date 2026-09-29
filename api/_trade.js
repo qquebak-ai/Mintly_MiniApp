@@ -86,7 +86,7 @@ export function tokensOutFor(state, tonIn) {
 
 /* Оценка покупки на указанную сумму: сколько уйдёт на газ и комиссию и
    сколько токенов останется человеку. */
-export function оценкаПокупки(state, tonAmount, feeBps = 100n) {
+export function оценкаПокупки(state, tonAmount, feeBps = (state && state.feeBps) ?? 0n) {
   const всего = toNano(String(tonAmount));
   const комиссия = (всего * feeBps) / 10000n;
   const чисто = всего - комиссия;
@@ -115,7 +115,7 @@ export function poolTokensOutFor(state, tonIn) {
   return out > 0n ? out : 0n;
 }
 
-export function оценкаПокупкиВПуле(state, tonAmount, feeBps = 100n) {
+export function оценкаПокупкиВПуле(state, tonAmount, feeBps = (state && state.feeBps) ?? 0n) {
   const всего = toNano(String(tonAmount));
   const комиссия = (всего * feeBps) / 10000n;
   const чисто = всего - комиссия;

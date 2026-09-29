@@ -567,7 +567,7 @@ export async function launchRealToken({
   buyAmountTon,
   treasuryAddress, // wallet that receives the "стартовая покупка" payment (same TREASURY_ADDRESS App.jsx uses for regular buys)
   feeAddress, // wallet that receives the platform commission cut of that payment
-  feePercent = 0.01, // keep in sync with FEE_PERCENT in App.jsx
+  feePercent = 0, // keep in sync with FEE_PERCENT in App.jsx
   network = "mainnet", // switch to "testnet" while validating this flow
   onStage,
 }) {

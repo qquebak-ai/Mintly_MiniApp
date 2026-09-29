@@ -521,7 +521,8 @@ async function состояниеИзКеша(tokenId) {
     tokensSold: нано(data.tokens_sold),
     tokensForSale: 0n,
     graduationTon: нано(data.graduation_ton),
-    feeBps: BigInt(Number(data.fee_bps) || 100),
+    // «|| 100» превращал честный ноль в процент — ноль теперь норма.
+    feeBps: BigInt(data.fee_bps == null ? 0 : Number(data.fee_bps)),
     graduated: !!data.graduated,
     // Цена уже посчитана обходом — брать её оттуда точнее, чем считать
     // по резервам без виртуальных: их в кеше нет.

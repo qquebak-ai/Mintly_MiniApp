@@ -469,7 +469,7 @@ const STR = {
     homePopularAll: "Все",
     heroBodyLead: "Создавай, торгуй и расти с ",
     heroBodyTail: " на сделку. Присоединяйся к экосистеме с первого дня.",
-    heroFee: "1% на сделку",
+    heroFee: "0% комиссии",
     mempadSpotlight: "В центре внимания",
     mempadLaunchToken: "Запустить токен",
     tickerBought: "купил", tickerSold: "продал", tickerLaunched: "запущен", tickerCreated: "создал",
@@ -702,7 +702,7 @@ const STR = {
     archSupplyTitle: "Эмиссия и листинг",
     archSupplyBody: "Выпуск фиксированный — миллиард токенов, чеканится целиком и целиком уходит в продажу. В TON продаётся 900 миллионов, остаток держится до листинга, порог — 1500 TON. В Solana продаётся 860 миллионов, 140 остаются под пару, порог — 35 SOL: на нём капитализация выходит около 25 тысяч долларов, и ровно столько же она стоит в пуле сразу после выхода — цена не прыгает. Когда порог взят, торговля в приложении закрывается, а собранная монета вместе с остатком выпуска уходит в пул на бирже.",
     archFeeTitle: "Комиссия",
-    archFeeBody: "Комиссия площадки — один процент с сделки, с покупки и с продажи. В резерв кривой она не попадает, поэтому цену не искажает. Ставка зашита в кривую при создании и задним числом не меняется: у токенов, запущенных при другой ставке, остаётся их собственная. Плюс комиссия сети — она идёт валидаторам, а не нам. Запуск бесплатный: только первая покупка и та же комиссия сети.",
+    archFeeBody: "Комиссии площадки нет — ноль процентов и с покупки, и с продажи. Ставка зашита в кривую при создании и задним числом не меняется: у токенов, запущенных раньше при другой ставке, остаётся их собственная. Платится только комиссия сети — она идёт валидаторам, а не нам. Запуск бесплатный: только первая покупка и та же комиссия сети.",
     archKeysTitle: "Ключи и подпись",
     archKeysBody: "Ключ кошелька в приложении хранится зашифрованным (AES-256-GCM с привязкой к владельцу), а подписывает отдельная служба вне основного сервера — веб-приложение ключа не видит. Каждая транзакция перед подписью разбирается по инструкциям: чужие программы и переводы мимо контракта отклоняются. Вывод — только на адрес, подтверждённый подписью вашего кошелька; смена адреса вступает в силу через сутки, на вывод есть суточный лимит.",
     archDataTitle: "Данные рынка",
@@ -1162,7 +1162,7 @@ const STR = {
     homePopularAll: "All",
     heroBodyLead: "Create, trade and grow with ",
     heroBodyTail: " per trade. Join the ecosystem from day one.",
-    heroFee: "1% per trade",
+    heroFee: "0% fees",
     mempadSpotlight: "Spotlight",
     mempadLaunchToken: "Launch token",
     tickerBought: "bought", tickerSold: "sold", tickerLaunched: "launched", tickerCreated: "created",
@@ -1394,7 +1394,7 @@ const STR = {
     archSupplyTitle: "Supply and listing",
     archSupplyBody: "Supply is fixed at one billion, minted in full and handed to the curve in full. On TON it sells 900 million and holds the rest until listing, with a 1500 TON threshold. On Solana 860 million are sold, 140 million wait for the pair, threshold 35 SOL: the market cap lands around 25 thousand dollars and stays there in the pool right after the move — no jump in price. Once the threshold is met the curve closes, and the collected coin plus the remaining supply move into a pool on a DEX.",
     archFeeTitle: "Fees",
-    archFeeBody: "The platform fee is one percent per trade, on buys and on sells alike. It never lands in the curve's reserve, so it doesn't distort the price. The rate is baked into the curve at creation and never changes retroactively, so tokens launched under a different rate keep their own. On top of that comes the network fee, which goes to validators, not to us. Launching is free: just your first buy and that same network fee.",
+    archFeeBody: "There is no platform fee — zero percent on buys and on sells alike. The rate is baked into the curve at creation and never changes retroactively, so tokens launched earlier under a different rate keep their own. You only pay the network fee, which goes to validators, not to us. Launching is free: just your first buy and that same network fee.",
     archKeysTitle: "Keys and signing",
     archKeysBody: "The in-app wallet key is stored encrypted (AES-256-GCM, bound to its owner) and signed by a separate service outside the main server — the web app never sees it. Every transaction is parsed instruction by instruction before signing: foreign programs and transfers around the curve are rejected. Withdrawals go only to an address you proved by signing with your own wallet; changing that address takes effect after 24 hours, and daily withdrawals are capped.",
     archDataTitle: "Market data",
@@ -21552,8 +21552,8 @@ const SUPPORT_FAQ = [
     id: "fees",
     q: { RU: "Какие комиссии?", EN: "What are the fees?" },
     a: {
-      RU: "Площадка берёт 1% с каждой покупки и продажи — контракт удерживает его сам. Отдельно платится комиссия сети TON, она идёт валидаторам, а не нам. Запуск токена бесплатный: платишь только за первую покупку и сеть.",
-      EN: "The platform takes 1% of every buy and sell — the contract withholds it itself. On top of that there's the TON network fee, which goes to validators, not us. Launching is free: you only pay for your first buy and the network.",
+      RU: "Площадка не берёт комиссию — 0% с покупки и продажи. Платится только комиссия сети TON, она идёт валидаторам, а не нам. Запуск токена бесплатный: платишь только за первую покупку и сеть.",
+      EN: "The platform takes no fee — 0% on every buy and sell. You only pay the TON network fee, which goes to validators, not us. Launching is free: you only pay for your first buy and the network.",
     },
   },
   {
@@ -25542,14 +25542,14 @@ function сообщитьОСделке(tokenId) {
 export default function TonLaunchApp() {
   const TREASURY_ADDRESS = addressForNetwork("UQD8ipaRIc2X1zJw0C8S9XfsKQOYiNAEPRUpfNidEZ3pIDdo");
 // Кошелёк комиссии площадки. Он зашивается в кривую при запуске токена,
-// и контракт сам отправляет туда 1% с каждой покупки и продажи. Смена
+// и контракт отправлял бы туда комиссию с каждой сделки — сейчас ставка 0%. Смена
 // адреса действует только на новые токены: у уже развёрнутых кривых
 // получатель поменять нельзя.
 // Кошелёк комиссии. Записан в тестовой форме («0Q…»), но счёт тот же —
 // приводим к форме текущей сети, чтобы в боевой деньги действительно
 // уходили: mainnet-форма этого же счёта — UQClGN5h…usvT.
 const FEE_ADDRESS = addressForNetwork("0QClGN5huzz-Z3bwgxr7GOPe5Jyi8PNKbsNnDFKFNGbjunBZ");
-const FEE_PERCENT = 0.01; // 1% комиссии
+const FEE_PERCENT = 0; // комиссии площадки нет
   // Балансовый API (tonapi.io) по умолчанию смотрит в mainnet. Если
   // кошелёк подключён в testnet (например, для проверки покупки на
   // тестовых TON), запрос к mainnet-адресу вернёт пустой/нулевой баланс,

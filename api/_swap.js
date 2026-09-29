@@ -36,7 +36,8 @@ const FEE_ADDRESS = process.env.FEE_ADDRESS || "UQClGN5huzz-Z3bwgxr7GOPe5Jyi8PNK
 
 // Доля площадки в сотых долях процента: 100 = 1%. Больше биржа не
 // пропускает, да и брать больше своей кривой было бы странно.
-const REFERRAL_BPS = 100;
+// Ноль: комиссии площадки нет и после выхода на биржу.
+const REFERRAL_BPS = 0;
 
 // Узел цепочки для расчёта адресов жетонных кошельков. Без ключа
 // toncenter пускает считанные запросы в минуту — на бота хватает, но
@@ -128,9 +129,12 @@ export async function свопТонВЖетон({ jetton, tonAmount, userWallet
     offerAmount: BigInt(Math.round(Number(tonAmount) * 1e9)),
     askJettonAddress: jetton,
     minAskAmount: BigInt(sim.min_ask_units || 1),
-    referralAddress: FEE_ADDRESS,
   };
-  if (реферал) параметры.referralValue = REFERRAL_BPS;
+  // Нулевая доля — реферальный адрес не передаём вовсе.
+  if (REFERRAL_BPS > 0) {
+    параметры.referralAddress = FEE_ADDRESS;
+    if (реферал) параметры.referralValue = REFERRAL_BPS;
+  }
 
   let tx;
   try {
@@ -153,7 +157,7 @@ export async function свопТонВЖетон({ jetton, tonAmount, userWallet
     курс: Number(sim.swap_rate) || 0,
     влияние: Number(sim.price_impact) || 0,
     комиссияБиржи: Number(sim.fee_units || 0) / 10 ** decimals,
-    доляПлощадки: реферал ? REFERRAL_BPS / 100 : null,
+    доляПлощадки: реферал && REFERRAL_BPS > 0 ? REFERRAL_BPS / 100 : null,
     версияРоутера: `${(sim.router || {}).major_version || 1}.${(sim.router || {}).minor_version || 0}`,
   };
 }
@@ -232,9 +236,12 @@ export async function свопЖетонВТон({ jetton, amount, userWallet, �
     offerAmount: units,
     proxyTon: proxy,
     minAskAmount: BigInt(sim.min_ask_units || 1),
-    referralAddress: FEE_ADDRESS,
   };
-  if (реферал) параметры.referralValue = REFERRAL_BPS;
+  // Нулевая доля — реферальный адрес не передаём вовсе.
+  if (REFERRAL_BPS > 0) {
+    параметры.referralAddress = FEE_ADDRESS;
+    if (реферал) параметры.referralValue = REFERRAL_BPS;
+  }
 
   let tx;
   try {
@@ -254,7 +261,7 @@ export async function свопЖетонВТон({ jetton, amount, userWallet, �
     минимум: Number(sim.min_ask_units || 0) / 1e9,
     влияние: Number(sim.price_impact) || 0,
     десятичные: dec,
-    доляПлощадки: реферал ? REFERRAL_BPS / 100 : null,
+    доляПлощадки: реферал && REFERRAL_BPS > 0 ? REFERRAL_BPS / 100 : null,
   };
 }
 

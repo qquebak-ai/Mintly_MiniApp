@@ -24,7 +24,7 @@ const VIRTUAL_TON = toNano(process.env.VIRTUAL_TON ?? "291.217");
 const VIRTUAL_TOKENS = toNano(process.env.VIRTUAL_TOKENS ?? "1073000000");
 const TOKENS_FOR_SALE = toNano(process.env.TOKENS_FOR_SALE ?? "900000000");
 const GRADUATION_TON = toNano(process.env.GRADUATION_TON ?? "1500");
-const FEE_BPS = BigInt(process.env.FEE_BPS ?? "100"); // 1%
+const FEE_BPS = BigInt(process.env.FEE_BPS ?? "0"); // 0% — площадка комиссию не берёт
 
 function requireEnv(name: string): string {
   const value = process.env[name];
