@@ -9,21 +9,27 @@
 @font-face{font-family:'NunitoX';font-weight:800;src:url('assets/fonts/nunito-800-cyrillic.woff2') format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
 @font-face{font-family:'NunitoX';font-weight:800;src:url('assets/fonts/nunito-800-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+2000-206F,U+20AC,U+2122,U+2212}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:1920px;height:1080px;overflow:hidden;background:#07060d}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#06050c}
 #stage,#ui{position:absolute;inset:0}
-#ui{pointer-events:none;font-family:'Onest',sans-serif;color:#f4f2ff}
-.vig{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(3,2,8,.72) 100%)}
-#flash{position:absolute;inset:0;background:#e9dcff;opacity:0;mix-blend-mode:screen}
-#fade{position:absolute;inset:0;background:#000;opacity:0}
-#title{position:absolute;left:150px;top:390px;font-family:'NunitoX';font-weight:800;font-size:196px;letter-spacing:-.045em;line-height:1;white-space:nowrap}
-#title span{display:inline-block}
-#sub{position:absolute;left:158px;top:612px;font-size:40px;font-weight:400;color:#c9c1ee;letter-spacing:-.005em}
-#chip{position:absolute;left:96px;bottom:84px;display:flex;align-items:center;gap:18px;font-size:30px;font-weight:500;color:#e6e0ff}
-#chip b{font-family:'NunitoX';font-weight:800;font-size:22px;letter-spacing:.2em;text-transform:uppercase;color:#1a0b3a;background:#c9b6ff;padding:8px 16px 7px;border-radius:12px}
-#end{position:absolute;left:0;right:0;top:730px;text-align:center}
-#end .n{font-family:'NunitoX';font-weight:800;font-size:150px;letter-spacing:-.045em;line-height:1}
-#end .s{font-size:36px;color:#c9c1ee;margin-top:22px}
-#end .u{font-family:ui-monospace,Menlo,monospace;font-size:30px;color:#b9a8ff;margin-top:26px;letter-spacing:.04em}
+#ui{pointer-events:none;font-family:'Onest',sans-serif;color:#f6f3ff}
+.vig{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 52%,rgba(2,1,6,.78) 100%)}
+.o{position:absolute;opacity:0;will-change:transform,opacity}
+.big{font-family:'NunitoX';font-weight:800;letter-spacing:-.035em;line-height:1.02;text-wrap:balance}
+.glow{text-shadow:0 0 40px rgba(170,110,255,.45),0 0 90px rgba(120,60,255,.25)}
+#cap1{left:0;right:0;top:830px;text-align:center;font-size:54px;font-weight:500;color:#e2dafc;letter-spacing:.005em}
+#chip{left:110px;bottom:96px;display:flex;align-items:center;gap:20px;font-size:36px;font-weight:500;color:#ece6ff}
+#chip b{font-family:'NunitoX';font-weight:800;font-size:24px;letter-spacing:.2em;text-transform:uppercase;color:#1a0b3a;background:#cdb9ff;padding:9px 18px 8px;border-radius:14px}
+#fast{left:0;right:0;top:360px;text-align:center;font-size:150px}
+#fast em{font-style:normal;background:linear-gradient(100deg,#ffffff 0%,#e7d4ff 40%,#19FB9B 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+#fastBg{left:260px;right:260px;top:250px;height:520px;background:radial-gradient(ellipse at 50% 50%,rgba(6,5,12,.82) 0%,rgba(6,5,12,.55) 45%,rgba(6,5,12,0) 72%)}
+#lock{left:1010px;top:360px;width:820px}
+#lock .a{font-size:132px}
+#lock .b{font-size:58px;margin-top:26px;color:#e2dafc;font-family:'NunitoX';font-weight:800;letter-spacing:-.02em;line-height:1.1}
+#end{left:0;right:0;top:720px;text-align:center}
+#end .s{font-size:44px;color:#d9d0f7;font-weight:500}
+#end .u{font-family:ui-monospace,Menlo,monospace;font-size:34px;color:#bba8ff;margin-top:26px;letter-spacing:.04em}
+#flash{position:absolute;inset:0;background:#efe4ff;opacity:0;mix-blend-mode:screen}
+#fade{position:absolute;inset:0;background:#000;opacity:1}
 </style>
 <script type="importmap">
 {"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}
@@ -33,10 +39,12 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:#07060d}
 <div id="stage"></div>
 <div id="ui">
   <div class="vig"></div>
-  <div id="title"></div>
-  <div id="sub">мемкоины на TON и Solana</div>
-  <div id="chip"><b id="chipTag"></b><span id="chipText"></span></div>
-  <div id="end"><div class="n">Mintly</div><div class="s">Telegram Mini App · TON · Solana</div><div class="u">mintly.company</div></div>
+  <div id="cap1" class="o">комиссии за сделки</div>
+  <div id="chip" class="o"><b id="chipTag"></b><span id="chipText"></span></div>
+  <div id="fastBg" class="o"></div>
+  <div id="fast" class="o big glow"><em>Самые быстрые</em><br>транзакции в мире</div>
+  <div id="lock" class="o"><div class="a big glow">комиссии</div><div class="b">и самые быстрые транзакции в мире</div></div>
+  <div id="end" class="o"><div class="s">Telegram Mini App · TON · Solana</div><div class="u">mintly.company</div></div>
   <div id="flash"></div>
   <div id="fade"></div>
 </div>

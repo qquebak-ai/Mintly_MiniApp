@@ -1,7 +1,7 @@
 # Авторский трек под шоурил: 120 BPM, такт = 2с, смена сцены каждые 4с.
 import numpy as np, wave
 from scipy.signal import butter, lfilter
-SR=44100; DUR=24.0; n=int(SR*DUR); L=np.zeros(n); R=np.zeros(n)
+SR=44100; DUR=28.0; n=int(SR*DUR); L=np.zeros(n); R=np.zeros(n)
 rs=np.random.RandomState(7)
 def put(t,s,g=1.0,pan=0.0):
     i=int(t*SR); e=min(n,i+len(s)); s=s[:e-i]*g
@@ -30,27 +30,32 @@ def boom():
 # аккорды: Am F C G по такту
 CH=[[220,261.6,329.6],[174.6,220,261.6],[196,261.6,329.6],[196,246.9,293.7]]
 BS=[55,43.65,65.41,49]
-for bar in range(12):
+for bar in range(14):
     t0=bar*2; c=CH[bar%4]
-    cut=600 if t0<4 else (1800 if t0<16 else 3000)
-    put(t0,pad(c,2.05,cut),.55 if t0>=4 else .4)
-# интро: тикающий пульс и подъём
-for b in range(8): put(b*.5,hat(.03),.5)
-put(3.4,whoosh(.6),.7)
-# основной бит 4–22
-for i in range(int((22-4)/.5)):
-    tm=4+i*.5; put(tm,kick(),1.0)
+    cut=700 if t0<8 else (2200 if t0<24 else 1400)
+    put(t0,pad(c,2.05,cut),.4 if t0<8 else .55)
+# 0–4: удар на «0%» и тихий пульс
+put(0.15,boom(),.75)
+for b in range(8): put(b*.5,hat(.03),.4)
+# 4–8: полутакт, подъём к дропу
+for i in range(8):
+    tm=4+i*.5
+    if i%2==0: put(tm,kick(),.8)
+    put(tm+.25,hat(),.35,.3)
+put(6.4,whoosh(1.6),.8)
+# 8–24: полный бит
+for i in range(int((24-8)/.5)):
+    tm=8+i*.5; put(tm,kick(),1.0)
     if i%2==1: put(tm,clap(),.45)
     put(tm+.25,hat(),.45,.3)
-    if tm>=16: put(tm+.125,hat(.03),.3,-.3); put(tm+.375,hat(.03),.3,-.3)
+    if tm>=20: put(tm+.125,hat(.03),.3,-.3); put(tm+.375,hat(.03),.3,-.3)
     put(tm,bass(BS[int(tm//2)%4],.45),.7)
-# переходы на смене сцен
-for c in (4,8,12,16,20):
-    if c>4: put(c-.6,whoosh(),.55)
-    put(c,boom(),.6)
-put(22,boom(),.8)
+put(9.1,whoosh(.5),.7)
+for c in (8,12,16,20,24):
+    if c>8: put(c-.6,whoosh(),.5)
+    put(c,boom(),.7 if c in (8,24) else .5)
 x=np.stack([L,R],1)
-fade=np.clip((DUR-np.arange(n)/SR)/1.8,0,1)[:,None]; x*=fade
+fade=np.clip((DUR-np.arange(n)/SR)/2.2,0,1)[:,None]; x*=fade
 x=np.tanh(x*1.4)/np.tanh(1.4); x/=np.abs(x).max()*1.08
 w=wave.open('assets/track.wav','wb'); w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR)
 w.writeframes((x*32767).astype(np.int16).tobytes()); w.close()
