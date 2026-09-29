@@ -2086,7 +2086,7 @@ function GlobalStyle() {
         92.5% { background-position: 80% 0; }
         94%  { background-position: 0% 0; }
       }
-      @media (prefers-reduced-motion: reduce) { [style*="минтиЖивёт"] { animation: none !important; } }
+      @keyframes минтиКадры { from { background-position: 0% 0; } to { background-position: 100% 0; } }
       @keyframes свечиПлывут {
         0%, 100% { transform: translateY(calc(-50% - 5px)); }
         50%      { transform: translateY(calc(-50% + 5px)); }
@@ -12416,7 +12416,7 @@ function СценаЗапуска() {
 // Сетка фона — 120×50 пикселей; маскот поверх неё нарисован втрое мельче
 // и живёт кадрами из спрайт-листа (исходник — demo/pixel/mascots.py).
 const СЕТКА_ФОНА = { w: 120, h: 50 };
-function СценаПикселя({ src, маскот }) {
+function СценаПикселя({ src, маскот, onМаскот }) {
   const { w: СШ, h: СВ } = СЕТКА_ФОНА;
   return (
     <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", background: "#000000" }}>
@@ -12427,18 +12427,74 @@ function СценаПикселя({ src, маскот }) {
       <span style={{ position: "absolute", right: 0, bottom: 0, height: "100%", aspectRatio: `${СШ} / ${СВ}` }}>
         <img src={src} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", imageRendering: "pixelated" }} />
         {маскот && (
-          <span style={{
-            position: "absolute",
+          <span
+            onClick={onМаскот ? (e) => { e.stopPropagation(); haptic("light"); onМаскот(); } : undefined}
+            style={{
+            position: "absolute", pointerEvents: onМаскот ? "auto" : "none", cursor: onМаскот ? "pointer" : undefined,
             left: `${(маскот.x0 / СШ) * 100}%`, top: `${(маскот.y0 / СВ) * 100}%`,
             width: `${(маскот.w / СШ) * 100}%`, height: `${(маскот.h / СВ) * 100}%`,
-            backgroundImage: `url(${маскот.лист})`, backgroundSize: "600% 100%", backgroundRepeat: "no-repeat",
+            backgroundImage: `url(${маскот.лист})`, backgroundSize: "100% 100%", backgroundRepeat: "no-repeat",
+            // На баннере Минти неподвижен; живой — на своём экране.
             imageRendering: "pixelated",
-            // Время от времени: долго стоит, потом вдох-выдох и моргание.
-            animation: `минтиЖивёт 6s step-end ${маскот.сдвиг}s infinite`,
           }} />
         )}
       </span>
     </span>
+  );
+}
+
+/* Экран Минти: все три облика маскота и все его покадровые анимации
+   на одной странице. Открывается нажатием на Минти на баннере.
+   Кадр — 112 мелких пикселей; клетка ровно 112px, чтобы пиксель ложился
+   на пиксель экрана без размазывания. Исходник — demo/pixel/mintie.py. */
+const ОБЛИКИ_МИНТИ = [
+  { id: "glasses", RU: "В очках", EN: "Shades" },
+  { id: "plain", RU: "Обычный", EN: "Classic" },
+  { id: "crown", RU: "В короне", EN: "Crowned" },
+];
+const АНИМАЦИИ_МИНТИ = [
+  { id: "idle", RU: "Дыхание", EN: "Breathing", кадров: 6, анимация: "минтиЖивёт 3.2s step-end infinite" },
+  { id: "jump", RU: "Прыжок", EN: "Jump", кадров: 6, анимация: "минтиКадры 0.9s steps(6, jump-none) infinite" },
+  { id: "wave", RU: "Привет", EN: "Wave", кадров: 4, анимация: "минтиКадры 0.64s steps(4, jump-none) infinite" },
+  { id: "run", RU: "Бег", EN: "Run", кадров: 4, анимация: "минтиКадры 0.48s steps(4, jump-none) infinite" },
+];
+// На узком экране три клетки в ряд не влезут по 112px — тогда чуть мельче.
+const КЛЕТКА_МИНТИ = "min(112px, calc((100vw - 48px) / 3))";
+function ЭкранМинти({ onBack }) {
+  const язык = lang === "EN" ? "EN" : "RU";
+  return (
+    <div className="fx-view flex flex-col" style={{ gap: 18, paddingTop: 8, paddingBottom: 40 }}>
+      {onBack && !hasTelegramBack() && (
+        <button onClick={onBack} className="fx-tap flex items-center gap-1 self-start" style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>
+          <ChevronLeft size={16} /> {t("back")}
+        </button>
+      )}
+      <div style={{ fontFamily: displayFont, fontSize: 26, fontWeight: 800, color: T.ice, letterSpacing: "-0.02em" }}>Минти</div>
+      <div className="flex flex-col" style={{ gap: 22 }}>
+        {АНИМАЦИИ_МИНТИ.map((а) => (
+          <div key={а.id} className="flex flex-col" style={{ gap: 8 }}>
+            <div style={{ fontFamily: displayFont, fontSize: 15, fontWeight: 700, color: T.muted }}>{а[язык]}</div>
+            <div className="flex" style={{ gap: 8, justifyContent: "space-between" }}>
+              {ОБЛИКИ_МИНТИ.map((о, i) => (
+                <div key={о.id} className="flex flex-col items-center" style={{ gap: 4 }}>
+                  <div style={{ width: КЛЕТКА_МИНТИ, height: КЛЕТКА_МИНТИ, borderRadius: 18, background: "#000000", overflow: "hidden" }}>
+                    <div style={{
+                      width: "100%", height: "100%",
+                      backgroundImage: `url(/mintie/mintie-${о.id}-${а.id}.webp)`,
+                      backgroundSize: `${а.кадров * 100}% 100%`, backgroundRepeat: "no-repeat",
+                      imageRendering: "pixelated",
+                      // Облики оживают вразнобой, а не хором.
+                      animation: а.анимация, animationDelay: `${-i * 0.37}s`,
+                    }} />
+                  </div>
+                  <span style={{ fontFamily: bodyFont, fontSize: 12, color: T.faint }}>{о[язык]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -12909,7 +12965,7 @@ function разбитьПоВыделениям(строка, выделения
   return куски;
 }
 
-function БаннерыГлавной({ onGoTab, onGoCreate }) {
+function БаннерыГлавной({ onGoTab, onGoCreate, onOpenMintie }) {
   // Язык берётся из общей настройки приложения, как и весь остальной текст.
   const язык = lang === "EN" ? "EN" : "RU";
   const лента = useRef(null);
@@ -13002,7 +13058,7 @@ function БаннерыГлавной({ onGoTab, onGoCreate }) {
                 в перспективе, то же ощущение плоскости, на которой стоит
                 предмет. */}
             {б.сцена === "запуск" ? <СценаЗапуска />
-              : б.пиксель ? <СценаПикселя src={б.пиксель} маскот={б.маскот} />
+              : б.пиксель ? <СценаПикселя src={б.пиксель} маскот={б.маскот} onМаскот={onOpenMintie} />
               : б.сцена === "торговля" ? (
                 /* Три растущие свечи справа — тот же приём, что и на
                    баннере запуска: один предмет на ровном чёрном, без
@@ -13430,7 +13486,7 @@ function завестиЗнаки() {
 
 function HomeView({
   onGoTab, onGoCreate, profile = null, accountCreated = false, userId = null,
-  onOpenMyProfile, профильГрузится = false, грузится = false, insetTop = 0, insetBottom = 0,
+  onOpenMyProfile, профильГрузится = false, грузится = false, insetTop = 0, insetBottom = 0, onOpenMintie,
 }) {
   // Главная сведена к баннерам и курсу — сводка, лента, токен дня,
   // движение и топ убраны по просьбе. Заголовок и шапка (аватар, ник,
@@ -13443,7 +13499,7 @@ function HomeView({
       </div>
       <div className="fx-view flex flex-col" style={{ gap: 26 }}>
         <ЖивыеКарточки />
-        <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} />
+        <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} onOpenMintie={onOpenMintie} />
       </div>
     </div>
   );
@@ -28159,6 +28215,7 @@ function mapTokenRow(row) {
   function backFromUserProfile() { уйтиСоСтраницы(() => setView(token ? "token" : tab)); }
   function backFromAchievements() { уйтиСоСтраницы(() => setView(откудаДостижения)); }
   function backFromProfile() { уйтиСоСтраницы(() => goTab("home")); }
+  function backFromMintie() { уйтиСоСтраницы(() => setView("home")); }
 
   /* Кнопка «Назад» в шапке Telegram.
 
@@ -28196,6 +28253,7 @@ function mapTokenRow(row) {
        приложения целиком. */
     if (view === "profile") return backFromProfile;
     if (view === "achievements") return backFromAchievements;
+    if (view === "mintie") return backFromMintie;
     return null;
   }, [pinLocked, pinModal, launchRequest, profileModalOpen, profileModalMode, settingsItem, tradeModal, manageToken_, назадФразы, view, tab, token, откудаДостижения]);
 
@@ -28783,6 +28841,7 @@ function mapTokenRow(row) {
           <div className="px-4">
           <KeepAlive show={view === "home"}>
             <HomeView
+              onOpenMintie={() => { setView("mintie"); }}
               onGoTab={goTab}
               onGoCreate={openCreate}
               curveTokens={communityTokens}
@@ -28853,6 +28912,11 @@ function mapTokenRow(row) {
               onOpenLogin={openLoginProfile}
             />
           </KeepAlive>
+          {view === "mintie" && (
+            <div className={уходСтраницы ? "fx-view-out" : undefined}>
+              <ЭкранМинти onBack={backFromMintie} />
+            </div>
+          )}
           {view === "achievements" && (
             <div className={уходСтраницы ? "fx-view-out" : undefined}>
               <AchievementsView achievements={achievements} onGoShop={() => goTab("shop")} onBack={backFromAchievements} />

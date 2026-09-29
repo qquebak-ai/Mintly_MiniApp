@@ -326,7 +326,9 @@ for name, p in MASCOTS.items():
         px, box = mascot_frame(p, f)
         frames.append(px)
     x0, y0, w, h, cw, ch = box
-    sheet = Image.new("RGBA", (cw * S2 * 6, ch * S2), (0, 0, 0, 0))
+    # на баннере Минти стоит неподвижно — нужен только кадр покоя
+    frames = frames[:1]
+    sheet = Image.new("RGBA", (cw * S2, ch * S2), (0, 0, 0, 0))
     for i, px in enumerate(frames):
         for (x, y), c in px.items():
             sheet.paste(tuple(int(c[k:k+2], 16) for k in (1, 3, 5)) + (255,), (i * cw * S2 + x * S2, y * S2, i * cw * S2 + (x + 1) * S2, (y + 1) * S2))
