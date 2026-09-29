@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<script src="assets/gsap.min.js"></script>
+<style>
+@font-face{font-family:'MintlyUI';font-weight:100 650;src:url('assets/onest-cyrillic.woff2') format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'MintlyUI';font-weight:100 650;src:url('assets/onest-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+2000-206F,U+20AC,U+2122,U+2212}
+@font-face{font-family:'MintlyUI';font-weight:751 900;src:url('assets/nunito-800-cyrillic.woff2') format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'MintlyUI';font-weight:751 900;src:url('assets/nunito-800-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+2000-206F,U+20AC,U+2122,U+2212}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#07060d;font-family:'MintlyUI',ui-sans-serif,system-ui,sans-serif;color:#f4f2ff}
+.mono{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+.scene{position:absolute;inset:0;width:1920px;height:1080px}
+.abs{position:absolute}
+.caret{display:inline-block;width:.55em;height:1.05em;background:currentColor;vertical-align:-.15em;margin-left:2px}
+/* I */
+#big{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:132px;font-weight:800;letter-spacing:-.03em}
+/* II — четыре формы, не четыре бренда */
+#s1{background:#0b0c10;padding:90px 110px;font-size:54px;color:#7dffb0;line-height:1.5}
+#s1 .dim{color:#5b6070}
+#s2{background:#0f0d1a}
+#s2 .panel{left:1140px;top:0;width:780px;height:1080px;background:#171428;border-left:2px solid #2b2650;padding:60px 56px}
+#s2 .code{left:80px;top:120px;font-size:30px;line-height:1.9;color:#4a4470}
+#s3{background:#efeaf7;color:#1b1530}
+#s3 .doc{left:360px;top:130px;width:1200px}
+#s3 h2{font-size:64px;font-weight:800;letter-spacing:-.02em;margin-bottom:34px}
+#s3 p{font-size:32px;line-height:1.6;color:#6c6488;margin-bottom:30px}
+#s3 .field{border:3px solid #7B1FE0;border-radius:18px;background:#fff;padding:26px 34px;font-size:46px;box-shadow:0 0 0 10px rgba(123,31,224,.12)}
+#s4{background:linear-gradient(160deg,#120a2b,#07060d 60%)}
+#s4 .comp{left:410px;top:400px;width:1100px;height:170px;border-radius:85px;background:#1d1838;border:2px solid #3a3270;display:flex;align-items:center;padding:0 60px;font-size:52px;box-shadow:0 40px 120px rgba(74,0,224,.45)}
+.tag{position:absolute;font-size:24px;letter-spacing:.18em;text-transform:uppercase;color:#8a83b3}
+/* III */
+.cut{position:absolute;inset:0;overflow:hidden}
+.card{position:absolute;width:960px;height:600px;border-radius:52px;padding:46px 54px;background-size:220% 220%}
+.card .lb{font-size:44px;font-weight:800;letter-spacing:-.01em;opacity:.95}
+.card .bal{font-size:132px;font-weight:800;letter-spacing:-.03em;margin-top:8px}
+.card .low{position:absolute;left:54px;right:54px;bottom:44px;font-size:42px;font-weight:600;display:flex;justify-content:space-between}
+.rate{position:absolute;width:1000px;height:600px;border-radius:52px;background:#12101f;border:2px solid #2a2547;padding:52px 60px}
+.rate .nm{font-size:64px;font-weight:800}
+.rate .pr{font-size:112px;font-weight:800;letter-spacing:-.03em;margin-top:14px}
+.rate .ch{position:absolute;left:60px;bottom:48px;font-size:56px;font-weight:800}
+.rate svg{position:absolute;right:50px;top:120px}
+.name{position:absolute;left:100px;bottom:34px;font-size:34px;letter-spacing:.2em;text-transform:uppercase;color:#a79fd0}
+/* IV */
+#cmd{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;font-size:76px}
+#note{position:absolute;left:0;right:0;bottom:46px;text-align:center;font-size:22px;color:#9c95c4}
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="28" data-width="1920" data-height="1080">
+
+<audio id="music" src="assets/track.mp3" data-start="0" data-duration="28" data-track-index="9" data-volume="0.62"></audio>
+
+<!-- I -->
+<div id="m1" class="scene clip" data-start="0" data-duration="3" data-track-index="0">
+  <div id="big"><span id="bigtxt"></span></div>
+</div>
+
+<!-- II -->
+<div id="s1" class="scene clip mono" data-start="3" data-duration="2.6" data-track-index="0">
+  <div class="dim">~/projects — zsh</div><div>&nbsp;</div>
+  <div>$ <span id="t1"></span><span class="caret"></span></div>
+  <div class="tag" style="left:110px;bottom:70px">terminal</div>
+</div>
+<div id="s2" class="scene clip" data-start="5.6" data-duration="1.8" data-track-index="0">
+  <div class="abs code mono">export function main() {<br>&nbsp;&nbsp;const chain = ...<br>&nbsp;&nbsp;return coin;<br>}</div>
+  <div class="abs panel"><div class="tag" style="position:static;margin-bottom:36px">panel</div>
+    <div class="mono" style="font-size:40px;line-height:1.5;background:#0f0d1a;border:2px solid #3a3270;border-radius:22px;padding:32px 34px"><span id="t2"></span><span class="caret"></span></div></div>
+</div>
+<div id="s3" class="scene clip" data-start="7.4" data-duration="1.4" data-track-index="0">
+  <div class="abs doc"><h2>Launch plan</h2><p>Name, ticker and supply are set. Write the next step below.</p>
+    <div class="field"><span id="t3"></span><span class="caret" style="color:#7B1FE0"></span></div></div>
+  <div class="tag" style="left:360px;bottom:70px;color:#6f6690">inline</div>
+</div>
+<div id="s4" class="scene clip" data-start="8.8" data-duration="1.2" data-track-index="0">
+  <div class="abs comp"><span id="t4"></span></div>
+  <div class="tag" style="left:410px;top:610px">composer</div>
+</div>
+
+<!-- III: нарезка собирается скриптом ниже -->
+
+
+<!-- IV -->
+<div id="cmdscene" class="scene clip" data-start="24" data-duration="4" data-track-index="0">
+  <div id="cmd" class="scene"><div class="mono" style="color:#b9a8ff" id="cmdtxt"></div></div>
+  <div id="note" class="mono">Demo cut · surfaces are neutral originals · card skins &amp; prices from the Mintly app</div>
+</div>
+</div>
+
+<script>
+// Один промпт, объявлен один раз — все четыре поверхности читают его отсюда.
+const PROMPT = "launch my coin on TON";
+const COMMAND = "t.me/mintly · mintly.company";
+const FPS = 30, snap = t => Math.round(t*FPS)/FPS;
+
+const SOL = [121.68,121.75,121.8,122.04,123.24,123.01,122.68,122.81,121.4,121.98,121.68,120.7,120.02,119.8,119.96,119.11,118.71,118.01,118.3,117.72,118.42,118.67,119.99,119.81,118.04,118.65,119.24,119.69,119.93,118.31,118.76,117.68,118.55,118.83,118.09,117.12,116.9,117.8,117.65,118.21,119.2,119.49,119.13,119.87,119.39,120.11,120.87,120.97];
+const TON = [1.584,1.65,1.67,1.661,1.651,1.639,1.631,1.633,1.631,1.635,1.609,1.627,1.608,1.605,1.621,1.628,1.608,1.616,1.625,1.662,1.676,1.655,1.658,1.685,1.616,1.607,1.651,1.64,1.645,1.601,1.602,1.568,1.574,1.573,1.565,1.555,1.54,1.551,1.558,1.55,1.58,1.59,1.588,1.588,1.572,1.58,1.553,1.545];
+
+// Настоящие заливки из WALLET_SKINS приложения.
+const SKINS = [
+  ["Mintly","linear-gradient(115deg,#E44BC8 0%,#C13AE6 18%,#8E2DE2 36%,#6A17E8 54%,#4A00E0 70%,#7B1FE0 84%,#2C0A78 100%)","#fff"],
+  ["Midnight","linear-gradient(140deg,#0F2027 0%,#203A43 45%,#2C5364 100%)","#fff"],
+  ["Candle","linear-gradient(115deg,#00A34C 0%,#00E96B 26%,#0B2A1A 58%,#E01E37 86%,#FF3B47 100%)","#fff"],
+  ["Gold","linear-gradient(120deg,#8A5E06 0%,#F0B429 32%,#FFF0C2 50%,#F0B429 68%,#6A4A08 100%)","#fff;text-shadow:0 3px 16px rgba(40,25,0,.75)"],
+  ["Solana","linear-gradient(120deg,#9945FF 0%,#7A3DF5 35%,#19FB9B 100%)","#fff"],
+  ["Magma","linear-gradient(125deg,#2B0A02 0%,#8E1400 30%,#FF3B00 55%,#FFD08A 74%,#7A1B00 100%)","#fff"],
+];
+function curve(a,w,h,col){
+  const mn=Math.min(...a),mx=Math.max(...a),p=a.map((v,i)=>`${(i/(a.length-1)*w).toFixed(1)},${(h-(v-mn)/(mx-mn)*h).toFixed(1)}`).join(" ");
+  return `<svg width="${w}" height="${h+20}" viewBox="-6 -10 ${w+12} ${h+20}"><polyline points="${p}" fill="none" stroke="${col}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+function rateHTML(nm,a,dec){
+  const last=a[a.length-1],pct=(last/a[0]-1)*100,up=pct>=0,col=up?"#00E96B":"#FF3B47";
+  return `<div class="rate" data-x><div class="nm">${nm}</div><div class="pr">$${last.toFixed(dec)}</div>${curve(a,340,150,col)}<div class="ch" style="color:${col}">${up?"+":""}${pct.toFixed(2)}%</div></div>`;
+}
+// 8 выходов: 6 скинов + 2 курса; варианты кадрирования меняются от реза к резу.
+const OUT = [
+  ...SKINS.map((s,i)=>({k:"card",i,html:`<div class="card" data-x style="background:${s[1]};color:${s[2]}"><div class="lb">Balance</div><div class="bal">$${[1284.5,96.2,3410,712.8,58.4,2205][i].toFixed(2)}</div><div class="low"><span>${[12.4,0.8,31.2,5.9,0.5,18.1][i]} SOL</span><span>${[8420,120,64000,3300,410,12900][i].toLocaleString("en-US")} GRAM</span></div></div>`,nm:s[0]+" card"})),
+  {k:"rate",html:rateHTML("SOL",SOL,2),nm:"SOL rate"},
+  {k:"rate",html:rateHTML("GRAM",TON,3),nm:"GRAM rate"},
+];
+// варианты кадра: центр / крупный план / наклон / смещение
+const VAR = [
+  {x:480,y:240,s:1,r:0},{x:300,y:120,s:1.35,r:0},{x:470,y:250,s:1,r:-6},{x:190,y:230,s:1.2,r:4},{x:560,y:190,s:.92,r:8},{x:420,y:110,s:1.25,r:-3},
+];
+// сетка резов — см. STORYBOARD.md
+const cuts=[10,11,12,13];
+for(let i=0;i<12;i++) cuts.push(14+i*.5);
+for(let i=0;i<8;i++) cuts.push(20+i*.25);
+cuts.push(22);
+const reel=document.getElementById("root");
+cuts.forEach((t,i)=>{
+  const o=OUT[i%OUT.length],v=VAR[(i*5+Math.floor(i/OUT.length))%VAR.length];
+  const el=document.createElement("div");el.className="cut clip";el.dataset.trackIndex="0";
+  el.innerHTML=o.html+`<div class="name mono">${String(i+1).padStart(2,"0")} · ${o.nm}</div>`;
+  el.style.background=i%2?"#07060d":"#0d0a1c";
+  reel.appendChild(el);
+  const c=el.firstElementChild;
+  c.style.left=v.x+"px";c.style.top=v.y+"px";c.style.transform=`scale(${v.s}) rotate(${v.r}deg)`;
+  el._t=snap(t);
+});
+
+const cutEls=[...document.querySelectorAll(".cut")];
+cutEls.forEach((el,i)=>{const end=i<cutEls.length-1?cutEls[i+1]._t:24;el.dataset.start=el._t;el.dataset.duration=(end-el._t).toFixed(4);el.style.display="";});
+const tl=gsap.timeline({paused:true});
+// I
+const big=document.getElementById("bigtxt");
+const type=(id,t0,dur,upTo=1)=>{const o={n:0},el=document.getElementById(id);
+  tl.to(o,{n:PROMPT.length*upTo,duration:dur,ease:"none",onUpdate(){el.textContent=PROMPT.slice(0,Math.round(o.n))}},t0);};
+type("bigtxt",0.3,1.6);
+tl.fromTo("#big",{scale:.96},{scale:1,duration:3,ease:"none"},0);
+// II: печатает быстрее с каждой поверхностью; в конце — сразу целиком
+type("t1",3.2,PROMPT.length/26);
+type("t2",5.7,PROMPT.length/40);
+type("t3",7.45,.5,.5); tl.call(()=>{document.getElementById("t3").textContent=PROMPT.slice(0,Math.round(PROMPT.length*.5))},null,7.95);
+tl.call(()=>{document.getElementById("t3").textContent=PROMPT},null,8.3);
+tl.call(()=>{document.getElementById("t4").textContent=PROMPT},null,8.8);
+tl.call(()=>{document.getElementById("t4").textContent=""},null,8.7);
+// III: жёсткие резы
+cutEls.forEach((el,i)=>{
+  const t=el._t, end=i<cutEls.length-1?cutEls[i+1]._t:24;
+  tl.fromTo(el.firstElementChild,{backgroundPosition:"0% 0%"},{backgroundPosition:"100% 100%",duration:Math.max(end-t,.2),ease:"none"},t);
+});
+// IV
+const cmd=document.getElementById("cmdtxt");
+tl.call(()=>{cmd.textContent=""},null,24);
+tl.call(()=>{cmd.textContent=COMMAND},null,24.6);
+window.__timelines=window.__timelines||{};
+window.__timelines["main"]=tl;
+tl.seek(0);
+</script>
+</body>
+</html>
