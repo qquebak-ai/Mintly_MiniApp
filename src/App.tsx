@@ -11159,7 +11159,8 @@ function КартаКурсаМонеты({ title, монета }) {
 
       <div
         style={{
-          position: "relative", zIndex: 1, fontFamily: displayFont, color: цвет, fontSize: 13.5, fontWeight: 800,
+          // Процент — в правом верхнем углу, на одной линии с названием.
+          position: "absolute", top: 14, right: 14, zIndex: 1, lineHeight: "22px", fontFamily: displayFont, color: цвет, fontSize: 13.5, fontWeight: 800,
           filter: готово ? "blur(0px)" : "blur(9px)",
           opacity: готово ? 1 : 0.45,
           transition: "filter 480ms ease, opacity 480ms ease",
