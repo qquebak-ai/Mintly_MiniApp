@@ -22,7 +22,7 @@ def sprite(cw, ch, ground, st, variant):
     def rect(x0, y0, x1, y1, c):
         for x in range(x0, x1 + 1):
             for y in range(y0, y1 + 1): put(x, y, c)
-    ox = cw // 2 - 18
+    ox = cw // 2 - 18 + st.get("sx", 0)       # sx — покачивание вбок
     dy = st.get("dy", 0); bob = st.get("bob", 0); crouch = st.get("crouch", 0)
     legs = st.get("legs", [0, 0, 0, 0])
     leg_len = 3 - min(crouch, 2)
@@ -202,7 +202,25 @@ def idle(i):  # 36 кадров = 3 с: вдох-выдох, взгляд в с�
     st["tl"] = [0, 0, 1, 2, 3, 4, 4, 3, 2, 1, 0][i - 26] if 26 <= i < 37 and i - 26 < 11 else 0
     if 30 <= i < 34: st["wag"] = 1 if i % 2 else 0
     return st
-def jump(i):  # 18 кадров: замах, толчок, полёт, зависание, падение, шлёп, отскок
+def jump(i):  # 30 кадров: замах, толчок, полёт, шлепок — и еле устоял на ногах
+    if i >= 18:
+        # после приземления лапы подкашиваются то слева, то справа,
+        # тело качает — вот-вот упадёт, но выпрямляется и отряхивается
+        w = [
+            {"legs": [2, 2, 0, 0], "sx": -1, "look": -1, "sq": 1, "gill": 1},
+            {"legs": [2, 1, 0, 0], "sx": -2, "look": -1, "sq": 1, "gill": 1, "blink": True},
+            {"legs": [1, 0, 0, 0], "sx": -1, "look": -1},
+            {"legs": [0, 0, 1, 2], "sx": 1, "look": 1, "gill": -1},
+            {"legs": [0, 0, 2, 2], "sx": 2, "look": 1, "sq": 1, "gill": -1, "blink": True},
+            {"legs": [0, 0, 1, 1], "sx": 1, "look": 1},
+            {"legs": [1, 0, 0, 0], "sx": -1},
+            {"legs": [0, 0, 0, 1], "sx": 1},
+            {"sq": -1, "tl": 4},
+            {"sq": -1, "tl": 4, "wag": 1},
+            {"tl": 3, "wag": -1},
+            {"tl": 2},
+        ][i - 18]
+        return w
     dys = [0, 0, 0, 0, -3, -7, -10, -12, -13, -13, -12, -9, -5, 0, 0, 0, 0, 0]
     sqs = [0, 1, 2, 2, -2, -1, -1, 0, 0, 0, 0, -1, -1, 2, 1, -1, 0, 0]
     st = {"dy": dys[i], "sq": sqs[i]}
@@ -227,7 +245,7 @@ def walk(i):  # 24 кадра = 2 с: неспешный шаг, лапы по �
     st["gill"] = 1 if (i // 6) % 2 else 0
     st["leaf"] = 1 if (i // 4) % 2 else 0
     return st
-ANIMS = {"idle": seq(36, idle), "jump": seq(18, jump), "wave": seq(16, wave), "walk": seq(24, walk)}
+ANIMS = {"idle": seq(36, idle), "jump": seq(30, jump), "wave": seq(16, wave), "walk": seq(24, walk)}
 for variant in ("glasses", "plain", "crown"):
     for a, frames in ANIMS.items():
         save([sprite(PW, PH, G, st, variant) for st in frames], PW, PH, 4, f"mintie/mintie-{variant}-{a}.webp")
