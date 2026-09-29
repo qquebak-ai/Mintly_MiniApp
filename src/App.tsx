@@ -12301,7 +12301,7 @@ function МояАктивность({ userId, тик = 0 }) {
 /* Картинки из public сервер отдаёт с вечным кэшем (immutable), и
    Telegram держит старого Минти после перерисовки. Номер версии в адресе
    — повышать при каждой замене картинок маскота. */
-const ВЕРСИЯ_МИНТИ = 11;
+const ВЕРСИЯ_МИНТИ = 12;
 
 const БАННЕРЫ = [
   {
@@ -12465,6 +12465,26 @@ const АНИМАЦИИ_МИНТИ = [
   { id: "alarm", RU: "Волнение", EN: "Alarm", кадров: 24 },
   { id: "walk", RU: "Ходьба", EN: "Walk", кадров: 24 },
 ].map((а) => ({ ...а, анимация: `минтиКадры ${(а.кадров / 12).toFixed(3)}s steps(${а.кадров}, jump-none) infinite` }));
+/* «Волнение» начинается со сна: пока экран не открыт, Минти спит и
+   сопит, а как только его открыли — вскакивает (18 кадров один раз),
+   и дальше по кругу идёт волнение. */
+function КадрыПробуждения({ облик, анимация, кадров }) {
+  const [проснулся, setПроснулся] = useState(false);
+  const лист = проснулся ? `alarm` : `wake`;
+  return (
+    <div
+      onAnimationEnd={() => setПроснулся(true)}
+      style={{
+        width: "100%", height: "100%",
+        backgroundImage: `url(/mintie/mintie-${облик}-${лист}.webp?v=${ВЕРСИЯ_МИНТИ})`,
+        backgroundSize: `${(проснулся ? кадров : 18) * 100}% 100%`, backgroundRepeat: "no-repeat",
+        imageRendering: "pixelated",
+        animation: проснулся ? анимация : "минтиКадры 1.5s steps(18, jump-none) 1 forwards",
+      }}
+    />
+  );
+}
+
 // На узком экране три клетки в ряд не влезут по 112px — тогда чуть мельче.
 const КЛЕТКА_МИНТИ = "min(112px, calc((100vw - 48px) / 3))";
 function ЭкранМинти({ onBack }) {
@@ -12485,6 +12505,7 @@ function ЭкранМинти({ onBack }) {
               {ОБЛИКИ_МИНТИ.map((о, i) => (
                 <div key={о.id} className="flex flex-col items-center" style={{ gap: 4 }}>
                   <div style={{ width: КЛЕТКА_МИНТИ, height: КЛЕТКА_МИНТИ, borderRadius: 18, background: "#000000", overflow: "hidden" }}>
+                    {а.id === "alarm" ? <КадрыПробуждения облик={о.id} анимация={а.анимация} кадров={а.кадров} /> : (
                     <div style={{
                       width: "100%", height: "100%",
                       backgroundImage: `url(/mintie/mintie-${о.id}-${а.id}.webp?v=${ВЕРСИЯ_МИНТИ})`,
@@ -12493,6 +12514,7 @@ function ЭкранМинти({ onBack }) {
                       // Облики оживают вразнобой, а не хором.
                       animation: а.анимация, animationDelay: `${-i * 0.37}s`,
                     }} />
+                    )}
                   </div>
                   <span style={{ fontFamily: bodyFont, fontSize: 12, color: T.faint }}>{о[язык]}</span>
                 </div>

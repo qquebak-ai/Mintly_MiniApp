@@ -179,6 +179,14 @@ def sprite(cw, ch, ground, st, variant):
                 c = "#FF3B47" if k < ln - 1 else "#FF8A8F"
                 put(int(round(x)), int(round(y)), c)
                 put(int(round(x)) + (1 if math.cos(a) > 0.3 else -1 if math.cos(a) < -0.3 else 0), int(round(y)), c)
+    # сон: пиксельные «z» всплывают над головой справа
+    zz = st.get("zzz")
+    if zz is not None:
+        for n, (zx, zy, big) in enumerate(((ox + 30, by0 - 3, 0), (ox + 33, by0 - 8, 1))):
+            yy = zy - (zz + n * 2) % 4
+            sz = 3 + big
+            for x in range(sz): put(zx + x, yy, "#BFD8FF"); put(zx + x, yy + sz - 1, "#BFD8FF")
+            for k in range(1, sz - 1): put(zx + sz - 1 - k, yy + k, "#BFD8FF")
     # тень на земле
     sw = 12 if dy > -4 else 8
     for x in range(cw // 2 - sw, cw // 2 + sw):
@@ -251,6 +259,13 @@ def alarm(i):  # 24 кадра = 2 с: заметил, что кто-то заш
         return {"sx": 1 if k % 2 else -1, "gill": -1 if k % 2 else 1, "alarm": 1 + k % 2, "look": 1 if k % 4 < 2 else -1, "tl": 3, "wag": 1 if k % 2 else -1}
     if i < 21: return {"alarm": 1 if i % 2 else 0, "tl": 2, "gill": 0}
     return {"blink": i == 22}
+def wake(i):  # 18 кадров: спит, сопит — и вскакивает, когда открыли экран
+    if i < 10:
+        return {"blink": True, "sq": 1 if i % 4 < 2 else 2, "gill": 1, "zzz": i, "tl": 0}
+    return [{"dy": -1, "sq": -2, "gill": -1, "alarm": 1, "tl": 3}, {"dy": -4, "sq": -2, "gill": -1, "alarm": 2, "tl": 5},
+            {"dy": -6, "sq": -1, "gill": -1, "alarm": 2, "tl": 6}, {"dy": -6, "gill": -1, "alarm": 1, "tl": 6},
+            {"dy": -4, "gill": -1, "alarm": 2, "tl": 5}, {"dy": -1, "sq": 1, "alarm": 1, "tl": 4},
+            {"sq": 2, "alarm": 2, "tl": 3}, {"sq": 1, "alarm": 1, "tl": 3}][i - 10]
 def walk(i):  # 24 кадра = 2 с: неспешный шаг, лапы по диагонали, как у настоящего зверя
     lift = [0, 1, 2, 2, 1, 0]
     order = [0, 2, 1, 3]                         # левая, правая внутренняя, левая внутренняя, правая
@@ -261,7 +276,7 @@ def walk(i):  # 24 кадра = 2 с: неспешный шаг, лапы по �
     st["gill"] = 1 if (i // 6) % 2 else 0
     st["leaf"] = 1 if (i // 4) % 2 else 0
     return st
-ANIMS = {"idle": seq(36, idle), "jump": seq(30, jump), "alarm": seq(24, alarm), "walk": seq(24, walk)}
+ANIMS = {"idle": seq(36, idle), "jump": seq(30, jump), "alarm": seq(24, alarm), "wake": seq(18, wake), "walk": seq(24, walk)}
 for variant in ("glasses", "plain", "crown"):
     for a, frames in ANIMS.items():
         save([sprite(PW, PH, G, st, variant) for st in frames], PW, PH, 4, f"mintie/mintie-{variant}-{a}.webp")
