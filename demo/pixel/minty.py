@@ -22,10 +22,13 @@ def sprite(cw, ch, ground, st, variant):
     by0 = by1 - 14 + crouch                      # верх головы
     hb = by0 + 9                                 # низ головы
     GP, GL = "#FF8FC8", "#FFC4E4"                # жабры — розовый акцент аксолотля
-    # хвост вбок с плавником, виляет
-    wag = st.get("wag", 0)
-    rect(ox + 26, by1 - 3, ox + 31, by1 - 1, M); rect(ox + 32, by1 - 3 + wag, ox + 34, by1 - 2 + wag, M)
-    rect(ox + 27, by1 - 4, ox + 33, by1 - 4 + (1 if wag else 0), L); put(ox + 35, by1 - 3 + wag, L)
+    # хвост: по умолчанию спрятан за телом, в анимациях выезжает (0–3)
+    wag = st.get("wag", 0); tl = [0, 2, 4, 8][st.get("tail", 0)]
+    if tl:
+        rect(ox + 26, by1 - 3, ox + 25 + tl, by1 - 1, M); rect(ox + 26, by1 - 1, ox + 25 + tl, by1 - 1, D)
+        rect(ox + 27, by1 - 4, ox + 24 + tl, by1 - 4, L)
+        if tl >= 8:
+            rect(ox + 32, by1 - 3 + wag, ox + 34, by1 - 2 + wag, M); put(ox + 35, by1 - 3 + wag, L)
     # лапки
     for i, lx in enumerate((10, 13, 21, 24)):
         if st.get("wave") and i == 3: continue
@@ -55,36 +58,55 @@ def sprite(cw, ch, ground, st, variant):
     # глаза
     eyes_y = by0 + 3
     if variant == "glasses":
-        # очки-шлем в духе VR: широкое стекло с полуовальным низом,
-        # серебристая рамка, переливы на стекле, ремешок до краёв головы
+        # Шлем в духе Vision Pro: цельное изогнутое чёрное стекло с
+        # полуовальным низом, алюминиевый обод, серая мягкая маска по краю,
+        # вязаный ремешок по бокам головы, колёсико сверху справа и
+        # светящиеся глаза Минти на стекле.
         x0, x1, y0, y1 = ox + 8, ox + 27, eyes_y - 2, eyes_y + 4
         w = x1 - x0
         cells = []
         for x in range(x0, x1 + 1):
             t = (x - x0) / w
-            # низ — половина овала: к краям стекло плавно поднимается
             bottom = y1 - int(round(3.2 * (1 - (1 - (2 * t - 1) ** 2) ** 0.5)))
             top = y0 + (1 if t < 0.03 or t > 0.97 else 0)
             for y in range(top, bottom + 1): cells.append((x, y))
         cs = set(cells)
+        edge = {c for c in cells if any((c[0] + a2, c[1] + b2) not in cs for a2, b2 in ((1, 0), (-1, 0), (0, 1), (0, -1)))}
+        # вязаный ремешок: рубчики уходят за голову
+        for bx in (ox + 5, ox + 6, ox + 7, ox + 28, ox + 29, ox + 30):
+            for y in range(eyes_y - 1, eyes_y + 3):
+                put(bx, y, "#9A9DA5" if (bx + y) % 2 else "#7D8088")
+        # мягкая маска — серая кайма, выглядывает из-под обода
+        for (x, y) in edge:
+            for a2, b2 in ((0, 1), (-1, 0), (1, 0)):
+                q = (x + a2, y + b2)
+                if q not in cs: put(*q, "#5E6068")
+        # стекло: глубокий чёрный с отливом сверху
         for (x, y) in cells:
             k = (y - y0) / (y1 - y0)
-            put(x, y, "#2B3150" if k < 0.3 else "#171B30" if k < 0.7 else "#0B0D1A")
-        # перелив по стеклу: фиолетовый к голубому
-        for (x, y) in cells:
-            if y == y0 + 1 and (x - x0) % 3 == 0: put(x, y, "#7A6BFF" if x < x0 + w / 2 else "#5FD4FF")
-        # бегущий блик — наискосок
+            put(x, y, "#1C2033" if k < 0.25 else "#0E1120" if k < 0.7 else "#06070F")
+        # глаза на стекле (EyeSight): мятное свечение, моргают вместе с Минти
+        blink = st.get("blink")
+        for ex in (x0 + 4, x1 - 6):
+            if blink:
+                rect(ex, eyes_y + 1, ex + 2, eyes_y + 1, "#7CF5E0")
+            else:
+                for gx in range(ex - 1, ex + 4):
+                    for gy in range(eyes_y - 1, eyes_y + 3):
+                        if (gx, gy) in cs: put(gx, gy, "#18343A")
+                rect(ex, eyes_y, ex + 2, eyes_y + 1, "#7CF5E0"); put(ex, eyes_y, "#D8FFF7")
+        # блик изогнутого стекла: дуга сверху + бегущая полоса
+        for x in range(x0 + 3, x1 - 2): put(x, y0 + 1, "#3A4263")
         g = st.get("glint")
-        bx = x0 + 3 + (g if g is not None else 0) * 6
-        for d in range(0, 5):
-            for q in ((bx + d, y1 - d), (bx + d + 1, y1 - d)):
-                if q in cs: put(*q, "#DDE6FF" if g is not None else "#59638F")
-        # рамка
-        for (x, y) in cells:
-            if any((x + a2, y + b2) not in cs for a2, b2 in ((1, 0), (-1, 0), (0, 1), (0, -1))): put(x, y, "#C9D1E0")
-        for x in range(x0 + 2, x1 - 1): put(x, y0, "#EEF2FA")
-        # ремешок
-        rect(ox + 7, eyes_y - 1, ox + 7, eyes_y + 1, "#8A93A6"); rect(ox + 28, eyes_y - 1, ox + 28, eyes_y + 1, "#8A93A6")
+        if g is not None:
+            bx = x0 + 3 + g * 6
+            for d in range(0, 5):
+                for q in ((bx + d, y1 - 1 - d), (bx + d + 1, y1 - 1 - d)):
+                    if q in cs and q not in edge: put(*q, "#DDE6FF")
+        # алюминиевый обод
+        for (x, y) in edge: put(x, y, "#C3C8D2" if y > y0 else "#EEF1F6")
+        # колёсико и кнопка сверху
+        rect(x1 - 3, y0 - 1, x1 - 2, y0 - 1, "#DDE1E8"); put(x0 + 3, y0 - 1, "#C3C8D2")
     else:
         h = 0 if st.get("blink") else 2
         for ex in (10, 23):
@@ -133,10 +155,11 @@ print(json.dumps(boxes))
 # ---- экран: 56×56 полупикселей в клетке 112px — ровно 2px на полупиксель ----
 PW = PH = 56; G = 50
 ANIMS = {
-    "idle": [{}, {"bob": 1, "gill": 1}, {"bob": 1, "gill": 1}, {}, {"blink": True, "glint": 1}, {"blink": True, "glint": 2}],
-    "jump": [{}, {"crouch": 2}, {"dy": -5, "legs": [1, 1, 1, 1], "gill": -1}, {"dy": -10, "legs": [2, 2, 2, 2], "gill": -1, "wag": 1}, {"dy": -5, "gill": 1}, {"crouch": 1, "gill": 1}],
-    "wave": [{"wave": 3}, {"wave": 5, "gill": 1}, {"wave": 7, "leaf": 1, "gill": 1}, {"wave": 5}],
-    "run": [{"legs": [2, 0, 0, 2], "bob": -1, "wag": 1}, {"legs": [0, 0, 0, 0]}, {"legs": [0, 2, 2, 0], "bob": -1, "wag": -1}, {"legs": [0, 0, 0, 0], "leaf": 1}],
+    # хвост во всех анимациях выезжает из-за тела и прячется обратно
+    "idle": [{}, {"bob": 1, "gill": 1, "tail": 1}, {"bob": 1, "gill": 1, "tail": 2}, {"tail": 1}, {"blink": True, "glint": 1}, {"blink": True, "glint": 2}],
+    "jump": [{}, {"crouch": 2, "tail": 1}, {"dy": -5, "legs": [1, 1, 1, 1], "gill": -1, "tail": 2}, {"dy": -10, "legs": [2, 2, 2, 2], "gill": -1, "wag": 1, "tail": 3}, {"dy": -5, "gill": 1, "tail": 2}, {"crouch": 1, "gill": 1, "tail": 1}],
+    "wave": [{"wave": 3, "tail": 1}, {"wave": 5, "gill": 1, "tail": 2}, {"wave": 7, "leaf": 1, "gill": 1, "tail": 3, "wag": -1}, {"wave": 5, "tail": 2}],
+    "run": [{"legs": [2, 0, 0, 2], "bob": -1, "tail": 1}, {"legs": [0, 0, 0, 0], "tail": 2}, {"legs": [0, 2, 2, 0], "bob": -1, "tail": 3, "wag": 1}, {"legs": [0, 0, 0, 0], "leaf": 1, "tail": 2}],
 }
 for variant in ("glasses", "plain", "crown"):
     for a, frames in ANIMS.items():
