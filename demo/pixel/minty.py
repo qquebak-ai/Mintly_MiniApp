@@ -3,7 +3,22 @@
 # пиксель, 3 тона + контур. Единица рисунка — полпикселя фона баннера.
 import json
 from PIL import Image
-L, M, D, O = "#8FF7CF", "#3FD9A0", "#1E9E73", "#0B4A37"   # свет, тон, тень, контур
+# Окрасы: тело (свет, тон, тень, контур), брюшко (два тона), жабры (тон, кончик, тень)
+SKINS = {
+    "mint":      (("#8FF7CF", "#3FD9A0", "#1E9E73", "#0B4A37"), ("#A9F8DA", "#8FEBC6"), ("#FF8FC8", "#FFC4E4", "#E0609F")),
+    "leucistic": (("#FFE3EE", "#FFC8DC", "#E79AB8", "#7A3552"), ("#FFF3F8", "#FFE0EC"), ("#FF4F7B", "#FF9DB5", "#C92E57")),
+    "albino":    (("#FFFFFF", "#F1ECEA", "#CFC6C2", "#5E5552"), ("#FFFFFF", "#F7F2F0"), ("#FF3355", "#FF8A9C", "#C21F3C")),
+    "gold":      (("#FFF1A8", "#FFD24A", "#D99A1A", "#6B4205"), ("#FFF6CC", "#FFE68A"), ("#FF8A5C", "#FFC0A3", "#D65A2E")),
+    "wild":      (("#6E8A6A", "#4A6448", "#2F4430", "#121E13"), ("#8FA58A", "#7A9276"), ("#9C5FB5", "#C79AD8", "#6E3A85")),
+    "violet":    (("#C9A2FF", "#9B5CF0", "#6A2FC0", "#2A0E57"), ("#DCC6FF", "#C8A9FF"), ("#FF6AD5", "#FFB3EC", "#C93AA6")),
+    "ice":       (("#E4FBFF", "#A8E6F5", "#6AB5D1", "#1F4C63"), ("#F2FDFF", "#DDF6FC"), ("#5FD4FF", "#C8F1FF", "#2E97C4")),
+    "fire":      (("#FFB27A", "#FF6A2B", "#C23A0E", "#4D1203"), ("#FFD2A8", "#FFBE88"), ("#FFD84A", "#FFF1A8", "#E09A00")),
+    "neon":      (("#7DFFF2", "#1CE0D0", "#0A9C92", "#013B38"), ("#C4FFF9", "#9DF7EE"), ("#FF2BD6", "#FF93EC", "#B3009A")),
+}
+def use_skin(name):
+    global L, M, D, O, B1, B2, GP0, GL0, GD0
+    (L, M, D, O), (B1, B2), (GP0, GL0, GD0) = SKINS[name]
+use_skin("mint")
 EYE = "#06100C"; LEAF, LEAF2 = "#2EE87A", "#12A150"
 Y = ["#A87400", "#E8B400", "#FFD84A"]; WH = "#FFFFFF"
 
@@ -33,7 +48,7 @@ def sprite(cw, ch, ground, st, variant):
     wx = 1 if rel >= 2 else (-1 if rel <= -2 else 0)                     # сплющился — стал шире
     by0 = by1 - 14 + crouch + sq                 # верх головы
     hb = by0 + 9 - (sq + 1) // 2                 # низ головы
-    GP, GL = "#FF8FC8", "#FFC4E4"                # жабры — розовый акцент аксолотля
+    GP, GL = GP0, GL0                            # жабры — акцент окраса
     # хвост: по умолчанию спрятан за телом, в анимациях выезжает (0–3)
     wag = st.get("wag", 0); tl = st.get("tl", [0, 2, 4, 8][st.get("tail", 0)])
     if tl:
@@ -75,8 +90,8 @@ def sprite(cw, ch, ground, st, variant):
         for q in ((x0, y0), (x1, y0), (x0, y1), (x1, y1)): px.pop(q, None)
     # туловище (уже головы) и голова (широкий брусок), углы скруглены
     rrect(ox + 10 - wx, hb, ox + 25 + wx, by1)
-    rect(ox + 13, hb + 2, ox + 22, by1 - 1, "#A9F8DA")          # светлое брюшко
-    rect(ox + 14, by1 - 1, ox + 21, by1 - 1, "#8FEBC6")
+    rect(ox + 13, hb + 2, ox + 22, by1 - 1, B1)          # светлое брюшко
+    rect(ox + 14, by1 - 1, ox + 21, by1 - 1, B2)
     rrect(ox + 7 - wx, by0, ox + 28 + wx, hb)
     put(ox + 10 - wx, by0 + 2, L); put(ox + 11 - wx, by0 + 3, L)
     # пятнышки на макушке и боках
@@ -92,7 +107,7 @@ def sprite(cw, ch, ground, st, variant):
             pts = [(0, 0), (1, 0), (2, -up), (3, -up), (4, tip), (5, tip - up)]
             for i, (dx0, dy0) in enumerate(pts):
                 put(base + side * dx0, gy + dy0, GL if i >= 4 else GP)
-                if i <= 3: put(base + side * dx0, gy + dy0 + 1, "#E0609F")   # толщина ветки
+                if i <= 3: put(base + side * dx0, gy + dy0 + 1, GD0)   # толщина ветки
             put(base + side * 3, gy - up - 1, GL)                              # пёрышко
     # «привет»: передняя лапка поднята сбоку
     if st.get("wave"):
@@ -232,12 +247,6 @@ def save(frames, cw, ch, S, path):
 # ---- баннеры: неподвижный кадр, ноги ровно на опоре фона ----
 BW, BH = 40, 36                        # полупиксели = 20×18 пикселей фона
 banner = {"trade": (106, 27, "glasses", {"wave": 5}), "fast": (80, 39, "plain", {"legs": [2, 0, 0, 2], "bob": -1, "wag": 1}), "shop": (73, 45, "crown", {})}
-boxes = {}
-for name, (cx, ground, variant, st) in banner.items():
-    save([sprite(BW, BH, BH - 2, st, variant)], BW, BH, 6, f"mintie-{name}.webp")
-    boxes[name] = dict(x0=cx - BW // 4, y0=ground - (BH - 2) // 2 - 1, w=BW // 2, h=BH // 2)
-print(json.dumps(boxes))
-
 # ---- экран: 56×56 полупикселей в клетке 112px — ровно 2px на полупиксель ----
 PW = PH = 56; G = 50
 def seq(n, fn): return [fn(i) for i in range(n)]
@@ -299,10 +308,17 @@ def walk(i):  # 24 кадра = 2 с: неспешный шаг, лапы по �
     st["leaf"] = 1 if (i // 4) % 2 else 0
     return st
 ANIMS = {"idle": seq(36, idle), "jump": seq(36, jump), "alarm": seq(24, alarm), "wake": seq(18, wake), "walk": seq(24, walk)}
-for variant in ("glasses", "plain", "crown"):
-    for a, frames in ANIMS.items():
-        save([sprite(PW, PH, G, st, variant) for st in frames], PW, PH, 4, f"mintie/mintie-{variant}-{a}.webp")
-
+import os
+for skin in SKINS:
+    use_skin(skin)
+    os.makedirs(f"out/{skin}", exist_ok=True)
+    for name, (cx, ground, variant, st) in banner.items():
+        save([sprite(BW, BH, BH - 2, st, variant)], BW, BH, 6, f"out/{skin}/banner-{name}.webp")
+    save([sprite(PW, PH, G, {}, "plain")], PW, PH, 4, f"out/{skin}/preview.webp")
+    for variant in ("glasses", "plain", "crown"):
+        for a_, frames in ANIMS.items():
+            save([sprite(PW, PH, G, st, variant) for st in frames], PW, PH, 4, f"out/{skin}/mintie-{variant}-{a_}.webp")
+use_skin("mint")
 # ---- иконка приложения: Минти в позе по умолчанию ----
 ic = sprite(56, 56, 50, {}, "plain")
 im = Image.new("RGBA", (576, 576), (0, 0, 0, 0))

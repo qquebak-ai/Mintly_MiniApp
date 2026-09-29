@@ -7597,7 +7597,7 @@ function coinsEarned(achievements) {
 }
 
 function cosmeticPrice(kind, id) {
-  const item = (kind === "frame" ? FRAME_BY_ID : kind === "card" ? CARD_BY_ID : WALLET_SKIN_BY_ID)[id];
+  const item = (kind === "frame" ? FRAME_BY_ID : kind === "card" ? CARD_BY_ID : kind === "mintie" ? MINTIE_SKIN_BY_ID : WALLET_SKIN_BY_ID)[id];
   return (item && item.price) || 0;
 }
 
@@ -9908,7 +9908,7 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
         // невидимые плитки не считаются вовсе; размер задан заранее,
         // чтобы полоса прокрутки не прыгала.
         contentVisibility: "auto",
-        containIntrinsicSize: kind === "wallet" ? "190px 234px" : "190px 210px",
+        containIntrinsicSize: kind === "wallet" || kind === "mintie" ? "190px 234px" : "190px 210px",
       }}
     >
       {/* Некупленное не гасим прозрачностью: предмет видно целиком, на
@@ -9916,16 +9916,21 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
           У вида карты своей серой подложки больше нет — карта сама
           крупная, и рамка вокруг только мешала её разглядеть. */}
       <div style={{
-        position: "relative", width: "100%", height: kind === "wallet" ? 128 : 104, borderRadius: 16, overflow: "hidden",
-        background: kind === "wallet" ? "transparent" : T.surface,
-        border: kind === "wallet" ? "none" : `1px solid ${equipped ? T.electric : T.line}`,
+        position: "relative", width: "100%", height: kind === "wallet" || kind === "mintie" ? 128 : 104, borderRadius: 16, overflow: "hidden",
+        background: kind === "wallet" ? "transparent" : kind === "mintie" ? "#000000" : T.surface,
+        border: kind === "wallet" ? "none" : `1px solid ${equipped ? T.electric : kind === "mintie" ? "transparent" : T.line}`,
         // Второй контур внутрь: снаружи его срезал бы overflow плитки, а
         // так надетое видно с одного взгляда и по краю ничего не торчит.
         boxShadow: kind !== "wallet" && equipped ? `inset 0 0 0 1px ${hexA(T.electric, 0.45)}` : "none",
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
         {kind === "card" && <ProfileCardBg cardId={item.id} height={96} radius={16} showcase />}
-        {kind === "wallet" ? (
+        {kind === "mintie" ? (
+          <img
+            src={`/mintie/${item.id}/preview.webp?v=${ВЕРСИЯ_МИНТИ}`} alt=""
+            style={{ position: "relative", zIndex: 1, height: 112, width: "auto", imageRendering: "pixelated" }}
+          />
+        ) : kind === "wallet" ? (
           /* Скин карты показываем самой картой: кружок аватарки тут
              ничего не объясняет, а маленькая карта баланса — сразу всё. */
           <div style={{
@@ -10102,7 +10107,11 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
       >
         {/* Предмет крупно: покупают глазами, а не по названию. */}
         <div style={{ position: "relative", width: "100%", height: 132, borderRadius: 18, overflow: "hidden", background: T.surfaceHi, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {kind === "wallet" ? (
+          {kind === "mintie" ? (
+            <div style={{ width: "100%", height: "100%", background: "#000000", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <img src={`/mintie/${item.id}/preview.webp?v=${ВЕРСИЯ_МИНТИ}`} alt="" style={{ height: 118, width: "auto", imageRendering: "pixelated" }} />
+            </div>
+          ) : kind === "wallet" ? (
             /* Вид карты показываем самой картой — с балансом и подписью,
                ровно как он будет выглядеть в кошельке. */
             <div style={{
@@ -10134,7 +10143,7 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
 
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 19.5, fontWeight: 700, marginTop: 14 }}>{pickLabel(item.label)}</span>
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 2 }}>
-          {kind === "frame" ? t("shopTabFrames") : kind === "card" ? t("shopTabCards") : t("shopTabWallet")}
+          {kind === "frame" ? t("shopTabFrames") : kind === "card" ? t("shopTabCards") : kind === "mintie" ? (lang === "EN" ? "Mintie skin" : "Окрас Минти") : t("shopTabWallet")}
         </span>
 
         <div className="flex items-center justify-between w-full rounded-[18px] px-4 py-3" style={{ marginTop: 14, background: T.bg, border: "none" }}>
@@ -10184,7 +10193,7 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
      незачем: нажал в магазине — надел. */
   lookRef.current = (kind, id) => {
     haptic("light");
-    if (kind === "wallet") { if (onEquip) onEquip("wallet", id); return; }
+    if (kind === "wallet" || kind === "mintie") { if (onEquip) onEquip(kind, id); return; }
     if (onOpenLook) onOpenLook(kind);
   };
   const ownedTap = useCallback((kind, id) => lookRef.current(kind, id), []);
@@ -10206,8 +10215,9 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
     if (onOpenAchievements) onOpenAchievements();
   };
   const tooPoor = useCallback((price) => tooPoorRef.current(price), []);
-  const items = WALLET_SKINS;
-  const kind = "wallet";
+  // Виды карты из магазина убраны — теперь здесь окрасы Минти.
+  const items = MINTIE_SKINS;
+  const kind = "mintie";
   const equippedId = cosmetics[kind];
 
   // Без аккаунта магазин закрыт целиком: монеты копятся за достижения,
@@ -10304,6 +10314,7 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
         <BuySheet
           item={(confirming.kind === "frame" ? FRAME_BY_ID
             : confirming.kind === "card" ? CARD_BY_ID
+            : confirming.kind === "mintie" ? MINTIE_SKIN_BY_ID
             : WALLET_SKIN_BY_ID)[confirming.id]}
           kind={confirming.kind}
           coins={coins}
@@ -12301,7 +12312,7 @@ function МояАктивность({ userId, тик = 0 }) {
 /* Картинки из public сервер отдаёт с вечным кэшем (immutable), и
    Telegram держит старого Минти после перерисовки. Номер версии в адресе
    — повышать при каждой замене картинок маскота. */
-const ВЕРСИЯ_МИНТИ = 16;
+const ВЕРСИЯ_МИНТИ = 17;
 
 const БАННЕРЫ = [
   {
@@ -12330,7 +12341,7 @@ const БАННЕРЫ = [
     знак: "свечи",
     сцена: "торговля",
     пиксель: `/banner-mx-trade.webp?v=${ВЕРСИЯ_МИНТИ}`,
-    маскот: { лист: `/mintie-trade.webp?v=${ВЕРСИЯ_МИНТИ}`, x0: 92, y0: 2.5, w: 28, h: 25.2, сдвиг: 0 },
+    маскот: { кадр: "trade", x0: 92, y0: 2.5, w: 28, h: 25.2, сдвиг: 0 },
     // Раньше каждая сеть переливалась своим цветом — синим и сиреневым,
     // под старую цветную сцену. На чёрном фоне с фиолетовыми свечами
     // обе идут одним и тем же оттенком, что и кнопка, — сцена и текст
@@ -12350,7 +12361,7 @@ const БАННЕРЫ = [
     знак: "монеты",
     сцена: "кошелёк",
     пиксель: `/banner-mx-fast.webp?v=${ВЕРСИЯ_МИНТИ}`,
-    маскот: { лист: `/mintie-fast.webp?v=${ВЕРСИЯ_МИНТИ}`, x0: 68, y0: 15.5, w: 28, h: 25.2, сдвиг: -2.1 },
+    маскот: { кадр: "fast", x0: 68, y0: 15.5, w: 28, h: 25.2, сдвиг: -2.1 },
     // «Быстрые» и переливается быстро: блик пробегает по слову за
     // полторы секунды — вдвое быстрее прочих, отсюда и ощущение скорости.
     выделения: [{ RU: "быстрые", EN: "fastest", стиль: "молния" }],
@@ -12364,7 +12375,7 @@ const БАННЕРЫ = [
     знак: "лист",
     сцена: "магазин",
     пиксель: `/banner-mx-shop.webp?v=${ВЕРСИЯ_МИНТИ}`,
-    маскот: { лист: `/mintie-shop.webp?v=${ВЕРСИЯ_МИНТИ}`, x0: 58, y0: 20.5, w: 28, h: 25.2, сдвиг: -4.3 },
+    маскот: { кадр: "shop", x0: 58, y0: 20.5, w: 28, h: 25.2, сдвиг: -4.3 },
     выделения: [{ RU: "облик", EN: "look", стиль: "радуга" }],
   },
 ];
@@ -12421,7 +12432,7 @@ function СценаЗапуска() {
 // Сетка фона — 120×50 пикселей; маскот поверх неё нарисован втрое мельче
 // и живёт кадрами из спрайт-листа (исходник — demo/pixel/mascots.py).
 const СЕТКА_ФОНА = { w: 120, h: 50 };
-function СценаПикселя({ src, маскот, onМаскот }) {
+function СценаПикселя({ src, маскот, onМаскот, окрас = "mint" }) {
   const { w: СШ, h: СВ } = СЕТКА_ФОНА;
   return (
     <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", background: "#000000" }}>
@@ -12438,7 +12449,7 @@ function СценаПикселя({ src, маскот, onМаскот }) {
             position: "absolute", pointerEvents: onМаскот ? "auto" : "none", cursor: onМаскот ? "pointer" : undefined,
             left: `${(маскот.x0 / СШ) * 100}%`, top: `${(маскот.y0 / СВ) * 100}%`,
             width: `${(маскот.w / СШ) * 100}%`, height: `${(маскот.h / СВ) * 100}%`,
-            backgroundImage: `url(${маскот.лист})`, backgroundSize: "100% 100%", backgroundRepeat: "no-repeat",
+            backgroundImage: `url(/mintie/${окрасМинти(окрас)}/banner-${маскот.кадр}.webp?v=${ВЕРСИЯ_МИНТИ})`, backgroundSize: "100% 100%", backgroundRepeat: "no-repeat",
             // На баннере Минти неподвижен; живой — на своём экране.
             imageRendering: "pixelated",
           }} />
@@ -12468,7 +12479,7 @@ const АНИМАЦИИ_МИНТИ = [
 /* «Волнение» начинается со сна: пока экран не открыт, Минти спит и
    сопит, а как только его открыли — вскакивает (18 кадров один раз),
    и дальше по кругу идёт волнение. */
-function КадрыПробуждения({ облик, анимация, кадров }) {
+function КадрыПробуждения({ облик, анимация, кадров, папка }) {
   const [проснулся, setПроснулся] = useState(false);
   const лист = проснулся ? `alarm` : `wake`;
   return (
@@ -12476,7 +12487,7 @@ function КадрыПробуждения({ облик, анимация, кад
       onAnimationEnd={() => setПроснулся(true)}
       style={{
         width: "100%", height: "100%",
-        backgroundImage: `url(/mintie/mintie-${облик}-${лист}.webp?v=${ВЕРСИЯ_МИНТИ})`,
+        backgroundImage: `url(${папка}/mintie-${облик}-${лист}.webp?v=${ВЕРСИЯ_МИНТИ})`,
         backgroundSize: `${(проснулся ? кадров : 18) * 100}% 100%`, backgroundRepeat: "no-repeat",
         imageRendering: "pixelated",
         animation: проснулся ? анимация : "минтиКадры 1.5s steps(18, jump-none) 1 forwards",
@@ -12487,7 +12498,8 @@ function КадрыПробуждения({ облик, анимация, кад
 
 // На узком экране три клетки в ряд не влезут по 112px — тогда чуть мельче.
 const КЛЕТКА_МИНТИ = "min(112px, calc((100vw - 48px) / 3))";
-function ЭкранМинти({ onBack }) {
+function ЭкранМинти({ onBack, окрас = "mint" }) {
+  const папка = `/mintie/${окрасМинти(окрас)}`;
   const язык = lang === "EN" ? "EN" : "RU";
   return (
     <div className="fx-view flex flex-col" style={{ gap: 18, paddingTop: 8, paddingBottom: 40 }}>
@@ -12505,10 +12517,10 @@ function ЭкранМинти({ onBack }) {
               {ОБЛИКИ_МИНТИ.map((о, i) => (
                 <div key={о.id} className="flex flex-col items-center" style={{ gap: 4 }}>
                   <div style={{ width: КЛЕТКА_МИНТИ, height: КЛЕТКА_МИНТИ, borderRadius: 18, background: "#000000", overflow: "hidden" }}>
-                    {а.id === "alarm" ? <КадрыПробуждения облик={о.id} анимация={а.анимация} кадров={а.кадров} /> : (
+                    {а.id === "alarm" ? <КадрыПробуждения облик={о.id} анимация={а.анимация} кадров={а.кадров} папка={папка} /> : (
                     <div style={{
                       width: "100%", height: "100%",
-                      backgroundImage: `url(/mintie/mintie-${о.id}-${а.id}.webp?v=${ВЕРСИЯ_МИНТИ})`,
+                      backgroundImage: `url(${папка}/mintie-${о.id}-${а.id}.webp?v=${ВЕРСИЯ_МИНТИ})`,
                       backgroundSize: `${а.кадров * 100}% 100%`, backgroundRepeat: "no-repeat",
                       imageRendering: "pixelated",
                       // Облики оживают вразнобой, а не хором.
@@ -12994,7 +13006,7 @@ function разбитьПоВыделениям(строка, выделения
   return куски;
 }
 
-function БаннерыГлавной({ onGoTab, onGoCreate, onOpenMintie }) {
+function БаннерыГлавной({ onGoTab, onGoCreate, onOpenMintie, окрас = "mint" }) {
   // Язык берётся из общей настройки приложения, как и весь остальной текст.
   const язык = lang === "EN" ? "EN" : "RU";
   const лента = useRef(null);
@@ -13087,7 +13099,7 @@ function БаннерыГлавной({ onGoTab, onGoCreate, onOpenMintie }) {
                 в перспективе, то же ощущение плоскости, на которой стоит
                 предмет. */}
             {б.сцена === "запуск" ? <СценаЗапуска />
-              : б.пиксель ? <СценаПикселя src={б.пиксель} маскот={б.маскот} onМаскот={onOpenMintie} />
+              : б.пиксель ? <СценаПикселя src={б.пиксель} маскот={б.маскот} onМаскот={onOpenMintie} окрас={окрас} />
               : б.сцена === "торговля" ? (
                 /* Три растущие свечи справа — тот же приём, что и на
                    баннере запуска: один предмет на ровном чёрном, без
@@ -13515,7 +13527,7 @@ function завестиЗнаки() {
 
 function HomeView({
   onGoTab, onGoCreate, profile = null, accountCreated = false, userId = null,
-  onOpenMyProfile, профильГрузится = false, грузится = false, insetTop = 0, insetBottom = 0, onOpenMintie,
+  onOpenMyProfile, профильГрузится = false, грузится = false, insetTop = 0, insetBottom = 0, onOpenMintie, окрасМ = "mint",
 }) {
   // Главная сведена к баннерам и курсу — сводка, лента, токен дня,
   // движение и топ убраны по просьбе. Заголовок и шапка (аватар, ник,
@@ -13528,7 +13540,7 @@ function HomeView({
       </div>
       <div className="fx-view flex flex-col" style={{ gap: 26 }}>
         <ЖивыеКарточки />
-        <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} onOpenMintie={onOpenMintie} />
+        <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} onOpenMintie={onOpenMintie} окрас={окрасМ} />
       </div>
     </div>
   );
@@ -15769,6 +15781,24 @@ const WALLET_SKINS = [
   },
 ];
 const WALLET_SKIN_BY_ID = Object.fromEntries(WALLET_SKINS.map((с) => [с.id, с]));
+
+/* Окрасы Минти — товар магазина вместо видов карты. Картинки на каждый
+   окрас — в public/mintie/<id>/ (исходник — demo/pixel/minty.py).
+   Цены дублируются в базе (public.cosmetics, kind = 'mintie'): списывает
+   она, здесь — только витрина. */
+const MINTIE_SKINS = [
+  { id: "mint", label: { RU: "Мята", EN: "Mint" }, price: 0 },
+  { id: "leucistic", label: { RU: "Лейсистик", EN: "Leucistic" }, price: 150 },
+  { id: "albino", label: { RU: "Альбинос", EN: "Albino" }, price: 180 },
+  { id: "wild", label: { RU: "Дикий", EN: "Wild" }, price: 200 },
+  { id: "gold", label: { RU: "Золотой", EN: "Golden" }, price: 260 },
+  { id: "ice", label: { RU: "Лёд", EN: "Ice" }, price: 260 },
+  { id: "violet", label: { RU: "Mintly", EN: "Mintly" }, price: 300 },
+  { id: "fire", label: { RU: "Огонь", EN: "Fire" }, price: 320 },
+  { id: "neon", label: { RU: "Неон", EN: "Neon" }, price: 400 },
+];
+const MINTIE_SKIN_BY_ID = Object.fromEntries(MINTIE_SKINS.map((с) => [с.id, с]));
+const окрасМинти = (id) => (MINTIE_SKIN_BY_ID[id] ? id : "mint");
 
 /* Объём углеволокна.
  *
@@ -27020,7 +27050,7 @@ function mapTokenRow(row) {
   // оформление устройства, серверу о нём знать нечего, поэтому храним в
   // localStorage рядом с темой и языком.
   const [cosmetics, setCosmetics] = useState(() => {
-    const base = { frame: "none", card: "none", wallet: "none" };
+    const base = { frame: "none", card: "none", wallet: "none", mintie: "mint" };
     try {
       if (typeof window !== "undefined") {
         const f = window.localStorage.getItem("mintly_frame");
@@ -27031,11 +27061,13 @@ function mapTokenRow(row) {
         if (f && FRAME_BY_ID[f]) base.frame = f;
         if (c && CARD_BY_ID[c]) base.card = c;
         if (w && WALLET_SKIN_BY_ID[w]) base.wallet = w;
+        const m = window.localStorage.getItem("mintly_mintie_skin");
+        if (m && MINTIE_SKIN_BY_ID[m]) base.mintie = m;
       }
     } catch (e) { /* localStorage unavailable */ }
     return base;
   });
-  const COSMETIC_STORAGE = { frame: "mintly_frame", card: "mintly_card", wallet: "mintly_wallet_skin" };
+  const COSMETIC_STORAGE = { frame: "mintly_frame", card: "mintly_card", wallet: "mintly_wallet_skin", mintie: "mintly_mintie_skin" };
 
   /* Купленные предметы. Баланс монет отдельно нигде не лежит: он
      считается как «заработано достижениями минус потрачено на покупки».
@@ -27088,7 +27120,7 @@ function mapTokenRow(row) {
     } catch (e) { /* localStorage unavailable */ }
     // localStorage оставляем для мгновенного отклика и гостей, но выбор
     // вошедшего уходит в профиль — иначе его предметы не увидит никто.
-    if (userId && kind !== "wallet") {
+    if (userId && kind !== "wallet" && kind !== "mintie") {
       supabase
         .from("profiles")
         .update(kind === "frame" ? { frame_id: id } : { card_id: id })
@@ -27286,7 +27318,7 @@ function mapTokenRow(row) {
     // Надевать сами не лезем: примерка живёт в «Редактировать
     // профиль», и покупка, которая молча меняет вид, — это ровно то
     // разделение, которое здесь и наводится.
-    const item = (kind === "frame" ? FRAME_BY_ID : kind === "card" ? CARD_BY_ID : WALLET_SKIN_BY_ID)[id];
+    const item = (kind === "frame" ? FRAME_BY_ID : kind === "card" ? CARD_BY_ID : kind === "mintie" ? MINTIE_SKIN_BY_ID : WALLET_SKIN_BY_ID)[id];
     showToast(tf("shopBought", { name: pickLabel(item ? item.label : null) || id }));
   }
   // Смена ника за монеты. Занятость проверяет сама база уникальным
@@ -28871,6 +28903,7 @@ function mapTokenRow(row) {
           <KeepAlive show={view === "home"}>
             <HomeView
               onOpenMintie={() => { setView("mintie"); }}
+              окрасМ={cosmetics.mintie}
               onGoTab={goTab}
               onGoCreate={openCreate}
               curveTokens={communityTokens}
@@ -28902,7 +28935,7 @@ function mapTokenRow(row) {
                 чужой кошелёк, хотя в базе у него ничего нет. */}
             <WalletView
               key={userId || "гость"}
-              скинКарты={cosmetics.wallet}
+              скинКарты="none"
               connected={connected}
               walletAddress={walletAddress}
               tonBalance={tonBalance}
@@ -28943,7 +28976,7 @@ function mapTokenRow(row) {
           </KeepAlive>
           {view === "mintie" && (
             <div className={уходСтраницы ? "fx-view-out" : undefined}>
-              <ЭкранМинти onBack={backFromMintie} />
+              <ЭкранМинти onBack={backFromMintie} окрас={cosmetics.mintie} />
             </div>
           )}
           {view === "achievements" && (
