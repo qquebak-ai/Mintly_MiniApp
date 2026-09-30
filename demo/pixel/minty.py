@@ -97,18 +97,20 @@ def sprite(cw, ch, ground, st, variant):
     # пятнышки на макушке и боках
     for q in ((20, 1), (21, 1), (21, 2), (14, 7), (15, 7)): put(ox + q[0], by0 + q[1], D)
     put(ox + 11 - wx, hb + 2, D); put(ox + 24 + wx, hb + 3, D)
-    # перистые жабры: по три ветки с каждой стороны головы, розовые
+    # жабры аксолотля: по три выступающих дуги с каждой стороны — сверху
+    # стебель цвета тела (кожа), под ним бахрома самих жабр цвета окраса
     fl = st.get("gill", 0)
     for k, gy in enumerate((by0 + 1, by0 + 4, by0 + 7)):
-        up = 1 - k   # верхние загнуты вверх, нижние вниз
+        arc = [[0, -1, -2, -2, -3, -4], [0, 0, 0, -1, -1, -1], [0, 1, 1, 2, 3, 3]][k]
         for side in (-1, 1):
             base = ox + (6 - wx if side < 0 else 29 + wx)
-            tip = -2 * up + (fl if k != 1 else 0)
-            pts = [(0, 0), (1, 0), (2, -up), (3, -up), (4, tip), (5, tip - up)]
-            for i, (dx0, dy0) in enumerate(pts):
-                put(base + side * dx0, gy + dy0, GL if i >= 4 else GP)
-                if i <= 3: put(base + side * dx0, gy + dy0 + 1, GD0)   # толщина ветки
-            put(base + side * 3, gy - up - 1, GL)                              # пёрышко
+            for i, d in enumerate(arc):
+                x = base + side * i
+                y = gy + d + (fl if i >= 3 and k != 1 else 0)
+                put(x, y, L if i < 3 else M)                         # стебель — кожа
+                if i >= 1:
+                    put(x, y + 1, GP if i < 5 else GL)               # бахрома жабр под кожей
+            put(base + side * 6, gy + arc[-1] + (fl if k != 1 else 0) + 1, GL)   # кончик
     # «привет»: передняя лапка поднята сбоку
     if st.get("wave"):
         h = st["wave"]
