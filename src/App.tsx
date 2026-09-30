@@ -12508,9 +12508,23 @@ const ФАЗЫ_НАВ_МИНТИ = {
 };
 const ПАУЗЫ_ВЗДОХА = [3000, 5000, 7000];
 function НавМинти({ окрас = "mint" }) {
-  const [фаза, setФаза] = useState("wake");
+  // Пока на экране заставка (#ширма), Минти просто спит: иначе пробуждение
+  // проигрывалось под ней, и после заставки оставался уже хвост анимации.
+  const [фаза, setФаза] = useState("sleep");
   const [круг, setКруг] = useState(0);
   const пауза = useRef(0);
+  useEffect(() => {
+    if (фаза !== "sleep") return undefined;
+    let т = null;
+    const ждать = () => {
+      const ширма = document.getElementById("ширма");
+      if (ширма || document.visibilityState !== "visible") { т = setTimeout(ждать, 120); return; }
+      // Даём секунду увидеть, что он спит, — потом вскакивает.
+      т = setTimeout(() => setФаза("wake"), 900);
+    };
+    ждать();
+    return () => clearTimeout(т);
+  }, [фаза]);
   useEffect(() => {
     if (фаза !== "idle") return undefined;
     const ждать = ПАУЗЫ_ВЗДОХА[пауза.current % ПАУЗЫ_ВЗДОХА.length];
@@ -12518,7 +12532,7 @@ function НавМинти({ окрас = "mint" }) {
     const т = setTimeout(() => { setФаза("breath"); setКруг((к) => к + 1); }, ждать);
     return () => clearTimeout(т);
   }, [фаза, круг]);
-  const лист = фаза === "idle" ? "breath" : фаза;
+  const лист = фаза === "idle" ? "breath" : фаза === "sleep" ? "wake" : фаза;
   const ф = ФАЗЫ_НАВ_МИНТИ[лист];
   const ШИР = 48;
   return (
@@ -12527,6 +12541,7 @@ function НавМинти({ окрас = "mint" }) {
       aria-hidden
       onClick={(e) => { e.stopPropagation(); haptic("light"); setФаза("alarm"); setКруг((к) => к + 1); }}
       onAnimationEnd={() => setФаза((f) => (f === "wake" ? "alarm" : "idle"))}
+      // Сон тоже прерывается нажатием — сразу волнение.
       style={{
         position: "absolute", right: 26,
         // «Край» в кадре — 37 из 48 строк: ниже него свисают лапки.
@@ -12536,7 +12551,7 @@ function НавМинти({ окрас = "mint" }) {
         backgroundSize: `${ф.кадров * 100}% 100%`, backgroundRepeat: "no-repeat",
         backgroundPosition: "0% 0",
         imageRendering: "pixelated",
-        animation: фаза === "idle" ? "none" : `минтиКадры ${ф.с}s steps(${ф.кадров}, jump-none) 1 both`,
+        animation: фаза === "idle" || фаза === "sleep" ? "none" : `минтиКадры ${ф.с}s steps(${ф.кадров}, jump-none) 1 both`,
       }}
     />
   );
