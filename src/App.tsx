@@ -12312,7 +12312,7 @@ function МояАктивность({ userId, тик = 0 }) {
 /* Картинки из public сервер отдаёт с вечным кэшем (immutable), и
    Telegram держит старого Минти после перерисовки. Номер версии в адресе
    — повышать при каждой замене картинок маскота. */
-const ВЕРСИЯ_МИНТИ = 18;
+const ВЕРСИЯ_МИНТИ = 19;
 
 const БАННЕРЫ = [
   {
@@ -12491,6 +12491,52 @@ function КадрыПробуждения({ облик, анимация, кад
         backgroundSize: `${(проснулся ? кадров : 18) * 100}% 100%`, backgroundRepeat: "no-repeat",
         imageRendering: "pixelated",
         animation: проснулся ? анимация : "минтиКадры 1.5s steps(18, jump-none) 1 forwards",
+      }}
+    />
+  );
+}
+
+/* Минти сидит на панели разделов справа, лапки свисают. При открытии
+   приложения спит, вскакивает, один круг волнуется, дальше просто
+   вздыхает — через 3, 5 и 7 секунд по очереди, чтобы не выглядело
+   метрономом. Нажатие — снова волнение. Кадр 44×48 полупикселей,
+   «край» панели — 37-я строка (исходник — demo/pixel/minty.py). */
+const ФАЗЫ_НАВ_МИНТИ = {
+  wake: { кадров: 18, с: 1.5 },
+  alarm: { кадров: 24, с: 2 },
+  breath: { кадров: 12, с: 1 },
+};
+const ПАУЗЫ_ВЗДОХА = [3000, 5000, 7000];
+function НавМинти({ окрас = "mint" }) {
+  const [фаза, setФаза] = useState("wake");
+  const [круг, setКруг] = useState(0);
+  const пауза = useRef(0);
+  useEffect(() => {
+    if (фаза !== "idle") return undefined;
+    const ждать = ПАУЗЫ_ВЗДОХА[пауза.current % ПАУЗЫ_ВЗДОХА.length];
+    пауза.current += 1;
+    const т = setTimeout(() => { setФаза("breath"); setКруг((к) => к + 1); }, ждать);
+    return () => clearTimeout(т);
+  }, [фаза, круг]);
+  const лист = фаза === "idle" ? "breath" : фаза;
+  const ф = ФАЗЫ_НАВ_МИНТИ[лист];
+  const ШИР = 48;
+  return (
+    <div
+      key={`${фаза}-${круг}`}
+      aria-hidden
+      onClick={(e) => { e.stopPropagation(); haptic("light"); setФаза("alarm"); setКруг((к) => к + 1); }}
+      onAnimationEnd={() => setФаза((f) => (f === "wake" ? "alarm" : "idle"))}
+      style={{
+        position: "absolute", right: 26,
+        // «Край» в кадре — 37 из 48 строк: ниже него свисают лапки.
+        bottom: `calc(100% - ${((48 - 37) / 44) * ШИР}px)`,
+        width: ШИР, height: (ШИР * 48) / 44, cursor: "pointer",
+        backgroundImage: `url(/mintie/${окрасМинти(окрас)}/nav-${лист}.webp?v=${ВЕРСИЯ_МИНТИ})`,
+        backgroundSize: `${ф.кадров * 100}% 100%`, backgroundRepeat: "no-repeat",
+        backgroundPosition: "0% 0",
+        imageRendering: "pixelated",
+        animation: фаза === "idle" ? "none" : `минтиКадры ${ф.с}s steps(${ф.кадров}, jump-none) 1 both`,
       }}
     />
   );
@@ -29115,6 +29161,7 @@ function mapTokenRow(row) {
             boxShadow: "0 10px 30px rgba(0,0,0,0.32)",
           }}
         >
+          <НавМинти окрас={cosmetics.mintie} />
           {/* Профиля в панели нет: туда ходят за своими делами, а не
               переключаются между ним и рынком. Вход — по аватарке в углу
               главной, как это устроено везде. Запуск — не раздел, а

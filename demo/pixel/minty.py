@@ -41,7 +41,9 @@ def sprite(cw, ch, ground, st, variant):
     dy = st.get("dy", 0); bob = st.get("bob", 0); crouch = st.get("crouch", 0)
     legs = st.get("legs", [0, 0, 0, 0])
     leg_len = 0 if st.get("flat") else 3 - min(crouch, 2)   # flat — рухнул на пузо
+    sit = st.get("sit")                                       # сидит на краю, лапки свисают
     by1 = ground - leg_len - 1 + dy + bob       # низ туловища
+    if sit: by1 = ground + dy + bob
     sq = st.get("sq", 0)                         # >0 сплющен, <0 вытянут — резиновое тело
     # бока раздаются едва-едва: на пиксель и только при сильном сжатии
     rel = sq - ПОЗА["sq"]
@@ -60,6 +62,14 @@ def sprite(cw, ch, ground, st, variant):
     sp = st.get("splay")          # лапы врастопырку, у каждой свой угол
     for i, lx in enumerate((10, 13, 21, 24)):
         if st.get("wave") and i == 3: continue
+        if sit:
+            # сидит на краю панели: лапки свисают вниз, чуть болтаются
+            sw = st.get("dangle", [0, 0, 0, 0])[i]
+            top = by1 + 1; bot = by1 + 4 + sw
+            rect(ox + lx, top, ox + lx + 1, bot, D)
+            for tx in (-1, 1, 2): put(ox + lx + tx, bot, D)
+            put(ox + lx - 1, bot, M); put(ox + lx + 2, bot, M)
+            continue
         if st.get("flat"):
             # упал плашмя: лапы торчат в стороны из-под пуза
             side = -1 if i < 2 else 1
@@ -233,6 +243,7 @@ def sprite(cw, ch, ground, st, variant):
             front = math.sin(a) > 0
             c, c2 = ("#FFE45C", "#FFF6B8") if front else ("#C9A21C", "#E8C94A")
             put(x, y, c2); put(x - 1, y, c); put(x + 1, y, c); put(x, y - 1, c); put(x, y + 1, c)
+    if sit: return px
     # тень на земле
     sw = 12 if dy > -4 else 8
     for x in range(cw // 2 - sw, cw // 2 + sw):
@@ -328,3 +339,20 @@ for (x, y), c in ic.items():
     im.paste(tuple(int(c[k:k+2], 16) for k in (1, 3, 5)) + (255,), (8 + x * 10, 8 + (y - 4) * 10, 8 + (x + 1) * 10, 8 + (y - 3) * 10))
 im.save("mintie-icon.png")
 bg = Image.new("RGBA", (576, 576), (6, 5, 12, 255)); bg.alpha_composite(im); bg.convert("RGB").save("mintie-icon-bg.png")
+
+# ---- панель навигации: сидит на краю, лапки свисают ----
+NW, NH, NG = 44, 48, 37
+def breath(i):
+    sq = [0, 0, 1, 1, 1, 0, -1, -1, 0, 0, 0, 0][i]
+    return {"sit": True, "sq": sq, "gill": 1 if sq > 0 else (-1 if sq < 0 else 0),
+            "dangle": [[0, 0, 0, 0], [1, 0, 0, 1], [1, 0, 0, 1], [0, 1, 1, 0], [0, 1, 1, 0], [0, 0, 0, 0]][i // 2]}
+NAV = {
+    "nav-wake": [dict(wake(i), sit=True) for i in range(18)],
+    "nav-alarm": [dict(alarm(i), sit=True, dy=max(-2, alarm(i).get("dy", 0))) for i in range(24)],
+    "nav-breath": [breath(i) for i in range(12)],
+}
+for skin in SKINS:
+    use_skin(skin)
+    for n, frames in NAV.items():
+        save([sprite(NW, NH, NG, st, "plain") for st in frames], NW, NH, 4, f"out/{skin}/{n}.webp")
+use_skin("mint")
