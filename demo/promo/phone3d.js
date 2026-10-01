@@ -8,8 +8,8 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 
 const VW = 1920, VH = 1080;
 // размеры в миллиметрах, экран — 393×852 точки, как у iPhone 15 Pro
-const SW = 66, SH = SW * 852 / 393, BEZ = 2.7;
-const W = SW + BEZ * 2, H = SH + BEZ * 2, D = 8.25, R = 11.6;
+const SW = 66, SH = SW * 852 / 393, BEZ = 1.45;
+const W = SW + BEZ * 2, H = SH + BEZ * 2, D = 8.25, R = 9.24 + BEZ;
 // камера длиннофокусная: меньше искажений, как в продуктовой съёмке
 const FOV = 20, DIST = 556;
 const MM_PER_PX = (2 * DIST * Math.tan((FOV / 2) * Math.PI / 180)) / VH;
@@ -75,11 +75,12 @@ class Phone {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, D * 0.62), band); m.position.set(x, y, 0); g.add(m);
     }
     // кнопки: действие и громкость слева, питание справа
-    const btn = (x, y, len) => { const m = new THREE.Mesh(new RoundedBoxGeometry(1.6, len, 2.6, 4, 0.7), ti); m.position.set(x, y, 0); g.add(m); };
-    btn(-W / 2 - 0.35, H / 2 - 30, 7.5); btn(-W / 2 - 0.35, H / 2 - 44, 11.5); btn(-W / 2 - 0.35, H / 2 - 58, 11.5); btn(W / 2 + 0.35, H / 2 - 50, 17);
+    const btn = (x, y, len) => { const m = new THREE.Mesh(new RoundedBoxGeometry(1.2, len, 2.2, 4, 0.5), ti); m.position.set(x, y, 0); g.add(m); };
+    // кнопки выступают из рамки примерно на полмиллиметра, как у настоящего айфона
+    btn(-W / 2 - 0.0, H / 2 - 30, 7.5); btn(-W / 2 - 0.0, H / 2 - 44, 11.5); btn(-W / 2 - 0.0, H / 2 - 58, 11.5); btn(W / 2 + 0.0, H / 2 - 50, 17);
     // фронтальное стекло: чёрное, с лаком — даёт блик по краю рамки
     const glassMat = new THREE.MeshPhysicalMaterial({ color: "#030305", metalness: 0, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.03 });
-    const glass = new THREE.Mesh(new THREE.ExtrudeGeometry(rrect(W - 1.5, H - 1.5, R - 0.75), { depth: 0.25, bevelEnabled: true, bevelThickness: 0.2, bevelSize: 0.3, bevelSegments: 4, curveSegments: 40 }), glassMat);
+    const glass = new THREE.Mesh(new THREE.ExtrudeGeometry(rrect(W - 1.1, H - 1.1, R - 0.55), { depth: 0.25, bevelEnabled: true, bevelThickness: 0.2, bevelSize: 0.3, bevelSegments: 4, curveSegments: 40 }), glassMat);
     glass.position.z = D / 2 - 0.3; g.add(glass);
     this.zFront = D / 2 + 0.2;
     // задняя матовая крышка в цвет рамки
@@ -91,14 +92,15 @@ class Phone {
     this.v.set(x, y, z).applyMatrix4(this.g.matrixWorld).project(this.cam);
     return [(this.v.x + 1) / 2 * VW, (1 - this.v.y) / 2 * VH];
   }
-  // x, y — центр телефона в пикселях кадра; s — масштаб; углы в градусах
+  // x, y — центр телефона в пикселях кадра; s — масштаб; углы в градусах,
+  // rx > 0 — верх телефона заваливается назад
   pose({ x = 960, y = 540, s = 1, rx = 0, ry = 0, rz = 0, o = 1 } = {}) {
     this.box.style.opacity = o;
     this.box.style.visibility = o > 0.001 ? "visible" : "hidden";
     if (o <= 0.001) return;
     const g = this.g, k = Math.PI / 180;
     g.position.set((x - VW / 2) * MM_PER_PX, -(y - VH / 2) * MM_PER_PX, 0);
-    g.rotation.set(rx * k, ry * k, rz * k, "YXZ"); g.scale.setScalar(s);
+    g.rotation.set(-rx * k, ry * k, rz * k, "YXZ"); g.scale.setScalar(s);
     g.updateMatrixWorld(true);
     this.r.render(this.sc, this.cam);
     const z = this.zFront, q = [this.project(-SW / 2, SH / 2, z), this.project(SW / 2, SH / 2, z), this.project(SW / 2, -SH / 2, z), this.project(-SW / 2, -SH / 2, z)];

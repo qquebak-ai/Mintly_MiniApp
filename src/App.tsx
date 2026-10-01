@@ -618,7 +618,7 @@ const STR = {
     bannerOptional: "Баннер 1200×400 (необязательно)",
     logoRequiredShort: "Логотип обязателен",
     nameLabel: "Название",
-    tickerLabel: "Тикет",
+    tickerLabel: "Тикер",
     descLabel: "Описание",
     descPlaceholder: "О чём этот токен и почему он появился",
     descRequiredShort: "Описание обязательно — после запуска изменить его будет нельзя",

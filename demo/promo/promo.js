@@ -116,23 +116,23 @@ const aW = [
   wg(A, 270, 124, `<div class="row" style="justify-content:space-between"><span style="font:800 19px Nunito">SOL</span><span class="chip up" style="background:#E3F8EE">+2.07%</span></div>
     <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:6px"><span class="num tn">$120.48</span>${spark(SOL.slice(10), 110, 38, "#0FA968")}</div>`),
   wg(A, 286, 92, `<div class="row">${logo("mcat", 56)}<div style="flex:1"><div style="font:800 19px Nunito">Moon Cat <span style="color:#5B7398;font:600 14px Onest">$MCAT</span></div>
-    <div class="lb" style="font-size:14px;display:flex;align-items:center;gap:7px"><i style="width:8px;height:8px;border-radius:50%;background:#1E8BFF;display:inline-block"></i>Launched 2s ago</div></div></div>`),
-  wg(A, 214, 132, `<div class="lb">Platform fee</div><div style="font:800 58px/1.05 Nunito;letter-spacing:-.03em" class="accent">0%</div><div class="lb" style="font-size:13px">on every trade</div>`),
-  wg(A, 222, 92, `<div class="row"><div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#0B4FD8,#35D0E8);display:flex;align-items:center;justify-content:center">${ICO.bolt("#fff", 26)}</div>
-    <div><div class="lb" style="font-size:14px">Confirmed in</div><div class="num tn" style="font-size:24px">0.4 s</div></div></div>`),
-  wg(A, 300, 88, `<div class="row">${logo("frog", 52)}<div style="flex:1"><div style="font:800 18px Nunito">Bought 1.7M LILY</div><div class="lb" style="font-size:14px">for 5 GRAM · fee 0%</div></div>${ICO.check()}</div>`),
+    <div class="lb" style="font-size:14px;display:flex;align-items:center;gap:7px"><i style="width:8px;height:8px;border-radius:50%;background:#1E8BFF;display:inline-block"></i>Запущен 2 с назад</div></div></div>`),
+  wg(A, 236, 132, `<div class="lb">Комиссия платформы</div><div style="font:800 58px/1.05 Nunito;letter-spacing:-.03em" class="accent">0%</div><div class="lb" style="font-size:13px">на каждую сделку</div>`),
+  wg(A, 262, 92, `<div class="row"><div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#0B4FD8,#35D0E8);display:flex;align-items:center;justify-content:center">${ICO.bolt("#fff", 26)}</div>
+    <div><div class="lb" style="font-size:14px">Подтверждено за</div><div class="num tn" style="font-size:24px">0.4 с</div></div></div>`),
+  wg(A, 330, 88, `<div class="row">${logo("frog", 52)}<div style="flex:1"><div style="font:800 18px Nunito">Купил 1.7M LILY</div><div class="lb" style="font-size:14px">за 5 GRAM · комиссия 0%</div></div>${ICO.check()}</div>`),
   wg(A, 260, 88, `<div class="row"><div style="display:flex">${["pup", "boo", "fire", "gold"].map((k, i) => `<div style="margin-left:${i ? -12 : 0}px;border:3px solid #fff;border-radius:50%;display:flex;background:#fff">${logo(k, 38)}</div>`).join("")}</div>
-    <div><div class="num tn" style="font-size:21px">1 284</div><div class="lb" style="font-size:13px">holders</div></div></div>`),
+    <div><div class="num tn" style="font-size:21px">1 284</div><div class="lb" style="font-size:13px">держателя</div></div></div>`),
 ];
 const aPos = [[430, 480, 1.25, -3], [1480, 455, 1.4, 2.5], [330, 735, 1.55, 2], [1600, 700, 1.7, -2], [560, 945, 1.85, 1.5], [1380, 950, 2.0, -1.5]];
 
 // ============ B · ПРОБЛЕМА 5.2–15.1 ============
 const B = scene(5.2, 15.15);
-const b1 = line(B, "Every day, there's a new *memecoin*", { top: 470, size: 76 });
-const b2 = line(B, "Fees eat your *gains.*", { top: 462, size: 88 });
-const b3 = line(B, "Trades take *forever.*", { top: 462, size: 88 });
-const b4 = line(B, "You just want to trade?", { top: 500, size: 46, color: "#5B7398" });
-const b5 = line(B, "Then meet *Mintly.*", { top: 486, size: 64 });
+const b1 = line(B, "Каждый день появляется новый *мемкоин*", { top: 474, size: 72 });
+const b2 = line(B, "Комиссии *не* *съедают* твою прибыль.", { top: 470, size: 78 });
+const b3 = line(B, "Торгуй *доступно.*", { top: 462, size: 88 });
+const b4 = line(B, "Хочешь просто торговать?", { top: 500, size: 46, color: "#5B7398" });
+const b5 = line(B, "Тогда знакомься — *Mintly.*", { top: 486, size: 64 });
 
 // ряды виджетов: по четыре над и под фразой, каждый слот всё время меняет
 // карточку — новая въезжает снизу, старая уходит вверх
@@ -166,58 +166,85 @@ function runSlots(slots, t, a, b, period, tick) {
     });
   });
 }
-// B1 — новые токены каждую секунду
+// детерминированный «случай»: одно и то же t даёт один и тот же кадр
+const rnd = (a, b = 0) => { const x = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return x - Math.floor(x); };
+// накопленная сумма случайных шагов: у каждой карточки свой ритм и свой размер шага
+function walk(seed, t, t0, dtMin, dtMax, stepMin, stepMax, pZero = 0.25) {
+  let tt = t0, v = 0;
+  for (let n = 0; n < 80; n++) {
+    tt += dtMin + rnd(seed, n * 2) * (dtMax - dtMin);
+    if (tt > t) break;
+    if (rnd(seed, n * 2 + 1) > pZero) v += stepMin + rnd(seed + 7, n) * (stepMax - stepMin);
+  }
+  return v;
+}
+const ago = (s) => (s < 1 ? "только что" : `${s} с назад`);
+// B1 — новые токены каждую секунду, капитализация растёт рывками, у каждого по-своему
 const b1Slots = makeSlots((i) => [0, 1, 2].map((r) => {
   const [k, name, tick] = TOK[(i + r * 3) % TOK.length];
-  return `${logo(k, 56)}<div style="flex:1;margin-left:14px;min-width:0"><div style="font:800 19px Nunito;white-space:nowrap">${name}</div><div class="lb" style="font-size:14px">$${tick} · <span class="ago tn">just now</span></div></div>
-    <div style="text-align:right"><span class="chip" style="background:#E6F1FF;color:#1565D8">NEW</span><div class="mc tn" style="font:800 17px Nunito;margin-top:6px" data-v="${2 + ((i * 7 + r * 3) % 9)}"></div></div>`;
+  return `${logo(k, 56)}<div style="flex:1;margin-left:14px;min-width:0"><div style="font:800 19px Nunito;white-space:nowrap">${name}</div><div class="lb" style="font-size:14px">$${tick} · <span class="ago tn"></span></div></div>
+    <div style="text-align:right"><span class="chip" style="background:#E6F1FF;color:#1565D8">НОВЫЙ</span><div class="mc tn up" style="font:800 17px Nunito;margin-top:6px"></div></div>`;
 }));
-// B2 — комиссии, которые съедают прибыль
-const FEES = [["Trading fee", "1.0%"], ["Network fee", "gas"], ["Slippage", "2.4%"], ["Priority fee", "tip"], ["Swap fee", "0.3%"], ["Spread", "0.8%"], ["Platform cut", "1.25%"], ["Bot fee", "1.0%"]];
+// B2 — комиссии в копейках: крошечный минус, который изредка прибавляет цент
+const FEEROW = [["mcat", "Покупка MCAT"], ["frog", "Продажа LILY"], ["gold", "Покупка GAXO"], ["pup", "Покупка PUP"], ["fire", "Продажа WICK"], ["neon", "Покупка NEON"], ["boo", "Покупка BOO"], ["violet", "Продажа VIO"], ["mint", "Покупка MINT"]];
 const b2Slots = makeSlots((i) => [0, 1, 2].map((r) => {
-  const [n, tag] = FEES[(i + r * 3) % FEES.length];
-  if ((i + r * 5) % 8 === 3) return `<div style="flex:1"><div class="lb" style="font-size:14px">Your gain</div><div style="font:800 22px Nunito" class="tn"><span style="color:#9AAAC2;text-decoration:line-through">+18%</span> <span class="dn gain">+6%</span></div></div>
-    <svg width="92" height="40" viewBox="0 0 92 40"><polyline points="2,8 20,12 36,10 52,22 70,26 90,36" fill="none" stroke="#E5484D" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  return `<div style="width:48px;height:48px;border-radius:15px;background:#FDECEC;display:flex;align-items:center;justify-content:center;flex:none">${ICO.minus("#E5484D", 20)}</div>
-    <div style="flex:1;margin-left:14px"><div style="font:700 17px Onest">${n}</div><div class="lb" style="font-size:13px">${tag}</div></div><div class="dn fee tn" style="font:800 21px Nunito" data-v="${(3 + ((i * 5 + r * 7) % 11) * 1.37).toFixed(2)}"></div>`;
+  const [k, n] = FEEROW[(i + r * 3) % FEEROW.length];
+  return `${logo(k, 52)}<div style="flex:1;margin-left:14px"><div style="font:700 17px Onest;white-space:nowrap">${n}</div><div class="lb" style="font-size:13px">сеть · Mintly 0%</div></div>
+    <div class="fee tn" style="font:800 20px Nunito;color:#C2464B"></div>`;
 }));
-// B3 — зависшие сделки, таймеры идут, полоски ползут
-const WAIT = ["Pending…", "Confirming 3/32", "Waiting for block", "Stuck in mempool", "Retrying…", "Waiting for wallet", "Re-sending tx", "Confirming 9/32"];
+// B3 — быстрые сделки: суммы всё время меняются, каждая подтверждена за доли секунды
 const b3Slots = makeSlots((i) => [0, 1, 2].map((r) => {
-  const n = WAIT[(i + r * 3) % WAIT.length];
-  return `<svg class="spin" width="44" height="44" viewBox="0 0 44 44" style="flex:none"><circle cx="22" cy="22" r="17" fill="none" stroke="#E3ECF8" stroke-width="5"/><circle cx="22" cy="22" r="17" fill="none" stroke="#1E8BFF" stroke-width="5" stroke-linecap="round" stroke-dasharray="30 120"/></svg>
-    <div style="flex:1;margin-left:14px"><div style="font:700 17px Onest">${n}</div><div style="height:6px;border-radius:3px;background:#E8EEF7;margin-top:9px;overflow:hidden"><div class="bar" style="height:100%;width:10%;border-radius:3px;background:linear-gradient(90deg,#0B4FD8,#35D0E8)"></div></div></div>
-    <div class="tm tn" style="font:800 19px Nunito;margin-left:14px;color:#5B7398" data-v="${8 + ((i * 11 + r * 17) % 40)}"></div>`;
+  const [k, , tick] = TOK[(i * 2 + r * 5 + 1) % TOK.length], sell = (i + r) % 3 === 2;
+  return `${logo(k, 52)}<div style="flex:1;margin-left:14px;min-width:0"><div style="font:800 18px Nunito;white-space:nowrap">${sell ? "Продал" : "Купил"} <span class="qty tn"></span> ${tick}</div><div class="lb" style="font-size:13px">за <span class="amt tn"></span> GRAM · <span class="spd tn"></span></div></div>
+    <div style="width:34px;height:34px;border-radius:50%;background:#E3F8EE;display:flex;align-items:center;justify-content:center;flex:none">${ICO.check("#0FA968", 19)}</div>`;
 }));
-function tickB1(c, t, i, j) { const el = c.querySelector(".mc"); if (el) el.textContent = fmtK(+el.dataset.v * 1000 + (t * 1000 * (1 + i * 0.3)) % 2400); const a = c.querySelector(".ago"); if (a) a.textContent = (Math.floor(t * 3 + i) % 4 === 0) ? "just now" : `${1 + Math.floor((t * 2 + i) % 9)}s ago`; }
-function tickB2(c, t, i) { const el = c.querySelector(".fee"); if (el) el.textContent = "−$" + (+el.dataset.v + (t - 8) * (0.9 + i * 0.17)).toFixed(2); }
-function tickB3(c, t, i) {
-  const sp = c.querySelector(".spin"); sp.style.transform = `rotate(${(t * 300 + i * 40) % 360}deg)`;
-  const tm = c.querySelector(".tm"), s = +tm.dataset.v + Math.floor((t - 10) * 3);
-  tm.textContent = `0${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-  c.querySelector(".bar").style.width = (8 + ((t * 2 + i * 7) % 22)) + "%";
+function tickB1(c, t, i, j) {
+  const seed = i * 31 + j * 7 + 1, base = 2000 + rnd(seed, 99) * 9000;
+  c.querySelector(".mc").textContent = fmtK(base + walk(seed, t, 5.4, 0.06, 0.32, 20, 520, 0.2));
+  c.querySelector(".ago").textContent = ago(Math.floor(Math.max(0, t - 6 - i * 0.2 - j * 0.6) * (0.8 + rnd(seed, 5))));
+}
+function tickB2(c, t, i, j) {
+  const seed = i * 17 + j * 5 + 3, cents = (rnd(seed, 1) < 0.5 ? 1 : 0) + Math.round(walk(seed, t, 8.3, 0.35, 0.9, 1, 1, 0.55));
+  c.querySelector(".fee").textContent = "−$0." + String(Math.min(cents, 9)).padStart(2, "0");
+}
+function tickB3(c, t, i, j) {
+  const seed = i * 23 + j * 11 + 5, n = Math.floor((t - 10) / (0.22 + rnd(seed, 3) * 0.2));
+  const amt = [0.1, 0.25, 0.5, 0.8, 1, 1.5, 2, 3, 5][Math.floor(rnd(seed, n) * 9)];
+  c.querySelector(".amt").textContent = String(amt).replace(".", ",");
+  c.querySelector(".qty").textContent = (amt * (180 + rnd(seed, n + 50) * 260) / 1000).toFixed(2).replace(".", ",") + "M";
+  c.querySelector(".spd").textContent = (0.3 + rnd(seed, n + 9) * 0.2).toFixed(1).replace(".", ",") + " с";
 }
 
-// коллаж «You just want to trade?»: восемь цельных виджетов на орбите — без
+// коллаж «Хочешь просто торговать?»: восемь цельных виджетов на орбите — без
 // обрезков баннеров, все одного стиля и целиком в кадре
 const ORB = [
   wg(B, 260, 112, `<div class="row" style="justify-content:space-between"><span style="font:800 18px Nunito">SOL</span><span class="chip up" style="background:#E3F8EE">+2.07%</span></div><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:4px"><span class="num tn" style="font-size:24px">$120.48</span>${spark(SOL.slice(12), 100, 34, "#0FA968")}</div>`),
-  wg(B, 320, 92, `<div class="row">${logo("mcat", 56)}<div style="flex:1"><div style="font:800 19px Nunito">Moon Cat</div><div class="lb" style="font-size:14px">$MCAT · 61% to listing</div></div><span class="up" style="font:800 17px Nunito">+38%</span></div>`),
-  wg(B, 270, 120, `<div style="position:absolute;inset:0;border-radius:26px;background:${GRAD}"></div><div style="position:relative;color:#fff"><div style="font:500 14px Onest;opacity:.85">Balance</div><div style="font:800 32px Nunito" class="tn">$1 284.50</div><div style="font:600 13px Onest;opacity:.9;margin-top:4px">12.4 SOL · 8 420 GRAM</div></div>`),
-  wg(B, 214, 92, `<div class="row"><div style="width:50px;height:50px;border-radius:16px;background:linear-gradient(135deg,#0B4FD8,#35D0E8);display:flex;align-items:center;justify-content:center">${ICO.bolt("#fff", 24)}</div><div><div class="lb" style="font-size:14px">Confirmed in</div><div class="num tn" style="font-size:23px">0.4 s</div></div></div>`),
-  wg(B, 300, 88, `<div class="row">${logo("pup", 50)}<div style="flex:1"><div style="font:800 17px Nunito">Bought 2.1M PUP</div><div class="lb" style="font-size:13px">for 3 GRAM · fee 0%</div></div>${ICO.check()}</div>`),
-  wg(B, 210, 112, `<div class="lb">Platform fee</div><div style="font:800 50px/1.05 Nunito;letter-spacing:-.03em" class="accent">0%</div>`),
-  wg(B, 270, 112, `<div class="row"><div style="width:76px;height:76px;border-radius:20px;background:#0B0A12;display:flex;align-items:center;justify-content:center"><img src="assets/app/gold-preview.webp" style="width:64px;image-rendering:pixelated"/></div><div><div style="font:800 18px Nunito">Gold skin</div><div class="lb" style="font-size:13px">Minti shop</div><span class="chip" style="background:#FFF4D6;color:#A86A00;margin-top:6px">300 coins</span></div></div>`),
+  wg(B, 320, 92, `<div class="row">${logo("mcat", 56)}<div style="flex:1"><div style="font:800 19px Nunito">Moon Cat</div><div class="lb" style="font-size:14px">$MCAT · 61% до биржи</div></div><span class="up" style="font:800 17px Nunito">+38%</span></div>`),
+  wg(B, 270, 120, `<div style="position:absolute;inset:0;border-radius:26px;background:${GRAD}"></div><div style="position:relative;color:#fff"><div style="font:500 14px Onest;opacity:.85">Баланс</div><div style="font:800 32px Nunito" class="tn">$1 284.50</div><div style="font:600 13px Onest;opacity:.9;margin-top:4px">12.4 SOL · 8 420 GRAM</div></div>`),
+  wg(B, 236, 92, `<div class="row"><div style="width:50px;height:50px;border-radius:16px;background:linear-gradient(135deg,#0B4FD8,#35D0E8);display:flex;align-items:center;justify-content:center">${ICO.bolt("#fff", 24)}</div><div><div class="lb" style="font-size:14px">Подтверждено за</div><div class="num tn" style="font-size:23px">0.4 с</div></div></div>`),
+  wg(B, 320, 88, `<div class="row">${logo("pup", 50)}<div style="flex:1"><div style="font:800 17px Nunito">Купил 2.1M PUP</div><div class="lb" style="font-size:13px">за 3 GRAM · комиссия 0%</div></div>${ICO.check()}</div>`),
+  wg(B, 230, 112, `<div class="lb">Комиссия платформы</div><div style="font:800 50px/1.05 Nunito;letter-spacing:-.03em" class="accent">0%</div>`),
+  wg(B, 290, 112, `<div class="row"><div style="width:76px;height:76px;border-radius:20px;background:#0B0A12;display:flex;align-items:center;justify-content:center"><img src="assets/app/gold-preview.webp" style="width:64px;image-rendering:pixelated"/></div><div><div style="font:800 18px Nunito">Золотой скин</div><div class="lb" style="font-size:13px">магазин Минти</div><span class="chip" style="background:#FFF4D6;color:#A86A00;margin-top:6px">300 монет</span></div></div>`),
   wg(B, 260, 112, `<div class="row" style="justify-content:space-between"><span style="font:800 18px Nunito">GRAM</span><span class="chip dn" style="background:#FDECEC">−4.52%</span></div><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:4px"><span class="num tn" style="font-size:24px">$1.54</span>${spark(TON.slice(12), 100, 34, "#E5484D")}</div>`),
 ];
 
 // ============ C · SIMPLE + ЛОГОТИП 15–19.7 ============
 const C = scene(15, 19.75);
-const cGuides = [];
-for (let i = 0; i < 9; i++) { const g = $(`<div class="guide" style="left:${330 + i * 160}px;top:0;width:1px;height:1080px"></div>`); C.appendChild(g); cGuides.push(g); }
-[[420], [640]].forEach(([y]) => { const g = $(`<div class="guide" style="left:0;top:${y}px;width:1920px;height:1px"></div>`); C.appendChild(g); cGuides.push(g); });
-const cWord = $(`<div class="c" style="top:390px;font:800 230px/1 'Nunito';letter-spacing:-0.03em;color:#0B1E46;white-space:nowrap"></div>`); C.appendChild(cWord);
-const cLetters = [..."Simple."].map((ch) => { const s = $(`<span class="w">${ch}</span>`); cWord.appendChild(s); return s; });
+// «Просто.» как в референсе: буквы группами между линиями сетки, у каждой
+// группы свои края и свои зазоры; сетка едет за буквами, пока слово собирается
+const C_GROUPS = ["П", "ро", "ст", "о."], C_GAPS = [96, 170, 70], C_TOP = 386, C_SIZE = 230;
+// линии по высоте капители и базовой линии Nunito при line-height 1
+const C_CAP = C_TOP + 0.124 * C_SIZE, C_BASE = C_TOP + 0.829 * C_SIZE;
+const cGroups = C_GROUPS.map((g) => { const e = $(`<div class="abs" style="left:0;top:${C_TOP}px;font:800 ${C_SIZE}px/1 'Nunito';letter-spacing:-0.03em;color:#0B1E46;white-space:nowrap">${g}</div>`); C.appendChild(e); return e; });
+const cH = [C_CAP, C_BASE].map((y) => { const g = $(`<div class="guide" style="background:rgba(30,110,220,.32);left:0;top:${y}px;width:1920px;height:1px;transform-origin:50% 50%"></div>`); C.appendChild(g); return g; });
+// у каждой группы два края; у части краёв — вторая линия рядом, как в референсе
+const cV = [];
+C_GROUPS.forEach((_, gi) => [0, 1].forEach((side) => {
+  const offs = (gi + side) % 2 ? [0, side ? 12 : -12] : [0];
+  offs.forEach((off) => { const g = $(`<div class="guide" style="background:rgba(30,110,220,.32);left:0;top:0;width:1px;height:1080px;transform-origin:50% ${((C_CAP + C_BASE) / 2 / 10.8).toFixed(1)}%"></div>`); g.gi = gi; g.side = side; g.off = off; C.appendChild(g); cV.push(g); });
+}));
+const cDots = [];
+C_GROUPS.forEach((_, gi) => [0, 1].forEach((side) => [C_CAP, C_BASE].forEach((y) => { const d = $(`<div class="abs" style="left:0;top:0;width:7px;height:7px;background:#0B1E46"></div>`); d.gi = gi; d.side = side; d.y = y; C.appendChild(d); cDots.push(d); })));
 const LOGO = `<svg viewBox="0 0 64 64" width="100%" height="100%"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0B4FD8"/><stop offset=".6" stop-color="#1E8BFF"/><stop offset="1" stop-color="#35D0E8"/></linearGradient></defs>
   <path d="M12 56 V28 L32 45 L52 28 V56" fill="none" stroke="url(#lg)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
   <g transform="translate(52,26) rotate(34)"><path d="M0 0 C -8 -7 -8 -19 0 -26 C 8 -19 8 -7 0 0 Z" fill="#3FD9A0"/></g></svg>`;
@@ -230,56 +257,66 @@ const cName = $(`<div class="abs" style="left:1060px;top:452px;font:800 150px/1 
 const D = scene(19.5, 37.15);
 // D1 — запуск: настоящий экран создания токена, по буквам
 const CREATE = Array.from({ length: 20 }, (_, i) => "create-" + String(i).padStart(2, "0"));
-const d1Scr = screen(frames(CREATE) + toast("Moon Cat is live", "MCAT · on-chain in 1.2 s") + `<div class="tap"></div>`);
+const d1Scr = screen(frames(CREATE) + toast("Moon Cat запущен", "MCAT · в сети за 1.2 с") + `<div class="tap"></div>`);
 const d1Wrap = $(`<div class="abs" style="inset:0"></div>`); D.appendChild(d1Wrap);
 const d1Phone = new Phone3D(d1Wrap, d1Scr);
-const d1T1 = line(D, "Launch a *memecoin*", { top: 372, size: 92, weight: 600 }); d1T1.style.left = "1010px"; d1T1.style.textAlign = "left";
-const d1T2 = line(D, "in seconds.", { top: 490, size: 92, weight: 600, color: "#5B7398" }); d1T2.style.left = "1010px"; d1T2.style.textAlign = "left";
-const d1Card = wg(D, 440, 150, `<div class="row">${logo("mcat", 62)}<div style="flex:1"><div style="font:800 22px Nunito">Moon Cat is live</div><div class="lb" style="font-size:14px">$MCAT · on-chain in 1.2 s</div></div><span class="chip up" style="background:#E3F8EE">LIVE</span></div>
-  <div style="display:flex;justify-content:space-between;margin-top:16px" class="lb"><span style="font-size:13px">Bonding curve</span><span class="tn d1pct" style="font:800 14px Nunito;color:#0B1E46">0%</span></div>
+const d1T1 = line(D, "Запусти *мемкоин*", { top: 372, size: 92, weight: 600 }); d1T1.style.left = "1010px"; d1T1.style.textAlign = "left";
+const d1T2 = line(D, "за секунды.", { top: 490, size: 92, weight: 600, color: "#5B7398" }); d1T2.style.left = "1010px"; d1T2.style.textAlign = "left";
+const d1Card = wg(D, 440, 150, `<div class="row">${logo("mcat", 62)}<div style="flex:1"><div style="font:800 22px Nunito">Moon Cat запущен</div><div class="lb" style="font-size:14px">$MCAT · в сети за 1.2 с</div></div><span class="chip up" style="background:#E3F8EE">В СЕТИ</span></div>
+  <div style="display:flex;justify-content:space-between;margin-top:16px" class="lb"><span style="font-size:13px">Кривая бондинга</span><span class="tn d1pct" style="font:800 14px Nunito;color:#0B1E46">0%</span></div>
   <div style="height:8px;border-radius:4px;background:#E8EEF7;margin-top:7px;overflow:hidden"><div class="d1bar" style="height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#0B4FD8,#1E8BFF,#35D0E8)"></div></div>`);
 // D2 — торговля: страница токена, лист покупки, нажатие
-const d2Scr = screen(frames(["token", "buy", "buy5"]) + toast("Bought 1 733 708 MCAT", "for 5 GRAM · platform fee 0%") + `<div class="tap"></div>`);
+const d2Scr = screen(frames(["token", "buy", "buy5"]) + toast("Куплено 1 733 708 MCAT", "за 5 GRAM · комиссия платформы 0%") + `<div class="tap"></div>`);
 const d2Wrap = $(`<div class="abs" style="inset:0"></div>`); D.appendChild(d2Wrap);
 const d2Phone = new Phone3D(d2Wrap, d2Scr);
-const d2T1 = line(D, "Trade with", { top: 280, size: 92, weight: 600 }); d2T1.style.left = "250px"; d2T1.style.textAlign = "left";
-const d2Zero = $(`<div class="abs accent" style="left:240px;top:372px;font:800 300px/1 'Nunito';letter-spacing:-0.05em;padding-right:20px">0%</div>`); D.appendChild(d2Zero);
-const d2T2 = line(D, "fees.", { top: 560, size: 92, weight: 600, color: "#5B7398" }); d2T2.style.left = "722px"; d2T2.style.textAlign = "left";
-const d2Card = wg(D, 470, 150, `<div class="lb" style="font-size:14px;display:flex;justify-content:space-between"><span>Receipt · MCAT</span><span>just now</span></div>
-  ${[["You paid", "5 GRAM"], ["Platform fee", "0.00 GRAM"]].map(([a, b], i) => `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:${i ? 8 : 12}px;font:600 17px Onest"><span style="color:#5B7398">${a}</span><span style="font:800 19px Nunito;${i ? "color:#0FA968" : ""}" class="tn">${b}${i ? ` <span style="vertical-align:-3px">${ICO.check("#0FA968", 17)}</span>` : ""}</span></div>`).join("")}`);
+const d2T1 = line(D, "Торгуй с", { top: 236, size: 92, weight: 600 }); d2T1.style.left = "250px"; d2T1.style.textAlign = "left";
+const d2Zero = $(`<div class="abs accent" style="left:240px;top:330px;font:800 290px/1 'Nunito';letter-spacing:-0.05em;padding-right:20px">0%</div>`); D.appendChild(d2Zero);
+const d2T2 = line(D, "комиссией.", { top: 616, size: 92, weight: 600, color: "#5B7398" }); d2T2.style.left = "250px"; d2T2.style.textAlign = "left";
+const d2Card = wg(D, 470, 150, `<div class="lb" style="font-size:14px;display:flex;justify-content:space-between"><span>Чек · MCAT</span><span>только что</span></div>
+  ${[["Ты заплатил", "5 GRAM"], ["Комиссия платформы", "0.00 GRAM"]].map(([a, b], i) => `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:${i ? 8 : 12}px;font:600 17px Onest"><span style="color:#5B7398">${a}</span><span style="font:800 19px Nunito;${i ? "color:#0FA968" : ""}" class="tn">${b}${i ? ` <span style="vertical-align:-3px">${ICO.check("#0FA968", 17)}</span>` : ""}</span></div>`).join("")}`);
 // D3 — скорость
-const d3 = $(`<div class="c" style="top:340px;font:700 120px/1.05 'Nunito';letter-spacing:-0.035em;color:#0B1E46"><div id="d3a" style="display:inline-block">Fastest transactions</div><br/><div id="d3b" style="display:inline-block" class="accent">in the world.</div></div>`); D.appendChild(d3);
-const d3Trails = [0, 1, 2].map(() => { const tr = $(`<div class="c" style="top:340px;font:700 120px/1.05 'Nunito';letter-spacing:-0.035em;color:#8CC4FF;opacity:0">Fastest transactions</div>`); D.appendChild(tr); return tr; });
+const d3 = $(`<div class="c" style="top:340px;font:700 108px/1.08 'Nunito';letter-spacing:-0.035em;color:#0B1E46"><div id="d3a" style="display:inline-block">Самые быстрые транзакции</div><br/><div id="d3b" style="display:inline-block" class="accent">в мире.</div></div>`); D.appendChild(d3);
+const d3Trails = [0, 1, 2].map(() => { const tr = $(`<div class="c" style="top:340px;font:700 108px/1.08 'Nunito';letter-spacing:-0.035em;color:#8CC4FF;opacity:0">Самые быстрые транзакции</div>`); D.appendChild(tr); return tr; });
 const d3Lines = Array.from({ length: 7 }, (_, i) => { const l = $(`<div class="abs" style="left:0;top:${300 + i * 46}px;width:${260 + (i % 3) * 140}px;height:3px;border-radius:2px;background:linear-gradient(90deg,rgba(30,139,255,0),rgba(30,139,255,.55),rgba(53,208,232,0))"></div>`); D.appendChild(l); return l; });
 const d3Card = wg(D, 520, 104, `<div class="row"><div style="width:62px;height:62px;border-radius:19px;background:linear-gradient(135deg,#0B4FD8,#35D0E8);display:flex;align-items:center;justify-content:center;flex:none">${ICO.bolt("#fff", 30)}</div>
-  <div style="flex:1"><div style="font:800 21px Nunito" class="d3st">Sending…</div><div class="lb" style="font-size:14px">Buy 5 GRAM of $MCAT</div></div>
-  <div class="row" style="gap:10px"><div class="d3ok" style="opacity:0;width:34px;height:34px;border-radius:50%;background:#E3F8EE;display:flex;align-items:center;justify-content:center">${ICO.check("#0FA968", 20)}</div><div class="num tn d3tm" style="font-size:30px;min-width:96px;text-align:right">0.00 s</div></div></div>`, "0 24px");
+  <div style="flex:1"><div style="font:800 21px Nunito" class="d3st">Отправка…</div><div class="lb" style="font-size:14px">Покупка $MCAT на 5 GRAM</div></div>
+  <div class="row" style="gap:10px"><div class="d3ok" style="opacity:0;width:34px;height:34px;border-radius:50%;background:#E3F8EE;display:flex;align-items:center;justify-content:center">${ICO.check("#0FA968", 20)}</div><div class="num tn d3tm" style="font-size:30px;min-width:96px;text-align:right">0.00 с</div></div></div>`, "0 24px");
 d3Card.style.display = "flex"; d3Card.style.alignItems = "center";
 // D4 — кошелёк
 const d4Wrap = $(`<div class="abs" style="left:380px;top:330px;width:620px;height:390px;perspective:1800px"></div>`); D.appendChild(d4Wrap);
 const d4Card = $(`<div style="position:relative;width:100%;height:100%;transform-style:preserve-3d"></div>`); d4Wrap.appendChild(d4Card);
 for (let i = 0; i < 10; i++) d4Card.appendChild($(`<div style="position:absolute;inset:0;border-radius:40px;background:linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.3)),${GRAD};transform:translateZ(${(-5 + i).toFixed(1)}px)"></div>`));
 d4Card.appendChild($(`<div style="position:absolute;inset:0;border-radius:40px;background:${GRAD};transform:translateZ(5.5px);padding:34px 40px;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 40px 80px rgba(60,20,160,.25)">
-  <div style="font:600 30px 'Onest';opacity:.9">Balance</div><div style="font:800 96px/1.1 'Nunito';letter-spacing:-0.03em" class="tn d4bal">$1 284.50</div>
+  <div style="font:600 30px 'Onest';opacity:.9">Баланс</div><div style="font:800 96px/1.1 'Nunito';letter-spacing:-0.03em" class="tn d4bal">$1 284.50</div>
   <div style="position:absolute;left:40px;bottom:34px;display:inline-flex;padding:12px 22px;border-radius:999px;background:rgba(255,255,255,.18);font:700 24px 'Onest'">12.4 SOL · 8 420 GRAM</div></div>`));
 const d4Mintie = $(`<div class="abs" style="left:430px;top:-118px;width:140px;height:153px;background:url(assets/app/nav-breath.webp) 0 0/1200% 100% no-repeat;image-rendering:pixelated;transform:translateZ(6px)"></div>`); d4Card.appendChild(d4Mintie);
-const d4T1 = line(D, "Your wallet.", { top: 410, size: 96, weight: 600 }); d4T1.style.left = "1130px"; d4T1.style.textAlign = "left";
-const d4T2 = line(D, "Right inside *Telegram.*", { top: 530, size: 64, weight: 500, color: "#5B7398" }); d4T2.style.left = "1134px"; d4T2.style.textAlign = "left";
+const d4T1 = line(D, "Твой кошелёк.", { top: 410, size: 96, weight: 600 }); d4T1.style.left = "1130px"; d4T1.style.textAlign = "left";
+const d4T2 = line(D, "Прямо в *Telegram.*", { top: 530, size: 64, weight: 500, color: "#5B7398" }); d4T2.style.left = "1134px"; d4T2.style.textAlign = "left";
 // D5 — печать
 const d5 = $(`<div class="c" style="top:450px;font:600 120px/1 'Onest';letter-spacing:-0.035em;color:#0B1E46"><span id="d5t"></span><span id="d5c" style="display:inline-block;width:6px;height:110px;background:#1E8BFF;margin-left:6px;vertical-align:-12px"></span></div>`); D.appendChild(d5);
 
 // ============ E · ФИНАЛ 37–45 ============
 const Esc = scene(37, 45, "radial-gradient(120% 90% at 50% 18%,#3FA9FF 0%,#1565C0 38%,#0A2A5E 78%,#061A3D 100%)");
 const eRays = [-28, -14, -3, 9, 20, 33].map((a, i) => { const r = $(`<div class="abs" style="left:${700 + i * 90}px;top:-200px;width:${120 + (i % 3) * 60}px;height:1500px;transform-origin:50% 0;background:linear-gradient(180deg,rgba(210,240,255,.42),rgba(210,240,255,0) 75%);filter:blur(28px);mix-blend-mode:screen"></div>`); r.a = a; Esc.appendChild(r); return r; });
-const eBubbles = Array.from({ length: 34 }, (_, i) => { const s0 = ((i * 9301 + 49297) % 233280) / 233280; const sz = 6 + s0 * 22; const b = $(`<div class="abs" style="left:0;top:0;width:${sz}px;height:${sz}px;border-radius:50%;border:2px solid rgba(220,245,255,.55);background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.6),rgba(255,255,255,.05) 60%)"></div>`); b.x = (i * 137.5) % 1920; b.sp = 60 + s0 * 120; b.ph = s0 * 30; Esc.appendChild(b); return b; });
-const eRing = $(`<svg class="abs" style="left:780px;top:330px;width:160px;height:160px;overflow:visible" viewBox="0 0 120 120"><circle cx="60" cy="60" r="48" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-dasharray="302" stroke-dashoffset="302" transform="rotate(-90 60 60)"/></svg>`); Esc.appendChild(eRing);
-const eLogo = $(`<div class="abs" style="left:770px;top:320px;width:180px;height:180px;filter:drop-shadow(0 10px 30px rgba(0,20,60,.45))">${LOGO.replace('fill="#3FD9A0"', 'fill="#ffffff"').replace(/url\(#lg\)/, "#ffffff")}</div>`); Esc.appendChild(eLogo);
-const eName = $(`<div class="abs" style="left:975px;top:330px;font:800 160px/1 'Nunito';letter-spacing:-0.04em;color:#fff;text-shadow:0 10px 40px rgba(0,20,60,.45);clip-path:inset(0 100% 0 0)">Mintly</div>`); Esc.appendChild(eName);
+// фон финала — стена мелких стеклянных пузырей, по которой идёт 3D-волна
+const eBubbles = [];
+for (let r = 0; r < 24; r++) for (let c = 0; c < 42; c++) {
+  const sd = r * 42 + c, sz = 6 + rnd(sd, 1) * 9;
+  const b = $(`<div class="abs" style="left:0;top:0;width:${sz.toFixed(1)}px;height:${sz.toFixed(1)}px;border-radius:50%;border:1px solid rgba(225,246,255,.7);background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.95) 0 14%,rgba(255,255,255,.18) 34%,rgba(160,215,255,.10) 62%,rgba(225,246,255,.45) 100%);box-shadow:0 0 6px rgba(170,225,255,.25)"></div>`);
+  b.bx = -60 + c * 49 + (rnd(sd, 2) - 0.5) * 30 + (r % 2) * 24; b.by = -40 + r * 50 + (rnd(sd, 3) - 0.5) * 28; b.sz = sz;
+  Esc.appendChild(b); eBubbles.push(b);
+}
+// логотип и имя одной строкой по общей оси — раньше имя сидело ниже знака
+const eLock = $(`<div class="abs" style="left:0;right:0;top:300px;height:180px;display:flex;justify-content:center;align-items:center;gap:26px"></div>`); Esc.appendChild(eLock);
+const eLogoBox = $(`<div style="position:relative;width:170px;height:170px;flex:none"></div>`); eLock.appendChild(eLogoBox);
+const eRing = $(`<svg class="abs" style="left:5px;top:5px;width:160px;height:160px;overflow:visible" viewBox="0 0 120 120"><circle cx="60" cy="60" r="48" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-dasharray="302" stroke-dashoffset="302" transform="rotate(-90 60 60)"/></svg>`); eLogoBox.appendChild(eRing);
+const eLogo = $(`<div class="abs" style="inset:0;filter:drop-shadow(0 8px 24px rgba(0,40,110,.28))">${LOGO.replace('fill="#3FD9A0"', 'fill="#ffffff"').replace(/url\(#lg\)/, "#ffffff")}</div>`); eLogoBox.appendChild(eLogo);
+const eName = $(`<div style="font:800 160px/1 'Nunito';letter-spacing:-0.04em;color:#fff;margin-top:-14px;clip-path:inset(0 100% 0 0)">Mintly</div>`); eLock.appendChild(eName);
 const ePill = $(`<div class="abs" style="left:50%;top:600px;transform:translateX(-50%);display:flex;align-items:center;gap:18px;padding:22px 38px 22px 26px;border-radius:999px;background:rgba(255,255,255,.9);box-shadow:0 20px 60px rgba(0,20,60,.35);white-space:nowrap">
   <div style="width:62px;height:62px;border-radius:50%;background:#2AABEE;display:flex;align-items:center;justify-content:center">${ICO.tg()}</div>
-  <div><div style="font:500 26px 'Onest';color:#4A6488">Open in Telegram</div><div style="font:800 40px 'Nunito';color:#0B1E46">@MintlyTrading_bot</div></div></div>`); Esc.appendChild(ePill);
-const eTag = line(Esc, "Launch. Trade. *Moon.*", { top: 820, size: 46, weight: 600, color: "#ffffff" });
-// на синем финале акцент светлее — иначе «Moon.» тонет в фоне
+  <div><div style="font:500 26px 'Onest';color:#4A6488">Открыть в Telegram</div><div style="font:800 40px 'Nunito';color:#0B1E46">@MintlyTrading_bot</div></div></div>`); Esc.appendChild(ePill);
+const eTag = line(Esc, "Запускай. Торгуй. *Взлетай.*", { top: 820, size: 46, weight: 600, color: "#ffffff" });
+// на синем финале акцент светлее — иначе «Взлетай.» тонет в фоне
 eTag.spans.forEach((w) => { if (w.classList.contains("accent")) w.style.backgroundImage = "linear-gradient(95deg,#8FF3E6,#E6FDFF)"; });
 
 const fade = document.getElementById("fade");
@@ -312,7 +349,6 @@ window.renderAt = (t) => {
     runSlots(b2Slots, t, 8.45, 10.1, 0.85, tickB2);
     words(b3, t, 10.5, { out: 12.05 });
     runSlots(b3Slots, t, 10.55, 12.0, 0.9, tickB3);
-    { const fev = b3.spans[2]; fev.style.letterSpacing = `${lerp(0, 0.18, E.sine(prog(t, 10.9, 12.0)))}em`; }
     words(b4, t, 12.3, { out: 13.6, stag: 0.06 });
     words(b5, t, 13.8, { out: 14.75, stag: 0.1 });
     const ok = E.out(prog(t, 12.15, 13.4)), oq = E.io(prog(t, 14.45, 15.1));
@@ -327,8 +363,32 @@ window.renderAt = (t) => {
   if (t >= 15 && t < 19.75) {
     sceneFx(C, t, 15, 19.75, 0.45, 0.6);
     const sp = E.io(prog(t, 15.3, 16.5)), inK = E.outQ(prog(t, 15.0, 15.6)), coll = E.io(prog(t, 16.7, 17.3));
-    cLetters.forEach((l, i) => { const off = (i - 3) * 150 * (1 - sp); const cx = (i - 3) * -110 * coll; S(l, { o: inK * (1 - coll), x: off + cx, y: (1 - inK) * 40, b: (1 - inK) * 12 + coll * 10, s: 1 - coll * 0.7 }); });
-    cGuides.forEach((g, i) => { g.style.opacity = clamp(prog(t, 15.0 + i * 0.03, 15.5 + i * 0.03)) * (1 - prog(t, 16.3, 16.9)); });
+    if (!cGroups.w || !cGroups.w[0]) cGroups.w = cGroups.map((e) => e.offsetWidth);
+    const ws = cGroups.w, tot = ws.reduce((a, b) => a + b, 0);
+    // зазоры дышат, пока слово разобрано, и схлопываются при сборке
+    const join = E.io(prog(t, 16.3, 16.95)), mb = Math.sin(prog(t, 16.3, 16.95) * Math.PI) * 5;
+    const gaps = C_GAPS.map((g, gi) => g * (1 + 0.16 * Math.sin(t * 1.4 + gi * 2.1)) * (1 - join));
+    const out = E.io(prog(t, 16.95, 17.35));
+    let x = 960 - (tot + gaps.reduce((a, b) => a + b, 0)) / 2;
+    const xs = ws.map((w, gi) => { const at0 = x; x += w + (gaps[gi] || 0); return at0; });
+    cGroups.forEach((e, gi) => {
+      const k = E.outQ(prog(t, 15.05 + gi * 0.07, 15.8 + gi * 0.07));
+      // в конце слово сжимается к центру и тает — на его месте рисуется кольцо
+      const cx = 960 + (xs[gi] + ws[gi] / 2 - 960) * (1 - out * 0.6) - ws[gi] / 2;
+      S(e, { o: k * (1 - out), x: cx, y: (1 - k) * 36, s: 1 - out * 0.35, b: (1 - k) * 12 + mb + out * 12 });
+    });
+    const gl = (1 - E.io(prog(t, 16.95, 17.3)));
+    cH.forEach((g, hi) => { const k = E.out(prog(t, 15.0 + hi * 0.1, 15.9 + hi * 0.1)); g.style.opacity = gl; g.style.transform = `scaleX(${k.toFixed(4)})`; });
+    cV.forEach((g, vi) => {
+      const k = E.out(prog(t, 15.05 + vi * 0.035, 15.85 + vi * 0.035));
+      const lx = xs[g.gi] + (g.side ? ws[g.gi] : 0) + g.off;
+      g.style.opacity = gl; g.style.transform = `translateX(${lx.toFixed(2)}px) scaleY(${k.toFixed(4)})`;
+    });
+    cDots.forEach((d, di) => {
+      const k = E.outQ(prog(t, 15.5 + di * 0.02, 15.9 + di * 0.02));
+      const lx = xs[d.gi] + (d.side ? ws[d.gi] : 0);
+      S(d, { o: k * gl, x: lx - 3, y: d.y - 3, s: k });
+    });
     const ring = prog(t, 17.05, 17.95); cRing.firstElementChild.setAttribute("stroke-dashoffset", (302 * (1 - E.io(ring))).toFixed(1));
     const rOut = E.io(prog(t, 17.9, 18.35)); S(cRing, { o: (ring > 0 ? 1 : 0) * (1 - rOut), s: 1 + rOut * 0.3 });
     const lk = E.soft(prog(t, 17.95, 18.65)); S(cLogo, { o: clamp(prog(t, 17.95, 18.3)), s: lk, r: (1 - lk) * -20, x: -140 * E.io(prog(t, 18.6, 19.25)) });
@@ -369,7 +429,7 @@ window.renderAt = (t) => {
       S(d2Zero, { o: zk * (1 - zq), y: (1 - zk) * 40, s: 0.94 + 0.06 * zk + zq * 0.05, b: (1 - zk) * 16 + zq * 14 });
       d2Zero.style.backgroundPosition = `${(t * 30) % 200}% 0`;
       const ck = E.outQ(prog(t, 27.3, 28.0)), cq = E.io(prog(t, 28.0, 28.6));
-      at(d2Card, 485, 820, { o: ck * (1 - cq), y: (1 - ck) * 40, b: (1 - ck) * 12 + cq * 12, s: 0.94 + 0.06 * ck }); }
+      at(d2Card, 485, 862, { o: ck * (1 - cq), y: (1 - ck) * 40, b: (1 - ck) * 12 + cq * 12, s: 0.94 + 0.06 * ck }); }
     // D3 28.6–31.7 — строка влетает со шлейфом, ниже — сделка за 0.4 с
     { const k = E.outQ(prog(t, 28.65, 29.55)), q = E.io(prog(t, 31.1, 31.7));
       d3.style.display = t >= 28.6 && t < 31.75 ? "block" : "none";
@@ -380,8 +440,8 @@ window.renderAt = (t) => {
       d3Lines.forEach((l, i) => { const lk = prog(t, 28.6 + i * 0.05, 29.5 + i * 0.05); S(l, { o: Math.sin(lk * Math.PI) * 0.9, x: lerp(-500, 2000, E.io(lk)) }); });
       const ck = E.outQ(prog(t, 29.6, 30.3));
       at(d3Card, 960, 720, { o: ck * (1 - q), y: (1 - ck) * 40, s: 0.94 + 0.06 * ck, b: (1 - ck) * 12 + q * 12 });
-      const run = prog(t, 30.25, 30.65); q1(d3Card, ".d3tm").textContent = (0.4 * run).toFixed(2) + " s";
-      const done = t >= 30.65; q1(d3Card, ".d3st").textContent = done ? "Confirmed" : "Sending…"; q1(d3Card, ".d3st").style.color = done ? "#0FA968" : "#0B1E46";
+      const run = prog(t, 30.25, 30.65); q1(d3Card, ".d3tm").textContent = (0.4 * run).toFixed(2) + " с";
+      const done = t >= 30.65; q1(d3Card, ".d3st").textContent = done ? "Подтверждено" : "Отправка…"; q1(d3Card, ".d3st").style.color = done ? "#0FA968" : "#0B1E46";
       const okk = E.soft(prog(t, 30.65, 31.0)); const okEl = q1(d3Card, ".d3ok"); okEl.style.opacity = clamp(okk); okEl.style.transform = `scale(${okk})`; }
     // D4 31.6–34.8 — кошелёк: карта мягко покачивается, сверху садится Минти
     { const k = E.out(prog(t, 31.55, 32.7)), q = E.io(prog(t, 34.15, 34.8));
@@ -391,23 +451,30 @@ window.renderAt = (t) => {
       const bal = 1284.5 * E.out(prog(t, 32.0, 33.0)); q1(d4Card, ".d4bal").textContent = "$" + Math.floor(bal).toLocaleString("en-US").replace(",", " ") + "." + String(Math.round((bal % 1) * 100)).padStart(2, "0").slice(0, 2);
       d4Mintie.style.opacity = E.out(prog(t, 33.0, 33.35)); d4Mintie.style.backgroundPosition = `${Math.floor(clamp((t - 33.0) * 10, 0, 11)) / 11 * 100}% 0`;
       words(d4T1, t, 32.0, { out: 34.15 }); words(d4T2, t, 32.35, { out: 34.2, stag: 0.08 }); }
-    // D5 34.7–37 — Launch it / Trade it / Moon it|
+    // D5 34.7–37 — Запускай / Торгуй / Взлетай|
     { const el = document.getElementById("d5t"), c = document.getElementById("d5c");
-      const seq = [["Launch it", 34.8, 35.55], ["Trade it", 35.6, 36.3], ["Moon it", 36.35, 37.15]];
+      const seq = [["Запускай", 34.8, 35.55], ["Торгуй", 35.6, 36.3], ["Взлетай", 36.35, 37.15]];
       const cur = seq.find(([, a, b]) => t >= a && t < b);
       d5.style.opacity = t >= 34.8 ? 1 : 0;
-      if (cur) { const n = Math.floor(clamp((t - cur[1]) * 20, 0, cur[0].length)); el.textContent = cur[0].slice(0, n); el.className = cur[0] === "Moon it" ? "accent" : ""; }
+      if (cur) { const n = Math.floor(clamp((t - cur[1]) * 20, 0, cur[0].length)); el.textContent = cur[0].slice(0, n); el.className = cur[0] === "Взлетай" ? "accent" : ""; }
       c.style.opacity = Math.floor(t * 3) % 2 ? 1 : 0.15; }
   }
   // ---- E ----
   if (t >= 37) {
     eRays.forEach((r, i) => { r.style.transform = `rotate(${r.a + Math.sin(t * 0.6 + i * 1.3) * 4}deg)`; r.style.opacity = 0.6 + Math.sin(t * 0.9 + i) * 0.3; });
-    eBubbles.forEach((b) => { const y = 1150 - ((t - 37) * b.sp + b.ph * 40) % 1300; S(b, { x: b.x + Math.sin(t * 1.4 + b.ph) * 22, y, o: 0.85 }); });
+    eBubbles.forEach((b) => {
+      // волна бежит по диагонали; ближе к зрителю пузырь крупнее и ярче
+      const z = 170 * Math.sin(b.bx * 0.0055 + t * 1.5) * Math.cos(b.by * 0.0065 - t * 1.05) + 90 * Math.sin((b.bx + b.by) * 0.0042 + t * 2.0);
+      const sc = 900 / (900 - z), yy = b.by - ((t - 37) * 14) % 50;
+      S(b, { x: 960 + (b.bx - 960) * sc - b.sz / 2, y: 540 + (yy - 540) * sc - b.sz / 2, s: sc * (0.9 + 0.2 * (z + 260) / 520), o: clamp(0.35 + 0.55 * (z + 260) / 520) });
+    });
     const ek = E.out(prog(t, 37, 37.8)); Esc.style.opacity = ek; Esc.style.filter = ek < 1 ? `blur(${((1 - ek) * 10).toFixed(1)}px)` : "none";
     const ring = prog(t, 37.6, 38.5); eRing.firstElementChild.setAttribute("stroke-dashoffset", (302 * (1 - E.io(ring))).toFixed(1));
     const rOut = E.io(prog(t, 38.4, 38.85)); S(eRing, { o: (ring > 0 ? 1 : 0) * (1 - rOut), s: 1 + rOut * 0.3 });
     const lk = E.soft(prog(t, 38.5, 39.2)); S(eLogo, { o: clamp(prog(t, 38.5, 38.8)), s: lk });
     const nk = E.io(prog(t, 39.0, 39.7)); eName.style.clipPath = `inset(0 ${(100 - nk * 100).toFixed(1)}% 0 0)`;
+    // пока имени нет, знак стоит по центру кадра и уезжает влево вместе с проявлением
+    eLogoBox.style.transform = `translateX(${((1 - nk) * (eName.offsetWidth + 26) / 2).toFixed(1)}px)`;
     const pk = E.outQ(prog(t, 39.9, 40.7)); ePill.style.opacity = pk; ePill.style.transform = `translateX(-50%) translateY(${(1 - pk) * 36}px) scale(${0.94 + 0.06 * pk})`; ePill.style.filter = pk < 1 ? `blur(${((1 - pk) * 10).toFixed(1)}px)` : "none";
     words(eTag, t, 40.8, { stag: 0.14 });
   }

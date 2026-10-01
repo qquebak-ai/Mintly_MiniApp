@@ -21,7 +21,7 @@ await p.addInitScript(({ человек }) => {
     initDataUnsafe: { user: { id: 42 } }, ready() {}, expand() {}, disableVerticalSwipes() {}, enableVerticalSwipes() {},
     HapticFeedback: { impactOccurred() {}, notificationOccurred() {} }, BackButton: { show() {}, hide() {}, onClick() {}, offClick() {} },
     colorScheme: "dark", themeParams: {}, version: "7.0", platform: "ios", onEvent() {}, offEvent() {}, setHeaderColor() {}, setBackgroundColor() {} } };
-  localStorage.setItem("mintly_language", "EN");
+  localStorage.setItem("mintly_language", "RU");
 }, { человек: ЧЕЛОВЕК });
 const json = (route, т) => route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(т) });
 const A48 = (k) => ("EQ" + k + "x".repeat(46)).slice(0, 48);
