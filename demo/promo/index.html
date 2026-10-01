@@ -9,12 +9,12 @@
 @font-face{font-family:'Nunito';font-weight:800;src:url('assets/fonts/nunito-800-latin.woff2') format('woff2')}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:1920px;height:1080px;overflow:hidden;background:#fff}
-body{font-family:'Onest',system-ui,sans-serif;color:#24104F;-webkit-font-smoothing:antialiased}
+body{font-family:'Onest',system-ui,sans-serif;color:#0B1E46;-webkit-font-smoothing:antialiased}
 .abs{position:absolute}
 .scene{position:absolute;inset:0;overflow:hidden;visibility:hidden}
 .c{position:absolute;left:0;right:0;text-align:center}
 .w{display:inline-block;will-change:transform,filter,opacity}
-.accent{background:linear-gradient(95deg,#7C3AED,#C13AE6 55%,#FF6AD5);-webkit-background-clip:text;background-clip:text;color:transparent}
+.accent{background:linear-gradient(95deg,#0B4FD8,#1E8BFF 55%,#35D0E8);-webkit-background-clip:text;background-clip:text;color:transparent}
 .blob{position:absolute;border-radius:50%;filter:blur(90px)}
 .fog{position:absolute;left:-10%;right:-10%;bottom:-140px;height:520px}
 .fog span{position:absolute;border-radius:50%;filter:blur(60px)}
@@ -22,7 +22,7 @@ body{font-family:'Onest',system-ui,sans-serif;color:#24104F;-webkit-font-smoothi
 /* телефон */
 .phone{position:absolute;width:420px;height:868px;border-radius:70px;padding:13px;
   background:linear-gradient(145deg,#4a4a55,#121217 40%,#2a2a33 70%,#0b0b0f);
-  box-shadow:0 60px 120px rgba(60,20,120,.35),0 0 0 2px #6b6b78 inset}
+  box-shadow:0 60px 120px rgba(10,50,120,.35),0 0 0 2px #6b6b78 inset}
 .phone .scr{position:relative;width:100%;height:100%;border-radius:58px;overflow:hidden;background:#07060c}
 .phone .island{position:absolute;left:50%;top:14px;width:124px;height:36px;margin-left:-62px;border-radius:20px;background:#000;z-index:5}
 .phone .btn{position:absolute;width:5px;border-radius:3px;background:#3a3a44}
@@ -34,7 +34,9 @@ body{font-family:'Onest',system-ui,sans-serif;color:#24104F;-webkit-font-smoothi
 .mono{font-family:ui-monospace,Menlo,monospace}
 #flash{position:absolute;inset:0;background:#fff;opacity:0}
 #fade{position:absolute;inset:0;background:#000;opacity:0}
-.guide{position:absolute;background:rgba(124,58,237,.22)}
+.guide{position:absolute;background:rgba(30,120,230,.22)}
+/* акцент внутри экранов приложения — родной сиреневый Mintly */
+.accentApp{background:linear-gradient(95deg,#7C3AED,#C13AE6 55%,#FF6AD5);-webkit-background-clip:text;background-clip:text;color:transparent}
 </style>
 </head>
 <body>

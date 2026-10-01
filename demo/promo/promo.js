@@ -26,7 +26,7 @@ const scenes = [];
 function scene(a, b, bg) { const el = $(`<div class="scene" style="background:${bg || "#fff"}"></div>`); root.appendChild(el); scenes.push({ el, a, b }); return el; }
 
 // ---- кинетическая строка: слова по одному, *слово* — акцентом ----
-function line(parent, text, { size = 72, top = 470, weight = 500, color = "#24104F", font = "Onest", ls = "-0.02em" } = {}) {
+function line(parent, text, { size = 72, top = 470, weight = 500, color = "#0B1E46", font = "Onest", ls = "-0.02em" } = {}) {
   const el = $(`<div class="c" style="top:${top}px;font:${weight} ${size}px '${font}';letter-spacing:${ls};color:${color};white-space:nowrap"></div>`);
   const spans = text.split(" ").map((w) => {
     const acc = w.startsWith("*"); w = w.replace(/\*/g, "");
@@ -53,7 +53,7 @@ function blobs(parent, list) {
 }
 function fog(parent) {
   const f = $(`<div class="fog"></div>`);
-  const parts = [[-2, 120, 520, "#C9A8FF"], [14, 70, 420, "#E7C6FF"], [30, 130, 560, "#B48CFF"], [47, 60, 460, "#F1D2FF"], [63, 120, 540, "#C29BFF"], [80, 70, 440, "#E9C9FF"], [96, 120, 520, "#BC94FF"]];
+  const parts = [[-2, 120, 520, "#9ED0FF"], [14, 70, 420, "#C7E8FF"], [30, 130, 560, "#7DB8FF"], [47, 60, 460, "#D4F1FF"], [63, 120, 540, "#92C6FF"], [80, 70, 440, "#BEEBF3"], [96, 120, 520, "#86BEFF"]];
   f.parts = parts.map(([x, y, w, c]) => { const s = $(`<span style="left:${x}%;top:${y}px;width:${w}px;height:${w * 0.55}px;background:${c};opacity:.75"></span>`); f.appendChild(s); return s; });
   parent.appendChild(f); return f;
 }
@@ -99,11 +99,11 @@ const homeScreen = `<div class="app">
     <div style="position:absolute;right:0;bottom:0;height:100%;aspect-ratio:120/50">
       <img src="assets/app/banner-mx-trade.webp" style="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated"/>
       <img src="assets/app/mintie-trade.webp" style="position:absolute;left:${92 / 1.2}%;top:${2.5 * 2}%;width:${28 / 1.2}%;height:${25.2 * 2}%;image-rendering:pixelated"/></div>
-    <div style="position:absolute;left:18px;top:14px;font:800 22px/1.15 'Nunito'">Trade memecoins<br/><span class="accent">Gram &amp; Solana</span></div>
+    <div style="position:absolute;left:18px;top:14px;font:800 22px/1.15 'Nunito'">Trade memecoins<br/><span class="accentApp">Gram &amp; Solana</span></div>
     <div style="position:absolute;left:18px;bottom:16px;padding:9px 14px;border-radius:12px;background:#8E2DE2;font:800 13px 'Nunito'">Open mempad</div></div>
   <div class="card" style="height:156px;margin-top:12px;background:#000">
     <img src="assets/app/banner-mountain.webp" style="position:absolute;right:-6%;bottom:-14%;width:52%;image-rendering:pixelated"/>
-    <div style="position:absolute;left:18px;top:14px;font:800 22px/1.15 'Nunito'">Launch a memecoin<br/><span class="accent">in seconds</span></div></div>
+    <div style="position:absolute;left:18px;top:14px;font:800 22px/1.15 'Nunito'">Launch a memecoin<br/><span class="accentApp">in seconds</span></div></div>
   ${navBar("home")}
 </div>`;
 const createScreen = `<div class="app">
@@ -141,10 +141,10 @@ const tokenScreen = `<div class="app">
 </div>`;
 
 // ============ A · ИНТРО 0–5.2 ============
-const A = scene(0, 5.4, "#F6F0FF");
-const aBlobs = blobs(A, [[300, 250, 420, "#D9C2FF"], [1650, 220, 380, "#FFD3EF"], [960, 1050, 520, "#C7A6FF"], [1500, 900, 360, "#FFE1C7"], [400, 950, 360, "#E8D6FF"]]);
+const A = scene(0, 5.4, "#EEF7FF");
+const aBlobs = blobs(A, [[300, 250, 420, "#BFE3FF"], [1650, 220, 380, "#BDF3F2"], [960, 1050, 520, "#8CC8FF"], [1500, 900, 360, "#DDF6FF"], [400, 950, 360, "#CFE6FF"]]);
 const aWord = $(`<div class="c" style="top:40px;font:800 300px/1 'Nunito';letter-spacing:-0.04em;white-space:nowrap"></div>`); A.appendChild(aWord);
-const aLetters = [..."Mintly"].map((ch, i) => { const s = $(`<span class="w" style="background:linear-gradient(95deg,#6D28FF,#A855F7 40%,#FF7AD9 80%,#FFB36B);background-size:600% 100%;background-position:${i * 20}% 0;-webkit-background-clip:text;background-clip:text;color:transparent">${ch}</span>`); aWord.appendChild(s); return s; });
+const aLetters = [..."Mintly"].map((ch, i) => { const s = $(`<span class="w" style="background:linear-gradient(95deg,#0B4FD8,#1E8BFF 40%,#35D0E8 80%,#8FF3E6);background-size:600% 100%;background-position:${i * 20}% 0;-webkit-background-clip:text;background-clip:text;color:transparent">${ch}</span>`); aWord.appendChild(s); return s; });
 const aPhoneWrap = $(`<div class="abs" style="left:750px;top:345px;width:420px;height:868px;perspective:1600px"></div>`); A.appendChild(aPhoneWrap);
 const aPhone = phone(homeScreen); aPhoneWrap.appendChild(aPhone);
 const OBJS = [
@@ -161,11 +161,11 @@ const b1Icons = ["coin", "candleUp", "gem", "star", "rocket", "candleDown"].map(
 const b2 = line(B, "Fees eat your *gains.*", { top: 470, size: 84 });
 const b2Icon = img("assets/candleDown.png", "left:1340px;top:380px;width:150px;height:200px;object-fit:contain"); B.appendChild(b2Icon);
 const b3 = $(`<div class="c" style="top:462px;font:500 88px 'Onest';letter-spacing:-0.02em">Trades take <span class="accent" id="fev" style="display:inline-block">forever.</span></div>`); B.appendChild(b3);
-const b4 = line(B, "You just want to trade?", { top: 500, size: 44, color: "#8A7BB0" });
+const b4 = line(B, "You just want to trade?", { top: 500, size: 44, color: "#5B7398" });
 const b5 = line(B, "Then meet *Mintly.*", { top: 488, size: 60 });
 // коллаж карточек на орбите
 const CARDS = [];
-function addCard(html, w, h) { const c = $(`<div class="abs" style="left:${-w / 2}px;top:${-h / 2}px;width:${w}px;height:${h}px;border-radius:22px;overflow:hidden;box-shadow:0 24px 50px rgba(80,30,160,.18)">${html}</div>`); B.appendChild(c); CARDS.push(c); }
+function addCard(html, w, h) { const c = $(`<div class="abs" style="left:${-w / 2}px;top:${-h / 2}px;width:${w}px;height:${h}px;border-radius:22px;overflow:hidden;box-shadow:0 24px 50px rgba(20,70,160,.18)">${html}</div>`); B.appendChild(c); CARDS.push(c); }
 addCard(`<img src="assets/app/banner-mx-trade.webp" style="width:100%;height:100%;object-fit:cover;object-position:right;image-rendering:pixelated"/>`, 300, 130);
 addCard(`<div style="width:100%;height:100%;background:#000;display:flex;align-items:center;justify-content:center"><img src="assets/app/gold-preview.webp" style="height:85%;image-rendering:pixelated"/></div>`, 150, 150);
 addCard(`<div style="width:100%;height:100%;background:${GRAD};padding:16px;color:#fff"><div style="font:500 14px Onest;opacity:.85">Balance</div><div style="font:800 34px Nunito">$1 284.50</div><div style="position:absolute;left:16px;bottom:14px;font:700 13px Onest">12.4 SOL · 8 420 GRAM</div></div>`, 290, 170);
@@ -181,29 +181,29 @@ addCard(`<div style="width:100%;height:100%;background:#fff;display:flex;align-i
 
 // ============ C · SIMPLE + ЛОГОТИП 15–19.6 ============
 const C = scene(15, 19.7, "#ffffff");
-const cBlobs = blobs(C, [[400, 900, 420, "#E3D0FF"], [1550, 200, 380, "#FFDDF3"], [1600, 950, 340, "#D9C2FF"]]);
+const cBlobs = blobs(C, [[400, 900, 420, "#D6ECFF"], [1550, 200, 380, "#D2F7F5"], [1600, 950, 340, "#BFDDFF"]]);
 const cGuides = [];
 for (let i = 0; i < 9; i++) { const g = $(`<div class="guide" style="left:${330 + i * 160}px;top:0;width:1px;height:1080px"></div>`); C.appendChild(g); cGuides.push(g); }
 [[420], [640]].forEach(([y]) => { const g = $(`<div class="guide" style="left:0;top:${y}px;width:1920px;height:1px"></div>`); C.appendChild(g); cGuides.push(g); });
-const cWord = $(`<div class="c" style="top:390px;font:800 230px/1 'Nunito';letter-spacing:-0.03em;color:#24104F;white-space:nowrap"></div>`); C.appendChild(cWord);
+const cWord = $(`<div class="c" style="top:390px;font:800 230px/1 'Nunito';letter-spacing:-0.03em;color:#0B1E46;white-space:nowrap"></div>`); C.appendChild(cWord);
 const cLetters = [..."Simple."].map((ch) => { const s = $(`<span class="w">${ch}</span>`); cWord.appendChild(s); return s; });
-const LOGO = `<svg viewBox="0 0 64 64" width="100%" height="100%"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C3AED"/><stop offset=".6" stop-color="#C13AE6"/><stop offset="1" stop-color="#FF6AD5"/></linearGradient></defs>
+const LOGO = `<svg viewBox="0 0 64 64" width="100%" height="100%"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0B4FD8"/><stop offset=".6" stop-color="#1E8BFF"/><stop offset="1" stop-color="#35D0E8"/></linearGradient></defs>
   <path d="M12 56 V28 L32 45 L52 28 V56" fill="none" stroke="url(#lg)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
   <g transform="translate(52,26) rotate(34)"><path d="M0 0 C -8 -7 -8 -19 0 -26 C 8 -19 8 -7 0 0 Z" fill="#3FD9A0"/></g></svg>`;
 const cRing = $(`<svg class="abs" style="left:900px;top:480px;width:120px;height:120px;overflow:visible" viewBox="0 0 120 120"><circle cx="60" cy="60" r="48" fill="none" stroke="url(#rg)" stroke-width="14" stroke-linecap="round" stroke-dasharray="302" stroke-dashoffset="302" transform="rotate(-90 60 60)"/>
-  <defs><linearGradient id="rg"><stop offset="0" stop-color="#7C3AED"/><stop offset="1" stop-color="#FF6AD5"/></linearGradient></defs></svg>`); C.appendChild(cRing);
+  <defs><linearGradient id="rg"><stop offset="0" stop-color="#0B5ED7"/><stop offset="1" stop-color="#35D0E8"/></linearGradient></defs></svg>`); C.appendChild(cRing);
 const cLogo = $(`<div class="abs" style="left:880px;top:450px;width:160px;height:160px">${LOGO}</div>`); C.appendChild(cLogo);
-const cName = $(`<div class="abs" style="left:1060px;top:452px;font:800 150px/1 'Nunito';letter-spacing:-0.04em;color:#24104F;clip-path:inset(0 100% 0 0)">Mintly</div>`); C.appendChild(cName);
+const cName = $(`<div class="abs" style="left:1060px;top:452px;font:800 150px/1 'Nunito';letter-spacing:-0.04em;color:#0B1E46;clip-path:inset(0 100% 0 0)">Mintly</div>`); C.appendChild(cName);
 
 // ============ D · ВОЗМОЖНОСТИ 19.6–37 ============
 const D = scene(19.5, 37.1, "#ffffff");
 const dFog = fog(D);
-const dBlobs = blobs(D, [[1500, 250, 420, "#EBDDFF"], [350, 300, 360, "#FFE3F4"]]);
+const dBlobs = blobs(D, [[1500, 250, 420, "#DDEFFF"], [350, 300, 360, "#D9F8F6"]]);
 // D1 — запуск
 const d1Wrap = $(`<div class="abs" style="left:300px;top:150px;width:420px;height:868px;perspective:1800px"></div>`); D.appendChild(d1Wrap);
 const d1Phone = phone(createScreen); d1Wrap.appendChild(d1Phone);
 const d1T1 = line(D, "Launch a *memecoin*", { top: 400, size: 92, weight: 600 }); d1T1.style.left = "860px"; d1T1.style.textAlign = "left";
-const d1T2 = line(D, "in seconds.", { top: 520, size: 92, weight: 600, color: "#8A7BB0" }); d1T2.style.left = "860px"; d1T2.style.textAlign = "left";
+const d1T2 = line(D, "in seconds.", { top: 520, size: 92, weight: 600, color: "#5B7398" }); d1T2.style.left = "860px"; d1T2.style.textAlign = "left";
 const d1Rocket = img("assets/rocket.png", "left:0;top:0;width:230px"); D.appendChild(d1Rocket);
 // D2 — торговля
 const d2Wrap = $(`<div class="abs" style="left:1200px;top:150px;width:420px;height:868px;perspective:1800px"></div>`); D.appendChild(d2Wrap);
@@ -213,9 +213,9 @@ const d2Zero = img("assets/zero.png", "left:330px;top:450px;width:420px"); D.app
 const d2T2 = line(D, "*fees.*", { top: 470, size: 92, weight: 600 }); d2T2.style.left = "780px"; d2T2.style.right = "auto"; d2T2.style.textAlign = "left";
 const d2Objs = [["candleUp", 230, 760, 130], ["coin", 760, 760, 120]].map(([n, x, y, w]) => { const o = img(`assets/${n}.png`, `left:${x}px;top:${y}px;width:${w}px`); D.appendChild(o); return o; });
 // D3 — скорость
-const d3 = $(`<div class="c" style="top:400px;font:700 120px/1.05 'Nunito';letter-spacing:-0.035em;color:#24104F"><div id="d3a" style="display:inline-block">Fastest transactions</div><br/><div id="d3b" style="display:inline-block" class="accent">in the world.</div></div>`); D.appendChild(d3);
+const d3 = $(`<div class="c" style="top:400px;font:700 120px/1.05 'Nunito';letter-spacing:-0.035em;color:#0B1E46"><div id="d3a" style="display:inline-block">Fastest transactions</div><br/><div id="d3b" style="display:inline-block" class="accent">in the world.</div></div>`); D.appendChild(d3);
 const d3Bolt = img("assets/bolt.png", "left:1460px;top:200px;width:300px"); D.appendChild(d3Bolt);
-const d3Trails = [0, 1, 2, 3].map((i) => { const tr = $(`<div class="c" style="top:400px;font:700 120px/1.05 'Nunito';letter-spacing:-0.035em;color:#B48CFF;opacity:0">Fastest transactions</div>`); D.appendChild(tr); return tr; });
+const d3Trails = [0, 1, 2, 3].map((i) => { const tr = $(`<div class="c" style="top:400px;font:700 120px/1.05 'Nunito';letter-spacing:-0.035em;color:#7DB8FF;opacity:0">Fastest transactions</div>`); D.appendChild(tr); return tr; });
 // D4 — кошелёк
 const d4Wrap = $(`<div class="abs" style="left:420px;top:330px;width:620px;height:390px;perspective:1600px"></div>`); D.appendChild(d4Wrap);
 const d4Card = $(`<div style="position:relative;width:100%;height:100%;transform-style:preserve-3d"></div>`); d4Wrap.appendChild(d4Card);
@@ -226,20 +226,25 @@ d4Card.appendChild($(`<div style="position:absolute;inset:0;border-radius:40px;b
 d4Card.appendChild($(`<div style="position:absolute;inset:0;border-radius:40px;background:${GRAD};transform:rotateY(180deg) translateZ(7.5px);backface-visibility:hidden"></div>`));
 const d4Mintie = $(`<div class="abs" style="left:430px;top:-118px;width:140px;height:153px;background:url(assets/app/nav-breath.webp) 0 0/1200% 100% no-repeat;image-rendering:pixelated"></div>`); d4Card.appendChild(d4Mintie);
 const d4T1 = line(D, "Your wallet.", { top: 410, size: 96, weight: 600 }); d4T1.style.left = "1130px"; d4T1.style.textAlign = "left";
-const d4T2 = line(D, "Right inside *Telegram.*", { top: 530, size: 64, weight: 500, color: "#8A7BB0" }); d4T2.style.left = "1134px"; d4T2.style.textAlign = "left";
+const d4T2 = line(D, "Right inside *Telegram.*", { top: 530, size: 64, weight: 500, color: "#5B7398" }); d4T2.style.left = "1134px"; d4T2.style.textAlign = "left";
 // D5 — печать
-const d5 = $(`<div class="c" style="top:450px;font:600 120px/1 'Onest';letter-spacing:-0.035em;color:#24104F"><span id="d5t"></span><span id="d5c" style="display:inline-block;width:6px;height:110px;background:#8E2DE2;margin-left:6px;vertical-align:-12px"></span></div>`); D.appendChild(d5);
+const d5 = $(`<div class="c" style="top:450px;font:600 120px/1 'Onest';letter-spacing:-0.035em;color:#0B1E46"><span id="d5t"></span><span id="d5c" style="display:inline-block;width:6px;height:110px;background:#1E8BFF;margin-left:6px;vertical-align:-12px"></span></div>`); D.appendChild(d5);
 
 // ============ E · ФИНАЛ 37–45 ============
-const Esc = scene(37, 45, "#9FC0EA");
-const eSky = img("assets/clouds.jpg", "left:-60px;top:-40px;width:2040px;height:1190px;object-fit:cover"); Esc.appendChild(eSky);
+const Esc = scene(37, 45, "radial-gradient(120% 90% at 50% 18%,#3FA9FF 0%,#1565C0 38%,#0A2A5E 78%,#061A3D 100%)");
+// финал — глубина океана: лучи света сверху и всплывающие пузырьки
+const eRays = [-28, -14, -3, 9, 20, 33].map((a, i) => { const r = $(`<div class="abs" style="left:${700 + i * 90}px;top:-200px;width:${120 + (i % 3) * 60}px;height:1500px;transform-origin:50% 0;background:linear-gradient(180deg,rgba(210,240,255,.42),rgba(210,240,255,0) 75%);filter:blur(28px);mix-blend-mode:screen"></div>`); r.a = a; Esc.appendChild(r); return r; });
+const eBubbles = Array.from({ length: 34 }, (_, i) => { const s0 = ((i * 9301 + 49297) % 233280) / 233280; const sz = 6 + s0 * 22; const b = $(`<div class="abs" style="left:0;top:0;width:${sz}px;height:${sz}px;border-radius:50%;border:2px solid rgba(220,245,255,.55);background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.6),rgba(255,255,255,.05) 60%)"></div>`); b.x = (i * 137.5) % 1920; b.sp = 60 + s0 * 120; b.ph = s0 * 30; Esc.appendChild(b); return b; });
+const eSky = $(`<div></div>`);
 const eRing = $(`<svg class="abs" style="left:780px;top:330px;width:160px;height:160px;overflow:visible" viewBox="0 0 120 120"><circle cx="60" cy="60" r="48" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-dasharray="302" stroke-dashoffset="302" transform="rotate(-90 60 60)"/></svg>`); Esc.appendChild(eRing);
-const eLogo = $(`<div class="abs" style="left:770px;top:320px;width:180px;height:180px;filter:drop-shadow(0 10px 30px rgba(60,40,140,.35))">${LOGO.replace('fill="#3FD9A0"', 'fill="#ffffff"').replace(/url\(#lg\)/, "#ffffff")}</div>`); Esc.appendChild(eLogo);
-const eName = $(`<div class="abs" style="left:975px;top:330px;font:800 160px/1 'Nunito';letter-spacing:-0.04em;color:#fff;text-shadow:0 10px 40px rgba(60,40,140,.35);clip-path:inset(0 100% 0 0)">Mintly</div>`); Esc.appendChild(eName);
-const ePill = $(`<div class="abs" style="left:50%;top:600px;transform:translateX(-50%);display:flex;align-items:center;gap:18px;padding:22px 38px 22px 26px;border-radius:999px;background:rgba(255,255,255,.88);box-shadow:0 20px 60px rgba(60,40,140,.25);white-space:nowrap">
+const eLogo = $(`<div class="abs" style="left:770px;top:320px;width:180px;height:180px;filter:drop-shadow(0 10px 30px rgba(0,20,60,.45))">${LOGO.replace('fill="#3FD9A0"', 'fill="#ffffff"').replace(/url\(#lg\)/, "#ffffff")}</div>`); Esc.appendChild(eLogo);
+const eName = $(`<div class="abs" style="left:975px;top:330px;font:800 160px/1 'Nunito';letter-spacing:-0.04em;color:#fff;text-shadow:0 10px 40px rgba(0,20,60,.45);clip-path:inset(0 100% 0 0)">Mintly</div>`); Esc.appendChild(eName);
+const ePill = $(`<div class="abs" style="left:50%;top:600px;transform:translateX(-50%);display:flex;align-items:center;gap:18px;padding:22px 38px 22px 26px;border-radius:999px;background:rgba(255,255,255,.88);box-shadow:0 20px 60px rgba(0,20,60,.35);white-space:nowrap">
   <div style="width:62px;height:62px;border-radius:50%;background:#2AABEE;display:flex;align-items:center;justify-content:center"><svg width="34" height="34" viewBox="0 0 24 24"><path d="M3 11.5 20 4.5l-3 15-5-4-3 3 .4-4.6L17 7.5 8 13z" fill="#fff"/></svg></div>
-  <div><div style="font:500 26px 'Onest';color:#5B4E80">Open in Telegram</div><div style="font:800 40px 'Nunito';color:#24104F">@MintlyTrading_bot</div></div></div>`); Esc.appendChild(ePill);
-const eTag = line(Esc, "Launch. Trade. *Moon.*", { top: 820, size: 46, weight: 600, color: "#2E2160" });
+  <div><div style="font:500 26px 'Onest';color:#4A6488">Open in Telegram</div><div style="font:800 40px 'Nunito';color:#0B1E46">@MintlyTrading_bot</div></div></div>`); Esc.appendChild(ePill);
+const eTag = line(Esc, "Launch. Trade. *Moon.*", { top: 820, size: 46, weight: 600, color: "#ffffff" });
+// на синем финале акцент светлее — иначе «Moon.» тонет в фоне
+eTag.spans.forEach((w) => { if (w.classList.contains("accent")) w.style.backgroundImage = "linear-gradient(95deg,#8FF3E6,#E6FDFF)"; });
 
 const flash = document.getElementById("flash"), fade = document.getElementById("fade");
 function typeText(el, str, t, a, cps = 14) { const n = Math.floor(clamp((t - a) * cps, 0, str.length)); el.textContent = str.slice(0, n); return n; }
@@ -359,7 +364,8 @@ window.renderAt = (t) => {
   }
   // ---- E ----
   if (t >= 37) {
-    const z = prog(t, 37, 45); eSky.style.transform = `scale(${1.02 + z * 0.08}) translate(${-z * 30}px,${-z * 12}px)`;
+    eRays.forEach((r, i) => { r.style.transform = `rotate(${r.a + Math.sin(t * 0.6 + i * 1.3) * 4}deg)`; r.style.opacity = 0.6 + Math.sin(t * 0.9 + i) * 0.3; });
+    eBubbles.forEach((b) => { const y = 1150 - ((t - 37) * b.sp + b.ph * 40) % 1300; S(b, { x: b.x + Math.sin(t * 1.4 + b.ph) * 22, y, o: 0.85 }); });
     Esc.style.opacity = E.out(prog(t, 37, 37.6));
     const ring = prog(t, 37.6, 38.5); eRing.firstElementChild.setAttribute("stroke-dashoffset", (302 * (1 - E.io(ring))).toFixed(1));
     const rOut = E.io(prog(t, 38.4, 38.8)); S(eRing, { o: (ring > 0 ? 1 : 0) * (1 - rOut), s: 1 + rOut * 0.4 });
