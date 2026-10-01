@@ -1,7 +1,7 @@
 // Кадры промо через Chromium. node render.mjs snap 1,2,3 — проверочные снимки;
 // node render.mjs frames 0,90 — кадры 0…89 в 2× для суперсэмплинга.
 import { chromium } from "playwright-core";
-import { mkdirSync } from "fs";
+import { mkdirSync, existsSync } from "fs";
 const FPS = 30, DUR = 45, N = FPS * DUR;
 const mode = process.argv[2], arg = process.argv[3] || "";
 const PR = mode === "frames" ? 2 : 1;
@@ -17,9 +17,11 @@ if (mode === "snap") {
   const [from, to] = arg.split(",").map(Number);
   mkdirSync("frames", { recursive: true });
   for (let f = from; f < Math.min(to, N); f++) {
+    // уже снятые кадры не трогаем — после сбоя кусок дорендеривается с места остановки
+    if (existsSync(`frames/f${String(f).padStart(4, "0")}.jpg`)) continue;
     // ждём шрифты и картинки после каждого кадра: новый браузер на кусок иначе снимал пустые карточки
     await page.evaluate(async (t) => { window.renderAt(t); await document.fonts.ready; await Promise.all([...document.images].map((i) => i.decode().catch(() => {}))); }, f / FPS);
-    await page.screenshot({ type: "jpeg", quality: 94, path: `frames/f${String(f).padStart(4, "0")}.jpg` });
+    await page.screenshot({ timeout: 180000, type: "jpeg", quality: 94, path: `frames/f${String(f).padStart(4, "0")}.jpg` });
   }
 }
 await browser.close();
