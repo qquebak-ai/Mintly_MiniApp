@@ -109,7 +109,7 @@ const homeScreen = `<div class="app">
 const createScreen = `<div class="app">
   <div style="font:800 30px 'Nunito';margin:8px 4px 18px">Launch token</div>
   <div style="display:flex;gap:14px;align-items:center">
-    <div id="cLogo" style="width:96px;height:96px;border-radius:26px;background:#15131F;border:2px dashed #3A3555;position:relative;overflow:hidden"><img src="assets/coin.png" style="position:absolute;inset:8px;width:80px;height:80px;object-fit:contain;opacity:0" /></div>
+    <div id="cLogo" style="width:96px;height:96px;border-radius:26px;background:#15131F;border:2px dashed #3A3555;position:relative;overflow:hidden"><img src="assets/coinPaw.png" style="position:absolute;inset:8px;width:80px;height:80px;object-fit:contain;opacity:0" /></div>
     <div style="color:#8F8AA8;font:500 15px 'Onest'">Logo<br/>tap to upload</div></div>
   ${[["Name", "cName"], ["Ticker", "cTick"]].map(([l, id]) => `<div style="margin-top:16px;color:#8F8AA8;font:500 14px 'Onest'">${l}</div>
     <div class="card" style="height:56px;margin-top:6px;padding:0 16px;display:flex;align-items:center;font:700 19px 'Onest'"><span id="${id}"></span><span id="${id}C" style="width:2px;height:24px;background:#B45CFF;margin-left:2px"></span></div>`).join("")}
@@ -118,7 +118,7 @@ const createScreen = `<div class="app">
   <div class="card" style="height:56px;margin-top:6px;padding:0 16px;display:flex;align-items:center;font:700 19px 'Onest'">1.5 GRAM</div>
   <div id="cBtn" style="margin-top:22px;height:62px;border-radius:22px;background:${GRAD};display:flex;align-items:center;justify-content:center;font:800 20px 'Nunito'">Launch</div>
   <div id="cDone" style="position:absolute;inset:0;background:rgba(7,6,12,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;opacity:0">
-    <img src="assets/coin.png" style="width:150px" /><div style="font:800 30px 'Nunito'">Moon Cat is live</div><div style="color:#2EE87A;font:700 17px 'Onest'">MCAT · on-chain in 1.2s</div></div>
+    <img src="assets/coinPaw.png" style="width:150px" /><div style="font:800 30px 'Nunito'">Moon Cat is live</div><div style="color:#2EE87A;font:700 17px 'Onest'">MCAT · on-chain in 1.2s</div></div>
 </div>`;
 // свечи графика токена: растут вверх с откатами
 const CANDLES = (() => { let v = 40, s = 7; const out = []; for (let i = 0; i < 26; i++) { s = (s * 16807) % 2147483647; const r = s / 2147483647; const o = v; v = v + (r - 0.32) * 9 + i * 0.25; out.push([o, v, Math.max(o, v) + r * 4, Math.min(o, v) - (1 - r) * 4]); } return out; })();
@@ -128,7 +128,7 @@ function chartSVG(n, w = 352, h = 300) {
   return `<svg width="${w}" height="${h}">${CANDLES.slice(0, n).map(([o, c, hi, lo], i) => { const up = c >= o, col = up ? "#2EE87A" : "#FF3B47", x = i * cw + cw / 2; return `<line x1="${x}" x2="${x}" y1="${py(hi)}" y2="${py(lo)}" stroke="${col}" stroke-width="2"/><rect x="${x - cw * 0.32}" y="${Math.min(py(o), py(c))}" width="${cw * 0.64}" height="${Math.max(3, Math.abs(py(o) - py(c)))}" rx="2" fill="${col}"/>`; }).join("")}</svg>`;
 }
 const tokenScreen = `<div class="app">
-  <div style="display:flex;align-items:center;gap:12px;margin:8px 4px 14px"><img src="assets/coin.png" style="width:52px" />
+  <div style="display:flex;align-items:center;gap:12px;margin:8px 4px 14px"><img src="assets/coinPaw.png" style="width:52px" />
     <div><div style="font:800 22px 'Nunito'">Moon Cat</div><div style="color:#8F8AA8;font:600 14px 'Onest'">MCAT · GRAM</div></div></div>
   <div style="font:800 36px 'Nunito';margin:0 4px"><span id="tPrice">$0.000214</span> <span id="tChg" style="font-size:18px;color:#2EE87A">+38.2%</span></div>
   <div class="card" style="height:310px;margin-top:14px;background:#0F0D18"><div id="tChart" style="position:absolute;left:0;top:4px"></div></div>
@@ -148,8 +148,8 @@ const aLetters = [..."Mintly"].map((ch, i) => { const s = $(`<span class="w" sty
 const aPhoneWrap = $(`<div class="abs" style="left:750px;top:345px;width:420px;height:868px;perspective:1600px"></div>`); A.appendChild(aPhoneWrap);
 const aPhone = phone(homeScreen); aPhoneWrap.appendChild(aPhone);
 const OBJS = [
-  ["coin", 520, 300, 200, 1.2, -12], ["candleUp", 1330, 330, 150, 1.35, 14], ["gem", 470, 640, 150, 1.5, 8], ["star", 1420, 640, 150, 1.6, -10],
-  ["bolt", 640, 830, 140, 1.75, 6], ["rocket", 1250, 820, 190, 1.85, -6], ["zero", 300, 470, 190, 2.0, -8], ["leaf", 1600, 450, 150, 2.1, 12],
+  ["coin", 520, 300, 200, 1.2, -12], ["candleUp", 1330, 330, 170, 1.35, 14], ["chart", 450, 650, 210, 1.5, 6], ["candleDown", 1430, 640, 150, 1.6, -10],
+  ["bolt", 640, 840, 150, 1.75, 6], ["rocket", 1260, 830, 200, 1.85, -6], ["zero", 290, 470, 200, 2.0, -8], ["coinPaw", 1620, 450, 170, 2.1, 12],
 ];
 const aObjs = OBJS.map(([n, x, y, w, d, r]) => { const o = img(`assets/${n}.png`, `left:${x - w / 2}px;top:${y - w / 2}px;width:${w}px;height:${w}px;object-fit:contain`); A.appendChild(o); o.d = d; o.r = r; o.x0 = x; o.y0 = y; return o; });
 
@@ -157,10 +157,11 @@ const aObjs = OBJS.map(([n, x, y, w, d, r]) => { const o = img(`assets/${n}.png`
 const B = scene(5.2, 15.1, "#ffffff");
 const bFog = fog(B);
 const b1 = line(B, "Every day, there's a new *memecoin*", { top: 470 });
-const b1Icons = ["coin", "candleUp", "gem", "star", "rocket", "candleDown"].map((n, i) => { const o = img(`assets/${n}.png`, `left:0;top:0;width:64px;height:64px;object-fit:contain`); B.appendChild(o); return o; });
+const b1Icons = ["coin", "coinMoon", "coinPaw", "coinFlame", "coinStar", "coin"].map((n, i) => { const o = img(`assets/${n}.png`, `left:0;top:0;width:64px;height:64px;object-fit:contain`); B.appendChild(o); return o; });
 const b2 = line(B, "Fees eat your *gains.*", { top: 470, size: 84 });
 const b2Icon = img("assets/candleDown.png", "left:1340px;top:380px;width:150px;height:200px;object-fit:contain"); B.appendChild(b2Icon);
 const b3 = $(`<div class="c" style="top:462px;font:500 88px 'Onest';letter-spacing:-0.02em">Trades take <span class="accent" id="fev" style="display:inline-block">forever.</span></div>`); B.appendChild(b3);
+const b3Glass = img("assets/hourglass.png", "left:1470px;top:350px;width:180px;height:260px;object-fit:contain"); B.appendChild(b3Glass);
 const b4 = line(B, "You just want to trade?", { top: 500, size: 44, color: "#5B7398" });
 const b5 = line(B, "Then meet *Mintly.*", { top: 488, size: 60 });
 // коллаж карточек на орбите
@@ -170,7 +171,7 @@ addCard(`<img src="assets/app/banner-mx-trade.webp" style="width:100%;height:100
 addCard(`<div style="width:100%;height:100%;background:#000;display:flex;align-items:center;justify-content:center"><img src="assets/app/gold-preview.webp" style="height:85%;image-rendering:pixelated"/></div>`, 150, 150);
 addCard(`<div style="width:100%;height:100%;background:${GRAD};padding:16px;color:#fff"><div style="font:500 14px Onest;opacity:.85">Balance</div><div style="font:800 34px Nunito">$1 284.50</div><div style="position:absolute;left:16px;bottom:14px;font:700 13px Onest">12.4 SOL · 8 420 GRAM</div></div>`, 290, 170);
 addCard(`<div style="width:100%;height:100%;background:#fff;padding:12px">${chartSVG(26, 236, 120)}</div>`, 260, 150);
-addCard(`<div style="width:100%;height:100%;background:#15131F;padding:14px;color:#fff;display:flex;gap:12px;align-items:center"><img src="assets/coin.png" style="width:56px"/><div><div style="font:800 20px Nunito">Moon Cat</div><div style="color:#2EE87A;font:700 15px Onest">+38.2%</div></div></div>`, 250, 90);
+addCard(`<div style="width:100%;height:100%;background:#15131F;padding:14px;color:#fff;display:flex;gap:12px;align-items:center"><img src="assets/coinPaw.png" style="width:56px"/><div><div style="font:800 20px Nunito">Moon Cat</div><div style="color:#2EE87A;font:700 15px Onest">+38.2%</div></div></div>`, 250, 90);
 addCard(`<div style="width:100%;height:100%;background:#000;display:flex;align-items:center;justify-content:center"><img src="assets/app/violet-preview.webp" style="height:85%;image-rendering:pixelated"/></div>`, 140, 140);
 addCard(`<img src="assets/app/banner-mx-shop.webp" style="width:100%;height:100%;object-fit:cover;object-position:right;image-rendering:pixelated"/>`, 280, 120);
 addCard(`<div style="width:100%;height:100%;background:#fff;display:flex;align-items:center;justify-content:center"><img src="assets/zero.png" style="width:78%"/></div>`, 170, 130);
@@ -259,7 +260,7 @@ window.renderAt = (t) => {
     const pk = E.expo(prog(t, 0.1, 1.9));
     const out = E.inQ(prog(t, 4.75, 5.4));
     S(aPhone, { y: lerp(520, 0, pk) + Math.sin(t * 1.1) * 8, rx: lerp(28, 8, pk), ry: lerp(-22, -9, pk) + Math.sin(t * 0.7) * 2, r: lerp(-6, -2, pk) });
-    aObjs.forEach((o) => { const k = prog(t, o.d, o.d + 0.6); const f = Math.sin(t * 1.3 + o.d * 3); S(o, { o: clamp(k * 3), s: E.back(k) * (1 + out * 0.4), r: o.r + f * 4, y: f * 14 + (o.y0 - 540) * out * 0.6, x: (o.x0 - 960) * out * 0.6, b: out * 14 }); });
+    aObjs.forEach((o) => { const k = prog(t, o.d, o.d + 0.6); const f = Math.sin(t * 1.3 + o.d * 3); S(o, { o: clamp(k * 3) * (1 - out), s: E.back(k) * (1 + out * 0.4), r: o.r + f * 4, y: f * 14 + (o.y0 - 540) * out * 0.6, x: (o.x0 - 960) * out * 0.6 }); });
     aWord.style.transform = `scale(${1 + out * 0.25})`; aWord.style.filter = out > 0 ? `blur(${out * 18}px)` : "none";
     aPhoneWrap.style.transform = `scale(${1 + out * 0.5}) translateY(${out * 200}px)`; aPhoneWrap.style.filter = out > 0 ? `blur(${out * 14}px)` : "none";
     A.style.opacity = 1 - prog(t, 5.15, 5.4);
@@ -279,6 +280,7 @@ window.renderAt = (t) => {
     words(b2, t, 8.6, { out: 10.25 });
     const k2 = E.back(prog(t, 9.3, 9.9)); S(b2Icon, { o: clamp(k2 * 2) * (1 - prog(t, 10.2, 10.55)), y: (1 - k2) * -200 + prog(t, 9.9, 10.5) * 60, r: 18 * k2 });
     { const k = E.outQ(prog(t, 10.55, 11.2)), q = E.io(prog(t, 11.9, 12.3)); S(b3, { o: k * (1 - q), y: (1 - k) * 30, b: (1 - k) * 14 + q * 16 });
+      const hk = E.back(prog(t, 10.9, 11.4)); S(b3Glass, { o: clamp(hk * 2) * (1 - q), s: hk, r: lerp(-30, 180 * E.io(prog(t, 11.3, 11.9)), 1) * 0 + 180 * E.io(prog(t, 11.3, 11.9)) - 10 });
       const fev = document.getElementById("fev"); fev.style.letterSpacing = `${lerp(-0.02, 0.32, E.io(prog(t, 11.0, 11.9)))}em`; }
     words(b4, t, 12.25, { out: 13.65, stag: 0.06 });
     words(b5, t, 13.85, { out: 14.75, stag: 0.1 });
@@ -336,7 +338,7 @@ window.renderAt = (t) => {
     const bp = prog(t, 26.5, 26.7); document.getElementById("tBuy").style.transform = `scale(${1 - Math.sin(bp * Math.PI) * 0.07})`;
     const tt = E.back(prog(t, 26.75, 27.15)) * (1 - prog(t, 28.0, 28.3)); const toast = document.getElementById("tToast"); toast.style.opacity = clamp(tt * 1.5); toast.style.transform = `translateY(${(1 - tt) * -30}px)`;
     words(d2T1, t, 24.6, { out: 28.15 });
-    { const k = E.back(prog(t, 25.0, 25.6)), q = E.inQ(prog(t, 28.1, 28.6)); S(d2Zero, { o: clamp(k * 2) * (1 - q), s: k * (1 + Math.sin(t * 2) * 0.02), r: -4 + Math.sin(t * 1.4) * 3, b: q * 14 }); }
+    { const k = E.back(prog(t, 25.0, 25.6)), q = E.inQ(prog(t, 28.1, 28.6)); S(d2Zero, { o: clamp(k * 2) * (1 - q), s: k * (1 + Math.sin(t * 2) * 0.02) * (1 - q * 0.3), r: -4 + Math.sin(t * 1.4) * 3 }); }
     words(d2T2, t, 25.5, { out: 28.2 });
     d2Objs.forEach((o, i) => { const k = E.back(prog(t, 25.6 + i * 0.15, 26.1 + i * 0.15)), q = prog(t, 28.0, 28.4); S(o, { o: clamp(k * 2) * (1 - q), s: k, y: Math.sin(t * 1.5 + i) * 12, r: Math.sin(t + i) * 8 }); });
     // D3 28.6–31.6 — скорость: строка влетает со шлейфом
