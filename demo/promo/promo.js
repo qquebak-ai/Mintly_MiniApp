@@ -108,10 +108,52 @@ const toast = (title, sub) => `<div class="toastA"><i>${ICO.check("#2EE87A", 17)
 // касание пальцем: круг сжимается и гаснет
 function tap(el, t, a) { const k = prog(t, a, a + 0.45); el.style.opacity = k > 0 && k < 1 ? (1 - k) * 0.9 : 0; el.style.transform = `scale(${0.6 + 0.6 * E.out(k)})`; }
 
+// ---- логотип: большая M уменьшается, уходит влево, из неё по букве выезжает «intly» ----
+const M_PATH = "M300 218 L627 660 L955 218 L1080 988 L886 988 L836 610 L627 910 L418 610 L369 988 L173 988 Z";
+let mLogoN = 0;
+// F — кегль слова, base — базовая линия; fill — заливка M, text — CSS цвета/градиента букв
+function mLogo(parent, { F, base, fill, text, glow = "none", tail = "intly", left = null }) {
+  const id = "mg" + mLogoN++, capH = 0.705 * F, mW = capH * 907 / 770;
+  const grad = fill.split(",");
+  const m = $(`<svg class="abs" style="left:0;top:0;width:${mW.toFixed(1)}px;height:${capH.toFixed(1)}px;overflow:visible;transform-origin:50% 50%;filter:${glow}" viewBox="173 218 907 770">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">${grad.map((c, i) => `<stop offset="${i / Math.max(1, grad.length - 1)}" stop-color="${c}"/>`).join("")}</linearGradient></defs>
+    <path d="${M_PATH}" fill="url(#${id})"/></svg>`);
+  const row = $(`<div class="abs" style="left:0;top:${(base - 0.829 * F).toFixed(1)}px;font:800 ${F}px/1 'Nunito';letter-spacing:-0.04em;white-space:nowrap;clip-path:inset(-40% -10% -40% 0)"></div>`);
+  const sp = [...tail].map((ch) => { const e = $(`<span style="display:inline-block;${text}">${ch}</span>`); row.appendChild(e); return e; });
+  parent.append(row, m);
+  const o = { m, row, sp, F, base, capH, mW, left };
+  o.measure = () => {
+    if (o.w) return;
+    const rw = row.offsetWidth; if (!rw) return;
+    o.w = rw; o.offs = sp.map((e) => e.offsetLeft); o.ws = sp.map((e) => e.offsetWidth);
+    o.gap = 0.035 * F; o.total = mW + o.gap + rw;
+    // градиент букв тянется на всё слово, а не на каждую букву отдельно
+    sp.forEach((e, i) => { if (/gradient/.test(text)) { e.style.backgroundSize = `${rw}px 100%`; e.style.backgroundPosition = `${-o.offs[i]}px 0`; } });
+  };
+  // t0 — начало; big — во сколько раз M крупнее в начале; sp — темп; out — исчезновение 0…1
+  o.at = (t, t0, { big = 2.4, cx = 960, cy = null, k = 1, out = 0 } = {}) => {
+    o.measure(); if (!o.w) return;
+    const L = o.left != null ? o.left : 960 - o.total / 2, mx = L + mW / 2, my = base - capH / 2;
+    const a = E.outQ(prog(t, t0, t0 + 0.55 * k)), mv = E.io(prog(t, t0 + 0.6 * k, t0 + 1.3 * k));
+    const sc = lerp(big, 1, mv) * (0.86 + 0.14 * a);
+    const x = lerp(cx, mx, mv), y = lerp(cy == null ? my : cy, my, mv);
+    S(m, { o: a * (1 - out), x: x - mW / 2, y: y - capH / 2, s: sc * (1 - out * 0.1), b: (1 - a) * 14 + out * 12 });
+    row.style.left = (L + mW + o.gap).toFixed(1) + "px";
+    row.style.opacity = 1 - out; row.style.filter = out > 0.01 ? `blur(${(out * 12).toFixed(1)}px)` : "none";
+    const t1 = t0 + 1.15 * k;
+    sp.forEach((e, i) => {
+      const q = E.outQ(prog(t, t1 + i * 0.09 * k, t1 + i * 0.09 * k + 0.55 * k));
+      // буква стартует целиком спрятанной под M и выезжает на своё место
+      S(e, { o: clamp(q * 1.8), x: -(o.offs[i] + o.ws[i] + o.gap) * (1 - q), b: (1 - q) * 5 });
+    });
+  };
+  return o;
+}
+
 // ============ A · ИНТРО 0–5.6 ============
 const A = scene(0, 5.7);
-const aWord = $(`<div class="c" style="top:46px;font:800 280px/1 'Nunito';letter-spacing:-0.04em;white-space:nowrap"></div>`); A.appendChild(aWord);
-const aLetters = [..."Mintly"].map((ch, i) => { const s = $(`<span class="w" style="background:linear-gradient(95deg,#0B4FD8,#1E8BFF 40%,#35D0E8 80%,#8FF3E6);background-size:600% 100%;background-position:${i * 20}% 0;padding-bottom:.14em;margin-bottom:-.14em;-webkit-background-clip:text;background-clip:text;color:transparent">${ch}</span>`); aWord.appendChild(s); return s; });
+const OCEAN_TXT = "background:linear-gradient(95deg,#0B4FD8,#1E8BFF 40%,#35D0E8 80%,#8FF3E6);-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:.14em;margin-bottom:-.14em";
+const aLogo = mLogo(A, { F: 270, base: 268, fill: "#0B4FD8,#1E8BFF,#35D0E8", text: OCEAN_TXT, glow: "drop-shadow(0 10px 40px rgba(30,139,255,.35))" });
 const aScr = screen(frames(["home"])); showFrame(aScr, 0);
 const aPhone = new Phone3D(A, aScr);
 const aW = [
@@ -126,7 +168,7 @@ const aW = [
   wg(A, 260, 88, `<div class="row"><div style="display:flex">${["pup", "boo", "fire", "gold"].map((k, i) => `<div style="margin-left:${i ? -12 : 0}px;border:3px solid #fff;border-radius:50%;display:flex;background:#fff">${logo(k, 38)}</div>`).join("")}</div>
     <div><div class="num tn" style="font-size:21px">1 284</div><div class="lb" style="font-size:13px">держателя</div></div></div>`),
 ];
-const aPos = [[430, 480, 1.25, -3], [1480, 455, 1.4, 2.5], [330, 735, 1.55, 2], [1600, 700, 1.7, -2], [560, 945, 1.85, 1.5], [1380, 950, 2.0, -1.5]];
+const aPos = [[430, 480, 2.0, -3], [1480, 455, 2.15, 2.5], [330, 735, 2.3, 2], [1600, 700, 2.45, -2], [560, 945, 2.6, 1.5], [1380, 950, 2.75, -1.5]];
 
 // ============ B · ПРОБЛЕМА 5.2–15.1 ============
 const B = scene(5.2, 15.15);
@@ -134,7 +176,8 @@ const b1 = line(B, "Каждый день появляется новый *ме�
 const b2 = line(B, "Комиссии *не* *съедают* твою прибыль.", { top: 470, size: 78 });
 const b3 = line(B, "Торгуй *доступно.*", { top: 462, size: 88 });
 const b4 = line(B, "Хочешь просто торговать?", { top: 500, size: 46, color: "#5B7398" });
-const b5 = line(B, "Тогда знакомься — *Mintly.*", { top: 486, size: 64 });
+const b5 = line(B, "Тогда знакомься —", { top: 486, size: 64 });
+const b5Logo = mLogo(B, { F: 64, base: 486 + 0.829 * 64 + 0.105 * 64, fill: "#0B4FD8,#1E8BFF,#35D0E8", text: OCEAN_TXT, tail: "intly." });
 
 // ряды виджетов: по четыре над и под фразой, каждый слот всё время меняет
 // карточку — новая въезжает снизу, старая уходит вверх
@@ -247,13 +290,7 @@ C_GROUPS.forEach((_, gi) => [0, 1].forEach((side) => {
 }));
 const cDots = [];
 C_GROUPS.forEach((_, gi) => [0, 1].forEach((side) => [C_CAP, C_BASE].forEach((y) => { const d = $(`<div class="abs" style="left:0;top:0;width:7px;height:7px;background:#0B1E46"></div>`); d.gi = gi; d.side = side; d.y = y; C.appendChild(d); cDots.push(d); })));
-const LOGO = `<svg viewBox="0 0 64 64" width="100%" height="100%"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0B4FD8"/><stop offset=".6" stop-color="#1E8BFF"/><stop offset="1" stop-color="#35D0E8"/></linearGradient></defs>
-  <path d="M12 56 V28 L32 45 L52 28 V56" fill="none" stroke="url(#lg)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-  <g transform="translate(52,26) rotate(34)"><path d="M0 0 C -8 -7 -8 -19 0 -26 C 8 -19 8 -7 0 0 Z" fill="#3FD9A0"/></g></svg>`;
-const cRing = $(`<svg class="abs" style="left:900px;top:480px;width:120px;height:120px;overflow:visible" viewBox="0 0 120 120"><circle cx="60" cy="60" r="48" fill="none" stroke="url(#rg)" stroke-width="14" stroke-linecap="round" stroke-dasharray="302" stroke-dashoffset="302" transform="rotate(-90 60 60)"/>
-  <defs><linearGradient id="rg"><stop offset="0" stop-color="#0B5ED7"/><stop offset="1" stop-color="#35D0E8"/></linearGradient></defs></svg>`); C.appendChild(cRing);
-const cLogo = $(`<div class="abs" style="left:880px;top:450px;width:160px;height:160px">${LOGO}</div>`); C.appendChild(cLogo);
-const cName = $(`<div class="abs" style="left:1060px;top:452px;font:800 150px/1 'Nunito';letter-spacing:-0.04em;color:#0B1E46;clip-path:inset(0 100% 0 0)">Mintly</div>`); C.appendChild(cName);
+const cLogo = mLogo(C, { F: 150, base: 540 + 0.705 * 150 / 2, fill: "#0B4FD8,#1E8BFF,#35D0E8", text: "color:#0B1E46", glow: "drop-shadow(0 12px 36px rgba(30,139,255,.3))" });
 
 // ============ D · ВОЗМОЖНОСТИ 19.5–37.1 ============
 const D = scene(19.5, 37.15);
@@ -309,11 +346,7 @@ for (let r = 0; r < 30; r++) for (let c = 0; c < 52; c++) {
   Esc.appendChild(b); eBubbles.push(b);
 }
 // логотип и имя одной строкой по общей оси — раньше имя сидело ниже знака
-const eLock = $(`<div class="abs" style="left:0;right:0;top:300px;height:180px;display:flex;justify-content:center;align-items:center;gap:26px"></div>`); Esc.appendChild(eLock);
-const eLogoBox = $(`<div style="position:relative;width:170px;height:170px;flex:none"></div>`); eLock.appendChild(eLogoBox);
-const eRing = $(`<svg class="abs" style="left:5px;top:5px;width:160px;height:160px;overflow:visible" viewBox="0 0 120 120"><circle cx="60" cy="60" r="48" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-dasharray="302" stroke-dashoffset="302" transform="rotate(-90 60 60)"/></svg>`); eLogoBox.appendChild(eRing);
-const eLogo = $(`<div class="abs" style="inset:0;filter:drop-shadow(0 8px 24px rgba(0,40,110,.28))">${LOGO.replace('fill="#3FD9A0"', 'fill="#ffffff"').replace(/url\(#lg\)/, "#ffffff")}</div>`); eLogoBox.appendChild(eLogo);
-const eName = $(`<div style="font:800 160px/1 'Nunito';letter-spacing:-0.04em;color:#fff;margin-top:-14px;clip-path:inset(0 100% 0 0)">Mintly</div>`); eLock.appendChild(eName);
+const eLogo = mLogo(Esc, { F: 160, base: 390 + 0.705 * 160 / 2, fill: "#FFFFFF,#E6F6FF,#BFE6FF", text: "color:#fff", glow: "drop-shadow(0 0 30px rgba(190,235,255,.45))" });
 const ePill = $(`<div class="abs" style="left:50%;top:600px;transform:translateX(-50%);display:flex;align-items:center;gap:18px;padding:22px 38px 22px 26px;border-radius:999px;background:rgba(255,255,255,.9);box-shadow:0 20px 60px rgba(0,20,60,.35);white-space:nowrap">
   <div style="width:62px;height:62px;border-radius:50%;background:#2AABEE;display:flex;align-items:center;justify-content:center">${ICO.tg()}</div>
   <div><div style="font:500 26px 'Onest';color:#4A6488">Открыть в Telegram</div><div style="font:800 40px 'Nunito';color:#0B1E46">@MintlyTrading_bot</div></div></div>`); Esc.appendChild(ePill);
@@ -334,8 +367,8 @@ window.renderAt = (t) => {
   // ---- A ----
   if (t < 5.7) {
     sceneFx(A, t, -1, 5.7, 0.5, 0.75);
-    aLetters.forEach((l, i) => { const k = prog(t, 0.5 + i * 0.07, 1.4 + i * 0.07); S(l, { o: E.out(k), y: (1 - E.soft(k)) * 90, s: 0.86 + 0.14 * E.soft(k), b: (1 - E.out(k)) * 16 }); });
-    const pk = E.out(prog(t, 0.15, 2.4));
+    aLogo.at(t, 0.3, { big: 1.9, cy: 470 });
+    const pk = E.out(prog(t, 1.1, 3.0));
     aPhone.pose({ x: 960, y: lerp(1500, 810, pk) + Math.sin(t * 0.9) * 6, s: 1.02, rx: lerp(30, 12, pk), ry: lerp(-18, -5, pk) + Math.sin(t * 0.6) * 3, rz: lerp(-4, -1, pk) });
     aW.forEach((w, i) => {
       const [x, y, d, r] = aPos[i], k = E.outQ(prog(t, d, d + 0.9)), f = Math.sin(t * 1.1 + i * 1.9);
@@ -344,15 +377,20 @@ window.renderAt = (t) => {
   }
   // ---- B ----
   if (t >= 5.2 && t < 15.15) {
-    sceneFx(B, t, 5.2, 15.15, 0.5, 0.55);
+    sceneFx(B, t, 5.2, 15.15, 0.5, 0.3);
     words(b1, t, 5.5, { out: 7.85 });
     runSlots(b1Slots, t, 5.55, 7.8, 0.95, tickB1);
     words(b2, t, 8.4, { out: 10.15 });
     runSlots(b2Slots, t, 8.45, 10.1, 0.85, tickB2);
     words(b3, t, 10.5, { out: 12.05 });
     runSlots(b3Slots, t, 10.55, 12.0, 0.9, tickB3);
-    words(b4, t, 12.3, { out: 13.6, stag: 0.06 });
-    words(b5, t, 13.8, { out: 14.75, stag: 0.1 });
+    words(b4, t, 12.3, { out: 13.35, stag: 0.06 });
+    // фраза и логотип стоят одной строкой по центру; логотип собирается из M
+    if (!b5.tw && b5.spans[0].offsetWidth) { b5.tw = b5.spans.reduce((a, e) => a + e.offsetWidth, 0) + 16 * (b5.spans.length - 1); }
+    b5Logo.measure();
+    if (b5.tw && b5Logo.w) { const tot = b5.tw + 22 + b5Logo.total; b5.style.transform = `translateX(${(-(tot / 2) + b5.tw / 2).toFixed(1)}px)`; b5Logo.left = 960 - tot / 2 + b5.tw + 22; }
+    words(b5, t, 13.45, { out: 14.85, stag: 0.08 });
+    b5Logo.at(t, 13.6, { big: 1.8, k: 0.55, cx: (b5Logo.left || 960) + (b5Logo.total || 0) / 2, out: E.io(prog(t, 14.85, 15.15)) });
     const ok = E.out(prog(t, 12.15, 13.4)), oq = E.io(prog(t, 14.45, 15.1));
     ORB.forEach((c, i) => {
       const a = (i / ORB.length) * Math.PI * 2 + t * 0.26 + 0.4;
@@ -391,10 +429,7 @@ window.renderAt = (t) => {
       const lx = xs[d.gi] + (d.side ? ws[d.gi] : 0);
       S(d, { o: k * gl, x: lx - 3, y: d.y - 3, s: k });
     });
-    const ring = prog(t, 17.05, 17.95); cRing.firstElementChild.setAttribute("stroke-dashoffset", (302 * (1 - E.io(ring))).toFixed(1));
-    const rOut = E.io(prog(t, 17.9, 18.35)); S(cRing, { o: (ring > 0 ? 1 : 0) * (1 - rOut), s: 1 + rOut * 0.3 });
-    const lk = E.soft(prog(t, 17.95, 18.65)); S(cLogo, { o: clamp(prog(t, 17.95, 18.3)), s: lk, r: (1 - lk) * -20, x: -140 * E.io(prog(t, 18.6, 19.25)) });
-    const nk = E.io(prog(t, 18.65, 19.35)); cName.style.clipPath = `inset(0 ${(100 - nk * 100).toFixed(1)}% 0 0)`; S(cName, { x: -140 * nk + (1 - nk) * -40 });
+    cLogo.at(t, 17.05, { big: 2.4, cy: 540, k: 0.85 });
   }
   // ---- D ----
   if (t >= 19.5 && t < 37.15) {
@@ -481,12 +516,7 @@ window.renderAt = (t) => {
       S(b, { x: 960 + (b.bx - 960) * sc - b.sz / 2, y: 540 + (yy - 540) * sc - b.sz / 2, s: sc * (0.9 + 0.2 * (z + 260) / 520), o: clamp(0.35 + 0.55 * (z + 260) / 520) });
     });
     const ek = E.out(prog(t, 37, 37.8)); Esc.style.opacity = ek; Esc.style.filter = ek < 1 ? `blur(${((1 - ek) * 10).toFixed(1)}px)` : "none";
-    const ring = prog(t, 37.6, 38.5); eRing.firstElementChild.setAttribute("stroke-dashoffset", (302 * (1 - E.io(ring))).toFixed(1));
-    const rOut = E.io(prog(t, 38.4, 38.85)); S(eRing, { o: (ring > 0 ? 1 : 0) * (1 - rOut), s: 1 + rOut * 0.3 });
-    const lk = E.soft(prog(t, 38.5, 39.2)); S(eLogo, { o: clamp(prog(t, 38.5, 38.8)), s: lk });
-    const nk = E.io(prog(t, 39.0, 39.7)); eName.style.clipPath = `inset(0 ${(100 - nk * 100).toFixed(1)}% 0 0)`;
-    // пока имени нет, знак стоит по центру кадра и уезжает влево вместе с проявлением
-    eLogoBox.style.transform = `translateX(${((1 - nk) * (eName.offsetWidth + 26) / 2).toFixed(1)}px)`;
+    eLogo.at(t, 37.7, { big: 2.3, cy: 470 });
     const pk = E.outQ(prog(t, 39.9, 40.7)); ePill.style.opacity = pk; ePill.style.transform = `translateX(-50%) translateY(${(1 - pk) * 36}px) scale(${0.94 + 0.06 * pk})`; ePill.style.filter = pk < 1 ? `blur(${((1 - pk) * 10).toFixed(1)}px)` : "none";
     words(eTag, t, 40.8, { stag: 0.14 });
   }
