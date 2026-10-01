@@ -39,11 +39,13 @@ function sceneFx(el, t, a, b, fin = 0.55, fout = 0.6) {
 // ---- кинетическая строка: слова по одному, *слово* — акцентом ----
 function line(parent, text, { size = 72, top = 470, weight = 500, color = "#FFFFFF", font = "Onest", ls = "-0.02em" } = {}) {
   const el = $(`<div class="c" style="top:${top}px;font:${weight} ${size}px '${font}';letter-spacing:${ls};color:${color};white-space:nowrap"></div>`);
-  const spans = text.split(" ").map((w) => { const acc = w.startsWith("*"); return $(`<span class="w${acc ? " accent" : ""}">${w.replace(/\*/g, "")}</span>`); });
+  // белые заголовки переливаются синим, как фон; серые подписи остаются серыми
+  const g = /^#fff(fff)?$/i.test(color);
+  const spans = text.split(" ").map((w) => { const acc = w.startsWith("*"); return $(`<span class="w${acc ? " accent" : g ? " grad" : ""}">${w.replace(/\*/g, "")}</span>`); });
   spans.forEach((s, i) => { el.appendChild(s); if (i < spans.length - 1) el.appendChild(document.createTextNode(" ")); });
   parent.appendChild(el); el.spans = spans; return el;
 }
-function words(l, t, a, { stag = 0.09, dur = 0.8, out = null, outDur = 0.6, rise = 30 } = {}) {
+function words(l, t, a, { stag = 0.1, dur = 1.05, out = null, outDur = 0.6, rise = 30 } = {}) {
   l.spans.forEach((w, i) => {
     const k = E.outQ(prog(t, a + i * stag, a + i * stag + dur));
     let o = k, y = (1 - k) * rise, b = (1 - k) * 14, s = 1;
@@ -55,6 +57,7 @@ function words(l, t, a, { stag = 0.09, dur = 0.8, out = null, outDur = 0.6, rise
 // ---- общий фон: светлые пятна и голубой туман снизу ----
 // фон как в приложении — чёрный, по нему медленно плывут и дышат синие пятна
 const BG = $(`<div class="abs" style="inset:0;background:#000"></div>`); root.appendChild(BG);
+const bgGrad = $(`<div class="abs" style="inset:-20%;background:linear-gradient(120deg,#000 0%,#06163D 18%,#000 34%,#0B2C70 52%,#000 68%,#081E52 84%,#000 100%);background-size:300% 300%"></div>`); BG.appendChild(bgGrad);
 const bgBlobs = [[300, 230, 420, "#123E9C"], [1650, 220, 380, "#0E3480"], [960, 1100, 540, "#1450B8"], [1520, 900, 360, "#0B2F73"], [380, 930, 380, "#103A8C"], [960, 380, 300, "#0A2560"]]
   .map(([x, y, r, c], i) => { const b = $(`<div class="blob" style="left:${x - r}px;top:${y - r}px;width:${r * 2}px;height:${r * 2}px;background:${c};opacity:.55"></div>`); b.i = i; BG.appendChild(b); return b; });
 const bgFog = $(`<div class="fog"></div>`); BG.appendChild(bgFog);
@@ -78,10 +81,11 @@ const GRAD = "linear-gradient(115deg,#E44BC8 0%,#C13AE6 18%,#8E2DE2 36%,#6A17E8 
 const SKIN = { gold: "#F4B73A,#B9770E", neon: "#28D7FF,#0A5BD8", violet: "#B26BFF,#5A20C9", mint: "#4BE3A6,#0E8A64" };
 function logo(k, sz) {
   if (SKIN[k]) { const [a, b] = SKIN[k].split(","); return `<div class="lg" style="width:${sz}px;height:${sz}px;background:radial-gradient(circle at 30% 25%,${a},${b});display:flex;align-items:center;justify-content:center;overflow:hidden"><img src="assets/app/${k}-preview.webp" style="width:86%;image-rendering:pixelated;margin-top:6%"/></div>`; }
-  return `<img class="lg" src="assets/tok/${k}.png" style="width:${sz}px;height:${sz}px"/>`;
+  // белая M гладкая, а не пиксельная — её не надо масштабировать по пикселям
+  return `<img class="lg" src="assets/tok/${k}.png" style="width:${sz}px;height:${sz}px${k === "m" ? ";image-rendering:auto;box-shadow:0 0 0 1px rgba(255,255,255,.14)" : ""}"/>`;
 }
-const TOK = [["mcat", "Moon Cat", "MCAT"], ["frog", "Lily Frog", "LILY"], ["gold", "Gold Axo", "GAXO"], ["pup", "Pixel Pup", "PUP"], ["fire", "Hot Wick", "WICK"],
-  ["neon", "Neon Axo", "NEON"], ["boo", "Boo", "BOO"], ["violet", "Violet", "VIO"], ["mint", "Minti", "MINT"]];
+const TOK = [["m", "Mintly", "MINT"], ["frog", "Lily Frog", "LILY"], ["gold", "Gold Axo", "GAXO"], ["pup", "Pixel Pup", "PUP"], ["fire", "Hot Wick", "WICK"],
+  ["neon", "Neon Axo", "NEON"], ["boo", "Boo", "BOO"], ["violet", "Violet", "VIO"], ["mint", "Minti", "MNTI"]];
 const ICO = {
   check: (c = "#2EE87A", s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
   bolt: (c, s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${c}"><path d="M13.5 2 4 13.5h6.5L9.5 22 20 9.5h-6.6z"/></svg>`,
@@ -183,7 +187,7 @@ const aPhone = new Phone3D(A, aScr);
 const aW = [
   wg(A, 270, 124, `<div class="row" style="justify-content:space-between"><span style="font:800 19px Nunito">SOL</span><span class="chip up" style="background:rgba(46,232,122,.14)">+2.07%</span></div>
     <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:6px"><span class="num tn">$120.48</span>${spark(SOL.slice(10), 110, 38, "#2EE87A")}</div>`),
-  wg(A, 286, 92, `<div class="row">${logo("mcat", 56)}<div style="flex:1"><div style="font:800 19px Nunito">Moon Cat <span style="color:#8E8E99;font:600 14px Onest">$MCAT</span></div>
+  wg(A, 286, 92, `<div class="row">${logo("m", 56)}<div style="flex:1"><div style="font:800 19px Nunito">Mintly <span style="color:#8E8E99;font:600 14px Onest">$MINT</span></div>
     <div class="lb" style="font-size:14px;display:flex;align-items:center;gap:7px"><i style="width:8px;height:8px;border-radius:50%;background:#fff;display:inline-block"></i>Запущен 2 с назад</div></div></div>`),
   wg(A, 236, 132, `<div class="lb">Комиссия платформы</div><div style="font:800 58px/1.05 Nunito;letter-spacing:-.03em" class="accent">0%</div><div class="lb" style="font-size:13px">на каждую сделку</div>`),
   wg(A, 262, 92, `<div class="row"><div style="width:52px;height:52px;border-radius:16px;background:#fff;display:flex;align-items:center;justify-content:center">${ICO.bolt("#0A0A0F", 26)}</div>
@@ -251,7 +255,7 @@ function runB1(t, a, b) {
 }
 
 // B2 — комиссии в копейках; карточки перелистываются по горизонтальной оси, как табло
-const FEEROW = [["mcat", "Покупка MCAT"], ["frog", "Продажа LILY"], ["gold", "Покупка GAXO"], ["pup", "Покупка PUP"], ["fire", "Продажа WICK"], ["neon", "Покупка NEON"], ["boo", "Покупка BOO"], ["violet", "Продажа VIO"], ["mint", "Покупка MINT"]];
+const FEEROW = [["m", "Покупка MINT"], ["frog", "Продажа LILY"], ["gold", "Покупка GAXO"], ["pup", "Покупка PUP"], ["fire", "Продажа WICK"], ["neon", "Покупка NEON"], ["boo", "Покупка BOO"], ["violet", "Продажа VIO"], ["mint", "Покупка MINT"]];
 const SLOT_X = [417, 779, 1141, 1503];
 const b2Slots = Array.from({ length: 8 }, (_, i) => [0, 1, 2].map((r) => {
   const [k, n] = FEEROW[(i + r * 3) % FEEROW.length];
@@ -318,7 +322,7 @@ function runB3(t, a, b) {
 // обрезков баннеров, все одного стиля и целиком в кадре
 const ORB = [
   wg(B, 260, 112, `<div class="row" style="justify-content:space-between"><span style="font:800 18px Nunito">SOL</span><span class="chip up" style="background:rgba(46,232,122,.14)">+2.07%</span></div><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:4px"><span class="num tn" style="font-size:24px">$120.48</span>${spark(SOL.slice(12), 100, 34, "#2EE87A")}</div>`),
-  wg(B, 320, 92, `<div class="row">${logo("mcat", 56)}<div style="flex:1"><div style="font:800 19px Nunito">Moon Cat</div><div class="lb" style="font-size:14px">$MCAT · 61% до биржи</div></div><span class="up" style="font:800 17px Nunito">+38%</span></div>`),
+  wg(B, 320, 92, `<div class="row">${logo("m", 56)}<div style="flex:1"><div style="font:800 19px Nunito">Mintly</div><div class="lb" style="font-size:14px">$MINT · 61% до биржи</div></div><span class="up" style="font:800 17px Nunito">+38%</span></div>`),
   wg(B, 270, 120, `<div style="position:absolute;inset:0;border-radius:26px;background:${GRAD}"></div><div style="position:relative;color:#fff"><div style="font:500 14px Onest;opacity:.85">Баланс</div><div style="font:800 32px Nunito" class="tn">$1 284.50</div><div style="font:600 13px Onest;opacity:.9;margin-top:4px">12.4 SOL · 8 420 GRAM</div></div>`),
   wg(B, 236, 92, `<div class="row"><div style="width:50px;height:50px;border-radius:16px;background:#fff;display:flex;align-items:center;justify-content:center">${ICO.bolt("#0A0A0F", 24)}</div><div><div class="lb" style="font-size:14px">Подтверждено за</div><div class="num tn" style="font-size:23px">0.4 с</div></div></div>`),
   wg(B, 320, 88, `<div class="row">${logo("pup", 50)}<div style="flex:1"><div style="font:800 17px Nunito">Купил 2.1M PUP</div><div class="lb" style="font-size:13px">за 3 GRAM · комиссия 0%</div></div>${ICO.check()}</div>`),
@@ -335,7 +339,7 @@ const C_GROUPS = ["П", "ро", "ст", "о."], C_GAPS = [96, 170, 70], C_TOP = 
 // линии по высоте капители и базовой линии Nunito при line-height 1
 const C_CAP = C_TOP + 0.124 * C_SIZE, C_BASE = C_TOP + 0.829 * C_SIZE;
 const cBand = $(`<div class="abs" style="left:0;top:${C_TOP - 40}px;width:1920px;height:${C_SIZE + 90}px;overflow:hidden"></div>`); C.appendChild(cBand);
-const cGroups = C_GROUPS.map((g) => { const e = $(`<div class="abs" style="left:0;top:40px;font:800 ${C_SIZE}px/1 'Nunito';letter-spacing:-0.03em;color:#FFFFFF;white-space:nowrap">${g}</div>`); cBand.appendChild(e); return e; });
+const cGroups = C_GROUPS.map((g) => { const e = $(`<div class="abs grad" style="left:0;top:40px;font:800 ${C_SIZE}px/1 'Nunito';letter-spacing:-0.03em;color:#FFFFFF;white-space:nowrap">${g}</div>`); cBand.appendChild(e); return e; });
 const cH = [C_CAP, C_BASE].map((y) => { const g = $(`<div class="guide" style="background:rgba(255,255,255,.2);left:0;top:${y}px;width:1920px;height:1px;transform-origin:50% 50%"></div>`); C.appendChild(g); return g; });
 // у каждой группы два края; у части краёв — вторая линия рядом, как в референсе
 const cV = [];
@@ -345,36 +349,57 @@ C_GROUPS.forEach((_, gi) => [0, 1].forEach((side) => {
 }));
 const cDots = [];
 C_GROUPS.forEach((_, gi) => [0, 1].forEach((side) => [C_CAP, C_BASE].forEach((y) => { const d = $(`<div class="abs" style="left:0;top:0;width:7px;height:7px;background:#FFFFFF"></div>`); d.gi = gi; d.side = side; d.y = y; C.appendChild(d); cDots.push(d); })));
-const cAlt = $(`<div class="c" style="top:40px;font:800 ${C_SIZE}px/1 'Nunito';letter-spacing:-0.03em;color:#FFFFFF;white-space:nowrap">Быстро.</div>`); cBand.appendChild(cAlt);
+const cAlt = $(`<div class="c" style="top:40px;font:800 ${C_SIZE}px/1 'Nunito';letter-spacing:-0.03em;color:#FFFFFF;white-space:nowrap"><span class="grad" style="display:inline-block">Быстро.</span></div>`); cBand.appendChild(cAlt);
 const cLogo = mLogo(C, { F: 132, tail: "intly.company", base: 540 + 0.705 * 150 / 2, fill: "#FFFFFF,#E3E7ED,#A7AFBA", text: "color:#FFFFFF", glow: "drop-shadow(0 12px 36px rgba(140,180,255,.22))" });
 
 // ============ D · ВОЗМОЖНОСТИ 19.5–37.1 ============
 const D = scene(19.5, 37.15);
 // D1 — запуск: настоящий экран создания токена, по буквам
-const CREATE = Array.from({ length: 20 }, (_, i) => "create-" + String(i).padStart(2, "0"));
-const d1Scr = screen(frames(CREATE) + toast("Moon Cat запущен", "MCAT · в сети за 1.2 с") + `<div class="tap"></div>`);
+const CREATE = Array.from({ length: 18 }, (_, i) => "create-" + String(i).padStart(2, "0"));
+const d1Scr = screen(frames(CREATE) + toast("Mintly запущен", "MINT · в сети за 1.2 с") + `<div class="tap"></div>`);
 const d1Wrap = $(`<div class="abs" style="inset:0"></div>`); D.appendChild(d1Wrap);
 const d1Phone = new Phone3D(d1Wrap, d1Scr);
 const d1T1 = line(D, "Создай свой *мемкоин*", { top: 364, size: 80, weight: 600 }); d1T1.style.left = "930px"; d1T1.style.textAlign = "left";
 const d1T2 = line(D, "за несколько секунд.", { top: 468, size: 80, weight: 600, color: "#8E8E99" }); d1T2.style.left = "930px"; d1T2.style.textAlign = "left";
-const d1Card = wg(D, 440, 150, `<div class="row">${logo("mcat", 62)}<div style="flex:1"><div style="font:800 22px Nunito">Moon Cat запущен</div><div class="lb" style="font-size:14px">$MCAT · в сети за 1.2 с</div></div><span class="chip up" style="background:rgba(46,232,122,.14)">В СЕТИ</span></div>
+const d1Card = wg(D, 440, 150, `<div class="row">${logo("m", 62)}<div style="flex:1"><div style="font:800 22px Nunito">Mintly запущен</div><div class="lb" style="font-size:14px">$MINT · в сети за 1.2 с</div></div><span class="chip up" style="background:rgba(46,232,122,.14)">В СЕТИ</span></div>
   <div style="display:flex;justify-content:space-between;margin-top:16px" class="lb"><span style="font-size:13px">Кривая бондинга</span><span class="tn d1pct" style="font:800 14px Nunito;color:#FFFFFF">0%</span></div>
   <div style="height:8px;border-radius:4px;background:rgba(255,255,255,.1);margin-top:7px;overflow:hidden"><div class="d1bar" style="height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#8E8E99,#fff)"></div></div>`);
 // D2 — торговля: страница токена, лист покупки, нажатие
-const d2Scr = screen(frames(["token", "buy", "buy5"]) + toast("Куплено 1 733 708 MCAT", "за 5 GRAM · комиссия платформы 0%") + `<div class="tap"></div>`);
+const d2Scr = screen(frames(["token"]) + `<div class="chartA" style="position:absolute;left:0;top:264px;width:393px;height:360px"></div>` + frames(["buy", "buy5"]) + toast("Куплено 7 291 338 MINT", "за 5 GRAM · комиссия платформы 0%") + `<div class="tap"></div>`);
 const d2Wrap = $(`<div class="abs" style="inset:0"></div>`); D.appendChild(d2Wrap);
 const d2Phone = new Phone3D(d2Wrap, d2Scr);
 const d2T1 = line(D, "Торгуй с", { top: 236, size: 92, weight: 600 }); d2T1.style.left = "250px"; d2T1.style.textAlign = "left";
 const d2Zero = $(`<div class="abs accent" style="left:240px;top:330px;font:800 290px/1 'Nunito';letter-spacing:-0.05em;padding-right:20px">0%</div>`); D.appendChild(d2Zero);
 const d2T2 = line(D, "комиссией.", { top: 616, size: 92, weight: 600, color: "#8E8E99" }); d2T2.style.left = "250px"; d2T2.style.textAlign = "left";
-const d2Card = wg(D, 470, 150, `<div class="lb" style="font-size:14px;display:flex;justify-content:space-between"><span>Чек · MCAT</span><span>только что</span></div>
+const d2Card = wg(D, 470, 150, `<div class="lb" style="font-size:14px;display:flex;justify-content:space-between"><span>Чек · MINT</span><span>только что</span></div>
   ${[["Ты заплатил", "5 GRAM"], ["Комиссия платформы", "0.00 GRAM"]].map(([a, b], i) => `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:${i ? 8 : 12}px;font:600 17px Onest"><span style="color:#8E8E99">${a}</span><span style="font:800 19px Nunito;${i ? "color:#2EE87A" : ""}" class="tn">${b}${i ? ` <span style="vertical-align:-3px">${ICO.check("#2EE87A", 17)}</span>` : ""}</span></div>`).join("")}`);
+// свечи нового токена (в единицах 1e-8 $): все зелёные, разной длины и с разными тенями
+const CND = [[60, 70, 74, 57], [70, 86, 89, 68], [86, 90, 97, 83], [90, 108, 110, 87], [108, 117, 125, 106]];
+const CH_W = 393, CH_H = 360, PLOT_R = 312, PY0 = 18, PY1 = 318, VMIN = 50, VMAX = 178, UP = "#00E96B";
+const cy = (v) => PY1 - (v - VMIN) / (VMAX - VMIN) * (PY1 - PY0);
+// g — рост шестой свечи 0…1: тело тянется вверх, тень обгоняет его, цена-метка едет следом
+function chartSVG(g) {
+  const cw = 26, x0 = 138, bw = 13;
+  let h = "";
+  for (let v = 60; v <= 170; v += 20) h += `<line x1="0" x2="${PLOT_R}" y1="${cy(v).toFixed(1)}" y2="${cy(v).toFixed(1)}" stroke="rgba(255,255,255,.06)"/><text x="${PLOT_R + 6}" y="${(cy(v) + 4).toFixed(1)}" fill="#8E8E99" font-family="Onest" font-size="10">$0.00000${String(v).padStart(3, "0").slice(0, 3).replace(/^0/, "0")}</text>`;
+  [40, 118, 196, 274].forEach((x) => { h += `<line x1="${x}" x2="${x}" y1="0" y2="${PY1 + 10}" stroke="rgba(255,255,255,.05)"/>`; });
+  ["12:41", "12:43", "12:45"].forEach((tx, i) => { h += `<text x="${118 + i * 78}" y="${PY1 + 30}" fill="#8E8E99" font-family="Onest" font-size="11" text-anchor="middle">${tx}</text>`; });
+  const all = g > 0 ? [...CND, [117, 117 + 46 * g, 117 + 52 * E.out(Math.min(1, g * 1.15)), 115]] : CND;
+  all.forEach(([o, c, hi, lo], i) => {
+    const x = x0 + i * cw, yt = cy(Math.max(o, c)), yb = cy(Math.min(o, c));
+    h += `<line x1="${x}" x2="${x}" y1="${cy(hi).toFixed(1)}" y2="${cy(lo).toFixed(1)}" stroke="${UP}" stroke-width="1.6"/><rect x="${x - bw / 2}" y="${yt.toFixed(1)}" width="${bw}" height="${Math.max(2, yb - yt).toFixed(1)}" rx="1.5" fill="${UP}"/>`;
+  });
+  const last = all[all.length - 1][1], ly = cy(last);
+  h += `<line x1="0" x2="${PLOT_R}" y1="${ly.toFixed(1)}" y2="${ly.toFixed(1)}" stroke="${UP}" stroke-width="1" stroke-dasharray="4 4" opacity=".8"/>
+    <rect x="${PLOT_R + 2}" y="${(ly - 10).toFixed(1)}" width="${CH_W - PLOT_R - 4}" height="20" rx="5" fill="${UP}"/><text x="${PLOT_R + 6}" y="${(ly + 4).toFixed(1)}" fill="#04210F" font-family="Onest" font-weight="700" font-size="10">$0.00000${Math.round(last).toString().padStart(3, "0")}</text>`;
+  return `<svg width="${CH_W}" height="${CH_H}" viewBox="0 0 ${CH_W} ${CH_H}">${h}</svg>`;
+}
 // D3 — скорость
-const d3 = $(`<div class="c" style="top:340px;font:700 108px/1.08 'Nunito';letter-spacing:-0.035em;color:#FFFFFF"><div id="d3a" style="display:inline-block">Самые быстрые транзакции</div><br/><div id="d3b" style="display:inline-block" class="accent">в мире.</div></div>`); D.appendChild(d3);
+const d3 = $(`<div class="c" style="top:340px;font:700 108px/1.08 'Nunito';letter-spacing:-0.035em;color:#FFFFFF"><div id="d3a" class="grad" style="display:inline-block">Самые быстрые транзакции</div><br/><div id="d3b" style="display:inline-block" class="accent">в мире.</div></div>`); D.appendChild(d3);
 const d3Trails = [0, 1, 2].map(() => { const tr = $(`<div class="c" style="top:340px;font:700 108px/1.08 'Nunito';letter-spacing:-0.035em;color:#55585F;opacity:0">Самые быстрые транзакции</div>`); D.appendChild(tr); return tr; });
 const d3Lines = Array.from({ length: 7 }, (_, i) => { const l = $(`<div class="abs" style="left:0;top:${300 + i * 46}px;width:${260 + (i % 3) * 140}px;height:3px;border-radius:2px;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.5),rgba(255,255,255,0))"></div>`); D.appendChild(l); return l; });
 const d3Card = wg(D, 520, 104, `<div class="row"><div style="width:62px;height:62px;border-radius:19px;background:#fff;display:flex;align-items:center;justify-content:center;flex:none">${ICO.bolt("#0A0A0F", 30)}</div>
-  <div style="flex:1"><div style="font:800 21px Nunito" class="d3st">Отправка…</div><div class="lb" style="font-size:14px">Покупка $MCAT на 5 GRAM</div></div>
+  <div style="flex:1"><div style="font:800 21px Nunito" class="d3st">Отправка…</div><div class="lb" style="font-size:14px">Покупка $MINT на 5 GRAM</div></div>
   <div class="row" style="gap:10px"><div class="d3ok" style="opacity:0;width:34px;height:34px;border-radius:50%;background:rgba(46,232,122,.14);display:flex;align-items:center;justify-content:center">${ICO.check("#2EE87A", 20)}</div><div class="num tn d3tm" style="font-size:30px;min-width:96px;text-align:right">0.00 с</div></div></div>`, "0 24px");
 d3Card.style.display = "flex"; d3Card.style.alignItems = "center";
 // D4 — кошелёк
@@ -388,7 +413,7 @@ const d4Mintie = $(`<div class="abs" style="left:430px;top:-118px;width:140px;he
 const d4T1 = line(D, "Твой кошелёк.", { top: 410, size: 96, weight: 600 }); d4T1.style.left = "1130px"; d4T1.style.textAlign = "left";
 const d4T2 = line(D, "Прямо в *Telegram.*", { top: 530, size: 64, weight: 500, color: "#8E8E99" }); d4T2.style.left = "1134px"; d4T2.style.textAlign = "left";
 // D5 — печать
-const d5 = $(`<div class="c" style="top:450px;font:600 120px/1 'Onest';letter-spacing:-0.035em;color:#FFFFFF"><span id="d5t"></span><span id="d5c" style="display:inline-block;width:6px;height:110px;background:#fff;margin-left:6px;vertical-align:-12px"></span></div>`); D.appendChild(d5);
+const d5 = $(`<div class="c" style="top:450px;font:600 120px/1 'Onest';letter-spacing:-0.035em;color:#FFFFFF"><span id="d5t" class="grad"></span><span id="d5c" style="display:inline-block;width:6px;height:110px;background:#fff;margin-left:6px;vertical-align:-12px"></span></div>`); D.appendChild(d5);
 
 // ============ E · ФИНАЛ 37–45 ============
 const Esc = scene(37, 45);
@@ -413,7 +438,13 @@ eTag.spans.forEach((w) => { if (w.classList.contains("accent")) w.style.backgrou
 const fade = document.getElementById("fade");
 const q1 = (el, s) => el.querySelector(s);
 
-window.renderAt = (t) => {
+// ролик длится 55 с, а разметка ниже — в прежних 45 с: всё идёт в 55/45 раза медленнее
+const STRETCH = 55 / 45;
+window.renderAt = (tReal) => renderScene(tReal / STRETCH);
+const absX = (el) => { let x = 0; for (let e = el; e && e !== root; e = e.offsetParent) x += e.offsetLeft; return x; };
+function renderScene(t) {
+  bgGrad.style.backgroundPosition = `${(50 + 50 * Math.sin(t * 0.21)).toFixed(2)}% ${(50 + 50 * Math.cos(t * 0.17)).toFixed(2)}%`;
+  bgGrad.style.transform = `rotate(${(Math.sin(t * 0.09) * 8).toFixed(2)}deg)`;
   // display, а не visibility: дети с visibility:visible просвечивали бы сквозь скрытую сцену
   scenes.forEach(({ el, a, b }) => { el.style.display = t >= a && t < b ? "block" : "none"; el.style.visibility = "visible"; });
   bgBlobs.forEach((b, i) => {
@@ -510,13 +541,13 @@ window.renderAt = (t) => {
       if (t < 22.35) {
         let fi = 0, ft = 0, fd = 0.25;
         if (t >= 20.75) { fi = 1; ft = 20.75; }
-        if (t >= 21.05) { const n = Math.min(7, Math.floor((t - 21.05) / 0.1)); fi = 2 + n; ft = 21.05 + n * 0.1; fd = 0.06; }
-        if (t >= 21.95) { const n = Math.min(3, Math.floor((t - 21.95) / 0.11)); fi = 10 + n; ft = 21.95 + n * 0.11; fd = 0.06; }
+        if (t >= 21.05) { const n = Math.min(5, Math.floor((t - 21.05) / 0.12)); fi = 2 + n; ft = 21.05 + n * 0.12; fd = 0.07; }
+        if (t >= 21.95) { const n = Math.min(3, Math.floor((t - 21.95) / 0.11)); fi = 8 + n; ft = 21.95 + n * 0.11; fd = 0.06; }
         blendFrame(d1Scr, fi, prog(t, ft, ft + fd));
       } else {
         const im = d1Scr.querySelectorAll("img.f");
-        im.forEach((x, j) => { x.style.opacity = j === 13 || j === 19 ? 1 : 0; x.style.transform = "none"; x.style.zIndex = j === 13 ? 2 : 1; });
-        im[13].style.transform = `translateY(${(-128 * sc).toFixed(2)}px)`; im[19].style.transform = `translateY(${(128 * (1 - sc)).toFixed(2)}px)`;
+        im.forEach((x, j) => { x.style.opacity = j === 11 || j === 17 ? 1 : 0; x.style.transform = "none"; x.style.zIndex = j === 11 ? 2 : 1; });
+        im[11].style.transform = `translateY(${(-128 * sc).toFixed(2)}px)`; im[17].style.transform = `translateY(${(128 * (1 - sc)).toFixed(2)}px)`;
       }
       const tp = q1(d1Scr, ".tap"); tp.style.left = "196px"; tp.style.top = "671px"; tap(tp, t, 22.85);
       const ts = q1(d1Scr, ".toastA"), tk = E.outQ(prog(t, 23.1, 23.5)); ts.style.opacity = tk; ts.style.transform = `translateY(${(1 - tk) * -24}px)`;
@@ -525,23 +556,25 @@ window.renderAt = (t) => {
       at(d1Card, 1150, 712, { o: ck * (1 - cq), y: (1 - ck) * 50, s: 0.92 + 0.08 * ck, b: (1 - ck) * 12 + cq * 12 });
       const pc = Math.round(61 * E.out(prog(t, 23.35, 24.2))); q1(d1Card, ".d1pct").textContent = pc + "%"; q1(d1Card, ".d1bar").style.width = pc + "%"; }
     // D2 24.2–28.7 — график, лист покупки, нажатие, тост
-    { const p2 = E.out(prog(t, 24.15, 25.5)), o2 = E.io(prog(t, 28.0, 28.7));
+    { const p2 = E.out(prog(t, 24.15, 25.5)), o2 = E.io(prog(t, 28.3, 28.85));
       d2Phone.pose({ x: lerp(1360, 1520, o2), y: lerp(1500, 545, p2) + Math.sin(t * 0.9 + 1) * 6 + o2 * 120, s: 1.13, rx: lerp(18, 4, p2), ry: lerp(-30, -17, p2) + Math.sin(t * 0.55 + 1) * 2.5 - o2 * 14, rz: lerp(-4, -1, p2), o: (t > 24.1 ? 1 : 0) * (1 - o2) });
       d2Wrap.style.filter = o2 > 0.01 ? `blur(${(o2 * 12).toFixed(1)}px)` : "none";
       const imgs = d2Scr.querySelectorAll("img.f");
-      const sheet = E.out(prog(t, 25.9, 26.35)), back = E.io(prog(t, 27.65, 28.05));
+      const sheet = E.out(prog(t, 25.9, 26.35)), back = E.io(prog(t, 27.4, 27.75));
       imgs[0].style.opacity = 1;
+      // после покупки свеча растёт плавно, как живая свеча в приложении
+      const grow = E.io(prog(t, 27.6, 28.3)), chEl = q1(d2Scr, ".chartA");
+      if (chEl.g !== grow) { chEl.g = grow; chEl.innerHTML = chartSVG(grow); }
       // сумма «5» появляется растворением, а не скачком
       const five = E.sine(prog(t, 26.66, 26.84));
       imgs[1].style.opacity = t < 26.84 ? sheet : 0; imgs[2].style.opacity = five * (1 - back);
       [imgs[1], imgs[2]].forEach((im) => { const k = im === imgs[1] ? sheet : 1 - back; im.style.clipPath = `inset(${((1 - k) * 60).toFixed(1)}% 0 0 0)`; im.style.transform = `translateY(${(1 - k) * 60}px)`; });
       const tp = q1(d2Scr, ".tap"); if (t < 26.9) { tp.style.left = "153px"; tp.style.top = "462px"; tap(tp, t, 26.5); } else { tp.style.left = "196px"; tp.style.top = "742px"; tap(tp, t, 27.0); }
-      const ts = q1(d2Scr, ".toastA"), tk = E.outQ(prog(t, 27.25, 27.65)) * (1 - E.io(prog(t, 28.1, 28.5))); ts.style.opacity = tk; ts.style.transform = `translateY(${(1 - tk) * -24}px)`;
-      words(d2T1, t, 24.55, { out: 28.0 }); words(d2T2, t, 25.35, { out: 28.05 });
+      const ts = q1(d2Scr, ".toastA"), tk = E.outQ(prog(t, 27.25, 27.65)) * (1 - E.io(prog(t, 28.15, 28.5))); ts.style.opacity = tk; ts.style.transform = `translateY(${(1 - tk) * -24}px)`;
+      words(d2T1, t, 24.55, { out: 28.15 }); words(d2T2, t, 25.35, { out: 28.2 });
       const zk = E.outQ(prog(t, 24.9, 25.8)), zq = E.io(prog(t, 28.0, 28.6));
       S(d2Zero, { o: zk * (1 - zq), y: (1 - zk) * 40, s: 0.94 + 0.06 * zk + zq * 0.05, b: (1 - zk) * 16 + zq * 14 });
-      d2Zero.style.backgroundPosition = `${(t * 30) % 200}% 0`;
-      const ck = E.outQ(prog(t, 27.3, 28.0)), cq = E.io(prog(t, 28.0, 28.6));
+            const ck = E.outQ(prog(t, 27.3, 28.0)), cq = E.io(prog(t, 28.0, 28.6));
       at(d2Card, 485, 862, { o: ck * (1 - cq), y: (1 - ck) * 40, b: (1 - ck) * 12 + cq * 12, s: 0.94 + 0.06 * ck }); }
     // D3 28.6–31.7 — строка влетает со шлейфом, ниже — сделка за 0.4 с
     { const k = E.outQ(prog(t, 28.65, 29.55)), q = E.io(prog(t, 31.1, 31.7));
@@ -569,7 +602,7 @@ window.renderAt = (t) => {
       const seq = [["Запускай", 34.8, 35.55], ["Торгуй", 35.6, 36.3], ["Взлетай", 36.35, 37.15]];
       const cur = seq.find(([, a, b]) => t >= a && t < b);
       d5.style.opacity = t >= 34.8 ? 1 : 0;
-      if (cur) { const n = Math.floor(clamp((t - cur[1]) * 20, 0, cur[0].length)); el.textContent = cur[0].slice(0, n); el.className = cur[0] === "Взлетай" ? "accent" : ""; }
+      if (cur) { const n = Math.floor(clamp((t - cur[1]) * 20, 0, cur[0].length)); el.textContent = cur[0].slice(0, n); el.className = cur[0] === "Взлетай" ? "accent" : "grad"; }
       c.style.opacity = Math.floor(t * 3) % 2 ? 1 : 0.15; }
   }
   // ---- E ----
@@ -587,6 +620,13 @@ window.renderAt = (t) => {
     words(eTag, t, 40.8, { stag: 0.14 });
   }
   fade.style.opacity = Math.max(E.sine(prog(t, 44.0, 45)), 1 - prog(t, 0, 0.4));
-};
+  // градиент букв бежит по всей строке, а не начинается заново в каждом слове
+  const gp = (t * 140) % 1800;
+  document.querySelectorAll(".grad,.accent").forEach((el) => {
+    if (el.offsetParent === null) return;
+    if (el.gx == null || el.gt !== el.textContent) { el.gx = absX(el); el.gt = el.textContent; }
+    el.style.backgroundPosition = `${(gp - el.gx).toFixed(1)}px 0`;
+  });
+}
 
 Promise.all(["800 20px Nunito", "700 20px Nunito", "500 20px Onest", "600 20px Onest", "700 20px Onest"].map((f) => document.fonts.load(f, "AБВabcабв0123$%"))).then(() => document.fonts.ready).then(() => Promise.all([...document.images].map((i) => (i.complete ? 1 : new Promise((r) => { i.onload = i.onerror = r; }))))).then(() => { window.renderAt(0); window.ready = true; });

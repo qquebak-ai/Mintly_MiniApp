@@ -32,16 +32,13 @@ const ряд = (k, name, ticker, mins, price, change, raised, holders, vol, tx) 
     graduated: false, holders, vol24_ton: vol, change24: change, tx24: tx, logo_url: `https://logos.test/${k}.png`, updated_at: new Date().toISOString() }] });
 // сделки кривой: рост с откатами — график на странице токена строится из них
 const ГАЗ = Number(process.env.GAS || 0);
-const СДЕЛКИ = (() => { const out = []; let сид = 11, t = Math.floor(Date.now() / 1000) - 3 * 3600;
-  for (let i = 0; i < 140; i++) { сид = (сид * 16807) % 2147483647; const r = сид / 2147483647; t += 40 + Math.floor(r * 70);
-    const продажа = r < 0.3; const тон = BigInt(Math.floor((2 + r * 9 + i * 0.05) * 1e9));
-    out.push(продажа ? { utime: t, success: true, in_msg: { op_code: "0x7362d09c", value: "50000000" }, out_msgs: [{ value: String(тон / 2n) }] }
-      : { utime: t, success: true, in_msg: { op_code: "0x42555921", value: String(тон + 300000000n) }, out_msgs: [] }); }
-  return out.reverse(); })();
+// свежий токен: пять покупок по минуте — пять зелёных свечей разной высоты
+const СДЕЛКИ = (() => { const t0 = Math.floor(Date.now() / 60000) * 60 - 5 * 60; const тон = [1.5, 3.2, 1.1, 4.4, 2.3];
+  return тон.map((v, i) => ({ utime: t0 + i * 60 + 20, success: true, in_msg: { op_code: "0x42555921", value: String(BigInt(Math.round(v * 1e9)) + 300000000n) }, out_msgs: [] })).reverse(); })();
 // резерв кривой = сумма сделок, иначе последняя свеча обрывается к цене из состояния
 const РЕЗЕРВ = СДЕЛКИ.slice().reverse().reduce((r, x) => x.in_msg.op_code === "0x42555921" ? r + Number(x.in_msg.value) - ГАЗ : Math.max(0, r - Number(x.out_msgs[0].value)), 0);
 export const токены = [
-  ряд("mcat", "Moon Cat", "MCAT", 2, 0.0000214, 38.2, 612, 1284, 9400, 3120),
+  ряд("m", "Mintly", "MINT", 2, 0.0000214, 38.2, 612, 1284, 9400, 3120),
   ряд("frog", "Lily Frog", "LILY", 9, 0.0000097, 12.6, 344, 702, 4100, 1460),
   ряд("pup", "Pixel Pup", "PUP", 17, 0.0000151, 24.9, 488, 931, 6200, 2210),
   ряд("boo", "Boo", "BOO", 26, 0.0000058, -3.1, 190, 388, 1500, 640),

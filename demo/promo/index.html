@@ -17,7 +17,9 @@ body{font-family:'Onest',system-ui,sans-serif;color:#fff;-webkit-font-smoothing:
 .scene{position:absolute;inset:0;overflow:hidden;visibility:hidden}
 .c{position:absolute;left:0;right:0;text-align:center}
 .w{display:inline-block;will-change:transform,filter,opacity}
-.accent{background:linear-gradient(95deg,#FFFFFF,#D5DAE1 50%,#8F96A3);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* переливы цветами фона: размер шага общий, позицию задаёт ролик — градиент тянется через всю строку */
+.grad{background-image:linear-gradient(100deg,#FFFFFF 0%,#FFFFFF 14%,#9CC0FF 30%,#5A8CFF 42%,#FFFFFF 58%,#FFFFFF 72%,#B5D0FF 86%,#FFFFFF 100%);background-size:1800px 100%;-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:.14em;margin-bottom:-.14em}
+.accent{background-image:linear-gradient(100deg,#8DB2FF 0%,#3F78FF 22%,#BFD6FF 46%,#2F6BFF 70%,#8DB2FF 100%);background-size:1800px 100%;-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:.14em;margin-bottom:-.14em}
 .blob{position:absolute;border-radius:50%;filter:blur(90px)}
 .fog{position:absolute;left:-10%;right:-10%;bottom:-140px;height:520px}
 .fog span{position:absolute;border-radius:50%;filter:blur(60px)}

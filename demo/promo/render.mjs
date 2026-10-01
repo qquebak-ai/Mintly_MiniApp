@@ -2,7 +2,7 @@
 // node render.mjs frames 0,90 — кадры 0…89 в 2× для суперсэмплинга.
 import { chromium } from "playwright-core";
 import { mkdirSync, existsSync } from "fs";
-const FPS = 30, DUR = 45, N = FPS * DUR;
+const FPS = 30, DUR = 55, N = FPS * DUR;
 const mode = process.argv[2], arg = process.argv[3] || "";
 const PR = mode === "frames" ? 2 : 1;
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
