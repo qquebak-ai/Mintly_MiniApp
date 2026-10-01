@@ -102,6 +102,8 @@ function screen(inner) {
 }
 const frames = (names) => names.map((n) => `<img class="f" src="assets/scr/${n}.png"/>`).join("");
 function showFrame(scr, i) { scr.querySelectorAll("img.f").forEach((im, j) => { im.style.opacity = j === i ? 1 : 0; }); }
+// i — текущий кадр, k — сколько он уже проявился поверх предыдущего
+function blendFrame(scr, i, k) { scr.querySelectorAll("img.f").forEach((im, j) => { im.style.transform = "none"; im.style.zIndex = j === i ? 2 : 1; im.style.opacity = j === i ? E.sine(k) : j === i - 1 && k < 1 ? 1 : 0; }); }
 const toast = (title, sub) => `<div class="toastA"><i>${ICO.check("#2EE87A", 17)}</i><div>${title}${sub ? `<small>${sub}</small>` : ""}</div></div>`;
 // касание пальцем: круг сжимается и гаснет
 function tap(el, t, a) { const k = prog(t, a, a + 0.45); el.style.opacity = k > 0 && k < 1 ? (1 - k) * 0.9 : 0; el.style.transform = `scale(${0.6 + 0.6 * E.out(k)})`; }
@@ -300,10 +302,10 @@ const Esc = scene(37, 45, "radial-gradient(120% 90% at 50% 18%,#3FA9FF 0%,#1565C
 const eRays = [-28, -14, -3, 9, 20, 33].map((a, i) => { const r = $(`<div class="abs" style="left:${700 + i * 90}px;top:-200px;width:${120 + (i % 3) * 60}px;height:1500px;transform-origin:50% 0;background:linear-gradient(180deg,rgba(210,240,255,.42),rgba(210,240,255,0) 75%);filter:blur(28px);mix-blend-mode:screen"></div>`); r.a = a; Esc.appendChild(r); return r; });
 // фон финала — стена мелких стеклянных пузырей, по которой идёт 3D-волна
 const eBubbles = [];
-for (let r = 0; r < 24; r++) for (let c = 0; c < 42; c++) {
-  const sd = r * 42 + c, sz = 6 + rnd(sd, 1) * 9;
+for (let r = 0; r < 30; r++) for (let c = 0; c < 52; c++) {
+  const sd = r * 52 + c, sz = 6 + rnd(sd, 1) * 9;
   const b = $(`<div class="abs" style="left:0;top:0;width:${sz.toFixed(1)}px;height:${sz.toFixed(1)}px;border-radius:50%;border:1px solid rgba(225,246,255,.7);background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.95) 0 14%,rgba(255,255,255,.18) 34%,rgba(160,215,255,.10) 62%,rgba(225,246,255,.45) 100%);box-shadow:0 0 6px rgba(170,225,255,.25)"></div>`);
-  b.bx = -60 + c * 49 + (rnd(sd, 2) - 0.5) * 30 + (r % 2) * 24; b.by = -40 + r * 50 + (rnd(sd, 3) - 0.5) * 28; b.sz = sz;
+  b.bx = -300 + c * 49 + (rnd(sd, 2) - 0.5) * 30 + (r % 2) * 24; b.by = r * 50 + (rnd(sd, 3) - 0.5) * 28; b.sz = sz;
   Esc.appendChild(b); eBubbles.push(b);
 }
 // логотип и имя одной строкой по общей оси — раньше имя сидело ниже знака
@@ -401,12 +403,20 @@ window.renderAt = (t) => {
     { const p1 = E.out(prog(t, 19.55, 21.0)), o1 = E.io(prog(t, 23.7, 24.45));
       d1Phone.pose({ x: lerp(640, 470, o1), y: lerp(1450, 560, p1) + Math.sin(t * 0.9) * 6 + o1 * 120, s: 0.92, rx: lerp(18, 4, p1), ry: lerp(30, 17, p1) + Math.sin(t * 0.55) * 2.5 + o1 * 14, rz: lerp(4, 1, p1), o: 1 - o1 });
       d1Wrap.style.filter = o1 > 0.01 ? `blur(${(o1 * 12).toFixed(1)}px)` : "none";
-      let fi = 0;
-      if (t >= 20.75) fi = 1;
-      if (t >= 21.05) fi = 2 + Math.min(7, Math.floor((t - 21.05) / 0.1));
-      if (t >= 21.95) fi = 10 + Math.min(3, Math.floor((t - 21.95) / 0.11));
-      if (t >= 22.4) fi = 14 + Math.min(5, Math.floor((t - 22.4) / 0.05));
-      showFrame(d1Scr, fi);
+      // кадры набора сменяются через короткое растворение, а прокрутка к кнопке —
+      // настоящим сдвигом снимка: раньше кадры прыгали без перехода
+      const sc = E.io(prog(t, 22.35, 22.8));
+      if (t < 22.35) {
+        let fi = 0, ft = 0, fd = 0.25;
+        if (t >= 20.75) { fi = 1; ft = 20.75; }
+        if (t >= 21.05) { const n = Math.min(7, Math.floor((t - 21.05) / 0.1)); fi = 2 + n; ft = 21.05 + n * 0.1; fd = 0.06; }
+        if (t >= 21.95) { const n = Math.min(3, Math.floor((t - 21.95) / 0.11)); fi = 10 + n; ft = 21.95 + n * 0.11; fd = 0.06; }
+        blendFrame(d1Scr, fi, prog(t, ft, ft + fd));
+      } else {
+        const im = d1Scr.querySelectorAll("img.f");
+        im.forEach((x, j) => { x.style.opacity = j === 13 || j === 19 ? 1 : 0; x.style.transform = "none"; x.style.zIndex = j === 13 ? 2 : 1; });
+        im[13].style.transform = `translateY(${(-128 * sc).toFixed(2)}px)`; im[19].style.transform = `translateY(${(128 * (1 - sc)).toFixed(2)}px)`;
+      }
       const tp = q1(d1Scr, ".tap"); tp.style.left = "196px"; tp.style.top = "671px"; tap(tp, t, 22.85);
       const ts = q1(d1Scr, ".toastA"), tk = E.outQ(prog(t, 23.1, 23.5)); ts.style.opacity = tk; ts.style.transform = `translateY(${(1 - tk) * -24}px)`;
       words(d1T1, t, 20.1, { out: 23.75 }); words(d1T2, t, 20.4, { out: 23.8 });
@@ -420,7 +430,9 @@ window.renderAt = (t) => {
       const imgs = d2Scr.querySelectorAll("img.f");
       const sheet = E.out(prog(t, 25.9, 26.35)), back = E.io(prog(t, 27.65, 28.05));
       imgs[0].style.opacity = 1;
-      imgs[1].style.opacity = t < 26.75 ? sheet : 0; imgs[2].style.opacity = t >= 26.75 ? 1 - back : 0;
+      // сумма «5» появляется растворением, а не скачком
+      const five = E.sine(prog(t, 26.66, 26.84));
+      imgs[1].style.opacity = t < 26.84 ? sheet : 0; imgs[2].style.opacity = five * (1 - back);
       [imgs[1], imgs[2]].forEach((im) => { const k = im === imgs[1] ? sheet : 1 - back; im.style.clipPath = `inset(${((1 - k) * 60).toFixed(1)}% 0 0 0)`; im.style.transform = `translateY(${(1 - k) * 60}px)`; });
       const tp = q1(d2Scr, ".tap"); if (t < 26.9) { tp.style.left = "153px"; tp.style.top = "462px"; tap(tp, t, 26.5); } else { tp.style.left = "196px"; tp.style.top = "742px"; tap(tp, t, 27.0); }
       const ts = q1(d2Scr, ".toastA"), tk = E.outQ(prog(t, 27.25, 27.65)) * (1 - E.io(prog(t, 28.1, 28.5))); ts.style.opacity = tk; ts.style.transform = `translateY(${(1 - tk) * -24}px)`;
@@ -465,7 +477,7 @@ window.renderAt = (t) => {
     eBubbles.forEach((b) => {
       // волна бежит по диагонали; ближе к зрителю пузырь крупнее и ярче
       const z = 170 * Math.sin(b.bx * 0.0055 + t * 1.5) * Math.cos(b.by * 0.0065 - t * 1.05) + 90 * Math.sin((b.bx + b.by) * 0.0042 + t * 2.0);
-      const sc = 900 / (900 - z), yy = b.by - ((t - 37) * 14) % 50;
+      const sc = 900 / (900 - z), yy = ((b.by - (t - 37) * 14) % 1500 + 1500) % 1500 - 220;
       S(b, { x: 960 + (b.bx - 960) * sc - b.sz / 2, y: 540 + (yy - 540) * sc - b.sz / 2, s: sc * (0.9 + 0.2 * (z + 260) / 520), o: clamp(0.35 + 0.55 * (z + 260) / 520) });
     });
     const ek = E.out(prog(t, 37, 37.8)); Esc.style.opacity = ek; Esc.style.filter = ek < 1 ? `blur(${((1 - ek) * 10).toFixed(1)}px)` : "none";
