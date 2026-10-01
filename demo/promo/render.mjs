@@ -12,12 +12,13 @@ await page.goto("http://127.0.0.1:8766/promo/index.html");
 await page.waitForFunction(() => window.ready === true, null, { timeout: 90000 });
 if (mode === "snap") {
   mkdirSync("snap", { recursive: true });
-  for (const t of arg.split(",").map(Number)) { await page.evaluate((t) => window.renderAt(t), t); await page.screenshot({ path: `snap/at-${String(t).padStart(5, "0")}.jpg`, type: "jpeg", quality: 85 }); }
+  for (const t of arg.split(",").map(Number)) { await page.evaluate(async (t) => { window.renderAt(t); await document.fonts.ready; await Promise.all([...document.images].map((i) => i.decode().catch(() => {}))); }, t); await page.screenshot({ path: `snap/at-${String(t).padStart(5, "0")}.jpg`, type: "jpeg", quality: 85 }); }
 } else {
   const [from, to] = arg.split(",").map(Number);
   mkdirSync("frames", { recursive: true });
   for (let f = from; f < Math.min(to, N); f++) {
-    await page.evaluate((t) => window.renderAt(t), f / FPS);
+    // ждём шрифты и картинки после каждого кадра: новый браузер на кусок иначе снимал пустые карточки
+    await page.evaluate(async (t) => { window.renderAt(t); await document.fonts.ready; await Promise.all([...document.images].map((i) => i.decode().catch(() => {}))); }, f / FPS);
     await page.screenshot({ type: "jpeg", quality: 94, path: `frames/f${String(f).padStart(4, "0")}.jpg` });
   }
 }
