@@ -19,19 +19,28 @@ body{font-family:'Onest',system-ui,sans-serif;color:#0B1E46;-webkit-font-smoothi
 .fog{position:absolute;left:-10%;right:-10%;bottom:-140px;height:520px}
 .fog span{position:absolute;border-radius:50%;filter:blur(60px)}
 .obj{position:absolute;will-change:transform,opacity}
-/* телефон */
-.phone{position:absolute;width:420px;height:868px;border-radius:70px;padding:13px;
-  background:linear-gradient(145deg,#4a4a55,#121217 40%,#2a2a33 70%,#0b0b0f);
-  box-shadow:0 60px 120px rgba(10,50,120,.35),0 0 0 2px #6b6b78 inset}
-.phone .scr{position:relative;width:100%;height:100%;border-radius:58px;overflow:hidden;background:#07060c}
-.phone .island{position:absolute;left:50%;top:14px;width:124px;height:36px;margin-left:-62px;border-radius:20px;background:#000;z-index:5}
-.phone .btn{position:absolute;width:5px;border-radius:3px;background:#3a3a44}
-.sb{position:absolute;left:0;right:0;top:0;height:54px;display:flex;justify-content:space-between;padding:18px 34px 0;color:#fff;font:700 17px 'Onest'}
-/* приложение внутри */
-.app{position:absolute;inset:0;padding:64px 18px 0;color:#F4F2FF}
-.card{border-radius:22px;background:#15131F;position:relative;overflow:hidden}
-.pill{display:inline-flex;align-items:center;gap:10px;border-radius:999px}
-.mono{font-family:ui-monospace,Menlo,monospace}
+/* экран 3D-айфона: 393×852 точки, натягивается на стекло из phone3d.js */
+.scr3{width:393px;height:852px;border-radius:55px;overflow:hidden;background:#000;color:#fff}
+.scr3 .sbar{position:absolute;left:0;right:0;top:0;height:54px;display:flex;justify-content:space-between;align-items:center;padding:4px 30px 0 46px;font:600 17px 'Onest';letter-spacing:-.01em}
+.scr3 .island{position:absolute;left:133px;top:11px;width:127px;height:37px;border-radius:20px;background:#000;box-shadow:inset 0 0 0 1px #111}
+.scr3 .appv{position:absolute;left:0;top:54px;width:393px;height:798px;overflow:hidden;background:#000}
+.scr3 .appv img.f{position:absolute;left:0;top:0;width:393px;height:798px;opacity:0}
+.scr3 .sheen{position:absolute;inset:0;background:linear-gradient(112deg,rgba(255,255,255,0) 40%,rgba(255,255,255,.075) 47%,rgba(255,255,255,0) 54%);background-size:320% 100%;pointer-events:none}
+.toastA{position:absolute;left:15px;right:14px;top:14px;height:56px;border-radius:22px;background:#17171A;border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;gap:14px;padding:0 16px 0 14px;font:800 16.5px 'Nunito';color:#fff;opacity:0}
+.toastA:before{content:"";position:absolute;left:0;top:13px;bottom:13px;width:2.5px;border-radius:2px;background:#2EE87A}
+.toastA i{width:30px;height:30px;border-radius:9px;background:rgba(46,232,122,.16);display:flex;align-items:center;justify-content:center;flex:none}
+.toastA small{display:block;font:500 12.5px 'Onest';color:#8E8E99;margin-top:1px}
+.tap{position:absolute;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(255,255,255,.35);border:2px solid rgba(255,255,255,.7);opacity:0}
+/* виджеты вокруг — белое стекло в гамме ролика */
+.wg{position:absolute;left:0;top:0;border-radius:26px;background:rgba(255,255,255,.94);box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 22px 48px rgba(18,64,150,.13),0 2px 6px rgba(18,64,150,.06);border:1px solid rgba(214,230,250,.9);color:#0B1E46;will-change:transform,opacity,filter}
+.wg .lb{font:500 15px 'Onest';color:#5B7398}
+.wg .num{font:800 26px 'Nunito';letter-spacing:-.01em}
+.wg .row{display:flex;align-items:center;gap:14px}
+.lg{border-radius:50%;flex:none;image-rendering:pixelated}
+.up{color:#0FA968}.dn{color:#E5484D}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;font:700 13px 'Onest'}
+.slot{position:absolute;left:0;top:0;overflow:hidden;border-radius:26px}
+.tn{font-variant-numeric:tabular-nums}
 #flash{position:absolute;inset:0;background:#fff;opacity:0}
 #fade{position:absolute;inset:0;background:#000;opacity:0}
 .guide{position:absolute;background:rgba(30,120,230,.22)}
@@ -43,6 +52,8 @@ body{font-family:'Onest',system-ui,sans-serif;color:#0B1E46;-webkit-font-smoothi
 <div id="root"></div>
 <div id="flash"></div>
 <div id="fade"></div>
-<script src="promo.js"></script>
+<script type="importmap">{"imports":{"three":"../showreel/node_modules/three/build/three.module.js","three/addons/":"../showreel/node_modules/three/examples/jsm/"}}</script>
+<script type="module" src="phone3d.js"></script>
+<script type="module" src="promo.js"></script>
 </body>
 </html>
