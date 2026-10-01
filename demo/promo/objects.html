@@ -1,0 +1,90 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;overflow:hidden}</style>
+<script type="importmap">{"imports":{"three":"../showreel/node_modules/three/build/three.module.js","three/addons/":"../showreel/node_modules/three/examples/jsm/"}}</script></head>
+<body><script type="module">
+// Глянцевые 3D-предметы для промо: каждый рендерится отдельно на
+// прозрачном фоне и дальше живёт в ролике картинкой.
+import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { TTFLoader } from "three/addons/loaders/TTFLoader.js";
+import { Font } from "three/addons/loaders/FontLoader.js";
+import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
+const S = 768, OBJ = new URLSearchParams(location.search).get("obj");
+const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+r.setPixelRatio(1); r.setSize(S, S); r.setClearColor(0, 0);
+r.toneMapping = THREE.NeutralToneMapping; r.toneMappingExposure = 0.95;
+document.body.appendChild(r.domElement);
+const sc = new THREE.Scene();
+sc.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture; sc.environmentIntensity = 0.55;
+const cam = new THREE.PerspectiveCamera(26, 1, 0.1, 100); cam.position.set(0, 0, 10); cam.lookAt(0, 0, 0);
+const key = new THREE.DirectionalLight("#ffffff", 1.6); key.position.set(-3, 5, 6); sc.add(key);
+const rim = new THREE.DirectionalLight("#ffd6f6", 1.0); rim.position.set(5, -2, 3); sc.add(rim);
+sc.add(new THREE.AmbientLight("#ffffff", 0.35));
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+function grad(geo, stops, axis = "y", deg = 0) {
+  geo.computeBoundingBox(); const b = geo.boundingBox; const p = geo.attributes.position, out = new Float32Array(p.count * 3), c = new THREE.Color();
+  const cols = stops.map(([h, q]) => [new THREE.Color(h), q]); const a = deg * Math.PI / 180;
+  for (let i = 0; i < p.count; i++) {
+    const nx = (p.getX(i) - b.min.x) / (b.max.x - b.min.x || 1), ny = (p.getY(i) - b.min.y) / (b.max.y - b.min.y || 1);
+    const k = clamp(axis === "y" ? ny : axis === "x" ? nx : (nx * Math.cos(a) + ny * Math.sin(a)));
+    let j = 1; while (j < cols.length - 1 && k > cols[j][1]) j++;
+    const [c0, p0] = cols[j - 1], [c1, p1] = cols[j]; c.copy(c0).lerp(c1, clamp((k - p0) / Math.max(1e-6, p1 - p0))).toArray(out, i * 3);
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(out, 3)); return geo;
+}
+const gloss = (o = {}) => new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.18, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.05, ...o });
+const add = (g, m) => { const x = new THREE.Mesh(g, m); sc.add(x); return x; };
+function shape(pts) { const s = new THREE.Shape(); pts.forEach(([x, y], i) => (i ? s.lineTo(x, y) : s.moveTo(x, y))); return s; }
+function ext(s, depth, bevel = 0.12) { const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 8, curveSegments: 32 }); g.center(); return g; }
+const PURPLE = [["#5B21E8", 0], ["#8E2DE2", 0.45], ["#E44BC8", 1]];
+const font = await new Promise((ok) => new TTFLoader().load("../showreel/assets/fonts/nunito-900.woff", (j) => ok(new Font(j))));
+function txt(str, size, depth, stops) { const g = new TextGeometry(str, { font, size, depth, curveSegments: 16, bevelEnabled: true, bevelThickness: depth * 0.2, bevelSize: size * 0.03, bevelSegments: 8 }); g.center(); return grad(g, stops, "d", 35); }
+
+if (OBJ === "coin") {
+  const g = new THREE.Group(); sc.add(g);
+  const body = new THREE.Mesh(grad(new THREE.CylinderGeometry(1.5, 1.5, 0.36, 96), PURPLE, "x"), gloss({ metalness: 0.3 })); body.rotation.x = Math.PI / 2; g.add(body);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.22, 0.07, 24, 96), new THREE.MeshPhysicalMaterial({ color: "#F3D9FF", roughness: 0.2, clearcoat: 1 })); ring.position.z = 0.2; g.add(ring);
+  const m = new THREE.Mesh(txt("M", 1.25, 0.18, [["#FFFFFF", 0], ["#F1E4FF", 1]]), gloss()); m.position.z = 0.22; g.add(m);
+  g.rotation.set(0.25, -0.55, 0.12);
+} else if (OBJ === "candleUp" || OBJ === "candleDown") {
+  const up = OBJ === "candleUp", st = up ? [["#00A34C", 0], ["#2EE87A", 0.6], ["#A8FFCB", 1]] : [["#B0102A", 0], ["#FF3B47", 0.6], ["#FF9AA2", 1]];
+  const g = new THREE.Group(); sc.add(g);
+  g.add(new THREE.Mesh(grad(new RoundedBoxGeometry(1.2, 2.6, 1.2, 8, 0.28), st), gloss()));
+  const w = new THREE.Mesh(grad(new THREE.CylinderGeometry(0.12, 0.12, 4.0, 24), st), gloss()); g.add(w);
+  g.rotation.set(0.2, 0.6, up ? -0.18 : 0.22);
+} else if (OBJ === "bolt") {
+  const b = add(ext(shape([[0.5, 2], [-0.9, -0.1], [0.05, -0.1], [-0.5, -2], [1, 0.36], [0.05, 0.36], [0.7, 2]]), 0.5, 0.14), gloss());
+  grad(b.geometry, [["#FF8A00", 0], ["#FFC93B", 0.55], ["#FFF3A6", 1]]); b.rotation.set(0.2, -0.45, -0.1);
+} else if (OBJ === "zero") {
+  const z = add(txt("0%", 1.7, 0.6, [["#6D28FF", 0], ["#A855F7", 0.5], ["#FF7AD9", 1]]), gloss()); z.rotation.set(0.12, -0.35, 0);
+} else if (OBJ === "leaf") {
+  const s = new THREE.Shape(); s.moveTo(0, -1.9); s.bezierCurveTo(1.6, -1.2, 1.6, 1.2, 0, 1.9); s.bezierCurveTo(-1.6, 1.2, -1.6, -1.2, 0, -1.9);
+  const l = add(ext(s, 0.25, 0.14), gloss()); grad(l.geometry, [["#0FA36B", 0], ["#3FD9A0", 0.6], ["#B8FFE1", 1]]);
+  const vein = add(new THREE.CylinderGeometry(0.05, 0.05, 3.4, 12), new THREE.MeshPhysicalMaterial({ color: "#E8FFF4", roughness: 0.3 })); vein.position.z = 0.26;
+  const grp = new THREE.Group(); sc.remove(l); sc.remove(vein); grp.add(l, vein); sc.add(grp); grp.rotation.set(0.25, -0.4, -0.6);
+} else if (OBJ === "gem") {
+  const gm = add(grad(new THREE.OctahedronGeometry(1.7, 0), [["#7C3AED", 0], ["#E44BC8", 0.6], ["#FFD1F3", 1]]), gloss({ flatShading: true, roughness: 0.08 }));
+  gm.scale.set(1, 1.25, 1); gm.rotation.set(0.3, 0.6, 0.1);
+} else if (OBJ === "star") {
+  const pts = []; for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? 0.85 : 1.9; pts.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
+  const s = add(ext(shape(pts), 0.5, 0.22), gloss()); grad(s.geometry, [["#FFB000", 0], ["#FFD84A", 0.6], ["#FFF4B8", 1]]); s.rotation.set(0.25, -0.5, 0.15);
+} else if (OBJ === "rocket") {
+  const g = new THREE.Group(); sc.add(g);
+  const prof = []; for (let i = 0; i <= 40; i++) { const t = i / 40; prof.push(new THREE.Vector2(Math.sin(Math.PI * Math.min(1, t * 1.15)) * 0.75 * (t < 0.1 ? t * 10 * 0.6 + 0.4 : 1) + 0.001, -1.6 + t * 3.4)); }
+  const body = new THREE.Mesh(grad(new THREE.LatheGeometry(prof, 64), [["#DCD3FF", 0], ["#FFFFFF", 0.45], ["#FFFFFF", 0.74], ["#E44BC8", 0.8], ["#8E2DE2", 1]]), gloss()); g.add(body);
+  const win = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.07, 16, 48), new THREE.MeshPhysicalMaterial({ color: "#8E2DE2", roughness: 0.2, clearcoat: 1 })); win.position.set(0, 0.45, 0.68); g.add(win);
+  const glass = new THREE.Mesh(new THREE.CircleGeometry(0.27, 48), new THREE.MeshPhysicalMaterial({ color: "#5FD4FF", roughness: 0.05, clearcoat: 1, emissive: "#1d6fa0", emissiveIntensity: 0.3 })); glass.position.set(0, 0.45, 0.7); g.add(glass);
+  for (let k = 0; k < 3; k++) {
+    const f = new THREE.Mesh(grad(ext(shape([[0, 0], [0.75, -0.6], [0.75, -1.05], [0, -0.55]]), 0.12, 0.05), [["#8E2DE2", 0], ["#E44BC8", 1]]), gloss());
+    const p = new THREE.Group(); f.position.set(0.85, -1.0, 0); p.add(f); p.rotation.y = k * Math.PI * 2 / 3; g.add(p);
+  }
+  g.rotation.set(0.15, 0.3, -0.62);
+} else if (OBJ === "chart") {
+  const g = new THREE.Group(); sc.add(g);
+  const panel = new THREE.Mesh(grad(new RoundedBoxGeometry(3.6, 2.6, 0.25, 8, 0.3), [["#FFFFFF", 0], ["#EFE7FF", 1]]), gloss()); g.add(panel);
+  const hs = [0.6, 0.9, 0.7, 1.2, 1.0, 1.6, 1.9];
+  hs.forEach((h, i) => { const up = i !== 2 && i !== 4; const b = new THREE.Mesh(grad(new RoundedBoxGeometry(0.28, h, 0.2, 4, 0.06), up ? [["#00A34C", 0], ["#2EE87A", 1]] : [["#D61F38", 0], ["#FF6B76", 1]]), gloss()); b.position.set(-1.35 + i * 0.45, -0.95 + h / 2 + i * 0.05, 0.22); g.add(b); });
+  g.rotation.set(-0.15, -0.45, 0.05);
+}
+r.render(sc, cam); window.ready = true;
+</script></body></html>
