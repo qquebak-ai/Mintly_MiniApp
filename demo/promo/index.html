@@ -11,13 +11,13 @@
 @font-face{font-family:'Nunito';font-weight:700;src:url('assets/fonts/nunito-700-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+2000-206F,U+2212}
 @font-face{font-family:'Nunito';font-weight:800;src:url('assets/fonts/nunito-800-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+2000-206F,U+2212}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:1920px;height:1080px;overflow:hidden;background:#fff}
-body{font-family:'Onest',system-ui,sans-serif;color:#0B1E46;-webkit-font-smoothing:antialiased}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#000}
+body{font-family:'Onest',system-ui,sans-serif;color:#fff;-webkit-font-smoothing:antialiased}
 .abs{position:absolute}
 .scene{position:absolute;inset:0;overflow:hidden;visibility:hidden}
 .c{position:absolute;left:0;right:0;text-align:center}
 .w{display:inline-block;will-change:transform,filter,opacity}
-.accent{background:linear-gradient(95deg,#0B4FD8,#1E8BFF 55%,#35D0E8);-webkit-background-clip:text;background-clip:text;color:transparent}
+.accent{background:linear-gradient(95deg,#FFFFFF,#D5DAE1 50%,#8F96A3);-webkit-background-clip:text;background-clip:text;color:transparent}
 .blob{position:absolute;border-radius:50%;filter:blur(90px)}
 .fog{position:absolute;left:-10%;right:-10%;bottom:-140px;height:520px}
 .fog span{position:absolute;border-radius:50%;filter:blur(60px)}
@@ -34,19 +34,19 @@ body{font-family:'Onest',system-ui,sans-serif;color:#0B1E46;-webkit-font-smoothi
 .toastA i{width:30px;height:30px;border-radius:9px;background:rgba(46,232,122,.16);display:flex;align-items:center;justify-content:center;flex:none}
 .toastA small{display:block;font:500 12.5px 'Onest';color:#8E8E99;margin-top:1px}
 .tap{position:absolute;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(255,255,255,.35);border:2px solid rgba(255,255,255,.7);opacity:0}
-/* виджеты вокруг — белое стекло в гамме ролика */
-.wg{position:absolute;left:0;top:0;border-radius:26px;background:rgba(255,255,255,.94);box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 22px 48px rgba(18,64,150,.13),0 2px 6px rgba(18,64,150,.06);border:1px solid rgba(214,230,250,.9);color:#0B1E46;will-change:transform,opacity,filter}
-.wg .lb{font:500 15px 'Onest';color:#5B7398}
+/* виджеты вокруг — тёмные карточки, как в приложении */
+.wg{position:absolute;left:0;top:0;border-radius:26px;background:#0F0F13;box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 22px 48px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.09);color:#fff;will-change:transform,opacity,filter}
+.wg .lb{font:500 15px 'Onest';color:#8E8E99}
 .wg .num{font:800 26px 'Nunito';letter-spacing:-.01em}
 .wg .row{display:flex;align-items:center;gap:14px}
 .lg{border-radius:50%;flex:none;image-rendering:pixelated}
-.up{color:#0FA968}.dn{color:#E5484D}
+.up{color:#2EE87A}.dn{color:#FF5A63}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;font:700 13px 'Onest'}
 .slot{position:absolute;left:0;top:0;overflow:hidden;border-radius:26px}
 .tn{font-variant-numeric:tabular-nums}
 #flash{position:absolute;inset:0;background:#fff;opacity:0}
 #fade{position:absolute;inset:0;background:#000;opacity:0}
-.guide{position:absolute;background:rgba(30,120,230,.22)}
+.guide{position:absolute;background:rgba(255,255,255,.2)}
 /* акцент внутри экранов приложения — родной сиреневый Mintly */
 .accentApp{background:linear-gradient(95deg,#7C3AED,#C13AE6 55%,#FF6AD5);-webkit-background-clip:text;background-clip:text;color:transparent}
 </style>
