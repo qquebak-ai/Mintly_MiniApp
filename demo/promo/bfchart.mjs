@@ -9,21 +9,21 @@ await page.evaluate(async () => {
   // настоящие OHLC-свечи: у каждой свои open/high/low/close, поэтому тела
   // разной длины, а тени торчат с обеих сторон на разную величину — как
   // в реальном терминале. Общий тренд вверх, но с естественными откатами.
-  let s = 1234567;
+  let s = 20260102;
   const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-  const W = 1920, H = 1080, N = 26, x0 = 24, step = (W - 48) / N;
-  const bw = step * 0.56;
-  let price = 60, lo = 1e9, hi = -1e9;
+  const W = 1920, H = 1080, N = 15, x0 = 30, step = (W - 60) / N;
+  const bw = step * 0.5;
+  // крупные тела: размах каждой свечи сопоставим с шагом цены, поэтому они
+  // высокие; общий дрейф слабый, чтобы тренд не «съедал» высоту отдельных свечей
+  let price = 0, lo = 1e9, hi = -1e9;
   const cs = [];
   for (let i = 0; i < N; i++) {
     const open = price;
-    const drift = 8 + Math.pow(i / N, 1.3) * 10;          // лёгкий уклон вверх
-    const body = (rnd() - 0.42) * 60 + drift;              // тело: то больше, то меньше, иногда красное
+    const body = ((rnd() - 0.4) * 2) * (55 + rnd() * 55) + 10; // длинные тела разной величины
     const close = open + body;
     const up = close >= open;
-    // тени с двух сторон — независимые и разной длины
-    const wickUp = rnd() * rnd() * 46 + 2;
-    const wickDn = rnd() * rnd() * 46 + 2;
+    const wickUp = rnd() * rnd() * 70 + 4;                      // тени с двух сторон, разные
+    const wickDn = rnd() * rnd() * 70 + 4;
     const high = Math.max(open, close) + wickUp;
     const low = Math.min(open, close) - wickDn;
     cs.push({ open, close, high, low, up });
@@ -31,7 +31,7 @@ await page.evaluate(async () => {
     lo = Math.min(lo, low); hi = Math.max(hi, high);
   }
   // масштаб по факту — график растянут почти на всю высоту кадра
-  const padT = 70, padB = 110, y = (val) => padT + (hi - val) / (hi - lo) * (H - padT - padB);
+  const padT = 60, padB = 90, y = (val) => padT + (hi - val) / (hi - lo) * (H - padT - padB);
   let h = ""; const pts = [];
   cs.forEach((c, i) => {
     const cx = x0 + i * step + step / 2;
