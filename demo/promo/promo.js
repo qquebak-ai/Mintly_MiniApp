@@ -422,10 +422,12 @@ const Esc = scene(37, 45);
 const eRays = [-28, -14, -3, 9, 20, 33].map((a, i) => { const r = $(`<div class="abs" style="left:${700 + i * 90}px;top:-200px;width:${120 + (i % 3) * 60}px;height:1500px;transform-origin:50% 0;background:linear-gradient(180deg,rgba(170,205,255,.16),rgba(170,205,255,0) 75%);filter:blur(28px);mix-blend-mode:screen"></div>`); r.a = a; Esc.appendChild(r); return r; });
 // фон финала — стена мелких стеклянных пузырей, по которой идёт 3D-волна
 const eBubbles = [];
-for (let r = 0; r < 30; r++) for (let c = 0; c < 52; c++) {
-  const sd = r * 52 + c, sz = 6 + rnd(sd, 1) * 9;
-  const b = $(`<div class="abs" style="left:0;top:0;width:${sz.toFixed(1)}px;height:${sz.toFixed(1)}px;border-radius:50%;border:1px solid rgba(225,246,255,.7);background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.95) 0 14%,rgba(255,255,255,.18) 34%,rgba(160,215,255,.10) 62%,rgba(225,246,255,.45) 100%);box-shadow:0 0 6px rgba(170,225,255,.25)"></div>`);
-  b.bx = -300 + c * 49 + (rnd(sd, 2) - 0.5) * 30 + (r % 2) * 24; b.by = r * 50 + (rnd(sd, 3) - 0.5) * 28; b.sz = sz;
+// поле мелких пузырей: сетка разрежена и без box-shadow — 1560 теней роняли swiftshader,
+// плотность сохраняется чаще расставленными ячейками, визуально так же «много мелких»
+for (let r = 0; r < 20; r++) for (let c = 0; c < 34; c++) {
+  const sd = r * 34 + c, sz = 6 + rnd(sd, 1) * 9;
+  const b = $(`<div class="abs" style="left:0;top:0;width:${sz.toFixed(1)}px;height:${sz.toFixed(1)}px;border-radius:50%;border:1px solid rgba(225,246,255,.7);background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.95) 0 14%,rgba(255,255,255,.18) 34%,rgba(160,215,255,.10) 62%,rgba(225,246,255,.45) 100%)"></div>`);
+  b.bx = -300 + c * 75 + (rnd(sd, 2) - 0.5) * 46 + (r % 2) * 36; b.by = r * 75 + (rnd(sd, 3) - 0.5) * 42; b.sz = sz;
   Esc.appendChild(b); eBubbles.push(b);
 }
 // логотип и имя одной строкой по общей оси — раньше имя сидело ниже знака
