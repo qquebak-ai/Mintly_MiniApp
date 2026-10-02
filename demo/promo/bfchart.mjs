@@ -19,11 +19,11 @@ await page.evaluate(async () => {
   const cs = [];
   for (let i = 0; i < N; i++) {
     const open = price;
-    const body = ((rnd() - 0.4) * 2) * (95 + rnd() * 90) + 16; // очень длинные тела разной величины
+    const body = 110 + rnd() * 150;      // только зелёные, очень длинные тела разной величины
     const close = open + body;
-    const up = close >= open;
-    const wickUp = rnd() * rnd() * 95 + 6;                      // тени с двух сторон, разные
-    const wickDn = rnd() * rnd() * 95 + 6;
+    const up = true;
+    const wickUp = rnd() * rnd() * 110 + 8; // тени с двух сторон, разные
+    const wickDn = rnd() * rnd() * 110 + 8;
     const high = Math.max(open, close) + wickUp;
     const low = Math.min(open, close) - wickDn;
     cs.push({ open, close, high, low, up });
