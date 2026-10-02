@@ -13,12 +13,12 @@ await page.evaluate(async () => {
   const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
   // тела заданы вручную — явно разной длины, ни одно не короткое, без повторов;
   // тени тоже разные сверху и снизу
-  const BODIES = [150, 240, 110, 300, 170, 250, 130, 330, 200, 280, 160, 230];
-  const WUP = [34, 10, 60, 18, 44, 12, 70, 20, 40, 14, 55, 26];
-  const WDN = [20, 50, 14, 38, 24, 66, 16, 46, 12, 58, 22, 42];
+  const BODIES = [260, 420, 200, 480, 320, 380, 240];
+  const WUP = [40, 16, 70, 22, 52, 18, 60];
+  const WDN = [24, 60, 18, 46, 28, 70, 20];
   const N = BODIES.length;
-  const W = 1920, H = 1080, x0 = 36, step = (W - 72) / N;
-  const bw = step * 0.5;
+  const W = 1920, H = 1080, x0 = 60, step = (W - 120) / N;
+  const bw = step * 0.44;
   let price = 0, lo = 1e9, hi = -1e9;
   const cs = [];
   for (let i = 0; i < N; i++) {
@@ -32,17 +32,16 @@ await page.evaluate(async () => {
   }
   // масштаб по факту — график растянут почти на всю высоту кадра
   const padT = 60, padB = 90, y = (val) => padT + (hi - val) / (hi - lo) * (H - padT - padB);
-  let h = ""; const pts = [];
+  let h = "";
   cs.forEach((c, i) => {
     const cx = x0 + i * step + step / 2;
     const top = y(Math.max(c.open, c.close)), bot = y(Math.min(c.open, c.close));
     const col = c.up ? "#00E96B" : "#FF3B47";
     h += `<line x1="${cx}" x2="${cx}" y1="${y(c.high)}" y2="${y(c.low)}" stroke="${col}" stroke-width="5"/>`;
     h += `<rect x="${cx - bw / 2}" y="${top}" width="${bw}" height="${Math.max(7, bot - top)}" rx="4" fill="${col}"/>`;
-    pts.push(`${cx},${y(c.close)}`);
+
   });
-  const svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="position:absolute;left:0;top:0;opacity:.4">
-    <polyline points="${pts.join(" ")}" fill="none" stroke="#5A8CFF" stroke-width="6" stroke-linejoin="round"/>${h}</svg>`;
+  const svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="position:absolute;left:0;top:0;opacity:.4">${h}</svg>`;
   const bg = document.getElementById("root").firstElementChild;
   bg.insertAdjacentHTML("beforeend", svg);
   window.renderAt(150 / 30);
