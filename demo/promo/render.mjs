@@ -12,7 +12,7 @@ await page.goto("http://127.0.0.1:8766/promo/index.html");
 await page.waitForFunction(() => window.ready === true, null, { timeout: 90000 });
 if (mode === "snap") {
   mkdirSync("snap", { recursive: true });
-  for (const t of arg.split(",").map(Number)) { await page.evaluate(async (t) => { window.renderAt(t); await document.fonts.ready; await Promise.all([...document.images].map((i) => i.decode().catch(() => {}))); }, t); await page.screenshot({ path: `snap/at-${String(t).padStart(5, "0")}.jpg`, type: "jpeg", quality: 85 }); }
+  for (const t of arg.split(",").map(Number)) { await page.evaluate(async (t) => { window.renderAt(t); await document.fonts.ready; await Promise.all([...document.images].map((i) => i.decode().catch(() => {}))); await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); }, t); await page.screenshot({ path: `snap/at-${String(t).padStart(5, "0")}.jpg`, type: "jpeg", quality: 85 }); }
 } else {
   const [from, to] = arg.split(",").map(Number);
   mkdirSync("frames", { recursive: true });
@@ -20,7 +20,9 @@ if (mode === "snap") {
     // уже снятые кадры не трогаем — после сбоя кусок дорендеривается с места остановки
     if (existsSync(`frames/f${String(f).padStart(4, "0")}.jpg`)) continue;
     // ждём шрифты и картинки после каждого кадра: новый браузер на кусок иначе снимал пустые карточки
-    await page.evaluate(async (t) => { window.renderAt(t); await document.fonts.ready; await Promise.all([...document.images].map((i) => i.decode().catch(() => {}))); }, f / FPS);
+    await page.evaluate(async (t) => { window.renderAt(t); await document.fonts.ready; await Promise.all([...document.images].map((i) => i.decode().catch(() => {})));
+      // два кадра браузера: иначе снимок иногда успевал до перерисовки текста с градиентной заливкой, и буква мигала
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); }, f / FPS);
     await page.screenshot({ timeout: 180000, type: "jpeg", quality: 94, path: `frames/f${String(f).padStart(4, "0")}.jpg` });
   }
 }

@@ -96,7 +96,9 @@ const ICO = {
 const fmtK = (v) => "$" + (v >= 1000 ? (v / 1000).toFixed(1) + "K" : v.toFixed(0));
 const wg = (parent, w, h, html, pad = "16px 18px") => { const e = $(`<div class="wg" style="width:${w}px;height:${h}px;padding:${pad}">${html}</div>`); parent.appendChild(e); e.w = w; e.h = h; return e; };
 // виджет ставится центром в (x, y)
-const at = (e, x, y, o = {}) => S(e, { ...o, x: x - e.w / 2 + (o.x || 0), y: y - e.h / 2 + (o.y || 0) });
+// все живые виджеты крупнее на 20 %: масштаб от центра, раскладка считает их уже крупными
+const WGS = 1.2;
+const at = (e, x, y, o = {}) => S(e, { ...o, s: (o.s == null ? 1 : o.s) * WGS, x: x - e.w / 2 + (o.x || 0), y: y - e.h / 2 + (o.y || 0) });
 
 // ---- экран айфона: статус-бар iOS + снимки настоящего приложения ----
 const SBI = `<span style="display:flex;gap:6px;align-items:center"><svg width="18" height="12" viewBox="0 0 18 12" fill="#fff"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
@@ -216,7 +218,7 @@ const b5Logo = mLogo(B, { F: B5F, base: 540 + 0.705 * B5F / 2, fill: "#FFFFFF,#E
 
 // ряды виджетов над и под фразой: на каждом слайде своя механика —
 // B1 бегущая лента, B2 перелистывание карточек, B3 лента сделок с толчком
-const SLOT_W = 336, SLOT_H = 96, STEP = 362, ROW_Y = [262, 818];
+const SLOT_W = 336, SLOT_H = 96, STEP = 432, ROW_Y = [250, 830];
 const card = (html) => { const c = $(`<div class="wg" style="width:${SLOT_W}px;height:${SLOT_H}px;padding:0 18px;display:flex;align-items:center">${html}</div>`); B.appendChild(c); c.w = SLOT_W; c.h = SLOT_H; return c; };
 // детерминированный «случай»: одно и то же t даёт один и тот же кадр
 const rnd = (a, b = 0) => { const x = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return x - Math.floor(x); };
@@ -256,7 +258,7 @@ function runB1(t, a, b) {
 
 // B2 — комиссии в копейках; карточки перелистываются по горизонтальной оси, как табло
 const FEEROW = [["m", "Покупка MINT"], ["frog", "Продажа LILY"], ["gold", "Покупка GAXO"], ["pup", "Покупка PUP"], ["fire", "Продажа WICK"], ["neon", "Покупка NEON"], ["boo", "Покупка BOO"], ["violet", "Продажа VIO"], ["mint", "Покупка MINT"]];
-const SLOT_X = [417, 779, 1141, 1503];
+const SLOT_X = [312, 744, 1176, 1608];
 const b2Slots = Array.from({ length: 8 }, (_, i) => [0, 1, 2].map((r) => {
   const [k, n] = FEEROW[(i + r * 3) % FEEROW.length];
   const c = card(`${logo(k, 52)}<div style="flex:1;margin-left:14px"><div style="font:700 17px Onest;white-space:nowrap">${n}</div><div class="lb" style="font-size:13px;white-space:nowrap">комиссия сети блокчейна</div></div>
@@ -280,7 +282,7 @@ function runB2(t, a, b) {
       if (j === cur && f < 0.5) ang += enter + leave;
       const vis = o * clamp(k * 2) * (1 - q) * (Math.abs(ang) < 90 ? 1 : 0);
       c.style.opacity = vis; c.style.visibility = vis > 0 ? "visible" : "hidden";
-      c.style.transform = `translate3d(${(x - SLOT_W / 2).toFixed(1)}px,${(y - SLOT_H / 2 + Math.sin(t * 1.3 + i * 1.7) * 4).toFixed(1)}px,0) perspective(700px) rotateX(${ang.toFixed(2)}deg)`;
+      c.style.transform = `translate3d(${(x - SLOT_W / 2).toFixed(1)}px,${(y - SLOT_H / 2 + Math.sin(t * 1.3 + i * 1.7) * 4).toFixed(1)}px,0) perspective(700px) rotateX(${ang.toFixed(2)}deg) scale(${WGS})`;
       c.style.filter = q > 0.01 ? `blur(${(q * 12).toFixed(1)}px)` : "none";
       if (vis > 0) { const cents = (rnd(c.seed, 1) < 0.5 ? 1 : 0) + Math.round(walk(c.seed, t, 8.3, 0.35, 0.9, 1, 1, 0.55)); c.querySelector(".fee").textContent = "−$0." + String(Math.min(cents, 9)).padStart(2, "0"); }
     });
@@ -310,7 +312,7 @@ function runB3(t, a, b) {
     for (let m = n - 4; m <= n; m++) {
       const c = pool[((m % B3POOL) + B3POOL) % B3POOL]; fillTrade(c, m, row);
       const pos = n - m - 1 + sh; // −1 → 0: влетает; 3 → 4: уходит
-      const x = row ? 1476 - pos * STEP : 444 + pos * STEP;
+      const x = row ? SLOT_X[3] - pos * STEP : SLOT_X[0] + pos * STEP;
       const enter = pos < 0 ? 1 + pos : 1, leave = pos > 3 ? 1 - (pos - 3) : 1;
       const pop = m === n ? E.soft(clamp(sh * 1.1)) : 1;
       at(c, x, ROW_Y[row], { o: k * (1 - q) * clamp(enter * 1.4) * leave, s: (0.94 + 0.06 * k) * (0.75 + 0.25 * pop), b: (1 - k) * 12 + q * 14 + (1 - leave) * 8, y: (1 - k) * (row ? 30 : -30) });
