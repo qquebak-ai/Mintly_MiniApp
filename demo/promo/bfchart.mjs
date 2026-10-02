@@ -11,19 +11,19 @@ await page.evaluate(async () => {
   // в реальном терминале. Общий тренд вверх, но с естественными откатами.
   let s = 20260102;
   const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-  const W = 1920, H = 1080, N = 15, x0 = 30, step = (W - 60) / N;
-  const bw = step * 0.5;
+  const W = 1920, H = 1080, N = 12, x0 = 30, step = (W - 60) / N;
+  const bw = step * 0.46;
   // крупные тела: размах каждой свечи сопоставим с шагом цены, поэтому они
   // высокие; общий дрейф слабый, чтобы тренд не «съедал» высоту отдельных свечей
   let price = 0, lo = 1e9, hi = -1e9;
   const cs = [];
   for (let i = 0; i < N; i++) {
     const open = price;
-    const body = ((rnd() - 0.4) * 2) * (55 + rnd() * 55) + 10; // длинные тела разной величины
+    const body = ((rnd() - 0.4) * 2) * (95 + rnd() * 90) + 16; // очень длинные тела разной величины
     const close = open + body;
     const up = close >= open;
-    const wickUp = rnd() * rnd() * 70 + 4;                      // тени с двух сторон, разные
-    const wickDn = rnd() * rnd() * 70 + 4;
+    const wickUp = rnd() * rnd() * 95 + 6;                      // тени с двух сторон, разные
+    const wickDn = rnd() * rnd() * 95 + 6;
     const high = Math.max(open, close) + wickUp;
     const low = Math.min(open, close) - wickDn;
     cs.push({ open, close, high, low, up });
