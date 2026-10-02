@@ -434,7 +434,7 @@ for (let r = 0; r < 20; r++) for (let c = 0; c < 34; c++) {
 const eLogo = mLogo(Esc, { F: 160, base: 390 + 0.705 * 160 / 2, fill: "#FFFFFF,#E3E7ED,#A7AFBA", text: "color:#fff", glow: "drop-shadow(0 0 30px rgba(190,235,255,.45))" });
 const ePill = $(`<div class="abs" style="left:50%;top:600px;transform:translateX(-50%);display:flex;align-items:center;gap:18px;padding:22px 38px 22px 26px;border-radius:999px;background:rgba(255,255,255,.9);box-shadow:0 20px 60px rgba(0,20,60,.35);white-space:nowrap">
   <div style="width:62px;height:62px;border-radius:50%;background:#2AABEE;display:flex;align-items:center;justify-content:center">${ICO.tg()}</div>
-  <div><div style="font:500 26px 'Onest';color:#5C5F68">Открыть в Telegram</div><div style="font:800 40px 'Nunito';color:#0A0A0F">@MintlyTrading_bot</div></div></div>`); Esc.appendChild(ePill);
+  <div><div style="font:500 26px 'Onest';color:#5C5F68">Открыть в Telegram</div><div style="font:800 40px 'Nunito';color:#0A0A0F">@MintlyAppbot</div></div></div>`); Esc.appendChild(ePill);
 const eTag = line(Esc, "Запускай. Торгуй. *Взлетай.*", { top: 820, size: 46, weight: 600, color: "#ffffff" });
 // на синем финале акцент светлее — иначе «Взлетай.» тонет в фоне
 eTag.spans.forEach((w) => { if (w.classList.contains("accent")) w.style.backgroundImage = "linear-gradient(95deg,#FFFFFF,#A7AFBA)"; });
