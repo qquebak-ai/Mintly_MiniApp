@@ -13,34 +13,29 @@ await page.evaluate(async () => {
   const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
   // тела заданы вручную — явно разной длины, ни одно не короткое, без повторов;
   // тени тоже разные сверху и снизу
-  const BODIES = [260, 420, 200, 480, 320, 380, 240];
-  const WUP = [40, 16, 70, 22, 52, 18, 60];
-  const WDN = [24, 60, 18, 46, 28, 70, 20];
-  const N = BODIES.length;
-  const W = 1920, H = 1080, x0 = 60, step = (W - 120) / N;
-  const bw = step * 0.44;
-  let price = 0, lo = 1e9, hi = -1e9;
-  const cs = [];
-  for (let i = 0; i < N; i++) {
-    const open = price;
-    const close = open + BODIES[i];      // только зелёные, длина берётся из набора
-    const high = close + WUP[i];
-    const low = open - WDN[i];
-    cs.push({ open, close, high, low, up: true });
-    price = close;
-    lo = Math.min(lo, low); hi = Math.max(hi, high);
-  }
-  // масштаб по факту — график растянут почти на всю высоту кадра
-  const padT = 60, padB = 90, y = (val) => padT + (hi - val) / (hi - lo) * (H - padT - padB);
+  // ДЛИНА СВЕЧИ ЗАДАНА ПРЯМО В ПИКСЕЛЯХ (без автомасштаба) — поэтому они
+  // действительно длинные; свечей много, тренд уходит по диагонали вверх,
+  // крайние слегка выходят за кадр. Только зелёные, тела разной длины.
+  const BODYpx = [150, 215, 125, 240, 170, 200, 135, 225, 165, 190, 130, 220, 160, 205];
+  const WUPpx = [36, 14, 60, 20, 48, 16, 66, 22, 40, 18, 56, 24, 44, 30];
+  const WDNpx = [22, 54, 16, 42, 26, 62, 18, 48, 14, 58, 20, 46, 28, 50];
+  const N = BODYpx.length;
+  const W = 1920, H = 1080, x0 = 50, step = (W - 100) / N;
+  const bw = step * 0.4;
+  // накапливаем пиксельную высоту (каждая свеча двигает цену вверх),
+  // потом центрируем так, чтобы средние свечи были по центру кадра
+  const yClose = []; let acc = 0;
+  for (let i = 0; i < N; i++) { acc += BODYpx[i]; yClose.push(acc); }
+  const mid = yClose[Math.floor(N / 2)];
+  const baseY = H / 2 + mid;                 // перенос: центр графика ~ середина кадра
   let h = "";
-  cs.forEach((c, i) => {
+  for (let i = 0; i < N; i++) {
     const cx = x0 + i * step + step / 2;
-    const top = y(Math.max(c.open, c.close)), bot = y(Math.min(c.open, c.close));
-    const col = c.up ? "#00E96B" : "#FF3B47";
-    h += `<line x1="${cx}" x2="${cx}" y1="${y(c.high)}" y2="${y(c.low)}" stroke="${col}" stroke-width="5"/>`;
-    h += `<rect x="${cx - bw / 2}" y="${top}" width="${bw}" height="${Math.max(7, bot - top)}" rx="4" fill="${col}"/>`;
-
-  });
+    const closeY = baseY - yClose[i];
+    const openY = closeY + BODYpx[i];        // тело: открытие ниже закрытия (зелёная)
+    h += `<line x1="${cx}" x2="${cx}" y1="${closeY - WUPpx[i]}" y2="${openY + WDNpx[i]}" stroke="#00E96B" stroke-width="5"/>`;
+    h += `<rect x="${cx - bw / 2}" y="${closeY}" width="${bw}" height="${BODYpx[i]}" rx="4" fill="#00E96B"/>`;
+  }
   const svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="position:absolute;left:0;top:0;opacity:.4">${h}</svg>`;
   const bg = document.getElementById("root").firstElementChild;
   bg.insertAdjacentHTML("beforeend", svg);
