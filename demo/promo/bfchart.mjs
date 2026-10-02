@@ -11,24 +11,22 @@ await page.evaluate(async () => {
   // в реальном терминале. Общий тренд вверх, но с естественными откатами.
   let s = 20260102;
   const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-  const W = 1920, H = 1080, N = 10, x0 = 40, step = (W - 80) / N;
-  const bw = step * 0.52;
-  // крупные тела: размах каждой свечи сопоставим с шагом цены, поэтому они
-  // высокие; общий дрейф слабый, чтобы тренд не «съедал» высоту отдельных свечей
+  // тела заданы вручную — явно разной длины, ни одно не короткое, без повторов;
+  // тени тоже разные сверху и снизу
+  const BODIES = [150, 240, 110, 300, 170, 250, 130, 330, 200, 280, 160, 230];
+  const WUP = [34, 10, 60, 18, 44, 12, 70, 20, 40, 14, 55, 26];
+  const WDN = [20, 50, 14, 38, 24, 66, 16, 46, 12, 58, 22, 42];
+  const N = BODIES.length;
+  const W = 1920, H = 1080, x0 = 36, step = (W - 72) / N;
+  const bw = step * 0.5;
   let price = 0, lo = 1e9, hi = -1e9;
   const cs = [];
   for (let i = 0; i < N; i++) {
     const open = price;
-    // только зелёные, но очень разной длины: часть короткие, часть огромные
-    const t = rnd();
-    const body = 30 + t * t * t * 360;   // кубическая кривая → сильный разброс длины
-    const close = open + body;
-    const up = true;
-    const wickUp = rnd() * rnd() * 90 + 6; // тени с двух сторон, разные
-    const wickDn = rnd() * rnd() * 90 + 6;
-    const high = Math.max(open, close) + wickUp;
-    const low = Math.min(open, close) - wickDn;
-    cs.push({ open, close, high, low, up });
+    const close = open + BODIES[i];      // только зелёные, длина берётся из набора
+    const high = close + WUP[i];
+    const low = open - WDN[i];
+    cs.push({ open, close, high, low, up: true });
     price = close;
     lo = Math.min(lo, low); hi = Math.max(hi, high);
   }
