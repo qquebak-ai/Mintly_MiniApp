@@ -4,7 +4,7 @@ import { chromium } from "playwright-core";
 import { mkdirSync, existsSync } from "fs";
 const FPS = 30, DUR = 55, N = FPS * DUR;
 const mode = process.argv[2], arg = process.argv[3] || "";
-const PR = mode === "frames" ? 2 : 1;
+const PR = mode === "frames" ? 1.5 : 1;
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: PR });
 page.on("pageerror", (e) => console.log("pageerror", e.message));
