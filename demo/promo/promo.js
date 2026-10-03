@@ -97,8 +97,8 @@ const fmtK = (v) => "$" + (v >= 1000 ? (v / 1000).toFixed(1) + "K" : v.toFixed(0
 const wg = (parent, w, h, html, pad = "16px 18px") => { const e = $(`<div class="wg" style="width:${w}px;height:${h}px;padding:${pad}">${html}</div>`); parent.appendChild(e); e.w = w; e.h = h; return e; };
 // виджет ставится центром в (x, y)
 // все живые виджеты крупнее на 20 %: масштаб от центра, раскладка считает их уже крупными
-const WGS = 1.2;
-const at = (e, x, y, o = {}) => S(e, { ...o, s: (o.s == null ? 1 : o.s) * WGS, x: x - e.w / 2 + (o.x || 0), y: y - e.h / 2 + (o.y || 0) });
+const WGS = 1.5;
+const at = (e, x, y, o = {}) => S(e, { ...o, s: (o.s == null ? 1 : o.s) * (o.ws == null ? WGS : o.ws), x: x - e.w / 2 + (o.x || 0), y: y - e.h / 2 + (o.y || 0) });
 
 // ---- экран айфона: статус-бар iOS + снимки настоящего приложения ----
 const SBI = `<span style="display:flex;gap:6px;align-items:center"><svg width="18" height="12" viewBox="0 0 18 12" fill="#fff"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
@@ -218,8 +218,9 @@ const b5Logo = mLogo(B, { F: B5F, base: 540 + 0.705 * B5F / 2, fill: "#FFFFFF,#E
 
 // ряды виджетов над и под фразой: на каждом слайде своя механика —
 // B1 бегущая лента, B2 перелистывание карточек, B3 лента сделок с толчком
-const SLOT_W = 336, SLOT_H = 96, STEP = 432, ROW_Y = [250, 830];
-const card = (html) => { const c = $(`<div class="wg" style="width:${SLOT_W}px;height:${SLOT_H}px;padding:0 18px;display:flex;align-items:center">${html}</div>`); B.appendChild(c); c.w = SLOT_W; c.h = SLOT_H; return c; };
+// карточки рядов намного крупнее: меньше в ряду, шире шаг — текст большой, без наложений
+const SLOT_W = 470, SLOT_H = 132, STEP = 560, ROW_Y = [242, 838], ROWS = 1;
+const card = (html) => { const c = $(`<div class="wg" style="width:${SLOT_W}px;height:${SLOT_H}px;padding:0 26px;display:flex;align-items:center">${html}</div>`); B.appendChild(c); c.w = SLOT_W; c.h = SLOT_H; return c; };
 // детерминированный «случай»: одно и то же t даёт один и тот же кадр
 const rnd = (a, b = 0) => { const x = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return x - Math.floor(x); };
 // накопленная сумма случайных шагов: у каждой карточки свой ритм и свой размер шага
@@ -240,15 +241,15 @@ const rowIn = (t, a, b, d) => [E.out(prog(t, a + d, a + d + 1.1)), E.io(prog(t, 
 const B1N = 7;
 const b1Rows = [0, 1].map((row) => Array.from({ length: B1N }, (_, i) => {
   const [k, name, tick] = TOK[(i * 2 + row * 5) % TOK.length];
-  const c = card(`${logo(k, 56)}<div style="flex:1;margin-left:14px;min-width:0"><div style="font:800 19px Nunito;white-space:nowrap">${name}</div><div class="lb" style="font-size:14px">$${tick} · <span class="ago tn"></span></div></div>
-    <div style="text-align:right"><span class="chip" style="background:rgba(255,255,255,.1);color:#fff">НОВЫЙ</span><div class="mc tn up" style="font:800 17px Nunito;margin-top:6px"></div></div>`);
+  const c = card(`${logo(k, 76)}<div style="flex:1;margin-left:18px;min-width:0"><div style="font:800 26px Nunito;white-space:nowrap">${name}</div><div class="lb" style="font-size:18px">$${tick} · <span class="ago tn"></span></div></div>
+    <div style="text-align:right"><span class="chip" style="background:rgba(255,255,255,.1);color:#fff;font-size:15px;padding:6px 13px">НОВЫЙ</span><div class="mc tn up" style="font:800 23px Nunito;margin-top:8px"></div></div>`);
   c.seed = row * 31 + i * 7 + 1; return c;
 }));
 function runB1(t, a, b) {
   b1Rows.forEach((cards, row) => cards.forEach((c, i) => {
     const [k, q] = rowIn(t, a, b, row * 0.12 + i * 0.04), dir = row ? 1 : -1;
     const span = B1N * STEP, off = ((i * STEP + dir * 48 * (t - a)) % span + span) % span - 420;
-    at(c, off + SLOT_W / 2, ROW_Y[row], { o: k * (1 - q), y: (1 - k) * (row ? 30 : -30) + Math.sin(t * 1.6 + i) * 4, b: (1 - k) * 12 + q * 14, s: 0.94 + 0.06 * k });
+    at(c, off + SLOT_W / 2, ROW_Y[row], { ws: ROWS, o: k * (1 - q), y: (1 - k) * (row ? 30 : -30) + Math.sin(t * 1.6 + i) * 4, b: (1 - k) * 12 + q * 14, s: 0.94 + 0.06 * k });
     if (k > 0 && q < 1) {
       c.querySelector(".mc").textContent = fmtK(2000 + rnd(c.seed, 99) * 9000 + walk(c.seed, t, 5.4, 0.06, 0.32, 20, 520, 0.2));
       c.querySelector(".ago").textContent = ago(Math.floor(Math.max(0, t - 6 - i * 0.3) * (0.8 + rnd(c.seed, 5))));
@@ -258,17 +259,18 @@ function runB1(t, a, b) {
 
 // B2 — комиссии в копейках; карточки перелистываются по горизонтальной оси, как табло
 const FEEROW = [["m", "Покупка MINT"], ["frog", "Продажа LILY"], ["gold", "Покупка GAXO"], ["pup", "Покупка PUP"], ["fire", "Продажа WICK"], ["neon", "Покупка NEON"], ["boo", "Покупка BOO"], ["violet", "Продажа VIO"], ["mint", "Покупка MINT"]];
-const SLOT_X = [312, 744, 1176, 1608];
-const b2Slots = Array.from({ length: 8 }, (_, i) => [0, 1, 2].map((r) => {
+// три крупные карточки в ряду (было четыре мелких) — текст больше
+const SLOT_X = [480, 960, 1440];
+const b2Slots = Array.from({ length: 6 }, (_, i) => [0, 1, 2].map((r) => {
   const [k, n] = FEEROW[(i + r * 3) % FEEROW.length];
-  const c = card(`${logo(k, 52)}<div style="flex:1;margin-left:14px"><div style="font:700 17px Onest;white-space:nowrap">${n}</div><div class="lb" style="font-size:13px;white-space:nowrap">комиссия сети блокчейна</div></div>
-    <div style="text-align:right"><div class="fee tn" style="font:800 20px Nunito;color:#FF5A63"></div><div class="lb" style="font-size:12px;white-space:nowrap">Mintly 0%</div></div>`);
+  const c = card(`${logo(k, 70)}<div style="flex:1;margin-left:18px"><div style="font:700 23px Onest;white-space:nowrap">${n}</div><div class="lb" style="font-size:17px;white-space:nowrap">комиссия сети блокчейна</div></div>
+    <div style="text-align:right"><div class="fee tn" style="font:800 27px Nunito;color:#FF5A63"></div><div class="lb" style="font-size:16px;white-space:nowrap">Mintly 0%</div></div>`);
   c.style.backfaceVisibility = "hidden"; c.seed = i * 17 + r * 5 + 3; return c;
 }));
 function runB2(t, a, b) {
   b2Slots.forEach((cards, i) => {
-    const row = i < 4 ? 0 : 1, x = SLOT_X[i % 4], y = ROW_Y[row];
-    const [k, q] = rowIn(t, a, b, (i % 4) * 0.08 + row * 0.1);
+    const row = i < 3 ? 0 : 1, x = SLOT_X[i % 3], y = ROW_Y[row];
+    const [k, q] = rowIn(t, a, b, (i % 3) * 0.08 + row * 0.1);
     // перелистывание неспешное: полный оборот 0.9 с, синусная кривая без рывка
     const per = 1.7 + rnd(i, 4) * 0.4, FL = 0.9, local = Math.max(0, t - a - 0.2 - rnd(i, 8) * 0.6);
     const n = Math.floor(local / per), f = E.sine(clamp((local - n * per - (per - FL)) / FL));
@@ -282,7 +284,7 @@ function runB2(t, a, b) {
       if (j === cur && f < 0.5) ang += enter + leave;
       const vis = o * clamp(k * 2) * (1 - q) * (Math.abs(ang) < 90 ? 1 : 0);
       c.style.opacity = vis; c.style.visibility = vis > 0 ? "visible" : "hidden";
-      c.style.transform = `translate3d(${(x - SLOT_W / 2).toFixed(1)}px,${(y - SLOT_H / 2 + Math.sin(t * 1.3 + i * 1.7) * 4).toFixed(1)}px,0) perspective(700px) rotateX(${ang.toFixed(2)}deg) scale(${WGS})`;
+      c.style.transform = `translate3d(${(x - SLOT_W / 2).toFixed(1)}px,${(y - SLOT_H / 2 + Math.sin(t * 1.3 + i * 1.7) * 4).toFixed(1)}px,0) perspective(900px) rotateX(${ang.toFixed(2)}deg) scale(${ROWS})`;
       c.style.filter = q > 0.01 ? `blur(${(q * 12).toFixed(1)}px)` : "none";
       if (vis > 0) { const cents = (rnd(c.seed, 1) < 0.5 ? 1 : 0) + Math.round(walk(c.seed, t, 8.3, 0.35, 0.9, 1, 1, 0.55)); c.querySelector(".fee").textContent = "−$0." + String(Math.min(cents, 9)).padStart(2, "0"); }
     });
@@ -291,9 +293,9 @@ function runB2(t, a, b) {
 
 // B3 — лента быстрых сделок: новая сделка влетает в начало ряда и толкает остальные
 const B3POOL = 6;
-const b3Rows = [0, 1].map(() => Array.from({ length: B3POOL }, () => card(`<div class="lgs" style="width:52px;height:52px;flex:none;position:relative">${TOK.map(([k], ti) => `<div class="lgi" data-i="${ti}" style="position:absolute;inset:0;display:none">${logo(k, 52)}</div>`).join("")}</div>
-  <div style="flex:1;margin-left:14px;min-width:0"><div style="font:800 18px Nunito;white-space:nowrap"><span class="act"></span> <span class="qty tn"></span> <span class="tk"></span></div><div class="lb" style="font-size:13px">за <span class="amt tn"></span> GRAM · <span class="spd tn"></span></div></div>
-  <div style="width:34px;height:34px;border-radius:50%;background:rgba(46,232,122,.14);display:flex;align-items:center;justify-content:center;flex:none">${ICO.check("#2EE87A", 19)}</div>`)));
+const b3Rows = [0, 1].map(() => Array.from({ length: B3POOL }, () => card(`<div class="lgs" style="width:70px;height:70px;flex:none;position:relative">${TOK.map(([k], ti) => `<div class="lgi" data-i="${ti}" style="position:absolute;inset:0;display:none">${logo(k, 70)}</div>`).join("")}</div>
+  <div style="flex:1;margin-left:18px;min-width:0"><div style="font:800 25px Nunito;white-space:nowrap"><span class="act"></span> <span class="qty tn"></span> <span class="tk"></span></div><div class="lb" style="font-size:17px">за <span class="amt tn"></span> GRAM · <span class="spd tn"></span></div></div>
+  <div style="width:44px;height:44px;border-radius:50%;background:rgba(46,232,122,.14);display:flex;align-items:center;justify-content:center;flex:none">${ICO.check("#2EE87A", 25)}</div>`)));
 function fillTrade(c, m, row) {
   if (c.m === m) return; c.m = m;
   const sd = m * 13 + row * 101, ti = Math.floor(rnd(sd, 1) * TOK.length), amt = [0.1, 0.25, 0.5, 0.8, 1, 1.5, 2, 3, 5][Math.floor(rnd(sd, 2) * 9)];
@@ -304,18 +306,19 @@ function fillTrade(c, m, row) {
   c.querySelector(".qty").textContent = (amt * (180 + rnd(sd, 4) * 260) / 1000).toFixed(2).replace(".", ",") + "M";
   c.querySelector(".spd").textContent = (0.3 + rnd(sd, 5) * 0.2).toFixed(1).replace(".", ",") + " с";
 }
+const B3_L = 300, B3_R = 1620; // крайние точки: верх течёт вправо, низ влево
 function runB3(t, a, b) {
   b3Rows.forEach((pool, row) => {
-    const per = row ? 0.62 : 0.5, u = Math.max(0, t - a - 0.4 - row * 0.2) / per, n = 4 + Math.floor(u), sh = E.io(clamp((u - Math.floor(u)) / 0.5));
+    const per = row ? 0.75 : 0.62, u = Math.max(0, t - a - 0.4 - row * 0.2) / per, n = 3 + Math.floor(u), sh = E.io(clamp((u - Math.floor(u)) / 0.5));
     const [k, q] = rowIn(t, a, b, row * 0.12);
     pool.forEach((c) => S(c, { o: 0 }));
-    for (let m = n - 4; m <= n; m++) {
+    for (let m = n - 3; m <= n; m++) {
       const c = pool[((m % B3POOL) + B3POOL) % B3POOL]; fillTrade(c, m, row);
-      const pos = n - m - 1 + sh; // −1 → 0: влетает; 3 → 4: уходит
-      const x = row ? SLOT_X[3] - pos * STEP : SLOT_X[0] + pos * STEP;
-      const enter = pos < 0 ? 1 + pos : 1, leave = pos > 3 ? 1 - (pos - 3) : 1;
+      const pos = n - m - 1 + sh; // −1 → 0: влетает; 2 → 3: уходит
+      const x = row ? B3_R - pos * STEP : B3_L + pos * STEP;
+      const enter = pos < 0 ? 1 + pos : 1, leave = pos > 2 ? 1 - (pos - 2) : 1;
       const pop = m === n ? E.soft(clamp(sh * 1.1)) : 1;
-      at(c, x, ROW_Y[row], { o: k * (1 - q) * clamp(enter * 1.4) * leave, s: (0.94 + 0.06 * k) * (0.75 + 0.25 * pop), b: (1 - k) * 12 + q * 14 + (1 - leave) * 8, y: (1 - k) * (row ? 30 : -30) });
+      at(c, x, ROW_Y[row], { ws: ROWS, o: k * (1 - q) * clamp(enter * 1.4) * leave, s: (0.94 + 0.06 * k) * (0.78 + 0.22 * pop), b: (1 - k) * 12 + q * 14 + (1 - leave) * 8, y: (1 - k) * (row ? 30 : -30) });
     }
   });
 }
