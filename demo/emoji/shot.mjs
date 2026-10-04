@@ -7,7 +7,7 @@ await page.waitForFunction(() => window.ready === true, null, { timeout: 90000 }
 await page.evaluate(() => window.stopAuto());
 const names = await page.evaluate(() => window.__names);
 // поза, в которой эмодзи выглядит выгоднее всего для стилла
-const POSE = { coin: 0.08, up: 0, down: 0, plus100: 0, plus1: 0 };
+const POSE = { coin: 0.04, up: 0.25, down: 0.25, plus100: 0.6, plus1: 0.6 };
 for (const n of names) {
   await page.evaluate(async ([n, t]) => { window.renderEmoji(n, t); await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); }, [n, POSE[n] ?? 0]);
   const el = await page.$("#stage canvas");
