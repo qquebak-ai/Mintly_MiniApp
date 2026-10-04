@@ -8,3 +8,8 @@ dist/*
 !dist/assets
 .env.local
 *.local
+
+# эмодзи: генерируемые кадры/референсы
+demo/emoji/out/
+demo/emoji/sheet/
+demo/emoji/frames/
