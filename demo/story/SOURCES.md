@@ -1,22 +1,21 @@
 # Источники изображений
 
-Все гравюры и фото монет — общественное достояние (public domain / CC0),
-взяты из открытых коллекций музеев. В ролике они переведены в «чернила»
-(`tools/prep.py`) и положены на сгенерированный пергамент.
+Все изображения — общественное достояние, без ограничений на публикацию
+(Library of Congress, Prints & Photographs: «No known restrictions on
+publication»). В ролике гравюры переведены в типографскую краску, а
+фотографии — в штриховой растр, чтобы всё выглядело одной газетной
+гравюрой (`tools/prep2.py`); бумага сгенерирована там же.
 
-| Файл | Работа | Автор, год | Коллекция |
+| Файл | Работа | Год | Library of Congress |
 |---|---|---|---|
-| `thales` | Thales Milesius, from Seven Wise Men of Greece | Jacques de Gheyn III, 1616 | Art Institute of Chicago, 268009 |
-| `market` | Peasant Family Going to Market | Martin Schongauer, 1469/74 | Art Institute of Chicago, 3991 |
-| `goldweigher` | Jan Uytenbogaert, “The Goldweigher” | Rembrandt van Rijn, 1639 | Art Institute of Chicago, 29283 |
-| `astro1` | Astrology, plate 29 from Arts and Sciences | Master of the E-Series Tarocchi, c. 1465 | Art Institute of Chicago, 11453 |
-| `press_robert` | An Olive Oil Press | Hubert Robert, c. 1759 | Art Institute of Chicago, 18661 |
-| `press_nova` | Nova Reperta, The Invention of the Olive Oil Press, plate 12 | Jan Collaert I, c. 1600 | The Metropolitan Museum of Art, 427835 |
-| `coin_dog`, `coin_punch` | Stater (Coin) Depicting a Crouching Dog, электрум | Kyzikos, Mysia, 5th c. BCE | Art Institute of Chicago, 111014 |
+| `edison78` | Thomas Alva Edison, 1847–1931 (портрет) | 1878 | cph.3b25846 |
+| `edphono` | Thomas Edison, seated, with phonograph | 1878 | cph.3b44216 |
+| `goldroom` | Scene in the New York Gold Room during the excitement of September 24th, 1869 (Frank Leslie's Illustrated Newspaper) | 1869 | cph.3b15462 |
+| `tickers` | Men looking at ticker tape in broker's office | 1894 | cai.2a14740 |
 
-Монета в кадре — электрум Малой Азии (соседний с Лидией Кизик), показана как
-иллюстрация: подпись в ролике говорит только о сплаве, а не о конкретной
-лидийской монете.
-
-История Фалеса и маслодавилен — Аристотель, «Политика», I, 1259a.
+Факты: в 1869 году 22-летний Эдисон приехал в Нью-Йорк без денег, починил
+сломавшийся аппарат, передававший цены золота брокерам, и получил работу;
+за улучшенный биржевой тикер ему заплатили $40 000, хотя он рассчитывал
+примерно на $5 000. Фраза «Гений — это 1% вдохновения и 99% пота»
+приписывается Эдисону (около 1903 года).
 Музыка синтезирована в `tools/track.py`.
