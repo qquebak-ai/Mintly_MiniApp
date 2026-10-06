@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Mintly Story</title>
+<style>
+@font-face{font-family:'Onest';font-weight:100 900;src:url('assets/fonts/onest-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+2000-206F,U+20AC,U+2122,U+2212}
+@font-face{font-family:'Onest';font-weight:100 900;src:url('assets/fonts/onest-cyrillic.woff2') format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Nunito';font-weight:800;src:url('assets/fonts/nunito-800-cyrillic.woff2') format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Nunito';font-weight:800;src:url('assets/fonts/nunito-800-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+2000-206F,U+2212}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#000}
+body{font-family:'Onest',system-ui,sans-serif;color:#fff;-webkit-font-smoothing:antialiased}
+.abs{position:absolute}
+.layer{position:absolute;inset:0;overflow:hidden}
+.scene{position:absolute;inset:0;visibility:hidden}
+.w{display:inline-block;will-change:transform,opacity,filter}
+/* переливы белого в синий — как в прошлом промо Mintly */
+.grad{background-image:linear-gradient(100deg,#FFFFFF 0%,#FFFFFF 14%,#9CC0FF 30%,#5A8CFF 42%,#FFFFFF 58%,#FFFFFF 72%,#B5D0FF 86%,#FFFFFF 100%);background-size:1800px 100%;-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:.14em;margin-bottom:-.14em}
+.accent{background-image:linear-gradient(100deg,#8DB2FF 0%,#3F78FF 22%,#BFD6FF 46%,#2F6BFF 70%,#8DB2FF 100%);background-size:1800px 100%;-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:.14em;margin-bottom:-.14em}
+/* на пергаменте акцент — синие чернила */
+.bi{color:#2347C4}
+/* подпись-плашка, как на гравюрах в референсе */
+.tag{display:inline-block;border:2.5px solid #2A231B;padding:11px 22px 10px;font:600 30px/1 'Onest';letter-spacing:.18em;text-transform:uppercase;color:#2A231B;background:rgba(238,230,212,.75);white-space:nowrap}
+.blob{position:absolute;border-radius:50%}
+.pill{display:inline-flex;align-items:center;gap:12px;padding:20px 36px;border-radius:999px;border:1.5px solid rgba(255,255,255,.22);background:rgba(255,255,255,.045);font:600 38px/1 'Onest';color:#fff;white-space:nowrap}
+.pill.blue{border-color:rgba(90,140,255,.75);color:#8DB2FF;background:rgba(47,107,255,.12)}
+#fade{position:absolute;inset:0;background:#000;opacity:0}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="fade"></div>
+<script src="story.js"></script>
+</body>
+</html>

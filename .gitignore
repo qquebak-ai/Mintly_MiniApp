@@ -14,3 +14,18 @@ demo/emoji/out/
 demo/emoji/sheet/
 demo/emoji/frames/
 demo/emoji/webm/preview.mp4
+
+# ролик-история: кадры, снимки, исходники картинок и промежуточные файлы
+demo/story/frames/
+demo/story/snap/
+demo/story/node_modules/
+demo/story/fullrender.log
+demo/story/assets/img/
+demo/story/assets/track.wav
+demo/story/assets/ink/thales.jpg
+demo/story/assets/ink/market.jpg
+demo/story/assets/ink/goldweigher.jpg
+demo/story/assets/ink/astro1.jpg
+demo/story/assets/ink/press_nova.jpg
+demo/story/assets/ink/press_robert.jpg
+demo/story/renders/mintly-story-send.mp4
