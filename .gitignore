@@ -30,3 +30,11 @@ demo/story/assets/ink/press_nova.jpg
 demo/story/assets/ink/press_robert.jpg
 demo/story/renders/mintly-story-send.mp4
 demo/story/assets/img2/
+
+# ролик про Леса Брауна: кадры, снимки, промежуточные файлы
+demo/les/frames/
+demo/les/snap/
+demo/les/node_modules/
+demo/les/fullrender.log
+demo/les/assets/track.wav
+demo/les/renders/mintly-lesbrown-send.mp4
