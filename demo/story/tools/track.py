@@ -115,7 +115,7 @@ while t < 56.0:
         put(tb, sub(root, B2 * .95), .5)
         for h in range(2): put(tb + h * B2 / 2, hat(), .75, pan=.25)
     t += 4 * B2; bar += 1
-for i in range(4): put(51.6 + i * .4, pop(780 + i * 140), .22)
+for i in range(4): put(51.3 + i * .4, pop(780 + i * 140), .22)
 for i in range(16): put(46.3 + i * .25, tick(3400, .015), .08, pan=.5)  # тики живого графика
 put(45.3, whoosh(.6, False), .2); put(50.7, whoosh(.6, False), .2)
 

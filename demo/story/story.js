@@ -178,7 +178,8 @@ const b4s = mkLine(B4, "столько ему *заплатили* за тике
 function drawB4(t) {
   const q = E.io(prog(t, B4b - 0.55, B4b));
   B4.style.opacity = 1 - q;
-  tagAt(b4tag, t, B4a + 0.3); words(b4l, t, B4a + 0.6);
+  // плашка и строка входят, пока гаснет прошлая гравюра — без пустой бумаги
+  tagAt(b4tag, t, B4a - 0.2); words(b4l, t, B4a + 0.05);
   const ap = E.out(prog(t, 26.2, 26.9)), run = E.io(prog(t, 27.0, 28.3));
   const v = Math.round(lerp(5000, 40000, run) / 50) * 50;
   b4n.textContent = "$" + v.toLocaleString("ru-RU").replace(/ /g, " ");
@@ -201,7 +202,7 @@ const c1c = mkLine(C1, "*99%* — берём на себя", { top: 570, size: 1
 function drawC1(t) { words(c1a, t, 39.7, { out: 44.9 }); words(c1b, t, 40.6, { out: 44.95, stag: 0.14 }); words(c1c, t, 41.5, { out: 45.0, stag: 0.14 }); }
 
 // C2 · живые цены: график растёт в реальном времени, как лента тикера
-const C2 = scene(MOD, 45.3, 51.0, drawC2);
+const C2 = scene(MOD, 45.3, 50.6, drawC2);
 const c2t = mkLine(C2, "Цены в реальном времени —", { top: 96, size: 84, weight: 700 });
 const c2s = mkLine(C2, "как тикер Эдисона, только *в твоём Telegram*", { top: 206, size: 50, weight: 500, color: "#B4BAC6" });
 const GX = 330, GY = 330, GW = 1260, GH = 520;
@@ -217,12 +218,13 @@ const gsvg = $(`<svg class="abs" style="left:${GX}px;top:${GY + 70}px;overflow:v
   <circle id="gp" r="22" fill="#5A8CFF" opacity=".25"/><circle id="gd" r="10" fill="#fff" stroke="#3F78FF" stroke-width="5"/></svg>`);
 C2.append(gcard, live, priceEl, gsvg);
 function drawC2(t) {
-  const k = E.out(prog(t, 45.3, 46.0)), q = E.io(prog(t, 50.4, 51.0));
+  // гаснет раньше, чем входит следующий заголовок, — строки не накладываются
+  const k = E.out(prog(t, 45.3, 46.0)), q = E.io(prog(t, 50.0, 50.55));
   C2.style.opacity = k * (1 - q);
   words(c2t, t, 45.6); words(c2s, t, 46.2, { stag: 0.07 });
   const ck = E.out(prog(t, 45.9, 46.7)); [gcard, live, priceEl, gsvg].forEach((e) => S(e, { o: ck, y: (1 - ck) * 30 }));
   // сколько точек уже «пришло»: график дописывается справа, как живой
-  const n = Math.max(2, Math.floor(lerp(30, series.length, prog(t, 46.3, 50.2))));
+  const n = Math.max(2, Math.floor(lerp(30, series.length, prog(t, 46.3, 49.8))));
   const H2 = GH - 70, step = GW / (series.length - 1);
   const pts = series.slice(0, n).map((v, i) => [i * step, H2 - v * H2]);
   const d = "M" + pts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L");
@@ -254,8 +256,8 @@ const cards = CARDS.map(([lb, d], i) => {
 });
 function drawC3(t) {
   const q = E.io(prog(t, 55.8, 56.4)); C3.style.opacity = 1 - q;
-  words(c3t, t, 51.0);
-  cards.forEach((c, i) => { const a = 51.6 + i * 0.4, k = E.soft(prog(t, a, a + 0.85)); S(c, { o: clamp(k * 1.4), y: (1 - k) * 40, s: 0.94 + 0.06 * k }); });
+  words(c3t, t, 50.55);
+  cards.forEach((c, i) => { const a = 51.3 + i * 0.4, k = E.soft(prog(t, a, a + 0.85)); S(c, { o: clamp(k * 1.4), y: (1 - k) * 40, s: 0.94 + 0.06 * k }); });
 }
 
 // ============ D · ПРИЗЫВ И ЛОГОТИП 56–62 ============
