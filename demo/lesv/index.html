@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Mintly · Лес Браун</title>
+<style>
+@font-face{font-family:'Onest';font-weight:100 900;src:url('assets/fonts/onest-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+2000-206F,U+20AC,U+2122,U+2212}
+@font-face{font-family:'Onest';font-weight:100 900;src:url('assets/fonts/onest-cyrillic.woff2') format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Nunito';font-weight:800;src:url('assets/fonts/nunito-800-cyrillic.woff2') format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Nunito';font-weight:800;src:url('assets/fonts/nunito-800-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+2000-206F,U+2212}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
+body{font-family:'Onest',system-ui,sans-serif;color:#fff;-webkit-font-smoothing:antialiased}
+.abs{position:absolute}
+.layer{position:absolute;inset:0;overflow:hidden}
+.scene{position:absolute;inset:0}
+.w{display:inline-block;will-change:transform,opacity,filter}
+/* человечки: белая линия на чёрном, как в референсе */
+.fig path,.fig rect,.fig circle,.fig ellipse,.fig line{fill:none;stroke:#fff;stroke-width:6;stroke-linecap:round;stroke-linejoin:round}
+.fig .pu{fill:#fff;stroke:none}
+.cap{position:absolute;left:60px;right:60px;top:500px;text-align:center;font:700 62px/1.18 'Onest';letter-spacing:-.01em;color:#fff}
+/* подпись на гравюре: светлая плашка с тёмной рамкой */
+.lbl{display:inline-block;padding:16px 30px 14px;background:#F3F1EA;border:3px solid #1C1E24;font:700 44px/1 'Onest';letter-spacing:.12em;text-transform:uppercase;color:#1C1E24;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.accent{color:#4F86FF}
+#flash{position:absolute;inset:0;background:#F3F1EA;opacity:0}
+#fade{position:absolute;inset:0;background:#000;opacity:0}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="flash"></div>
+<div id="fade"></div>
+<script src="lesv.js"></script>
+</body>
+</html>

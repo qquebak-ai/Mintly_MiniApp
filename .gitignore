@@ -38,3 +38,10 @@ demo/les/node_modules/
 demo/les/fullrender.log
 demo/les/assets/track.wav
 demo/les/renders/mintly-lesbrown-send.mp4
+
+# вертикальный ролик про Леса Брауна: кадры, снимки, промежуточные файлы
+demo/lesv/frames/
+demo/lesv/snap/
+demo/lesv/node_modules/
+demo/lesv/fullrender.log
+demo/lesv/assets/track.wav
