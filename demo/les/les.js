@@ -160,7 +160,7 @@ function artScene({ a, b, key, side, tag, says, sayAt, size = 70, extra }) {
   const tg = mkTag(el, tag, { left: colX, top: top0 - 96 });
   const groups = says.map((ls) => block(el, ls, { left: colX, top: top0, size, weight: 700 }));
   function draw(t) {
-    artAt(art, t, a + 0.15, b);
+    artAt(art, t, a, b);
     tagAt(tg, t, a + 0.6, b - 1.05);
     groups.forEach((g, i) => { const nx = sayAt[i + 1]; blockAt(g, t, sayAt[i], { out: nx == null ? b - 1.1 : nx - 0.65 }); });
     if (extra) extra(t, art);
@@ -169,14 +169,14 @@ function artScene({ a, b, key, side, tag, says, sayAt, size = 70, extra }) {
 }
 
 artScene({ a: 0, b: 7.0, key: "birth", side: "R", tag: "Майами · 1945", says: [["Он родился", "на полу", "*заброшенного дома*"]], sayAt: [1.2], size: 92 });
-artScene({ a: 6.8, b: 13.2, key: "school", side: "L", tag: "Пятый класс", says: [["В школе его записали", "в *«отсталые»* и вернули", "на класс назад"]], sayAt: [7.8], size: 74,
+artScene({ a: 6.35, b: 13.2, key: "school", side: "L", tag: "Пятый класс", says: [["В школе его записали", "в *«отсталые»* и вернули", "на класс назад"]], sayAt: [7.8], size: 74,
   extra: (t, art) => {
     // штамп «шлёпается» на листок: увеличен и прозрачен → на место с толчком
     const st = art.querySelector(".stampTx"), k = E.soft(prog(t, 9.0, 9.45));
     st.setAttribute("transform", `rotate(-9 318 314) translate(318 314) scale(${lerp(1.8, 1, k).toFixed(3)}) translate(-318 -314)`);
   } });
-artScene({ a: 13.0, b: 19.4, key: "trash", side: "R", tag: "Майами-Бич", says: [["Работал мусорщиком", "и мечтал вести", "*радиоэфир*"]], sayAt: [14.0], size: 82 });
-artScene({ a: 19.2, b: 26.4, key: "door", side: "L", tag: "Радиостанция", says: [["Каждый день приходил", "и спрашивал:", "«Работа есть?» — *«Нет»*"], ["Пока его не взяли", "*на побегушки*"]], sayAt: [20.2, 23.4], size: 74,
+artScene({ a: 12.6, b: 19.4, key: "trash", side: "R", tag: "Майами-Бич", says: [["Работал мусорщиком", "и мечтал вести", "*радиоэфир*"]], sayAt: [14.0], size: 82 });
+artScene({ a: 18.8, b: 26.4, key: "door", side: "L", tag: "Радиостанция", says: [["Каждый день приходил", "и спрашивал:", "«Работа есть?» — *«Нет»*"], ["Пока его не взяли", "*на побегушки*"]], sayAt: [20.2, 23.4], size: 74,
   extra: (t, art) => {
     // стук в дверь: дуги расходятся волной, трижды за реплику
     art.querySelectorAll(".knock").forEach((e, i) => {
@@ -184,7 +184,7 @@ artScene({ a: 19.2, b: 26.4, key: "door", side: "L", tag: "Радиостанц�
       e.style.opacity = on ? (0.25 + 0.75 * Math.max(0, 1 - Math.abs(ph - 0.25) * 3)).toFixed(3) : "1";
     });
   } });
-artScene({ a: 26.2, b: 32.6, key: "mic", side: "R", tag: "Однажды", says: [["Ведущий не смог", "выйти в эфир —", "и Лес взял *микрофон*"]], sayAt: [27.2], size: 78,
+artScene({ a: 25.8, b: 32.6, key: "mic", side: "R", tag: "Однажды", says: [["Ведущий не смог", "выйти в эфир —", "и Лес взял *микрофон*"]], sayAt: [27.2], size: 78,
   extra: (t, art) => {
     // табличка «В ЭФИРЕ» загорается, когда звучит его имя
     const on = E.out(prog(t, 29.4, 29.8)) * (1 - E.io(prog(t, 31.6, 32.0)));
@@ -192,10 +192,10 @@ artScene({ a: 26.2, b: 32.6, key: "mic", side: "R", tag: "Однажды", says:
     art.querySelector(".airTx").style.fill = on > 0.5 ? "#FFFFFF" : "#8DB2FF";
     air.style.filter = on > 0.02 ? `drop-shadow(0 0 ${(on * 18).toFixed(1)}px rgba(90,140,255,.9))` : "none";
   } });
-artScene({ a: 32.4, b: 38.8, key: "stage", side: "L", tag: "Потом", says: [["Стал спикером,", "которого слушают миллионы,", "и честно *разбогател*"]], sayAt: [33.4], size: 70 });
+artScene({ a: 32.0, b: 38.8, key: "stage", side: "L", tag: "Потом", says: [["Стал спикером,", "которого слушают миллионы,", "и честно *разбогател*"]], sayAt: [33.4], size: 70 });
 
 // ============ МОСТИК: старт с пола → так устроены монеты Mintly ============
-const BR = scene(38.6, 46.1, drawBR);
+const BR = scene(38.2, 45.9, drawBR);
 const br1 = mkLine(BR, "Он начал буквально *с пола*.", { top: 120, size: 84, weight: 700 });
 const br2 = mkLine(BR, "Монеты в *Mintly* устроены так же:", { top: 232, size: 66, weight: 600, color: "#C9D6F2" });
 const CX = 460, CY = 380, CW = 1000, CH = 420;
@@ -216,8 +216,8 @@ const rings = BUY.map(() => { const c = document.createElementNS("http://www.w3.
 [chart.querySelector(".ax"), chart.querySelector(".cl")].forEach((e) => { e.setAttribute("pathLength", "1"); e.style.strokeDasharray = "1 1"; });
 const onCurve = (p) => [p * CW, CH - price(p) * CH];
 function drawBR(t) {
-  const q = E.io(prog(t, 45.5, 46.1)); BR.style.opacity = 1 - q;
-  words(br1, t, 39.0); words(br2, t, 40.2, { stag: 0.09 });
+  const q = E.io(prog(t, 45.3, 45.85)); BR.style.opacity = 1 - q;
+  words(br1, t, 38.5); words(br2, t, 40.2, { stag: 0.09 });
   chart.querySelector(".ax").style.strokeDashoffset = 1 - E.io(prog(t, 40.9, 41.5));
   const dr = E.io(prog(t, 41.3, 43.9));
   chart.querySelector(".cl").style.strokeDashoffset = (1 - dr).toFixed(4);
@@ -233,7 +233,7 @@ function drawBR(t) {
 }
 
 // ============ РЕКОМЕНДАЦИИ ============
-const RC = scene(45.8, 52.1, drawRC);
+const RC = scene(45.7, 52.1, drawRC);
 const rct = mkLine(RC, "Чтобы начать, хватит *минуты*", { top: 140, size: 88, weight: 700 });
 const CARDS = [
   ["Своя монета за минуту", `<circle cx="12" cy="12" r="8.5"/><path d="M8.6 15.4V8.6l3.4 4 3.4-4v6.8"/>`],
@@ -250,7 +250,7 @@ const cards = CARDS.map(([lb, d], i) => {
 });
 function drawRC(t) {
   const q = E.io(prog(t, 51.5, 52.1)); RC.style.opacity = 1 - q;
-  words(rct, t, 46.1);
+  words(rct, t, 45.85);
   cards.forEach((c, i) => { const a = 46.9 + i * 0.42, k = E.soft(prog(t, a, a + 0.85)); S(c, { o: clamp(k * 1.4), y: (1 - k) * 40, s: 0.94 + 0.06 * k }); });
 }
 
