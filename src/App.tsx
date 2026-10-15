@@ -23335,7 +23335,7 @@ function ЗнакЗагрузки({ size = 40, вид = "контур", оста
       <svg width={size} height={size} viewBox={ВИД_ЗВЕЗДЫ} aria-hidden style={{ display: "block", overflow: "visible", flex: "none" }}>
         <path
           d={ПУТЬ_ЗВЕЗДЫ} fill={цвет}
-          style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: остановлен ? "none" : "знакРаскрытие 3.4s cubic-bezier(0.45, 0, 0.25, 1) infinite" }}
+          style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: остановлен ? "none" : "знакРаскрытие 2.9s cubic-bezier(0.45, 0, 0.25, 1) infinite" }}
         />
       </svg>
     );

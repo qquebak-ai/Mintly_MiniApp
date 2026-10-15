@@ -187,7 +187,7 @@
          зависшим. Появляется не сразу: при быстром ответе его не видно. */
       #ширма.пусто .знак { width: 56px; height: 56px; opacity: 0; animation: ширмаПоявись 1ms linear 700ms forwards; }
       #ширма.пусто .знак path { transform-box: fill-box; transform-origin: 50% 50%;
-                                animation: ширмаРаскрытие 3.4s cubic-bezier(0.45, 0, 0.25, 1) 700ms infinite both; }
+                                animation: ширмаРаскрытие 2.9s cubic-bezier(0.45, 0, 0.25, 1) 700ms infinite both; }
       @keyframes ширмаПоявись { to { opacity: 1; } }
       @keyframes ширмаРаскрытие { 0% { transform: scale(0.2) rotate(-60deg); opacity: 0; } 42%, 72% { transform: scale(1) rotate(0deg); opacity: 1; } 100% { transform: scale(0.2) rotate(50deg); opacity: 0; } }
       /* Свечи внизу заставки: светло-серые, встают слева направо по
