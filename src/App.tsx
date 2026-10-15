@@ -333,7 +333,8 @@ const STR = {
     // Строки заставки: имя посередине чёрного и то же имя в шапке.
     authSplashLead: "Мемкоины на TON и Solana",
     onbEmailTitle: "Введите почту",
-    onbEmailLead: "Для входа и регистрации",
+    onbEmailLead: "Для регистрации аккаунта",
+    onbLoginCodeLead: "Для входа в аккаунт — код отправили на {mail}",
     onbNameTitle: "Как вас зовут?",
     onbNameLead: "Это имя будут видеть другие",
     onbUserTitle: "Придумайте юзернейм",
@@ -1037,7 +1038,8 @@ const STR = {
     authSignInCta: "Sign in",
     authSplashLead: "Memecoins on TON and Solana",
     onbEmailTitle: "Enter your email",
-    onbEmailLead: "To log in or sign up",
+    onbEmailLead: "To create your account",
+    onbLoginCodeLead: "To log in, we sent a code to {mail}",
     onbNameTitle: "What's your name?",
     onbNameLead: "This name will be visible to others",
     onbUserTitle: "Choose a username",
@@ -24904,7 +24906,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   (ВЕРХ_КАРТОЧКИ), а здесь ни аватарки, ни длинного текста
                   нет — с тем же отступом иконка с заголовком повисали в
                   пустоте над окошками кода. */}
-              <ОнбЗаголовок title={t("mailCodeTitle")} lead={tf("mailCodeTo", { mail: почтаЧистая })} />
+              {/* Первый шаг говорит только о регистрации; о входе речь заходит
+                  здесь — сюда попадают лишь нажавшие «Войти». */}
+              <ОнбЗаголовок title={t("mailCodeTitle")} lead={tf("onbLoginCodeLead", { mail: почтаЧистая })} />
 
               {/* Шесть окошек вместо одного поля: видно, сколько знаков
                   уже набрано и сколько осталось, а следующее место
