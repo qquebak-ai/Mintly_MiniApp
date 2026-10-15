@@ -17,8 +17,18 @@ const E = {
   out5: (k) => 1 - Math.pow(1 - k, 5),
   io: (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2),
   inQ: (k) => k * k * k,
-  back: (k) => { const c = 1.6; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); },
+  back: (k) => { const c = 0.9; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); },
 };
+// значение по ключам [t, ...числа] с мягким переходом между ними — так
+// ни один параметр сцены не прыгает на стыке
+const smooth = (k) => k * k * (3 - 2 * k);
+function keys(t, K) {
+  if (t <= K[0][0]) return K[0].slice(1);
+  for (let i = 1; i < K.length; i++) {
+    if (t <= K[i][0]) { const a = K[i - 1], b = K[i], k = smooth((t - a[0]) / (b[0] - a[0])); return a.slice(1).map((v, j) => lerp(v, b[j + 1], k)); }
+  }
+  return K[K.length - 1].slice(1);
+}
 const show = (el, on) => { el.style.display = on ? "" : "none"; };
 function S(el, { o = 1, x = 0, y = 0, s = 1, r = 0, b = 0 } = {}) {
   el.style.opacity = o;
@@ -51,8 +61,8 @@ bgFog.parts = [[-2, 170, 520, "#0D3277"], [14, 120, 420, "#0A2862"], [30, 180, 5
   .map(([x, y, w, c]) => { const sp = $(`<span style="left:${x}%;top:${y}px;width:${w}px;height:${w * 0.55}px;background:${c};opacity:.45"></span>`); bgFog.appendChild(sp); return sp; });
 function drawBG(t) {
   // в «тёмных» сценах референса фон приглушён, но не пропадает
-  const тёмно = (t >= 2.58 && t < 3.55) || (t >= 10.0 && t < 13.0);
-  BG.style.opacity = тёмно ? 0.45 : 1;
+  // в «тёмных» сценах фон приглушается плавно, а не щелчком
+  BG.style.opacity = keys(t, [[0, 1], [2.4, 1], [2.85, 0.45], [3.45, 0.45], [3.85, 1], [9.85, 1], [10.25, 0.45], [12.7, 0.45], [13.15, 1]])[0];
   bgGrad.style.backgroundPosition = `${(50 + 50 * Math.sin(t * 0.21)).toFixed(2)}% ${(50 + 50 * Math.cos(t * 0.17)).toFixed(2)}%`;
   bgGrad.style.transform = `rotate(${(Math.sin(t * 0.09) * 8).toFixed(2)}deg)`;
   bgBlobs.forEach((b, i) => {
@@ -84,14 +94,11 @@ const silkWrap = $(`<div class="scene"></div>`); silkWrap.appendChild(silk); roo
 const silkG = silk.querySelector("#silkG");
 function drawSilk(t) {
   // яркость и положение по сценам: полное свечение в начале, дальше — край
-  let o = 0, dx = 0, dy = 0, sc = 1;
-  if (t < 2.58) { o = 1; }
-  else if (t < 3.55) { o = 0; }
-  else if (t < 4.45) { o = 0.85 * E.out(prog(t, 3.55, 3.85)); dx = -520; dy = 260; sc = 1.15; }
-  else if (t < 5.3) { o = 0.35; dx = -620; dy = 320; sc = 1.2; }
-  else if (t < 6.5) { o = 0.6; dx = 560; dy = -120; sc = 1.05; }
-  else if (t < 8.3) { o = 0.55; dx = 900; dy = -320; sc = 1.1; }
-  else if (t < 10.0) { o = 0.6 * (1 - prog(t, 9.75, 10.0)); dx = -760; dy = 0; sc = 1.1; }
+  const [o, dx, dy, sc] = keys(t, [
+    [0, 1, 0, 0, 1], [2.4, 1, 0, 0, 1], [2.85, 0, -260, 130, 1.08], [3.5, 0, -520, 260, 1.15], [3.9, 0.85, -520, 260, 1.15],
+    [4.4, 0.85, -560, 280, 1.17], [4.8, 0.35, -620, 320, 1.2], [5.15, 0.35, -300, 200, 1.15], [5.6, 0.6, 560, -120, 1.05],
+    [6.4, 0.6, 620, -160, 1.06], [6.8, 0.55, 900, -320, 1.1], [8.2, 0.55, 860, -300, 1.1], [8.7, 0.6, -760, 0, 1.1],
+    [9.8, 0.6, -800, 10, 1.1], [10.2, 0, -820, 20, 1.1]]);
   silkWrap.style.opacity = o;
   silkWrap.style.visibility = o > 0.002 ? "visible" : "hidden";
   const a = Math.sin(t * 1.3) * 5 + t * 1.5, bx = Math.sin(t * 0.9) * 60 + dx, by = Math.cos(t * 1.1) * 40 + dy;
@@ -125,10 +132,12 @@ function layoutChips() {
   chipX = chipW.map((w) => { const p = x; x += w + gap; return p; });
 }
 function drawS1(t) {
-  const on = t < 2.58; show(s1, on); if (!on) return;
-  // камера чуть наезжает, пока курсор идёт к чипу
-  const zoom = 1 + 0.05 * E.io(prog(t, 1.85, 2.58));
+  const on = t < 2.85; show(s1, on); if (!on) return;
+  // камера чуть наезжает, пока курсор идёт к чипу, и сцена растворяется
+  const zoom = 1 + 0.05 * E.io(prog(t, 1.85, 2.58)) + 0.06 * E.io(prog(t, 2.45, 2.85));
   s1.style.transform = `scale(${zoom.toFixed(4)})`; s1.style.transformOrigin = "960px 540px";
+  const ух = E.io(prog(t, 2.45, 2.8));
+  s1.style.opacity = 1 - ух; s1.style.filter = ух > 0.01 ? `blur(${(ух * 10).toFixed(1)}px)` : "none";
   // знак: проявляется в центре вращением, затем уходит влево к слову
   const kIn = E.out(prog(t, 0.08, 0.4)), kL = E.io(prog(t, 0.38, 0.66)), kOut = prog(t, 1.12, 1.3);
   const lx = lerp(W / 2, 700, kL) - 75, ly = H / 2 - 75;
@@ -228,7 +237,7 @@ function typeChars(chars, t, a, b, accent = "#7FA9FF") {
   });
 }
 function drawS2(t) {
-  const on = t >= 2.58 && t < 4.62; show(s2, on); if (!on) return;
+  const on = t >= 2.5 && t < 4.62; show(s2, on); if (!on) return;
   S(glowTop, { o: (1 - E.out(prog(t, 3.5, 3.8))) * (0.8 + 0.2 * Math.sin(t * 6)) });
   typeChars(charsName, t, 2.7, 3.45);
   typeChars(charsTick, t, 3.92, 4.16);
@@ -248,10 +257,11 @@ function drawS2(t) {
   const pr = clamp(prog(t, 4.22, 4.28) - prog(t, 4.3, 4.38));
   fbtn.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
   fbtn.style.boxShadow = `0 0 ${(30 + 40 * pr).toFixed(0)}px rgba(120,165,255,${(0.45 + 0.4 * pr).toFixed(2)})`;
-  const fly = E.inQ(prog(t, 4.38, 4.56));
-  s2.style.transform = `scale(${(1 + 1.6 * fly).toFixed(4)})`; s2.style.transformOrigin = "960px 760px";
-  s2.style.filter = fly > 0.01 ? `blur(${(fly * 16).toFixed(1)}px)` : "none";
-  s2.style.opacity = 1 - fly;
+  const fly = E.io(prog(t, 4.34, 4.6)), вход = E.io(prog(t, 2.55, 2.85));
+  s2.style.transform = `scale(${(1 + 1.4 * fly + 0.04 * (1 - вход)).toFixed(4)})`; s2.style.transformOrigin = "960px 760px";
+  const бл = fly * 16 + (1 - вход) * 8;
+  s2.style.filter = бл > 0.05 ? `blur(${бл.toFixed(1)}px)` : "none";
+  s2.style.opacity = (1 - fly) * вход;
 }
 
 // ===================== 3. ПРОЛЁТ СКВОЗЬ МЕМПАД =====================
@@ -273,13 +283,13 @@ const rowEls = Array.from({ length: 24 }, (_, i) => {
   return { el, x: (rnd() - 0.5) * 1300 - 610, y: (rnd() - 0.5) * 760 + 170, z0: -3300 + i * 120 + rnd() * 90 };
 });
 function drawS3(t) {
-  const on = t >= 4.44 && t < 5.5; show(s3, on); if (!on) return;
-  const k = prog(t, 4.44, 5.5);
+  const on = t >= 4.4 && t < 5.5; show(s3, on); if (!on) return;
+  const k = prog(t, 4.4, 5.5);
   const sp = 2600 * E.io(k) + 700 * k;
   rowEls.forEach((c) => {
     const z = c.z0 + sp;
     const near = clamp((z + 260) / 420), far = clamp((z + 2700) / 500);
-    const o = far * (1 - clamp((z - 120) / 200)) * (1 - prog(t, 5.32, 5.5)) * prog(t, 4.44, 4.56);
+    const o = far * (1 - clamp((z - 120) / 200)) * (1 - smooth(prog(t, 5.2, 5.5))) * smooth(prog(t, 4.4, 4.62));
     c.el.style.opacity = o.toFixed(3);
     c.el.style.visibility = o > 0.01 ? "visible" : "hidden";
     c.el.style.transform = `translate3d(${(960 + c.x).toFixed(1)}px,${(540 + c.y).toFixed(1)}px,${z.toFixed(1)}px)`;
@@ -324,7 +334,7 @@ const iceTile = shop.querySelectorAll(".tbox")[1];
 const cur4 = cursor.cloneNode(true); s4.appendChild(cur4);
 function cardGlow(c) { card.firstElementChild.style.boxShadow = `0 0 0 2px ${c}44, 0 0 70px ${c}66, 0 40px 120px rgba(0,0,0,.6)`; }
 function drawS4(t) {
-  const on = t >= 5.25 && t < 10.08; show(s4, on); if (!on) return;
+  const on = t >= 5.2 && t < 10.25; show(s4, on); if (!on) return;
   const лёд = t >= 8.36;
   const цвет = лёд ? "#7FD8FF" : "#2EE87A";
   ctint.style.background = `radial-gradient(70% 90% at 100% 0%, ${цвет}38 0%, ${цвет}10 45%, transparent 70%)`;
@@ -332,17 +342,17 @@ function drawS4(t) {
   cmintie.style.backgroundImage = `url(assets/app/nav-${лёд ? "ice" : "mint"}.webp)`;
   cmintie.style.backgroundPosition = `${((Math.floor(t * 12) % 12) / 11) * 100}% 0`;
   let x = 0, y = 0, ry = -8, rx = 4, s = 1, b = 0, o = 1;
-  if (t < 5.66) { const k = E.out(prog(t, 5.25, 5.66)); x = lerp(1100, 40, k); ry = lerp(-62, -20, k); rx = lerp(10, 6, k); b = (1 - k) * 16; o = E.out(prog(t, 5.25, 5.4)); }
+  if (t < 5.66) { const k = E.out(prog(t, 5.2, 5.66)); x = lerp(1100, 40, k); y = 60; ry = lerp(-62, -20, k); rx = lerp(10, 6, k); b = (1 - k) * 16; o = smooth(prog(t, 5.2, 5.45)); }
   else if (t < 6.42) { const k = E.out(prog(t, 5.66, 6.42)); x = lerp(40, -30, k); ry = lerp(-20, -8, k); rx = lerp(6, 3, k); s = lerp(1, 1.04, k); }
   else if (t < 8.3) {
     // камера ныряет вниз: карта уходит вверх, под ней — магазин
     const k = E.io(prog(t, 6.42, 6.74)), pan = E.io(prog(t, 6.9, 8.3));
-    x = -30 - 260 * pan; y = lerp(0, -760, k); ry = -8 + 4 * pan; rx = 3; s = 1.04; b = Math.sin(k * Math.PI) * 14;
+    x = -30 - 260 * pan; y = lerp(60, -760, k); ry = -8 + 4 * pan; rx = 3; s = 1.04; b = Math.sin(k * Math.PI) * 14;
   } else if (t < 9.92) {
     // и возвращается — Минти уже ледяной
     const k = E.out(prog(t, 8.3, 8.72)), d = E.io(prog(t, 8.72, 9.92));
-    x = lerp(-290, -40, k) - 40 * d; y = lerp(-900, 60, k) - 10 * d; ry = lerp(-4, -10, k) + 4 * d; rx = lerp(3, 4, k); s = lerp(1.04, 0.96, k) + 0.03 * d; b = (1 - k) * 18;
-  } else { const k = E.inQ(prog(t, 9.92, 10.08)); x = -80; y = 60 - 60 * k; ry = -6; s = 0.99; b = k * 12; o = 1 - k; }
+    x = lerp(-290, -40, k) - 40 * d; y = lerp(-760, 60, k) - 10 * d; ry = lerp(-4, -10, k) + 4 * d; rx = lerp(3, 4, k); s = lerp(1.04, 0.96, k) + 0.03 * d; b = (1 - k) * 18;
+  } else { const k = E.io(prog(t, 9.92, 10.25)); x = -80; y = 50 - 70 * k; ry = -6; s = 0.99 - 0.04 * k; b = k * 12; o = 1 - k; }
   if (t >= 5.66 && t < 6.42) y = 60;
   card.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) scale(${s.toFixed(4)})`;
   card.style.filter = b > 0.05 ? `blur(${b.toFixed(1)}px)` : "none";
@@ -360,7 +370,7 @@ function drawS4(t) {
   const tileX = px + (16 + 185 + 88) * SS, tileY = py + 64 * SS;
   const kc = E.out(prog(t, 7.2, 7.75));
   const pr = clamp(prog(t, 7.9, 7.98) - prog(t, 8.02, 8.12));
-  S(cur4, { o: t < 6.9 || t > 8.3 ? 0 : prog(t, 7.2, 7.3), x: lerp(tileX + 300, tileX - 10, kc), y: lerp(tileY + 500, tileY, kc), s: 1 - 0.12 * pr });
+  S(cur4, { o: t < 6.9 || t > 8.3 ? 0 : smooth(prog(t, 7.2, 7.32)) * (1 - smooth(prog(t, 8.12, 8.28))), x: lerp(tileX + 300, tileX - 10, kc), y: lerp(tileY + 500, tileY, kc), s: 1 - 0.12 * pr });
   const sel = E.out(prog(t, 7.95, 8.1));
   iceTile.style.boxShadow = `0 0 0 ${(3 * sel).toFixed(1)}px #fff, 0 0 ${(30 * sel).toFixed(0)}px rgba(127,216,255,${(0.7 * sel).toFixed(2)})`;
   iceTile.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
@@ -387,11 +397,11 @@ function onPath(u, L, R) {
   return [L + R, R + (d - q), 90];
 }
 function drawS5(t) {
-  const on = t >= 10.05 && t < 11.75; show(s5, on); if (!on) return;
-  const fade = 1 - prog(t, 11.52, 11.7);
+  const on = t >= 10.0 && t < 11.75; show(s5, on); if (!on) return;
+  const fade = 1 - smooth(prog(t, 11.4, 11.72));
   const rise = E.io(prog(t, 10.1, 11.6));
   const ly = lerp(380, 330, rise);
-  const kL = E.out(prog(t, 10.08, 10.32));
+  const kL = E.out(prog(t, 10.05, 10.45));
   S(logo5, { o: kL * fade, x: W / 2 - 64, y: ly, s: lerp(0.7, 1, kL), b: (1 - kL) * 10 });
   const x0 = W / 2 - lineW / 2, y0 = ly + 188;
   const L = lineW, R = 200;
@@ -423,14 +433,17 @@ const bar = $(`<div class="abs" style="left:${W / 2 - BW / 2}px;top:${BY}px;widt
 </div>`); s6.appendChild(bar);
 const barIn = [...bar.querySelectorAll(".bin")];
 function drawS6(t) {
-  const on = t >= 13.0; show(s6, on); if (!on) return;
+  const on = t >= 12.75; show(s6, on); if (!on) return;
+  const kE = smooth(prog(t, 12.75, 13.1));
+  s6.style.opacity = kE; s6.style.transform = `scale(${(1.04 - 0.04 * kE).toFixed(4)})`;
+  s6.style.filter = kE < 0.99 ? `blur(${((1 - kE) * 8).toFixed(1)}px)` : "none";
   // полоса: вспышка-штрих → два сдвинутых слоя → строка поиска
   const k1 = E.out(prog(t, 13.06, 13.24));
   const sw = BW * 0.95 * k1;
   streak.style.width = sw + "px"; streak.style.transform = `translateX(${-sw / 2}px)`;
   streak.style.opacity = t < 13.24 ? k1 : 0; streak.style.filter = `blur(${(1 - k1) * 6 + 1.5}px)`;
   const g = t >= 13.24 && t < 13.5;
-  const j = Math.sin(t * 90) * 10;
+  const j = 10 * (1 - smooth(prog(t, 13.24, 13.5)));
   show(offA, g); show(offB, g);
   if (g) {
     const k = prog(t, 13.24, 13.5);

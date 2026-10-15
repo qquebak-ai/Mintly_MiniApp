@@ -2,7 +2,7 @@
 # Полный рендер: каждый браузер снимает кусок по 40 кадров (холодный старт
 # амортизируется), 3 куска параллельно; повторные проходы добивают пропуски.
 cd "$(dirname "$0")"
-N=510
+N=1020
 for pass in 1 2 3 4; do
   seq 0 40 $((N-1)) | xargs -P 3 -I{} sh -c '
     e=$(({}+40)); [ $e -gt '$N' ] && e='$N'
@@ -13,4 +13,4 @@ for pass in 1 2 3 4; do
   [ "$M" -eq 0 ] && break
 done
 mkdir -p renders
-ffmpeg -y -loglevel error -framerate 30 -i frames/f%04d.jpg -i assets/track.mp3 -c:v libx264 -preset slow -crf 17 -pix_fmt yuv420p -c:a aac -b:a 256k -shortest -movflags +faststart renders/mintly-built.mp4 && echo MUXED
+ffmpeg -y -loglevel error -framerate 60 -i frames/f%04d.jpg -i assets/track.mp3 -c:v libx264 -preset slow -crf 17 -pix_fmt yuv420p -c:a aac -b:a 256k -shortest -movflags +faststart renders/mintly-built.mp4 && echo MUXED
