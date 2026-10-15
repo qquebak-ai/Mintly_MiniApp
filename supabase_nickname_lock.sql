@@ -17,7 +17,10 @@ returns trigger
 language plpgsql
 as $$
 begin
-  if new.nickname is distinct from old.nickname then
+  -- Пустой ник заполнить можно: строку профиля база заводит сама, ещё до
+  -- того как человек выбрал имя, и без этого исключения такой аккаунт
+  -- навсегда остался бы безымянным.
+  if coalesce(old.nickname, '') <> '' and new.nickname is distinct from old.nickname then
     raise exception 'nickname is immutable' using errcode = '42501';
   end if;
   return new;

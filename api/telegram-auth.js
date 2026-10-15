@@ -400,11 +400,14 @@ export default async function handler(req, res) {
   if (body.probe === true) {
     const { data: existing, error: probeErr } = await admin
       .from("profiles")
-      .select("id")
+      .select("id, nickname")
       .eq("telegram_id", tgUser.id)
       .maybeSingle();
     if (probeErr) return fail(res, 500, "probe_failed", probeErr.message);
-    return res.status(200).json({ exists: !!existing });
+    // Строка без ника — заготовка, которую база ставит сама при появлении
+    // пользователя. Аккаунтом она не считается: человек имя ещё не выбрал,
+    // и ему нужен экран создания, а не молчаливый вход.
+    return res.status(200).json({ exists: !!(existing && existing.nickname) });
   }
 
   // Только привязать приглашение. Нужно тому, кто уже вошёл и открыл
@@ -503,7 +506,7 @@ export default async function handler(req, res) {
 
     // Профиль заводим только если его ещё нет: при повторном входе нельзя
     // затирать никнейм, описание и аватарку, которые человек поменял сам.
-    const { data: profile } = await admin.from("profiles").select("id, telegram_id, invited_by").eq("id", userId).maybeSingle();
+    const { data: profile } = await admin.from("profiles").select("id, telegram_id, invited_by, nickname").eq("id", userId).maybeSingle();
     if (profile && profile.telegram_id != null && String(profile.telegram_id) !== String(tgUser.id)) {
       return fail(res, 409, "account_conflict", `profile telegram_id ${profile.telegram_id} != ${tgUser.id}`);
     }
@@ -520,7 +523,10 @@ export default async function handler(req, res) {
       // «доклеивать» её к чужой записи нельзя: это и есть захват.
       return fail(res, 409, "account_conflict", "existing account without telegram binding");
     }
-    if (!profile) {
+    // Профиль без ника — та же «первая встреча»: строку завела база, а имя
+    // человек ещё не выбирал. Пустить его так — значит оставить внутри
+    // безымянным, и экран создания больше не появится.
+    if (!profile || !profile.nickname) {
       // Ник обязателен и берётся только с экрана входа. Своего варианта
       // сервер не придумывает: имя выбирается один раз на всю жизнь
       // аккаунта, и назначать его за человека нельзя. Занятый не
@@ -536,7 +542,8 @@ export default async function handler(req, res) {
       // пригласивший действительно есть в базе. Сам себя пригласить
       // нельзя, переписать связь позже — тоже: здесь она ставится один
       // раз и больше не трогается.
-      const invitedBy = await resolveInviter(admin, body.startParam, tgUser.id, userId);
+      // У заготовки связь могла уже стоять — её не переписываем.
+      const invitedBy = (profile && profile.invited_by) || await resolveInviter(admin, body.startParam, tgUser.id, userId);
 
       const { error: insertErr } = await admin.from("profiles").upsert({
         id: userId,
@@ -710,7 +717,9 @@ async function завестиПрофиль(req, res) {
   const userId = кто.user.id;
 
   const { data: есть } = await admin.from("profiles").select("id, nickname").eq("id", userId).maybeSingle();
-  if (есть) return res.status(200).json({ created: false, nickname: есть.nickname });
+  // Строка без ника — заготовка базы, а не аккаунт: имя ещё предстоит
+  // выбрать, и ниже оно ляжет в эту же строку.
+  if (есть && есть.nickname) return res.status(200).json({ created: false, nickname: есть.nickname });
 
   const nickname = wantedNickname(body);
   if (!nickname) return res.status(400).json({ error: "nickname_required" });

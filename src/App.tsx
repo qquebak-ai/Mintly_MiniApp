@@ -23025,14 +23025,17 @@ async function signInWithTelegram(nickname) {
 }
 
 // Есть ли у вошедшего профиль. Нет — значит аккаунт ещё не заведён, и
-// человека ждёт экран с ником.
+// человека ждёт экран с ником. Строка без ника — тоже «нет»: её заводит
+// сама база в момент появления пользователя, ещё до того как человек
+// выбрал имя, и считать её аккаунтом нельзя — приложение пустило бы
+// внутрь безымянного, а экран создания больше не показало бы.
 async function профильЕсть(userId) {
   if (!userId) return false;
-  const { data, error } = await supabase.from("profiles").select("id").eq("id", userId).maybeSingle();
+  const { data, error } = await supabase.from("profiles").select("id, nickname").eq("id", userId).maybeSingle();
   // Ошибка — это «не узнали», а не «нет»: решать за человека, что аккаунта
   // нет, по сбою связи нельзя.
   if (error) return null;
-  return !!data;
+  return !!(data && data.nickname);
 }
 
 const ПОЧТА_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
@@ -26459,7 +26462,11 @@ const FEE_PERCENT = 0; // комиссии площадки нет
        иначе человек с аккаунтом оказывался бы «без аккаунта» от одной
        потерянной секунды сети. */
     if (error && error.code !== "PGRST116") { console.warn("[mintly] профиль не загрузился:", error.message); return; }
-    if (!prof) { setAccountCreated(false); setProfile(EMPTY_PROFILE); setMyTokens([]); return; }
+    // Строка без ника — заготовка базы, а не аккаунт (см. профильЕсть).
+    // Сессия есть, а профиля точно нет — значит, дверь должна открыться
+    // сама, когда бы это ни выяснилось: не только при запуске, но и после
+    // позднего входа или обновления сессии.
+    if (!prof || !prof.nickname) { setAccountCreated(false); setProfile(EMPTY_PROFILE); setMyTokens([]); setНужнаРегистрация(true); return; }
     setProfile({ nickname: prof.nickname, email: prof.email, bio: prof.bio || "", avatarUrl: prof.avatar_url, emoji: prof.emoji, verified: !!prof.verified });
     // Ступень знака создателя лежит в профиле, а не только на устройстве:
     // её должны видеть другие. Здесь только читаем, повышает её эффект
@@ -27018,10 +27025,17 @@ function mapTokenRow(row) {
         // пройдёт, а новому сервер ответит «нужен ник», и мы откроем
         // экран создания.
         let есть = null;
-        try {
-          есть = (await probeTelegramAccount()).exists;
-        } catch (err) {
-          console.warn("[mintly] telegram probe failed:", err && err.message);
+        /* Разведку повторяем: один потерянный ответ раньше вёл к входу
+           вслепую, и тот, кто аккаунт так и не создал, оказывался на
+           главной с «Аккаунт не создан» вместо экрана создания. */
+        for (let попытка = 0; попытка < 3 && есть === null; попытка++) {
+          if (попытка) await new Promise((r) => setTimeout(r, 900 * попытка));
+          try {
+            есть = (await probeTelegramAccount()).exists;
+          } catch (err) {
+            console.warn("[mintly] telegram probe failed:", err && err.message);
+          }
+          if (!active) return;
         }
         if (есть === false) {
           нуженАккаунт = true;
