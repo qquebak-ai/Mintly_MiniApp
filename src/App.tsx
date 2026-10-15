@@ -15138,7 +15138,7 @@ function ЖидкаяКнопка({ onClick, disabled = false, занята = fa
      вращается; включается, только когда кнопку уже можно нажать. */
   const белая = готова || занята;
   return (
-    <div className="flex justify-center" style={{ width: "100%" }}>
+    <div className="flex justify-center" style={{ width: "100%", ...появлениеКнопки(готова || занята) }}>
       <div style={{
         position: "relative", isolation: "isolate",
         width: занята ? "34%" : "100%",
@@ -23476,11 +23476,26 @@ function ОнбПоле({ рамка = null, children }) {
 /* Те же свойства, что у ЖидкаяКнопка (disabled, занята, готова), чтобы
    подмена в шагах не меняла вызовы. Неактивная кнопка остаётся светлой,
    тускнеет только подпись — так на референсе. */
+/* Кнопка шага появляется, только когда шаг можно пройти (в поле
+   загорелась галочка): до этого её нет вовсе — ни плашки, ни текста, и
+   взгляд не цепляется за серую кнопку, нажать которую нельзя. Место под
+   ней держится, чтобы ничего не прыгало. */
+const появлениеКнопки = (видна) => ({
+  opacity: видна ? 1 : 0,
+  transform: видна ? "translateY(0) scale(1)" : "translateY(10px) scale(0.97)",
+  filter: видна ? "blur(0)" : "blur(4px)",
+  pointerEvents: видна ? "auto" : "none",
+  transition: "opacity 380ms ease, transform 520ms cubic-bezier(0.22, 1.25, 0.36, 1), filter 380ms ease",
+});
+
 function ОнбКнопка({ onClick, disabled = false, занята = false, готова = false, children }) {
   return (
+    <div className="w-full" style={появлениеКнопки(готова || занята)}>
     <button
       onClick={onClick}
       disabled={disabled || занята}
+      aria-hidden={!(готова || занята)}
+      tabIndex={готова || занята ? 0 : -1}
       className="fx-tap w-full"
       style={{
         height: ОНБ.высота, borderRadius: ОНБ.радиус, border: "none", background: ОНБ.текст,
@@ -23494,6 +23509,7 @@ function ОнбКнопка({ onClick, disabled = false, занята = false, �
     >
       {children}
     </button>
+    </div>
   );
 }
 
@@ -25430,7 +25446,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               {/* Дальше только одна дорога — внутрь. Почта уже привязана, а
                   код за ней человек запросит плашкой на главной, когда
                   сам захочет; здесь письма не ждут. */}
-              <ОнбКнопка onClick={() => { onСоздан(); onClose(); }}>
+              <ОнбКнопка готова onClick={() => { onСоздан(); onClose(); }}>
                 {t("enterApp")}
               </ОнбКнопка>
             </>
