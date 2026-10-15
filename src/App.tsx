@@ -2067,9 +2067,10 @@ function GlobalStyle() {
       .вст-тихо:active { opacity: 0.6; }
       @keyframes spin360 { from{ transform: rotate(0deg); } to{ transform: rotate(360deg); } }
       /* Знак-загрузчик: «прорисовка» — контур бежит линией и заливается;
-         «раскрытие» — распускается из точки с поворотом и отдачей. */
+         «раскрытие» — плавно распускается из точки с поворотом и так же
+         плавно сворачивается: без отдачи, она читалась рывком. */
       @keyframes знакКонтур { 0% { stroke-dashoffset: 1; fill-opacity: 0; } 55% { stroke-dashoffset: 0; fill-opacity: 0; } 75%, 90% { stroke-dashoffset: 0; fill-opacity: 1; } 100% { stroke-dashoffset: -1; fill-opacity: 0; } }
-      @keyframes знакРаскрытие { 0% { transform: scale(0) rotate(-90deg); opacity: 0; } 45%, 80% { transform: scale(1) rotate(0deg); opacity: 1; } 100% { transform: scale(0) rotate(60deg); opacity: 0; } }
+      @keyframes знакРаскрытие { 0% { transform: scale(0.2) rotate(-60deg); opacity: 0; } 42%, 72% { transform: scale(1) rotate(0deg); opacity: 1; } 100% { transform: scale(0.2) rotate(50deg); opacity: 0; } }
       @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
       @keyframes навСетьСмена { from{opacity:0; transform:scale(0.5) rotate(-40deg);} to{opacity:1; transform:scale(1) rotate(0deg);} }
       @keyframes навМенюСети { from{opacity:0; transform:translateY(8px) scale(0.86);} to{opacity:1; transform:translateY(0) scale(1);} }
@@ -23324,7 +23325,7 @@ function ЗнакЗагрузки({ size = 40, вид = "контур", оста
       <svg width={size} height={size} viewBox={ВИД_ЗВЕЗДЫ} aria-hidden style={{ display: "block", overflow: "visible", flex: "none" }}>
         <path
           d={ПУТЬ_ЗВЕЗДЫ} fill={цвет}
-          style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: остановлен ? "none" : "знакРаскрытие 2.2s cubic-bezier(0.2, 1.3, 0.4, 1) infinite" }}
+          style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: остановлен ? "none" : "знакРаскрытие 3.4s cubic-bezier(0.45, 0, 0.25, 1) infinite" }}
         />
       </svg>
     );
