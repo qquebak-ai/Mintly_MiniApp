@@ -75,6 +75,35 @@ async function убратьКартинки(admin, id) {
   }
 }
 
+// Всё, что держится за одну учётку, и сама учётка.
+async function удалитьЦеликом(admin, id) {
+  const беды = [];
+  for (const [таблица, колонка] of СВОЁ) {
+    const { error } = await admin.from(таблица).delete().eq(колонка, id);
+    if (error && !НЕТ_ТАБЛИЦЫ.has(error.code)) {
+      console.error(`[delete-account] ${таблица}.${колонка}:`, error.message);
+      беды.push(`${таблица}: ${error.message}`);
+    }
+  }
+  // Подписки держатся двумя концами — и тем, и другим.
+  for (const колонка of ["follower_id", "following_id"]) {
+    const { error } = await admin.from("follows").delete().eq(колонка, id);
+    if (error && !НЕТ_ТАБЛИЦЫ.has(error.code)) беды.push(`follows: ${error.message}`);
+  }
+  // Кого он привёл — остаётся с ними, но без ссылки на него.
+  await admin.from("profiles").update({ invited_by: null }).eq("invited_by", id);
+
+  await убратьКартинки(admin, id);
+
+  const { error: удалить } = await admin.auth.admin.deleteUser(id);
+  if (удалить && !/not.?found/i.test(удалить.message || "")) {
+    console.error("[delete-account] auth.users:", удалить.message);
+    return { беды, ошибка: удалить.message };
+  }
+  return { беды, ошибка: null };
+
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -95,28 +124,40 @@ export default async function handler(req, res) {
   if (authErr || !человек) return res.status(401).json({ error: "bad_session" });
   const id = человек.id;
 
-  const беды = [];
-  for (const [таблица, колонка] of СВОЁ) {
-    const { error } = await admin.from(таблица).delete().eq(колонка, id);
-    if (error && !НЕТ_ТАБЛИЦЫ.has(error.code)) {
-      console.error(`[delete-account] ${таблица}.${колонка}:`, error.message);
-      беды.push(`${таблица}: ${error.message}`);
+  /* Удаляем не одну учётку, а всё, что связано с этим человеком: у
+     аккаунта из Telegram могли остаться вторые, пустые учётки — со
+     служебным адресом tg<id>@telegram.local или с тем же telegram_id.
+     Оставь их — и следующий вход узнал бы человека по ним. */
+  const { data: свой } = await admin.from("profiles").select("telegram_id").eq("id", id).maybeSingle();
+  const тг = (свой && свой.telegram_id) || (человек.user_metadata && человек.user_metadata.telegram_id) || null;
+  const все = new Set([id]);
+  if (тг) {
+    const служебный = `tg${тг}@telegram.local`;
+    const { data: связанные } = await admin.from("profiles").select("id")
+      .or(`telegram_id.eq.${тг},email.eq."${служебный}"`).limit(20);
+    for (const р of связанные || []) все.add(р.id);
+    // Учётка без профиля видна только в самой авторизации.
+    for (let стр = 1; стр <= 5; стр++) {
+      const { data: список, error } = await admin.auth.admin.listUsers({ page: стр, perPage: 1000 });
+      if (error || !список || !список.users || !список.users.length) break;
+      for (const у of список.users) {
+        const мета = у.user_metadata || {};
+        if (у.email === служебный || String(мета.telegram_id || "") === String(тг)) все.add(у.id);
+      }
+      if (список.users.length < 1000) break;
     }
   }
-  // Подписки держатся двумя концами — и тем, и другим.
-  for (const колонка of ["follower_id", "following_id"]) {
-    const { error } = await admin.from("follows").delete().eq(колонка, id);
-    if (error && !НЕТ_ТАБЛИЦЫ.has(error.code)) беды.push(`follows: ${error.message}`);
-  }
-  // Кого он привёл — остаётся с ними, но без ссылки на него.
-  await admin.from("profiles").update({ invited_by: null }).eq("invited_by", id);
 
-  await убратьКартинки(admin, id);
-
-  const { error: удалить } = await admin.auth.admin.deleteUser(id);
-  if (удалить) {
-    console.error("[delete-account] auth.users:", удалить.message);
-    return res.status(500).json({ error: "delete_failed", detail: удалить.message.slice(0, 200) });
+  const беды = [];
+  // Отложенное приглашение держится за сам telegram_id — без него новый
+  // аккаунт на этом Telegram получил бы старого пригласившего.
+  if (тг) await admin.from("pending_referrals").delete().eq("telegram_id", тг);
+  for (const кто of все) {
+    const итог = await удалитьЦеликом(admin, кто);
+    if (итог.беды.length) беды.push(...итог.беды);
+    if (итог.ошибка && кто === id) {
+      return res.status(500).json({ error: "delete_failed", detail: итог.ошибка.slice(0, 200) });
+    }
   }
 
   // Учётной записи больше нет — значит аккаунта нет нигде. Недоделки по

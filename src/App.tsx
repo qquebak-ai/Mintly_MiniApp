@@ -11698,23 +11698,9 @@ function ЭкранНастроек({ открыт, onClose, profile, accountCre
             </div>
           ))}
 
-          {/* Выход — последним и отдельно от списка: в профиле он висел
-              поверх карточки и попадал под палец при каждом заходе, а
-              здесь его находят, когда за ним и пришли. Поиск его не
-              прячет: это не пункт настроек, а дверь наружу. */}
-          {accountCreated && (
-            <button
-              onClick={onВыход}
-              className="fx-tap w-full flex items-center justify-center"
-              style={{
-                gap: 8, padding: "14px 16px", borderRadius: 20,
-                background: hexA(T.rose, 0.10), border: `1px solid ${hexA(T.rose, 0.28)}`,
-                fontFamily: displayFont, fontSize: 15, fontWeight: 700, color: T.rose,
-              }}
-            >
-              <LogOut size={15} /> {t("logOutShort")}
-            </button>
-          )}
+          {/* Кнопки «Выйти» нет: из аккаунта не выходят, его удаляют —
+              в настройках аккаунта. Выход оставлял на телефоне полуживое
+              состояние, а аккаунт в базе — нетронутым. */}
         </div>
       </div>
       {/* Лёгкий блюр у нижнего края: список уходит под него не обрезом, а
@@ -29044,6 +29030,8 @@ function mapTokenRow(row) {
     setProfile(EMPTY_PROFILE);
     закрытьВсёОткрытое();
     if (wallet) tonConnectUI.disconnect();
+    // Ничего от удалённого аккаунта не остаётся и в памяти вкладки.
+    try { sessionStorage.clear(); } catch (e) { /* закрыто — и так пусто */ }
     showToast(t("accountDeleted"));
   }
   function openLoginProfile() { setProfileModalMode("login"); setProfileModalOpen(true); }
@@ -29678,7 +29666,6 @@ function mapTokenRow(row) {
           supportUnread={supportUnread}
           onПункт={(item) => setSettingsItem(item)}
           onПрофиль={() => { setНастройкиОткрыты(false); goTab("profile"); }}
-          onВыход={() => { setНастройкиОткрыты(false); logOutProfile(); }}
           insetTop={insetTop}
           insetBottom={insetBottom}
         />
