@@ -8,8 +8,8 @@
     <meta name="theme-color" content="#0B0D12" />
     <!-- Иконка вкладки — маскот: он же встречает на заставке и в пустых
          экранах, поэтому приложение узнаётся ещё до открытия. -->
-    <link rel="icon" type="image/png" href="/logo-star.png?v=19" />
-    <link rel="apple-touch-icon" href="/logo-star-bg.png?v=19" />
+    <link rel="icon" type="image/png" href="/logo-star.png?v=20" />
+    <link rel="apple-touch-icon" href="/logo-star-bg.png?v=20" />
 
     <!-- Карточка ссылки. Без неё приложение, отправленное в чат,
          разворачивалось пустым прямоугольником — а ссылку пересылают
@@ -167,13 +167,13 @@
          к своему размеру. Место и размер те же, что у знака в окне входа
          (46% высоты, 84 точки): окно подхватывает его без скачка. */
       #ширма .знак { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%);
-                     filter: drop-shadow(0 0 10px rgba(255,255,255,0.32)) drop-shadow(0 0 2px rgba(255,255,255,0.4)); will-change: transform, opacity, filter; }
+                     will-change: transform, opacity, filter; }
       #ширма:not(.идёт):not(.уходит) .знак { opacity: 0; }
       #ширма.идёт .знак { animation: ширмаИзДали 900ms cubic-bezier(0.16, 1, 0.3, 1) 60ms both; }
       #ширма.уходит .знак { animation: ширмаЗнакУход 420ms cubic-bezier(0.4, 0, 1, 1) both; }
       @keyframes ширмаИзДали { from { opacity: 0; transform: translate(-50%, -50%) scale(0.3); filter: blur(14px); }
                                60% { opacity: 1; filter: blur(0); }
-                               to { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 10px rgba(255,255,255,0.32)) drop-shadow(0 0 2px rgba(255,255,255,0.4)); } }
+                               to { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: none; } }
       @keyframes ширмаЗнакУход { to { opacity: 0; transform: translate(-50%, -50%) scale(1.12); filter: blur(6px); } }
       @keyframes ширмаВсплыв { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes ширмаВправо { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(16px); } }
