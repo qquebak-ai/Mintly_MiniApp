@@ -336,6 +336,11 @@ const STR = {
     onbEmailLead: "Для регистрации аккаунта",
     onbLoginCodeLead: "Для входа в аккаунт — код отправили на {mail}",
     onbRegisterCta: "Регистрация",
+    onbLoginTitle: "Вход",
+    onbLoginLead: "Введите почту аккаунта — пришлём на неё код",
+    onbGetCode: "Получить код",
+    onbLoginTelegram: "Войти через Telegram",
+    onbLoginNoAccount: "Аккаунта с такой почтой нет",
     onbNameTitle: "Как вас зовут?",
     onbNameLead: "Это имя будут видеть другие",
     onbUserTitle: "Придумайте юзернейм",
@@ -1042,6 +1047,11 @@ const STR = {
     onbEmailLead: "To create your account",
     onbLoginCodeLead: "To log in, we sent a code to {mail}",
     onbRegisterCta: "Sign up",
+    onbLoginTitle: "Log in",
+    onbLoginLead: "Enter your account email — we will send a code",
+    onbGetCode: "Get code",
+    onbLoginTelegram: "Log in with Telegram",
+    onbLoginNoAccount: "No account with this email",
     onbNameTitle: "What's your name?",
     onbNameLead: "This name will be visible to others",
     onbUserTitle: "Choose a username",
@@ -24070,7 +24080,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     if (!open || isEdit) return undefined;
     const btn = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.BackButton;
     if (!btn || typeof btn.show !== "function") return undefined;
-    const ПРЕЖНИЙ = { имя: "почта", ник: "имя", код: "почта" };
+    const ПРЕЖНИЙ = { имя: "почта", ник: "имя", вход: "почта", код: "вход" };
     const куда = ПРЕЖНИЙ[шагВхода];
     if (!куда) { btn.hide(); return undefined; }
     const назад = () => {
@@ -24422,7 +24432,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
        одна кнопка входа, человек, дошедший до конца шагов, нажимал бы её,
        окно закрывалось, а аккаунт не появлялся. Сервер сам решит, новый
        это аккаунт или уже заведённый. */
-    const входБезНика = естьАккаунт === true && шагВхода === "почта";
+    const входБезНика = естьАккаунт === true && шагВхода === "вход";
     const можно = внутриTelegram && !tgBusy && !ждём && (входБезНика || никГоден);
 
     function поймать(err) {
@@ -24566,7 +24576,11 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         clearTimeout(переотправкаТаймерRef.current);
         переотправкаТаймерRef.current = setTimeout(() => setЛогинМожноПереотправить(true), 120000);
       } catch (e) {
-        setЛогинОшибка(String((e && e.message) || "").slice(0, 140) || t("authMailUnknown"));
+        const текст = String((e && e.message) || "");
+        // Код шлётся только существующему аккаунту; на чужой адрес сервер
+        // отвечает «регистрация не разрешена» — человеку это значит одно:
+        // аккаунта с такой почтой нет.
+        setЛогинОшибка(/signup|not allowed|not found/i.test(текст) ? t("onbLoginNoAccount") : (текст.slice(0, 140) || t("authMailUnknown")));
       } finally {
         setЛогинИдёт(false);
       }
@@ -24779,9 +24793,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             // Ниже знака с воздухом: вплотную штрихи читались его подчёркиванием.
             top: верхОкна + логоY + ОНБ.логоМелкий / 2 + 12,
             /* Шагов три всегда, есть ли уже аккаунт или нет, — полоса не
-               прячется. Нет её только на входе по коду: это не шаг
+               прячется. Нет её только на страницах входа: это не шаги
                регистрации. */
-            opacity: картаВидна && шагВхода !== "готово" && шагВхода !== "код" ? 1 : 0,
+            opacity: картаВидна && шагВхода !== "готово" && шагВхода !== "код" && шагВхода !== "вход" ? 1 : 0,
             transition: `opacity 420ms ease ${первыйПоказ && картаВидна ? 560 : 0}ms`,
           }}
         >
@@ -24910,34 +24924,12 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 {t("onbContinue")}
               </ОнбКнопка>
 
-              {/* Занятая почта — не тупик: аккаунт с ней уже есть, просто
-                  не на этом Telegram. Мелкая кнопка, а не отдельный шаг —
-                  это не то, ради чего человек сюда пришёл, а выход для
-                  тех немногих, кому он нужен. Нажатие сразу шлёт код и
-                  переводит на второй шаг — тот же самый, что у окна
-                  подтверждения почты. */}
-              {почтаНеСвободна && (
+              {/* Вход — отдельной страницей, а не скрытым действием: раньше
+                  «Войти» то слало код, то молча входило, и человек видел
+                  всё ту же «регистрацию». Ссылка мелкая и есть всегда. */}
+              {внутриTelegram && (
                 <button
-                  onClick={отправитьКодВхода}
-                  disabled={логинИдёт}
-                  className="fx-tap w-full"
-                  style={{
-                    background: "transparent", border: "none", padding: "2px 0 0", cursor: "pointer",
-                    color: логинИдёт ? T.faint : T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
-                  }}
-                >
-                  {t("authSignInCta")}
-                </button>
-              )}
-
-              {/* Аккаунт на этот телеграм уже заведён — тогда почта с
-                  именем не нужны вовсе, и весь путь сводится к одному
-                  нажатию. Мелкой строкой: это не главный ход, а выход для
-                  тех, кто здесь не впервые. */}
-              {естьАккаунт === true && (
-                <button
-                  onClick={создать}
-                  disabled={tgBusy}
+                  onClick={() => { haptic("light"); setЛогинОшибка(""); setПочтаБеда(""); сменитьШагВхода("вход"); }}
                   className="fx-tap w-full"
                   style={{
                     background: "transparent", border: "none", padding: "2px 0 0", cursor: "pointer",
@@ -24962,6 +24954,73 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   <Send size={14} /> {t("openInTelegram")}
                 </a>
               )}
+            </>
+          ) : шагВхода === "вход" ? (
+            <>
+              {/* Вход: почта — и на неё код. Тому, у кого аккаунт заведён на
+                  этот Telegram, хватает одного нажатия — для него отдельная
+                  мелкая строка. Обратно к регистрации — тоже мелкой. */}
+              <ОнбЗаголовок title={t("onbLoginTitle")} lead={t("onbLoginLead")} />
+              <div className="flex flex-col" style={{ gap: 6 }}>
+                <ОнбПоле рамка={логинОшибка ? T.down : null}>
+                  <ПолеСЖивымТекстом
+                    className="онб-поле"
+                    value={почтаВвод}
+                    onChange={(e) => { setПочтаВвод(e.target.value); setЛогинОшибка(""); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                    type="email"
+                    inputMode="email"
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    autoComplete="off"
+                    style={{
+                      flex: 1, minWidth: 0, height: "100%", background: "transparent", border: "none", outline: "none",
+                      color: ОНБ.текст, caretColor: ОНБ.каретка, fontFamily: bodyFont, fontSize: 16,
+                    }}
+                  />
+                </ОнбПоле>
+                {логинОшибка && (
+                  <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5, lineHeight: 1.45 }}>{логинОшибка}</span>
+                )}
+              </div>
+              <ОнбКнопка
+                onClick={() => {
+                  if (!почтаПохожа) { setЛогинОшибка(t("authMailBad")); return; }
+                  // Код только что ушёл, а повтор ещё закрыт — письмо уже в
+                  // ящике, просто возвращаем к окошкам кода.
+                  if (!логинМожноПереотправить) { haptic("light"); сменитьШагВхода("код"); return; }
+                  отправитьКодВхода();
+                }}
+                disabled={!почтаПохожа || логинИдёт}
+                занята={логинИдёт}
+                готова={почтаПохожа}
+              >
+                {t("onbGetCode")}
+              </ОнбКнопка>
+              {естьАккаунт === true && (
+                <button
+                  onClick={создать}
+                  disabled={tgBusy}
+                  className="fx-tap w-full"
+                  style={{
+                    background: "transparent", border: "none", padding: "2px 0 0", cursor: "pointer",
+                    color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+                  }}
+                >
+                  {t("onbLoginTelegram")}
+                </button>
+              )}
+              <button
+                onClick={() => { haptic("light"); setЛогинОшибка(""); сменитьШагВхода("почта"); }}
+                className="fx-tap w-full"
+                  style={{
+                    background: "transparent", border: "none", padding: "2px 0 0", cursor: "pointer",
+                    color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+                  }}
+              >
+                {t("onbRegisterCta")}
+              </button>
             </>
           ) : шагВхода === "код" ? (
             <>
