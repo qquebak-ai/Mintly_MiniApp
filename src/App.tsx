@@ -15121,8 +15121,9 @@ function ЖидкаяКнопка({ onClick, disabled = false, занята = fa
           style={{
             position: "relative", overflow: "hidden", width: "100%",
             padding: "16px 0", borderRadius: 12, border: "none",
-            background: T.surfaceHi,
-            color: белая ? "#2A2C31" : T.muted,
+            // Как в ширме: кнопка светлая всегда, неактивная — бледной надписью.
+            background: "#F2F0EB",
+            color: белая ? "#2A2C31" : "rgba(42, 44, 49, 0.4)",
             fontFamily: displayFont, fontWeight: 800, fontSize: 16,
             transition: "color 320ms ease",
           }}
@@ -21404,7 +21405,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
                 // никакого лишнего зазора между ними.
                 <span className="flex items-baseline" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
                   {t("launchAmountLabel")}:&nbsp;
-                  <input
+                  <ПолеСЖивымТекстом
                     // Клавиатура числовая, а точку и запятую пускаем сами:
                     // на части телефонов запятая — единственный десятичный
                     // разделитель, который умеет показать раскладка.
@@ -24467,7 +24468,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             if (id) await supabase.from("profiles").update({ email: почтаЧистая }).eq("id", id);
           } catch (e) { console.warn("[mintly] почта не легла в профиль:", e && e.message); }
         }
-        setШагВхода("готово");
+        /* Страницы «Аккаунт готов» больше нет: создан — сразу внутрь. */
+        onСоздан(); onClose();
       } catch (err) {
         if ((err && err.message) === "nickname_required") {
           setЕстьАккаунт(false);
@@ -24782,7 +24784,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   {/* Знак ответа стоит в самом поле, как у имени: место
                       под него занято всегда, поэтому поле не дёргается. */}
                   <ОнбПоле рамка={почтаБеда || почтаНеСвободна ? T.down : (почтаСвободна ? T.up : null)}>
-                    <input
+                    <ПолеСЖивымТекстом
                       className="онб-поле"
                       value={почтаВвод}
                       onChange={(e) => { setПочтаВвод(e.target.value); setПочтаБеда(""); }}
@@ -24961,7 +24963,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               <ОнбЗаголовок title={t("onbNameTitle")} lead={t("onbNameLead")} />
               <div className="flex flex-col" style={{ gap: 6 }}>
                 <ОнбПоле>
-                  <input
+                  <ПолеСЖивымТекстом
                     className="онб-поле"
                     value={имяВвод}
                     onChange={(e) => setИмяВвод(e.target.value.slice(0, 40))}
@@ -25001,8 +25003,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   {/* Собачка приклеена к полю, а не набирается руками: ник
                       хранится без неё, и человеку не нужно про это знать. */}
                   <ОнбПоле рамка={(tgNickTouched && !никФормат) || никНеСвободен ? T.down : (никСвободен ? T.up : null)}>
-                    <span aria-hidden style={{ width: 10, height: 10, borderRadius: "50%", background: ОНБ.точка, flex: "none" }} />
-                    <input
+                    <span aria-hidden style={{ color: ОНБ.приглушённый, fontFamily: bodyFont, fontSize: 16, flex: "none", marginRight: -6 }}>@</span>
+                    <ПолеСЖивымТекстом
                       className="онб-поле"
                       value={tgNick}
                       onChange={(e) => { setTgNick(e.target.value.replace(/[^A-Za-z0-9_.]/g, "")); setTgNickTouched(true); setTgError(""); }}
@@ -25037,14 +25039,17 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5, lineHeight: 1.45 }}>{tgError}</span>
               )}
 
-              <ОнбКнопка
+              {/* Последний шаг — та самая жидкая кнопка: сжимается, внутри
+                  слипаются капли, пока сервер создаёт аккаунт. */}
+              <ЖидкаяКнопка
                 onClick={создать}
                 disabled={!можно}
                 занята={tgBusy || ждём}
                 готова={можно}
+                сияние
               >
                 {входБезНика ? t("authSignInCta") : t("onbCreate")}
-              </ОнбКнопка>
+              </ЖидкаяКнопка>
 
               {/* Мимо этого экрана хода нет: без аккаунта в приложении
                   нечего делать — ни кошелька, ни сделок, ни своих
