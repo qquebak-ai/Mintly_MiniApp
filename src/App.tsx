@@ -2066,6 +2066,10 @@ function GlobalStyle() {
       .вст-тихо { transition: color 180ms ease-out, opacity 180ms ease-out; }
       .вст-тихо:active { opacity: 0.6; }
       @keyframes spin360 { from{ transform: rotate(0deg); } to{ transform: rotate(360deg); } }
+      /* Знак-загрузчик: «прорисовка» — контур бежит линией и заливается;
+         «раскрытие» — распускается из точки с поворотом и отдачей. */
+      @keyframes знакКонтур { 0% { stroke-dashoffset: 1; fill-opacity: 0; } 55% { stroke-dashoffset: 0; fill-opacity: 0; } 75%, 90% { stroke-dashoffset: 0; fill-opacity: 1; } 100% { stroke-dashoffset: -1; fill-opacity: 0; } }
+      @keyframes знакРаскрытие { 0% { transform: scale(0) rotate(-90deg); opacity: 0; } 45%, 80% { transform: scale(1) rotate(0deg); opacity: 1; } 100% { transform: scale(0) rotate(60deg); opacity: 0; } }
       @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
       @keyframes навСетьСмена { from{opacity:0; transform:scale(0.5) rotate(-40deg);} to{opacity:1; transform:scale(1) rotate(0deg);} }
       @keyframes навМенюСети { from{opacity:0; transform:translateY(8px) scale(0.86);} to{opacity:1; transform:translateY(0) scale(1);} }
@@ -8415,7 +8419,7 @@ function TokenCreatorCard({ ownerId, currentUserId, onNeedAuth, showToast, onOpe
   if (loading && !creator) {
     return (
       <div className="rounded-[22px] p-4 flex items-center justify-center" style={{ background: T.surface, border: "none" }}>
-        <LeafLoader size={34} />
+        <ЗнакЗагрузки size={34} вид="контур" />
       </div>
     );
   }
@@ -9875,13 +9879,12 @@ function BootSplash({ steps, done, уходит = false, insetTop = 0 }) {
       }}
     >
 
-      {/* Во всю ширину: вереница котов должна уходить за края экрана, а
-          не толкаться в узкой колонке. */}
+      {/* Во всю ширину: так знак с полоской стоят ровно по центру экрана. */}
       <div style={{ position: "relative", zIndex: 1, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-        {/* Лента тормозит по тому же признаку, по которому уходит сама
+        {/* Знак замирает по тому же признаку, по которому уходит сама
             заставка: и когда данные пришли, и когда мы устали их ждать —
             вид один и тот же. */}
-        <LeafLoader progress={progress} size={223} остановлен={done} отклик />
+        <ЗнакЗагрузки size={96} вид="раскрытие" остановлен={done} />
         <div style={{ width: 132, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
           <div style={{
             width: `${Math.round(progress * 100)}%`, height: "100%", borderRadius: 999,
@@ -17767,7 +17770,7 @@ function TokenComments({ tokenId, currentUserId, onNeedAuth, onOpenProfile, show
       )}
 
       {items === null ? (
-        <div className="flex items-center justify-center" style={{ height: 70 }}><LeafLoader size={30} /></div>
+        <div className="flex items-center justify-center" style={{ height: 70 }}><ЗнакЗагрузки size={30} вид="раскрытие" /></div>
       ) : items.length === 0 ? (
         <div className="rounded-[20px] p-4 text-center" style={{ background: T.surface, border: `1px dashed ${T.line}` }}>
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{t("commentsEmpty")}</span>
@@ -19130,7 +19133,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         <div style={{ position: "relative", marginLeft: -16, marginRight: -16, background: T.bg }}>
           {!chartReady && chartPending ? (
             <div className="flex items-center justify-center" style={{ height: 360 }}>
-              <LeafLoader size={64} />
+              <ЗнакЗагрузки size={64} вид="контур" />
             </div>
           ) : !chartReady ? (
             <div className="flex flex-col items-center justify-center gap-3" style={{ height: 360, padding: "0 20px" }}>
@@ -19442,7 +19445,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           {!token.poolAddress && !token.curveAddress ? (
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{tr("txUnavailable")}</span>
           ) : tradesLoading && !trades ? (
-            <div className="flex items-center justify-center" style={{ height: 100 }}><LeafLoader size={40} /></div>
+            <div className="flex items-center justify-center" style={{ height: 100 }}><ЗнакЗагрузки size={40} вид="раскрытие" /></div>
           ) : !trades ? (
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{tr("txLoadFailed")}</span>
           ) : trades.length === 0 ? (
@@ -20849,7 +20852,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
               значила, а на пустом экране читалась как оборванная
               картинка. */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 64 }}>
-            <RefreshCw size={30} color={T.electric} style={{ animation: "spin360 1.1s linear infinite" }} />
+            <ЗнакЗагрузки size={44} вид="контур" />
           </div>
           <div>
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700 }}>
@@ -20871,7 +20874,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
                   {state === "done" ? (
                     <CheckCircle2 size={16} color={T.up} />
                   ) : state === "active" ? (
-                    <RefreshCw size={16} color={T.electric} style={{ animation: "spin360 1s linear infinite" }} />
+                    <ЗнакЗагрузки size={16} вид="раскрытие" />
                   ) : (
                     <Icon size={16} color={T.muted} />
                   )}
@@ -23312,6 +23315,33 @@ function ЗнакЗвезда({ size = 64 }) {
     </svg>
   );
 }
+/* Загрузчик — сам знак приложения, двумя способами по очереди в разных
+   местах, чтобы ожидание не выглядело одним и тем же колёсиком везде.
+   Остановлен — знак просто стоит: ждать больше нечего. */
+function ЗнакЗагрузки({ size = 40, вид = "контур", остановлен = false, цвет = "#E4E2DC" }) {
+  if (вид === "раскрытие") {
+    return (
+      <svg width={size} height={size} viewBox={ВИД_ЗВЕЗДЫ} aria-hidden style={{ display: "block", overflow: "visible", flex: "none" }}>
+        <path
+          d={ПУТЬ_ЗВЕЗДЫ} fill={цвет}
+          style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: остановлен ? "none" : "знакРаскрытие 2.2s cubic-bezier(0.2, 1.3, 0.4, 1) infinite" }}
+        />
+      </svg>
+    );
+  }
+  return (
+    <svg width={size} height={size} viewBox={ВИД_ЗВЕЗДЫ} aria-hidden style={{ display: "block", overflow: "visible", flex: "none" }}>
+      <path
+        d={ПУТЬ_ЗВЕЗДЫ} fill={цвет} stroke={цвет} pathLength={1}
+        // Толщина линии в единицах рисунка: у мелкого знака тоньше
+        // 1,5 точки на экране она уже не читается.
+        strokeWidth={Math.max(2.5, 225 / size)} strokeLinejoin="round"
+        style={{ strokeDasharray: 1, animation: остановлен ? "none" : "знакКонтур 2.4s ease-in-out infinite" }}
+      />
+    </svg>
+  );
+}
+
 function ОнбЛоготип({ size = 64 }) {
   return <ЗнакЗвезда size={size} />;
 }
@@ -23405,7 +23435,7 @@ function ЗагрузкаВхода() {
         background: ОНБ.фон, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22,
       }}
     >
-      <RefreshCw size={26} color="rgba(242, 240, 235, 0.55)" style={{ animation: "spin360 1.1s linear infinite" }} />
+      <ЗнакЗагрузки size={44} вид="раскрытие" />
       {долго && (
         <button
           onClick={() => window.location.reload()}
@@ -29077,7 +29107,7 @@ function mapTokenRow(row) {
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           gap: 12, padding: "0 28px",
         }}>
-          <RefreshCw size={30} color={T.electric} style={{ animation: "spin360 1.1s linear infinite" }} />
+          <ЗнакЗагрузки size={44} вид="контур" />
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 700 }}>
             {ждётПокупкиТокен ? `${ждётПокупкиСумма} TON · ${ждётПокупкиТокен}` : t("openingWallet")}
           </span>
