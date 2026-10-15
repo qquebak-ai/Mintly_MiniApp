@@ -171,7 +171,7 @@
       #ширма:not(.идёт):not(.уходит) .знак { opacity: 0; }
       #ширма.идёт .знак { animation: ширмаИзДали 900ms cubic-bezier(0.16, 1, 0.3, 1) 60ms both; }
       #ширма.уходит .знак { animation: ширмаЗнакУход 420ms cubic-bezier(0.4, 0, 1, 1) both; }
-      @keyframes ширмаИзДали { from { opacity: 0; transform: translate(-50%, -50%) scale(0.3); filter: blur(14px); }
+      @keyframes ширмаИзДали { from { opacity: 0; transform: translate(-50%, -50%) scale(0.3); filter: blur(6px); }
                                60% { opacity: 1; filter: blur(0); }
                                to { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: none; } }
       @keyframes ширмаЗнакУход { to { opacity: 0; transform: translate(-50%, -50%) scale(1.12); filter: blur(6px); } }

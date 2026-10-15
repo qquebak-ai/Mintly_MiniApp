@@ -24630,7 +24630,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           @keyframes онбПриход { from { opacity: 0; transform: translateX(22px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
           @keyframes онбУход { to { opacity: 0; transform: translateX(-22px); filter: blur(3px); } }
           @keyframes онбПроявись { from { opacity: 0; } }
-          @keyframes онбИзДали { from { opacity: 0; transform: scale(0.3); filter: blur(14px); } 60% { opacity: 1; filter: blur(0); } to { opacity: 1; transform: scale(1); filter: none; } }
+          @keyframes онбИзДали { from { opacity: 0; transform: scale(0.3); filter: blur(6px); } 45% { opacity: 1; } to { opacity: 1; transform: scale(1); filter: blur(0); } }
           .онб-поле::placeholder { color: rgba(242, 240, 235, 0.28); }
         `}</style>
         {/* Заставка: имя под логотипом по центру. Тот же размер и то же
@@ -24727,13 +24727,14 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           aria-hidden
           style={{
             position: "absolute", left: "50%", zIndex: 2, pointerEvents: "none",
-            top: заставкаНаЭкране ? "46%" : верхОкна + логоY,
-            transform: `translate(-50%, -50%) scale(${заставкаНаЭкране ? 1 : ОНБ.логоМелкий / ОНБ.логоКрупный})`,
-            transition: "top 750ms cubic-bezier(0.22, 1, 0.36, 1), transform 750ms cubic-bezier(0.22, 1, 0.36, 1)",
+            /* Знак сразу на своём месте наверху и только приближается из
+               глубины — без переезда из центра снизу вверх: два движения
+               подряд читались суетой. */
+            top: верхОкна + логоY,
+            transform: `translate(-50%, -50%) scale(${ОНБ.логоМелкий / ОНБ.логоКрупный})`,
           }}
         >
-          {/* Приближение уже сыграло на поле index.html — повторять не нужно. */}
-          <div style={{ animation: уже ? "none" : "онбИзДали 900ms cubic-bezier(0.16, 1, 0.3, 1) 60ms backwards", transformOrigin: "50% 50%" }}>
+          <div style={{ animation: "онбИзДали 900ms cubic-bezier(0.16, 1, 0.3, 1) 40ms backwards", transformOrigin: "50% 50%" }}>
             <ОнбЛоготип size={ОНБ.логоКрупный} />
           </div>
         </div>
@@ -24746,7 +24747,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             position: "absolute", left: 0, right: 0, zIndex: 2, pointerEvents: "none",
             // Ниже знака с воздухом: вплотную штрихи читались его подчёркиванием.
             top: верхОкна + логоY + ОНБ.логоМелкий / 2 + 12,
-            opacity: картаВидна && шагВхода !== "готово" && естьАккаунт !== true ? 1 : 0,
+            /* Шагов три всегда, есть ли уже аккаунт или нет, — полоса не
+               прячется. Нет её только на входе по коду: это не шаг
+               регистрации. */
+            opacity: картаВидна && шагВхода !== "готово" && шагВхода !== "код" ? 1 : 0,
             transition: `opacity 420ms ease ${первыйПоказ && картаВидна ? 560 : 0}ms`,
           }}
         >
