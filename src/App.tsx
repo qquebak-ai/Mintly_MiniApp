@@ -335,6 +335,7 @@ const STR = {
     onbEmailTitle: "Введите почту",
     onbEmailLead: "Для регистрации аккаунта",
     onbLoginCodeLead: "Для входа в аккаунт — код отправили на {mail}",
+    onbRegisterCta: "Регистрация",
     onbNameTitle: "Как вас зовут?",
     onbNameLead: "Это имя будут видеть другие",
     onbUserTitle: "Придумайте юзернейм",
@@ -1040,6 +1041,7 @@ const STR = {
     onbEmailTitle: "Enter your email",
     onbEmailLead: "To create your account",
     onbLoginCodeLead: "To log in, we sent a code to {mail}",
+    onbRegisterCta: "Sign up",
     onbNameTitle: "What's your name?",
     onbNameLead: "This name will be visible to others",
     onbUserTitle: "Choose a username",
@@ -24029,6 +24031,26 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     setУходитШагВхода(true);
     setTimeout(() => { setШагВхода(новый); setУходитШагВхода(false); }, УХОД_ШАГА_ВХОДА);
   }
+  /* Стрелка «Назад» в шапке Telegram ведёт на шаг раньше: с имени — на
+     почту, с юзернейма — на имя, со входа по коду — обратно на почту.
+     На первом шаге возвращаться некуда, и стрелки нет: само окно до
+     создания аккаунта не закрывается. */
+  useEffect(() => {
+    if (!open || isEdit) return undefined;
+    const btn = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.BackButton;
+    if (!btn || typeof btn.show !== "function") return undefined;
+    const ПРЕЖНИЙ = { имя: "почта", ник: "имя", код: "почта" };
+    const куда = ПРЕЖНИЙ[шагВхода];
+    if (!куда) { btn.hide(); return undefined; }
+    const назад = () => {
+      haptic("light");
+      if (шагВхода === "код") { setЛогинКод(""); setЛогинОшибка(""); }
+      сменитьШагВхода(куда);
+    };
+    btn.onClick(назад);
+    btn.show();
+    return () => { btn.offClick(назад); btn.hide(); };
+  }, [open, isEdit, шагВхода]);
   /* Отступ карточки сверху считается один раз, при открытии, и дальше не
      пересчитывается. В долях экрана (vh) он зависел от высоты окна, а
      Telegram укорачивает окно на высоту клавиатуры — и карточка прыгала
@@ -24960,6 +24982,23 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 }}
               >
                 {t("authCodeResend")}
+              </button>
+              {/* Обратный ход ко второй двери: с экрана входа можно вернуться
+                  к регистрации. Почту сбрасываем — эта уже занята, новый
+                  аккаунт на неё не завести. */}
+              <button
+                onClick={() => {
+                  haptic("light");
+                  setЛогинКод(""); setЛогинОшибка(""); setПочтаВвод("");
+                  сменитьШагВхода("почта");
+                }}
+                className="fx-tap"
+                style={{
+                  alignSelf: "center", padding: 0, border: "none", background: "transparent", cursor: "pointer",
+                  color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+                }}
+              >
+                {t("onbRegisterCta")}
               </button>
             </>
           ) : шагВхода === "имя" ? (
