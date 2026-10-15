@@ -2063,6 +2063,8 @@ function GlobalStyle() {
       .вст-тихо:active { opacity: 0.6; }
       @keyframes spin360 { from{ transform: rotate(0deg); } to{ transform: rotate(360deg); } }
       @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+      @keyframes навСетьСмена { from{opacity:0; transform:scale(0.5) rotate(-40deg);} to{opacity:1; transform:scale(1) rotate(0deg);} }
+      @keyframes навМенюСети { from{opacity:0; transform:translateY(8px) scale(0.86);} to{opacity:1; transform:translateY(0) scale(1);} }
       @keyframes страницаСнизу { from { opacity: 0; transform: translateY(34px); } to { opacity: 1; transform: none; } }
       /* Сцены на баннерах: свечи растут, монеты плавают, лист качается,
          ракета взлетает. Периоды разные, чтобы соседние баннеры не
@@ -10649,22 +10651,11 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
   );
 }
 
-function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solДоступен = false, currentUserId = null }) {
+function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solДоступен = false, currentUserId = null, сеть = "ton" }) {
   const [filter, setFilter] = useState("new");
-  // Сеть выбирается сверху, отдельно от фильтров: это не «ещё один
-  // способ отсортировать», а другой рынок целиком — свои токены, свои
-  // кошельки, своя лента.
-  const [сеть, setСеть] = useState(() => {
-    try {
-      const с = typeof window !== "undefined" && window.localStorage.getItem("mintly.network");
-      return с === "sol" || с === "ton" ? с : "ton";
-    } catch {
-      return "ton";
-    }
-  });
-  useEffect(() => {
-    try { if (typeof window !== "undefined") window.localStorage.setItem("mintly.network", сеть); } catch { /* приватный режим */ }
-  }, [сеть]);
+  // Сеть выбирается кружком рядом со свёрнутой панелью разделов: это не
+  // «ещё один способ отсортировать», а другой рынок целиком, и держит её
+  // приложение, а не раздел.
 
   // «В центре внимания» — пятёрка токенов, по которым прошло больше всего
   // сделок за последний час, и она прокручивается по кругу. Час берём как
@@ -10780,10 +10771,6 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
 
   return (
     <div className="flex flex-col" style={{ gap: 20, paddingTop: 8, paddingBottom: 16 }}>
-      {/* Сеть — ползунком: рынок меняется движением, а не случайным
-          касанием по краю экрана. */}
-      {разделГотов ? <NetworkSlider value={сеть} onChange={setСеть} /> : <ПлашкаЧисла width={168} height={38} radius={999} />}
-
       {/* Пока раздел не готов, его содержимое скрыто, но смонтировано:
           лента сама ходит за сделками, и без неё на экране ждать было бы
           нечего. На виду в это время — та же раскладка плашками: бегущая
@@ -26010,6 +25997,26 @@ const FEE_PERCENT = 0; // комиссии площадки нет
   const TONAPI_KEY = "";
   const [view, setView] = useState("home");
   const [tab, setTab] = useState("home");
+  // Сеть мемпада живёт здесь, а не в разделе: её кружок стоит рядом с
+  // панелью разделов, снаружи самого мемпада.
+  const [сетьМемпада, setСетьМемпада] = useState(() => {
+    try {
+      const с = typeof window !== "undefined" && window.localStorage.getItem("mintly.network");
+      return с === "sol" || с === "ton" ? с : "ton";
+    } catch {
+      return "ton";
+    }
+  });
+  useEffect(() => {
+    try { if (typeof window !== "undefined") window.localStorage.setItem("mintly.network", сетьМемпада); } catch { /* приватный режим */ }
+  }, [сетьМемпада]);
+  // В мемпаде панель сворачивается до одного его кружка: рынок занимает
+  // весь экран, а прочие разделы возвращаются повторным нажатием на него.
+  const [навСвёрнута, setНавСвёрнута] = useState(false);
+  const [менюСети, setМенюСети] = useState(false);
+  useEffect(() => {
+    if (tab !== "mempad") { setНавСвёрнута(false); setМенюСети(false); }
+  }, [tab]);
   const [token, setToken] = useState(null);
 
   /* Открытый токен переживает обновление страницы, но не новый запуск.
@@ -29172,7 +29179,7 @@ function mapTokenRow(row) {
             />
           </KeepAlive>
           <KeepAlive show={view === "mempad"}>
-            <MempadView myTokensLoading={!communityLoaded} myTokens={communityTokens} onOpen={openToken} onLaunch={openCreate} solДоступен={solЗапуск} currentUserId={userId} />
+            <MempadView myTokensLoading={!communityLoaded} myTokens={communityTokens} onOpen={openToken} onLaunch={openCreate} solДоступен={solЗапуск} currentUserId={userId} сеть={сетьМемпада} />
           </KeepAlive>
           </div>
           <KeepAlive show={view === "wallet"}>
@@ -29335,6 +29342,24 @@ function mapTokenRow(row) {
             Размытия подложки нет намеренно: панель висит над прокруткой,
             и браузер пересчитывал бы его на каждом кадре списка. Плотная
             заливка выглядит так же и ничего не стоит. */}
+        {(() => {
+          // Свёртка — только пока стоишь в самом мемпаде: поверх запуска
+          // или в другом разделе панель всегда полная.
+          const свёрнута = навСвёрнута && tab === "mempad" && view !== "create";
+          // Одна кривая на всё: кружки уезжают внутрь с обеих сторон, а
+          // капсула ужимается вместе с ними, без рывка в конце.
+          const ХОД = "520ms cubic-bezier(0.65, 0, 0.2, 1)";
+          const ЛОГО_СЕТИ = { ton: "/coins/gram.png", sol: "/coins/sol.png" };
+          return (
+        <div
+          className="flex items-end justify-center"
+          style={{
+            position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: insetBottom + 6, zIndex: 5,
+            // Под клавиатурой панели не видно — без анимации, как будто
+            // клавиатура просто её закрыла.
+            visibility: клавиатура ? "hidden" : "visible",
+          }}
+        >
         <div
           // Панель уже и ниже, иконки ближе друг к другу: без подписей
           // прежняя ширина оставляла между ними пустоту во весь палец, и
@@ -29344,11 +29369,8 @@ function mapTokenRow(row) {
           // прозрачные. Так видно, где стоишь, без подписи под значком и
           // без свечения вокруг него.
           style={{
-            position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: insetBottom + 6, zIndex: 5,
-            // Под клавиатурой панели не видно — без анимации, как будто
-            // клавиатура просто её закрыла.
-            visibility: клавиатура ? "hidden" : "visible",
-            width: "auto", maxWidth: 420, gap: 8,
+            position: "relative",
+            width: "auto", maxWidth: 420,
             padding: 9,
             borderRadius: 999,
             // Панель просто чёрная и прозрачная: под ней видно, что список
@@ -29362,7 +29384,11 @@ function mapTokenRow(row) {
             boxShadow: "0 10px 30px rgba(0,0,0,0.32)",
           }}
         >
-          <НавМинти окрас={cosmetics.mintie} />
+          {/* Минти сидит на краю полной капсулы; на одном кружке ему места
+              нет — прячется, пока панель свёрнута. */}
+          <div style={{ position: "absolute", inset: 0, pointerEvents: свёрнута ? "none" : "auto", opacity: свёрнута ? 0 : 1, transition: `opacity 260ms ease ${свёрнута ? "0ms" : "300ms"}` }}>
+            <НавМинти окрас={cosmetics.mintie} />
+          </div>
           {/* Профиля в панели нет: туда ходят за своими делами, а не
               переключаются между ним и рынком. Вход — по аватарке в углу
               главной, как это устроено везде. Запуск — не раздел, а
@@ -29375,25 +29401,55 @@ function mapTokenRow(row) {
             { id: "create", label: t("navCreate"), icon: ЗначокРакета },
             { id: "shop", label: t("navShop"), icon: ЗначокСумка },
             { id: "wallet", label: t("navWallet"), icon: ЗначокСтолбики },
-          ].map(({ id, label, icon: Icon, locked }) => {
+          ].map(({ id, label, icon: Icon, locked }, i) => {
             // Запуск — поверх текущего раздела, а не переключение на
             // него: если подсвечивать «создать» и сам раздел разом,
             // получаются два выбранных кружка сразу. Пока открыт запуск,
             // раздел под ним подсветку временно уступает.
             const active = id === "create" ? view === "create" : tab === id && view !== "create";
+            const скрыт = свёрнута && id !== "mempad";
             return (
-              <button
+              // Обёртка ужимается до нуля вместе с промежутком: так
+              // капсула сходится к мемпаду с обеих сторон сразу, а не
+              // съезжает вбок.
+              <div
                 key={id}
+                style={{
+                  width: скрыт ? 0 : 58, height: 58, flex: "none",
+                  marginLeft: i === 0 || скрыт ? 0 : 8,
+                  display: "flex", justifyContent: "center",
+                  transition: `width ${ХОД}, margin-left ${ХОД}`,
+                }}
+              >
+              <button
                 // Отклик отдаём сразу, до перерисовки: тяжёлый экран
                 // строится десятую долю секунды, и без него кажется, что
                 // нажатие не прошло — человек жмёт второй раз.
-                onClick={() => { haptic("light"); if (id === "create") openCreate(); else goTab(id); }}
+                onClick={() => {
+                  haptic("light");
+                  setМенюСети(false);
+                  if (id === "create") { openCreate(); return; }
+                  if (id === "mempad") {
+                    // Первое нажатие открывает мемпад и сворачивает
+                    // панель, повторное — разворачивает её обратно.
+                    if (tab === "mempad" && view !== "create") setНавСвёрнута((v) => !v);
+                    else { setНавСвёрнута(true); goTab(id); }
+                    return;
+                  }
+                  setНавСвёрнута(false);
+                  goTab(id);
+                }}
+                tabIndex={скрыт ? -1 : 0}
                 className="fx-tap flex items-center justify-center"
                 style={{
-                  position: "relative", border: "none", padding: 0,
+                  position: "relative", border: "none", padding: 0, flex: "none",
                   width: 58, height: 58, borderRadius: "50%",
                   background: active ? "#FFFFFF" : "transparent",
-                  transition: `background ${EASE}`,
+                  opacity: скрыт ? 0 : 1,
+                  transform: скрыт ? "scale(0.4)" : "scale(1)",
+                  filter: скрыт ? "blur(6px)" : "blur(0px)",
+                  pointerEvents: скрыт ? "none" : "auto",
+                  transition: `background ${EASE}, opacity 380ms ease ${скрыт ? "0ms" : "140ms"}, transform ${ХОД}, filter ${ХОД}`,
                 }}
               >
                 <Icon
@@ -29412,9 +29468,84 @@ function mapTokenRow(row) {
                 )}
 
               </button>
+              </div>
             );
           })}
         </div>
+        {/* Сеть — такой же круглой капсулой рядом со свёрнутой панелью:
+            один знак без подписи, по нажатию — меню из двух сетей. */}
+        <div
+          style={{
+            position: "relative", flex: "none",
+            width: свёрнута ? 76 : 0, marginLeft: свёрнута ? 10 : 0, height: 76,
+            transition: `width ${ХОД}, margin-left ${ХОД}`,
+          }}
+        >
+          <button
+            aria-label="Сеть"
+            tabIndex={свёрнута ? 0 : -1}
+            onClick={() => { haptic("light"); setМенюСети((v) => !v); }}
+            className="fx-tap flex items-center justify-center"
+            style={{
+              position: "absolute", left: 0, top: 0, width: 76, height: 76, padding: 0, border: "none", borderRadius: "50%",
+              background: hexA("#000000", 0.22),
+              backdropFilter: "blur(26px) saturate(1.5)",
+              WebkitBackdropFilter: "blur(26px) saturate(1.5)",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.32)",
+              opacity: свёрнута ? 1 : 0,
+              transform: свёрнута ? "scale(1)" : "scale(0.4)",
+              pointerEvents: свёрнута ? "auto" : "none",
+              transition: `opacity 380ms ease ${свёрнута ? "160ms" : "0ms"}, transform ${ХОД}`,
+            }}
+          >
+            <span style={{ width: 58, height: 58, borderRadius: "50%", background: менюСети ? "#FFFFFF" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", transition: `background ${EASE}` }}>
+              <img key={сетьМемпада} src={ЛОГО_СЕТИ[сетьМемпада]} alt="" width={30} height={30} style={{ borderRadius: "50%", display: "block", animation: "навСетьСмена 360ms cubic-bezier(0.2, 1.3, 0.4, 1)" }} />
+            </span>
+          </button>
+          {/* Меню всплывает над кружком; закрывается выбором или любым
+              касанием мимо. */}
+          {свёрнута && менюСети && (
+            <>
+              <div onClick={() => setМенюСети(false)} style={{ position: "fixed", inset: -2000, zIndex: -1 }} />
+              <div
+                style={{
+                  position: "absolute", right: 0, bottom: "calc(100% + 10px)", minWidth: 168, padding: 6,
+                  borderRadius: 18, background: T.surface, border: `1px solid ${T.line}`,
+                  boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
+                  transformOrigin: "100% 100%", animation: "навМенюСети 260ms cubic-bezier(0.2, 1.1, 0.4, 1)",
+                }}
+              >
+                {[["ton", "Gram"], ["sol", "Solana"]].map(([ключ, имя]) => {
+                  const выбрана = сетьМемпада === ключ;
+                  return (
+                    <button
+                      key={ключ}
+                      onClick={() => {
+                        haptic("light");
+                        setМенюСети(false);
+                        if (!выбрана) setСетьМемпада(ключ);
+                      }}
+                      className="fx-tap flex items-center"
+                      style={{
+                        width: "100%", gap: 12, padding: "10px 12px", border: "none", borderRadius: 12,
+                        background: выбрана ? T.surfaceHi : "transparent",
+                        color: выбрана ? T.ice : T.muted,
+                        fontFamily: bodyFont, fontSize: 15, fontWeight: выбрана ? 700 : 500, textAlign: "left",
+                      }}
+                    >
+                      <img src={ЛОГО_СЕТИ[ключ]} alt="" width={24} height={24} style={{ borderRadius: "50%", display: "block" }} />
+                      <span style={{ flex: 1 }}>{имя}</span>
+                      {выбрана && <Check size={16} color={T.ice} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+        </div>
+          );
+        })()}
       </div>
     </div>
   );
