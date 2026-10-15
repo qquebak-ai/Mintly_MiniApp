@@ -507,9 +507,33 @@ export default async function handler(req, res) {
   }
 
   try {
+    /* До конца регистрации в базе не появляется ничего. Раньше
+       пользователь заводился первым делом — ещё до проверки ника и почты,
+       — и каждая брошенная или отклонённая попытка оставляла учётку с
+       безымянной заготовкой профиля. Теперь всё, что может отказать,
+       проверяется до записи. */
+    // Старые профили могли остаться без telegram_id — их узнаём по
+    // служебному адресу, иначе вернувшегося попросили бы придумать ник.
+    const { data: поТелеграму, error: поТгErr } = await admin.from("profiles").select("id, nickname")
+      .or(`telegram_id.eq.${tgUser.id},email.eq."${email}"`).limit(5);
+    if (поТгErr) return fail(res, 500, "lookup_failed", поТгErr.message);
+    const ужеЕсть = !!(поТелеграму || []).find((п) => п && п.nickname);
+    if (!ужеЕсть) {
+      const ник = wantedNickname(body);
+      if (!ник) return res.status(400).json({ error: "nickname_required" });
+      if ((await nicknameTaken(admin, ник)) === true) return res.status(409).json({ error: "nickname_taken" });
+      const п = String(body.email || "").trim().toLowerCase();
+      if (п && /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(п)) {
+        const { data: занята } = await admin.from("profiles").select("id")
+          .ilike("email", экранировать(п)).not("nickname", "is", null).neq("nickname", "").limit(1);
+        if (занята && занята.length) return res.status(409).json({ error: "email_taken" });
+      }
+    }
+    let завёлСейчас = false;
+
     // Первый вход — заводим пользователя. Если он уже есть, Supabase
     // ответит ошибкой «already registered», и это нормальный путь.
-    const { error: createErr } = await admin.auth.admin.createUser({
+    const { data: заведён, error: createErr } = await admin.auth.admin.createUser({
       email,
       email_confirm: true,
       user_metadata: {
@@ -530,6 +554,7 @@ export default async function handler(req, res) {
        секундном сбое. Не сдаёмся сразу — пробуем ещё раз, а окончательно
        решает generateLink ниже: если пользователь всё-таки появился, вход
        продолжается как ни в чём не бывало. */
+    if (!createErr && заведён && заведён.user) завёлСейчас = true;
     if (createErr && !/already|exists|registered/i.test(createErr.message || "")) {
       console.error("[telegram-auth] createUser:", createErr.message);
       await new Promise((r) => setTimeout(r, 400));
@@ -644,6 +669,11 @@ export default async function handler(req, res) {
       if (insertErr && /immutable/i.test(insertErr.message || "") && profile && !profile.nickname) {
         const { error: delErr } = await admin.from("profiles").delete().eq("id", userId).or("nickname.is.null,nickname.eq.");
         if (!delErr) ({ error: insertErr } = await admin.from("profiles").insert(строка));
+      }
+      if (insertErr && завёлСейчас) {
+        // Профиль не лёг — заведённую только что учётку убираем: без
+        // законченной регистрации в базе не должно остаться ничего.
+        try { await admin.auth.admin.deleteUser(userId); } catch (e) { /* уберёт следующая попытка */ }
       }
       if (insertErr) {
         // Между проверкой и записью ник или почту мог занять кто-то

@@ -26808,6 +26808,9 @@ const FEE_PERCENT = 0; // комиссии площадки нет
     // позднего входа или обновления сессии.
     if (!prof || !prof.nickname) {
       try { localStorage.removeItem("mintly_has_account"); } catch (e) { /* приватный режим */ }
+      // Аккаунта нет или из него вышли — с телефона стирается всё, кроме
+      // языка и отметок входа; недоведённая сессия не переживёт перезапуск.
+      try { window.__хранилище && window.__хранилище.аккаунтаНет(); } catch (e) { /* без хранилища */ }
       setAccountCreated(false); setProfile(EMPTY_PROFILE); setMyTokens([]); setНужнаРегистрация(true); return;
     }
     setProfile({ nickname: prof.nickname, email: prof.email, bio: prof.bio || "", avatarUrl: prof.avatar_url, emoji: prof.emoji, verified: !!prof.verified });
@@ -26844,6 +26847,9 @@ const FEE_PERCENT = 0; // комиссии площадки нет
     setAccountCreated(true);
     // Метка для index.html: по ней решается, играть ли заставку при
     // следующем запуске (тому, у кого аккаунта нет, — сразу окно).
+    // Аккаунт есть — всё, что копилось в памяти, переезжает на телефон
+    // (см. гостевое хранилище в index.html).
+    try { window.__хранилище && window.__хранилище.аккаунтЕсть(); } catch (e) { /* без хранилища */ }
     try { localStorage.setItem("mintly_has_account", "1"); } catch (e) { /* приватный режим */ }
     // Косметика хранится в профиле, а не только на устройстве — иначе её
     // не увидят другие. Но если на сервере пусто, а локально что-то
@@ -28970,6 +28976,9 @@ function mapTokenRow(row) {
     setAccountCreated(false);
     setНужнаРегистрация(true);
     try { localStorage.removeItem("mintly_has_account"); } catch (e) { /* приватный режим */ }
+    // Аккаунта нет или из него вышли — с телефона стирается всё, кроме
+    // языка и отметок входа; недоведённая сессия не переживёт перезапуск.
+    try { window.__хранилище && window.__хранилище.аккаунтаНет(); } catch (e) { /* без хранилища */ }
     setProfile(EMPTY_PROFILE);
     закрытьВсёОткрытое();
     if (wallet) tonConnectUI.disconnect();
@@ -29008,6 +29017,9 @@ function mapTokenRow(row) {
     setAccountCreated(false);
     setНужнаРегистрация(true);
     try { localStorage.removeItem("mintly_has_account"); } catch (e) { /* приватный режим */ }
+    // Аккаунта нет или из него вышли — с телефона стирается всё, кроме
+    // языка и отметок входа; недоведённая сессия не переживёт перезапуск.
+    try { window.__хранилище && window.__хранилище.аккаунтаНет(); } catch (e) { /* без хранилища */ }
     setProfile(EMPTY_PROFILE);
     закрытьВсёОткрытое();
     if (wallet) tonConnectUI.disconnect();
