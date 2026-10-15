@@ -25063,6 +25063,21 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                     текстСвободно={t("authMailFits")}
                     текстЗанято={t("authMailUsed")}
                   />
+                {/* «Войти» появляется, только когда почта оказалась занятой:
+                    аккаунт с ней уже есть — значит, сюда пришли войти, а не
+                    регистрироваться. Почта переезжает на страницу входа. */}
+                {внутриTelegram && почтаНеСвободна && (
+                  <button
+                    onClick={() => { haptic("light"); setЛогинОшибка(""); setПочтаБеда(""); сменитьШагВхода("вход"); }}
+                    className="fx-tap"
+                    style={{
+                      background: "transparent", border: "none", padding: "2px 4px", cursor: "pointer", alignSelf: "flex-start",
+                      color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+                    }}
+                  >
+                    {t("authSignInCta")}
+                  </button>
+                )}
                 </div>
               )}
               {почтаБеда && (
@@ -25099,21 +25114,6 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 {t("onbContinue")}
               </ОнбКнопка>
 
-              {/* «Войти» появляется, только когда почта оказалась занятой:
-                  аккаунт с ней уже есть — значит, сюда пришли войти, а не
-                  регистрироваться. Почта переезжает на страницу входа. */}
-              {внутриTelegram && почтаНеСвободна && (
-                <button
-                  onClick={() => { haptic("light"); setЛогинОшибка(""); setПочтаБеда(""); сменитьШагВхода("вход"); }}
-                  className="fx-tap w-full"
-                  style={{
-                    background: "transparent", border: "none", padding: "2px 0 0", cursor: "pointer",
-                    color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
-                  }}
-                >
-                  {t("authSignInCta")}
-                </button>
-              )}
 
               {!внутриTelegram && (
                 <a
@@ -25185,6 +25185,20 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 <span style={{ minHeight: 18, fontFamily: bodyFont, color: T.down, fontSize: 12.5, lineHeight: 1.45 }}>
                   {логинОшибка || (логинПочта.адрес === почтаЧистая && логинПочта.есть === false ? t("onbLoginNoAccount") : "")}
                 </span>
+                {/* «Регистрация» — только когда стало ясно, что аккаунта с
+                    этой почтой нет. Почта уходит в регистрацию вместе с ним. */}
+                {(логинПочта.адрес === почтаЧистая && логинПочта.есть === false) || логинОшибка === t("onbLoginNoAccount") ? (
+                  <button
+                    onClick={() => { haptic("light"); setЛогинОшибка(""); setЛогинПароль(""); сменитьШагВхода("почта"); }}
+                    className="fx-tap"
+                    style={{
+                      background: "transparent", border: "none", padding: "0 0 2px", cursor: "pointer", alignSelf: "flex-start",
+                      color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
+                    }}
+                  >
+                    {t("onbRegisterCta")}
+                  </button>
+                ) : null}
               </div>
               <ОнбКнопка
                 onClick={войтиПаролем}
@@ -25207,20 +25221,6 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   {t("onbLoginTelegram")}
                 </button>
               )}
-              {/* «Регистрация» — только когда стало ясно, что аккаунта с
-                  этой почтой нет. Почта уходит в регистрацию вместе с ним. */}
-              {(логинПочта.адрес === почтаЧистая && логинПочта.есть === false) || логинОшибка === t("onbLoginNoAccount") ? (
-                <button
-                  onClick={() => { haptic("light"); setЛогинОшибка(""); setЛогинПароль(""); сменитьШагВхода("почта"); }}
-                  className="fx-tap w-full"
-                  style={{
-                    background: "transparent", border: "none", padding: "2px 0 0", cursor: "pointer",
-                    color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
-                  }}
-                >
-                  {t("onbRegisterCta")}
-                </button>
-              ) : null}
             </>
           ) : шагВхода === "код" ? (
             <>
