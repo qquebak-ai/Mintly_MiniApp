@@ -23410,28 +23410,17 @@ function надёжностьПароля(п) {
 const ПАРОЛЬ_ДОСТАТОЧНО = 5;
 
 function ШкалаПароля({ балл }) {
-  const ЦВЕТА = ["#FF3B47", "#FFC233", "#00E96B"];
+  /* Одна сплошная линия: длина — надёжность, цвет — одна ступень на всю
+     линию (красный, жёлтый, зелёный). Делёная на куски читалась тремя
+     разными шкалами сразу. */
+  const цвет = балл <= 3 ? "#FF3B47" : балл <= 6 ? "#FFC233" : "#00E96B";
   return (
-    <div className="flex" style={{ gap: 8 }} aria-hidden>
-      {ЦВЕТА.map((цвет, г) => (
-        <div key={г} className="flex" style={{ flex: 1, gap: 3 }}>
-          {[0, 1, 2].map((к) => {
-            const н = г * 3 + к;
-            const горит = н < балл;
-            return (
-              <span key={к} style={{ flex: 1, height: 4, borderRadius: 2, background: hexA("#FFFFFF", 0.08), overflow: "hidden", position: "relative" }}>
-                {/* Заливка въезжает слева по очереди: шкала «набирается»
-                    вслед за паролем, а не мигает целиком. */}
-                <span style={{
-                  position: "absolute", inset: 0, borderRadius: 2, background: цвет,
-                  transform: `scaleX(${горит ? 1 : 0})`, transformOrigin: "0 50%",
-                  transition: `transform 320ms cubic-bezier(0.22, 1, 0.36, 1) ${горит ? (н % 3) * 60 : 0}ms`,
-                }} />
-              </span>
-            );
-          })}
-        </div>
-      ))}
+    <div aria-hidden style={{ height: 4, borderRadius: 2, background: hexA("#FFFFFF", 0.08), overflow: "hidden" }}>
+      <div style={{
+        height: "100%", borderRadius: 2, background: цвет,
+        width: `${(Math.max(0, Math.min(9, балл)) / 9) * 100}%`,
+        transition: "width 360ms cubic-bezier(0.22, 1, 0.36, 1), background-color 300ms ease",
+      }} />
     </div>
   );
 }
