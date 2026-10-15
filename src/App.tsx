@@ -13355,9 +13355,11 @@ function снятьШирму({ уйти = false } = {}) {
        потом снимаем через два кадра, как и раньше. */
     const убрать = () => {
       if (!window.__ширмаСтарт) { setTimeout(убрать, 30); return; }
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        if (поле.parentNode) поле.parentNode.removeChild(поле);
-      }));
+      /* Знак M на поле ещё приближается — снимать его посреди движения
+         нельзя: окно рисует знак уже на месте, и это был бы скачок. */
+      const осталось = Math.max(0, 960 - (Date.now() - window.__ширмаСтарт));
+      // Гасим, а не выдёргиваем: свечи внизу поля иначе пропадали рывком.
+      setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(погасить)), осталось);
     };
     убрать();
     return;
@@ -24096,8 +24098,14 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const картаВидна = !первыйПоказ || !заставка;
   useEffect(() => {
     if (!open) { setПервыйПоказ(true); setЗаставка(true); setУходитЗаставка(false); return undefined; }
-    const ух = setTimeout(() => setУходитЗаставка(true), 60);
-    const сн = setTimeout(() => { setЗаставка(false); setУходитЗаставка(false); }, 80);
+    /* Знак сперва приближается из глубины в центре (онбИзДали, 900 мс),
+       и только после этого уезжает наверх — два движения не наслаиваются. */
+    // Отсчёт от начала заставки: если знак уже приближался на поле
+    // index.html, окно ждёт ровно столько, сколько ему осталось.
+    // Не раньше чем через 0,3 с: поле index.html гаснет поверх 0,22 с, и
+    // знак, тронувшись раньше, на миг раздваивался — второй ещё в центре.
+    const ух = setTimeout(() => setУходитЗаставка(true), Math.max(300, 1000 - уже));
+    const сн = setTimeout(() => { setЗаставка(false); setУходитЗаставка(false); }, Math.max(340, 1040 - уже));
     // Сбрасываем задержки позже конца всех выходов: переменную читает
     // уже идущая анимация, и смена на полпути дёрнула бы её назад.
     const т = setTimeout(() => setПервыйПоказ(false), 4200);
@@ -24244,7 +24252,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     setОтступДуги(Math.round(Math.min(Math.max(высота * 0.35, 240), 310)));
     /* Заголовок — на трети высоты: на 42% между знаком и текстом зияла
        пустота, а с клавиатурой текст уезжал под самый верх. */
-    setОтступТекста(Math.round(Math.min(Math.max(высота * 0.30, 200), 300)));
+    setОтступТекста(Math.round(Math.min(Math.max(высота * 0.21, 150), 220)));
     setTgNick("");
     setTgNickTouched(false);
     setЕстьАккаунт(null);
@@ -24577,13 +24585,14 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           @keyframes онбПриход { from { opacity: 0; transform: translateX(22px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
           @keyframes онбУход { to { opacity: 0; transform: translateX(-22px); filter: blur(3px); } }
           @keyframes онбПроявись { from { opacity: 0; } }
+          @keyframes онбИзДали { from { opacity: 0; transform: scale(0.3); filter: blur(14px); } 60% { opacity: 1; filter: blur(0); } to { opacity: 1; transform: scale(1); filter: none; } }
           .онб-поле::placeholder { color: rgba(242, 240, 235, 0.28); }
         `}</style>
         {/* Заставка: имя под логотипом по центру. Тот же размер и то же
             место, что у заставки на поле из index.html, — окно продолжает
             её, а не рисует заново. Логотип живёт отдельно (ниже): на
             заставке он крупный, потом уезжает вверх и уменьшается. */}
-        {первыйПоказ && заставка && (
+        {false && (
           <div
             aria-hidden
             style={{
@@ -24678,7 +24687,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             transition: "top 750ms cubic-bezier(0.22, 1, 0.36, 1), transform 750ms cubic-bezier(0.22, 1, 0.36, 1)",
           }}
         >
-          <div style={{ animation: уже ? "none" : "онбПроявись 600ms ease 100ms backwards" }}>
+          {/* Приближение уже сыграло на поле index.html — повторять не нужно. */}
+          <div style={{ animation: уже ? "none" : "онбИзДали 900ms cubic-bezier(0.16, 1, 0.3, 1) 60ms backwards", transformOrigin: "50% 50%" }}>
             <ОнбЛоготип size={ОНБ.логоКрупный} />
           </div>
         </div>
@@ -24692,7 +24702,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             // Ниже буквы M с воздухом: вплотную штрихи читались её подчёркиванием.
             top: верхОкна + логоY + 30,
             opacity: картаВидна && шагВхода !== "готово" && естьАккаунт !== true ? 1 : 0,
-            transition: "opacity 420ms ease",
+            transition: `opacity 420ms ease ${первыйПоказ && картаВидна ? 560 : 0}ms`,
           }}
         >
           <ОнбШаги шаг={шагНомер} />
@@ -24726,7 +24736,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             // заставки стояли в одном месте разом.
             opacity: картаВидна ? 1 : 0,
             pointerEvents: картаВидна ? "auto" : "none",
-            transition: "opacity 420ms ease",
+            /* При первом показе текст ждёт, пока знак доедет наверх:
+               вместе они ложились друг на друга посреди экрана. */
+            transition: `opacity 420ms ease ${первыйПоказ && картаВидна ? 520 : 0}ms`,
           }}
         >
           {/* Кадр между шагами (почта/код/ник/готово) — та же пара
