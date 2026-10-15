@@ -55,31 +55,28 @@ function загрузитьЗапуск() {
  * язык рынка, и подменять его нечем.
  */
 const DARK_THEME = {
-  // Чисто чёрный фон по дизайн-плану: карточки не выделяются заливкой,
-  // элементы разводят отступы и волосяные линии.
-  bg: "#000000",
-  surface: "#0A0B0E",
-  surfaceHi: "#101216",
-  line: "#1A1D24",
-  lineHi: "#262A33",
-  ice: "#F5F7FA",
-  paper: "#E4E7EC",
-  muted: "#8B929D",
-  // Приглушённый серый для второстепенных подписей: между muted и
-  // границей, чтобы третий уровень текста не спорил со вторым.
-  faint: "#5F6670",
-  electric: "#6C7CFF",
-  turquoise: "#6C7CFF",
-  violet: "#6C7CFF",
-  rose: "#8B929D",
-  /* Рост и падение — ровно те цвета, которыми рисуются свечи на
-     графике. Раньше здесь стояла приглушённая пара (мятный и розовый):
-     на одном экране с графиком получалось два разных «зелёного» и два
-     «красного», и проценты рядом со свечами выглядели выцветшими. */
+  /* Палитра снята с ширмы онбординга: тёмный графит вместо чистого
+     чёрного, тёплый светлый вместо холодного белого, приглушённый текст
+     той же тёплой краской. Цветного акцента нет — роль акцента играет
+     светлая заливка (главные кнопки, выбранное), а цвет остаётся только
+     у смысла: рост, падение, предупреждение. */
+  bg: "#0B0D12",
+  surface: "#14171F",
+  surfaceHi: "#1B1F29",
+  line: "#22262F",
+  lineHi: "#30343E",
+  ice: "#F2F0EB",
+  paper: "#E4E1DA",
+  muted: "#97958F",
+  faint: "#63625F",
+  electric: "#F2F0EB",
+  turquoise: "#F2F0EB",
+  violet: "#F2F0EB",
+  rose: "#97958F",
   up: "#00E96B",
   down: "#FF3B47",
   warning: "#E5A83C",
-  mintGlass: "#6C7CFF",
+  mintGlass: "#F2F0EB",
 };
 
 /* White theme: same structural logic, inverted — a paper-white canvas,
@@ -133,7 +130,7 @@ let T = { ...DARK_THEME };
 function applyTheme(mode) {
   Object.assign(T, THEMES[mode] || DARK_THEME);
   PRISM = mode === "White" ? LIGHT_PRISM : DARK_PRISM;
-  PRISM_TEXT = "#FFFFFF";
+  PRISM_TEXT = "#2A2C31";
 }
 function glow(alpha) { return hexA(T.turquoise, alpha); }
 function ink(alpha) { return hexA(T.ice, alpha); }
@@ -1581,7 +1578,7 @@ function tf(key, vars) {
    так они читаются как одно семейство. */
 /* Готовые сочетания из тёмной подборки, а не подобранные на глаз:
    «Amin» (#8E2DE2 → #4A00E0) — фирменный акцент, он же цвет маскота. */
-const ГРАДИЕНТ_БРЕНДА = "linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%)";
+const ГРАДИЕНТ_БРЕНДА = "linear-gradient(135deg, #F2F0EB 0%, #DCD9D2 100%)";
 /* Кнопки.
  *
  * Фиолетовый остался ровно один — на создании аккаунта. Там нажатие
@@ -1594,14 +1591,14 @@ const ГРАДИЕНТ_БРЕНДА = "linear-gradient(135deg, #8E2DE2 0%, #4A00
  * работе, ночная синь в кошельке и хвоя на подтверждениях. По ним всем
  * так же идёт медленная волна от края к краю: оттенки соседние, надпись
  * читается ровно, а кнопка не выглядит наклейкой. */
-const ЦВЕТ_ВХОДА = "linear-gradient(112deg, #4A0BAE 0%, #6C16E1 24%, #B14CFF 50%, #6C16E1 76%, #4A0BAE 100%)";
-const ЦВЕТ_КНОПКИ = "linear-gradient(112deg, #15181F 0%, #242936 50%, #15181F 100%)";
-const ЦВЕТ_КНОПКИ_НОЧЬ = "linear-gradient(112deg, #0C1A2C 0%, #17324F 50%, #0C1A2C 100%)";
-const ЦВЕТ_КНОПКИ_ХВОЯ = "linear-gradient(112deg, #08251A 0%, #11402C 50%, #08251A 100%)";
+const ЦВЕТ_ВХОДА = "linear-gradient(112deg, #DEDBD4 0%, #F2F0EB 24%, #FFFFFF 50%, #F2F0EB 76%, #DEDBD4 100%)";
+const ЦВЕТ_КНОПКИ = "linear-gradient(112deg, #14171F 0%, #20242E 50%, #14171F 100%)";
+const ЦВЕТ_КНОПКИ_НОЧЬ = ЦВЕТ_КНОПКИ;
+const ЦВЕТ_КНОПКИ_ХВОЯ = ЦВЕТ_КНОПКИ;
 /* Та же краска плоским цветом — для мест, где градиент не годится:
    внутри другого градиента (градиент в градиенте — не CSS) и на
    мелочи вроде точек кода, где перелив всё равно не виден. */
-const ЦВЕТ_КНОПКИ_ПЛОСКО = "#6C16E1";
+const ЦВЕТ_КНОПКИ_ПЛОСКО = "#F2F0EB";
 /* Тот же перелив для текста. Краски светлее кнопочных: буквы лежат на
    тёмном небе, и фирменный фиолет в них ушёл бы в нечитаемое пятно —
    поэтому волна идёт от белого к сирени и обратно. */
@@ -1616,17 +1613,17 @@ const переливТекста = (краски) => ({
 });
 /* Голубой — под GRAM, фиолетовый — под Solana: у каждой сети свой цвет
    в приложении, и в заголовке они те же. */
-const ПЕРЕЛИВ_ГОЛУБОЙ = переливТекста("#FFFFFF 0%, #DCF2FF 20%, #4FC3FF 50%, #DCF2FF 80%, #FFFFFF 100%");
-const ПЕРЕЛИВ_СИРЕНЬ = переливТекста("#FFFFFF 0%, #F0E4FF 22%, #C79BFF 50%, #F0E4FF 78%, #FFFFFF 100%");
+const ПЕРЕЛИВ_ГОЛУБОЙ = переливТекста("#FFFFFF 0%, #E4E1DA 22%, #A9A69F 50%, #E4E1DA 78%, #FFFFFF 100%");
+const ПЕРЕЛИВ_СИРЕНЬ = переливТекста("#FFFFFF 0%, #E4E1DA 22%, #A9A69F 50%, #E4E1DA 78%, #FFFFFF 100%");
 /* Радуга для «облика»: краски магазина. Крайние цвета совпадают —
    иначе на стыке круга видно, как палитра перескакивает обратно. */
 const ПЕРЕЛИВ_РАДУГА = переливТекста(
-  "#C08BFF 0%, #FF5FA2 18%, #FFB020 36%, #38D39F 54%, #4FC3FF 72%, #8E2DE2 88%, #C08BFF 100%"
+  "#FFFFFF 0%, #CFCCC5 25%, #8E8B85 50%, #CFCCC5 75%, #FFFFFF 100%"
 );
 /* Блик, пробегающий по слову. Полоса узкая и яркая, идёт без возврата и
    вдвое быстрее прочих переливов — слово читается как вспышка. */
 const ПЕРЕЛИВ_МОЛНИЯ = {
-  backgroundImage: "linear-gradient(100deg, #29B6FF 0%, #29B6FF 34%, #FFFFFF 46%, #DFF6FF 54%, #29B6FF 66%, #29B6FF 100%)",
+  backgroundImage: "linear-gradient(100deg, #A9A69F 0%, #A9A69F 34%, #FFFFFF 46%, #F2F0EB 54%, #A9A69F 66%, #A9A69F 100%)",
   backgroundSize: "260% 100%",
   WebkitBackgroundClip: "text",
   backgroundClip: "text",
@@ -1635,7 +1632,7 @@ const ПЕРЕЛИВ_МОЛНИЯ = {
   animation: "бликБежит 1.5s linear infinite",
 };
 const ПЕРЕЛИВ_ТЕКСТА = {
-  backgroundImage: "linear-gradient(112deg, #FFFFFF 0%, #F0E4FF 22%, #C79BFF 50%, #F0E4FF 78%, #FFFFFF 100%)",
+  backgroundImage: "linear-gradient(112deg, "+"#FFFFFF 0%, #E4E1DA 22%, #A9A69F 50%, #E4E1DA 78%, #FFFFFF 100%"+")",
   backgroundSize: "230% 100%",
   WebkitBackgroundClip: "text",
   backgroundClip: "text",
@@ -1649,7 +1646,7 @@ const ПЕРЕЛИВ_ТЕКСТА = {
    тёмный стык, он и держит их раздельно. */
 /* Кнопка кошелька — в цвете сети: та же волна, но синяя. */
 const ПЕРЕЛИВ_КНОПКИ_СЕТИ = {
-  background: "linear-gradient(112deg, #0059A8 0%, #0098EA 26%, #56CCFF 50%, #0098EA 74%, #0059A8 100%)",
+  background: ЦВЕТ_ВХОДА,
   backgroundSize: "230% 100%",
   animation: "кнопкаПереливается 5.5s ease-in-out infinite",
 };
@@ -1664,12 +1661,12 @@ const ПЕРЕЛИВ_КНОПКИ_ТОРГИ = {
 /* Кнопки первого и последнего баннера берут цвет своего неба: тёмный
    графит остальных кнопок на фиолетовом фоне читался заплаткой. */
 const ПЕРЕЛИВ_КНОПКИ_ЗАПУСК = {
-  background: "linear-gradient(112deg, #3C0A86 0%, #6C16E1 26%, #C79BFF 50%, #6C16E1 74%, #3C0A86 100%)",
+  background: ЦВЕТ_ВХОДА,
   backgroundSize: "230% 100%",
   animation: "кнопкаПереливается 5.5s ease-in-out infinite",
 };
 const ПЕРЕЛИВ_КНОПКИ_МАГАЗИН = {
-  background: "linear-gradient(112deg, #4C1D95 0%, #7C3AED 26%, #C08BFF 50%, #7C3AED 74%, #4C1D95 100%)",
+  background: ЦВЕТ_ВХОДА,
   backgroundSize: "230% 100%",
   animation: "кнопкаПереливается 5.5s ease-in-out infinite",
 };
@@ -1704,7 +1701,7 @@ const текстГрадиентом = (градиент) => ({
 const DARK_PRISM = ГРАДИЕНТ_БРЕНДА;
 const LIGHT_PRISM = ГРАДИЕНТ_БРЕНДА;
 let PRISM = DARK_PRISM;
-let PRISM_TEXT = "#FFFFFF"; // Midnight ink reads best set on solid Ember in both themes
+let PRISM_TEXT = "#2A2C31"; // Midnight ink reads best set on solid Ember in both themes
 const FACET = "polygon(18% 0%, 100% 0%, 100% 82%, 82% 100%, 0% 100%, 0% 18%)";
 
 /* Editorial serif for display type (hero numbers, page titles, section
@@ -7386,7 +7383,7 @@ function Toast({ toast, insetTop = 0, onClose = () => {} }) {
   if (!toast) return null;
 
   const { вид, заголовок, текст } = разобратьТост(toast.текст);
-  const цвет = вид === "отказ" ? "#FF5C6B" : вид === "подсказка" ? "#C79BFF" : "#31D07B";
+  const цвет = вид === "отказ" ? "#FF5C6B" : вид === "подсказка" ? "#E4E1DA" : "#31D07B";
   const Значок = вид === "отказ" ? AlertTriangle : вид === "подсказка" ? Info : CheckCircle2;
 
   function начало(e) {
@@ -8966,7 +8963,7 @@ function BadgeSheet({ onClose, art, title, subtitle, text }) {
           <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, marginTop: 8, maxWidth: 280 }}>{text}</p>
           <button
             onClick={onClose}
-            className="fx-tap w-full rounded-[20px] py-3"
+            className="fx-tap w-full rounded-[12px] min-h-[52px] py-3"
             style={{ marginTop: 18, maxWidth: 320, background: T.surfaceHi, border: "none", fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}
           >
             {tr("wreathClose")}
@@ -10138,7 +10135,7 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
               background: item.ткань ? "#131319" : item.fill,
               backgroundSize: item.ткань ? undefined : (item.size || "320% 320%"),
               animation: item.ткань ? "none" : "картаПереливается 9s ease-in-out infinite",
-              boxShadow: `0 12px 30px ${hexA(item.glow || "#7C3AED", 0.38)}`,
+              boxShadow: `0 12px 30px ${hexA(item.glow || "#F2F0EB", 0.38)}`,
             }}>
               {item.ткань && <СлойКарбона fill={item.fill} size={item.size} />}
               {item.ткань && <СлоиТкани />}
@@ -10181,7 +10178,7 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
         </button>
         <button
           onClick={onClose}
-          className="fx-tap w-full rounded-[20px] py-2.5"
+          className="fx-tap w-full rounded-[12px] min-h-[52px] py-3"
           style={{ marginTop: 8, background: "transparent", border: "none", fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}
         >
           {t("cancel")}
@@ -12388,7 +12385,7 @@ const БАННЕРЫ = [
     id: "shop",
     строки: { RU: ["Собери свой облик", "в магазине"], EN: ["Build your look", "in the shop"] },
     кнопка: { RU: "В магазин", EN: "Open shop" },
-    цвет: "#C08BFF",
+    цвет: "#E4E1DA",
     действие: "shop",
     знак: "лист",
     сцена: "магазин",
@@ -12711,7 +12708,7 @@ const СВЕЧИ_ФОНА = (() => {
 })();
 
 function СценаТорговли() {
-  const ЗЕЛЁНЫЙ = "#2ED47A", ФИОЛЕТ = "#8E2DE2";
+  const ЗЕЛЁНЫЙ = "#2ED47A", ФИОЛЕТ = "#F2F0EB";
   // Высоты подобраны так, чтобы лента читалась как движение вверх с
   // откатами, а не как случайный частокол.
   const свечи = [26, 34, 22, 40, 30, 46, 36, 52, 42, 58, 48, 64, 54, 70, 60, 76];
@@ -12868,7 +12865,7 @@ function СценаКошелька() {
  * звёзды.
  */
 function СценаМагазина() {
-  const СИРЕНЬ = "#C08BFF", ФИОЛЕТ = "#7C3AED", ЛЁД = "#8FD8FF";
+  const СИРЕНЬ = "#E4E1DA", ФИОЛЕТ = "#F2F0EB", ЛЁД = "#8FD8FF";
   /* Правее восьмидесяти процентов звёзд не ставим: там стоит лавка, и
      звезда за ней почти не видна — только мельтешит краем. */
   const звёзды = [
@@ -13247,17 +13244,17 @@ function БаннерыГлавной({ onGoTab, onGoCreate, onOpenMintie, ок�
                   display: "inline-block", padding: "13px 22px", borderRadius: 999,
                   fontFamily: displayFont, fontSize: 15.5, fontWeight: 800,
                   ...(б.сцена === "кошелёк"
-                    ? { ...ПЕРЕЛИВ_КНОПКИ_СЕТИ, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#0098EA", 0.42)}` }
+                    ? { ...ПЕРЕЛИВ_КНОПКИ_СЕТИ, color: PRISM_TEXT, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }
                     : б.сцена === "торговля"
                     // Зелёно-красная волна была под старую сцену со
                     // своим заревом; на ровном чёрном фоне с фиолетовыми
                     // свечами она спорила с картинкой — кнопка теперь в
                     // цвете самих свечей.
-                    ? { ...ПЕРЕЛИВ_КНОПКИ_ЗАПУСК, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#8E2DE2", 0.45)}` }
+                    ? { ...ПЕРЕЛИВ_КНОПКИ_ЗАПУСК, color: PRISM_TEXT, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }
                     : б.сцена === "магазин"
-                    ? { ...ПЕРЕЛИВ_КНОПКИ_МАГАЗИН, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#C08BFF", 0.38)}` }
+                    ? { ...ПЕРЕЛИВ_КНОПКИ_МАГАЗИН, color: PRISM_TEXT, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }
                     : б.сцена
-                      ? { ...ПЕРЕЛИВ_КНОПКИ_ЗАПУСК, color: PRISM_TEXT, boxShadow: `0 8px 24px ${hexA("#8E2DE2", 0.45)}` }
+                      ? { ...ПЕРЕЛИВ_КНОПКИ_ЗАПУСК, color: PRISM_TEXT, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }
                       : { background: T.ice, color: T.bg }),
                 }}
               >
@@ -13997,7 +13994,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", а
                 onClick={() => { setСетьПрихода(м.ключ); haptic("light"); }}
                 className="fx-tap flex items-center justify-center"
                 style={{
-                  flex: 1, gap: 8, padding: "12px 0", borderRadius: 999, border: "none",
+                  flex: 1, gap: 8, padding: "12px 0", borderRadius: 12, border: "none",
                   background: сетьПрихода === м.ключ ? T.surfaceHi : "transparent",
                   color: сетьПрихода === м.ключ ? T.ice : T.muted,
                   fontFamily: displayFont, fontSize: 14.5, fontWeight: 700,
@@ -14022,7 +14019,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", а
             <img src={код} alt="" style={{ width: "100%", height: "100%", display: "block" }} />
           ) : адресСети ? (
             <div style={{ width: 120, height: 10, borderRadius: 999, background: T.surface, overflow: "hidden" }}>
-              <div style={{ width: "40%", height: "100%", borderRadius: 999, background: hexA("#8E2DE2", 0.55), animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
+              <div style={{ width: "40%", height: "100%", borderRadius: 999, background: hexA("#F2F0EB", 0.55), animation: "leafLoaderBar 1.6s ease-in-out infinite" }} />
             </div>
           ) : (
             // Без аккаунта адреса нет. Объяснять это здесь незачем:
@@ -14074,7 +14071,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", а
           className="fx-tap w-full flex items-center justify-center"
           style={{
             position: "relative", overflow: "hidden",
-            gap: 8, padding: "16px 0", borderRadius: 999, border: "none",
+            gap: 8, padding: "16px 0", borderRadius: 12, border: "none",
             ...ПЕРЕЛИВ_КНОПКИ,
             color: PRISM_TEXT, fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             animation: скопировано ? "кнопкаКивнула 420ms cubic-bezier(0.22, 1, 0.36, 1)" : "none",
@@ -14116,7 +14113,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", а
           onClick={поделиться}
           className="fx-tap w-full"
           style={{
-            padding: "16px 0", borderRadius: 999, border: "none", background: T.surfaceHi,
+            padding: "16px 0", borderRadius: 12, border: "none", background: T.surfaceHi,
             color: T.ice, fontFamily: displayFont, fontSize: 16, fontWeight: 700,
           }}
         >
@@ -14630,7 +14627,7 @@ function ЭкранВывода({
             disabled={!адресГоден}
             className="fx-tap w-full"
             style={{
-              padding: "16px 0", borderRadius: 999, border: "none",
+              padding: "16px 0", borderRadius: 12, border: "none",
               ...(адресГоден ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
               color: адресГоден ? PRISM_TEXT : T.muted,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
@@ -14711,7 +14708,7 @@ function ЭкранВывода({
             disabled={!кодГоден || идёт}
             className="fx-tap"
             style={{
-              flex: 1, padding: "16px 0", borderRadius: 999, border: "none",
+              flex: 1, padding: "16px 0", borderRadius: 12, border: "none",
               ...(кодГоден && !идёт ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
               color: кодГоден && !идёт ? PRISM_TEXT : T.muted,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
@@ -14817,7 +14814,7 @@ function ЭкранВывода({
             onClick={() => доля(ч)}
             className="fx-tap"
             style={{
-              flex: 1, padding: "14px 0", borderRadius: 999, border: "none",
+              flex: 1, padding: "14px 0", borderRadius: 12, border: "none",
               background: T.surface, color: T.ice, fontFamily: displayFont, fontSize: 15.5, fontWeight: 700,
             }}
           >
@@ -15121,9 +15118,9 @@ function ЖидкаяКнопка({ onClick, disabled = false, занята = fa
           className="fx-tap flex items-center justify-center"
           style={{
             position: "relative", overflow: "hidden", width: "100%",
-            padding: "16px 0", borderRadius: 999, border: "none",
+            padding: "16px 0", borderRadius: 12, border: "none",
             background: T.surfaceHi,
-            color: белая ? "#0B0B0C" : T.muted,
+            color: белая ? "#2A2C31" : T.muted,
             fontFamily: displayFont, fontWeight: 800, fontSize: 16,
             transition: "color 320ms ease",
           }}
@@ -15131,7 +15128,7 @@ function ЖидкаяКнопка({ onClick, disabled = false, занята = fa
           {/* Белая заливка — отдельным слоем, чтобы проявляться плавно,
               а не загораться рывком. В ожидании остаётся включённой. */}
           <span aria-hidden style={{
-            position: "absolute", inset: 0, borderRadius: 999, background: "#EDEDEF",
+            position: "absolute", inset: 0, borderRadius: 12, background: "#F2F0EB",
             pointerEvents: "none", opacity: белая ? 1 : 0, transition: "opacity 320ms ease",
           }} />
           <span style={{
@@ -15141,7 +15138,7 @@ function ЖидкаяКнопка({ onClick, disabled = false, занята = fa
           }}>
             {children}
           </span>
-          <ТочкиЗагрузки видно={занята} цвет="#0B0B0C" />
+          <ТочкиЗагрузки видно={занята} цвет="#2A2C31" />
         </button>
       </div>
     </div>
@@ -15587,18 +15584,15 @@ const КОШ_СТРАНИЦА = "#0E1015";   // сама страница сни
    страница уходит в чёрный (см. КОШ_ПОЛОТНО_МГЛА), иначе список по ним
    не прочитать. */
 const КОШ_ПОЛОТНО = [
-  "radial-gradient(58% 52% at 10% 6%, #8E2DE2 0%, rgba(142,45,226,0) 62%)",
-  "radial-gradient(54% 46% at 80% 2%, #2E6BFF 0%, rgba(46,107,255,0) 60%)",
-  "radial-gradient(50% 42% at 94% 26%, #FF3D8B 0%, rgba(255,61,139,0) 58%)",
-  "radial-gradient(46% 38% at 28% 30%, #38D39F 0%, rgba(56,211,159,0) 60%)",
-  "radial-gradient(62% 44% at 54% 16%, #FFB020 0%, rgba(255,176,32,0) 55%)",
+  "radial-gradient(60% 50% at 18% 4%, rgba(242,240,235,0.16) 0%, rgba(242,240,235,0) 62%)",
+  "radial-gradient(55% 44% at 86% 10%, rgba(242,240,235,0.10) 0%, rgba(242,240,235,0) 60%)",
 ].join(", ");
 /* Мгла поверх пятен: у верхнего края приглушает цвет, ниже заголовка
    уже глухая. Без неё пятна слепят и текст по ним не прочитать. */
-const КОШ_ПОЛОТНО_МГЛА = "linear-gradient(180deg, rgba(8,9,12,0.42) 0%, rgba(8,9,12,0.58) 22%, rgba(8,9,12,0.82) 48%, rgba(8,9,12,0.95) 70%, #08090C 88%)";
-const КОШ_КАРТОЧКА = "#171A21";   // строки на ней
-const КОШ_РОСТ_ФОН = hexA("#8E2DE2", 0.20);
-const КОШ_РОСТ_ТЕКСТ = "#C79BFF";
+const КОШ_ПОЛОТНО_МГЛА = "linear-gradient(180deg, rgba(11,13,18,0.2) 0%, rgba(11,13,18,0.5) 30%, rgba(11,13,18,0.9) 62%, #0B0D12 84%)";
+const КОШ_КАРТОЧКА = "#14171F";   // строки на ней
+const КОШ_РОСТ_ФОН = hexA("#F2F0EB", 0.20);
+const КОШ_РОСТ_ТЕКСТ = "#E4E1DA";
 const КОШ_ПАДЕНИЕ_ФОН = hexA("#FF3B47", 0.16);
 const КОШ_ПАДЕНИЕ_ТЕКСТ = "#FF3B47";
 /* Приход в истории — зелёным, а не фирменным фиолетовым. Фиолетовый
@@ -15772,7 +15766,7 @@ function ИсторияКошелька({ userId, тик = 0, безЗаголо
                   style={{ width: 20, flexShrink: 0 }}
                 >
                   {обмен
-                    ? <Repeat size={17} strokeWidth={2.4} color="#C79BFF" />
+                    ? <Repeat size={17} strokeWidth={2.4} color="#E4E1DA" />
                     : создал
                       ? <Rocket size={17} strokeWidth={2.2} color={T.electric} />
                     : покупка
@@ -15812,7 +15806,7 @@ function ИсторияКошелька({ userId, тик = 0, безЗаголо
    цветами светятся волны вокруг карты: держать два одинаковых списка
    оттенков — значит однажды поменять один и забыть другой. */
 const ГРАДИЕНТ_КАРТЫ =
-  "linear-gradient(115deg, #E44BC8 0%, #C13AE6 18%, #8E2DE2 36%, #6A17E8 54%, #4A00E0 70%, #7B1FE0 84%, #2C0A78 100%)";
+  "linear-gradient(135deg, #22262F 0%, #181B23 55%, #12141A 100%)";
 
 /* Вид карты баланса — товар магазина.
  *
@@ -15824,7 +15818,7 @@ const ГРАДИЕНТ_КАРТЫ =
 const WALLET_SKINS = [
   {
     id: "none", label: { RU: "Mintly", EN: "Mintly" }, price: 0,
-    fill: ГРАДИЕНТ_КАРТЫ, glow: "#7C3AED",
+    fill: ГРАДИЕНТ_КАРТЫ, glow: "#000000",
   },
   {
     id: "midnight", label: { RU: "Полночь", EN: "Midnight" }, price: 140,
@@ -16390,7 +16384,7 @@ function МастерФразы({
         disabled={!активна}
         className="fx-tap w-full"
         style={{
-          padding: "16px 0", borderRadius: 999, border: "none",
+          padding: "16px 0", borderRadius: 12, border: "none",
           ...(активна ? ВОЛНА(краска) : { background: T.surfaceHi }),
           color: активна ? PRISM_TEXT : T.muted,
           fontFamily: displayFont, fontSize: 16, fontWeight: 800,
@@ -16577,7 +16571,7 @@ function МастерФразы({
             }}
             className="fx-tap w-full flex items-center justify-center"
             style={{
-              gap: 8, padding: "13px 0", borderRadius: 999, border: "none",
+              gap: 8, padding: "13px 0", borderRadius: 12, border: "none",
               background: T.surfaceHi, color: T.ice, fontFamily: displayFont, fontSize: 14.5, fontWeight: 700,
             }}
           >
@@ -17764,7 +17758,7 @@ function TokenComments({ tokenId, currentUserId, onNeedAuth, onOpenProfile, show
       ) : (
         <button
           onClick={() => onNeedAuth && onNeedAuth()}
-          className="fx-tap w-full rounded-[18px] py-2.5"
+          className="fx-tap w-full rounded-[12px] min-h-[52px] py-3"
           style={{ background: T.surface, border: `1px dashed ${T.line}`, fontFamily: bodyFont, fontSize: 13.5, color: T.muted }}
         >
           {t("commentNeedAccount")}
@@ -18059,7 +18053,7 @@ function ЧатТокена({ tokenId, свой = false, currentUserId, onNeedAu
                 </span>
                 <div style={{
                   maxWidth: "78%", padding: "8px 11px", borderRadius: 14,
-                  background: м.mine ? hexA("#8E2DE2", 0.28) : T.surfaceHi,
+                  background: м.mine ? hexA("#F2F0EB", 0.28) : T.surfaceHi,
                 }}>
                   <div style={{ fontFamily: displayFont, color: T.faint, fontSize: 11, marginBottom: 2 }}>
                     {м.nickname ? `@${м.nickname}` : t("chatSomeone")} · {fmtSince(м.createdAt)}
@@ -18158,12 +18152,12 @@ function ОбещанияТокена({ механики, замок, tokenId })
       <div className="flex flex-col" style={{ gap: 10 }}>
         {включённые.map((м) => (
           <div key={м.key} className="flex items-start" style={{ gap: 10 }}>
-            <м.icon size={16} color="#C79BFF" style={{ marginTop: 1, flexShrink: 0 }} />
+            <м.icon size={16} color="#E4E1DA" style={{ marginTop: 1, flexShrink: 0 }} />
             <span className="flex-1 min-w-0">
               <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>
                 {t(м.tKey)}
                 {м.key === "buyback" && фонд != null && (
-                  <span style={{ fontFamily: monoFont, color: "#C79BFF", fontSize: 13, fontWeight: 700 }}> · {фонд.toFixed(3)}</span>
+                  <span style={{ fontFamily: monoFont, color: "#E4E1DA", fontSize: 13, fontWeight: 700 }}> · {фонд.toFixed(3)}</span>
                 )}
               </span>
               <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 2 }}>{t(м.описание)}</span>
@@ -18172,7 +18166,7 @@ function ОбещанияТокена({ механики, замок, tokenId })
         ))}
         {естьЗамок && (
           <div className="flex items-start" style={{ gap: 10 }}>
-            <Lock size={16} color="#C79BFF" style={{ marginTop: 1, flexShrink: 0 }} />
+            <Lock size={16} color="#E4E1DA" style={{ marginTop: 1, flexShrink: 0 }} />
             <span className="flex-1 min-w-0">
               <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>
                 {t("lockOnToken")}
@@ -20419,7 +20413,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           <div className="flex justify-between"><span>{t("minReceive")}</span><span style={{ color: T.ice }}><ТекстСЧислами text={amount > 0 ? (isBuy ? `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 0 })} ${token.ticker}` : `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`) : "—"} /></span></div>
         </div>
 
-        <button onClick={handleConfirm} disabled={!canConfirm} className="fx-tap w-full rounded-[20px] py-3 mt-5" style={{
+        <button onClick={handleConfirm} disabled={!canConfirm} className="fx-tap w-full rounded-[12px] min-h-[52px] py-3 mt-5" style={{
           fontFamily: displayFont, fontWeight: 700, fontSize: 15,
           // Покупка — фирменным градиентом, продажа — цветом падения:
           // два действия не должны выглядеть одинаково, и по цвету видно,
@@ -20837,13 +20831,13 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
             <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 6, lineHeight: 1.5, whiteSpace: "pre-wrap", textAlign: "left" }}>{error}</div>
           </div>
           <div className="flex flex-col gap-2 w-full mt-1">
-            <button onClick={copyErrorLog} className="fx-tap w-full rounded-[20px] py-3" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.ice, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            <button onClick={copyErrorLog} className="fx-tap w-full rounded-[12px] min-h-[52px] py-3" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.ice, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
               <Copy size={14} color={T.ice} /> {logCopied ? t("linkCopied") : "Скопировать лог"}
             </button>
-            <button onClick={onRetry} className="fx-tap w-full rounded-[20px] py-3" style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
+            <button onClick={onRetry} className="fx-tap w-full rounded-[12px] min-h-[52px] py-3" style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
               {t("retry")}
             </button>
-            <button onClick={() => onClose && onClose(null)} className="fx-tap w-full rounded-[20px] py-3" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>
+            <button onClick={() => onClose && onClose(null)} className="fx-tap w-full rounded-[12px] min-h-[52px] py-3" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>
               {t("doneClose")}
             </button>
           </div>
@@ -20942,12 +20936,12 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
           <div className="flex flex-col gap-2 w-full mt-2">
             <button
               onClick={() => onViewToken && onViewToken(result)}
-              className="fx-tap w-full rounded-[20px] py-3"
+              className="fx-tap w-full rounded-[12px] min-h-[52px] py-3"
               style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
             >
               {t("launchBuyCta")}
             </button>
-            <button onClick={() => onClose && onClose(result)} className="fx-tap w-full rounded-[20px] py-3" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>
+            <button onClick={() => onClose && onClose(result)} className="fx-tap w-full rounded-[12px] min-h-[52px] py-3" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>
               {t("doneClose")}
             </button>
           </div>
@@ -20988,12 +20982,12 @@ function ПереключательМеханики({ item, включено, on
       className="fx-tap w-full flex items-start"
       style={{
         gap: 12, padding: "13px 14px", borderRadius: 18, textAlign: "left",
-        background: включено ? hexA("#8E2DE2", 0.16) : T.surface,
+        background: включено ? hexA("#F2F0EB", 0.16) : T.surface,
         border: `1px solid ${включено ? hexA("#B15CFF", 0.55) : T.line}`,
         transition: `background ${EASE}, border-color ${EASE}`,
       }}
     >
-      <item.icon size={17} color={включено ? "#C79BFF" : T.muted} style={{ marginTop: 2, flexShrink: 0 }} />
+      <item.icon size={17} color={включено ? "#E4E1DA" : T.muted} style={{ marginTop: 2, flexShrink: 0 }} />
       <span className="flex-1 min-w-0">
         <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
           {t(item.tKey)}
@@ -21290,7 +21284,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         </p>
         <div className="flex flex-col gap-2 w-full mt-2" style={{ maxWidth: 260 }}>
           {!accountCreated && (
-            <button onClick={onOpenCreateProfile} className="fx-tap w-full rounded-[20px] py-3" style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>
+            <button onClick={onOpenCreateProfile} className="fx-tap w-full rounded-[12px] min-h-[52px] py-3" style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5 }}>
               {t("createAccount")}
             </button>
           )}
@@ -22316,7 +22310,7 @@ function ПодключениеX({ showToast }) {
         </div>
         <button
           onClick={отключить}
-          className="fx-tap w-full rounded-[20px] py-3"
+          className="fx-tap w-full rounded-[12px] min-h-[52px] py-3"
           style={{ background: "transparent", border: `1px solid ${hexA(T.down, 0.35)}`, fontFamily: bodyFont, fontSize: 14.5, color: T.down }}
         >
           {t("xUnlink")}
@@ -22337,7 +22331,7 @@ function ПодключениеX({ showToast }) {
       <button
         onClick={подключить}
         disabled={занята}
-        className={`fx-tap w-full rounded-[16px] py-3 flex items-center justify-center${занята ? " fx-busy" : ""}`}
+        className={`fx-tap w-full rounded-[12px] min-h-[52px] py-3 flex items-center justify-center${занята ? " fx-busy" : ""}`}
         style={{
           gap: 8, ...ВОЛНА(ЦВЕТ_КНОПКИ), border: "none",
           fontFamily: displayFont, fontWeight: 700, fontSize: 15, color: PRISM_TEXT,
@@ -23300,29 +23294,18 @@ const ОНБ = {
   serif: '"New York", "Iowan Old Style", Georgia, "Times New Roman", serif',
 };
 
-/* Шестилепестковая «звёздочка» с мягким свечением. Лепестки разной
-   длины — так контур выглядит нарисованным от руки, а не циркулем. */
+/* Знак приложения — буква M, тот же путь, что в роликах и на иконке.
+   Мягкое свечение то же, что было у прежнего знака: на тёмном поле
+   белая буква без него выглядит вырезанной дырой. */
+const ПУТЬ_M = "M300 218 L627 660 L955 218 L1080 988 L886 988 L836 610 L627 910 L418 610 L369 988 L173 988 Z";
 function ОнбЛоготип({ size = 64 }) {
-  const лепестки = [0, 60, 120, 180, 240, 300].map((град, i) => {
-    const длина = [22, 19, 23, 20, 22, 18][i];
-    const w = 8.5;
-    return (
-      <path
-        key={град}
-        transform={`rotate(${град} 32 32)`}
-        d={`M32 32 C ${32 - w} ${32 - длина * 0.45}, ${32 - w * 0.7} ${32 - длина}, 32 ${32 - длина} C ${32 + w * 0.7} ${32 - длина}, ${32 + w} ${32 - длина * 0.45}, 32 32 Z`}
-      />
-    );
-  });
   return (
     <svg
-      width={size} height={size} viewBox="0 0 64 64" fill="none"
-      stroke={ОНБ.текст} strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round"
-      style={{ display: "block", filter: "drop-shadow(0 0 5px rgba(242,240,235,0.45))" }}
+      width={size} height={Math.round(size * 770 / 907)} viewBox="173 218 907 770"
+      style={{ display: "block", overflow: "visible", filter: "drop-shadow(0 0 6px rgba(242,240,235,0.35))" }}
       aria-hidden
     >
-      {лепестки}
-      <circle cx="32" cy="32" r="2.4" fill={ОНБ.текст} stroke="none" />
+      <path d={ПУТЬ_M} fill={ОНБ.текст} />
     </svg>
   );
 }
@@ -23348,11 +23331,11 @@ function ОнбШаги({ шаг }) {
 
 function ОнбЗаголовок({ title, lead }) {
   return (
-    <div className="flex flex-col" style={{ gap: 6, textAlign: "center", paddingBottom: 14 }}>
-      <span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif', color: ОНБ.текст, fontSize: 27, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.15 }}>
+    <div className="flex flex-col" style={{ gap: 8, textAlign: "center", paddingBottom: 18 }}>
+      <span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif', color: ОНБ.текст, fontSize: 28, fontWeight: 700, letterSpacing: "-0.015em", lineHeight: 1.15, textWrap: "balance" }}>
         {title}
       </span>
-      {lead ? <span style={{ fontFamily: bodyFont, color: ОНБ.приглушённый, fontSize: 13, lineHeight: 1.4 }}>{lead}</span> : null}
+      {lead ? <span style={{ fontFamily: bodyFont, color: ОНБ.приглушённый, fontSize: 15, lineHeight: 1.4, textWrap: "balance" }}>{lead}</span> : null}
     </div>
   );
 }
@@ -23784,7 +23767,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
             disabled={шаг === "адрес" ? (!годна || идёт) : false}
             className="fx-tap w-full"
             style={{
-              padding: "16px 0", borderRadius: 999, border: "none",
+              padding: "16px 0", borderRadius: 12, border: "none",
               ...((шаг === "готово" || годна) && !идёт ? ВОЛНА(ЦВЕТ_КНОПКИ_НОЧЬ) : { background: T.surfaceHi }),
               color: (шаг === "готово" || годна) && !идёт ? PRISM_TEXT : T.muted,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
@@ -24259,8 +24242,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
        нельзя, это и есть тот прыжок. */
     setОтступСверху(Math.round(Math.min(Math.max(высота * 0.165, 115), 158)));
     setОтступДуги(Math.round(Math.min(Math.max(высота * 0.35, 240), 310)));
-    // Заголовок — около 42% высоты, как на референсе; считаем один раз.
-    setОтступТекста(Math.round(Math.min(Math.max(высота * 0.42, 250), 380)));
+    /* Заголовок — на трети высоты: на 42% между знаком и текстом зияла
+       пустота, а с клавиатурой текст уезжал под самый верх. */
+    setОтступТекста(Math.round(Math.min(Math.max(высота * 0.30, 200), 300)));
     setTgNick("");
     setTgNickTouched(false);
     setЕстьАккаунт(null);
@@ -24590,8 +24574,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         }}
       >
         <style>{`
-          @keyframes онбПриход { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
-          @keyframes онбУход { to { opacity: 0; transform: translateX(-28px); } }
+          @keyframes онбПриход { from { opacity: 0; transform: translateX(22px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+          @keyframes онбУход { to { opacity: 0; transform: translateX(-22px); filter: blur(3px); } }
           @keyframes онбПроявись { from { opacity: 0; } }
           .онб-поле::placeholder { color: rgba(242, 240, 235, 0.28); }
         `}</style>
@@ -24604,7 +24588,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             aria-hidden
             style={{
               position: "absolute", left: 0, right: 0, top: "46%", marginTop: 52, textAlign: "center",
-              fontFamily: ОНБ.serif, fontSize: 28, fontWeight: 400, letterSpacing: "0.01em", color: ОНБ.текст,
+              fontFamily: displayFont, fontSize: 28, fontWeight: 300, letterSpacing: "0.3em", paddingLeft: "0.3em", color: ОНБ.текст,
               opacity: уходитЗаставка ? 0 : 1, transition: "opacity 350ms ease", pointerEvents: "none",
               // Проявляем только если поля из index.html не было: иначе имя
               // там уже стоит, и второе проявление читалось бы миганием.
@@ -24705,7 +24689,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           ref={шапкаRef}
           style={{
             position: "absolute", left: 0, right: 0, zIndex: 2, pointerEvents: "none",
-            top: верхОкна + логоY + 20,
+            // Ниже буквы M с воздухом: вплотную штрихи читались её подчёркиванием.
+            top: верхОкна + логоY + 30,
             opacity: картаВидна && шагВхода !== "готово" && естьАккаунт !== true ? 1 : 0,
             transition: "opacity 420ms ease",
           }}
@@ -24753,8 +24738,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             style={{
               gap: 14,
               animation: уходитШагВхода
-                ? `онбУход ${УХОД_ШАГА_ВХОДА}ms ease forwards`
-                : "онбПриход 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
+                ? `онбУход ${УХОД_ШАГА_ВХОДА}ms cubic-bezier(0.4, 0, 1, 1) forwards`
+                : "онбПриход 460ms cubic-bezier(0.22, 1, 0.36, 1) both",
             }}
           >
           {шагВхода === "почта" ? (
@@ -25385,7 +25370,7 @@ async function uploadAvatarIfNeeded(userId) {
         </div>
 
         {serverError && <span style={{ fontFamily: bodyFont, color: T.rose, fontSize: 13, marginTop: 10, display: "block" }}>{serverError}</span>}
-        <button onClick={handleSubmit} disabled={submitting} className="fx-tap w-full rounded-[20px] py-3 mt-5" style={{ background: canSubmit ? PRISM : T.surfaceHi, color: canSubmit ? PRISM_TEXT : T.muted, fontFamily: displayFont, fontWeight: 700, fontSize: 15, boxShadow: canSubmit ? `0 0 22px ${glow(0.28)}` : "none", opacity: submitting ? 0.6 : 1 }}>
+        <button onClick={handleSubmit} disabled={submitting} className="fx-tap w-full rounded-[12px] min-h-[52px] py-3 mt-5" style={{ background: canSubmit ? PRISM : T.surfaceHi, color: canSubmit ? PRISM_TEXT : T.muted, fontFamily: displayFont, fontWeight: 700, fontSize: 15, boxShadow: canSubmit ? `0 0 22px ${glow(0.28)}` : "none", opacity: submitting ? 0.6 : 1 }}>
           {submitting ? t("submittingText") : isEdit ? t("saveChanges") : isLogin ? t("loginCta") : t("createAccountShort")}
         </button>
       </div>
@@ -28977,7 +28962,7 @@ function mapTokenRow(row) {
               зовёт его ещё раз. Ждать вслепую человек не должен. */}
           <button
             onClick={() => { const с = ждётПодписи || ждётПокупкиСумма; if (с > 0) { setЖдётПодписи(0); автопокупка(с); } }}
-            className="fx-tap w-full rounded-[20px] py-3 mt-2"
+            className="fx-tap w-full rounded-[12px] min-h-[52px] py-3 mt-2"
             style={{ maxWidth: 320, ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
           >
             {t("openWalletCta")}
