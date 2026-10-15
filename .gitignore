@@ -45,3 +45,8 @@ demo/lesv/snap/
 demo/lesv/node_modules/
 demo/lesv/fullrender.log
 demo/lesv/assets/track.wav
+demo/built/frames/
+demo/built/snap/
+demo/built/node_modules
+demo/built/fullrender.log
+demo/built/assets/track.wav
