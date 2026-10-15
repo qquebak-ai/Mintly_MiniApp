@@ -23247,7 +23247,9 @@ function ИндикаторПроверки({ ждём = false, свободно
   };
   const начинка = занято ? <X size={size} strokeWidth={3} />
     : свободно ? <Check size={size} strokeWidth={3} />
-    : <ЗнакиОжидания size={size} />;
+    // Пока база думает — тот же знак-загрузчик, что и в остальном
+    // приложении: контур бежит линией и заливается.
+    : <ЗнакЗагрузки size={size + 3} вид="контур" />;
   if (!жмётся) return <span aria-hidden style={общий}>{начинка}</span>;
   return (
     <button
@@ -23376,7 +23378,7 @@ function ЗнакЗагрузки({ size = 40, вид = "контур", оста
         d={ПУТЬ_ЗВЕЗДЫ} fill={цвет} stroke={цвет} pathLength={1}
         // Толщина линии в единицах рисунка: у мелкого знака тоньше
         // 1,5 точки на экране она уже не читается.
-        strokeWidth={Math.max(2.5, 225 / size)} strokeLinejoin="round"
+        strokeWidth={Math.max(2.5, 160 / size)} strokeLinejoin="round"
         style={{ strokeDasharray: 1, animation: остановлен ? "none" : "знакКонтур 2.4s ease-in-out infinite" }}
       />
     </svg>
