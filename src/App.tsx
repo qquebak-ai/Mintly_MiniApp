@@ -29375,6 +29375,25 @@ function mapTokenRow(row) {
           // панель и пересчитывал размытие под ней — отсюда рывки.
           const ХОД = "560ms cubic-bezier(0.65, 0, 0.25, 1)";
           const ЛОГО_СЕТИ = { ton: "/coins/gram.png", sol: "/coins/sol.png" };
+          // У картинки Соланы знак занимает половину кадра внутри чёрного
+          // круга, а у Грама — всю ширину без фона. Поэтому Солана здесь
+          // нарисована векторно, без круга и того же размера, что Грам.
+          const ЗнакСети = ({ сеть: с, size, style }) => с === "sol" ? (
+            <svg width={size} height={size} viewBox="-8 -51 414 414" aria-hidden style={{ display: "block", flex: "none", ...style }}>
+              <defs>
+                <linearGradient id="навСол" x1="360.9" y1="-37.5" x2="141.2" y2="383.3" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stopColor="#00FFA3" /><stop offset="1" stopColor="#DC1FFF" />
+                </linearGradient>
+              </defs>
+              <g fill="url(#навСол)">
+                <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" />
+                <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" />
+                <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" />
+              </g>
+            </svg>
+          ) : (
+            <img src={ЛОГО_СЕТИ[с]} alt="" width={size} height={size} style={{ display: "block", flex: "none", ...style }} />
+          );
           const КРУГ = 58, ЗАЗОР = 8, ПОЛЕ = 9;
           const ПУНКТЫ = [
             { id: "home", label: t("navHome"), icon: ЗначокДом },
@@ -29514,7 +29533,7 @@ function mapTokenRow(row) {
             }}
           >
             <span style={{ width: КРУГ, height: КРУГ, borderRadius: "50%", background: менюСети ? "#FFFFFF" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", transition: `background ${EASE}` }}>
-              <img key={сетьМемпада} src={ЛОГО_СЕТИ[сетьМемпада]} alt="" width={30} height={30} style={{ borderRadius: "50%", display: "block", animation: "навСетьСмена 360ms cubic-bezier(0.2, 1.3, 0.4, 1)" }} />
+              <ЗнакСети key={сетьМемпада} сеть={сетьМемпада} size={30} style={{ animation: "навСетьСмена 360ms cubic-bezier(0.2, 1.3, 0.4, 1)" }} />
             </span>
           </button>
           {/* Меню всплывает над кружком; закрывается выбором или любым
@@ -29548,7 +29567,7 @@ function mapTokenRow(row) {
                         fontFamily: bodyFont, fontSize: 15, fontWeight: выбрана ? 700 : 500, textAlign: "left",
                       }}
                     >
-                      <img src={ЛОГО_СЕТИ[ключ]} alt="" width={24} height={24} style={{ borderRadius: "50%", display: "block" }} />
+                      <ЗнакСети сеть={ключ} size={24} />
                       <span style={{ flex: 1 }}>{имя}</span>
                       {выбрана && <Check size={16} color={T.ice} />}
                     </button>
