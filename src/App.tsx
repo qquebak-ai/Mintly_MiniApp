@@ -24125,6 +24125,19 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   // Адрес, про который база точно ответила «свободен», — чтобы не спрашивать дважды.
   const почтаСвободнаRef = useRef("");
   const [никПроверка, setНикПроверка] = useState({ имя: "", итог: null });
+  // Есть ли законченный аккаунт с почтой, набранной на странице входа.
+  const [логинПочта, setЛогинПочта] = useState({ адрес: "", есть: null });
+  useEffect(() => {
+    if (шагВхода !== "вход") return undefined;
+    const адрес = почтаВвод.trim().toLowerCase();
+    if (!ПОЧТА_RE.test(адрес)) return undefined;
+    let живо = true;
+    const id = setTimeout(async () => {
+      const есть = await почтаЗарегистрирована(адрес);
+      if (живо) setЛогинПочта({ адрес, есть });
+    }, 400);
+    return () => { живо = false; clearTimeout(id); };
+  }, [шагВхода, почтаВвод]);
   // Идёт проверка после нажатия «Далее»: кнопка занята и повторно не нажимается.
   const [почтаЖдём, setПочтаЖдём] = useState(false);
   /* Вход по коду — на случай, если введённая почта уже занята: значит,
@@ -25086,10 +25099,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 {t("onbContinue")}
               </ОнбКнопка>
 
-              {/* Вход — отдельной страницей, а не скрытым действием: раньше
-                  «Войти» то слало код, то молча входило, и человек видел
-                  всё ту же «регистрацию». Ссылка мелкая и есть всегда. */}
-              {внутриTelegram && (
+              {/* «Войти» появляется, только когда почта оказалась занятой:
+                  аккаунт с ней уже есть — значит, сюда пришли войти, а не
+                  регистрироваться. Почта переезжает на страницу входа. */}
+              {внутриTelegram && почтаНеСвободна && (
                 <button
                   onClick={() => { haptic("light"); setЛогинОшибка(""); setПочтаБеда(""); сменитьШагВхода("вход"); }}
                   className="fx-tap w-full"
@@ -25169,7 +25182,9 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                     {логинПарольВиден ? <EyeOff size={19} color={ОНБ.приглушённый} /> : <Eye size={19} color={ОНБ.приглушённый} />}
                   </button>
                 </ОнбПоле>
-                <span style={{ minHeight: 18, fontFamily: bodyFont, color: T.down, fontSize: 12.5, lineHeight: 1.45 }}>{логинОшибка}</span>
+                <span style={{ minHeight: 18, fontFamily: bodyFont, color: T.down, fontSize: 12.5, lineHeight: 1.45 }}>
+                  {логинОшибка || (логинПочта.адрес === почтаЧистая && логинПочта.есть === false ? t("onbLoginNoAccount") : "")}
+                </span>
               </div>
               <ОнбКнопка
                 onClick={войтиПаролем}
@@ -25192,16 +25207,20 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   {t("onbLoginTelegram")}
                 </button>
               )}
-              <button
-                onClick={() => { haptic("light"); setЛогинОшибка(""); сменитьШагВхода("почта"); }}
-                className="fx-tap w-full"
+              {/* «Регистрация» — только когда стало ясно, что аккаунта с
+                  этой почтой нет. Почта уходит в регистрацию вместе с ним. */}
+              {(логинПочта.адрес === почтаЧистая && логинПочта.есть === false) || логинОшибка === t("onbLoginNoAccount") ? (
+                <button
+                  onClick={() => { haptic("light"); setЛогинОшибка(""); setЛогинПароль(""); сменитьШагВхода("почта"); }}
+                  className="fx-tap w-full"
                   style={{
                     background: "transparent", border: "none", padding: "2px 0 0", cursor: "pointer",
                     color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
                   }}
-              >
-                {t("onbRegisterCta")}
-              </button>
+                >
+                  {t("onbRegisterCta")}
+                </button>
+              ) : null}
             </>
           ) : шагВхода === "код" ? (
             <>
@@ -25257,23 +25276,6 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 }}
               >
                 {t("authCodeResend")}
-              </button>
-              {/* Обратный ход ко второй двери: с экрана входа можно вернуться
-                  к регистрации. Почту сбрасываем — эта уже занята, новый
-                  аккаунт на неё не завести. */}
-              <button
-                onClick={() => {
-                  haptic("light");
-                  setЛогинКод(""); setЛогинОшибка(""); setПочтаВвод("");
-                  сменитьШагВхода("почта");
-                }}
-                className="fx-tap"
-                style={{
-                  alignSelf: "center", padding: 0, border: "none", background: "transparent", cursor: "pointer",
-                  color: T.electric, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700,
-                }}
-              >
-                {t("onbRegisterCta")}
               </button>
             </>
           ) : шагВхода === "пароль" ? (
