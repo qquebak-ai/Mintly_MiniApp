@@ -345,6 +345,7 @@ const STR = {
     onbGetCode: "Получить код",
     onbLoginTelegram: "Войти через Telegram",
     onbLoginNoAccount: "Аккаунта с такой почтой нет",
+    authTelegramHasAccount: "К этому Telegram уже привязан аккаунт @{name} — войдите в него",
     onbPasswordTitle: "Придумайте пароль",
     onbPasswordLead: "Им вы будете входить по почте",
     onbPasswordHint: "Не короче 6 знаков",
@@ -1067,6 +1068,7 @@ const STR = {
     onbGetCode: "Get code",
     onbLoginTelegram: "Log in with Telegram",
     onbLoginNoAccount: "No account with this email",
+    authTelegramHasAccount: "This Telegram already has the account @{name} — log in to it",
     onbPasswordTitle: "Create a password",
     onbPasswordLead: "You will use it to log in with email",
     onbPasswordHint: "At least 6 characters",
@@ -23057,7 +23059,7 @@ async function signInWithTelegram(nickname, email) {
     // Консоли внутри Telegram нет, поэтому текст ошибки сервера едет
     // вместе с кодом — иначе непонятно, на каком шаге всё встало.
     const err = new Error(json.error || `auth_failed_${res.status}`);
-    err.detail = json.detail || "";
+    err.detail = json.detail || json.nickname || "";
     throw err;
   }
 
@@ -24541,6 +24543,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         : код === "nickname_taken" ? tf("authErrNicknameTaken", { name: ник })
         : код === "nickname_required" ? t("nicknameError")
         : код === "email_taken" ? t("authMailUsed")
+        : код === "telegram_has_account" ? tf("authTelegramHasAccount", { name: (err && err.detail) || "" })
         : `${t("createFailed")} (${код || "?"})${хвост}`);
     }
 

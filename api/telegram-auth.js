@@ -517,7 +517,29 @@ export default async function handler(req, res) {
     const { data: поТелеграму, error: поТгErr } = await admin.from("profiles").select("id, nickname")
       .or(`telegram_id.eq.${tgUser.id},email.eq."${email}"`).limit(5);
     if (поТгErr) return fail(res, 500, "lookup_failed", поТгErr.message);
-    const ужеЕсть = !!(поТелеграму || []).find((п) => п && п.nickname);
+    const готовый = (поТелеграму || []).find((п) => п && п.nickname) || null;
+    const ужеЕсть = !!готовый;
+    /* Законченный аккаунт этого Telegram — входим именно в него, по его
+       id, а не по служебному адресу tg<id>@telegram.local. После
+       подтверждения почты адрес учётки меняется на настоящий, служебный
+       освобождается, и поиск по нему находил (или заводил) другую,
+       пустую учётку — отсюда «ник занят» при свободном нике: запись
+       упиралась в telegram_id настоящего аккаунта. */
+    if (готовый) {
+      const ник = wantedNickname(body);
+      // Это регистрация, а аккаунт на этот Telegram уже есть — второй не
+      // заводим и молча в старый не пускаем: человек должен это увидеть.
+      if (ник && ник.toLowerCase() !== String(готовый.nickname).toLowerCase()) {
+        return res.status(409).json({ error: "telegram_has_account", nickname: готовый.nickname });
+      }
+      const { data: кто, error: ктоErr } = await admin.auth.admin.getUserById(готовый.id);
+      const адрес = кто && кто.user && кто.user.email;
+      if (ктоErr || !адрес) return fail(res, 500, "user_lookup_failed", ктоErr && ктоErr.message);
+      const { data: ссылка, error: ссылкаErr } = await admin.auth.admin.generateLink({ type: "magiclink", email: адрес });
+      if (ссылкаErr || !ссылка?.properties?.hashed_token) return fail(res, 500, "link_failed", ссылкаErr && ссылкаErr.message);
+      await admin.from("profiles").update({ telegram_id: tgUser.id }).eq("id", готовый.id).is("telegram_id", null);
+      return res.status(200).json({ token_hash: ссылка.properties.hashed_token });
+    }
     if (!ужеЕсть) {
       const ник = wantedNickname(body);
       if (!ник) return res.status(400).json({ error: "nickname_required" });
