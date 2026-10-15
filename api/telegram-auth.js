@@ -342,6 +342,66 @@ async function проверитьДоступность(req, res) {
   return res.status(200).json(ответ);
 }
 
+/* ВХОД ПО ПОЧТЕ И ПАРОЛЮ
+
+   Почта, которую человек видит и вводит, — не всегда адрес его учётной
+   записи: у аккаунтов из Telegram служебный адрес tg<id>@telegram.local,
+   а настоящий лежит в профиле, пока его не подтвердили. Поэтому сам
+   клиент войти по паролю не может — сервер находит аккаунт по почте из
+   профиля и проверяет пароль уже по адресу учётной записи.
+
+   Только законченные аккаунты (с ником): брошенная на полпути
+   регистрация — не аккаунт. С включённой защитой почтой пароля мало —
+   сессию не отдаём, а шлём код на подтверждённый адрес. */
+async function входПаролем(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return res.status(500).json({ error: "server_not_configured" });
+  let body;
+  try {
+    body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+  } catch (err) {
+    return fail(res, 400, "bad_body", err && err.message);
+  }
+  const почта = String(body.email || "").trim().toLowerCase();
+  const пароль = String(body.password || "");
+  if (почта.length > 254 || !/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(почта)) return res.status(400).json({ error: "bad_email" });
+  if (пароль.length < 6 || пароль.length > 128) return res.status(401).json({ error: "bad_password" });
+  // Перебор пароля: счётчик и на адрес, и на сеть, с которой пробуют.
+  if (rateLimited(`pw:${почта}`) || rateLimited(`pwip:${clientKey(req)}`)) {
+    res.setHeader("Retry-After", "300");
+    return res.status(429).json({ error: "too_many_requests" });
+  }
+
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data: профили, error: пErr } = await admin.from("profiles")
+    .select("id, mail_2fa").ilike("email", экранировать(почта)).not("nickname", "is", null).neq("nickname", "").limit(1);
+  if (пErr) return fail(res, 500, "lookup_failed", пErr.message);
+  const профиль = профили && профили[0];
+  if (!профиль) return res.status(404).json({ error: "no_account" });
+
+  const { data: кто, error: ктоErr } = await admin.auth.admin.getUserById(профиль.id);
+  const адресУчётки = кто && кто.user && кто.user.email;
+  if (ктоErr || !адресУчётки) return fail(res, 500, "user_lookup_failed", ктоErr && ктоErr.message);
+
+  // Отдельный клиент: вход меняет его состояние, а общий admin должен
+  // остаться с сервисным ключом.
+  const вход = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data: сессия, error: входErr } = await вход.auth.signInWithPassword({ email: адресУчётки, password: пароль });
+  if (входErr || !сессия || !сессия.session) return res.status(401).json({ error: "bad_password" });
+
+  if (профиль.mail_2fa) {
+    // Пароль верный, но сессию держим при себе — нужен ещё код с почты.
+    try { await вход.auth.signOut(); } catch (e) { /* сессия и так никуда не уйдёт */ }
+    const { error: кодErr } = await вход.auth.signInWithOtp({ email: адресУчётки, options: { shouldCreateUser: false } });
+    if (кодErr) return fail(res, 502, "code_failed", кодErr.message);
+    return res.status(200).json({ need_code: true, email: адресУчётки });
+  }
+  return res.status(200).json({
+    access_token: сессия.session.access_token,
+    refresh_token: сессия.session.refresh_token,
+  });
+}
+
 export default async function handler(req, res) {
   // Вход не только через Telegram: здесь же живут Phantom и заведение
   // профиля после Google или почты. Отдельным файлом их не сделать —
@@ -352,6 +412,7 @@ export default async function handler(req, res) {
   if (действие === "phantom") return входФантомом(req, res);
   if (действие === "profile") return завестиПрофиль(req, res);
   if (действие === "available") return проверитьДоступность(req, res);
+  if (действие === "password") return входПаролем(req, res);
 
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");

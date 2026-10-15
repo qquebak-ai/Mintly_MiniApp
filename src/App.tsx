@@ -337,12 +337,23 @@ const STR = {
     onbLoginCodeLead: "Для входа в аккаунт — код отправили на {mail}",
     onbRegisterCta: "Регистрация",
     onbLoginTitle: "Вход",
-    onbLoginLead: "Введите почту аккаунта — пришлём на неё код",
+    onbLoginLead: "Почта и пароль вашего аккаунта",
+    onbLoginEmailPh: "Почта",
+    onbLoginPasswordPh: "Пароль",
+    onbLoginBadPassword: "Неверный пароль",
+    onbLoginTooMany: "Слишком много попыток — подождите пару минут",
     onbGetCode: "Получить код",
     onbLoginTelegram: "Войти через Telegram",
     onbLoginNoAccount: "Аккаунта с такой почтой нет",
-    onbNameTitle: "Как вас зовут?",
-    onbNameLead: "Это имя будут видеть другие",
+    onbPasswordTitle: "Придумайте пароль",
+    onbPasswordLead: "Им вы будете входить по почте",
+    onbPasswordHint: "Не короче 6 знаков",
+    onbPasswordShort: "Нужно хотя бы 6 знаков",
+    onbPasswordWeak: "Слабый — добавьте цифры, заглавные или знаки",
+    onbPasswordOk: "Неплохой пароль",
+    onbPasswordStrong: "Надёжный пароль",
+    onbPasswordShow: "Показать пароль",
+    onbPasswordHide: "Скрыть пароль",
     onbUserTitle: "Придумайте юзернейм",
     onbUserLead: "4–20 символов: буквы, цифры, _ и точка",
     onbContinue: "Продолжить",
@@ -1048,12 +1059,23 @@ const STR = {
     onbLoginCodeLead: "To log in, we sent a code to {mail}",
     onbRegisterCta: "Sign up",
     onbLoginTitle: "Log in",
-    onbLoginLead: "Enter your account email — we will send a code",
+    onbLoginLead: "Your account email and password",
+    onbLoginEmailPh: "Email",
+    onbLoginPasswordPh: "Password",
+    onbLoginBadPassword: "Wrong password",
+    onbLoginTooMany: "Too many attempts — wait a couple of minutes",
     onbGetCode: "Get code",
     onbLoginTelegram: "Log in with Telegram",
     onbLoginNoAccount: "No account with this email",
-    onbNameTitle: "What's your name?",
-    onbNameLead: "This name will be visible to others",
+    onbPasswordTitle: "Create a password",
+    onbPasswordLead: "You will use it to log in with email",
+    onbPasswordHint: "At least 6 characters",
+    onbPasswordShort: "Use at least 6 characters",
+    onbPasswordWeak: "Weak — add digits, capitals or symbols",
+    onbPasswordOk: "Decent password",
+    onbPasswordStrong: "Strong password",
+    onbPasswordShow: "Show password",
+    onbPasswordHide: "Hide password",
     onbUserTitle: "Choose a username",
     onbUserLead: "4–20 characters: letters, numbers, _ and .",
     onbContinue: "Continue",
@@ -23365,6 +23387,55 @@ function ОнбЛоготип({ size = 64 }) {
   return <ЗнакЗвезда size={size} />;
 }
 
+/* Надёжность пароля по девятибалльной шкале: три красных деления, три
+   жёлтых, три зелёных. Длина даёт до пяти баллов, разнообразие знаков —
+   до четырёх. Короче шести знаков пароль не принимается вовсе, поэтому
+   выше красного он не поднимается; затёртые пароли и повтор одного
+   знака — сразу в самый низ. */
+const ЗАТЁРТЫЕ_ПАРОЛИ = ["123456", "1234567", "12345678", "123456789", "1234567890", "password", "qwerty", "qwerty123", "111111", "000000", "abc123", "йцукен", "пароль", "iloveyou", "admin1"];
+function надёжностьПароля(п) {
+  const с = String(п || "");
+  if (!с) return 0;
+  if (ЗАТЁРТЫЕ_ПАРОЛИ.includes(с.toLowerCase()) || /^(.)\1*$/.test(с)) return 1;
+  let б = 0;
+  for (const д of [6, 8, 10, 12, 14]) if (с.length >= д) б += 1;
+  if (/[a-zа-яё]/.test(с)) б += 1;
+  if (/[A-ZА-ЯЁ]/.test(с)) б += 1;
+  if (/\d/.test(с)) б += 1;
+  if (/[^A-Za-zА-Яа-яЁё\d]/.test(с)) б += 1;
+  if (с.length < 6) б = Math.min(б, 2);
+  return Math.max(1, Math.min(9, б));
+}
+// С какого балла можно идти дальше: второе жёлтое деление.
+const ПАРОЛЬ_ДОСТАТОЧНО = 5;
+
+function ШкалаПароля({ балл }) {
+  const ЦВЕТА = ["#FF3B47", "#FFC233", "#00E96B"];
+  return (
+    <div className="flex" style={{ gap: 8 }} aria-hidden>
+      {ЦВЕТА.map((цвет, г) => (
+        <div key={г} className="flex" style={{ flex: 1, gap: 3 }}>
+          {[0, 1, 2].map((к) => {
+            const н = г * 3 + к;
+            const горит = н < балл;
+            return (
+              <span key={к} style={{ flex: 1, height: 4, borderRadius: 2, background: hexA("#FFFFFF", 0.08), overflow: "hidden", position: "relative" }}>
+                {/* Заливка въезжает слева по очереди: шкала «набирается»
+                    вслед за паролем, а не мигает целиком. */}
+                <span style={{
+                  position: "absolute", inset: 0, borderRadius: 2, background: цвет,
+                  transform: `scaleX(${горит ? 1 : 0})`, transformOrigin: "0 50%",
+                  transition: `transform 320ms cubic-bezier(0.22, 1, 0.36, 1) ${горит ? (н % 3) * 60 : 0}ms`,
+                }} />
+              </span>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Три штриха: активный шире и ярче, остальные короткие и тусклые.
 function ОнбШаги({ шаг, всего = 3 }) {
   return (
@@ -24040,7 +24111,13 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
      ключом, и на этом же экране предлагается сразу после создания. */
   const [шагВхода, setШагВхода] = useState("почта");  // почта | код | имя | ник | готово
   const [почтаВвод, setПочтаВвод] = useState("");
-  const [имяВвод, setИмяВвод] = useState("");
+  // Пароль с шага регистрации и пароль на странице входа — раздельно:
+  // вернувшись с входа к регистрации, человек не должен найти там чужой
+  // набранный пароль.
+  const [парольВвод, setПарольВвод] = useState("");
+  const [парольВиден, setПарольВиден] = useState(false);
+  const [логинПароль, setЛогинПароль] = useState("");
+  const [логинПарольВиден, setЛогинПарольВиден] = useState(false);
   const [почтаБеда, setПочтаБеда] = useState("");
   const [естьАккаунт, setЕстьАккаунт] = useState(null); // null — ещё спрашиваем
   /* Занято ли уже введённое. Спрашиваем на ходу: узнать об этом после
@@ -24088,7 +24165,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     if (!open || isEdit) return undefined;
     const btn = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.BackButton;
     if (!btn || typeof btn.show !== "function") return undefined;
-    const ПРЕЖНИЙ = { имя: "почта", ник: "имя", вход: "почта", код: "вход" };
+    const ПРЕЖНИЙ = { пароль: "почта", ник: "пароль", вход: "почта", код: "вход" };
     const куда = ПРЕЖНИЙ[шагВхода];
     if (!куда) { btn.hide(); return undefined; }
     const назад = () => {
@@ -24312,7 +24389,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     let живо = true;
     setШагВхода("почта");
     setПочтаВвод("");
-    setИмяВвод("");
+    setПарольВвод(""); setПарольВиден(false); setЛогинПароль(""); setЛогинПарольВиден(false);
     setПочтаБеда("");
     setЛогинКод("");
     setЛогинОшибка("");
@@ -24508,13 +24585,16 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           return;
         }
         haptic("success");
-        /* Имя с отдельного шага кладём в метаданные пользователя: колонки
-           под него в profiles нет, а менять схему базы ради него никто не
-           просил. Неудача аккаунт не отменяет. */
-        const имяЧистое = имяВвод.trim();
-        if (имяЧистое) {
-          try { await supabase.auth.updateUser({ data: { name: имяЧистое } }); }
-          catch (e) { console.warn("[mintly] имя не сохранилось:", e && e.message); }
+        /* Пароль ставим сразу после создания: до него нет сессии. Им
+           потом входят по почте. Сбой связи — пробуем ещё раз: без пароля
+           войти можно только через Telegram. */
+        if (парольВвод) {
+          for (let попытка = 0; попытка < 3; попытка++) {
+            const { error: пErr } = await supabase.auth.updateUser({ password: парольВвод });
+            if (!пErr) break;
+            console.warn("[mintly] пароль не сохранился:", пErr.message);
+            await new Promise((r) => setTimeout(r, 700));
+          }
         }
         /* Картинку кладём после создания: до него нет ни сессии, ни
            папки в хранилище — оно закрыто политиками по владельцу.
@@ -24564,6 +24644,54 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
        механикой, что подтверждение вывода (supabase signInWithOtp /
        verifyOtp): shouldCreateUser: false — новый аккаунт этот вызов не
        заводит, только впускает в существующий. */
+    /* Вход по почте и паролю. Проверяет сервер: почта из профиля не
+       всегда адрес учётной записи (см. входПаролем в api/telegram-auth).
+       Ответ — либо готовая сессия, либо просьба о коде, если включена
+       защита почтой: тогда код уже ушёл, и ведём к окошкам. */
+    async function войтиПаролем() {
+      if (логинИдёт || !почтаПохожа || логинПароль.length < 6) return;
+      setЛогинОшибка("");
+      setЛогинИдёт(true);
+      try {
+        const ответ = await fetch(апи("/api/telegram-auth?action=password"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: почтаЧистая, password: логинПароль }),
+        });
+        const о = await ответ.json().catch(() => ({}));
+        if (!ответ.ok) {
+          setЛогинОшибка(о.error === "no_account" ? t("onbLoginNoAccount")
+            : о.error === "bad_password" ? t("onbLoginBadPassword")
+            : о.error === "too_many_requests" ? t("onbLoginTooMany")
+            : t("authMailUnknown"));
+          haptic("error");
+          return;
+        }
+        markSignedOut(false);
+        markSeenSession();
+        if (о.need_code) {
+          // Код ушёл на подтверждённый адрес — им и подтверждаем.
+          if (о.email) setПочтаВвод(о.email);
+          setЛогинКод("");
+          setЛогинМожноПереотправить(false);
+          clearTimeout(переотправкаТаймерRef.current);
+          переотправкаТаймерRef.current = setTimeout(() => setЛогинМожноПереотправить(true), 120000);
+          сменитьШагВхода("код");
+          haptic("light");
+          return;
+        }
+        const { error } = await supabase.auth.setSession({ access_token: о.access_token, refresh_token: о.refresh_token });
+        if (error) throw error;
+        haptic("success");
+        onClose();
+      } catch (e) {
+        setЛогинОшибка(t("authMailUnknown"));
+        haptic("error");
+      } finally {
+        setЛогинИдёт(false);
+      }
+    }
+
     async function отправитьКодВхода() {
       if (!логинМожноПереотправить) return;
       setЛогинОшибка("");
@@ -24684,7 +24812,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     // Центр маленького логотипа — на 62% от поля сверху; штрихи под ним.
     const логоY = Math.round(отступСверху * 0.62);
     // Какой по счёту штрих горит: код входа — продолжение шага «почта».
-    const шагНомер = шагВхода === "имя" ? 1 : шагВхода === "ник" ? 2 : 0;
+    const шагНомер = шагВхода === "пароль" ? 1 : шагВхода === "ник" ? 2 : 0;
     const экран = (
       <div
         /* Без проявления: окно входа выходит из чёрного поля, и пока оно
@@ -24936,7 +25064,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                      ответом под полем; если не узнали — переспросим
                      перед созданием аккаунта (см. создать). */
                   haptic("light");
-                  сменитьШагВхода("имя");
+                  сменитьШагВхода("пароль");
                   const адрес = почтаЧистая;
                   почтаЗанята(адрес).then((итог) => {
                     if (итог === false) { почтаСвободнаRef.current = адрес; return; }
@@ -24987,42 +25115,61 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   этот Telegram, хватает одного нажатия — для него отдельная
                   мелкая строка. Обратно к регистрации — тоже мелкой. */}
               <ОнбЗаголовок title={t("onbLoginTitle")} lead={t("onbLoginLead")} />
-              <div className="flex flex-col" style={{ gap: 6 }}>
-                <ОнбПоле рамка={логинОшибка ? T.down : null}>
+              <div className="flex flex-col" style={{ gap: 10 }}>
+                <ОнбПоле рамка={логинОшибка && !логинПароль ? T.down : null}>
                   <ПолеСЖивымТекстом
                     className="онб-поле"
                     value={почтаВвод}
+                    placeholder={t("onbLoginEmailPh")}
                     onChange={(e) => { setПочтаВвод(e.target.value); setЛогинОшибка(""); }}
-                    onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
                     type="email"
                     inputMode="email"
                     spellCheck={false}
                     autoCapitalize="off"
                     autoCorrect="off"
-                    autoComplete="off"
+                    autoComplete="username"
                     style={{
                       flex: 1, minWidth: 0, height: "100%", background: "transparent", border: "none", outline: "none",
                       color: ОНБ.текст, caretColor: ОНБ.каретка, fontFamily: bodyFont, fontSize: 16,
                     }}
                   />
                 </ОнбПоле>
-                {логинОшибка && (
-                  <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5, lineHeight: 1.45 }}>{логинОшибка}</span>
-                )}
+                <ОнбПоле рамка={логинОшибка && логинПароль ? T.down : null}>
+                  <ПолеСЖивымТекстом
+                    className="онб-поле"
+                    value={логинПароль}
+                    placeholder={t("onbLoginPasswordPh")}
+                    onChange={(e) => { setЛогинПароль(e.target.value.slice(0, 128)); setЛогинОшибка(""); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") войтиПаролем(); }}
+                    type={логинПарольВиден ? "text" : "password"}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    autoComplete="current-password"
+                    spellCheck={false}
+                    style={{
+                      flex: 1, minWidth: 0, height: "100%", background: "transparent", border: "none", outline: "none",
+                      color: ОНБ.текст, caretColor: ОНБ.каретка, fontFamily: bodyFont, fontSize: 16,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    aria-label={логинПарольВиден ? t("onbPasswordHide") : t("onbPasswordShow")}
+                    onClick={() => { haptic("light"); setЛогинПарольВиден((v) => !v); }}
+                    className="fx-tap"
+                    style={{ flex: "none", width: 36, height: 36, marginRight: -6, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+                  >
+                    {логинПарольВиден ? <EyeOff size={19} color={ОНБ.приглушённый} /> : <Eye size={19} color={ОНБ.приглушённый} />}
+                  </button>
+                </ОнбПоле>
+                <span style={{ minHeight: 18, fontFamily: bodyFont, color: T.down, fontSize: 12.5, lineHeight: 1.45 }}>{логинОшибка}</span>
               </div>
               <ОнбКнопка
-                onClick={() => {
-                  if (!почтаПохожа) { setЛогинОшибка(t("authMailBad")); return; }
-                  // Код только что ушёл, а повтор ещё закрыт — письмо уже в
-                  // ящике, просто возвращаем к окошкам кода.
-                  if (!логинМожноПереотправить) { haptic("light"); сменитьШагВхода("код"); return; }
-                  отправитьКодВхода();
-                }}
-                disabled={!почтаПохожа || логинИдёт}
+                onClick={войтиПаролем}
+                disabled={!почтаПохожа || логинПароль.length < 6 || логинИдёт}
                 занята={логинИдёт}
-                готова={почтаПохожа}
+                готова={почтаПохожа && логинПароль.length >= 6}
               >
-                {t("onbGetCode")}
+                {t("authSignInCta")}
               </ОнбКнопка>
               {естьАккаунт === true && (
                 <button
@@ -25121,38 +25268,56 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 {t("onbRegisterCta")}
               </button>
             </>
-          ) : шагВхода === "имя" ? (
+          ) : шагВхода === "пароль" ? (
             <>
-              {/* Имя, которое увидят другие. Не путать с юзернеймом: имя
-                  свободное, юзернейм уникальный и выбирается следующим
-                  шагом. */}
-              <ОнбЗаголовок title={t("onbNameTitle")} lead={t("onbNameLead")} />
-              <div className="flex flex-col" style={{ gap: 6 }}>
+              {/* Пароль — второй ключ ко входу, по почте. Шкала под полем
+                  набирается вслед за паролем; дальше пускает со второго
+                  жёлтого деления. */}
+              <ОнбЗаголовок title={t("onbPasswordTitle")} lead={t("onbPasswordLead")} />
+              <div className="flex flex-col" style={{ gap: 10 }}>
                 <ОнбПоле>
                   <ПолеСЖивымТекстом
                     className="онб-поле"
-                    value={имяВвод}
-                    onChange={(e) => setИмяВвод(e.target.value.slice(0, 40))}
-                    onKeyDown={(e) => { if (e.key === "Enter" && имяВвод.trim()) { haptic("light"); сменитьШагВхода("ник"); } }}
-                    type="text"
-                    autoCapitalize="words"
+                    value={парольВвод}
+                    onChange={(e) => setПарольВвод(e.target.value.slice(0, 128))}
+                    onKeyDown={(e) => { if (e.key === "Enter" && надёжностьПароля(парольВвод) >= ПАРОЛЬ_ДОСТАТОЧНО && парольВвод.length >= 6) { haptic("light"); сменитьШагВхода("ник"); } }}
+                    type={парольВиден ? "text" : "password"}
+                    autoCapitalize="off"
                     autoCorrect="off"
-                    autoComplete="off"
+                    autoComplete="new-password"
                     spellCheck={false}
-                    maxLength={40}
+                    maxLength={128}
                     style={{
                       flex: 1, minWidth: 0, height: "100%", background: "transparent", border: "none", outline: "none",
                       color: ОНБ.текст, caretColor: ОНБ.каретка, fontFamily: bodyFont, fontSize: 16,
                     }}
                   />
+                  <button
+                    type="button"
+                    aria-label={парольВиден ? t("onbPasswordHide") : t("onbPasswordShow")}
+                    onClick={() => { haptic("light"); setПарольВиден((v) => !v); }}
+                    className="fx-tap"
+                    style={{ flex: "none", width: 36, height: 36, marginRight: -6, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+                  >
+                    {парольВиден ? <EyeOff size={19} color={ОНБ.приглушённый} /> : <Eye size={19} color={ОНБ.приглушённый} />}
+                  </button>
                 </ОнбПоле>
-                {/* Место под строку ответа, как у других шагов: кнопка
-                    стоит на одной высоте на всех шагах. */}
-                <div style={{ minHeight: 18 }} />
+                <ШкалаПароля балл={парольВвод ? надёжностьПароля(парольВвод) : 0} />
+                <span style={{ minHeight: 18, fontFamily: bodyFont, fontSize: 12.5, lineHeight: 1.45,
+                  color: !парольВвод ? ОНБ.приглушённый
+                    : парольВвод.length < 6 || надёжностьПароля(парольВвод) <= 3 ? T.down
+                    : надёжностьПароля(парольВвод) <= 6 ? "#FFC233" : T.up }}>
+                  {!парольВвод ? t("onbPasswordHint")
+                    : парольВвод.length < 6 ? t("onbPasswordShort")
+                    : надёжностьПароля(парольВвод) < ПАРОЛЬ_ДОСТАТОЧНО ? t("onbPasswordWeak")
+                    : надёжностьПароля(парольВвод) <= 6 ? t("onbPasswordOk")
+                    : t("onbPasswordStrong")}
+                </span>
               </div>
               <ОнбКнопка
-                onClick={() => { if (!имяВвод.trim()) return; haptic("light"); сменитьШагВхода("ник"); }}
-                disabled={!имяВвод.trim()}
+                onClick={() => { if (парольВвод.length < 6 || надёжностьПароля(парольВвод) < ПАРОЛЬ_ДОСТАТОЧНО) return; haptic("light"); сменитьШагВхода("ник"); }}
+                disabled={парольВвод.length < 6 || надёжностьПароля(парольВвод) < ПАРОЛЬ_ДОСТАТОЧНО}
+                готова={парольВвод.length >= 6 && надёжностьПароля(парольВвод) >= ПАРОЛЬ_ДОСТАТОЧНО}
               >
                 {t("onbContinue")}
               </ОнбКнопка>
