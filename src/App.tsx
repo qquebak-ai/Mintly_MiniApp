@@ -23269,6 +23269,14 @@ function СтатусПроверки({ проверяем, итог, текст
   );
 }
 
+// Есть ли с этой почтой законченный аккаунт (с ником). null — не узнали.
+async function почтаЗарегистрирована(почта) {
+  const адрес = String(почта || "").trim().toLowerCase();
+  if (!адрес) return false;
+  const о = await проверитьДоступность({ email: адрес });
+  return typeof о.email_registered === "boolean" ? о.email_registered : null;
+}
+
 async function почтаЗанята(почта) {
   const адрес = String(почта || "").trim().toLowerCase();
   if (!адрес) return false;
@@ -24562,6 +24570,12 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
       setЛогинКод("");
       setЛогинИдёт(true);
       try {
+        /* Войти можно только в аккаунт, который прошёл регистрацию до
+           конца. Брошенный на полпути (адрес есть, ника нет) — не
+           аккаунт: код ему не шлём. «Не узнали» тоже не пропускаем —
+           проверка после кода всё равно закроет дверь. */
+        const зарег = await почтаЗарегистрирована(почтаЧистая);
+        if (зарег === false) { setЛогинОшибка(t("onbLoginNoAccount")); haptic("error"); return; }
         const { error } = await supabase.auth.signInWithOtp({
           email: почтаЧистая,
           options: { shouldCreateUser: false },
@@ -24602,8 +24616,20 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         // покажет «Аккаунт не создан».
         markSignedOut(false);
         markSeenSession();
-        const { error } = await supabase.auth.verifyOtp({ email: почтаЧистая, token: код, type: "email" });
+        const { data: вошёл, error } = await supabase.auth.verifyOtp({ email: почтаЧистая, token: код, type: "email" });
         if (error) throw error;
+        /* Код верный, но аккаунт без ника — регистрация не закончена.
+           Внутрь такого не пускаем: сессию сразу закрываем и говорим
+           прямо. «Не узнали» (сбой связи) не считаем отказом. */
+        const id = вошёл && вошёл.user && вошёл.user.id;
+        if (id && (await профильЕсть(id)) === false) {
+          try { await supabase.auth.signOut(); } catch (e) { /* сессии и так не будет */ }
+          setЛогинКод("");
+          setЛогинОшибка(t("onbLoginNoAccount"));
+          haptic("error");
+          сменитьШагВхода("вход");
+          return;
+        }
         haptic("success");
         onClose();
       } catch (e) {

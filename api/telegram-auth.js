@@ -330,6 +330,12 @@ async function проверитьДоступность(req, res) {
         if (!рErr && typeof р === "boolean") занята = р;
       }
       ответ.email_taken = занята;
+      // Для входа «занята» мало: адрес мог остаться от брошенной на
+      // полпути регистрации. Войти можно только в аккаунт с ником —
+      // его и ищем отдельно.
+      const { data: зарег, error: зарегErr } = await admin.from("profiles")
+        .select("id").ilike("email", экранировать(почта)).not("nickname", "is", null).neq("nickname", "").limit(1);
+      ответ.email_registered = зарегErr ? null : !!(зарег && зарег.length);
     }
   }
 
