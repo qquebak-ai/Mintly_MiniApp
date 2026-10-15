@@ -333,7 +333,7 @@ const STR = {
     // Строки заставки: имя посередине чёрного и то же имя в шапке.
     authSplashLead: "Мемкоины на TON и Solana",
     onbEmailTitle: "Введите почту",
-    onbEmailLead: "Для входа и восстановления аккаунта",
+    onbEmailLead: "Для входа и регистрации",
     onbNameTitle: "Как вас зовут?",
     onbNameLead: "Это имя будут видеть другие",
     onbUserTitle: "Придумайте юзернейм",
@@ -1037,7 +1037,7 @@ const STR = {
     authSignInCta: "Sign in",
     authSplashLead: "Memecoins on TON and Solana",
     onbEmailTitle: "Enter your email",
-    onbEmailLead: "For login and account recovery",
+    onbEmailLead: "To log in or sign up",
     onbNameTitle: "What's your name?",
     onbNameLead: "This name will be visible to others",
     onbUserTitle: "Choose a username",
