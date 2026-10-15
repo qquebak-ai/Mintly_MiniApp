@@ -104,17 +104,22 @@ const logo1 = $(`<div class="abs" style="left:0;top:0;width:150px;height:150px;f
 const WORD = "Mintly";
 const word1 = $(`<div class="abs" style="left:0;top:0;font:800 118px/1.1 'Nunito';letter-spacing:-.02em;white-space:nowrap;filter:drop-shadow(0 0 18px rgba(120,165,255,.55))">${[...WORD].map((c) => `<span class="ch grad">${c}</span>`).join("")}</div>`); s1.appendChild(word1);
 const pill = $(`<div class="abs" style="left:0;top:0;height:96px;border-radius:30px;background:#fff;box-shadow:0 0 40px rgba(220,232,255,.95),0 0 110px rgba(79,134,255,.6)"></div>`); s1.appendChild(pill);
-const CHIPS = [["home", "Главная"], ["swap", "Мемпад"], ["rocket", "Запуск"], ["bag", "Магазин"], ["bars", "Кошелёк"]];
-const row = $(`<div class="abs" style="left:0;top:0;width:${W}px;height:80px"></div>`); s1.appendChild(row);
-const chips = CHIPS.map(([k, л]) => { const c = $(`<div class="chip">${ico(k)}<span>${л}</span></div>`); row.appendChild(c); return c; });
+// Панель разделов — та же капсула, что внизу приложения: пять круглых
+// кнопок, выбранная залита белым, на краю сидит Минти.
+const CHIPS = ["home", "swap", "rocket", "bag", "bars"];
+const КН = 132, ЗАЗОР_КН = 18, ПОЛЕ_КН = 20;
+const row = $(`<div class="abs" style="left:0;top:0;width:${W}px;height:${КН}px"></div>`); s1.appendChild(row);
+const capsule = $(`<div class="abs" style="left:0;top:${-ПОЛЕ_КН}px;height:${КН + ПОЛЕ_КН * 2}px;border-radius:999px;background:rgba(0,0,0,.22);backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);box-shadow:0 10px 30px rgba(0,0,0,.32)"></div>`); row.appendChild(capsule);
+const navMintie = $(`<div class="abs" style="left:0;top:0;width:150px;height:164px;background:url(assets/app/nav-mint.webp) 0 0/1200% 100% no-repeat;image-rendering:pixelated"></div>`); row.appendChild(navMintie);
+const chips = CHIPS.map((k) => { const c = $(`<div class="navb">${ico(k)}</div>`); row.appendChild(c); return c; });
 const ЦЕЛЬ = 2;
 const cursor = $(`<svg class="abs" style="left:0;top:0;filter:drop-shadow(0 6px 14px rgba(0,0,0,.6))" width="64" height="72" viewBox="0 0 32 36">
   <path d="M11 3.5c1.4 0 2.4 1 2.4 2.4V15l1-.2c1.1-.1 2 .4 2.4 1.3l.5-.1c1.2-.2 2.2.4 2.6 1.4h.6c1.4 0 2.5 1.1 2.5 2.5v6.3c0 4.4-3.2 7.8-7.6 7.8h-1.6c-2.6 0-4.4-1-6-3.2L3.6 25c-.8-1.1-.6-2.6.5-3.4 1-.7 2.4-.5 3.2.4l1.3 1.5V5.9c0-1.4 1-2.4 2.4-2.4z" fill="#fff" stroke="#111" stroke-width="1.6" stroke-linejoin="round"/>
   <path d="M13.4 15v6M16.8 16.1v5M20.3 17.6v4" stroke="#111" stroke-width="1.4" stroke-linecap="round"/></svg>`); s1.appendChild(cursor);
 let chipW = [], chipX = [];
 function layoutChips() {
-  const gap = 18;
-  chipW = chips.map((c) => c.offsetWidth);
+  const gap = ЗАЗОР_КН;
+  chipW = chips.map(() => КН);
   const total = chipW.reduce((a, b) => a + b, 0) + gap * (chips.length - 1);
   let x = (W - total) / 2;
   chipX = chipW.map((w) => { const p = x; x += w + gap; return p; });
@@ -141,8 +146,17 @@ function drawS1(t) {
   pill.style.width = pw + "px"; pill.style.height = ph + "px";
   S(pill, { o: (t >= 1.12 ? kP : 0) * (1 - kPo), x: lerp(wx + 170, W / 2, kSt) - pw / 2, y: H / 2 - ph / 2, b: kSt * 6 });
   // чипы: из середины разъезжаются с отдачей и горизонтальным смазом
-  row.style.transform = `translate3d(0,${H / 2 - 48}px,0)`;
+  row.style.transform = `translate3d(0,${H / 2 - КН / 2}px,0)`;
   const kC = prog(t, 1.36, 1.8);
+  // капсула растёт из плашки до ширины всех кнопок
+  const kCap = E.back(kC), full = chipX[4] + КН - chipX[0] + ПОЛЕ_КН * 2;
+  const cw = lerp(Math.min(full, 380), full, kCap);
+  capsule.style.width = cw + "px";
+  S(capsule, { o: E.out(prog(t, 1.34, 1.46)), x: W / 2 - cw / 2 });
+  // Минти на правом краю — дышит, как в приложении
+  const кадр = Math.floor(((t * 12) % 12));
+  navMintie.style.backgroundPosition = `${(кадр / 11) * 100}% 0`;
+  S(navMintie, { o: E.out(prog(t, 1.6, 1.75)), x: W / 2 + cw / 2 - 190, y: -ПОЛЕ_КН - 164 + 40 });
   chips.forEach((c, i) => {
     const kk = E.back(kC), from = W / 2 - chipW[i] / 2;
     const x = lerp(from, chipX[i], kk);
@@ -154,44 +168,61 @@ function drawS1(t) {
       glow = E.out(prog(t, 2.16, 2.32));
     }
     S(c, { o, x, s, b: (1 - E.out(prog(t, 1.36, 1.62))) * 9 });
-    if (i === ЦЕЛЬ) {
-      c.style.background = `rgba(79,134,255,${(0.38 * glow + 0.0).toFixed(3)})`;
-      c.querySelector("span").style.color = glow > 0.5 ? "#DCE8FF" : "#fff";
-    }
+    // выбранная кнопка — белый круг: сначала «Главная», после нажатия «Запуск»
+    const актив = i === ЦЕЛЬ ? glow : (i === 0 ? 1 - E.out(prog(t, 2.16, 2.32)) : 0);
+    c.style.background = `rgba(255,255,255,${актив.toFixed(3)})`;
+    c.querySelector("svg").style.stroke = актив > 0.5 ? "#14151A" : "#9B9FA9";
+    c.querySelector("svg").style.strokeWidth = актив > 0.5 ? 2 : 1.8;
   });
   // курсор: снизу к «Запуску», нажатие
   const kc = E.out(prog(t, 1.82, 2.1));
-  const tx = chipX[ЦЕЛЬ] + chipW[ЦЕЛЬ] / 2 - 14, ty = H / 2 + 6;
+  const tx = chipX[ЦЕЛЬ] + chipW[ЦЕЛЬ] / 2 - 14, ty = H / 2 + 10;
   const press = clamp(prog(t, 2.14, 2.22) - prog(t, 2.24, 2.36));
   S(cursor, { o: prog(t, 1.82, 1.9), x: lerp(tx + 260, tx, kc), y: lerp(ty + 520, ty, kc), s: 1 - 0.12 * press });
 }
 
-// ===================== 2. ЗАПРОС: крупно → в поле ввода =====================
+// ===================== 2. СОЗДАНИЕ ТОКЕНА: поле крупно → вся форма =====================
+// Форма — та же, что в разделе «Запуск»: переключатель сети, логотип и
+// баннер, «Название», «Тикер» и кнопка запуска. Размеры — точки
+// приложения (экран 393), камера их увеличивает.
 const s2 = $(`<div class="scene"></div>`); root.appendChild(s2);
 const glowTop = $(`<div class="abs" style="left:560px;top:-70px;width:800px;height:150px;border-radius:50%;background:radial-gradient(closest-side,rgba(79,134,255,.75),rgba(79,134,255,.18) 60%,rgba(79,134,255,0))"></div>`); s2.appendChild(glowTop);
-const BOX_W = 1460, BOX_H = 330;
-function promptBox(text) {
-  const g = $(`<div class="abs" style="left:0;top:0;width:${BOX_W}px;height:${BOX_H}px;transform-origin:0 0"></div>`);
-  const bg = $(`<div class="box" style="inset:0"></div>`); g.appendChild(bg);
-  const tx = $(`<div class="abs" style="left:64px;top:70px;font:500 46px/1.2 'Onest';white-space:nowrap">${[...text].map((c) => `<span class="ch">${c === " " ? " " : c}</span>`).join("")}</div>`); g.appendChild(tx);
-  const plus = $(`<svg class="abs" style="left:58px;top:228px" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"><path d="M12 4v16M4 12h16"/></svg>`); g.appendChild(plus);
-  const ctr = $(`<div class="abs" style="right:52px;top:226px;height:60px;display:flex;align-items:center;gap:30px;font:500 30px/1 'Onest';color:rgba(242,240,235,.85)">
-    <span>GRAM <span style="opacity:.6;font-size:24px">⌄</span></span>
-    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3" fill="#fff"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
-    <svg width="40" height="34" viewBox="0 0 30 24" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="2.2" stroke-linecap="round"><path d="M3 10v4M7.5 6v12M12 9v6M16.5 4v16M21 8v8M25.5 11v2"/></svg>
-    <span class="send" style="width:60px;height:60px;border-radius:16px;background:${СИНИЙ};display:flex;align-items:center;justify-content:center;box-shadow:0 0 24px rgba(79,134,255,.6)"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></span>
-  </div>`); g.appendChild(ctr);
-  return { g, bg, tx, plus, ctr, send: ctr.querySelector(".send"), chars: [...tx.children] };
-}
-const P1 = promptBox("Хочу запустить мемкоин Lily Frog.");
-s2.appendChild(P1.g);
+const поле = (y, ph, id) => `<div class="abs" style="left:16px;top:${y}px;width:361px;height:50px;border-radius:12px;background:#14171F;border:1px solid #22262F;display:flex;align-items:center;padding:0 14px;font:400 17px/1 'Onest'">
+  <span class="ph ph-${id}" style="color:#63625F">${ph}</span><span class="val val-${id}" style="color:#F2F0EB;white-space:pre"></span></div>`;
+const подпись = (y, txt) => `<div class="abs" style="left:16px;top:${y}px;font:500 14px/1 'Onest';color:#97958F">${txt}</div>`;
+const form = $(`<div class="abs" style="left:0;top:0;width:393px;height:540px;transform-origin:0 0">
+  <div class="fbg abs" style="inset:-14px -0px;border-radius:40px;background:#0B0D12;box-shadow:0 0 0 1px rgba(255,255,255,.06),0 40px 100px rgba(0,0,0,.6)"></div>
+  <div class="fui abs" style="inset:0">
+    <div class="abs" style="left:16px;top:14px;width:168px;height:38px;border-radius:999px;background:#14171F">
+      <div class="abs" style="left:3px;top:3px;width:81px;height:32px;border-radius:999px;background:rgba(255,255,255,.92)"></div>
+      <div class="abs" style="left:3px;top:0;width:81px;height:38px;display:flex;align-items:center;justify-content:center;font:800 13.5px/1 'Nunito';color:#0B0B0F">GRAM</div>
+      <div class="abs" style="left:84px;top:0;width:81px;height:38px;display:flex;align-items:center;justify-content:center;font:600 13.5px/1 'Onest';color:#63625F">SOL</div>
+    </div>
+    ${подпись(80, "Логотип")}
+    <div class="abs" style="left:16px;top:102px;width:76px;height:76px;border-radius:50%;border:1.5px dashed #30343E;overflow:hidden">
+      <img class="flogo" src="assets/tok/frog.png" style="width:100%;height:100%;image-rendering:pixelated;opacity:0"/></div>
+    <div class="abs" style="left:104px;top:102px;width:273px;height:76px;border-radius:16px;border:1.5px dashed #30343E;display:flex;align-items:center;justify-content:center;font:400 12px/1 'Onest';color:#97958F">Баннер 1200×400 (необязательно)</div>
+    ${подпись(204, "Название")}
+    ${поле(226, "Prism Cat", "name")}
+    ${подпись(302, "Тикер")}
+    ${поле(324, "PRSM", "tick")}
+    <div class="fbtn abs" style="left:16px;top:410px;width:361px;height:52px;border-radius:12px;background:#F2F0EB;display:flex;align-items:center;justify-content:center;font:800 16px/1 'Nunito';color:#2A2C31;box-shadow:0 0 30px rgba(120,165,255,.45)">Запустить токен</div>
+  </div>
+</div>`);
+s2.appendChild(form);
+const fbg = form.querySelector(".fbg"), fui = form.querySelector(".fui"), fbtn = form.querySelector(".fbtn"), flogo = form.querySelector(".flogo");
+const ИМЯ = "Lily Frog", ТИКЕР = "LILY";
+const valName = form.querySelector(".val-name"), phName = form.querySelector(".ph-name");
+const valTick = form.querySelector(".val-tick"), phTick = form.querySelector(".ph-tick");
+valName.innerHTML = [...ИМЯ].map((c) => `<span class="ch">${c}</span>`).join("");
+valTick.innerHTML = [...ТИКЕР].map((c) => `<span class="ch">${c}</span>`).join("");
+const charsName = [...valName.children], charsTick = [...valTick.children];
 // печать: свежие буквы синие и остывают в белый
 function typeChars(chars, t, a, b, accent = "#7FA9FF") {
   const n = chars.length;
   chars.forEach((ch, i) => {
     const ti = a + (b - a) * (i / n);
-    const vis = t >= ti;
-    ch.style.visibility = vis ? "visible" : "hidden";
+    ch.style.display = t >= ti ? "inline-block" : "none";
     const cool = clamp((t - ti - 0.28) / 0.25);
     ch.style.color = cool >= 1 ? "#F2F0EB" : (cool <= 0 ? accent : `color-mix(in srgb, #F2F0EB ${Math.round(cool * 100)}%, ${accent})`);
   });
@@ -199,52 +230,53 @@ function typeChars(chars, t, a, b, accent = "#7FA9FF") {
 function drawS2(t) {
   const on = t >= 2.58 && t < 4.62; show(s2, on); if (!on) return;
   S(glowTop, { o: (1 - E.out(prog(t, 3.5, 3.8))) * (0.8 + 0.2 * Math.sin(t * 6)) });
-  typeChars(P1.chars, t, 2.68, 4.18);
-  // крупно, без рамки → сжимается в поле ввода → поле дрейфует
+  typeChars(charsName, t, 2.7, 3.45);
+  typeChars(charsTick, t, 3.92, 4.16);
+  phName.style.display = t >= 2.7 ? "none" : ""; phTick.style.display = t >= 3.92 ? "none" : "";
+  // крупно — одно поле «Название» во весь кадр, затем камера отъезжает к форме
   const k = E.io(prog(t, 3.48, 3.86));
-  const big = { s: 1.95, x: 440 - 64 * 1.95, y: 440 - 70 * 1.95 };
-  const small = { s: 1.12, x: 260, y: 330 };
+  const big = { s: 4.2, x: 330 - 16 * 4.2, y: 470 - 238 * 4.2 };
+  const small = { s: 2.0, x: (W - 393 * 2.0) / 2, y: 46 };
   const drift = E.out(prog(t, 3.86, 4.62));
-  const s = lerp(big.s, small.s, k), x = lerp(big.x, small.x, k) - 110 * drift, y = lerp(big.y, small.y, k) + 40 * drift;
-  // кнопка «+» в крупном виде — в углу экрана: поле больше кадра
-  const gs = s;
-  P1.g.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) scale(${gs.toFixed(4)}) perspective(2000px) rotateY(${(-4 * drift).toFixed(2)}deg)`;
-  P1.bg.style.opacity = k;
-  P1.ctr.style.opacity = E.out(prog(t, 3.6, 3.9));
-  // «+» в крупном состоянии стоит у нижнего края экрана
-  P1.plus.style.top = (k < 1 ? lerp((960 - big.y) / big.s - 28, 228, k) : 228) + "px";
-  P1.plus.style.left = (k < 1 ? lerp((110 - big.x) / big.s - 28, 58, k) : 58) + "px";
-  // нажатие «отправить» и улёт поля в камеру
-  const pr = clamp(prog(t, 4.24, 4.3) - prog(t, 4.32, 4.4));
-  P1.send.style.transform = `scale(${(1 - 0.12 * pr).toFixed(3)})`;
+  const s = lerp(big.s, small.s, k), x = lerp(big.x, small.x, k) - 60 * drift, y = lerp(big.y, small.y, k) + 10 * drift;
+  form.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) scale(${s.toFixed(4)}) perspective(2000px) rotateY(${(-4 * drift).toFixed(2)}deg)`;
+  fbg.style.opacity = k;
+  // всё, кроме поля, проявляется вместе с отъездом камеры
+  [...fui.children].forEach((e) => { if (!e.contains(valName)) e.style.opacity = E.out(prog(t, 3.55, 3.9)); });
+  flogo.style.opacity = E.out(prog(t, 3.75, 3.95));
+  // нажатие «Запустить токен» и улёт формы в камеру
+  const pr = clamp(prog(t, 4.22, 4.28) - prog(t, 4.3, 4.38));
+  fbtn.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
+  fbtn.style.boxShadow = `0 0 ${(30 + 40 * pr).toFixed(0)}px rgba(120,165,255,${(0.45 + 0.4 * pr).toFixed(2)})`;
   const fly = E.inQ(prog(t, 4.38, 4.56));
-  s2.style.transform = `scale(${(1 + 1.6 * fly).toFixed(4)})`; s2.style.transformOrigin = "960px 520px";
+  s2.style.transform = `scale(${(1 + 1.6 * fly).toFixed(4)})`; s2.style.transformOrigin = "960px 760px";
   s2.style.filter = fly > 0.01 ? `blur(${(fly * 16).toFixed(1)}px)` : "none";
   s2.style.opacity = 1 - fly;
 }
 
-// ===================== 3. ПРОЛЁТ СКВОЗЬ КОД =====================
+// ===================== 3. ПРОЛЁТ СКВОЗЬ МЕМПАД =====================
+// Строки ленты мемпада — те же, что в приложении: логотип, тикер, имя и
+// возраст, капитализация и изменение.
 const s3 = $(`<div class="scene" style="perspective:900px;perspective-origin:960px 540px"></div>`); root.appendChild(s3);
-const CODE = [
-  ["#FF7AB6", "contract BondingCurve with Deployable {"], ["#F2F0EB", "  supply: Int as coins = 0;"], ["#7FA9FF", "  reserve: Int as coins = 0;"],
-  ["#00E96B", "  receive(msg: Buy) {"], ["#F2F0EB", "    let price = self.priceAt(self.supply);"], ["#FFC233", "    require(context().value >= price, \"low\");"],
-  ["#7FA9FF", "    self.supply += msg.amount;"], ["#00E96B", "    send(SendParameters{ to: sender(), value: 0 });"], ["#F2F0EB", "  }"],
-  ["#FF3B47", "  get fun priceAt(s: Int): Int {"], ["#F2F0EB", "    return BASE + s * s / K;"], ["#7FA9FF", "import { Mintly } from \"@mintly/sdk\";"],
-  ["#00E96B", "const token = await mintly.launch({"], ["#F2F0EB", "  name: \"Lily Frog\", ticker: \"LILY\","], ["#FFC233", "  chain: \"gram\", curve: \"bonding\","],
-  ["#7FA9FF", "});"], ["#FF7AB6", "<TokenCard token={token} />"], ["#00E96B", "listing.at(1000 * GRAM)"], ["#F2F0EB", "emit(Launched{ id: token.id })"],
-  ["#7FA9FF", "  receive(msg: Sell) {"], ["#FF3B47", "    self.reserve -= payout;"], ["#00E96B", "mempad.push(token)"], ["#F2F0EB", "holders.add(sender())"],
-  ["#FFC233", "chart.candle(\"1m\").update(price)"], ["#7FA9FF", "const curve = new BondingCurve(K, BASE);"], ["#00E96B", "export default token;"],
+const ЛЕНТА = [
+  ["frog", "$LILY", "Lily Frog · 9 мин", "$30.1K", "+12.6%", 1], ["m", "$MINT", "Mintly · 2 мин", "$66.3K", "+38.2%", 1], ["pup", "$PUP", "Pixel Pup · 17 мин", "$46.8K", "+24.9%", 1],
+  ["boo", "$BOO", "Boo · 26 мин", "$18.0K", "-3.1%", 0], ["fire", "$WICK", "Hot Wick · 31 мин", "$12.7K", "+6.4%", 1], ["mcat", "$MCAT", "Moon Cat · 44 мин", "$9.4K", "+2.2%", 1],
 ];
 let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-const codeEls = CODE.map(([c, txt], i) => {
-  const el = $(`<div class="code" style="left:0;top:0;color:${c};text-shadow:0 0 12px ${c}66">${txt.replace(/</g, "&lt;")}</div>`); s3.appendChild(el);
-  return { el, x: (rnd() - 0.5) * 1100 - 820, y: (rnd() - 0.5) * 700 - 40, z0: -3300 + i * 112 + rnd() * 100 };
+const rowEls = Array.from({ length: 24 }, (_, i) => {
+  const [lg, tk, nm, mc, ch, up] = ЛЕНТА[i % ЛЕНТА.length];
+  const el = $(`<div class="abs" style="left:0;top:0;width:620px;height:96px;display:flex;align-items:center;gap:20px;padding:0 24px;border-radius:26px;background:#0F0F13;border:1px solid rgba(255,255,255,.09)">
+    <img src="assets/tok/${lg}.png" style="width:64px;height:64px;border-radius:50%;image-rendering:pixelated;flex:none"/>
+    <div style="flex:1"><div style="font:800 28px/1.1 'Nunito';color:#fff">${tk}</div><div style="font:500 19px/1.3 'Onest';color:#97958F">${nm}</div></div>
+    <div style="text-align:right"><div style="font:800 28px/1.1 'Nunito';color:${up ? "#2EE87A" : "#FF5A63"}">${mc}</div><div style="font:600 19px/1.3 'Onest';color:${up ? "#2EE87A" : "#FF5A63"}">${ch}</div></div></div>`);
+  s3.appendChild(el);
+  return { el, x: (rnd() - 0.5) * 1300 - 610, y: (rnd() - 0.5) * 760 + 170, z0: -3300 + i * 120 + rnd() * 90 };
 });
 function drawS3(t) {
   const on = t >= 4.44 && t < 5.5; show(s3, on); if (!on) return;
   const k = prog(t, 4.44, 5.5);
   const sp = 2600 * E.io(k) + 700 * k;
-  codeEls.forEach((c) => {
+  rowEls.forEach((c) => {
     const z = c.z0 + sp;
     const near = clamp((z + 260) / 420), far = clamp((z + 2700) / 500);
     const o = far * (1 - clamp((z - 120) / 200)) * (1 - prog(t, 5.32, 5.5)) * prog(t, 4.44, 4.56);
@@ -255,63 +287,83 @@ function drawS3(t) {
   });
 }
 
-// ===================== 4. КАРТОЧКА ТОКЕНА И ВТОРОЙ ЗАПРОС =====================
+// ===================== 4. КАРТА БАЛАНСА И МАГАЗИН =====================
+// Карта — та, что открывает «Кошелёк»: баланс, монеты и Минти на краю.
+// Второй ход — магазин: нажатие на «Лёд» перекрашивает Минти, а с ним и
+// свечение карты.
 const s4 = $(`<div class="scene" style="perspective:1700px;perspective-origin:960px 540px"></div>`); root.appendChild(s4);
-const CW = 1240, CH = 720;
-const card = $(`<div class="abs" style="left:${(W - CW) / 2}px;top:${(H - CH) / 2}px;width:${CW}px;height:${CH}px;border-radius:52px;overflow:hidden;transform-style:preserve-3d">
-  <div class="cbg abs" style="inset:0"></div>
-  <div class="abs" style="inset:0;border-radius:52px;box-shadow:inset 0 0 0 2.5px rgba(255,255,255,.28),inset 0 2px 24px rgba(255,255,255,.18)"></div>
-  <div class="abs" style="left:64px;top:52px;display:flex;align-items:center;gap:40px;font:500 26px/1 'Onest';color:rgba(255,255,255,.9)">
-    <span style="width:66px;height:66px;border-radius:50%;background:#0F0F13;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1.5px rgba(255,255,255,.18)">${star(40)}</span>
-    <span>Мемпад</span><span>Запуск</span><span>Магазин</span><span style="margin-left:150px">Кошелёк</span>
+const CW = 1240, CH = 690;
+const card = $(`<div class="abs" style="left:${(W - CW) / 2}px;top:${(H - CH) / 2}px;width:${CW}px;height:${CH}px;transform-style:preserve-3d">
+  <div class="abs" style="inset:0;border-radius:72px;overflow:hidden;background:linear-gradient(135deg, #22262F 0%, #181B23 55%, #12141A 100%)">
+    <div class="ctint abs" style="inset:0"></div>
+    <div class="abs" style="inset:0;border-radius:72px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.08),inset 0 2px 30px rgba(255,255,255,.06)"></div>
+    <div class="abs" style="left:96px;top:84px;font:600 46px/1 'Onest';color:rgba(242,240,235,.82)">Баланс</div>
+    <div class="abs" style="left:92px;top:150px;font:800 138px/1 'Nunito';letter-spacing:-.02em;color:#F2F0EB">$1 520<span style="color:rgba(242,240,235,.4)">,00</span></div>
+    <div class="abs" style="left:96px;top:322px;display:flex;gap:22px;align-items:center">
+      <img src="assets/tok/frog.png" style="width:84px;height:84px;border-radius:50%;image-rendering:pixelated"/>
+      <div><div style="font:800 46px/1.1 'Nunito';color:#fff">Lily Frog</div><div style="font:500 32px/1.3 'Onest';color:#97958F">$LILY · 12 400 шт.</div></div>
+      <div style="margin-left:40px;font:800 40px/1 'Nunito';color:#2EE87A">+12.6%</div>
+    </div>
+    <div class="abs" style="left:96px;top:530px;height:84px;padding:0 40px;border-radius:999px;background:rgba(255,255,255,.12);display:flex;align-items:center;font:600 36px/1 'Onest';color:#F2F0EB">4.9 SOL · 190 GRAM</div>
   </div>
-  <div class="abs" style="left:70px;top:226px;display:flex;align-items:center;gap:26px">
-    <img src="assets/tok/frog.png" style="width:120px;height:120px;border-radius:50%;image-rendering:pixelated;box-shadow:0 0 0 3px rgba(255,255,255,.25)"/>
-    <div><div style="font:800 92px/1 'Nunito';letter-spacing:-.02em;color:#fff">Lily Frog</div>
-    <div style="font:600 34px/1.3 'Onest';color:rgba(255,255,255,.82);margin-top:8px">$LILY · $30.1K <span style="color:#2EE87A">+12.6%</span></div></div>
-  </div>
-  <svg class="abs" style="left:640px;top:420px" width="540" height="150" viewBox="0 0 540 150" fill="none"><path d="M0 120 L40 112 L80 118 L120 96 L160 104 L200 80 L240 88 L280 62 L320 70 L360 48 L400 58 L440 34 L480 40 L540 14" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/></svg>
-  <div class="abs" style="left:70px;top:588px;height:62px;padding:0 34px;border-radius:18px;background:#fff;color:#14151A;font:800 28px/62px 'Nunito'">Купить</div>
+  <div class="cmintie abs" style="right:90px;top:-232px;width:264px;height:288px;background:url(assets/app/nav-mint.webp) 0 0/1200% 100% no-repeat;image-rendering:pixelated"></div>
 </div>`);
 s4.appendChild(card);
-const cbg = card.querySelector(".cbg");
-const ЦВЕТ_1 = "linear-gradient(115deg,#E44BC8 0%,#C13AE6 18%,#8E2DE2 36%,#6A17E8 54%,#4A00E0 70%,#7B1FE0 84%,#2C0A78 100%)";
-const ЦВЕТ_2 = "linear-gradient(115deg,#7FE6FF 0%,#28D7FF 18%,#1A9BF0 38%,#0A5BD8 62%,#0A3AA8 84%,#061E66 100%)";
-const P2 = promptBox("Хочу синий фон.");
-P2.bg.style.background = "#0F0F13";
-s4.appendChild(P2.g);
-function cardGlow(c) { card.style.boxShadow = `0 0 0 2px ${c}55, 0 0 60px ${c}88, 0 40px 120px rgba(0,0,0,.6)`; }
+const ctint = card.querySelector(".ctint"), cmintie = card.querySelector(".cmintie");
+// магазин: плитки окрасов Минти, как в приложении
+const ПЛИТКИ = [["gold", "Золотой", "260"], ["ice", "Лёд", "260"], ["albino", "Альбинос", "180"], ["wild", "Дикий", "200"]];
+const shop = $(`<div class="abs" style="left:0;top:0;width:393px;height:300px;transform-origin:0 0">
+  ${ПЛИТКИ.map(([id, имя, цена], i) => `<div class="tile abs" style="left:${16 + (i % 2) * 185}px;top:${Math.floor(i / 2) * 200}px;width:176px">
+    <div class="tbox" style="height:128px;border-radius:18px;background:#000;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 0 #fff">
+      <img src="assets/app/mintie-${id}.webp" style="width:118px;image-rendering:pixelated"/></div>
+    <div style="text-align:center;font:800 14.5px/1 'Nunito';color:#F2F0EB;margin-top:14px">${имя}</div>
+    <div style="text-align:center;font:700 12.5px/1 'Onest';color:#F2F0EB;margin-top:10px;opacity:.85">Ⓜ ${цена}</div></div>`).join("")}
+</div>`);
+s4.appendChild(shop);
+const iceTile = shop.querySelectorAll(".tbox")[1];
+const cur4 = cursor.cloneNode(true); s4.appendChild(cur4);
+function cardGlow(c) { card.firstElementChild.style.boxShadow = `0 0 0 2px ${c}44, 0 0 70px ${c}66, 0 40px 120px rgba(0,0,0,.6)`; }
 function drawS4(t) {
   const on = t >= 5.25 && t < 10.08; show(s4, on); if (!on) return;
-  const синий = t >= 8.36;
-  cbg.style.background = синий ? ЦВЕТ_2 : ЦВЕТ_1;
-  cardGlow(синий ? "#28D7FF" : "#C13AE6");
+  const лёд = t >= 8.36;
+  const цвет = лёд ? "#7FD8FF" : "#2EE87A";
+  ctint.style.background = `radial-gradient(70% 90% at 100% 0%, ${цвет}38 0%, ${цвет}10 45%, transparent 70%)`;
+  cardGlow(цвет);
+  cmintie.style.backgroundImage = `url(assets/app/nav-${лёд ? "ice" : "mint"}.webp)`;
+  cmintie.style.backgroundPosition = `${((Math.floor(t * 12) % 12) / 11) * 100}% 0`;
   let x = 0, y = 0, ry = -8, rx = 4, s = 1, b = 0, o = 1;
   if (t < 5.66) { const k = E.out(prog(t, 5.25, 5.66)); x = lerp(1100, 40, k); ry = lerp(-62, -20, k); rx = lerp(10, 6, k); b = (1 - k) * 16; o = E.out(prog(t, 5.25, 5.4)); }
   else if (t < 6.42) { const k = E.out(prog(t, 5.66, 6.42)); x = lerp(40, -30, k); ry = lerp(-20, -8, k); rx = lerp(6, 3, k); s = lerp(1, 1.04, k); }
   else if (t < 8.3) {
-    // камера ныряет вниз: карточка уходит вверх, остаётся её нижний край
+    // камера ныряет вниз: карта уходит вверх, под ней — магазин
     const k = E.io(prog(t, 6.42, 6.74)), pan = E.io(prog(t, 6.9, 8.3));
-    x = -30 - 260 * pan; y = lerp(0, -720, k); ry = -8 + 4 * pan; rx = 3; s = 1.04; b = Math.sin(k * Math.PI) * 14;
+    x = -30 - 260 * pan; y = lerp(0, -760, k); ry = -8 + 4 * pan; rx = 3; s = 1.04; b = Math.sin(k * Math.PI) * 14;
   } else if (t < 9.92) {
-    // и возвращается обратно — уже перекрашенная
+    // и возвращается — Минти уже ледяной
     const k = E.out(prog(t, 8.3, 8.72)), d = E.io(prog(t, 8.72, 9.92));
-    x = lerp(-290, -40, k) - 40 * d; y = lerp(-900, 0, k) + 10 * d; ry = lerp(-4, -10, k) + 4 * d; rx = lerp(3, 4, k); s = lerp(1.04, 1, k) + 0.03 * d; b = (1 - k) * 18;
-  } else { const k = E.inQ(prog(t, 9.92, 10.08)); x = -80; y = -60 * k; ry = -6; s = 1.03; b = k * 12; o = 1 - k; }
+    x = lerp(-290, -40, k) - 40 * d; y = lerp(-900, 60, k) - 10 * d; ry = lerp(-4, -10, k) + 4 * d; rx = lerp(3, 4, k); s = lerp(1.04, 0.96, k) + 0.03 * d; b = (1 - k) * 18;
+  } else { const k = E.inQ(prog(t, 9.92, 10.08)); x = -80; y = 60 - 60 * k; ry = -6; s = 0.99; b = k * 12; o = 1 - k; }
+  if (t >= 5.66 && t < 6.42) y = 60;
   card.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) scale(${s.toFixed(4)})`;
   card.style.filter = b > 0.05 ? `blur(${b.toFixed(1)}px)` : "none";
   card.style.opacity = o;
-  // второй запрос: живёт под карточкой, пока камера внизу
+  // магазин живёт под картой, пока камера внизу
   const kIn = E.io(prog(t, 6.42, 6.74)), kOut = E.io(prog(t, 8.3, 8.6));
   const pan = E.io(prog(t, 6.9, 8.3));
-  const py = lerp(1300, 400, kIn) + lerp(0, 1000, kOut), px = 30 - 240 * pan;
-  P2.g.style.transform = `translate3d(${px.toFixed(1)}px,${py.toFixed(1)}px,0) scale(1.3)`;
-  P2.g.style.opacity = t < 6.42 || t > 8.62 ? 0 : 1;
-  P2.g.style.filter = (Math.sin(kIn * Math.PI) + Math.sin(kOut * Math.PI)) > 0.05 ? `blur(${((Math.sin(kIn * Math.PI) + Math.sin(kOut * Math.PI)) * 12).toFixed(1)}px)` : "none";
-  P2.bg.style.opacity = 0.9; P2.ctr.style.opacity = 1;
-  typeChars(P2.chars, t, 6.78, 7.62);
-  const pr = clamp(prog(t, 7.94, 8.0) - prog(t, 8.04, 8.12));
-  P2.send.style.transform = `scale(${(1 - 0.12 * pr).toFixed(3)})`;
+  const SS = 2.3;
+  const py = lerp(1300, 300, kIn) + lerp(0, 1000, kOut), px = 360 - 200 * pan;
+  shop.style.transform = `translate3d(${px.toFixed(1)}px,${py.toFixed(1)}px,0) scale(${SS})`;
+  shop.style.opacity = t < 6.42 || t > 8.62 ? 0 : 1;
+  const bl = Math.sin(kIn * Math.PI) + Math.sin(kOut * Math.PI);
+  shop.style.filter = bl > 0.05 ? `blur(${(bl * 12).toFixed(1)}px)` : "none";
+  // курсор приходит к «Лёд» и нажимает
+  const tileX = px + (16 + 185 + 88) * SS, tileY = py + 64 * SS;
+  const kc = E.out(prog(t, 7.2, 7.75));
+  const pr = clamp(prog(t, 7.9, 7.98) - prog(t, 8.02, 8.12));
+  S(cur4, { o: t < 6.9 || t > 8.3 ? 0 : prog(t, 7.2, 7.3), x: lerp(tileX + 300, tileX - 10, kc), y: lerp(tileY + 500, tileY, kc), s: 1 - 0.12 * pr });
+  const sel = E.out(prog(t, 7.95, 8.1));
+  iceTile.style.boxShadow = `0 0 0 ${(3 * sel).toFixed(1)}px #fff, 0 0 ${(30 * sel).toFixed(0)}px rgba(127,216,255,${(0.7 * sel).toFixed(2)})`;
+  iceTile.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
 }
 
 // ===================== 5. ЗНАК И «СДЕЛАНО В MINTLY.» =====================
