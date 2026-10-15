@@ -40,12 +40,36 @@ const ИКОНКИ = {
 const ico = (k, cls = "") => `<svg class="${cls}" viewBox="0 0 24 24">${ИКОНКИ[k]}</svg>`;
 const СИНИЙ = "#4F86FF";
 
+// ===================== ФОН ПЕРВОГО ПРОМО =====================
+// чёрный, по нему медленно плывут и дышат синие пятна, снизу голубой туман
+const BG = $(`<div class="scene" style="background:#000"></div>`); root.appendChild(BG);
+const bgGrad = $(`<div class="abs" style="inset:-20%;background:linear-gradient(120deg,#000 0%,#06163D 18%,#000 34%,#0B2C70 52%,#000 68%,#081E52 84%,#000 100%);background-size:300% 300%"></div>`); BG.appendChild(bgGrad);
+const bgBlobs = [[300, 230, 420, "#123E9C"], [1650, 220, 380, "#0E3480"], [960, 1100, 540, "#1450B8"], [1520, 900, 360, "#0B2F73"], [380, 930, 380, "#103A8C"], [960, 380, 300, "#0A2560"]]
+  .map(([x, y, r, c]) => { const b = $(`<div class="blob" style="left:${x - r}px;top:${y - r}px;width:${r * 2}px;height:${r * 2}px;background:${c};opacity:.55"></div>`); BG.appendChild(b); return b; });
+const bgFog = $(`<div class="fog"></div>`); BG.appendChild(bgFog);
+bgFog.parts = [[-2, 170, 520, "#0D3277"], [14, 120, 420, "#0A2862"], [30, 180, 560, "#123E95"], [47, 110, 460, "#0A2A66"], [63, 170, 540, "#103889"], [80, 120, 440, "#0B2C6C"], [96, 170, 520, "#123B8E"]]
+  .map(([x, y, w, c]) => { const sp = $(`<span style="left:${x}%;top:${y}px;width:${w}px;height:${w * 0.55}px;background:${c};opacity:.45"></span>`); bgFog.appendChild(sp); return sp; });
+function drawBG(t) {
+  // в «тёмных» сценах референса фон приглушён, но не пропадает
+  const тёмно = (t >= 2.58 && t < 3.55) || (t >= 10.0 && t < 13.0);
+  BG.style.opacity = тёмно ? 0.45 : 1;
+  bgGrad.style.backgroundPosition = `${(50 + 50 * Math.sin(t * 0.21)).toFixed(2)}% ${(50 + 50 * Math.cos(t * 0.17)).toFixed(2)}%`;
+  bgGrad.style.transform = `rotate(${(Math.sin(t * 0.09) * 8).toFixed(2)}deg)`;
+  bgBlobs.forEach((b, i) => {
+    b.style.transform = `translate(${(Math.sin(t * 0.33 + i * 2) * 160).toFixed(1)}px,${(Math.cos(t * 0.27 + i * 1.3) * 90).toFixed(1)}px) scale(${(1 + 0.18 * Math.sin(t * 0.5 + i)).toFixed(3)})`;
+    b.style.opacity = (0.42 + 0.18 * Math.sin(t * 0.6 + i * 1.7)).toFixed(3);
+  });
+  bgFog.parts.forEach((p, i) => { p.style.transform = `translate(${Math.sin(t * 0.5 + i) * 40}px,${Math.cos(t * 0.4 + i * 1.7) * 18}px)`; });
+}
+// переливы цветами фона по заголовкам, как в первом промо
+function shimmer(t) { document.querySelectorAll(".grad").forEach((e) => { e.style.backgroundPosition = `${(-t * 260) % 1800}px 0`; }); }
+
 // ===================== ШЁЛК =====================
 // Свечение из трёх размытых лент: синий край, ледяная середина, белое ядро.
 const silk = $(`<svg class="abs" style="left:0;top:0" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
-    <linearGradient id="sg1" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#10248A"/><stop offset=".4" stop-color="#3F74FF"/><stop offset=".62" stop-color="#B9D1FF"/><stop offset=".8" stop-color="#5B8DFF"/><stop offset="1" stop-color="#1E46C8"/></linearGradient>
-    <linearGradient id="sg2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3B6BFF" stop-opacity="0"/><stop offset=".5" stop-color="#CFE0FF"/><stop offset="1" stop-color="#4F86FF" stop-opacity="0"/></linearGradient>
+    <linearGradient id="sg1" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#06163D"/><stop offset=".4" stop-color="#1450B8"/><stop offset=".62" stop-color="#5A8CFF"/><stop offset=".8" stop-color="#123E9C"/><stop offset="1" stop-color="#0B2C70"/></linearGradient>
+    <linearGradient id="sg2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3F78FF" stop-opacity="0"/><stop offset=".5" stop-color="#9CC0FF"/><stop offset="1" stop-color="#3F78FF" stop-opacity="0"/></linearGradient>
     <filter id="sb" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="38"/></filter>
     <filter id="sb2" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="20"/></filter>
   </defs>
@@ -78,7 +102,7 @@ function drawSilk(t) {
 const s1 = $(`<div class="scene"></div>`); root.appendChild(s1);
 const logo1 = $(`<div class="abs" style="left:0;top:0;width:150px;height:150px;filter:drop-shadow(0 0 18px rgba(200,220,255,.8))">${star(150, "#F4F6FF")}</div>`); s1.appendChild(logo1);
 const WORD = "Mintly";
-const word1 = $(`<div class="abs" style="left:0;top:0;font:700 112px/1 'Onest';letter-spacing:-.02em;color:#fff;text-shadow:0 0 22px rgba(190,215,255,.85),0 0 60px rgba(79,134,255,.5);white-space:nowrap">${[...WORD].map((c) => `<span class="ch">${c}</span>`).join("")}</div>`); s1.appendChild(word1);
+const word1 = $(`<div class="abs" style="left:0;top:0;font:800 118px/1.1 'Nunito';letter-spacing:-.02em;white-space:nowrap;filter:drop-shadow(0 0 18px rgba(120,165,255,.55))">${[...WORD].map((c) => `<span class="ch grad">${c}</span>`).join("")}</div>`); s1.appendChild(word1);
 const pill = $(`<div class="abs" style="left:0;top:0;height:96px;border-radius:30px;background:#fff;box-shadow:0 0 40px rgba(220,232,255,.95),0 0 110px rgba(79,134,255,.6)"></div>`); s1.appendChild(pill);
 const CHIPS = [["home", "Главная"], ["swap", "Мемпад"], ["rocket", "Запуск"], ["bag", "Магазин"], ["bars", "Кошелёк"]];
 const row = $(`<div class="abs" style="left:0;top:0;width:${W}px;height:80px"></div>`); s1.appendChild(row);
@@ -159,7 +183,7 @@ function promptBox(text) {
   </div>`); g.appendChild(ctr);
   return { g, bg, tx, plus, ctr, send: ctr.querySelector(".send"), chars: [...tx.children] };
 }
-const P1 = promptBox("Хочу запустить мемкоин на Gram.");
+const P1 = promptBox("Хочу запустить мемкоин Lily Frog.");
 s2.appendChild(P1.g);
 // печать: свежие буквы синие и остывают в белый
 function typeChars(chars, t, a, b, accent = "#7FA9FF") {
@@ -206,7 +230,7 @@ const CODE = [
   ["#00E96B", "  receive(msg: Buy) {"], ["#F2F0EB", "    let price = self.priceAt(self.supply);"], ["#FFC233", "    require(context().value >= price, \"low\");"],
   ["#7FA9FF", "    self.supply += msg.amount;"], ["#00E96B", "    send(SendParameters{ to: sender(), value: 0 });"], ["#F2F0EB", "  }"],
   ["#FF3B47", "  get fun priceAt(s: Int): Int {"], ["#F2F0EB", "    return BASE + s * s / K;"], ["#7FA9FF", "import { Mintly } from \"@mintly/sdk\";"],
-  ["#00E96B", "const token = await mintly.launch({"], ["#F2F0EB", "  name: \"Prism Cat\", ticker: \"PRSM\","], ["#FFC233", "  chain: \"gram\", curve: \"bonding\","],
+  ["#00E96B", "const token = await mintly.launch({"], ["#F2F0EB", "  name: \"Lily Frog\", ticker: \"LILY\","], ["#FFC233", "  chain: \"gram\", curve: \"bonding\","],
   ["#7FA9FF", "});"], ["#FF7AB6", "<TokenCard token={token} />"], ["#00E96B", "listing.at(1000 * GRAM)"], ["#F2F0EB", "emit(Launched{ id: token.id })"],
   ["#7FA9FF", "  receive(msg: Sell) {"], ["#FF3B47", "    self.reserve -= payout;"], ["#00E96B", "mempad.push(token)"], ["#F2F0EB", "holders.add(sender())"],
   ["#FFC233", "chart.candle(\"1m\").update(price)"], ["#7FA9FF", "const curve = new BondingCurve(K, BASE);"], ["#00E96B", "export default token;"],
@@ -214,7 +238,7 @@ const CODE = [
 let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 const codeEls = CODE.map(([c, txt], i) => {
   const el = $(`<div class="code" style="left:0;top:0;color:${c};text-shadow:0 0 12px ${c}66">${txt.replace(/</g, "&lt;")}</div>`); s3.appendChild(el);
-  return { el, x: (rnd() - 0.5) * 1100 - 300, y: (rnd() - 0.5) * 700, z0: -3300 + i * 112 + rnd() * 100 };
+  return { el, x: (rnd() - 0.5) * 1100 - 820, y: (rnd() - 0.5) * 700 - 40, z0: -3300 + i * 112 + rnd() * 100 };
 });
 function drawS3(t) {
   const on = t >= 4.44 && t < 5.5; show(s3, on); if (!on) return;
@@ -238,25 +262,30 @@ const card = $(`<div class="abs" style="left:${(W - CW) / 2}px;top:${(H - CH) / 
   <div class="cbg abs" style="inset:0"></div>
   <div class="abs" style="inset:0;border-radius:52px;box-shadow:inset 0 0 0 2.5px rgba(255,255,255,.28),inset 0 2px 24px rgba(255,255,255,.18)"></div>
   <div class="abs" style="left:64px;top:52px;display:flex;align-items:center;gap:40px;font:500 26px/1 'Onest';color:rgba(255,255,255,.9)">
-    <span style="width:66px;height:66px;border-radius:50%;background:#0B0D12;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1.5px rgba(255,255,255,.18)">${star(40)}</span>
+    <span style="width:66px;height:66px;border-radius:50%;background:#0F0F13;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1.5px rgba(255,255,255,.18)">${star(40)}</span>
     <span>Мемпад</span><span>Запуск</span><span>Магазин</span><span style="margin-left:150px">Кошелёк</span>
   </div>
-  <div class="abs" style="left:70px;top:286px;font:500 92px/1.12 'Onest';letter-spacing:-.02em;color:#fff">Prism Cat<br><span style="opacity:.92">$PRSM на Gram</span></div>
-  <div class="abs" style="left:70px;top:588px;height:58px;padding:0 30px;border-radius:16px;background:#fff;color:#14151A;font:600 26px/58px 'Onest'">Купить</div>
+  <div class="abs" style="left:70px;top:226px;display:flex;align-items:center;gap:26px">
+    <img src="assets/tok/frog.png" style="width:120px;height:120px;border-radius:50%;image-rendering:pixelated;box-shadow:0 0 0 3px rgba(255,255,255,.25)"/>
+    <div><div style="font:800 92px/1 'Nunito';letter-spacing:-.02em;color:#fff">Lily Frog</div>
+    <div style="font:600 34px/1.3 'Onest';color:rgba(255,255,255,.82);margin-top:8px">$LILY · $30.1K <span style="color:#2EE87A">+12.6%</span></div></div>
+  </div>
+  <svg class="abs" style="left:640px;top:420px" width="540" height="150" viewBox="0 0 540 150" fill="none"><path d="M0 120 L40 112 L80 118 L120 96 L160 104 L200 80 L240 88 L280 62 L320 70 L360 48 L400 58 L440 34 L480 40 L540 14" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/></svg>
+  <div class="abs" style="left:70px;top:588px;height:62px;padding:0 34px;border-radius:18px;background:#fff;color:#14151A;font:800 28px/62px 'Nunito'">Купить</div>
 </div>`);
 s4.appendChild(card);
 const cbg = card.querySelector(".cbg");
-const ЦВЕТ_1 = "radial-gradient(120% 140% at 100% 100%, #7FA9FF 0%, #2F63F0 28%, #142A7A 60%, #0B1230 100%)";
-const ЦВЕТ_2 = "radial-gradient(120% 140% at 100% 100%, #7CFFB5 0%, #00C95C 28%, #075A33 60%, #04190F 100%)";
-const P2 = promptBox("Хочу зелёный фон.");
-P2.bg.style.background = "#08090D";
+const ЦВЕТ_1 = "linear-gradient(115deg,#E44BC8 0%,#C13AE6 18%,#8E2DE2 36%,#6A17E8 54%,#4A00E0 70%,#7B1FE0 84%,#2C0A78 100%)";
+const ЦВЕТ_2 = "linear-gradient(115deg,#7FE6FF 0%,#28D7FF 18%,#1A9BF0 38%,#0A5BD8 62%,#0A3AA8 84%,#061E66 100%)";
+const P2 = promptBox("Хочу синий фон.");
+P2.bg.style.background = "#0F0F13";
 s4.appendChild(P2.g);
 function cardGlow(c) { card.style.boxShadow = `0 0 0 2px ${c}55, 0 0 60px ${c}88, 0 40px 120px rgba(0,0,0,.6)`; }
 function drawS4(t) {
   const on = t >= 5.25 && t < 10.08; show(s4, on); if (!on) return;
-  const зелёный = t >= 8.36;
-  cbg.style.background = зелёный ? ЦВЕТ_2 : ЦВЕТ_1;
-  cardGlow(зелёный ? "#00E96B" : СИНИЙ);
+  const синий = t >= 8.36;
+  cbg.style.background = синий ? ЦВЕТ_2 : ЦВЕТ_1;
+  cardGlow(синий ? "#28D7FF" : "#C13AE6");
   let x = 0, y = 0, ry = -8, rx = 4, s = 1, b = 0, o = 1;
   if (t < 5.66) { const k = E.out(prog(t, 5.25, 5.66)); x = lerp(1100, 40, k); ry = lerp(-62, -20, k); rx = lerp(10, 6, k); b = (1 - k) * 16; o = E.out(prog(t, 5.25, 5.4)); }
   else if (t < 6.42) { const k = E.out(prog(t, 5.66, 6.42)); x = lerp(40, -30, k); ry = lerp(-20, -8, k); rx = lerp(6, 3, k); s = lerp(1, 1.04, k); }
@@ -289,11 +318,11 @@ function drawS4(t) {
 const s5 = $(`<div class="scene"></div>`); root.appendChild(s5);
 const logo5 = $(`<div class="abs" style="left:0;top:0;width:128px;height:128px;filter:drop-shadow(0 0 16px rgba(190,215,255,.85)) drop-shadow(0 0 40px rgba(79,134,255,.45))">${star(128, "#F4F6FF")}</div>`); s5.appendChild(logo5);
 const LINE = "Сделано в Mintly.";
-const line5 = $(`<div class="abs" style="left:0;top:0;font:700 66px/1 'Onest';letter-spacing:-.01em;color:#fff;white-space:nowrap;text-shadow:0 0 16px rgba(190,215,255,.45)">${[...LINE].map((c) => `<span class="ch" style="position:absolute;left:0;top:0">${c === " " ? " " : c}</span>`).join("")}</div>`); s5.appendChild(line5);
+const line5 = $(`<div class="abs" style="left:0;top:0;font:800 70px/1 'Nunito';letter-spacing:-.01em;color:#fff;white-space:nowrap;text-shadow:0 0 16px rgba(190,215,255,.45)">${[...LINE].map((c, i) => `<span class="ch" style="position:absolute;left:0;top:0;color:${i >= 10 ? "#7FA6FF" : "#fff"}">${c === " " ? " " : c}</span>`).join("")}</div>`); s5.appendChild(line5);
 const lineChars = [...line5.children];
 let charX = [], lineW = 0;
 function layoutLine() {
-  const m = document.createElement("span"); m.style.cssText = "font:700 66px/1 'Onest';letter-spacing:-.01em;position:absolute;visibility:hidden;white-space:pre"; document.body.appendChild(m);
+  const m = document.createElement("span"); m.style.cssText = "font:800 70px/1 'Nunito';letter-spacing:-.01em;position:absolute;visibility:hidden;white-space:pre"; document.body.appendChild(m);
   charX = []; let acc = 0;
   for (let i = 0; i < LINE.length; i++) { m.textContent = LINE.slice(0, i); charX.push(m.getBoundingClientRect().width); }
   m.textContent = LINE; lineW = m.getBoundingClientRect().width; m.remove();
@@ -325,20 +354,20 @@ function drawS5(t) {
 }
 
 // ===================== 6. КОНЦОВКА =====================
-const s6 = $(`<div class="scene" style="background:#0B0D12"></div>`); root.appendChild(s6);
+const s6 = $(`<div class="scene"></div>`); root.appendChild(s6);
 const endLogo = $(`<div class="abs" style="left:${W / 2 - 80}px;top:200px">${star(160, "#F4F6FF")}</div>`); s6.appendChild(endLogo);
-const endName = $(`<div class="abs" style="left:0;width:${W}px;top:390px;text-align:center;font:700 66px/1 'Onest';color:#fff;letter-spacing:-.01em">Mintly</div>`); s6.appendChild(endName);
+const endName = $(`<div class="abs" style="left:0;width:${W}px;top:390px;text-align:center;font:800 72px/1.1 'Nunito';color:#fff;letter-spacing:-.01em">Mintly</div>`); s6.appendChild(endName);
 const BW = 640, BH = 70, BY = 610;
 const streak = $(`<div class="abs" style="left:${W / 2}px;top:${BY + 8}px;height:54px;border-radius:8px;background:linear-gradient(90deg,#4F86FF 0%,#9EC1FF 35%,#fff 50%,#9EC1FF 65%,#4F86FF 100%)"></div>`); s6.appendChild(streak);
 const offA = $(`<div class="abs" style="left:0;top:0;width:${BW}px;height:${BH}px;border-radius:12px;background:${СИНИЙ}"></div>`); s6.appendChild(offA);
 const offB = $(`<div class="abs" style="left:0;top:0;width:${BW}px;height:${BH}px;border-radius:12px;background:#CFE0FF"></div>`); s6.appendChild(offB);
 const bar = $(`<div class="abs" style="left:${W / 2 - BW / 2}px;top:${BY}px;width:${BW}px;height:${BH}px;border-radius:14px;background:#fff;box-shadow:-6px 0 0 ${СИНИЙ},6px 0 0 #9EC1FF">
-  <div class="abs" style="left:7px;top:7px;right:80px;bottom:7px;border-radius:9px;background:#0B0D12"></div>
+  <div class="abs" style="left:7px;top:7px;right:80px;bottom:7px;border-radius:9px;background:#0F0F13"></div>
   <div class="bin abs" style="left:30px;top:0;height:${BH}px;display:flex;align-items:center;gap:22px;font:500 27px/1 'Onest';color:rgba(242,240,235,.92)">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
     <span>@MintlyAppbot</span>
   </div>
-  <div class="bin abs" style="right:0;top:0;width:80px;height:${BH}px;display:flex;align-items:center;justify-content:center">${star(40, "#0B0D12")}</div>
+  <div class="bin abs" style="right:0;top:0;width:80px;height:${BH}px;display:flex;align-items:center;justify-content:center">${star(40, "#0F0F13")}</div>
 </div>`); s6.appendChild(bar);
 const barIn = [...bar.querySelectorAll(".bin")];
 function drawS6(t) {
@@ -365,7 +394,7 @@ function drawS6(t) {
 }
 
 window.renderAt = (t) => {
-  drawSilk(t); drawS1(t); drawS2(t); drawS3(t); drawS4(t); drawS5(t); drawS6(t);
+  drawBG(t); shimmer(t); drawSilk(t); drawS1(t); drawS2(t); drawS3(t); drawS4(t); drawS5(t); drawS6(t);
 };
 (async () => {
   await document.fonts.ready;
