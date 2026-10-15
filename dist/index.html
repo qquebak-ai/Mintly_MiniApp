@@ -111,7 +111,7 @@
         сообщить("promise", (r && (r.stack || r.message)) || String(r || "отказ без причины"));
       });
     </script>
-    <script type="module" crossorigin src="/assets/index-BrLlv6ZQ.js"></script>
+    <script type="module" crossorigin src="/assets/index-DxqV8ch0.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/react-DS-kCp2g.js">
     <link rel="modulepreload" crossorigin href="/assets/supabase-QBHRJHLH.js">
     <link rel="modulepreload" crossorigin href="/assets/icons-DcWHCyXX.js">
@@ -183,6 +183,10 @@
       @keyframes ширмаВсплыв { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes ширмаВправо { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(16px); } }
       @media (prefers-reduced-motion: reduce) { #ширма * { animation: none !important; } }
+      /* Аккаунта на этом телефоне ещё не было — заставку не играем:
+         человеку сразу нужно окно регистрации, а не полторы секунды
+         знака. Поле остаётся пустым тёмным, пока окно не встанет. */
+      #ширма.пусто .знак, #ширма.пусто .свечи { display: none; }
       /* Свечи внизу заставки: светло-серые, встают слева направо по
          очереди, как график, который рисуется на глазах. Числа — те же,
          что у СвечиЗаставки в приложении: окно входа их продолжает. */
@@ -264,6 +268,14 @@
 
       (function () {
         var поле = document.getElementById("ширма");
+        var естьАккаунт = false;
+        try { естьАккаунт = localStorage.getItem("mintly_has_account") === "1"; } catch (e) { /* хранилище закрыто */ }
+        if (!естьАккаунт && поле) {
+          window.__безЗаставки = true;
+          window.__ширмаСтарт = Date.now();
+          поле.classList.add("пусто");
+          return;
+        }
         var пущено = false;
         function пуск() {
           if (пущено || !поле) return;

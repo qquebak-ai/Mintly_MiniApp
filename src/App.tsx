@@ -13326,6 +13326,13 @@ function снятьШирму({ уйти = false } = {}) {
     setTimeout(() => { if (поле.parentNode) поле.parentNode.removeChild(поле); }, 240);
   };
 
+  /* Заставка не игралась (аккаунта на телефоне не было) — ждать нечего:
+     поле пустое, гасим его через два кадра, как только окно нарисовано. */
+  if (window.__безЗаставки) {
+    requestAnimationFrame(() => requestAnimationFrame(погасить));
+    return;
+  }
+
   if (!уйти) {
     /* Открывается окно входа — у него своя заставка ровно на этом месте.
        Имя с подписью убираем сразу, чтобы два одинаковых слова не легли
@@ -24065,7 +24072,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   // Прошлая видимая высота: по ней видно, клавиатура выезжает или уходит.
   const прошлаяВысота = useRef(0);
   useEffect(() => { подъёмЖивой.current = подъём; }, [подъём]);
-  const [первыйПоказ, setПервыйПоказ] = useState(true);
+  // Заставка на поле не игралась — окно не продолжает её, а встаёт сразу:
+  // знак уже наверху, карточка видна с первого кадра.
+  const безЗаставки = typeof window !== "undefined" && !!window.__безЗаставки;
+  const [первыйПоказ, setПервыйПоказ] = useState(!безЗаставки);
   /* Заставка живёт ровно до того мига, когда поверхность трогается с
      места: её уход и выезд листа — одно движение, а не два подряд. */
   /* Заставка окна — продолжение той, что уже идёт на поле из index.html,
@@ -24082,7 +24092,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   }
   const уже = сдвигЗаставки.current || 0;
   const ЖДАТЬ_ЗАСТАВКУ = 0;
-  const [заставка, setЗаставка] = useState(true);
+  const [заставка, setЗаставка] = useState(!безЗаставки);
   // Буквы уходят вправо заранее: к мигу, когда трогается поверхность,
   // имя посередине уже стёрто, и два движения не накладываются.
   const [уходитЗаставка, setУходитЗаставка] = useState(false);
@@ -24094,7 +24104,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
      только когда заставки на экране действительно больше нет. */
   const картаВидна = !первыйПоказ || !заставка;
   useEffect(() => {
-    if (!open) { setПервыйПоказ(true); setЗаставка(true); setУходитЗаставка(false); return undefined; }
+    if (!open) { setПервыйПоказ(!window.__безЗаставки); setЗаставка(!window.__безЗаставки); setУходитЗаставка(false); return undefined; }
+    if (window.__безЗаставки) return undefined;
     /* Знак сперва приближается из глубины в центре (онбИзДали, 900 мс),
        и только после этого уезжает наверх — два движения не наслаиваются. */
     // Отсчёт от начала заставки: если знак уже приближался на поле
@@ -26470,7 +26481,10 @@ const FEE_PERCENT = 0; // комиссии площадки нет
     // Сессия есть, а профиля точно нет — значит, дверь должна открыться
     // сама, когда бы это ни выяснилось: не только при запуске, но и после
     // позднего входа или обновления сессии.
-    if (!prof || !prof.nickname) { setAccountCreated(false); setProfile(EMPTY_PROFILE); setMyTokens([]); setНужнаРегистрация(true); return; }
+    if (!prof || !prof.nickname) {
+      try { localStorage.removeItem("mintly_has_account"); } catch (e) { /* приватный режим */ }
+      setAccountCreated(false); setProfile(EMPTY_PROFILE); setMyTokens([]); setНужнаРегистрация(true); return;
+    }
     setProfile({ nickname: prof.nickname, email: prof.email, bio: prof.bio || "", avatarUrl: prof.avatar_url, emoji: prof.emoji, verified: !!prof.verified });
     // Ступень знака создателя лежит в профиле, а не только на устройстве:
     // её должны видеть другие. Здесь только читаем, повышает её эффект
@@ -26503,6 +26517,9 @@ const FEE_PERCENT = 0; // комиссии площадки нет
       minTon: Number(prof.notify_min_ton) >= 0 ? Number(prof.notify_min_ton) : 0.05,
     });
     setAccountCreated(true);
+    // Метка для index.html: по ней решается, играть ли заставку при
+    // следующем запуске (тому, у кого аккаунта нет, — сразу окно).
+    try { localStorage.setItem("mintly_has_account", "1"); } catch (e) { /* приватный режим */ }
     // Косметика хранится в профиле, а не только на устройстве — иначе её
     // не увидят другие. Но если на сервере пусто, а локально что-то
     // надето (выбор сделан до переезда в базу), локальное не затираем, а
@@ -28627,6 +28644,7 @@ function mapTokenRow(row) {
     await supabase.auth.signOut();
     setAccountCreated(false);
     setНужнаРегистрация(true);
+    try { localStorage.removeItem("mintly_has_account"); } catch (e) { /* приватный режим */ }
     setProfile(EMPTY_PROFILE);
     закрытьВсёОткрытое();
     if (wallet) tonConnectUI.disconnect();
@@ -28664,6 +28682,7 @@ function mapTokenRow(row) {
     await supabase.auth.signOut();
     setAccountCreated(false);
     setНужнаРегистрация(true);
+    try { localStorage.removeItem("mintly_has_account"); } catch (e) { /* приватный режим */ }
     setProfile(EMPTY_PROFILE);
     закрытьВсёОткрытое();
     if (wallet) tonConnectUI.disconnect();
