@@ -108,8 +108,11 @@ async function nicknameTaken(admin, nickname) {
   // Подчёркивание — подстановочный знак ILIKE, а в никнеймах оно
   // разрешено: без экранирования «user_1» совпадал бы с «userA1».
   const pattern = nickname.replace(/[%_\\]/g, "\\$&");
-  const { data } = await admin.from("profiles").select("nickname").ilike("nickname", pattern).maybeSingle();
-  return !!data;
+  // limit(1), а не maybeSingle: при двух совпадениях maybeSingle отвечает
+  // ошибкой с пустыми данными — и занятое имя выглядело свободным.
+  const { data, error } = await admin.from("profiles").select("nickname").ilike("nickname", pattern).not("nickname", "is", null).limit(1);
+  if (error) return null;
+  return !!(data && data.length);
 }
 
 // Ник, выбранный человеком на экране входа. Своего варианта сервер не
@@ -601,8 +604,19 @@ export default async function handler(req, res) {
       // узнать, что имя не досталось.
       const nickname = wantedNickname(body);
       if (!nickname) return res.status(400).json({ error: "nickname_required" });
-      if (await nicknameTaken(admin, nickname)) {
+      if ((await nicknameTaken(admin, nickname)) === true) {
         return res.status(409).json({ error: "nickname_taken" });
+      }
+      /* Почта с первого шага: на неё потом входят по паролю, поэтому у
+         двух законченных аккаунтов одной почты быть не может — иначе вход
+         попадал бы в чужой. Проверяем здесь, а не только «на ходу» в
+         форме: тот ответ мог устареть. */
+      const почтаАккаунта = String(body.email || "").trim().toLowerCase();
+      const почтаГодна = почтаАккаунта.length <= 254 && /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(почтаАккаунта);
+      if (почтаГодна) {
+        const { data: сПочтой } = await admin.from("profiles").select("id")
+          .ilike("email", экранировать(почтаАккаунта)).neq("id", userId).limit(1);
+        if (сПочтой && сПочтой.length) return res.status(409).json({ error: "email_taken" });
       }
 
       // Приглашение засчитывается только при первом входе и только если
@@ -612,21 +626,31 @@ export default async function handler(req, res) {
       // У заготовки связь могла уже стоять — её не переписываем.
       const invitedBy = (profile && profile.invited_by) || await resolveInviter(admin, body.startParam, tgUser.id, userId);
 
-      const { error: insertErr } = await admin.from("profiles").upsert({
+      const строка = {
         id: userId,
         telegram_id: tgUser.id,
         nickname,
-        email,
+        email: почтаГодна ? почтаАккаунта : email,
         bio: "",
         avatar_url: null,
         emoji: null,
         invited_by: invitedBy,
-      }, { onConflict: "id" });
+      };
+      let { error: insertErr } = await admin.from("profiles").upsert(строка, { onConflict: "id" });
+      /* Заготовку без ника запирает триггер lock_nickname («ник не
+         меняется»): пустое имя для него — тоже имя. Раньше этот отказ
+         читался как «ник занят», хотя ник свободен. Заготовка ничего не
+         хранит, поэтому заводим строку заново. */
+      if (insertErr && /immutable/i.test(insertErr.message || "") && profile && !profile.nickname) {
+        const { error: delErr } = await admin.from("profiles").delete().eq("id", userId).or("nickname.is.null,nickname.eq.");
+        if (!delErr) ({ error: insertErr } = await admin.from("profiles").insert(строка));
+      }
       if (insertErr) {
-        // Между проверкой и записью ник мог занять кто-то другой: тогда
-        // падает уникальный ключ, и это не сбой сервера, а «имя ушло».
-        if (/duplicate|unique|nickname/i.test(insertErr.message || "")) {
-          return res.status(409).json({ error: "nickname_taken" });
+        // Между проверкой и записью ник или почту мог занять кто-то
+        // другой: тогда падает уникальный ключ — это не сбой, а «ушло».
+        // Любое другое упоминание ника в ошибке — не про занятость.
+        if (/duplicate|unique/i.test(insertErr.message || "")) {
+          return res.status(409).json({ error: /email/i.test(insertErr.message || "") ? "email_taken" : "nickname_taken" });
         }
         return fail(res, 500, "profile_failed", insertErr.message);
       }
@@ -790,7 +814,7 @@ async function завестиПрофиль(req, res) {
 
   const nickname = wantedNickname(body);
   if (!nickname) return res.status(400).json({ error: "nickname_required" });
-  if (await nicknameTaken(admin, nickname)) return res.status(409).json({ error: "nickname_taken" });
+  if ((await nicknameTaken(admin, nickname)) === true) return res.status(409).json({ error: "nickname_taken" });
 
   const мета = кто.user.user_metadata || {};
   const { error: insertErr } = await admin.from("profiles").upsert({
@@ -804,7 +828,7 @@ async function завестиПрофиль(req, res) {
     wallet_address: мета.wallet_address || null,
   }, { onConflict: "id" });
   if (insertErr) {
-    if (/duplicate|unique|nickname/i.test(insertErr.message || "")) {
+    if (/duplicate|unique/i.test(insertErr.message || "")) {
       return res.status(409).json({ error: "nickname_taken" });
     }
     return fail(res, 500, "profile_failed", insertErr.message);

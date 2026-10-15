@@ -23041,7 +23041,7 @@ async function linkReferralIfAny() {
 }
 
 // Бросает ошибку с понятным кодом — вызывающая сторона показывает текст.
-async function signInWithTelegram(nickname) {
+async function signInWithTelegram(nickname, email) {
   const initData = telegramInitData();
   if (!initData) throw new Error("no_telegram");
 
@@ -23050,7 +23050,7 @@ async function signInWithTelegram(nickname) {
   const res = await fetch(апи("/api/telegram-auth"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ initData, startParam, nickname: nickname || undefined }),
+    body: JSON.stringify({ initData, startParam, nickname: nickname || undefined, email: email || undefined }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -24522,6 +24522,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         // же экране и выбирает другое.
         : код === "nickname_taken" ? tf("authErrNicknameTaken", { name: ник })
         : код === "nickname_required" ? t("nicknameError")
+        : код === "email_taken" ? t("authMailUsed")
         : `${t("createFailed")} (${код || "?"})${хвост}`);
     }
 
@@ -24552,7 +24553,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           setTgBusy(false);
           return;
         }
-        await signInWithTelegram(входБезНика ? "" : ник);
+        await signInWithTelegram(входБезНика ? "" : ник, входБезНика ? "" : почтаЧистая);
         // Вошедшему второй ключ предлагать незачем — он уже выбирал.
         if (входБезНика) {
           /* Вход прошёл, но профиль мог не появиться или остаться без
@@ -24621,6 +24622,17 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           // Аккаунта на самом деле нет — это не ошибка, а начало шагов.
           if (входБезНика) { setTgError(""); сменитьШагВхода("почта"); return; }
         }
+        /* Почту заняли, пока человек шёл по шагам, — показываем это там,
+           где её вводили, с тем же красным ответом под полем. */
+        if ((err && err.message) === "email_taken") {
+          setПочтаПроверка({ адрес: почтаЧистая, итог: true });
+          setTgError("");
+          сменитьШагВхода("почта");
+          return;
+        }
+        /* Имя заняли между проверкой и созданием — зелёная рамка больше
+           не правда: перекрашиваем поле в «занято». */
+        if ((err && err.message) === "nickname_taken") { setНикПроверка({ имя: ник, итог: true }); setTgError(""); haptic("error"); return; }
         поймать(err);
       } finally {
         setTgBusy(false);
