@@ -60,11 +60,13 @@ const DARK_THEME = {
      той же тёплой краской. Цветного акцента нет — роль акцента играет
      светлая заливка (главные кнопки, выбранное), а цвет остаётся только
      у смысла: рост, падение, предупреждение. */
-  bg: "#0B0D12",
-  surface: "#14171F",
-  surfaceHi: "#1B1F29",
-  line: "#22262F",
-  lineHi: "#30343E",
+  // Палитра промо-ролика: чистый чёрный фон, графитовые поверхности
+  // и тонкие линии — строки лежат лентой прямо на чёрном.
+  bg: "#000000",
+  surface: "#0F0F13",
+  surfaceHi: "#14171F",
+  line: "#1A1C22",
+  lineHi: "#2A2D35",
   ice: "#F2F0EB",
   paper: "#E4E1DA",
   muted: "#97958F",
@@ -73,8 +75,8 @@ const DARK_THEME = {
   turquoise: "#F2F0EB",
   violet: "#F2F0EB",
   rose: "#97958F",
-  up: "#00E96B",
-  down: "#FF3B47",
+  up: "#2EE87A",
+  down: "#FF5A63",
   warning: "#E5A83C",
   mintGlass: "#F2F0EB",
 };
@@ -128,6 +130,9 @@ function hexA(hex, alpha) {
    (grid line / vignette) effects that used to assume a dark backdrop. */
 let T = { ...DARK_THEME };
 function applyTheme(mode) {
+  // Светлой темы больше нет: весь интерфейс собран под чёрный фон ролика,
+  // и сохранённое когда-то «White» тоже открывается тёмным.
+  mode = "Dark";
   Object.assign(T, THEMES[mode] || DARK_THEME);
   PRISM = mode === "White" ? LIGHT_PRISM : DARK_PRISM;
   PRISM_TEXT = "#2A2C31";
@@ -8067,103 +8072,54 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
   const доляДоБиржи = своя
     ? Math.max(0, Math.min(1, (Number(tok.raisedTon) || 0) / tok.graduationTon))
     : 0;
-  // Держателей знают не у всех: у токенов с биржи их не сосчитать, зато
-  // видно число сделок. Показываем то, что есть на самом деле.
-  const людиИлиСделки = tok.holders != null
-    ? { подпись: "держателей", значение: Number(tok.holders).toLocaleString("ru-RU") }
-    : { подпись: "сделок за сутки", значение: (tok.tx24h || 0).toLocaleString("ru-RU") };
 
   return (
     <button
       onClick={() => onOpen(tok)}
       className="fx-tap fx-card w-full text-left"
-      // Задержка появления копится только на первых карточках: при сорока
-      // элементах прежние сорок миллисекунд на каждый растягивали список
-      // на полторы секунды, и переключение вкладки выглядело медленным.
-      //
-      // Без фона, рамки и разделителя: сорок плашек подряд рябят, а
-      // линия под каждой строкой режет список на куски. Строки разводит
-      // зазор — этого хватает, чтобы не путать соседние токены.
+      // Лента, как в промо-ролике: строка прямо на чёрном, под ней тонкая
+      // линия. Внутри — только то, по чему выбирают: лицо токена, имя,
+      // капитализация и изменение; подробности — на странице токена.
+      // Задержка появления копится только на первых строках: при сорока
+      // элементах список иначе разворачивался бы полторы секунды.
       style={{
-        padding: "10px 2px", background: "transparent",
+        padding: "13px 2px", background: "transparent",
+        borderBottom: `1px solid ${T.line}`,
         animationDelay: `${Math.min(index, 6) * 22}ms`,
       }}
     >
-      {/* Логотип — крупнее прежнего: в списке он и есть лицо токена, а
-          на нём разбирают картинку, а не тикер. */}
-      <div className="flex items-center" style={{ gap: 12 }}>
+      <div className="flex items-center" style={{ gap: 14 }}>
         {своя ? (
-          <КольцоДоБиржи size={54} доля={доляДоБиржи} готово={доляДоБиржи >= 1}>
-            <TokenAvatar size={54} tone={рост ? "up" : "down"} src={tok.logoUrl} />
+          <КольцоДоБиржи size={48} доля={доляДоБиржи} готово={доляДоБиржи >= 1}>
+            <TokenAvatar size={48} tone={рост ? "up" : "down"} src={tok.logoUrl} />
           </КольцоДоБиржи>
         ) : (
-          <TokenAvatar size={54} tone={рост ? "up" : "down"} src={tok.logoUrl} />
+          <TokenAvatar size={48} tone={рост ? "up" : "down"} src={tok.logoUrl} />
         )}
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center" style={{ gap: 6 }}>
-            <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 600 }}>${tok.ticker}</span>
+            <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800 }}>${tok.ticker}</span>
             <ПометкаТест сеть={tok.network} />
           </div>
-          <div className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2 }}>
+          <div className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 3 }}>
             {tok.name || "—"}
             {возраст ? ` · ${возраст}` : ""}
+            {/* До биржи — числом прямо в подписи: по кольцу видно
+                «много/мало», а решение принимают по проценту. */}
+            {своя ? <span style={{ color: доляДоБиржи >= 0.8 ? T.up : T.faint }}>{` · до DEX ${Math.round(доляДоБиржи * 100)}%`}</span> : ""}
             {tok.dexName ? ` · ${tok.dexName}` : ""}
           </div>
-          {/* Сколько кривой собрано — числом, а не только кольцом вокруг
-              логотипа: по кольцу видно «много/мало», а решение принимают
-              по проценту. */}
-          {своя && (
-            <div className="flex items-center" style={{ gap: 6, marginTop: 5 }}>
-              <div style={{ flex: 1, maxWidth: 96, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
-                <div style={{
-                  width: `${Math.round(доляДоБиржи * 100)}%`, height: "100%",
-                  // На подходе к бирже полоса зеленеет: это и есть тот
-                  // самый момент, ради которого раздел открывают.
-                  background: доляДоБиржи >= 0.8 ? ГРАДИЕНТ_РОСТА : PRISM,
-                }} />
-              </div>
-              <span style={{ fontFamily: monoFont, fontSize: 11, color: доляДоБиржи >= 0.8 ? T.up : T.faint }}>
-                {Math.round(доляДоБиржи * 100)}%
-              </span>
-            </div>
-          )}
         </div>
 
-        {/* Спарклайна в строке нет. У свежего токена сделок одна-две, и
-            линия выходила ровной чертой через всю карточку — она ничего
-            не сообщала, но забирала место и внимание. Форму движения
-            показывает сам график на странице токена. */}
-
         <div className="text-right flex-shrink-0">
-          {/* Градиент по буквам кладётся на сам умный текст: у знаков
-              свой блок, и заливка родителя сквозь них не проходит —
-              цифры оставались невидимыми. */}
-          <div style={{ fontFamily: monoFont, fontSize: 15, fontWeight: 700 }}>
-            <УмныйТекст text={fmtUSD(tok.mcapNum)} className="умн-градиент" style={текстГрадиентом(рост ? ГРАДИЕНТ_РОСТА : ГРАДИЕНТ_ПАДЕНИЯ)} />
+          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>
+            <ТекстСЧислами text={fmtUSD(tok.mcapNum)} />
           </div>
-          <div style={{ fontFamily: monoFont, color: рост ? T.up : T.down, fontSize: 12.5, marginTop: 3 }}>
+          <div style={{ fontFamily: bodyFont, color: рост ? T.up : T.down, fontSize: 13, fontWeight: 700, marginTop: 3 }}>
             {рост ? "+" : ""}<ТекстСЧислами text={(tok.change || 0).toFixed(1)} />%
           </div>
         </div>
-      </div>
-
-      {/* Описание — две строки, не больше: длинный текст на карточке
-          вытесняет цифры, ради которых её и читают. */}
-      {tok.description ? (
-        <p style={{
-          fontFamily: bodyFont, color: T.paper, fontSize: 12.5, lineHeight: 1.45, marginTop: 10,
-          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-        }}>
-          {tok.description}
-        </p>
-      ) : null}
-
-      <div className="grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, marginTop: 12 }}>
-        <ЧислоКарточки подпись="цена" значение={fmtPrice(tok.price)} />
-        <ЧислоКарточки подпись={своя ? "в токене" : "ликвидность"} значение={`$${tok.liq}`} />
-        <ЧислоКарточки подпись="объём 24ч" значение={`$${tok.vol}`} />
-        <ЧислоКарточки подпись={людиИлиСделки.подпись} значение={людиИлиСделки.значение} />
       </div>
     </button>
   );
@@ -10238,6 +10194,17 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
    То же правило, что и с покупкой вещи: монеты не уходят по одному
    нажатию. Здесь же видно, сколько останется и что вообще может выпасть
    — иначе непонятно, за что платишь. */
+/* Крупный заголовок раздела, как в промо-ролике: им экран и называется,
+   отдельной шапки над ним нет. */
+function ЗаголовокРаздела({ children, справа = null, style }) {
+  return (
+    <div className="flex items-center justify-between" style={{ gap: 12, minHeight: 44, paddingTop: 6, ...style }}>
+      <h1 style={{ fontFamily: displayFont, color: T.ice, fontSize: 38, fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.01em", margin: 0 }}>{children}</h1>
+      {справа}
+    </div>
+  );
+}
+
 function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achievementsReady = true, onOpenAchievements, showToast, accountCreated = false, onOpenLogin }) {
   // Разделов в магазине больше нет: рамки и карточки профиля убраны,
   // остался только вид карты баланса.
@@ -10333,7 +10300,8 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
           Остаётся у верхнего края при прокрутке — цены видно на любой
           высоте витрины. Подложка непрозрачная: под плашкой проезжают
           карточки. */}
-      <div style={{ position: "sticky", top: 4, zIndex: 5, alignSelf: "flex-end" }}>
+      <div className="flex items-center justify-between" style={{ gap: 12 }}>
+        <ЗаголовокРаздела>Магазин</ЗаголовокРаздела>
         <button
           onClick={onOpenAchievements}
           className="fx-tap flex items-center gap-1.5 px-3 py-1.5"
@@ -10813,6 +10781,7 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
 
   return (
     <div className="flex flex-col" style={{ gap: 20, paddingTop: 8, paddingBottom: 16 }}>
+      <ЗаголовокРаздела>Мемпад</ЗаголовокРаздела>
       {/* Пока раздел не готов, его содержимое скрыто, но смонтировано:
           лента сама ходит за сделками, и без неё на экране ждать было бы
           нечего. На виду в это время — та же раскладка плашками: бегущая
@@ -10865,7 +10834,7 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
         </div>
       )}
 
-      <div className="no-scrollbar flex items-center overflow-x-auto" style={{ gap: 18, touchAction: "pan-x", overscrollBehaviorX: "contain", overflowY: "hidden" }}>
+      <div className="no-scrollbar flex items-center overflow-x-auto" style={{ gap: 8, touchAction: "pan-x", overscrollBehaviorX: "contain", overflowY: "hidden" }}>
         {MEMPAD_FILTERS.map((f) => {
           const active = filter === f.id;
           return (
@@ -10873,15 +10842,15 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
               key={f.id}
               onClick={() => setFilter(f.id)}
               className="fx-tap whitespace-nowrap flex-shrink-0"
-              // Ряд слов, без подложек: выбранное держится белым и жирным,
-              // остальные приглушены — капсула вокруг текста добавляла
-              // рамку там, где хватает самого текста.
+              // Капсулы с тонкой обводкой, выбранная залита белым — как в
+              // промо-ролике: на чёрной ленте фильтр должен читаться кнопкой.
               style={{
-                background: "transparent", border: "none",
-                padding: "7px 0", borderRadius: 0,
-                fontFamily: displayFont, fontSize: 13.5, fontWeight: active ? 700 : 500,
-                color: active ? T.ice : T.faint,
-                transition: `color ${EASE}`,
+                background: active ? T.ice : "transparent",
+                border: `1px solid ${active ? T.ice : hexA("#FFFFFF", 0.12)}`,
+                padding: "9px 15px", borderRadius: 999,
+                fontFamily: bodyFont, fontSize: 14, fontWeight: 600,
+                color: active ? "#0B0B0F" : T.muted,
+                transition: `color ${EASE}, background ${EASE}`,
               }}
             >
               {t(f.labelKey)}
@@ -10890,8 +10859,8 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
         })}
       </div>
 
-      {/* Ни фона, ни рамки, ни разделителя — строки разводит зазор. */}
-      <div className="flex flex-col gap-3" key={сеть}>
+      {/* Лента: строки прямо на чёрном, между ними — тонкая линия. */}
+      <div className="flex flex-col" key={сеть}>
         {/* Смена фильтра внутри готового раздела — не повод гасить весь
             экран: там достаточно скелетов на месте строк.
 
@@ -15601,7 +15570,9 @@ function useSolUsd() {
    интерфейсе белое полотно на пол-экрана слепит и выглядит чужим
    куском. Отделяется она не светлотой, а тоном: чуть светлее фона,
    строки на ней — ещё на ступень светлее. */
-const КОШ_СТРАНИЦА = "#0E1015";   // сама страница снизу
+// Страница активов лежит прямо на чёрном, как лента в промо-ролике:
+// отдельный светлый лист под ней больше не нужен.
+const КОШ_СТРАНИЦА = "transparent";   // сама страница снизу
 /* Полотно страницы — не заливка и не растяжка из двух цветов, а сетка
    цветных пятен: каждое светит своим цветом и гаснет к краю, а там, где
    они находят друг на друга, получаются переходы, которых линейным
@@ -17148,6 +17119,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
        страница просто занимает всю ширину и упирается в край сама, без
        отрицательных отступов и пересчёта ширины окна. */
     <div className={`flex flex-col${приходКошелька ? " fx-view" : ""}`} style={{ paddingTop: 8 }}>
+      <ЗаголовокРаздела style={{ margin: "0 16px 16px" }}>Кошелёк</ЗаголовокРаздела>
       {/* Карта баланса. Сумма читается одним взглядом: целые рубли
           крупно и белым, копейки приглушены — так глаз не спотыкается о
           мелкую часть, которая на решение не влияет. */}
@@ -21323,6 +21295,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   // сорок точек, и под кнопкой запуска оставалась пустая половина экрана.
   return (
     <div className="fx-view flex flex-col gap-7" style={{ position: "relative", isolation: "isolate", paddingTop: 8 }}>
+      <ЗаголовокРаздела style={{ marginBottom: -12 }}>Запуск</ЗаголовокРаздела>
       {/* Сеть выбирается тем же ползунком, что и в мемпаде: это один и
           тот же выбор рынка, и выглядеть он должен одинаково. Пустой
           обёртки здесь нет: без неё gap не добавляет фантомный отступ,
