@@ -19565,128 +19565,114 @@ async function drawTokenShareCard(canvas, { token, curve, link, holders }) {
   canvas.height = SHARE_H;
 
   // Шрифт приложения приезжает из сети. Пока он не готов, canvas молча
-  // рисует системным — карточка выходила чужой на вид.
+  // рисует системным — карточка выходила чужой на вид. MintlyUI — это
+  // Onest на обычных начертаниях и Nunito на жирных, как в промо-ролике.
+  const F = "'MintlyUI', 'Onest', sans-serif";
   try {
     if (document.fonts && document.fonts.load) {
       await Promise.all([
-        document.fonts.load("700 92px 'Jost'"),
-        document.fonts.load("400 36px 'Jost'"),
+        document.fonts.load(`800 92px ${F}`),
+        document.fonts.load(`500 36px ${F}`),
       ]);
     }
   } catch (e) { /* нет так нет */ }
 
   const logo = await shareLoadImage(token.logoUrl);
 
-  const M = 88;                    // поля
-  const ink = "#FFFFFF";
-  const muted = "#7C828B";
-  const accent = "#FF6B35";
+  // Палитра ролика: чистый чёрный, графит, тёплый белый; цвет — только у
+  // роста и падения.
+  const M = 80;
+  const ink = "#F2F0EB";
+  const muted = "#97958F";
+  const dim = "#63625F";
+  const плита = "#0F0F13";
+  const линия = "rgba(255,255,255,0.09)";
+  const рост = "#2EE87A", падение = "#FF5A63";
+  const сеть = token.chain === "solana" ? "SOL" : "GRAM";
 
-  ctx.fillStyle = "#07080A";
+  ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, SHARE_W, SHARE_H);
-  // Два пятна света: тёплое сверху и мятное снизу — те же два цвета, на
-  // которых стоит весь интерфейс.
-  let g = ctx.createRadialGradient(SHARE_W * 0.88, 90, 0, SHARE_W * 0.88, 90, 820);
-  g.addColorStop(0, "rgba(255,107,53,0.30)");
-  g.addColorStop(1, "rgba(255,107,53,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, SHARE_W, SHARE_H);
-  g = ctx.createRadialGradient(60, SHARE_H - 120, 0, 60, SHARE_H - 120, 760);
-  g.addColorStop(0, "rgba(127,231,196,0.14)");
-  g.addColorStop(1, "rgba(127,231,196,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, SHARE_W, SHARE_H);
-
-  ctx.strokeStyle = "rgba(255,255,255,0.10)";
-  ctx.lineWidth = 2;
-  shareRect(ctx, 26, 26, SHARE_W - 52, SHARE_H - 52, 58);
-  ctx.stroke();
-
   ctx.textBaseline = "alphabetic";
   ctx.textAlign = "left";
 
-  // Шапка
+  // Шапка: знак приложения и имя, справа — сеть плашкой
+  const знак = new Path2D(ПУТЬ_ЗВЕЗДЫ);
+  ctx.save();
+  ctx.translate(M, 92);
+  ctx.scale(64 / 150, 64 / 150);
+  ctx.translate(-25, -25);
+  ctx.fillStyle = "#E4E2DC";
+  ctx.fill(знак);
+  ctx.restore();
   ctx.fillStyle = ink;
-  ctx.font = "700 46px 'Jost', sans-serif";
-  ctx.fillText("MINTLY", M, 148);
-  ctx.fillStyle = muted;
-  ctx.font = "400 30px 'Jost', sans-serif";
-  ctx.textAlign = "right";
-  ctx.fillText("TON", SHARE_W - M, 146);
+  ctx.font = `800 50px ${F}`;
+  ctx.fillText("Mintly", M + 82, 142);
+  ctx.font = `700 30px ${F}`;
+  const сw = ctx.measureText(сеть).width + 56;
+  ctx.fillStyle = "#14171F";
+  shareRect(ctx, SHARE_W - M - сw, 96, сw, 58, 29);
+  ctx.fill();
+  ctx.fillStyle = ink;
+  ctx.textAlign = "center";
+  ctx.fillText(сеть, SHARE_W - M - сw / 2, 136);
   ctx.textAlign = "left";
 
-  // Аватар токена
-  const A = 220;
-  const ax = M;
-  const ay = 246;
+  // Лицо токена: круглый логотип с тонкой обводкой, крупный тикер
+  const A = 200, ax = M, ay = 236;
   ctx.save();
-  shareRect(ctx, ax, ay, A, A, 64);
-  ctx.clip();
-  ctx.fillStyle = "rgba(255,255,255,0.05)";
+  ctx.beginPath(); ctx.arc(ax + A / 2, ay + A / 2, A / 2, 0, Math.PI * 2); ctx.clip();
+  ctx.fillStyle = "#14171F";
   ctx.fillRect(ax, ay, A, A);
   if (logo) {
-    // Логотипы приходят любой формы: вписываем по короткой стороне,
-    // иначе квадратная рамка режет широкую картинку по краям.
     const k = Math.max(A / logo.width, A / logo.height);
-    const w = logo.width * k;
-    const h = logo.height * k;
+    const w = logo.width * k, h = logo.height * k;
     ctx.drawImage(logo, ax + (A - w) / 2, ay + (A - h) / 2, w, h);
   } else {
-    ctx.font = "120px 'Apple Color Emoji', 'Noto Color Emoji', 'Segoe UI Emoji', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillStyle = ink;
-    ctx.fillText(token.emoji || "🪙", ax + A / 2, ay + A / 2 + 44);
-    ctx.textAlign = "left";
+    ctx.save();
+    ctx.translate(ax + A * 0.2, ay + A * 0.2);
+    ctx.scale((A * 0.6) / 150, (A * 0.6) / 150);
+    ctx.translate(-25, -25);
+    ctx.fillStyle = "#E4E2DC";
+    ctx.fill(знак);
+    ctx.restore();
   }
   ctx.restore();
-  ctx.strokeStyle = "rgba(255,107,53,0.55)";
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
   ctx.lineWidth = 3;
-  shareRect(ctx, ax, ay, A, A, 64);
-  ctx.stroke();
+  ctx.beginPath(); ctx.arc(ax + A / 2, ay + A / 2, A / 2 - 1.5, 0, Math.PI * 2); ctx.stroke();
 
-  // Тикер и название
-  const tx = ax + A + 44;
+  const tx = ax + A + 40;
   ctx.fillStyle = ink;
-  ctx.font = "700 88px 'Jost', sans-serif";
-  ctx.fillText(`$${String(token.ticker || "").toUpperCase()}`, tx, ay + 112);
+  ctx.font = `800 92px ${F}`;
+  ctx.fillText(`$${String(token.ticker || "").toUpperCase()}`, tx, ay + 114);
   ctx.fillStyle = muted;
-  ctx.font = "400 40px 'Jost', sans-serif";
+  ctx.font = `500 40px ${F}`;
   const name = String(token.name || "");
-  ctx.fillText(name.length > 18 ? name.slice(0, 17) + "…" : name, tx, ay + 176);
+  ctx.fillText(name.length > 18 ? name.slice(0, 17) + "…" : name, tx, ay + 172);
 
-  // Капитализация и движение
+  // Капитализация крупно, рядом — изменение цветом рынка
   ctx.fillStyle = muted;
-  ctx.font = "400 32px 'Jost', sans-serif";
-  ctx.fillText(t("shareCardMcap"), M, 626);
+  ctx.font = `500 32px ${F}`;
+  ctx.fillText(t("shareCardMcap"), M, 566);
   ctx.fillStyle = ink;
-  ctx.font = "700 112px 'Jost', sans-serif";
+  ctx.font = `800 128px ${F}`;
   const mcap = fmtUSD(token.mcapNum);
-  ctx.fillText(mcap, M, 728);
-
+  ctx.fillText(mcap, M, 686);
   const change = Number(token.change);
   if (Number.isFinite(change)) {
     const up = change >= 0;
     const label = `${up ? "+" : ""}${change.toFixed(2)}%`;
-    // Ширина числа меряется его же шрифтом: капитализация бывает и
-    // «$980», и «$12.40M», и плашка должна встать вплотную к любой.
-    ctx.font = "700 112px 'Jost', sans-serif";
     const mw = ctx.measureText(mcap).width;
-    ctx.font = "700 38px 'Jost', sans-serif";
-    const bw = ctx.measureText(label).width + 48;
-    ctx.fillStyle = up ? "rgba(56,211,159,0.16)" : "rgba(255,77,90,0.16)";
-    shareRect(ctx, M + mw + 28, 668, bw, 62, 31);
-    ctx.fill();
-    ctx.fillStyle = up ? "#38D39F" : "#FF4D5A";
-    ctx.fillText(label, M + mw + 52, 710);
+    ctx.font = `800 40px ${F}`;
+    ctx.fillStyle = up ? рост : падение;
+    ctx.fillText(label, M + mw + 30, 674);
   }
-
   ctx.fillStyle = muted;
-  ctx.font = "400 34px 'Jost', sans-serif";
-  ctx.fillText(`${fmtPrice(token.price)} ${t("perToken")}`, M, 794);
+  ctx.font = `500 34px ${F}`;
+  ctx.fillText(`${fmtPrice(token.price)} ${t("perToken")}`, M, 748);
 
-  // Путь до биржи. Кривая может быть ещё не прочитана — тогда полосы
-  // просто нет, выдумывать проценты нельзя.
-  const barY = 890;
+  // Путь до биржи — белая полоса на графите, без цветных градиентов
+  const barY = 846;
   const barDrawn = !!(curve && curve.graduationTon);
   if (barDrawn) {
     const raised = Number(curve.realTon) / 1e9;
@@ -19694,72 +19680,77 @@ async function drawTokenShareCard(canvas, { token, curve, link, holders }) {
     const done = curve.graduated || raised >= target;
     const pct = done ? 1 : Math.max(0, Math.min(1, raised / target));
     ctx.fillStyle = muted;
-    ctx.font = "400 32px 'Jost', sans-serif";
-    ctx.fillText(done ? t("shareCardOnDex") : t("shareCardToDex"), M, barY - 24);
+    ctx.font = `500 32px ${F}`;
+    ctx.fillText(done ? t("shareCardOnDex") : t("shareCardToDex"), M, barY - 26);
     ctx.textAlign = "right";
-    ctx.fillStyle = done ? "#38D39F" : ink;
-    ctx.font = "700 34px 'Jost', sans-serif";
-    ctx.fillText(done ? `${fmtTon(raised)} TON` : `${fmtTon(raised)} / ${fmtTon(target)} TON`, SHARE_W - M, barY - 24);
+    ctx.fillStyle = done ? рост : ink;
+    ctx.font = `800 34px ${F}`;
+    ctx.fillText(done ? "DEX" : `${Math.round(pct * 100)}%`, SHARE_W - M, barY - 26);
     ctx.textAlign = "left";
-
     const bw = SHARE_W - M * 2;
-    ctx.fillStyle = "rgba(255,255,255,0.07)";
-    shareRect(ctx, M, barY, bw, 26, 13);
+    ctx.fillStyle = "#14171F";
+    shareRect(ctx, M, barY, bw, 20, 10);
     ctx.fill();
-    const fill = Math.max(26, bw * pct);
-    const fg = ctx.createLinearGradient(M, 0, M + fill, 0);
-    if (done) { fg.addColorStop(0, "#38D39F"); fg.addColorStop(1, "#7FE7C4"); }
-    else { fg.addColorStop(0, "#FF6B35"); fg.addColorStop(1, "#FFA46B"); }
-    ctx.fillStyle = fg;
-    shareRect(ctx, M, barY, fill, 26, 13);
+    ctx.fillStyle = done ? рост : ink;
+    shareRect(ctx, M, barY, Math.max(20, bw * pct), 20, 10);
     ctx.fill();
   }
 
-  // Три числа в ряд. Стоят они здесь не для красоты: без них у токена
-  // без кривой середина карточки оставалась пустой, а сами цифры —
-  // первое, что смотрят перед покупкой.
-  const cells = [
+  // Три числа строкой ленты: подпись слева, значение справа, тонкие линии
+  const rows = [
     [t("statHolders"), holders == null ? "—" : String(holders)],
     [t("statVolume24h"), token.vol ? `$${token.vol}` : "—"],
     [t("tokenAgeLabel"), fmtAge(token.createdAt) || "—"],
   ];
-  const gap = 18;
-  const cw = (SHARE_W - M * 2 - gap * 2) / 3;
-  // Без полосы до биржи ряд поднимается: иначе под ценой зияет дыра.
-  const cy = barDrawn ? 950 : 890;
-  cells.forEach(([label, value], i) => {
-    const cx = M + (cw + gap) * i;
-    ctx.fillStyle = "rgba(255,255,255,0.05)";
-    shareRect(ctx, cx, cy, cw, 112, 34);
-    ctx.fill();
-    ctx.textAlign = "center";
+  let ry = barDrawn ? 900 : 812;
+  rows.forEach(([label, value]) => {
+    ctx.fillStyle = линия;
+    ctx.fillRect(M, ry, SHARE_W - M * 2, 2);
     ctx.fillStyle = muted;
-    ctx.font = "400 27px 'Jost', sans-serif";
-    ctx.fillText(label, cx + cw / 2, cy + 44);
+    ctx.font = `500 32px ${F}`;
+    ctx.fillText(label, M, ry + 50);
+    ctx.textAlign = "right";
     ctx.fillStyle = ink;
-    ctx.font = "700 40px 'Jost', sans-serif";
-    ctx.fillText(value, cx + cw / 2, cy + 90);
+    ctx.font = `800 36px ${F}`;
+    ctx.fillText(value, SHARE_W - M, ry + 51);
     ctx.textAlign = "left";
+    ry += 72;
   });
 
-  // Подвал: ссылка приглашения крупно, под ней зачем её открывать.
-  const fy = SHARE_H - 248;
-  ctx.fillStyle = "rgba(255,255,255,0.05)";
-  shareRect(ctx, M, fy, SHARE_W - M * 2, 108, 40);
+  // Подвал: ссылка прямо на токен — белой капсулой, как главная кнопка
+  const fy = SHARE_H - 214;
+  ctx.fillStyle = ink;
+  shareRect(ctx, M, fy, SHARE_W - M * 2, 96, 48);
   ctx.fill();
-  ctx.strokeStyle = "rgba(255,107,53,0.35)";
-  ctx.lineWidth = 2;
-  shareRect(ctx, M, fy, SHARE_W - M * 2, 108, 40);
-  ctx.stroke();
-  ctx.fillStyle = accent;
-  ctx.font = "700 34px 'Jost', sans-serif";
+  ctx.fillStyle = "#14151A";
+  ctx.font = `800 34px ${F}`;
   ctx.textAlign = "center";
   const short = String(link).replace(/^https?:\/\//, "");
-  ctx.fillText(short.length > 42 ? short.slice(0, 41) + "…" : short, SHARE_W / 2, fy + 68);
-  ctx.fillStyle = muted;
-  ctx.font = "400 32px 'Jost', sans-serif";
-  ctx.fillText(t("shareCardFooter"), SHARE_W / 2, fy + 172);
+  ctx.fillText(short.length > 44 ? short.slice(0, 43) + "…" : short, SHARE_W / 2, fy + 61);
+  ctx.fillStyle = dim;
+  ctx.font = `500 30px ${F}`;
+  ctx.fillText(t("shareCardFooter"), SHARE_W / 2, fy + 150);
   ctx.textAlign = "left";
+  void плита;
+}
+
+/* Ссылка прямо на токен: мини-приложение открывается сразу на его
+   странице (метку tok_<id> приложение уже понимает). Нужен id строки в
+   базе — у только что запущенного токена в карточке лежит адрес
+   контракта, тогда находим строку по нему. */
+async function ссылкаНаТокен(token) {
+  let id = String((token && token.id) || "");
+  if (!UUID_RE_APP.test(id)) {
+    const адрес = (token && (token.tokenAddress || token.id)) || "";
+    if (адрес) {
+      try {
+        const { data } = await supabase.from("tokens").select("id").eq("address", адрес).maybeSingle();
+        if (data && data.id) id = data.id;
+      } catch (e) { /* без сети — останется ссылка на бота */ }
+    }
+  }
+  if (!UUID_RE_APP.test(id)) return `https://t.me/${TG_BOT}`;
+  return TG_APP ? `https://t.me/${TG_BOT}/${TG_APP}?startapp=tok_${id}` : `https://t.me/${TG_BOT}?start=tok_${id}`;
 }
 
 /* Шторка с готовой карточкой: сверху то, что уйдёт в чат, снизу три
@@ -19773,7 +19764,13 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
   const canvasRef = useRef(null);
   const blobRef = useRef(null);
   const [ready, setReady] = useState(false);
-  const link = referralLink(userId) || `https://t.me/${TG_BOT}`;
+  const [link, setLink] = useState(`https://t.me/${TG_BOT}`);
+  useEffect(() => {
+    if (!token) return undefined;
+    let брошено = false;
+    ссылкаНаТокен(token).then((l) => { if (!брошено) setLink(l); });
+    return () => { брошено = true; };
+  }, [token && token.id]);
   // Состояние кривой страница перечитывает по таймеру и каждый раз даёт
   // новый объект. Пересобирать картинку из-за этого незачем — следим за
   // самими числами.
