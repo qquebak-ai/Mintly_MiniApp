@@ -741,7 +741,7 @@ const платф = $(`<div class="abs" style="left:0;top:0;width:${W}px;height:$
   </div>
 </div>`); vb.appendChild(платф);
 const абр = платф.querySelector(".абр");
-const текстКарты = словаВ("Получи свой *токен", 66);
+const текстКарты = словаВ("Доведи токен до *DEX —<br>получи *лимитированную *карту", 60);
 // --- карточка токена, она же потом — карточка с цифрой
 const карта = $(`<div class="abs" style="left:0;top:0;transform-origin:50% 50%">
   <div class="кфон abs" style="inset:0;background:linear-gradient(135deg,#4F86FF,#1D4FE0 55%,#0B2CA8);box-shadow:inset 0 2px 0 rgba(255,255,255,.35),0 40px 90px rgba(0,0,0,.55)"></div>
@@ -750,12 +750,12 @@ const карта = $(`<div class="abs" style="left:0;top:0;transform-origin:50% 
     <img src="assets/tok/frog.png" style="position:absolute;left:40px;top:40px;width:84px;height:84px;border-radius:50%;image-rendering:pixelated;box-shadow:0 0 0 3px rgba(255,255,255,.35)"/>
     <div style="position:absolute;left:40px;bottom:40px"><div style="font:800 54px/1 'Nunito';color:#fff">$LILY</div><div style="font:600 24px/1.5 'Onest';color:rgba(255,255,255,.75)">Lily Frog</div></div>
     <img src="assets/app/gram.png" style="position:absolute;right:40px;bottom:44px;width:64px;height:64px"/>
-    <div style="position:absolute;right:40px;top:44px;font:800 28px/1 'Nunito';color:rgba(255,255,255,.85)">Mintly</div>
+    <div style="position:absolute;right:40px;top:40px;text-align:right"><div style="font:800 28px/1 'Nunito';color:rgba(255,255,255,.85)">Mintly</div><div style="margin-top:10px;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.18);font:700 17px/1 'Onest';color:#fff;letter-spacing:.06em">LIMITED · DEX</div></div>
   </div>
   <div class="кст abs" style="inset:0;overflow:hidden">
-    <div style="position:absolute;left:44px;top:46px;font:800 150px/1 'Nunito';color:#fff;letter-spacing:-.03em">0%</div>
-    <div style="position:absolute;left:48px;top:206px;font:800 46px/1.1 'Nunito'"><span style="color:#5A8CFF">Комиссия</span> <span style="color:#fff">платформы</span></div>
-    <div style="position:absolute;left:48px;top:268px;font:500 22px/1 'Onest';color:#7F8AA8">на запуск и каждую сделку</div>
+    <div style="position:absolute;left:44px;top:46px;font:800 150px/1 'Nunito';color:#fff;letter-spacing:-.03em">1/1</div>
+    <div style="position:absolute;left:48px;top:206px;font:800 46px/1.1 'Nunito'"><span style="color:#5A8CFF">Карта</span> <span style="color:#fff">твоего токена</span></div>
+    <div style="position:absolute;left:48px;top:268px;font:500 22px/1 'Onest';color:#7F8AA8">только для токенов, дошедших до DEX</div>
     <div class="куб abs" style="left:240px;top:360px;width:230px;height:210px">
       <div class="abs" style="left:0;top:40px;width:200px;height:170px;background:linear-gradient(180deg,#3F78FF,#1240C8)"></div>
       <div class="abs" style="left:0;top:0;width:230px;height:40px;background:#7FA6FF;clip-path:polygon(0 100%,15% 0,100% 0,87% 100%)"></div>
@@ -804,7 +804,7 @@ function drawV(v) {
   платф.firstElementChild.style.transform = `translateY(${(140 * smooth(prog(v, 1.9, 2.25))).toFixed(1)}px) rotateX(64deg)`;
   абр.style.filter = `brightness(${(1 + 0.25 * Math.sin(v * 4)).toFixed(3)})`;
   поСловам(текстКарты, v, 0.2, 0.12, 0.45);
-  S(текстКарты, { o: 1 - smooth(prog(v, 1.85, 2.1)), y: 150 - 30 * smooth(prog(v, 1.85, 2.1)) });
+  S(текстКарты, { o: 1 - smooth(prog(v, 1.85, 2.1)), y: 90 - 30 * smooth(prog(v, 1.85, 2.1)) });
   // карточка опускается на платформу, покачивается, потом выпрямляется
   // и, становясь квадратной, превращается в карточку с цифрой
   const kD = E.out(prog(v, 0.1, 1.0)), kM = E.io(prog(v, 1.95, 2.45));
