@@ -3,11 +3,17 @@
 # переходе камеры, звон на знаке, глитч-удар на концовке и тишина за ним.
 import numpy as np, wave, sys
 from scipy.signal import butter, lfilter
-SR = 44100; DUR = 24.5; n = int(SR * DUR); L = np.zeros(n); R = np.zeros(n)
+SR = 44100; DUR = 23.72; n = int(SR * DUR); L = np.zeros(n); R = np.zeros(n)
 rs = np.random.RandomState(5)
 # слайды с преимуществами вклиниваются в действие: время действия → время ролика
-INS = [4.42, 5.25, 6.42, 8.28, 10.0]; SLD = 1.5
-def M(t): return t + SLD * sum(1 for a in INS if t >= a)
+INS = [(4.42, 5.2), (5.9, 5.9), (6.42, 6.42), (8.28, 8.28), (10.0, 10.0)]; SLD = 1.5
+def M(t):
+    # события из вырезанного куска (пролёт сквозь ленту) не звучат
+    r = t
+    for a, b in INS:
+        if t >= b: r += SLD - (b - a)
+        elif t >= a: return -1
+    return r
 def put(t, s, g=1.0, pan=0.0): put_raw(M(t), s, g, pan)
 def put_raw(t, s, g=1.0, pan=0.0):
     i = int(t * SR)
@@ -89,8 +95,8 @@ put(10.08, chime(76), .3); put(10.08, chime(83), .14)
 for i in range(17): put(10.32 + .8 * i / 17, tick(), .3)
 put(11.0, pad([64, 71, 76, 83], 1.6, cut=3000, att=.4, rel=1.0), .18)
 # слайды: свист на входе и мягкий аккорд под фразой
-for a in INS:
-    r = M(a) - SLD
+for a, b in INS:
+    r = M(b) - SLD
     put_raw(r - .05, whoosh(.4), .3); put_raw(r + .15, pad([69, 76, 81, 88], 1.2, cut=3200, att=.2, rel=.6), .14); put_raw(r + .2, pop(1000), .12)
 # концовка: глитч и удар, потом тишина
 put(13.04, glitch(.5), .45); put(13.04, hit(), .7); put(13.42, pop(1600), .2)

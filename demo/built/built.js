@@ -278,7 +278,7 @@ const rowEls = Array.from({ length: 24 }, (_, i) => {
   return { el, x: (rnd() - 0.5) * 1300 - 610, y: (rnd() - 0.5) * 760 + 170, z0: -3300 + i * 120 + rnd() * 90 };
 });
 function drawS3(t) {
-  const on = t >= 4.4 && t < 5.5; show(s3, on); if (!on) return;
+  const on = false; show(s3, on); if (!on) return;
   const k = prog(t, 4.4, 5.5);
   const sp = 2600 * E.io(k) + 700 * k;
   rowEls.forEach((c) => {
@@ -414,26 +414,29 @@ function slide(html) {
   return el;
 }
 const ДЛ = 1.5; // сколько живёт слайд
+// [где встаёт слайд, откуда действие продолжается после него]: после
+// первого слайда действие сразу идёт к странице токена — пролёта сквозь
+// ленту больше нет
 const ВСТАВКИ = [
-  [4.42, slide("Запуск токена<br>*за *секунды")],
-  [5.25, slide("Gram и Solana<br>*в *одном *месте")],
-  [6.42, slide("Комиссия *0%")],
-  [8.28, slide("Покупка<br>*за *секунду")],
-  [10.0, slide("Прямо *в *Telegram")],
+  [4.42, 5.2, slide("Запуск токена<br>*за *секунды")],
+  [5.9, 5.9, slide("Gram и Solana<br>*в *одном *месте")],
+  [6.42, 6.42, slide("Комиссия *0%")],
+  [8.28, 8.28, slide("Покупка<br>*за *секунду")],
+  [10.0, 10.0, slide("Прямо *в *Telegram")],
 ];
 // реальное время → время действия и текущий слайд
 function разложить(T) {
   let сдвиг = 0;
-  for (const [t0, el] of ВСТАВКИ) {
+  for (const [t0, t1, el] of ВСТАВКИ) {
     const начало = t0 + сдвиг;
     if (T < начало) break;
     if (T < начало + ДЛ) return { t: t0, el, p: T - начало };
-    сдвиг += ДЛ;
+    сдвиг += ДЛ - (t1 - t0);
   }
   return { t: T - сдвиг, el: null, p: 0 };
 }
 function drawSlides(р) {
-  ВСТАВКИ.forEach(([, el]) => { el.box.style.display = el === р.el ? "flex" : "none"; });
+  ВСТАВКИ.forEach(([, , el]) => { el.box.style.display = el === р.el ? "flex" : "none"; });
   const вход = р.el ? smooth(prog(р.p, 0, 0.28)) * (1 - smooth(prog(р.p, ДЛ - 0.28, ДЛ))) : 0;
   ui.style.opacity = 1 - вход;
   ui.style.filter = вход > 0.01 ? `blur(${(вход * 14).toFixed(1)}px)` : "none";
