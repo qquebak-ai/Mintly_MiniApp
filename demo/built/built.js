@@ -112,12 +112,11 @@ const WORD = "Mintly";
 const word1 = $(`<div class="abs" style="left:0;top:0;font:800 118px/1.1 'Nunito';letter-spacing:-.02em;white-space:nowrap;filter:drop-shadow(0 0 18px rgba(120,165,255,.55))">${[...WORD].map((c) => `<span class="ch grad">${c}</span>`).join("")}</div>`); s1.appendChild(word1);
 const pill = $(`<div class="abs" style="left:0;top:0;height:96px;border-radius:30px;background:#fff;box-shadow:0 0 40px rgba(220,232,255,.95),0 0 110px rgba(79,134,255,.6)"></div>`); s1.appendChild(pill);
 // Панель разделов — та же капсула, что внизу приложения: пять круглых
-// кнопок, выбранная залита белым, на краю сидит Минти.
+// кнопок, выбранная залита белым.
 const CHIPS = ["home", "swap", "rocket", "bag", "bars"];
 const КН = 132, ЗАЗОР_КН = 18, ПОЛЕ_КН = 20;
 const row = $(`<div class="abs" style="left:0;top:0;width:${W}px;height:${КН}px"></div>`); s1.appendChild(row);
 const capsule = $(`<div class="abs" style="left:0;top:${-ПОЛЕ_КН}px;height:${КН + ПОЛЕ_КН * 2}px;border-radius:999px;background:rgba(0,0,0,.22);backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);box-shadow:0 10px 30px rgba(0,0,0,.32)"></div>`); row.appendChild(capsule);
-const navMintie = $(`<div class="abs" style="left:0;top:0;width:150px;height:164px;background:url(assets/app/nav-mint.webp) 0 0/1200% 100% no-repeat;image-rendering:pixelated"></div>`); row.appendChild(navMintie);
 const chips = CHIPS.map((k) => { const c = $(`<div class="navb">${ico(k)}</div>`); row.appendChild(c); return c; });
 const ЦЕЛЬ = 2;
 const cursor = $(`<svg class="abs" style="left:0;top:0;filter:drop-shadow(0 6px 14px rgba(0,0,0,.6))" width="64" height="72" viewBox="0 0 32 36">
@@ -162,10 +161,6 @@ function drawS1(t) {
   const cw = lerp(Math.min(full, 380), full, kCap);
   capsule.style.width = cw + "px";
   S(capsule, { o: E.out(prog(t, 1.34, 1.46)), x: W / 2 - cw / 2 });
-  // Минти на правом краю — дышит, как в приложении
-  const кадр = Math.floor(((t * 12) % 12));
-  navMintie.style.backgroundPosition = `${(кадр / 11) * 100}% 0`;
-  S(navMintie, { o: E.out(prog(t, 1.6, 1.75)), x: W / 2 + cw / 2 - 190, y: -ПОЛЕ_КН - 164 + 40 });
   chips.forEach((c, i) => {
     const kk = E.back(kC), from = W / 2 - chipW[i] / 2;
     const x = lerp(from, chipX[i], kk);
@@ -245,7 +240,7 @@ function drawS2(t) {
   // крупно — одно поле «Название» во весь кадр, затем камера отъезжает к форме
   const k = E.io(prog(t, 3.48, 3.86));
   const big = { s: 4.2, x: 330 - 16 * 4.2, y: 470 - 238 * 4.2 };
-  const small = { s: 2.0, x: (W - 393 * 2.0) / 2, y: 46 };
+  const small = { s: 2.0, x: 1000, y: 46 };
   const drift = E.out(prog(t, 3.86, 4.62));
   const s = lerp(big.s, small.s, k), x = lerp(big.x, small.x, k) - 60 * drift, y = lerp(big.y, small.y, k) + 10 * drift;
   form.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) scale(${s.toFixed(4)}) perspective(2000px) rotateY(${(-4 * drift).toFixed(2)}deg)`;
@@ -297,83 +292,137 @@ function drawS3(t) {
   });
 }
 
-// ===================== 4. КАРТА БАЛАНСА И МАГАЗИН =====================
-// Карта — та, что открывает «Кошелёк»: баланс, монеты и Минти на краю.
-// Второй ход — магазин: нажатие на «Лёд» перекрашивает Минти, а с ним и
-// свечение карты.
+// ===================== 4. СТРАНИЦА ТОКЕНА И ПОКУПКА =====================
+// Карточка — шапка страницы токена из приложения: логотип, имя, цена,
+// график и кнопки. Второй ход — покупка: сумма, «Купить» и мгновенное
+// подтверждение; карточка возвращается уже с позицией.
 const s4 = $(`<div class="scene" style="perspective:1700px;perspective-origin:960px 540px"></div>`); root.appendChild(s4);
 const CW = 1240, CH = 690;
 const card = $(`<div class="abs" style="left:${(W - CW) / 2}px;top:${(H - CH) / 2}px;width:${CW}px;height:${CH}px;transform-style:preserve-3d">
-  <div class="abs" style="inset:0;border-radius:72px;overflow:hidden;background:linear-gradient(135deg, #22262F 0%, #181B23 55%, #12141A 100%)">
-    <div class="ctint abs" style="inset:0"></div>
-    <div class="abs" style="inset:0;border-radius:72px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.08),inset 0 2px 30px rgba(255,255,255,.06)"></div>
-    <div class="abs" style="left:96px;top:84px;font:600 46px/1 'Onest';color:rgba(242,240,235,.82)">Баланс</div>
-    <div class="abs" style="left:92px;top:150px;font:800 138px/1 'Nunito';letter-spacing:-.02em;color:#F2F0EB">$1 520<span style="color:rgba(242,240,235,.4)">,00</span></div>
-    <div class="abs" style="left:96px;top:322px;display:flex;gap:22px;align-items:center">
-      <img src="assets/tok/frog.png" style="width:84px;height:84px;border-radius:50%;image-rendering:pixelated"/>
-      <div><div style="font:800 46px/1.1 'Nunito';color:#fff">Lily Frog</div><div style="font:500 32px/1.3 'Onest';color:#97958F">$LILY · 12 400 шт.</div></div>
-      <div style="margin-left:40px;font:800 40px/1 'Nunito';color:#2EE87A">+12.6%</div>
+  <div class="abs" style="inset:0;border-radius:64px;overflow:hidden;background:#0F0F13">
+    <div class="ctint abs" style="inset:0;background:radial-gradient(70% 90% at 100% 0%, rgba(90,140,255,.22) 0%, rgba(90,140,255,.06) 45%, transparent 70%)"></div>
+    <div class="abs" style="inset:0;border-radius:64px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.08),inset 0 2px 30px rgba(255,255,255,.05)"></div>
+    <div class="abs" style="left:84px;top:70px;display:flex;align-items:center;gap:30px">
+      <img src="assets/tok/frog.png" style="width:120px;height:120px;border-radius:50%;image-rendering:pixelated"/>
+      <div><div style="font:800 84px/1 'Nunito';letter-spacing:-.02em;color:#fff">Lily Frog</div>
+      <div style="font:500 34px/1.3 'Onest';color:#97958F;margin-top:6px">$LILY · Gram</div></div>
     </div>
-    <div class="abs" style="left:96px;top:530px;height:84px;padding:0 40px;border-radius:999px;background:rgba(255,255,255,.12);display:flex;align-items:center;font:600 36px/1 'Onest';color:#F2F0EB">4.9 SOL · 190 GRAM</div>
+    <div class="abs" style="right:84px;top:80px;text-align:right">
+      <div style="font:800 76px/1 'Nunito';color:#F2F0EB">$30.1K</div>
+      <div style="font:700 34px/1.4 'Onest';color:#2EE87A">+$3.4K (+12.6%)</div>
+    </div>
+    <svg class="abs" style="left:84px;top:250px" width="1072" height="230" viewBox="0 0 1072 230" fill="none">
+      <defs><linearGradient id="ar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2EE87A" stop-opacity=".32"/><stop offset="1" stop-color="#2EE87A" stop-opacity="0"/></linearGradient></defs>
+      <path d="M0 196 L70 184 L140 190 L210 160 L280 170 L350 132 L420 146 L490 112 L560 124 L630 86 L700 100 L770 70 L840 80 L910 44 L980 56 L1072 18 L1072 230 L0 230Z" fill="url(#ar)"/>
+      <path class="cline" d="M0 196 L70 184 L140 190 L210 160 L280 170 L350 132 L420 146 L490 112 L560 124 L630 86 L700 100 L770 70 L840 80 L910 44 L980 56 L1072 18" stroke="#2EE87A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="cpos abs" style="left:84px;top:500px;font:500 30px/1 'Onest';color:#97958F">Ваша позиция: <span class="cposv" style="color:#F2F0EB;font-weight:600">токенов пока нет</span></div>
+    <div class="abs" style="left:84px;top:560px;right:84px;height:96px;display:flex;gap:24px">
+      <div class="cbuy" style="flex:1;border-radius:24px;background:#00E96B;display:flex;align-items:center;justify-content:center;font:800 38px/1 'Nunito';color:#04150B">Купить</div>
+      <div style="flex:1;border-radius:24px;background:#FF3B47;display:flex;align-items:center;justify-content:center;font:800 38px/1 'Nunito';color:#fff">Продать</div>
+    </div>
   </div>
-  <div class="cmintie abs" style="right:90px;top:-232px;width:264px;height:288px;background:url(assets/app/nav-mint.webp) 0 0/1200% 100% no-repeat;image-rendering:pixelated"></div>
 </div>`);
 s4.appendChild(card);
-const ctint = card.querySelector(".ctint"), cmintie = card.querySelector(".cmintie");
-// магазин: плитки окрасов Минти, как в приложении
-const ПЛИТКИ = [["gold", "Золотой", "260"], ["ice", "Лёд", "260"], ["albino", "Альбинос", "180"], ["wild", "Дикий", "200"]];
-const shop = $(`<div class="abs" style="left:0;top:0;width:393px;height:300px;transform-origin:0 0">
-  ${ПЛИТКИ.map(([id, имя, цена], i) => `<div class="tile abs" style="left:${16 + (i % 2) * 185}px;top:${Math.floor(i / 2) * 200}px;width:176px">
-    <div class="tbox" style="height:128px;border-radius:18px;background:#000;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 0 #fff">
-      <img src="assets/app/mintie-${id}.webp" style="width:118px;image-rendering:pixelated"/></div>
-    <div style="text-align:center;font:800 14.5px/1 'Nunito';color:#F2F0EB;margin-top:14px">${имя}</div>
-    <div style="text-align:center;font:700 12.5px/1 'Onest';color:#F2F0EB;margin-top:10px;opacity:.85">Ⓜ ${цена}</div></div>`).join("")}
+const cposv = card.querySelector(".cposv"), cposWrap = card.querySelector(".cpos");
+// окно покупки: сумма, быстрые суммы и одна кнопка — как в приложении
+const buy = $(`<div class="abs" style="left:0;top:0;width:393px;height:330px;transform-origin:0 0">
+  <div class="abs" style="inset:0;border-radius:28px;background:#0F0F13;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 30px 80px rgba(0,0,0,.6)"></div>
+  <div class="abs" style="left:20px;top:22px;font:800 20px/1 'Nunito';color:#F2F0EB">Купить $LILY</div>
+  <div class="abs" style="left:20px;top:62px;font:500 13px/1 'Onest';color:#97958F">Сумма</div>
+  <div class="abs" style="left:20px;top:84px;font:800 46px/1 'Nunito';color:#F2F0EB">0.5 <span style="color:#97958F;font-size:28px">GRAM</span></div>
+  <div class="abs" style="left:20px;top:148px;display:flex;gap:8px">
+    ${["0.1", "0.5", "1", "MAX"].map((v) => `<span style="padding:8px 14px;border-radius:999px;background:${v === "0.5" ? "#F2F0EB" : "#1B1F29"};color:${v === "0.5" ? "#14151A" : "#F2F0EB"};font:700 13px/1 'Onest'">${v}</span>`).join("")}
+  </div>
+  <div class="abs" style="left:20px;top:192px;font:500 13px/1.3 'Onest';color:#97958F">Получите ≈ <span style="color:#F2F0EB">12 400 LILY</span> · комиссия 0%</div>
+  <div class="bbtn abs" style="left:20px;right:20px;top:240px;height:58px;border-radius:16px;background:#00E96B;display:flex;align-items:center;justify-content:center;font:800 18px/1 'Nunito';color:#04150B">Купить</div>
 </div>`);
-s4.appendChild(shop);
-const iceTile = shop.querySelectorAll(".tbox")[1];
+s4.appendChild(buy);
+const bbtn = buy.querySelector(".bbtn");
+// подтверждение — плашка, как всплывает в приложении после сделки
+const toast = $(`<div class="abs" style="left:0;top:0;width:620px;height:112px;border-radius:30px;background:#17171A;border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;gap:24px;padding:0 30px;box-shadow:0 30px 80px rgba(0,0,0,.6)">
+  <span style="position:absolute;left:0;top:26px;bottom:26px;width:5px;border-radius:3px;background:#2EE87A"></span>
+  <span style="width:60px;height:60px;border-radius:18px;background:rgba(46,232,122,.16);display:flex;align-items:center;justify-content:center;flex:none">
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#2EE87A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+  <div style="flex:1"><div style="font:800 34px/1.1 'Nunito';color:#fff">Куплено</div><div style="font:500 24px/1.3 'Onest';color:#8E8E99">12 400 LILY · комиссия 0%</div></div>
+  <div class="tsec" style="font:800 34px/1 'Nunito';color:#2EE87A;font-variant-numeric:tabular-nums">0,0 с</div>
+</div>`);
+s4.appendChild(toast);
+const tsec = toast.querySelector(".tsec");
 const cur4 = cursor.cloneNode(true); s4.appendChild(cur4);
-function cardGlow(c) { card.firstElementChild.style.boxShadow = `0 0 0 2px ${c}44, 0 0 70px ${c}66, 0 40px 120px rgba(0,0,0,.6)`; }
 function drawS4(t) {
   const on = t >= 5.2 && t < 10.25; show(s4, on); if (!on) return;
-  const лёд = t >= 8.36;
-  const цвет = лёд ? "#7FD8FF" : "#2EE87A";
-  ctint.style.background = `radial-gradient(70% 90% at 100% 0%, ${цвет}38 0%, ${цвет}10 45%, transparent 70%)`;
-  cardGlow(цвет);
-  cmintie.style.backgroundImage = `url(assets/app/nav-${лёд ? "ice" : "mint"}.webp)`;
-  cmintie.style.backgroundPosition = `${((Math.floor(t * 12) % 12) / 11) * 100}% 0`;
+  const куплено = t >= 8.3;
+  cposv.textContent = куплено ? "12 400 LILY · $15.20" : "токенов пока нет";
+  cposv.style.color = куплено ? "#2EE87A" : "#F2F0EB";
+  card.firstElementChild.style.boxShadow = `0 0 0 2px rgba(90,140,255,.25), 0 0 70px rgba(90,140,255,.35), 0 40px 120px rgba(0,0,0,.6)`;
   let x = 0, y = 0, ry = -8, rx = 4, s = 1, b = 0, o = 1;
   if (t < 5.66) { const k = E.out(prog(t, 5.2, 5.66)); x = lerp(1100, 40, k); y = 60; ry = lerp(-62, -20, k); rx = lerp(10, 6, k); b = (1 - k) * 16; o = smooth(prog(t, 5.2, 5.45)); }
-  else if (t < 6.42) { const k = E.out(prog(t, 5.66, 6.42)); x = lerp(40, -30, k); ry = lerp(-20, -8, k); rx = lerp(6, 3, k); s = lerp(1, 1.04, k); }
+  else if (t < 6.42) { const k = E.out(prog(t, 5.66, 6.42)); x = lerp(40, -30, k); y = 60; ry = lerp(-20, -8, k); rx = lerp(6, 3, k); s = lerp(1, 1.04, k); }
   else if (t < 8.3) {
-    // камера ныряет вниз: карта уходит вверх, под ней — магазин
+    // камера ныряет вниз: карточка уходит вверх, под ней — окно покупки
     const k = E.io(prog(t, 6.42, 6.74)), pan = E.io(prog(t, 6.9, 8.3));
-    x = -30 - 260 * pan; y = lerp(60, -760, k); ry = -8 + 4 * pan; rx = 3; s = 1.04; b = Math.sin(k * Math.PI) * 14;
+    x = -30 - 260 * pan; y = lerp(60, -880, k); ry = -8 + 4 * pan; rx = 3; s = 1.04; b = Math.sin(k * Math.PI) * 14;
   } else if (t < 9.92) {
-    // и возвращается — Минти уже ледяной
+    // и возвращается — уже с позицией
     const k = E.out(prog(t, 8.3, 8.72)), d = E.io(prog(t, 8.72, 9.92));
-    x = lerp(-290, -40, k) - 40 * d; y = lerp(-760, 60, k) - 10 * d; ry = lerp(-4, -10, k) + 4 * d; rx = lerp(3, 4, k); s = lerp(1.04, 0.96, k) + 0.03 * d; b = (1 - k) * 18;
+    x = lerp(-290, -40, k) - 40 * d; y = lerp(-880, 60, k) - 10 * d; ry = lerp(-4, -10, k) + 4 * d; rx = lerp(3, 4, k); s = lerp(1.04, 0.96, k) + 0.03 * d; b = (1 - k) * 18;
   } else { const k = E.io(prog(t, 9.92, 10.25)); x = -80; y = 50 - 70 * k; ry = -6; s = 0.99 - 0.04 * k; b = k * 12; o = 1 - k; }
-  if (t >= 5.66 && t < 6.42) y = 60;
   card.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) scale(${s.toFixed(4)})`;
   card.style.filter = b > 0.05 ? `blur(${b.toFixed(1)}px)` : "none";
   card.style.opacity = o;
-  // магазин живёт под картой, пока камера внизу
+  // позиция подсвечивается, когда карточка вернулась
+  const hl = smooth(prog(t, 8.7, 9.0)) * (1 - smooth(prog(t, 9.4, 9.9)));
+  cposWrap.style.textShadow = hl > 0.01 ? `0 0 ${(24 * hl).toFixed(0)}px rgba(46,232,122,${(0.8 * hl).toFixed(2)})` : "none";
+  // окно покупки живёт под карточкой, пока камера внизу
   const kIn = E.io(prog(t, 6.42, 6.74)), kOut = E.io(prog(t, 8.3, 8.6));
   const pan = E.io(prog(t, 6.9, 8.3));
   const SS = 2.3;
-  const py = lerp(1300, 300, kIn) + lerp(0, 1000, kOut), px = 360 - 200 * pan;
-  shop.style.transform = `translate3d(${px.toFixed(1)}px,${py.toFixed(1)}px,0) scale(${SS})`;
-  shop.style.opacity = t < 6.42 || t > 8.62 ? 0 : 1;
+  const py = lerp(1300, 250, kIn) + lerp(0, 1000, kOut), px = 1000 - 200 * pan;
+  buy.style.transform = `translate3d(${px.toFixed(1)}px,${py.toFixed(1)}px,0) scale(${SS})`;
+  buy.style.opacity = t < 6.42 || t > 8.62 ? 0 : 1;
   const bl = Math.sin(kIn * Math.PI) + Math.sin(kOut * Math.PI);
-  shop.style.filter = bl > 0.05 ? `blur(${(bl * 12).toFixed(1)}px)` : "none";
-  // курсор приходит к «Лёд» и нажимает
-  const tileX = px + (16 + 185 + 88) * SS, tileY = py + 64 * SS;
-  const kc = E.out(prog(t, 7.2, 7.75));
-  const pr = clamp(prog(t, 7.9, 7.98) - prog(t, 8.02, 8.12));
-  S(cur4, { o: t < 6.9 || t > 8.3 ? 0 : smooth(prog(t, 7.2, 7.32)) * (1 - smooth(prog(t, 8.12, 8.28))), x: lerp(tileX + 300, tileX - 10, kc), y: lerp(tileY + 500, tileY, kc), s: 1 - 0.12 * pr });
-  const sel = E.out(prog(t, 7.95, 8.1));
-  iceTile.style.boxShadow = `0 0 0 ${(3 * sel).toFixed(1)}px #fff, 0 0 ${(30 * sel).toFixed(0)}px rgba(127,216,255,${(0.7 * sel).toFixed(2)})`;
-  iceTile.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
+  buy.style.filter = bl > 0.05 ? `blur(${(bl * 12).toFixed(1)}px)` : "none";
+  // курсор к «Купить», нажатие, и сразу — «Куплено»
+  const bx = px + 196 * SS, by = py + 269 * SS;
+  const kc = E.out(prog(t, 7.0, 7.45));
+  const pr = clamp(prog(t, 7.5, 7.58) - prog(t, 7.62, 7.72));
+  S(cur4, { o: t < 6.9 || t > 8.3 ? 0 : smooth(prog(t, 7.0, 7.12)) * (1 - smooth(prog(t, 8.1, 8.26))), x: lerp(bx + 300, bx - 10, kc), y: lerp(by + 400, by, kc), s: 1 - 0.12 * pr });
+  bbtn.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
+  bbtn.style.boxShadow = `0 0 ${(40 * pr).toFixed(0)}px rgba(46,232,122,${(0.7 * pr).toFixed(2)})`;
+  const kt = E.back(prog(t, 7.62, 7.95)), tOut = smooth(prog(t, 8.15, 8.35));
+  S(toast, { o: smooth(prog(t, 7.62, 7.78)) * (1 - tOut), x: px + 393 * SS / 2 - 310, y: lerp(py - 120, py - 170, kt) - 40 * tOut, s: lerp(0.95, 1.12, kt) });
+  // счётчик времени сделки бежит и встаёт
+  const сек = 0.9 * smooth(prog(t, 7.62, 7.9));
+  tsec.textContent = `${сек.toFixed(1).replace(".", ",")} с`;
+}
+
+// ===================== ПОДПИСИ =====================
+// Короткие фразы о том, чем Mintly лучше, — в духе первого промо:
+// белым, с акцентом синим, слово за словом из размытия.
+const caps = $(`<div class="scene"></div>`); root.appendChild(caps);
+function cap(html, x, y, size, align = "left") {
+  const el = $(`<div class="abs" style="left:${x}px;top:${y}px;width:${align === "center" ? W - 2 * x : 760}px;text-align:${align};font:800 ${size}px/1.12 'Nunito';letter-spacing:-.015em;color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.6)">${html}</div>`);
+  caps.appendChild(el);
+  el.innerHTML = el.innerHTML.replace(/(<br>)|([^\s<]+(?:<\/?a>)?)/g, (m, br) => br ? br : `<span class="w" style="display:inline-block">${m}</span>`);
+  el.spans = [...el.querySelectorAll(".w")];
+  el.spans.forEach((sp) => { if (sp.textContent.startsWith("*")) { sp.textContent = sp.textContent.slice(1); sp.style.color = "#7FA6FF"; } });
+  return el;
+}
+const CAPS = [
+  [cap("Запуск токена<br>*за *секунды", 130, 400, 84), 3.72, 4.32],
+  [cap("Gram и Solana —<br>*в *одном *мемпаде", 160, 430, 92, "center"), 4.58, 5.3],
+  [cap("Комиссия *0%", 160, 60, 84, "center"), 5.72, 6.4],
+  [cap("Покупка —<br>*за *секунду", 130, 360, 84), 6.86, 8.2],
+  [cap("Прямо *в *Telegram", 160, 60, 84, "center"), 8.78, 9.86],
+];
+function drawCaps(t) {
+  CAPS.forEach(([el, a, b]) => {
+    const on = t >= a - 0.05 && t < b + 0.3;
+    el.style.display = on ? "" : "none"; if (!on) return;
+    const out = smooth(prog(t, b - 0.12, b + 0.18));
+    el.spans.forEach((w, i) => { const k = E.out(prog(t, a + i * 0.07, a + i * 0.07 + 0.42)); S(w, { o: k * (1 - out), y: (1 - k) * 22 - out * 10, b: (1 - k) * 8 + out * 6 }); });
+  });
 }
 
 // ===================== 5. ЗНАК И «СДЕЛАНО В MINTLY.» =====================
@@ -459,7 +508,7 @@ function drawS6(t) {
 }
 
 window.renderAt = (t) => {
-  drawBG(t); shimmer(t); drawSilk(t); drawS1(t); drawS2(t); drawS3(t); drawS4(t); drawS5(t); drawS6(t);
+  drawBG(t); shimmer(t); drawSilk(t); drawS1(t); drawS2(t); drawS3(t); drawS4(t); drawS5(t); drawS6(t); drawCaps(t);
 };
 (async () => {
   await document.fonts.ready;
