@@ -18463,7 +18463,14 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const [ждёмДольше, setЖдёмДольше] = useState(false);
   useEffect(() => {
     setЖдёмДольше(false);
-    const id = setTimeout(() => setЖдёмДольше(true), 6000);
+    /* Только что запущенный токен сеть и биржа видят не сразу: первые
+       десятки секунд у него нет ни цены, ни свечей. Раньше через шесть
+       секунд страница открывалась с нулями и «биржа не ответила» —
+       теперь у свежего токена ждём дольше, на чёрном экране со знаком,
+       пока цифры не приедут. */
+    const создан = token.createdAt ? new Date(token.createdAt).getTime() : 0;
+    const свежий = создан > 0 && Date.now() - создан < 15 * 60 * 1000;
+    const id = setTimeout(() => setЖдёмДольше(true), свежий ? 60000 : 6000);
     return () => clearTimeout(id);
   }, [token.id]);
 
@@ -28513,6 +28520,11 @@ function mapTokenRow(row) {
       curveJettonWallet: result.curveJettonWallet || null,
       dexPoolAddress: result.curvePoolAddress || null,
       createdAt: result.createdAt || Date.now(),
+      // Сеть обязательна: без неё токен Solana открывался как токен TON —
+      // страница искала его кривую не в той цепочке и показывала нули.
+      chain: result.chain === "solana" ? "solana" : "ton",
+      network: result.network || null,
+      ownerId: userId || null,
     });
     openToken(feedToken);
     if (openTradeSheet) {
