@@ -351,7 +351,7 @@ s4.appendChild(toast);
 const tsec = toast.querySelector(".tsec");
 const cur4 = cursor.cloneNode(true); s4.appendChild(cur4);
 function drawS4(t) {
-  const on = t >= 5.2 && t < 10.25; show(s4, on); if (!on) return;
+  const on = t >= 5.2 && t < 9.99; show(s4, on); if (!on) return;
   const куплено = t >= 8.3;
   cposv.textContent = куплено ? "12 400 LILY · $15.20" : "токенов пока нет";
   cposv.style.color = куплено ? "#2EE87A" : "#F2F0EB";
@@ -413,7 +413,7 @@ function slide(html) {
   el.spans.forEach((sp) => { if (sp.textContent.startsWith("*")) { sp.textContent = sp.textContent.slice(1); sp.classList.add("grad"); } });
   return el;
 }
-const ДЛ = 1.5; // сколько живёт слайд
+const ДЛ = 2.4; // сколько живёт слайд: фразу успевают прочесть
 // [где встаёт слайд, откуда действие продолжается после него]: после
 // первого слайда действие сразу идёт к странице токена — пролёта сквозь
 // ленту больше нет
@@ -459,7 +459,57 @@ function вести(л, k) {
 }
 // 1. Запуск — ракета из приложения уходит вверх по дуге
 const РАКЕТА = '<g transform="rotate(-45 12 12)" fill="none" stroke="#E4E2DC" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" fill="#5A8CFF" stroke="#5A8CFF"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" fill="#E4E2DC"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></g>';
-const ракета = летун(0, "M180 1200 C 230 720, 420 300, 900 250 S 1520 170, 1760 -170", РАКЕТА, 130, 90, "rgba(79,134,255,.6)");
+// Ракета летит по прямой наискосок — снизу слева вверх направо, мимо
+// фразы: корпус с бликом, иллюминатор, синие стабилизаторы, живое
+// пламя и дымный след, который отстаёт и тает.
+const Р_ОТ = [-260, 1060], Р_ДО = [1180, -380];
+const РУГОЛ = Math.atan2(Р_ДО[1] - Р_ОТ[1], Р_ДО[0] - Р_ОТ[0]) * 180 / Math.PI;
+const дым = Array.from({ length: 34 }, () => { const e = $(`<div class="abs" style="left:0;top:0;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,rgba(210,225,255,.55),rgba(150,180,255,.18) 55%,rgba(150,180,255,0) 72%)"></div>`); ВСЕ_СЛАЙДЫ[0].deco.appendChild(e); return e; });
+const ракетаВсё = $(`<div class="abs" style="left:0;top:0;width:360px;height:360px">
+  <svg class="abs" style="left:0;top:0;overflow:visible;filter:drop-shadow(0 18px 40px rgba(79,134,255,.55))" width="360" height="360" viewBox="-180 -180 360 360">
+    <defs>
+      <linearGradient id="рк" x1="-1" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9AA4B8"/><stop offset=".35" stop-color="#FFFFFF"/><stop offset=".6" stop-color="#E4E2DC"/><stop offset="1" stop-color="#7C869A"/></linearGradient>
+      <linearGradient id="рс" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7FA6FF"/><stop offset="1" stop-color="#1F4FD1"/></linearGradient>
+      <radialGradient id="ри" cx=".35" cy=".35" r=".8"><stop offset="0" stop-color="#E8F0FF"/><stop offset=".35" stop-color="#5A8CFF"/><stop offset="1" stop-color="#0B2C70"/></radialGradient>
+      <radialGradient id="рп" cx=".5" cy=".15" r=".9"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".25" stop-color="#FFF3B0"/><stop offset=".55" stop-color="#FFB13B"/><stop offset="1" stop-color="#FF5A1F" stop-opacity="0"/></radialGradient>
+      <radialGradient id="рп2" cx=".5" cy=".1" r=".9"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".4" stop-color="#BFD6FF"/><stop offset="1" stop-color="#5A8CFF" stop-opacity="0"/></radialGradient>
+    </defs>
+    <g class="пламя"><path class="п1" d="M-26 62 Q-34 120 0 190 Q34 120 26 62 Z" fill="url(#рп)"/><path class="п2" d="M-14 62 Q-18 104 0 146 Q18 104 14 62 Z" fill="url(#рп2)"/></g>
+    <path d="M-34 30 L-70 78 L-66 92 L-30 70 Z" fill="url(#рс)"/><path d="M34 30 L70 78 L66 92 L30 70 Z" fill="url(#рс)"/>
+    <path d="M-30 58 L30 58 L22 72 L-22 72 Z" fill="#3A4152"/>
+    <path d="M0 -150 C 36 -112 44 -40 36 58 L-36 58 C -44 -40 -36 -112 0 -150 Z" fill="url(#рк)"/>
+    <path d="M0 -150 C 18 -132 28 -110 32 -88 L-32 -88 C -28 -110 -18 -132 0 -150 Z" fill="url(#рс)"/>
+    <path d="M-36 30 L36 30 L36 42 L-36 42 Z" fill="#5A8CFF" opacity=".9"/>
+    <circle cx="0" cy="-38" r="22" fill="#3A4152"/><circle cx="0" cy="-38" r="16" fill="url(#ри)"/>
+    <path d="M-6 -48 a10 10 0 0 1 10 -4" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" fill="none" opacity=".85"/>
+    <path d="M-20 -110 C -26 -60 -26 0 -22 50" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" fill="none" opacity=".55"/>
+    <path d="M0 58 L0 72" stroke="#0F0F13" stroke-width="40" opacity="0"/>
+  </svg>
+</div>`);
+ВСЕ_СЛАЙДЫ[0].deco.appendChild(ракетаВсё);
+const п1 = ракетаВсё.querySelector(".п1"), п2 = ракетаВсё.querySelector(".п2");
+function drawRocket(q) {
+  // лёгкий разгон в начале и ровный ход дальше
+  const k = q < 0.12 ? 0.12 * E.inQ(q / 0.12) : 0.12 + (q - 0.12) * 1.05;
+  const x = lerp(Р_ОТ[0], Р_ДО[0], k), y = lerp(Р_ОТ[1], Р_ДО[1], k);
+  const дрожь = Math.sin(q * 140) * 1.6;
+  ракетаВсё.style.transform = `translate3d(${(x - 180 + дрожь).toFixed(1)}px,${(y - 180).toFixed(1)}px,0) rotate(${(РУГОЛ + 90).toFixed(2)}deg)`;
+  // пламя дрожит и меняет длину
+  const f = 1 + 0.18 * Math.sin(q * 90) + 0.1 * Math.sin(q * 230);
+  п1.setAttribute("transform", `translate(0 62) scale(${(1 + 0.06 * Math.sin(q * 170)).toFixed(3)} ${f.toFixed(3)}) translate(0 -62)`);
+  п2.setAttribute("transform", `translate(0 62) scale(1 ${(0.9 + 0.2 * Math.sin(q * 120 + 1)).toFixed(3)}) translate(0 -62)`);
+  // дым: клубы рождаются у сопла, отстают, растут и тают
+  const ux = Math.cos(РУГОЛ * Math.PI / 180), uy = Math.sin(РУГОЛ * Math.PI / 180);
+  дым.forEach((e, j) => {
+    const рожд = j / дым.length * 0.95, возр = q - рожд;
+    if (возр < 0 || k > 1.3) { e.style.opacity = 0; return; }
+    const kk = рожд < 0.12 ? 0.12 * E.inQ(рожд / 0.12) : 0.12 + (рожд - 0.12) * 1.05;
+    const bx = lerp(Р_ОТ[0], Р_ДО[0], kk) - ux * 130, by = lerp(Р_ОТ[1], Р_ДО[1], kk) - uy * 130;
+    const рост = 0.6 + возр * 6, сдув = возр * 60;
+    e.style.transform = `translate3d(${(bx - 40 + Math.sin(j * 2.3) * сдув * 0.4).toFixed(1)}px,${(by - 40 + сдув * 0.5).toFixed(1)}px,0) scale(${рост.toFixed(3)})`;
+    e.style.opacity = Math.max(0, 0.9 - возр * 1.6).toFixed(3);
+  });
+}
 // 2. Две сети — тот самый переключатель GRAM / SOL из приложения
 const сети = $(`<div class="abs" style="left:${W / 2 - 230}px;top:150px;width:460px;height:104px;border-radius:999px;background:#14171F;box-shadow:0 20px 60px rgba(0,0,0,.45)">
   <div class="бег abs" style="left:8px;top:8px;width:218px;height:88px;border-radius:999px;background:rgba(255,255,255,.92)"></div>
@@ -482,20 +532,20 @@ const самолёт = летун(4, "M-120 820 C 380 980, 620 300, 980 330 S 16
 function drawDeco(i, p) {
   const жизнь = smooth(prog(p, 0, 0.3)) * (1 - smooth(prog(p, ДЛ - 0.35, ДЛ)));
   ВСЕ_СЛАЙДЫ[i].deco.style.opacity = жизнь;
-  if (i === 0) вести(ракета, E.io(prog(p, 0.05, 1.35)));
+  if (i === 0) drawRocket(p / ДЛ);
   else if (i === 1) {
     // бегунок едет на SOL и возвращается на GRAM — как пальцем
-    const k = E.io(prog(p, 0.35, 0.7)) - E.io(prog(p, 0.95, 1.3));
+    const q = p / ДЛ, k = E.io(prog(q, 0.2, 0.42)) - E.io(prog(q, 0.6, 0.82));
     бег.style.transform = `translateX(${(226 * k).toFixed(1)}px)`;
     сг.style.color = k < 0.5 ? "#0B0B0F" : "#63625F"; сс.style.color = k >= 0.5 ? "#0B0B0F" : "#63625F";
   } else if (i === 2) {
     // падение с ускорением, лёгкий отскок кошелька при попадании
-    const k = E.inQ(prog(p, 0.15, 0.85)), y = lerp(-170, 770, k), сжатие = Math.sin(Math.PI * prog(p, 0.85, 1.1));
+    const q = p / ДЛ, k = E.inQ(prog(q, 0.12, 0.55)), y = lerp(-170, 770, k), сжатие = Math.sin(Math.PI * prog(q, 0.55, 0.72));
     монета.style.transform = `translate3d(${W / 2 - 75}px,${y.toFixed(1)}px,0) rotate(${(k * 200).toFixed(1)}deg)`;
-    монета.style.opacity = p < 0.9 ? 1 : 1 - smooth(prog(p, 0.9, 1.0));
+    монета.style.opacity = q < 0.58 ? 1 : 1 - smooth(prog(q, 0.58, 0.64));
     кошелёк.style.transform = `translateY(${(10 * сжатие).toFixed(1)}px) scale(${(1 + 0.08 * сжатие).toFixed(3)},${(1 - 0.06 * сжатие).toFixed(3)})`;
-  } else if (i === 3) вести(молния, E.io(prog(p, 0.05, 1.3)));
-  else if (i === 4) вести(самолёт, E.io(prog(p, 0.05, 1.35)));
+  } else if (i === 3) вести(молния, E.io(prog(p / ДЛ, 0.05, 0.85)));
+  else if (i === 4) вести(самолёт, E.io(prog(p / ДЛ, 0.05, 0.88)));
 }
 
 function drawSlides(р) {

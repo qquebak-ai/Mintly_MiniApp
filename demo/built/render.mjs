@@ -2,7 +2,7 @@
 // node render.mjs frames 0,120 — кадры 0…119 (снятые не трогаем, можно дорендерить).
 import { chromium } from "playwright-core";
 import { mkdirSync, existsSync } from "fs";
-const FPS = 60, DUR = 18.92, N = FPS * DUR;
+const FPS = 60, DUR = 23.42, N = FPS * DUR;
 const mode = process.argv[2], arg = process.argv[3] || "";
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
