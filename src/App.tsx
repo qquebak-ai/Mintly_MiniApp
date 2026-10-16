@@ -18994,7 +18994,13 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
 
       <TrendFX up={up} seedKey={token.seed} />
       <TokenShareSheet
-        token={shareOpen ? { ...token, logoUrl: логотип } : null}
+        token={shareOpen ? {
+          ...token, logoUrl: логотип,
+          // Живые цифры со страницы: у свежего токена в ленте ещё нули,
+          // и карточка уезжала в чат с «$0».
+          mcapNum: капОкна > 0 ? капОкна : token.mcapNum,
+          price: живаяЦена > 0 ? живаяЦена : token.price,
+        } : null}
         curve={curve}
         holders={держателейВсего}
         userId={currentUserId}
@@ -19827,8 +19833,19 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
      готовое сообщение с картинкой и кнопкой «Открыть токен», а Telegram
      показывает выбор, кому его отправить. Если так не вышло (старый
      клиент, бот не ответил) — открываем выбор чата хотя бы со ссылкой. */
+  /* Для чата карточку уменьшаем: полный размер (1080×1350) тяжёлый, и
+     у собеседника она приходила серой снизу — догружалась частями. */
+  function уменьшить(canvas, ширина) {
+    const c = document.createElement("canvas");
+    c.width = ширина; c.height = Math.round((canvas.height / canvas.width) * ширина);
+    const x = c.getContext("2d");
+    x.imageSmoothingQuality = "high";
+    x.drawImage(canvas, 0, 0, c.width, c.height);
+    return c.toDataURL("image/jpeg", 0.86);
+  }
   async function sendTelegram(tg) {
-    const подпись = `$${String(token.ticker || "").toUpperCase()} в Mintly — ${link}`;
+    // Подпись — только тикер: ссылка уже стоит в кнопке под картинкой.
+    const подпись = `$${String(token.ticker || "").toUpperCase()} в Mintly`;
     try {
       const canvas = canvasRef.current;
       if (tg.shareMessage && canvas) {
@@ -19838,7 +19855,7 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
           const r = await fetch(апи("/api/share-card"), {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${ключ}` },
-            body: JSON.stringify({ image: canvas.toDataURL("image/jpeg", 0.88), link, caption: подпись }),
+            body: JSON.stringify({ image: уменьшить(canvas, 720), link, caption: подпись }),
           });
           const j = await r.json().catch(() => null);
           if (j && j.id) { tg.shareMessage(j.id); return; }
