@@ -5,7 +5,7 @@
 // знак и «Сделано в Mintly.», буквы уезжают по дуге.
 // Кадр зависит только от t — renderAt(t) можно звать в любом порядке.
 "use strict";
-const W = 1920, H = 1080, DUR = 26.62;
+const W = 1920, H = 1080, DUR = 25.32;
 const root = document.getElementById("root");
 const $ = (h) => { const d = document.createElement("div"); d.innerHTML = h.trim(); return d.firstElementChild; };
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -717,7 +717,7 @@ function drawSlides(р) {
 // фраза по словам, наклоняется и улетает, на её место — вторая →
 // «Всегда.» становится плашкой, на неё сверху ложатся ещё две →
 // синий экран с именем в белой плашке.
-const В_ДЛ = 8.4;
+const В_ДЛ = 7.1;
 const vb = $(`<div class="scene"></div>`);
 const словаВ = (html, size, extra = "") => {
   const e = $(`<div class="abs" style="left:0;width:${W}px;text-align:center;font:800 ${size}px/1.15 'Nunito';letter-spacing:-.01em;color:#fff;white-space:nowrap;${extra}">${html}</div>`);
@@ -742,28 +742,16 @@ const платф = $(`<div class="abs" style="left:0;top:0;width:${W}px;height:$
 </div>`); vb.appendChild(платф);
 const абр = платф.querySelector(".абр");
 const текстКарты = словаВ("Доведи токен до *DEX —<br>получи *лимитированную *карту", 60);
-// --- карточка токена, она же потом — карточка с цифрой
+// --- карточка токена
 const карта = $(`<div class="abs" style="left:0;top:0;transform-origin:50% 50%">
   <div class="кфон abs" style="inset:0;background:linear-gradient(135deg,#4F86FF,#1D4FE0 55%,#0B2CA8);box-shadow:inset 0 2px 0 rgba(255,255,255,.35),0 40px 90px rgba(0,0,0,.55)"></div>
-  <div class="кфон2 abs" style="inset:0;background:linear-gradient(160deg,#0F2470,#060B26 70%);box-shadow:inset 0 0 0 2px rgba(90,140,255,.35),0 40px 90px rgba(0,0,0,.6)"></div>
   <div class="ктк abs" style="inset:0">
     <img src="assets/tok/frog.png" style="position:absolute;left:40px;top:40px;width:84px;height:84px;border-radius:50%;image-rendering:pixelated;box-shadow:0 0 0 3px rgba(255,255,255,.35)"/>
     <div style="position:absolute;left:40px;bottom:40px"><div style="font:800 54px/1 'Nunito';color:#fff">$LILY</div><div style="font:600 24px/1.5 'Onest';color:rgba(255,255,255,.75)">Lily Frog</div></div>
     <img src="assets/app/gram.png" style="position:absolute;right:40px;bottom:44px;width:64px;height:64px"/>
     <div style="position:absolute;right:40px;top:40px;text-align:right"><div style="font:800 28px/1 'Nunito';color:rgba(255,255,255,.85)">Mintly</div><div style="margin-top:10px;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.18);font:700 17px/1 'Onest';color:#fff;letter-spacing:.06em">LIMITED · DEX</div></div>
   </div>
-  <div class="кст abs" style="inset:0;overflow:hidden">
-    <div style="position:absolute;left:44px;top:46px;font:800 150px/1 'Nunito';color:#fff;letter-spacing:-.03em">1/1</div>
-    <div style="position:absolute;left:48px;top:206px;font:800 46px/1.1 'Nunito'"><span style="color:#5A8CFF">Карта</span> <span style="color:#fff">твоего токена</span></div>
-    <div style="position:absolute;left:48px;top:268px;font:500 22px/1 'Onest';color:#7F8AA8">только для токенов, дошедших до DEX</div>
-    <div class="куб abs" style="left:240px;top:360px;width:230px;height:210px">
-      <div class="abs" style="left:0;top:40px;width:200px;height:170px;background:linear-gradient(180deg,#3F78FF,#1240C8)"></div>
-      <div class="abs" style="left:0;top:0;width:230px;height:40px;background:#7FA6FF;clip-path:polygon(0 100%,15% 0,100% 0,87% 100%)"></div>
-      <div class="abs" style="left:200px;top:0;width:30px;height:210px;background:#0B2CA8;clip-path:polygon(0 19%,100% 0,100% 81%,0 100%)"></div>
-    </div>
-  </div>
 </div>`); vb.appendChild(карта);
-const кфон2 = карта.querySelector(".кфон2"), ктк = карта.querySelector(".ктк"), кст = карта.querySelector(".кст"), куб = карта.querySelector(".куб");
 // --- синие дуги через кадр: светящийся отрезок бежит по кривой
 const дуги = $(`<svg class="abs" style="left:0;top:0;overflow:visible;filter:drop-shadow(0 0 10px rgba(79,134,255,.8))" width="${W}" height="${H}">
   <path class="д1" d="M-200 420 C 300 130, 760 120, 1060 360 S 1520 980, 2100 640" fill="none" stroke="#3F78FF" stroke-width="12" stroke-linecap="round" pathLength="1"/>
@@ -805,56 +793,53 @@ function drawV(v) {
   абр.style.filter = `brightness(${(1 + 0.25 * Math.sin(v * 4)).toFixed(3)})`;
   поСловам(текстКарты, v, 0.2, 0.12, 0.45);
   S(текстКарты, { o: 1 - smooth(prog(v, 1.85, 2.1)), y: 90 - 30 * smooth(prog(v, 1.85, 2.1)) });
-  // карточка опускается на платформу, покачивается, потом выпрямляется
-  // и, становясь квадратной, превращается в карточку с цифрой
-  const kD = E.out(prog(v, 0.1, 1.0)), kM = E.io(prog(v, 1.95, 2.45));
-  const cw = lerp(600, 560, kM), ch = lerp(370, 560, kM);
+  // карточка опускается на платформу, покачивается и уходит влево вместе с дугой
+  const kD = E.out(prog(v, 0.1, 1.0));
+  const cw = 600, ch = 370;
   карта.style.width = cw + "px"; карта.style.height = ch + "px";
-  [...карта.querySelectorAll(".кфон,.кфон2")].forEach((e) => { e.style.borderRadius = lerp(34, 44, kM) + "px"; });
-  const кач = Math.sin(v * 2.2) * (1 - kM);
-  const cy = lerp(lerp(-480, 500, kD) + кач * 10, H / 2, kM) - ch / 2;
-  // уход влево вместе с дугой
-  const kL = E.io(prog(v, 3.15, 3.6));
+  карта.querySelector(".кфон").style.borderRadius = "34px";
+  const кач = Math.sin(v * 2.2);
+  const cy = lerp(-480, 500, kD) + кач * 10 - ch / 2;
+  const kL = E.io(prog(v, 1.85, 2.3));
   const cx = W / 2 - cw / 2 - 1300 * kL;
-  карта.style.transform = `translate3d(${cx.toFixed(1)}px,${cy.toFixed(1)}px,0) perspective(1400px) rotateX(${lerp(26, 0, kM).toFixed(2)}deg) rotateZ(${(lerp(-5, 0, kM) + кач * 1.5 - 6 * kL).toFixed(2)}deg)`;
-  карта.style.opacity = smooth(prog(v, 0.1, 0.35)) * (1 - smooth(prog(v, 3.4, 3.6)));
+  карта.style.transform = `translate3d(${cx.toFixed(1)}px,${cy.toFixed(1)}px,0) perspective(1400px) rotateX(26deg) rotateZ(${(-5 + кач * 1.5 - 6 * kL).toFixed(2)}deg)`;
+  карта.style.opacity = smooth(prog(v, 0.1, 0.35)) * (1 - smooth(prog(v, 2.1, 2.3)));
   карта.style.filter = kL > 0.01 ? `blur(${(kL * 14).toFixed(1)}px)` : "none";
-  кфон2.style.opacity = kM; ктк.style.opacity = 1 - smooth(prog(v, 1.95, 2.15));
-  кст.style.opacity = smooth(prog(v, 2.3, 2.5));
-  куб.style.transform = `translateY(${(220 * (1 - E.out(prog(v, 2.45, 2.95)))).toFixed(1)}px)`;
+  // дальше всё идёт на 1,3 с раньше: сцены с цифрой больше нет
+  const u = v + 1.3;
   // 2. дуги
-  дуга(д1, E.io(prog(v, 2.75, 3.75)));
-  дуга(д2, E.io(prog(v, 4.45, 5.4)));
+  дуга(д1, E.io(prog(u, 2.75, 3.75)));
+  дуга(д2, E.io(prog(u, 4.45, 5.4)));
   // 3. фраза А по словам, наклоняется и улетает вниз вправо; за ней фраза Б
-  поСловам(фразаА, v, 3.6, 0.16);
-  const kA = E.io(prog(v, 4.75, 5.35));
-  фразаА.style.opacity = 1 - smooth(prog(v, 5.05, 5.35));
+  поСловам(фразаА, u, 3.6, 0.16);
+  const kA = E.io(prog(u, 4.75, 5.35));
+  фразаА.style.opacity = 1 - smooth(prog(u, 5.05, 5.35));
   фразаА.style.transform = `translate3d(${(520 * kA).toFixed(1)}px,${(500 + 380 * kA).toFixed(1)}px,0) rotate(${(-8 * kA).toFixed(2)}deg) scale(${(1 + 0.9 * kA).toFixed(3)})`;
   фразаА.style.filter = kA > 0.01 ? `blur(${(kA * 12).toFixed(1)}px)` : "none";
-  поСловам(фразаБ, v, 4.95, 0.12);
-  const kБ = smooth(prog(v, 5.8, 6.05));
+  поСловам(фразаБ, u, 4.95, 0.12);
+  const kБ = smooth(prog(u, 5.8, 6.05));
   S(фразаБ, { o: 1 - kБ, y: 470 - 30 * kБ, b: kБ * 10 });
   // 4. «Всегда.» → плашка «Запускай» → стопка
-  поСловам(всегда, v, 6.0, 0, 0.3);
-  const kПл = E.back(prog(v, 6.4, 6.65));
-  S(всегда, { o: 1 - smooth(prog(v, 6.45, 6.6)), y: H / 2 - 44 });
-  S(пл1В, { o: smooth(prog(v, 6.4, 6.5)), s: lerp(0.3, 1, kПл) });
-  запускай.style.opacity = smooth(prog(v, 6.5, 6.65));
+  поСловам(всегда, u, 6.0, 0, 0.3);
+  const kПл = E.back(prog(u, 6.4, 6.65));
+  S(всегда, { o: 1 - smooth(prog(u, 6.45, 6.6)), y: H / 2 - 44 });
+  S(пл1В, { o: smooth(prog(u, 6.4, 6.5)), s: lerp(0.3, 1, kПл) });
+  запускай.style.opacity = smooth(prog(u, 6.5, 6.65));
   const лечь = (e, a, ур) => {
-    const k = E.out(prog(v, a, a + 0.32));
-    e.style.opacity = smooth(prog(v, a, a + 0.08));
+    const k = E.out(prog(u, a, a + 0.32));
+    e.style.opacity = smooth(prog(u, a, a + 0.08));
     e.style.transform = `translateY(${(-ур * 92 * k).toFixed(1)}px) rotateX(${lerp(-100, 14, k).toFixed(2)}deg) scale(${lerp(0.96, 0.98 - ур * 0.02, k).toFixed(3)})`;
   };
   лечь(пл2, 6.75, 1); лечь(пл3, 7.0, 2);
   // 5. синий экран раскрывается кругом из плашки; на нём — имя
-  const kС = E.io(prog(v, 7.35, 7.7));
+  const kС = E.io(prog(u, 7.35, 7.7));
   синий.style.clipPath = `circle(${(kС * 1200).toFixed(1)}px at 960px 540px)`;
-  синий.style.opacity = v >= 7.35 ? 1 : 0;
-  const kИ = E.back(prog(v, 7.55, 7.8)), kСх = E.io(prog(v, 7.95, 8.15));
+  синий.style.opacity = u >= 7.35 ? 1 : 0;
+  const kИ = E.back(prog(u, 7.55, 7.8)), kСх = E.io(prog(u, 7.95, 8.15));
   const iw = lerp(440, 300, kСх);
   имяПл.style.width = iw + "px"; имяПл.style.left = W / 2 - iw / 2 + "px";
-  S(имяПл, { o: smooth(prog(v, 7.55, 7.62)) * (1 - kСх), s: lerp(0.5, 1, kИ) });
-  S(имяВ, { o: smooth(prog(v, 7.6, 7.72)), s: lerp(0.6, 1, kИ) });
+  S(имяПл, { o: smooth(prog(u, 7.55, 7.62)) * (1 - kСх), s: lerp(0.5, 1, kИ) });
+  S(имяВ, { o: smooth(prog(u, 7.6, 7.72)), s: lerp(0.6, 1, kИ) });
   имяВ.style.color = kСх > 0.5 ? "#fff" : "#1F5BFF";
 }
 

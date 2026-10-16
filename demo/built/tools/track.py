@@ -3,10 +3,10 @@
 # переходе камеры, звон на знаке, глитч-удар на концовке и тишина за ним.
 import numpy as np, wave, sys
 from scipy.signal import butter, lfilter
-SR = 44100; DUR = 26.62; n = int(SR * DUR); L = np.zeros(n); R = np.zeros(n)
+SR = 44100; DUR = 25.32; n = int(SR * DUR); L = np.zeros(n); R = np.zeros(n)
 rs = np.random.RandomState(5)
 # слайды с преимуществами вклиниваются в действие: время действия → время ролика
-SN, SK, SLD, NS, VD = 4.42, 10.0, 2.4, 5, 8.4   # слайды и вставка: где встают, откуда действие дальше
+SN, SK, SLD, NS, VD = 4.42, 10.0, 2.4, 5, 7.1   # слайды и вставка: где встают, откуда действие дальше
 def M(t):
     # то, что было между запуском и знаком (карточка и покупка), вырезано
     if t < SN: return t
@@ -98,13 +98,12 @@ for k in range(NS):
     put_raw(r - .05, whoosh(.4), .3); put_raw(r + .15, pad([69, 76, 81, 88], 2.0, cut=3200, att=.2, rel=.6), .14); put_raw(r + .2, pop(1000), .12)
 # вставка по второму референсу: платформа, цифра, дуги, фразы, стопка, синий экран
 V0 = SN + SLD * NS
-for dt, s_, g in [(0.05, whoosh(.5), .3), (0.2, chime(81), .14), (0.95, pop(700), .25), (2.0, whoosh(.4), .3), (2.45, pop(900), .2),
-                  (2.75, whoosh(1.0), .35), (3.15, whoosh(.45, False), .3), (4.45, whoosh(.95), .3), (4.75, whoosh(.5, False), .3),
-                  (6.0, pop(1100), .2), (6.42, pop(800), .3), (6.77, pop(1000), .25), (7.02, pop(1250), .25), (7.35, whoosh(.4), .4),
-                  (7.58, chime(88), .18), (7.58, hit(), .35), (8.1, whoosh(.3, False), .25)]:
+for dt, s_, g in [(0.05, whoosh(.5), .3), (0.2, chime(81), .14), (0.95, pop(700), .25), (1.45, whoosh(1.0), .35), (1.85, whoosh(.45, False), .3),
+                  (3.15, whoosh(.95), .3), (3.45, whoosh(.5, False), .3), (4.7, pop(1100), .2), (5.12, pop(800), .3), (5.47, pop(1000), .25),
+                  (5.72, pop(1250), .25), (6.05, whoosh(.4), .4), (6.28, chime(88), .18), (6.28, hit(), .35), (6.8, whoosh(.3, False), .25)]:
     put_raw(V0 + dt, s_, g)
-for k in range(5): put_raw(V0 + 3.6 + k * .16, tick(), .35)
-for k in range(6): put_raw(V0 + 4.95 + k * .12, tick(), .3)
+for k in range(5): put_raw(V0 + 2.3 + k * .16, tick(), .35)
+for k in range(6): put_raw(V0 + 3.65 + k * .12, tick(), .3)
 
 mix = np.stack([L, R], 1); mix = np.tanh(mix * 1.1) * .9
 fade = np.ones(n); a, b = int(M(11.45) * SR), int(M(11.8) * SR); fade[a:b] = np.linspace(1, 0, b - a); fade[b:] = 0
