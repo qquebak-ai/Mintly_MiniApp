@@ -3,15 +3,15 @@
 # переходе камеры, звон на знаке, глитч-удар на концовке и тишина за ним.
 import numpy as np, wave, sys
 from scipy.signal import butter, lfilter
-SR = 44100; DUR = 23.42; n = int(SR * DUR); L = np.zeros(n); R = np.zeros(n)
+SR = 44100; DUR = 26.62; n = int(SR * DUR); L = np.zeros(n); R = np.zeros(n)
 rs = np.random.RandomState(5)
 # слайды с преимуществами вклиниваются в действие: время действия → время ролика
-SN, SK, SLD, NS = 4.42, 10.0, 2.4, 5   # блок слайдов: где встаёт, откуда действие дальше
+SN, SK, SLD, NS, VD = 4.42, 10.0, 2.4, 5, 8.4   # слайды и вставка: где встают, откуда действие дальше
 def M(t):
     # то, что было между запуском и знаком (карточка и покупка), вырезано
     if t < SN: return t
     if t < SK: return -1
-    return t - (SK - SN) + SLD * NS
+    return t - (SK - SN) + SLD * NS + VD
 def put(t, s, g=1.0, pan=0.0): put_raw(M(t), s, g, pan)
 def put_raw(t, s, g=1.0, pan=0.0):
     i = int(t * SR)
@@ -63,12 +63,12 @@ def glitch(d):
 # бит 122 BPM от начала до знака
 B = 60 / 122; PROG = [(45, [57, 64, 69, 72]), (41, [53, 60, 65, 69]), (48, [55, 60, 64, 67]), (43, [55, 59, 62, 67])]
 t = 0.0; bar = 0
-while t < SN + SLD * NS:
+while t < SN + SLD * NS + VD:
     root, ch = PROG[bar % 4]
     put_raw(t, pad(ch, 4 * B + .3), .22)
     for b in range(4):
         tb = t + b * B
-        if tb >= SN + SLD * NS: break
+        if tb >= SN + SLD * NS + VD: break
         put_raw(tb, kick(), .55)
         if b in (1, 3): put_raw(tb, clap(), .4)
         for h in range(2): put_raw(tb + h * B / 2 + B / 4, hat(h == 1), .6, pan=.3)
@@ -96,11 +96,18 @@ put(11.0, pad([64, 71, 76, 83], 1.6, cut=3000, att=.4, rel=1.0), .18)
 for k in range(NS):
     r = SN + k * SLD
     put_raw(r - .05, whoosh(.4), .3); put_raw(r + .15, pad([69, 76, 81, 88], 2.0, cut=3200, att=.2, rel=.6), .14); put_raw(r + .2, pop(1000), .12)
-# концовка: глитч и удар, потом тишина
-put(13.04, glitch(.5), .45); put(13.04, hit(), .7); put(13.42, pop(1600), .2)
+# вставка по второму референсу: платформа, цифра, дуги, фразы, стопка, синий экран
+V0 = SN + SLD * NS
+for dt, s_, g in [(0.05, whoosh(.5), .3), (0.2, chime(81), .14), (0.95, pop(700), .25), (2.0, whoosh(.4), .3), (2.45, pop(900), .2),
+                  (2.75, whoosh(1.0), .35), (3.15, whoosh(.45, False), .3), (4.45, whoosh(.95), .3), (4.75, whoosh(.5, False), .3),
+                  (6.0, pop(1100), .2), (6.42, pop(800), .3), (6.77, pop(1000), .25), (7.02, pop(1250), .25), (7.35, whoosh(.4), .4),
+                  (7.58, chime(88), .18), (7.58, hit(), .35), (8.1, whoosh(.3, False), .25)]:
+    put_raw(V0 + dt, s_, g)
+for k in range(5): put_raw(V0 + 3.6 + k * .16, tick(), .35)
+for k in range(6): put_raw(V0 + 4.95 + k * .12, tick(), .3)
 
 mix = np.stack([L, R], 1); mix = np.tanh(mix * 1.1) * .9
-fade = np.ones(n); a, b = int(M(13.75) * SR), int(M(14.0) * SR); fade[a:b] = np.linspace(1, 0, b - a); fade[b:] = 0
+fade = np.ones(n); a, b = int(M(11.45) * SR), int(M(11.8) * SR); fade[a:b] = np.linspace(1, 0, b - a); fade[b:] = 0
 mix *= fade[:, None]
 pcm = (mix / max(1e-6, np.abs(mix).max()) * .92 * 32767).astype(np.int16)
 with wave.open(sys.argv[1], "wb") as w:
