@@ -206,7 +206,7 @@ const form = $(`<div class="abs" style="left:0;top:0;width:393px;height:540px;tr
     </div>
     ${подпись(80, "Логотип")}
     <div class="abs" style="left:16px;top:102px;width:76px;height:76px;border-radius:50%;border:1.5px dashed #30343E;overflow:hidden">
-      <img class="flogo" src="assets/coins/jimothy.png" style="width:100%;height:100%;opacity:0"/></div>
+      <img class="flogo" src="assets/coins/mintly.png" style="width:100%;height:100%;opacity:0"/></div>
     <div class="abs" style="left:104px;top:102px;width:273px;height:76px;border-radius:16px;border:1.5px dashed #30343E;display:flex;align-items:center;justify-content:center;font:400 12px/1 'Onest';color:#97958F">Баннер 1200×400 (необязательно)</div>
     ${подпись(204, "Название")}
     ${поле(226, "Prism Cat", "name")}
@@ -217,7 +217,7 @@ const form = $(`<div class="abs" style="left:0;top:0;width:393px;height:540px;tr
 </div>`);
 s2.appendChild(form);
 const fbg = form.querySelector(".fbg"), fui = form.querySelector(".fui"), fbtn = form.querySelector(".fbtn"), flogo = form.querySelector(".flogo");
-const ИМЯ = "Jimothy", ТИКЕР = "JIM";
+const ИМЯ = "Mintly", ТИКЕР = "MINT";
 const valName = form.querySelector(".val-name"), phName = form.querySelector(".ph-name");
 const valTick = form.querySelector(".val-tick"), phTick = form.querySelector(".ph-tick");
 valName.innerHTML = [...ИМЯ].map((c) => `<span class="ch">${c}</span>`).join("");
@@ -266,7 +266,7 @@ function drawS2(t) {
 // возраст, капитализация и изменение.
 const s3 = $(`<div class="scene" style="perspective:900px;perspective-origin:960px 540px"></div>`); root.appendChild(s3);
 const ЛЕНТА = [
-  ["frog", "$JIM", "Jimothy · 9 мин", "$30.1K", "+12.6%", 1], ["m", "$MINT", "Mintly · 2 мин", "$66.3K", "+38.2%", 1], ["pup", "$PUP", "Pixel Pup · 17 мин", "$46.8K", "+24.9%", 1],
+  ["frog", "$MINT", "Jimothy · 9 мин", "$30.1K", "+12.6%", 1], ["m", "$MINT", "Mintly · 2 мин", "$66.3K", "+38.2%", 1], ["pup", "$PUP", "Pixel Pup · 17 мин", "$46.8K", "+24.9%", 1],
   ["boo", "$BOO", "Boo · 26 мин", "$18.0K", "-3.1%", 0], ["fire", "$WICK", "Hot Wick · 31 мин", "$12.7K", "+6.4%", 1], ["mcat", "$MCAT", "Moon Cat · 44 мин", "$9.4K", "+2.2%", 1],
 ];
 let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -305,9 +305,9 @@ const card = $(`<div class="abs" style="left:${(W - CW) / 2}px;top:${(H - CH) / 
     <div class="ctint abs" style="inset:0;background:radial-gradient(70% 90% at 100% 0%, rgba(172,172,172,.22) 0%, rgba(172,172,172,.06) 45%, transparent 70%)"></div>
     <div class="abs" style="inset:0;border-radius:64px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.08),inset 0 2px 30px rgba(255,255,255,.05)"></div>
     <div class="abs" style="left:84px;top:70px;display:flex;align-items:center;gap:30px">
-      <img src="assets/coins/jimothy.png" style="width:120px;height:120px;border-radius:50%;"/>
-      <div><div style="font:800 84px/1 'Nunito';letter-spacing:-.02em;color:#fff">Jimothy</div>
-      <div style="font:500 34px/1.3 'Onest';color:#97958F;margin-top:6px">$JIM · Gram</div></div>
+      <img src="assets/coins/mintly.png" style="width:120px;height:120px;border-radius:50%;"/>
+      <div><div style="font:800 84px/1 'Nunito';letter-spacing:-.02em;color:#fff">Mintly</div>
+      <div style="font:500 34px/1.3 'Onest';color:#97958F;margin-top:6px">$MINT · Gram</div></div>
     </div>
     <div class="abs" style="right:84px;top:80px;text-align:right">
       <div style="font:800 76px/1 'Nunito';color:#F2F0EB">$30.1K</div>
@@ -330,13 +330,13 @@ const cposv = card.querySelector(".cposv"), cposWrap = card.querySelector(".cpos
 // окно покупки: сумма, быстрые суммы и одна кнопка — как в приложении
 const buy = $(`<div class="abs" style="left:0;top:0;width:393px;height:330px;transform-origin:0 0">
   <div class="abs" style="inset:0;border-radius:28px;background:#0F0F13;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 30px 80px rgba(0,0,0,.6)"></div>
-  <div class="abs" style="left:20px;top:22px;font:800 20px/1 'Nunito';color:#F2F0EB">Купить $JIM</div>
+  <div class="abs" style="left:20px;top:22px;font:800 20px/1 'Nunito';color:#F2F0EB">Купить $MINT</div>
   <div class="abs" style="left:20px;top:62px;font:500 13px/1 'Onest';color:#97958F">Сумма</div>
   <div class="abs" style="left:20px;top:84px;font:800 46px/1 'Nunito';color:#F2F0EB">0.5 <span style="color:#97958F;font-size:28px">GRAM</span></div>
   <div class="abs" style="left:20px;top:148px;display:flex;gap:8px">
     ${["0.1", "0.5", "1", "MAX"].map((v) => `<span style="padding:8px 14px;border-radius:999px;background:${v === "0.5" ? "#F2F0EB" : "#1B1F29"};color:${v === "0.5" ? "#14151A" : "#F2F0EB"};font:700 13px/1 'Onest'">${v}</span>`).join("")}
   </div>
-  <div class="abs" style="left:20px;top:192px;font:500 13px/1.3 'Onest';color:#97958F">Получите ≈ <span style="color:#F2F0EB">12 400 JIM</span> · комиссия 0%</div>
+  <div class="abs" style="left:20px;top:192px;font:500 13px/1.3 'Onest';color:#97958F">Получите ≈ <span style="color:#F2F0EB">12 400 MINT</span> · комиссия 0%</div>
   <div class="bbtn abs" style="left:20px;right:20px;top:240px;height:58px;border-radius:16px;background:#00E96B;display:flex;align-items:center;justify-content:center;font:800 18px/1 'Nunito';color:#04150B">Купить</div>
 </div>`);
 s4.appendChild(buy);
@@ -346,7 +346,7 @@ const toast = $(`<div class="abs" style="left:0;top:0;width:620px;height:112px;b
   <span style="position:absolute;left:0;top:26px;bottom:26px;width:5px;border-radius:3px;background:#2EE87A"></span>
   <span style="width:60px;height:60px;border-radius:18px;background:rgba(46,232,122,.16);display:flex;align-items:center;justify-content:center;flex:none">
     <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#2EE87A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
-  <div style="flex:1"><div style="font:800 34px/1.1 'Nunito';color:#fff">Куплено</div><div style="font:500 24px/1.3 'Onest';color:#8E8E99">12 400 JIM · комиссия 0%</div></div>
+  <div style="flex:1"><div style="font:800 34px/1.1 'Nunito';color:#fff">Куплено</div><div style="font:500 24px/1.3 'Onest';color:#8E8E99">12 400 MINT · комиссия 0%</div></div>
   <div class="tsec" style="font:800 34px/1 'Nunito';color:#2EE87A;font-variant-numeric:tabular-nums">0,0 с</div>
 </div>`);
 s4.appendChild(toast);
@@ -355,7 +355,7 @@ const cur4 = cursor.cloneNode(true); s4.appendChild(cur4);
 function drawS4(t) {
   const on = t >= 5.2 && t < 9.99; show(s4, on); if (!on) return;
   const куплено = t >= 8.3;
-  cposv.textContent = куплено ? "12 400 JIM · $15.20" : "токенов пока нет";
+  cposv.textContent = куплено ? "12 400 MINT · $15.20" : "токенов пока нет";
   cposv.style.color = куплено ? "#2EE87A" : "#F2F0EB";
   card.firstElementChild.style.boxShadow = `0 0 0 2px rgba(172,172,172,.25), 0 0 70px rgba(172,172,172,.35), 0 40px 120px rgba(0,0,0,.6)`;
   let x = 0, y = 0, ry = -8, rx = 4, s = 1, b = 0, o = 1;
@@ -587,7 +587,8 @@ function нажатие(c, p, x, y, a, b) {
 const сПодписью = (y, txt) => `<div class="abs" style="left:20px;top:${y}px;font:500 15px/1 'Onest';color:#97958F">${txt}</div>`;
 const сПолем = (y, ph, cls, h = 52) => `<div class="abs" style="left:20px;top:${y}px;width:353px;height:${h}px;border-radius:14px;background:#14171F;border:1px solid #22262F;display:flex;align-items:${h > 60 ? "flex-start" : "center"};padding:${h > 60 ? "16px" : "0"} 16px;font:400 18px/1 'Onest'">
   <span class="ph" style="color:#63625F">${ph}</span><span class="${cls}" style="color:#F2F0EB;white-space:pre"></span></div>`;
-const буквы = (el, txt) => { el.innerHTML = [...txt].map((c) => `<span class="ch">${c}</span>`).join(""); return [...el.children]; };
+// перенос строки — пустая буква во всю ширину поля: следующая уходит вниз
+const буквы = (el, txt) => { el.innerHTML = [...txt].map((c) => c === "\n" ? `<span class="ch" style="width:100%;height:0"></span>` : `<span class="ch">${c}</span>`).join(""); return [...el.children]; };
 const переключательСети = (w, h) => `<div class="abs" style="left:0;top:0;width:${w}px;height:${h}px;border-radius:999px;background:#14171F">
   <div class="бег abs" style="left:${h * 0.08}px;top:${h * 0.08}px;width:${w / 2 - h * 0.08}px;height:${h * 0.84}px;border-radius:999px;background:rgba(255,255,255,.92)"></div>
   <div class="сг abs" style="left:0;top:0;width:${w / 2}px;height:${h}px;display:flex;align-items:center;justify-content:center;gap:${h * 0.14}px;font:800 ${h * 0.36}px/1 'Nunito'"><img src="assets/app/gram.png" style="width:${h * 0.42}px;height:${h * 0.42}px"/>GRAM</div>
@@ -596,12 +597,12 @@ const переключательСети = (w, h) => `<div class="abs" style="le
 
 // 1. Запуск токена за секунды — телефон с формой: имя, тикер, «Запустить»;
 // запуск идёт по-настоящему 2,8 с, плашка ждёт вместе с ним
-const ЗАПУСК_С = 2.8, ЗАПУСК_ОТ = 1.5;
+const ЗАПУСК_С = 2.8, ЗАПУСК_ОТ = 1.6;
 const тф1 = телефон(0, `
   <div class="abs" style="left:20px;top:70px;font:800 28px/1 'Nunito';color:#fff">Создать токен</div>
   <div class="abs" style="left:20px;top:118px;width:180px;height:42px">${переключательСети(180, 42)}</div>
   ${сПодписью(186, "Логотип")}
-  <div class="abs" style="left:20px;top:210px;width:84px;height:84px;border-radius:50%;border:1.5px dashed #30343E;overflow:hidden"><img class="лого" src="assets/coins/jimothy.png" style="width:100%;height:100%;opacity:0"/></div>
+  <div class="abs" style="left:20px;top:210px;width:84px;height:84px;border-radius:50%;border:1.5px dashed #30343E;overflow:hidden"><img class="лого" src="assets/coins/mintly.png" style="width:100%;height:100%;opacity:0"/></div>
   <div class="abs" style="left:116px;top:210px;width:257px;height:84px;border-radius:18px;border:1.5px dashed #30343E;display:flex;align-items:center;justify-content:center;font:400 13px/1 'Onest';color:#97958F">Баннер (необязательно)</div>
   ${сПодписью(318, "Название")}${сПолем(342, "Prism Cat", "имя")}
   ${сПодписью(418, "Тикер")}${сПолем(442, "PRSM", "тикер")}
@@ -611,17 +612,18 @@ const тф1 = телефон(0, `
     <div class="кнт abs" style="inset:0;display:flex;align-items:center;justify-content:center;font:800 18px/1 'Nunito';color:#2A2C31">Запустить токен</div>
   </div>`);
 тф1.querySelector(".сг").style.color = "#0B0B0F"; тф1.querySelector(".сс").style.color = "#63625F";
-const тф1Имя = буквы(тф1.querySelector(".имя"), "Jimothy"), тф1Тик = буквы(тф1.querySelector(".тикер"), "JIM");
+const тф1Имя = буквы(тф1.querySelector(".имя"), "Mintly"), тф1Тик = буквы(тф1.querySelector(".тикер"), "MINT");
+const тф1Опис = буквы(тф1.querySelector(".опис"), "Мемкоины на Gram и Solana\nпрямо в Telegram");
 const тф1Пх = [...тф1.querySelectorAll(".ph")];
 const тф1Кн = тф1.querySelector(".кн"), тф1Пол = тф1.querySelector(".пол"), тф1Кнт = тф1.querySelector(".кнт"), тф1Лого = тф1.querySelector(".лого");
-const пл1 = плашка(0, 800, 820, ["Запускаем…", "Токен запущен"], "$JIM · Gram");
+const пл1 = плашка(0, 800, 820, ["Запускаем…", "Токен запущен"], "$MINT · Gram");
 const пл1Палец = палец(0);
 function слайдЗапуск(p) {
   появление(тф1, p, "подъём", П_K);
-  typeChars(тф1Имя, p, 0.45, 0.8); typeChars(тф1Тик, p, 0.85, 1.0);
-  тф1Пх[0].style.display = p >= 0.45 ? "none" : ""; тф1Пх[1].style.display = p >= 0.85 ? "none" : "";
-  тф1Лого.style.opacity = smooth(prog(p, 1.0, 1.15));
-  const pr = нажатие(пл1Палец, p, ...наЭкране(196, 705), 1.0, 1.32);
+  typeChars(тф1Имя, p, 0.45, 0.72); typeChars(тф1Тик, p, 0.76, 0.9); typeChars(тф1Опис, p, 0.92, 1.3);
+  тф1Пх[0].style.display = p >= 0.45 ? "none" : ""; тф1Пх[1].style.display = p >= 0.76 ? "none" : ""; тф1Пх[2].style.display = p >= 0.92 ? "none" : "";
+  тф1Лого.style.opacity = smooth(prog(p, 0.9, 1.05));
+  const pr = нажатие(пл1Палец, p, ...наЭкране(196, 705), 1.12, 1.4);
   тф1Кн.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
   // кнопка сама показывает ход запуска, ровно столько, сколько он длится
   const t = p - ЗАПУСК_ОТ, ход = clamp(t / ЗАПУСК_С), готово = t >= ЗАПУСК_С;
@@ -694,7 +696,7 @@ function слайдСети(p) {
 const стр = (лев, cls, прав, цвет = "#F2F0EB") => `<div style="display:flex;justify-content:space-between;align-items:center;padding:20px 0;border-top:1px solid rgba(255,255,255,.07);font:500 26px/1 'Onest';color:#97958F"><span>${лев}</span><span class="${cls}" style="font:800 30px/1.12 'Nunito';color:${цвет};font-variant-numeric:tabular-nums;display:flex">${прав}</span></div>`;
 const ком = виджет(2, 1040, 160, 660, `
   <div style="padding:40px 44px 30px">
-    <div style="display:flex;align-items:center;gap:16px;font:600 26px/1 'Onest';color:#97958F"><img src="assets/coins/jimothy.png" style="width:40px;height:40px;border-radius:50%"/>Продажа $JIM</div>
+    <div style="display:flex;align-items:center;gap:16px;font:600 26px/1 'Onest';color:#97958F"><img src="assets/coins/mintly.png" style="width:40px;height:40px;border-radius:50%"/>Продажа $MINT</div>
     <div style="display:flex;align-items:baseline;gap:22px;margin:26px 0 8px">
       <span class="кпроц" style="font:800 150px/1.12 'Nunito';color:#fff;letter-spacing:-.03em;font-variant-numeric:tabular-nums;display:flex"><span class="кц"></span>%</span>
       <span style="font:600 26px/1.3 'Onest';color:#63625F">комиссия<br>Mintly</span></div>
@@ -731,8 +733,8 @@ function слайдКомиссия(p) {
 const ПОКУПКА_С = 0.9, ПОКУПКА_ОТ = 1.3;
 const тф4 = телефон(3, `
   <div class="abs" style="left:20px;top:70px;display:flex;align-items:center;gap:16px">
-    <img src="assets/coins/jimothy.png" style="width:72px;height:72px;border-radius:50%"/>
-    <div><div style="font:800 28px/1 'Nunito';color:#fff">Jimothy</div><div style="font:500 16px/1.5 'Onest';color:#97958F">$JIM · Gram</div></div></div>
+    <img src="assets/coins/mintly.png" style="width:72px;height:72px;border-radius:50%"/>
+    <div><div style="font:800 28px/1 'Nunito';color:#fff">Mintly</div><div style="font:500 16px/1.5 'Onest';color:#97958F">$MINT · Gram</div></div></div>
   <div class="abs" style="left:20px;top:168px;font:800 44px/1.12 'Nunito';color:#F2F0EB;display:flex;font-variant-numeric:tabular-nums">$<span class="цн"></span></div>
   <div class="abs" style="left:20px;top:222px;font:700 18px/1.12 'Onest';color:#2EE87A;display:flex">+<span class="пр"></span>%</div>
   <svg class="abs" style="left:20px;top:258px" width="353" height="150" viewBox="0 0 353 150" fill="none">
@@ -741,17 +743,17 @@ const тф4 = телефон(3, `
     <path class="лин" d="M0 128 L30 120 L60 124 L90 104 L120 110 L150 86 L180 94 L210 72 L240 80 L270 54 L300 62 L330 34 L353 22" stroke="#2EE87A" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1 1"/>
   </svg>
   <div class="abs" style="left:12px;right:12px;top:430px;bottom:12px;border-radius:40px;background:#14171F">
-    <div class="abs" style="left:20px;top:24px;font:800 22px/1 'Nunito';color:#F2F0EB">Купить $JIM</div>
+    <div class="abs" style="left:20px;top:24px;font:800 22px/1 'Nunito';color:#F2F0EB">Купить $MINT</div>
     <div class="abs" style="left:20px;top:66px;font:500 14px/1 'Onest';color:#97958F">Сумма</div>
     <div class="abs" style="left:20px;top:88px;font:800 48px/1 'Nunito';color:#F2F0EB">0.5 <span style="color:#97958F;font-size:28px">GRAM</span></div>
     <div class="abs" style="left:20px;top:154px;display:flex;gap:8px">
       ${["0.1", "0.5", "1", "MAX"].map((v) => `<span style="padding:9px 16px;border-radius:999px;background:${v === "0.5" ? "#F2F0EB" : "#1F2430"};color:${v === "0.5" ? "#14151A" : "#F2F0EB"};font:700 14px/1 'Onest'">${v}</span>`).join("")}</div>
-    <div class="abs" style="left:20px;top:204px;font:500 14px/1.3 'Onest';color:#97958F">Получите ≈ <span style="color:#F2F0EB">48 200 JIM</span></div>
+    <div class="abs" style="left:20px;top:204px;font:500 14px/1.3 'Onest';color:#97958F">Получите ≈ <span style="color:#F2F0EB">48 200 MINT</span></div>
     <div class="кн abs" style="left:20px;right:20px;top:250px;height:62px;border-radius:16px;background:#00E96B;display:flex;align-items:center;justify-content:center;font:800 20px/1 'Nunito';color:#04150B">Купить</div>
   </div>`);
 const тф4Лин = тф4.querySelector(".лин"), тф4Зал = тф4.querySelector(".зал"), тф4Кн = тф4.querySelector(".кн");
 const тф4Цена = барабанЦены(тф4.querySelector(".цн"), 1, 5), тф4Проц = барабанЦены(тф4.querySelector(".пр"), 1, 2);
-const пл4 = плашка(3, 800, 190, ["Покупаем…", "Куплено"], "48 200 JIM · комиссия 0%");
+const пл4 = плашка(3, 800, 190, ["Покупаем…", "Куплено"], "48 200 MINT · комиссия 0%");
 const пл4Палец = палец(3);
 function слайдПокупка(p) {
   появление(тф4, p, "поворот", П_K);
@@ -776,7 +778,7 @@ const тф5 = телефон(4, `
   <div class="abs" style="left:20px;top:20px;font:700 17px/1 'Onest';color:#F2F0EB">9:41</div>
   <div class="abs" style="left:18px;top:62px;font:400 34px/1 'Onest';color:#AEAEAE">‹</div>
   <div class="abs" style="left:56px;top:58px;width:48px;height:48px;border-radius:50%;background:#0F0F13;display:flex;align-items:center;justify-content:center">${star(30, "#E4E2DC")}</div>
-  <div class="abs" style="left:116px;top:62px"><div style="font:700 19px/1.1 'Onest';color:#fff">Mintly</div><div style="font:400 15px/1.5 'Onest';color:#929292">бот</div></div>
+  <div class="abs" style="left:116px;top:62px"><div style="font:700 19px/1.1 'Onest';color:#fff">Mintly</div><div style="font:400 15px/1.5 'Onest';color:#929292">мемкоины на Gram и Solana</div></div>
   <div class="сооб abs" style="left:14px;top:168px;width:300px;border-radius:20px 20px 20px 6px;background:#262626;padding:16px 18px;font:400 18px/1.4 'Onest';color:#F2F0EB">Запускай и покупай мемкоины прямо здесь — Gram и Solana в одном приложении.<div style="text-align:right;font-size:13px;color:#7E7E7E;margin-top:4px">9:41</div></div>
   <div class="ткн abs" style="left:14px;top:330px;width:300px;height:52px;border-radius:14px;background:#525252;display:flex;align-items:center;justify-content:center;font:600 18px/1 'Onest';color:#fff">Открыть Mintly</div>
   <div class="abs" style="left:0;right:0;bottom:0;height:92px;background:#212121;display:flex;align-items:flex-start;gap:12px;padding:14px 14px 0">
@@ -886,8 +888,8 @@ const текстКарты = словаВ("Доведи токен до *DEX —
 const карта = $(`<div class="abs" style="left:0;top:0;transform-origin:50% 50%">
   <div class="кфон abs" style="inset:0;background:linear-gradient(135deg,#A7A7A7,#7E7E7E 55%,#5A5A5A);box-shadow:inset 0 2px 0 rgba(255,255,255,.35),0 40px 90px rgba(0,0,0,.55)"></div>
   <div class="ктк abs" style="inset:0">
-    <img src="assets/coins/jimothy.png" style="position:absolute;left:40px;top:40px;width:84px;height:84px;border-radius:50%;box-shadow:0 0 0 3px rgba(255,255,255,.35)"/>
-    <div style="position:absolute;left:40px;bottom:40px"><div style="font:800 54px/1 'Nunito';color:#fff">$JIM</div><div style="font:600 24px/1.5 'Onest';color:rgba(255,255,255,.75)">Jimothy</div></div>
+    <img src="assets/coins/mintly.png" style="position:absolute;left:40px;top:40px;width:84px;height:84px;border-radius:50%;box-shadow:0 0 0 3px rgba(255,255,255,.35)"/>
+    <div style="position:absolute;left:40px;bottom:40px"><div style="font:800 54px/1 'Nunito';color:#fff">$MINT</div><div style="font:600 24px/1.5 'Onest';color:rgba(255,255,255,.75)">Mintly</div></div>
     <img src="assets/app/gram.png" style="position:absolute;right:40px;bottom:44px;width:64px;height:64px"/>
     <div style="position:absolute;right:40px;top:40px;text-align:right"><div style="font:800 28px/1 'Nunito';color:rgba(255,255,255,.85)">Mintly</div><div style="margin-top:10px;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.18);font:700 17px/1 'Onest';color:#fff;letter-spacing:.06em">LIMITED · DEX</div></div>
   </div>
