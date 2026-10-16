@@ -6700,6 +6700,36 @@ function MintlyFrame({ children, size = 52, glow }) {
  * Прогоняем через пережимающий CDN: та же картинка приходит в три
  * килобайта. Если CDN не справится, показ откатывается на исходную
  * ссылку — она рабочая, просто тяжёлая. */
+/* Готовность картинок ленты. Строка токена показывается целиком — с
+   логотипом, а не пустым кружком, который через секунду заполняется:
+   пока картинка не загрузилась, строки нет. Загруженные адреса помним,
+   чтобы при возврате в ленту не ждать их снова. */
+const ГОТОВЫЕ_КАРТИНКИ = new Set();
+function прогретьКартинку(url, срок = 6000) {
+  if (!url || ГОТОВЫЕ_КАРТИНКИ.has(url)) return Promise.resolve(true);
+  return new Promise((готово) => {
+    const img = new Image();
+    const конец = (ok) => { clearTimeout(таймер); ГОТОВЫЕ_КАРТИНКИ.add(url); готово(ok); };
+    // Битую или слишком медленную картинку больше не ждём: строка
+    // покажется с заглушкой, а не пропадёт из ленты навсегда.
+    const таймер = setTimeout(() => конец(false), срок);
+    img.onload = () => конец(true);
+    img.onerror = () => конец(false);
+    img.src = url;
+  });
+}
+function useКартинкаГотова(url) {
+  const [готова, setГотова] = useState(() => !url || ГОТОВЫЕ_КАРТИНКИ.has(url));
+  useEffect(() => {
+    if (!url || ГОТОВЫЕ_КАРТИНКИ.has(url)) { setГотова(true); return undefined; }
+    let брошено = false;
+    setГотова(false);
+    прогретьКартинку(url).then(() => { if (!брошено) setГотова(true); });
+    return () => { брошено = true; };
+  }, [url]);
+  return готова;
+}
+
 function превьюКартинки(url, размер) {
   const s = String(url || "");
   if (!/^https?:\/\//i.test(s)) return s;
@@ -8063,6 +8093,7 @@ function ЧислоКарточки({ подпись, значение, цвет
  * запуске), возраст, шкала до листинга и четыре цифры, по которым
  * мемкоины и сравнивают. Открывать имеет смысл уже осознанно. */
 const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
+  const картинкаГотова = useКартинкаГотова(tok.logoUrl ? превьюКартинки(tok.logoUrl, 48) : null);
   const рост = (tok.change || 0) >= 0;
   const возраст = (fmtAge(tok.createdAt) || "")
     .replace(/M$/, " мин").replace(/H$/, " ч").replace(/D$/, " д");
@@ -8073,6 +8104,7 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
     ? Math.max(0, Math.min(1, (Number(tok.raisedTon) || 0) / tok.graduationTon))
     : 0;
 
+  if (!картинкаГотова) return null;
   return (
     <button
       onClick={() => onOpen(tok)}
@@ -20415,7 +20447,7 @@ function Field({ label, placeholder, area, value, onChange, type = "text", icon:
 const CROP_BOX = 280;      // on-screen viewport size (css px)
 const CROP_OUTPUT = 512;   // exported image size (px)
 
-function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
+function ImageCropModal({ file, shape = "circle", onCancel, onConfirm, выход = CROP_OUTPUT }) {
   const [imgEl, setImgEl] = useState(null);
   const [natural, setNatural] = useState({ w: 0, h: 0 });
   const [baseScale, setBaseScale] = useState(1);
@@ -20559,10 +20591,11 @@ function ImageCropModal({ file, shape = "circle", onCancel, onConfirm }) {
     const cropY = -pos.y / scale;
     const cropSize = CROP_BOX / scale;
     const canvas = document.createElement("canvas");
-    canvas.width = CROP_OUTPUT;
-    canvas.height = CROP_OUTPUT;
+    canvas.width = выход;
+    canvas.height = выход;
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(imgEl, cropX, cropY, cropSize, cropSize, 0, 0, CROP_OUTPUT, CROP_OUTPUT);
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(imgEl, cropX, cropY, cropSize, cropSize, 0, 0, выход, выход);
     canvas.toBlob((blob) => {
       if (!blob) return;
       const baseName = (file.name || "image").replace(/\.[^.]+$/, "");
@@ -20719,7 +20752,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
   }
 
   return (
-    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "absolute", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.92)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(20px + var(--tg-inset-top, 0px)) 20px calc(20px + var(--tg-inset-bottom, 0px))", overflowY: "auto" }}>
+    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "absolute", inset: 0, zIndex: 80, background: done || error ? "rgba(0,0,0,0.92)" : "#000000", backdropFilter: done || error ? "blur(6px)" : "none", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(20px + var(--tg-inset-top, 0px)) 24px calc(20px + var(--tg-inset-bottom, 0px))", overflowY: "auto" }}>
       {error ? (
         <div className="fx-modal-card flex flex-col items-center text-center gap-4" style={{ width: "100%", maxWidth: 340, background: T.surface, border: "none", borderRadius: 24, padding: 24 }}>
           {/* Ошибку встречает маскот, а не безликий значок: тот же
@@ -20752,38 +20785,46 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
           </div>
         </div>
       ) : !done ? (
-        <div className="fx-modal-card flex flex-col items-center text-center gap-5" style={{ width: "100%", maxWidth: 340 }}>
-          {/* Голая крутилка, без гранёной плашки: она тут ничего не
-              значила, а на пустом экране читалась как оборванная
-              картинка. */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 64 }}>
-            <ЗнакЗагрузки size={44} вид="контур" />
-          </div>
-          <div>
-            <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700 }}>
-              {form.name.trim() || "Token"} · ${(form.ticker.trim() || "TICKER").toUpperCase()}
+        <div className="fx-modal-card flex flex-col" style={{ width: "100%", maxWidth: 360, alignSelf: "stretch", justifyContent: "center" }}>
+          {/* Лента шагов, как в промо-ролике: на чёрном — лицо токена и
+              список этапов без карточек. Пройденный этап — зелёная
+              галочка, текущий — прорисовка знака, впереди — приглушённые.
+              Этапы связаны линией: видно, сколько уже позади. */}
+          <div className="flex items-center" style={{ gap: 14, marginBottom: 30 }}>
+            <div style={{ width: 60, height: 60, borderRadius: "50%", flexShrink: 0, overflow: "hidden", background: logoUrl ? `center/cover no-repeat url(${logoUrl})` : T.surfaceHi, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {!logoUrl && <ЗнакЗвезда size={34} />}
             </div>
-            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 6 }}>{t("launchingWait")}</div>
+            <div className="min-w-0" style={{ textAlign: "left" }}>
+              <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800, lineHeight: 1.1 }}>
+                {form.name.trim() || "Token"}
+              </div>
+              <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 4 }}>
+                ${(form.ticker.trim() || "TICKER").toUpperCase()} · {t("launchingWait")}
+              </div>
+            </div>
           </div>
-          <div className="flex flex-col gap-2.5 w-full mt-1">
+          <div className="flex flex-col">
             {LAUNCH_STEPS.map((step, i) => {
-              const Icon = step.icon;
               const state = i < stepIndex ? "done" : i === stepIndex ? "active" : "pending";
+              const последний = i === LAUNCH_STEPS.length - 1;
               return (
-                <div key={step.key} className="flex items-center gap-2.5 rounded-[20px] px-3 py-2.5" style={{
-                  background: state === "active" ? ink(0.07) : "transparent",
-                  border: `1px solid ${state === "active" ? ink(0.22) : T.line}`,
-                  opacity: state === "pending" ? 0.45 : 1,
-                  transition: `opacity ${EASE}, background ${EASE}`,
-                }}>
-                  {state === "done" ? (
-                    <CheckCircle2 size={16} color={T.up} />
-                  ) : state === "active" ? (
-                    <ЗнакЗагрузки size={16} вид="раскрытие" />
-                  ) : (
-                    <Icon size={16} color={T.muted} />
-                  )}
-                  <span style={{ fontFamily: bodyFont, fontSize: 14, color: state === "pending" ? T.muted : T.ice, textAlign: "left" }}>{step.label()}</span>
+                <div key={step.key} className="flex" style={{ gap: 16, minHeight: последний ? 0 : 58 }}>
+                  <div className="flex flex-col items-center" style={{ width: 26, flexShrink: 0 }}>
+                    <div style={{ width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: state === "done" ? hexA(T.up, 0.16) : "transparent", border: state === "pending" ? `1.5px solid ${T.lineHi}` : "none", transition: `background ${EASE}` }}>
+                      {state === "done" ? <Check size={15} color={T.up} strokeWidth={3} />
+                        : state === "active" ? <ЗнакЗагрузки size={22} />
+                        : null}
+                    </div>
+                    {!последний && (
+                      <div style={{ flex: 1, width: 2, borderRadius: 1, margin: "6px 0", background: i < stepIndex ? hexA(T.up, 0.55) : T.line, transition: `background ${EASE}` }} />
+                    )}
+                  </div>
+                  <span style={{
+                    fontFamily: bodyFont, fontSize: 17, lineHeight: "26px", textAlign: "left",
+                    fontWeight: state === "active" ? 700 : 500,
+                    color: state === "pending" ? T.faint : state === "done" ? T.muted : T.ice,
+                    transition: `color ${EASE}`,
+                  }}>{step.label()}</span>
                 </div>
               );
             })}
@@ -21037,6 +21078,39 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   // предпросмотр и умирал вместе со вкладкой, никуда не сохраняясь.
   const [bannerFile, setBannerFile] = useState(null);
   const [touched, setTouched] = useState(false);
+  /* Запуск по шагам, как регистрация: сначала лицо токена (сеть,
+     логотип, имя, тикер), потом рассказ о нём (описание и ссылки), и
+     последним — деньги и сама кнопка. На каждом шаге видно только то,
+     что нужно решить сейчас, а не длинную форму целиком. */
+  const ШАГОВ_ЗАПУСКА = 3;
+  const [шаг, setШаг] = useState(0);
+  const шагГотов = шаг === 0
+    ? !!logoUrl && !!form.name.trim() && !!form.ticker.trim() && !solЗакрыт
+    : шаг === 1 ? !!form.desc.trim() : true;
+  function дальше() {
+    setTouched(true);
+    if (шаг === 0) {
+      if (solЗакрыт) { showToast(t("solLaunchClosedTitle")); return; }
+      if (!logoUrl) { showToast(t("logoRequired")); return; }
+      if (!form.name.trim() || !form.ticker.trim()) { showToast(t("nameTickerRequired")); return; }
+    }
+    if (шаг === 1 && !form.desc.trim()) { showToast(t("descRequiredWarning")); return; }
+    haptic("light");
+    // Подсказки об ошибках — только о том шаге, где человек сейчас.
+    setTouched(false);
+    setШаг((ш) => Math.min(ШАГОВ_ЗАПУСКА - 1, ш + 1));
+  }
+  function назадШаг() { haptic("light"); setTouched(false); setШаг((ш) => Math.max(0, ш - 1)); }
+  /* Системная «Назад» Telegram на втором и третьем шаге ведёт на шаг
+     назад, а не уводит из запуска. */
+  useEffect(() => {
+    const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    const кн = tg && tg.BackButton;
+    if (!кн || шаг === 0) return undefined;
+    const н = () => назадШаг();
+    try { кн.show(); кн.onClick(н); } catch (e) { /* старый клиент */ }
+    return () => { try { кн.offClick(н); кн.hide(); } catch (e) { /* старый клиент */ } };
+  }, [шаг]);
   /* Что включено при запуске. Хранится вместе с токеном и показывается
      покупателю: механика ценна не тем, что она есть, а тем, что о ней
      знают до покупки. */
@@ -21165,6 +21239,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
     setBannerUrl(null);
     setBannerFile(null);
     setTouched(false);
+    setШаг(0);
   }
 
   function finishLaunch(result) {
@@ -21207,12 +21282,33 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   // сорок точек, и под кнопкой запуска оставалась пустая половина экрана.
   return (
     <div className="fx-view flex flex-col gap-7" style={{ position: "relative", isolation: "isolate", paddingTop: 8 }}>
-      <ЗаголовокРаздела style={{ marginBottom: -12 }}>Запуск</ЗаголовокРаздела>
+      <ЗаголовокРаздела
+        style={{ marginBottom: -12 }}
+        справа={
+          <div className="flex items-center" style={{ gap: 6 }}>
+            {Array.from({ length: ШАГОВ_ЗАПУСКА }, (_, i) => (
+              <span key={i} style={{
+                height: 4, borderRadius: 2, width: i === шаг ? 22 : 8,
+                background: i <= шаг ? T.ice : T.lineHi,
+                transition: "width 420ms cubic-bezier(0.34, 1.4, 0.64, 1), background 300ms ease",
+              }} />
+            ))}
+          </div>
+        }
+      >
+        {шаг > 0 ? (
+          <button onClick={назадШаг} className="fx-tap flex items-center" style={{ background: "transparent", border: "none", padding: 0, gap: 4, color: T.ice, font: "inherit" }}>
+            <ChevronLeft size={30} color={T.ice} style={{ marginLeft: -8 }} />
+            {["Запуск", "Описание", "Покупка"][шаг]}
+          </button>
+        ) : "Запуск"}
+      </ЗаголовокРаздела>
       {/* Сеть выбирается тем же ползунком, что и в мемпаде: это один и
           тот же выбор рынка, и выглядеть он должен одинаково. Пустой
           обёртки здесь нет: без неё gap не добавляет фантомный отступ,
           когда выбора сети ещё нет, и раздел начинается на том же
           уровне, что «Главная» и «Мемпад». */}
+      {шаг === 0 && (<>
       {solДоступен && <NetworkSlider value={сетьЗапуска} onChange={setСетьЗапуска} />}
 
       {solЗакрыт && (
@@ -21246,6 +21342,9 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
 
       <Field label={t("nameLabel")} placeholder="Prism Cat" value={form.name} onChange={set("name")} />
       <Field label={t("tickerLabel")} placeholder="PRSM" value={form.ticker} onChange={set("ticker")} />
+      </>)}
+
+      {шаг === 1 && (<>
 
       <div>
         <Field label={t("descLabel")} placeholder={t("descPlaceholder")} area value={form.desc} onChange={set("desc")} error={touched && !form.desc.trim()} />
@@ -21257,6 +21356,26 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         <Field label="X" placeholder="x.com/..." value={form.x} onChange={set("x")} />
         <Field label={t("siteLabel")} placeholder="site.xyz" value={form.site} onChange={set("site")} />
       </div>
+      </>)}
+
+      {шаг < ШАГОВ_ЗАПУСКА - 1 && (
+        <button
+          onClick={дальше}
+          className="fx-tap rounded-[22px]"
+          style={{
+            fontFamily: displayFont, fontWeight: 700, fontSize: 17.5, padding: "18px 0", marginTop: 4,
+            // Готово — белая кнопка, как главное действие в ролике; пока
+            // шаг не заполнен — тихая графитовая.
+            color: шагГотов ? "#14151A" : T.faint,
+            background: шагГотов ? T.ice : T.surfaceHi,
+            transition: "background 220ms ease, color 220ms ease",
+          }}
+        >
+          Далее
+        </button>
+      )}
+
+      {шаг === 2 && (<>
 
       <div className="flex flex-col gap-1.5">
         {/* Сумму задают ползунком, а не клавиатурой: верх шкалы — весь
@@ -21429,16 +21548,17 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         className="cta-launch fx-tap rounded-[22px]"
         style={{
           fontFamily: displayFont, fontWeight: 700, fontSize: 17.5,
-          color: нехватка ? T.muted : PRISM_TEXT,
-          ...(нехватка ? { background: T.surfaceHi } : ВОЛНА(ЦВЕТ_КНОПКИ)),
+          color: нехватка ? T.muted : "#14151A",
+          background: нехватка ? T.surfaceHi : T.ice,
           opacity: нехватка ? 0.7 : 1,
           padding: "18px 0", marginTop: 4,
         }}
       >
         {t("launchTokenCta")}
       </button>
+      </>)}
 
-      <ImageCropModal file={logoCropFile} shape="circle" onCancel={() => setLogoCropFile(null)} onConfirm={handleLogoCropConfirm} />
+      <ImageCropModal file={logoCropFile} shape="circle" выход={256} onCancel={() => setLogoCropFile(null)} onConfirm={handleLogoCropConfirm} />
     </div>
   );
 }
@@ -27931,6 +28051,10 @@ function mapTokenRow(row) {
     // нельзя. Поэтому: попытка, обновление сессии и вторая попытка, а
     // если и она не прошла — кладём в телефон и досохраняем при
     // следующем запуске приложения.
+    // Картинку прогреваем до того, как токен попадёт в ленту: первая
+    // выдача файла из хранилища медленная, и у всех остальных строка
+    // появлялась без логотипа. Ждём не дольше трёх секунд.
+    if (строка.logo_url) await прогретьКартинку(строка.logo_url, 3000);
     let { data: row, error } = await supabase.from("tokens").insert(строка).select().single();
     if (error) {
       console.warn("[mintly] первая попытка сохранить токен не прошла:", error.message);
