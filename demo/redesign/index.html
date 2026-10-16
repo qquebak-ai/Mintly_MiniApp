@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Mintly · новый дизайн</title>
+<style>
+@font-face{font-family:'Onest';font-weight:100 900;src:url('../built/assets/fonts/onest-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+2000-206F,U+20AC,U+2212}
+@font-face{font-family:'Onest';font-weight:100 900;src:url('../built/assets/fonts/onest-cyrillic.woff2') format('woff2');unicode-range:U+0400-045F}
+@font-face{font-family:'Nunito';font-weight:800;src:url('../built/assets/fonts/nunito-800-cyrillic.woff2') format('woff2');unicode-range:U+0400-045F}
+@font-face{font-family:'Nunito';font-weight:800;src:url('../built/assets/fonts/nunito-800-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+2000-206F,U+2212}
+*{margin:0;padding:0;box-sizing:border-box}
+/* Палитра из видео: чистый чёрный, графитовые поверхности, тёплый белый
+   текст; цвет — только у цен (рост/падение) и у главного действия */
+:root{--bg:#000;--s1:#0F0F13;--s2:#14171F;--line:rgba(255,255,255,.08);--tx:#F2F0EB;--mut:#97958F;--dim:#63625F;--up:#2EE87A;--dn:#FF5A63;--buy:#00E96B}
+body{background:#050505;font-family:'Onest',system-ui,sans-serif;color:var(--tx);-webkit-font-smoothing:antialiased;padding:56px 48px 64px}
+h1.page{font:800 44px/1.1 'Nunito';margin-bottom:6px}
+p.sub{font:500 18px/1.4 'Onest';color:var(--mut);margin-bottom:36px}
+.row{display:flex;gap:36px;flex-wrap:wrap}
+.cap{font:600 16px/1 'Onest';color:var(--mut);margin:0 0 14px 6px}
+.phone{width:393px;height:852px;border-radius:54px;background:var(--bg);position:relative;overflow:hidden;box-shadow:0 0 0 10px #1C1D22,0 0 0 11.5px rgba(255,255,255,.14),0 40px 100px rgba(0,0,0,.7)}
+.sb{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;font:700 16px/1 'Onest'}
+.isl{position:absolute;left:134px;top:12px;width:125px;height:36px;border-radius:20px;background:#000;z-index:5}
+.scr{position:absolute;inset:54px 0 0;overflow:hidden;padding:6px 18px 140px}
+.N{font-family:'Nunito';font-weight:800}
+.num{font-variant-numeric:tabular-nums}
+.up{color:var(--up)}.dn{color:var(--dn)}
+.av{border-radius:50%;flex:none;object-fit:cover;background:#1a1a1a}
+/* --- нижняя навигация: та же капсула, что в приложении и в видео --- */
+.nav{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);display:flex;gap:8px;padding:9px;border-radius:999px;background:rgba(20,20,22,.72);backdrop-filter:blur(24px);box-shadow:0 10px 30px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.07);z-index:6}
+.nav b{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.nav b.on{background:#fff}
+.nav svg{width:26px;height:26px;stroke:#9B9FA9;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav b.on svg{stroke:#14151A;stroke-width:2}
+/* --- общие кусочки --- */
+.top{display:flex;align-items:center;justify-content:space-between;margin:6px 0 18px}
+.ttl{font:800 34px/1 'Nunito';letter-spacing:-.01em}
+.me{width:42px;height:42px;border-radius:50%;background:var(--s2);display:flex;align-items:center;justify-content:center}
+.seg{display:inline-flex;padding:4px;border-radius:999px;background:var(--s2)}
+.seg span{padding:9px 16px;border-radius:999px;font:700 14px/1 'Onest';color:var(--dim);display:flex;align-items:center;gap:7px}
+.seg span.on{background:rgba(255,255,255,.92);color:#0B0B0F}
+.seg img{width:16px;height:16px;border-radius:50%}
+.chips{display:flex;gap:8px;overflow:hidden;margin:16px 0 14px}
+.chips span{padding:10px 15px;border-radius:999px;font:600 14px/1 'Onest';color:var(--mut);background:var(--s2);white-space:nowrap}
+.chips span.on{background:#fff;color:#0B0B0F}
+.btn{height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;font:800 18px/1 'Nunito'}
+.btn.w{background:#F2F0EB;color:#14151A}
+.btn.g{background:var(--buy);color:#04150B}
+.btn.r{background:#FF3B47;color:#fff}
+.btn.o{background:var(--s2);color:var(--tx)}
+.lab{font:500 13px/1 'Onest';color:var(--mut);margin:14px 0 8px}
+.fld{height:52px;border-radius:14px;background:var(--s2);border:1px solid #22262F;display:flex;align-items:center;padding:0 16px;font:400 17px/1 'Onest'}
+.fld.ph{color:var(--dim)}
+
+/* ===== Вариант A — «Карточки»: всё на графитовых плитках, как виджеты в видео ===== */
+.A .list{display:flex;flex-direction:column;gap:8px}
+.A .it{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:20px;background:var(--s1);border:1px solid var(--line)}
+.A .card{border-radius:26px;background:var(--s1);border:1px solid var(--line);padding:18px}
+/* ===== Вариант B — «Лента»: без плиток, крупные строки на чистом чёрном ===== */
+.B .list{display:flex;flex-direction:column}
+.B .it{display:flex;align-items:center;gap:14px;padding:14px 2px;border-bottom:1px solid var(--line)}
+.B .card{padding:4px 2px 18px;border-bottom:1px solid var(--line)}
+.B .ttl{font-size:40px}
+.B .chips span{background:none;border:1px solid rgba(255,255,255,.12)}
+.B .chips span.on{background:#fff;border-color:#fff}
+
+.it .nm{font:800 18px/1.15 'Nunito'}
+.it .ds{font:500 13px/1.4 'Onest';color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .r{margin-left:auto;text-align:right;flex:none}
+.it .pr{font:800 17px/1.15 'Nunito'}
+.it .ch{font:700 13px/1.4 'Onest'}
+</style>
+</head>
+<body>
+<h1 class="page">Mintly — новый дизайн</h1>
+<p class="sub">Стиль ролика: чистый чёрный, графит, тёплый белый; цвет только у цен и у кнопок покупки. Логотип и нижняя капсула — как сейчас.</p>
+<div id="root"></div>
+<script src="../built/assets/star.js"></script>
+<script>
+const ЗВ = window.__STAR;
+const star = (s, f = "#E4E2DC") => `<svg width="${s}" height="${s}" viewBox="25 25 150 150" style="display:block"><path d="${ЗВ}" fill="${f}"/></svg>`;
+const И = {
+  home: '<path d="M4 10.4 12 4l8 6.4V19a1.4 1.4 0 0 1-1.4 1.4H5.4A1.4 1.4 0 0 1 4 19z"/>',
+  swap: '<path d="M4 8.6h13.2"/><path d="M14.4 5.4 17.8 8.6l-3.4 3.2"/><path d="M20 15.4H6.8"/><path d="M9.6 12.2 6.2 15.4l3.4 3.2"/>',
+  rocket: '<g transform="rotate(-45 12 12)"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></g>',
+  bag: '<path d="M3.8 7.8h16.4v11a1.8 1.8 0 0 1-1.8 1.8H5.6a1.8 1.8 0 0 1-1.8-1.8z"/><path d="M8.4 7.8V6.2A3.6 3.6 0 0 1 12 2.6a3.6 3.6 0 0 1 3.6 3.6v1.6"/>',
+  bars: '<path d="M4.8 13.2v6"/><path d="M9.6 8.4v10.8"/><path d="M14.4 5.2v14"/><path d="M19.2 10.6v8.6"/>',
+  user: '<circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.6 7-5.6s6.2 2 7 5.6"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/>',
+  back: '<path d="M14.5 5 8 12l6.5 7"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  arrowUp: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+  arrowDn: '<path d="M12 5v14M6 13l6 6 6-6"/>',
+};
+const ic = (k, s = 22, c = "#F2F0EB", w = 1.8) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${И[k]}</svg>`;
+const AV = (n) => `../built/assets/coins/${n}.png`;
+const GRAM = "../built/assets/app/gram.png", SOL = "../built/assets/app/sol.png";
+const nav = (on) => `<div class="nav">${["home", "swap", "rocket", "bag", "bars"].map((k) => `<b class="${k === on ? "on" : ""}"><svg viewBox="0 0 24 24">${И[k]}</svg></b>`).join("")}</div>`;
+const phone = (inner, on) => `<div class="phone"><div class="isl"></div><div class="sb"><span>9:41</span><span style="opacity:.9">●●● ᯤ ▮</span></div><div class="scr">${inner}</div>${on ? nav(on) : ""}</div>`;
+const МОНЕТЫ = [
+  ["jimothy", "Jimothy", "$0.00310754", "+9.85%", 1, "Капитализация $3.1M"],
+  ["gtr", "GTR", "$0.23", "+12.91%", 1, "Капитализация $230K"],
+  ["cards", "CARDS", "$0.33", "+10.04%", 1, "Капитализация $33M"],
+  ["otc", "OTC", "$0.0105", "+55.76%", 1, "Капитализация $10.5M"],
+  ["ansem", "ANSEM", "$0.11", "-3.88%", 0, "Капитализация $110M"],
+  ["heehaw", "HeeHaw", "$0.00037973", "+1.88%", 1, "Капитализация $379K"],
+  ["mintly", "Mintly", "$0.0042", "+24.10%", 1, "Капитализация $42K"],
+];
+const ряд = ([a, n, p, c, u, d], extra = "") => `<div class="it"><img class="av" src="${AV(a)}" width="48" height="48"/><div style="min-width:0"><div class="nm">${n}${extra}</div><div class="ds">${d}</div></div><div class="r"><div class="pr num">${p}</div><div class="ch num ${u ? "up" : "dn"}">${c}</div></div></div>`;
+const график = (w = 357, h = 150, c = "#2EE87A") => `<svg width="${w}" height="${h}" viewBox="0 0 357 150" fill="none" style="display:block"><defs><linearGradient id="g${c.slice(1)}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".28"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient></defs><path d="M0 128 L30 120 L60 124 L90 104 L120 110 L150 86 L180 94 L210 72 L240 80 L270 54 L300 62 L330 34 L357 22 L357 150 L0 150Z" fill="url(#g${c.slice(1)})"/><path d="M0 128 L30 120 L60 124 L90 104 L120 110 L150 86 L180 94 L210 72 L240 80 L270 54 L300 62 L330 34 L357 22" stroke="${c}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+// ---------- экраны ----------
+const главная = () => phone(`
+  <div class="top"><div style="display:flex;align-items:center;gap:10px">${star(30)}<span class="ttl">Mintly</span></div><div class="me">${ic("user", 22)}</div></div>
+  <div class="card" style="padding-bottom:20px">
+    <div style="font:500 14px/1 'Onest';color:var(--mut)">Баланс</div>
+    <div class="N num" style="font-size:46px;margin:10px 0 4px">$1 284.50</div>
+    <div class="up" style="font:700 15px/1 'Onest'">+$86.20 · +7.2% за сутки</div>
+    <div style="display:flex;gap:8px;margin-top:18px"><div class="btn w" style="flex:1;height:50px">Купить</div><div class="btn o" style="flex:1;height:50px">Продать</div><div class="btn o" style="width:50px;height:50px">${ic("plus", 22)}</div></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin:22px 2px 10px"><span class="N" style="font-size:22px">В тренде</span><span style="font:600 14px/1 'Onest';color:var(--mut)">Все</span></div>
+  <div class="list">${[МОНЕТЫ[3], МОНЕТЫ[1], МОНЕТЫ[2], МОНЕТЫ[6]].map((m) => ряд(m)).join("")}</div>`, "home");
+
+const мемпад = () => phone(`
+  <div class="top"><span class="ttl">Мемпад</span><div class="seg"><span class="on"><img src="${GRAM}"/>GRAM</span><span><img src="${SOL}"/>SOL</span></div></div>
+  <div class="fld ph" style="gap:10px">${ic("search", 20, "#63625F")}Токен или адрес</div>
+  <div class="chips"><span class="on">Новые</span><span>Трендовые</span><span>Скоро на бирже</span><span>По обороту</span></div>
+  <div class="list">${МОНЕТЫ.slice(0, 7).map((m) => ряд(m)).join("")}</div>`, "swap");
+
+const токен = () => phone(`
+  <div class="top" style="margin-bottom:14px"><div class="me">${ic("back", 22)}</div><div class="seg"><span class="on">1Ч</span><span>1Д</span><span>1Н</span><span>ВСЁ</span></div></div>
+  <div style="display:flex;align-items:center;gap:14px"><img class="av" src="${AV("jimothy")}" width="60" height="60"/><div><div class="N" style="font-size:26px">Jimothy</div><div style="font:500 14px/1.4 'Onest';color:var(--mut)">$JIM · Solana</div></div></div>
+  <div class="N num" style="font-size:44px;margin:18px 0 4px">$0.00310754</div>
+  <div class="up" style="font:700 15px/1 'Onest'">+$0.00027 · +9.85%</div>
+  <div style="margin:16px -2px 10px">${график()}</div>
+  <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:14px 10px">
+    ${[["Капитализация", "$3.1M"], ["Объём 24ч", "$842K"], ["Держатели", "12 480"], ["До DEX", "72%"]].map(([a, b]) => `<div><div style="font:500 13px/1 'Onest';color:var(--mut)">${a}</div><div class="N num" style="font-size:20px;margin-top:6px">${b}</div></div>`).join("")}
+    <div style="grid-column:1/-1;height:8px;border-radius:9px;background:var(--s2);overflow:hidden"><div style="width:72%;height:100%;background:#F2F0EB;border-radius:9px"></div></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:16px"><div class="btn g" style="flex:1">Купить</div><div class="btn r" style="flex:1">Продать</div></div>`, null);
+
+const запуск = () => phone(`
+  <div class="top"><span class="ttl">Запуск</span><div class="seg"><span class="on"><img src="${GRAM}"/>GRAM</span><span><img src="${SOL}"/>SOL</span></div></div>
+  <div style="display:flex;gap:12px">
+    <div style="width:92px;height:92px;border-radius:50%;border:1.5px dashed #30343E;overflow:hidden;flex:none"><img src="${AV("mintly")}" width="92" height="92"/></div>
+    <div style="flex:1;height:92px;border-radius:20px;border:1.5px dashed #30343E;display:flex;align-items:center;justify-content:center;font:500 13px/1.4 'Onest';color:var(--mut);text-align:center">Баннер 1200×400<br>необязательно</div></div>
+  <div class="lab">Название</div><div class="fld">Mintly</div>
+  <div class="lab">Тикер</div><div class="fld">MINT</div>
+  <div class="lab">Описание</div><div class="fld" style="height:86px;align-items:flex-start;padding-top:15px;line-height:1.35">Мемкоины на Gram и Solana прямо в Telegram</div>
+  <div class="lab">Начальная покупка</div><div class="fld" style="justify-content:space-between"><span>0.5</span><span style="color:var(--mut)">GRAM</span></div>
+  <div style="font:500 13px/1.4 'Onest';color:var(--mut);margin:14px 2px">Комиссия платформы — 0%. Токен появится в мемпаде сразу после запуска.</div>
+  <div class="btn w">Запустить токен</div>`, "rocket");
+
+const магазин = () => phone(`
+  <div class="top"><span class="ttl">Магазин</span><div class="seg"><span class="on">★ 1 240</span></div></div>
+  <div class="card" style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+    <div style="width:110px;height:70px;border-radius:12px;background:linear-gradient(135deg,#A7A7A7,#7E7E7E 55%,#5A5A5A);position:relative;overflow:hidden;flex:none"><div style="position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(0,0,0,.45) 48%,transparent 66%)"></div><img src="${AV("mintly")}" width="22" height="22" style="position:absolute;left:9px;top:9px;border-radius:50%"/></div>
+    <div><div class="N" style="font-size:19px">Лимитированная карта</div><div style="font:500 13px/1.4 'Onest';color:var(--mut)">Для токенов, дошедших до DEX</div></div></div>
+  <div class="chips" style="margin-top:4px"><span class="on">Рамки</span><span>Карточки</span><span>Кошельки</span><span>Минти</span></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    ${[["Графит", "Бесплатно", "#3A3A3F"], ["Серебро", "★ 300", "#8E8E93"], ["Оникс", "★ 600", "#1B1B1F"], ["Платина", "★ 900", "#C9C9CE"]].map(([n, p, c], i) => `<div class="card" style="padding:14px"><div style="height:110px;border-radius:16px;background:var(--s2);display:flex;align-items:center;justify-content:center"><div style="width:68px;height:68px;border-radius:50%;box-shadow:0 0 0 5px ${c};overflow:hidden"><img src="${AV(["jimothy", "gtr", "cards", "heehaw"][i])}" width="68" height="68"/></div></div><div class="N" style="font-size:17px;margin-top:12px">${n}</div><div style="font:600 13px/1.5 'Onest';color:var(--mut)">${p}</div></div>`).join("")}
+  </div>`, "bag");
+
+const кошелёк = () => phone(`
+  <div class="top"><span class="ttl">Кошелёк</span><div class="me">${ic("user", 22)}</div></div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:500 14px/1 'Onest';color:var(--mut)">UQB3…k9Fd</span><span style="font:600 13px/1 'Onest';color:var(--mut)">Tonkeeper</span></div>
+    <div class="N num" style="font-size:46px;margin:12px 0 4px">$1 284.50</div>
+    <div class="up" style="font:700 15px/1 'Onest'">+7.2% за сутки</div>
+    <div style="display:flex;gap:8px;margin-top:18px">${[["arrowDn", "Получить"], ["arrowUp", "Отправить"], ["swap", "Обмен"]].map(([k, t]) => `<div style="flex:1;height:66px;border-radius:16px;background:var(--s2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font:600 13px/1 'Onest'">${ic(k, 20)}${t}</div>`).join("")}</div>
+  </div>
+  <div style="margin:22px 2px 10px" class="N"><span style="font-size:22px">Активы</span></div>
+  <div class="list">
+    ${ряд(["mintly", "GRAM", "$612.40", "+2.10%", 1, "184.2 GRAM"])}
+    ${ряд(["jimothy", "Jimothy", "$402.15", "+9.85%", 1, "129 400 JIM"])}
+    ${ряд(["cards", "CARDS", "$198.00", "+10.04%", 1, "600 CARDS"])}
+    ${ряд(["ansem", "ANSEM", "$71.95", "-3.88%", 0, "654 ANSEM"])}
+  </div>`, "bars");
+
+const ЭКРАНЫ = [["Главная", главная], ["Мемпад", мемпад], ["Страница токена", токен], ["Запуск", запуск], ["Магазин", магазин], ["Кошелёк", кошелёк]];
+const v = new URLSearchParams(location.search).get("v") || "A";
+document.getElementById("root").innerHTML = `<div class="row ${v}">${ЭКРАНЫ.map(([n, f]) => `<div><div class="cap">${n}</div>${f()}</div>`).join("")}</div>`;
+// у «GRAM» в кошельке своя иконка
+document.querySelectorAll('.it img[src$="mintly.png"]').forEach((im) => { if (im.parentElement.querySelector(".nm").textContent === "GRAM") im.src = GRAM; });
+</script>
+</body>
+</html>
