@@ -3,17 +3,15 @@
 # переходе камеры, звон на знаке, глитч-удар на концовке и тишина за ним.
 import numpy as np, wave, sys
 from scipy.signal import butter, lfilter
-SR = 44100; DUR = 23.72; n = int(SR * DUR); L = np.zeros(n); R = np.zeros(n)
+SR = 44100; DUR = 18.92; n = int(SR * DUR); L = np.zeros(n); R = np.zeros(n)
 rs = np.random.RandomState(5)
 # слайды с преимуществами вклиниваются в действие: время действия → время ролика
-INS = [(4.42, 5.2), (5.9, 5.9), (6.42, 6.42), (8.28, 8.28), (10.0, 10.0)]; SLD = 1.5
+SN, SK, SLD, NS = 4.42, 10.0, 1.5, 5   # блок слайдов: где встаёт, откуда действие дальше
 def M(t):
-    # события из вырезанного куска (пролёт сквозь ленту) не звучат
-    r = t
-    for a, b in INS:
-        if t >= b: r += SLD - (b - a)
-        elif t >= a: return -1
-    return r
+    # то, что было между запуском и знаком (карточка и покупка), вырезано
+    if t < SN: return t
+    if t < SK: return -1
+    return t - (SK - SN) + SLD * NS
 def put(t, s, g=1.0, pan=0.0): put_raw(M(t), s, g, pan)
 def put_raw(t, s, g=1.0, pan=0.0):
     i = int(t * SR)
@@ -65,12 +63,12 @@ def glitch(d):
 # бит 122 BPM от начала до знака
 B = 60 / 122; PROG = [(45, [57, 64, 69, 72]), (41, [53, 60, 65, 69]), (48, [55, 60, 64, 67]), (43, [55, 59, 62, 67])]
 t = 0.0; bar = 0
-while t < M(9.95):
+while t < SN + SLD * NS:
     root, ch = PROG[bar % 4]
     put_raw(t, pad(ch, 4 * B + .3), .22)
     for b in range(4):
         tb = t + b * B
-        if tb >= M(9.95): break
+        if tb >= SN + SLD * NS: break
         put_raw(tb, kick(), .55)
         if b in (1, 3): put_raw(tb, clap(), .4)
         for h in range(2): put_raw(tb + h * B / 2 + B / 4, hat(h == 1), .6, pan=.3)
@@ -95,8 +93,8 @@ put(10.08, chime(76), .3); put(10.08, chime(83), .14)
 for i in range(17): put(10.32 + .8 * i / 17, tick(), .3)
 put(11.0, pad([64, 71, 76, 83], 1.6, cut=3000, att=.4, rel=1.0), .18)
 # слайды: свист на входе и мягкий аккорд под фразой
-for a, b in INS:
-    r = M(b) - SLD
+for k in range(NS):
+    r = SN + k * SLD
     put_raw(r - .05, whoosh(.4), .3); put_raw(r + .15, pad([69, 76, 81, 88], 1.2, cut=3200, att=.2, rel=.6), .14); put_raw(r + .2, pop(1000), .12)
 # концовка: глитч и удар, потом тишина
 put(13.04, glitch(.5), .45); put(13.04, hit(), .7); put(13.42, pop(1600), .2)
