@@ -399,16 +399,17 @@ function drawS4(t) {
 
 // ===================== СЛАЙДЫ С ПРЕИМУЩЕСТВАМИ =====================
 // Каждое преимущество — отдельный слайд на чистом фоне, без интерфейса:
-// крупная фраза по словам из размытия, как в первом промо. Слайды
+// крупная фраза по словам из размытия, как в первом промо, — слева,
+// а справа экран или виджет с тем, о чём она. Слайды
 // вклиниваются в действие: интерфейс на это время замирает и
 // растворяется, а потом продолжается с того же места.
 const ui = $(`<div class="scene"></div>`);
 const slides = $(`<div class="scene"></div>`);
 function slide(html) {
-  const box = $(`<div class="abs" style="left:0;right:0;top:0;height:${H}px;display:flex;align-items:center;justify-content:center"><div class="deco abs" style="inset:0"></div><div style="position:relative;text-align:center;font:800 132px/1.12 'Nunito';letter-spacing:-.02em;color:#fff;text-shadow:0 8px 40px rgba(0,0,0,.55)">${html}</div></div>`);
+  const box = $(`<div class="abs" style="left:0;right:0;top:0;height:${H}px;display:flex;align-items:center;justify-content:flex-start;padding-left:150px"><div class="deco abs" style="inset:0"></div><div style="position:relative;text-align:left;font:800 118px/1.12 'Nunito';letter-spacing:-.02em;color:#fff;text-shadow:0 8px 40px rgba(0,0,0,.55)">${html}</div></div>`);
   slides.appendChild(box);
   const el = box.lastElementChild; el.box = box; el.deco = box.firstElementChild;
-  el.innerHTML = el.innerHTML.replace(/(<br>)|([^\s<]+)/g, (m, br) => br ? br : `<span class="w" style="display:inline-block;margin:0 .14em">${m}</span>`);
+  el.innerHTML = el.innerHTML.replace(/(<br>)|([^\s<]+)/g, (m, br) => br ? br : `<span class="w" style="display:inline-block;margin:0 .26em 0 0">${m}</span>`);
   el.spans = [...el.querySelectorAll(".w")];
   el.spans.forEach((sp) => { if (sp.textContent.startsWith("*")) { sp.textContent = sp.textContent.slice(1); sp.classList.add("grad"); } });
   return el;
@@ -437,80 +438,116 @@ function разложить(T) {
     return { t, el: ВСЕ_СЛАЙДЫ[i], p: T - С_НАЧ - i * ДЛ, блок: T - С_НАЧ }; }
   return { t: T - С_ДЛ + (С_КОН - С_НАЧ), el: null, p: 0, блок: -1 };
 }
-// ---- своё движение под каждой фразой: ни одно не повторяется ----
-// Летун по дуге с пунктирным следом — самолётик понравился, поэтому так
-// же летают ракета (запуск) и молния (покупка), каждый по своей кривой.
-const мер = (d) => { const p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("d", d); return p; };
-function летун(i, путь, иконка, размер, поворот, тень) {
-  const след = $(`<svg class="abs" style="left:0;top:0" width="${W}" height="${H}"><path d="${путь}" fill="none" stroke="rgba(156,192,255,.45)" stroke-width="4" stroke-dasharray="2 22" stroke-linecap="round"/></svg>`);
-  const тело = $(`<svg class="abs" style="left:0;top:0;filter:drop-shadow(0 10px 30px ${тень})" width="${размер}" height="${размер}" viewBox="0 0 24 24">${иконка}</svg>`);
-  ВСЕ_СЛАЙДЫ[i].deco.appendChild(след); ВСЕ_СЛАЙДЫ[i].deco.appendChild(тело);
-  return { линия: след.querySelector("path"), тело, м: мер(путь), размер, поворот };
+// ---- справа от фразы — то, о чём она: экран приложения или виджет ----
+// Фраза слева только называет преимущество, а справа его видно в деле:
+// телефон там, где важно действие пальцем, отдельный виджет — где важна
+// одна цифра или сравнение.
+const ПX = 1300, ПY = 102; // где стоит телефон
+const ЭX = ПX + 12, ЭY = ПY + 12; // начало экрана — от него считаются нажатия
+function телефон(i, html) {
+  const ph = $(`<div class="abs" style="left:${ПX}px;top:${ПY}px;width:417px;height:876px;border-radius:66px;background:#1C1D22;box-shadow:inset 0 0 0 2px rgba(255,255,255,.14),0 50px 120px rgba(0,0,0,.65),0 0 90px rgba(79,134,255,.22)">
+    <div class="scr abs" style="left:12px;top:12px;width:393px;height:852px;border-radius:54px;overflow:hidden;background:#0B0D12">
+      <div class="abs" style="left:34px;top:20px;font:700 17px/1 'Onest';color:#F2F0EB">9:41</div>
+      ${html}
+    </div>
+    <div class="abs" style="left:146px;top:24px;width:125px;height:36px;border-radius:20px;background:#000"></div>
+  </div>`);
+  ВСЕ_СЛАЙДЫ[i].deco.appendChild(ph);
+  return ph;
 }
-function вести(л, k) {
-  const L = л.м.getTotalLength(), a = л.м.getPointAtLength(L * k), b = л.м.getPointAtLength(Math.min(L, L * k + 4));
-  const ug = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
-  л.тело.style.transform = `translate3d(${(a.x - л.размер / 2).toFixed(1)}px,${(a.y - л.размер / 2).toFixed(1)}px,0) rotate(${(ug + л.поворот).toFixed(1)}deg)`;
-  // пунктир дорисовывается ровно до летуна
-  л.линия.style.strokeDasharray = "2 22";
-  л.линия.style.clipPath = "none";
-  л.линия.setAttribute("pathLength", "1");
-  л.линия.style.strokeDasharray = `${(k * 1).toFixed(4)} 1`;
+const виджет = (i, x, y, w, html, доп = "") => {
+  const e = $(`<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;border-radius:40px;background:#0F0F13;border:1.5px solid rgba(255,255,255,.09);box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 40px 110px rgba(0,0,0,.6),0 0 80px rgba(79,134,255,.16);${доп}">${html}</div>`);
+  ВСЕ_СЛАЙДЫ[i].deco.appendChild(e);
+  return e;
+};
+// плашка-подтверждение, как всплывает в приложении после действия
+const плашка = (i, x, y, заг, под, хвост) => виджет(i, x, y, 520, `
+  <div style="height:112px;display:flex;align-items:center;gap:22px;padding:0 28px">
+    <span style="width:60px;height:60px;border-radius:18px;background:rgba(46,232,122,.16);display:flex;align-items:center;justify-content:center;flex:none">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#2EE87A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+    <div style="flex:1"><div style="font:800 32px/1.1 'Nunito';color:#fff">${заг}</div><div style="font:500 22px/1.35 'Onest';color:#8E8E99">${под}</div></div>
+    <div class="сек" style="font:800 32px/1 'Nunito';color:#2EE87A;font-variant-numeric:tabular-nums">${хвост}</div>
+  </div>`, "border-radius:30px");
+const палец = (i) => { const c = cursor.cloneNode(true); ВСЕ_СЛАЙДЫ[i].deco.appendChild(c); return c; };
+// экран и виджеты въезжают справа из размытия
+function въезд(e, p, a = 0.05, сдвиг = 160) {
+  const k = E.out(prog(p, a, a + 0.6));
+  S(e, { o: smooth(prog(p, a, a + 0.3)), x: (1 - k) * сдвиг, b: (1 - k) * 10 });
 }
-// 1. Запуск — ракета из приложения уходит вверх по дуге
-const РАКЕТА = '<g transform="rotate(-45 12 12)" fill="none" stroke="#E4E2DC" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" fill="#5A8CFF" stroke="#5A8CFF"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" fill="#E4E2DC"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></g>';
-// Ракета летит по прямой наискосок — снизу слева вверх направо, мимо
-// фразы: корпус с бликом, иллюминатор, синие стабилизаторы, живое
-// пламя и дымный след, который отстаёт и тает.
-const Р_ОТ = [-260, 1060], Р_ДО = [1180, -380];
-const РУГОЛ = Math.atan2(Р_ДО[1] - Р_ОТ[1], Р_ДО[0] - Р_ОТ[0]) * 180 / Math.PI;
-const дым = Array.from({ length: 34 }, () => { const e = $(`<div class="abs" style="left:0;top:0;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,rgba(210,225,255,.55),rgba(150,180,255,.18) 55%,rgba(150,180,255,0) 72%)"></div>`); ВСЕ_СЛАЙДЫ[0].deco.appendChild(e); return e; });
-// Ракета — та самая анимированная эмодзи 🚀 из приложения (rocket.json):
-// её кадр выставляется по времени, чтобы рендер был покадрово точным.
-const ракетаВсё = $(`<div class="abs" style="left:0;top:0;width:360px;height:360px;filter:drop-shadow(0 18px 40px rgba(79,134,255,.45))"></div>`);
-ВСЕ_СЛАЙДЫ[0].deco.appendChild(ракетаВсё);
-const ракетаАним = lottie.loadAnimation({ container: ракетаВсё, renderer: "svg", loop: true, autoplay: false, animationData: window.РАКЕТА_ДАННЫЕ });
-function drawRocket(q) {
-  // лёгкий разгон в начале и ровный ход дальше
-  const k = q < 0.12 ? 0.12 * E.inQ(q / 0.12) : 0.12 + (q - 0.12) * 1.05;
-  const x = lerp(Р_ОТ[0], Р_ДО[0], k), y = lerp(Р_ОТ[1], Р_ДО[1], k);
-  const дрожь = Math.sin(q * 140) * 1.6;
-  ракетаВсё.style.transform = `translate3d(${(x - 180 + дрожь).toFixed(1)}px,${(y - 180).toFixed(1)}px,0) rotate(${(РУГОЛ + 45).toFixed(2)}deg)`;
-  ракетаАним.goToAndStop((q * ДЛ * 60) % ракетаАним.totalFrames, true);
-  // дым: клубы рождаются у сопла, отстают, растут и тают
-  const ux = Math.cos(РУГОЛ * Math.PI / 180), uy = Math.sin(РУГОЛ * Math.PI / 180);
-  дым.forEach((e, j) => {
-    const рожд = j / дым.length * 0.95, возр = q - рожд;
-    if (возр < 0 || k > 1.3) { e.style.opacity = 0; return; }
-    const kk = рожд < 0.12 ? 0.12 * E.inQ(рожд / 0.12) : 0.12 + (рожд - 0.12) * 1.05;
-    const bx = lerp(Р_ОТ[0], Р_ДО[0], kk) - ux * 130, by = lerp(Р_ОТ[1], Р_ДО[1], kk) - uy * 130;
-    const рост = 0.6 + возр * 6, сдув = возр * 60;
-    e.style.transform = `translate3d(${(bx - 40 + Math.sin(j * 2.3) * сдув * 0.4).toFixed(1)}px,${(by - 40 + сдув * 0.5).toFixed(1)}px,0) scale(${рост.toFixed(3)})`;
-    e.style.opacity = Math.max(0, 0.9 - возр * 1.6).toFixed(3);
-  });
+// палец подходит снизу к точке экрана и нажимает
+function нажатие(c, q, x, y, a, b) {
+  const kc = E.out(prog(q, a, b)), pr = clamp(prog(q, b + 0.02, b + 0.05) - prog(q, b + 0.07, b + 0.11));
+  S(c, { o: smooth(prog(q, a, a + 0.05)) * (1 - smooth(prog(q, b + 0.16, b + 0.24))), x: lerp(x + 220, x, kc) - 14, y: lerp(y + 380, y, kc) - 6, s: 1 - 0.12 * pr });
+  return pr;
 }
-// 2. Две сети — тот самый переключатель GRAM / SOL из приложения
-const сети = $(`<div class="abs" style="left:${W / 2 - 230}px;top:70px;width:460px;height:104px;border-radius:999px;background:#14171F;box-shadow:0 20px 60px rgba(0,0,0,.45)">
-  <div class="бег abs" style="left:8px;top:8px;width:218px;height:88px;border-radius:999px;background:rgba(255,255,255,.92)"></div>
-  <div class="сг abs" style="left:8px;top:0;width:218px;height:104px;display:flex;align-items:center;justify-content:center;gap:14px;font:800 36px/1 'Nunito'"><img src="assets/app/gram.png" style="width:40px;height:40px"/>GRAM</div>
-  <div class="сс abs" style="left:234px;top:0;width:218px;height:104px;display:flex;align-items:center;justify-content:center;gap:14px;font:800 36px/1 'Nunito'"><img src="assets/app/sol.png" style="width:40px;height:40px;border-radius:50%"/>SOL</div>
-</div>`);
-ВСЕ_СЛАЙДЫ[1].deco.appendChild(сети);
-const бег = сети.querySelector(".бег"), сг = сети.querySelector(".сг"), сс = сети.querySelector(".сс");
-// под фразой — сам мемпад: строка фильтров и токены выбранной сети;
-// переключатель меняет список, как в приложении
-const МП_Y = 640, МП_W = 1000;
-const мемпад = $(`<div class="abs" style="left:${W / 2 - МП_W / 2}px;top:${МП_Y}px;width:${МП_W}px">
-  <div style="display:flex;gap:44px;padding:0 8px 22px;font:600 30px/1 'Onest';color:#63625F">
-    <span style="color:#F2F0EB">Новые</span><span>Трендовые</span><span>Скоро на бирже</span><span>По обороту</span></div>
-  <div class="мпряды" style="position:relative;height:330px;overflow:hidden"></div>
-</div>`);
-ВСЕ_СЛАЙДЫ[1].deco.appendChild(мемпад);
+const сПодписью = (y, txt) => `<div class="abs" style="left:20px;top:${y}px;font:500 15px/1 'Onest';color:#97958F">${txt}</div>`;
+const сПолем = (y, ph, cls, h = 52) => `<div class="abs" style="left:20px;top:${y}px;width:353px;height:${h}px;border-radius:14px;background:#14171F;border:1px solid #22262F;display:flex;align-items:${h > 60 ? "flex-start" : "center"};padding:${h > 60 ? "16px" : "0"} 16px;font:400 18px/1 'Onest'">
+  <span class="ph" style="color:#63625F">${ph}</span><span class="${cls}" style="color:#F2F0EB;white-space:pre"></span></div>`;
+const буквы = (el, txt) => { el.innerHTML = [...txt].map((c) => `<span class="ch">${c}</span>`).join(""); return [...el.children]; };
+const переключательСети = (w, h) => `<div class="abs" style="left:0;top:0;width:${w}px;height:${h}px;border-radius:999px;background:#14171F">
+  <div class="бег abs" style="left:${h * 0.08}px;top:${h * 0.08}px;width:${w / 2 - h * 0.08}px;height:${h * 0.84}px;border-radius:999px;background:rgba(255,255,255,.92)"></div>
+  <div class="сг abs" style="left:0;top:0;width:${w / 2}px;height:${h}px;display:flex;align-items:center;justify-content:center;gap:${h * 0.14}px;font:800 ${h * 0.36}px/1 'Nunito'"><img src="assets/app/gram.png" style="width:${h * 0.42}px;height:${h * 0.42}px"/>GRAM</div>
+  <div class="сс abs" style="left:${w / 2}px;top:0;width:${w / 2}px;height:${h}px;display:flex;align-items:center;justify-content:center;gap:${h * 0.14}px;font:800 ${h * 0.36}px/1 'Nunito'"><img src="assets/app/sol.png" style="width:${h * 0.42}px;height:${h * 0.42}px;border-radius:50%"/>SOL</div>
+</div>`;
+
+// 1. Запуск токена за секунды — телефон с формой: имя, тикер, «Запустить»,
+// и сразу плашка «Токен запущен» с секундомером
+const тф1 = телефон(0, `
+  <div class="abs" style="left:20px;top:70px;font:800 28px/1 'Nunito';color:#fff">Создать токен</div>
+  <div class="abs" style="left:20px;top:118px;width:180px;height:42px">${переключательСети(180, 42)}</div>
+  ${сПодписью(186, "Логотип")}
+  <div class="abs" style="left:20px;top:210px;width:84px;height:84px;border-radius:50%;border:1.5px dashed #30343E;overflow:hidden"><img class="лого" src="assets/tok/frog.png" style="width:100%;height:100%;image-rendering:pixelated;opacity:0"/></div>
+  <div class="abs" style="left:116px;top:210px;width:257px;height:84px;border-radius:18px;border:1.5px dashed #30343E;display:flex;align-items:center;justify-content:center;font:400 13px/1 'Onest';color:#97958F">Баннер (необязательно)</div>
+  ${сПодписью(318, "Название")}${сПолем(342, "Prism Cat", "имя")}
+  ${сПодписью(418, "Тикер")}${сПолем(442, "PRSM", "тикер")}
+  ${сПодписью(518, "Описание")}${сПолем(542, "Расскажите о токене", "опис", 96)}
+  <div class="кн abs" style="left:20px;top:676px;width:353px;height:58px;border-radius:14px;background:#F2F0EB;overflow:hidden;box-shadow:0 0 30px rgba(120,165,255,.4)">
+    <div class="пол abs" style="left:0;top:0;bottom:0;width:0;background:#9CC0FF"></div>
+    <div class="кнт abs" style="inset:0;display:flex;align-items:center;justify-content:center;font:800 18px/1 'Nunito';color:#2A2C31">Запустить токен</div>
+  </div>`);
+тф1.querySelector(".сг").style.color = "#0B0B0F"; тф1.querySelector(".сс").style.color = "#63625F";
+const тф1Имя = буквы(тф1.querySelector(".имя"), "Lily Frog"), тф1Тик = буквы(тф1.querySelector(".тикер"), "LILY");
+const тф1Пх = [...тф1.querySelectorAll(".ph")];
+const тф1Кн = тф1.querySelector(".кн"), тф1Пол = тф1.querySelector(".пол"), тф1Кнт = тф1.querySelector(".кнт"), тф1Лого = тф1.querySelector(".лого");
+const пл1 = плашка(0, 1000, 870, "Токен запущен", "$LILY · Gram", "0,0 с");
+const пл1Сек = пл1.querySelector(".сек");
+const пл1Палец = палец(0);
+function слайдЗапуск(p) {
+  const q = p / ДЛ;
+  въезд(тф1, p);
+  typeChars(тф1Имя, q, 0.14, 0.3); typeChars(тф1Тик, q, 0.32, 0.4);
+  тф1Пх[0].style.display = q >= 0.14 ? "none" : ""; тф1Пх[1].style.display = q >= 0.32 ? "none" : "";
+  тф1Лого.style.opacity = smooth(prog(q, 0.4, 0.46));
+  const pr = нажатие(пл1Палец, q, ЭX + 196, ЭY + 705, 0.4, 0.5);
+  тф1Кн.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
+  // после нажатия кнопка сама показывает ход запуска, а затем — готово
+  const ход = prog(q, 0.54, 0.7), готово = q >= 0.7;
+  тф1Пол.style.width = `${(ход * 100).toFixed(1)}%`;
+  тф1Пол.style.opacity = готово ? 0 : 0.55;
+  тф1Кн.style.background = готово ? "#2EE87A" : "#F2F0EB";
+  тф1Кнт.textContent = готово ? "Запущен" : q >= 0.54 ? "Запускаем…" : "Запустить токен";
+  тф1Кнт.style.color = готово ? "#04150B" : "#2A2C31";
+  const kp = E.back(prog(q, 0.7, 0.8));
+  S(пл1, { o: smooth(prog(q, 0.7, 0.76)), y: (1 - kp) * 40, s: lerp(0.94, 1, kp) });
+  пл1Сек.textContent = `${(2.8 * ход).toFixed(1).replace(".", ",")} с`;
+}
+
+// 2. Gram и Solana в одном месте — виджет мемпада: переключатель сети,
+// строка фильтров и токены выбранной сети
+const МП_W = 720;
+const мемпад = виджет(1, 1130, 250, МП_W, `
+  <div style="padding:32px 30px 34px">
+    <div class="abs" style="left:30px;top:32px;width:340px;height:76px">${переключательСети(340, 76)}</div>
+    <div style="display:flex;gap:26px;padding:104px 4px 24px;font:600 22px/1 'Onest';color:#63625F;white-space:nowrap">
+      <span style="color:#F2F0EB">Новые</span><span>Трендовые</span><span>Скоро на бирже</span><span>По обороту</span></div>
+    <div class="мпряды" style="position:relative;height:320px;overflow:hidden"></div>
+  </div>`);
+const бег = мемпад.querySelector(".бег"), сг = мемпад.querySelector(".сг"), сс = мемпад.querySelector(".сс");
 const мпРяды = мемпад.querySelector(".мпряды");
-const ряд = ([lg, tk, nm, mc, ch, up]) => $(`<div class="abs" style="left:0;right:0;height:96px;display:flex;align-items:center;gap:22px;padding:0 26px;border-radius:24px;background:#0F0F13;border:1px solid rgba(255,255,255,.08)">
-  <img src="assets/tok/${lg}.png" style="width:62px;height:62px;border-radius:50%;image-rendering:pixelated;flex:none"/>
-  <div style="flex:1"><div style="font:800 30px/1.1 'Nunito';color:#fff">${tk}</div><div style="font:500 21px/1.35 'Onest';color:#97958F">${nm}</div></div>
-  <div style="text-align:right"><div style="font:800 30px/1.1 'Nunito';color:${up ? "#2EE87A" : "#FF5A63"}">${mc}</div><div style="font:600 21px/1.35 'Onest';color:${up ? "#2EE87A" : "#FF5A63"}">${ch}</div></div></div>`);
+const ряд = ([lg, tk, nm, mc, ch, up]) => $(`<div class="abs" style="left:0;right:0;height:96px;display:flex;align-items:center;gap:20px;padding:0 24px;border-radius:24px;background:#14171F;border:1px solid rgba(255,255,255,.06)">
+  <img src="assets/tok/${lg}.png" style="width:60px;height:60px;border-radius:50%;image-rendering:pixelated;flex:none"/>
+  <div style="flex:1"><div style="font:800 28px/1.1 'Nunito';color:#fff">${tk}</div><div style="font:500 20px/1.35 'Onest';color:#97958F">${nm}</div></div>
+  <div style="text-align:right"><div style="font:800 28px/1.1 'Nunito';color:${up ? "#2EE87A" : "#FF5A63"}">${mc}</div><div style="font:600 20px/1.35 'Onest';color:${up ? "#2EE87A" : "#FF5A63"}">${ch}</div></div></div>`);
 const МП_ТОН = [["frog", "$LILY", "Lily Frog · 9 мин", "$30.1K", "+12.6%", 1], ["m", "$MINT", "Mintly · 2 мин", "$66.3K", "+38.2%", 1], ["pup", "$PUP", "Pixel Pup · 17 мин", "$46.8K", "+24.9%", 1]].map(ряд);
 const МП_СОЛ = [["boo", "$BOO", "Boo · 26 мин", "$18.0K", "-3.1%", 0], ["fire", "$WICK", "Hot Wick · 31 мин", "$12.7K", "+6.4%", 1], ["mcat", "$MCAT", "Moon Cat · 44 мин", "$9.4K", "+2.2%", 1]].map(ряд);
 [...МП_ТОН, ...МП_СОЛ].forEach((e) => мпРяды.appendChild(e));
@@ -518,43 +555,139 @@ function рядыСети(список, вид, сдвиг) {
   // вид: 0 — спрятаны, 1 — на месте; сдвиг ±1 — откуда въезжают
   список.forEach((e, j) => {
     const k = clamp(вид * 1.25 - j * 0.12);
-    S(e, { o: smooth(k), x: (1 - smooth(k)) * 140 * сдвиг, y: j * 112, b: (1 - k) * 6 });
+    S(e, { o: smooth(k), x: (1 - smooth(k)) * 120 * сдвиг, y: j * 110, b: (1 - k) * 6 });
   });
 }
-// 3. Комиссия 0% — монета падает в кошелёк целиком, ничего не отщипывается
-const кошелёк = $(`<svg class="abs" style="left:${W / 2 - 150}px;top:740px" width="300" height="272" viewBox="0 0 24 22" fill="none" stroke="#E4E2DC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M3 6.5h16.5a1.5 1.5 0 0 1 1.5 1.5v10.5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 18.5z" fill="#14171F"/><path d="M3 6.5V5a1.5 1.5 0 0 1 1.5-1.5h12"/><path d="M21 11h-4a1.75 1.75 0 0 0 0 3.5h4" fill="#1B1F29"/></svg>`);
-const монета = $(`<img class="abs" src="assets/app/gram.png" style="left:0;top:0;width:150px;height:150px;filter:drop-shadow(0 12px 30px rgba(79,134,255,.6))"/>`);
-ВСЕ_СЛАЙДЫ[2].deco.appendChild(монета); ВСЕ_СЛАЙДЫ[2].deco.appendChild(кошелёк);
-// 4. Покупка за секунду — молния пролетает по своей дуге
-const МОЛНИЯ = '<path d="M13.2 2 4.8 13.4h6l-1.2 8.6L19.2 10h-6.2z" fill="#2EE87A" stroke="#2EE87A" stroke-width="1" stroke-linejoin="round"/>';
-const молния = летун(3, "M-140 880 C 400 1000, 700 780, 980 840 S 1600 1000, 2080 720", МОЛНИЯ, 120, 0, "rgba(46,232,122,.55)");
-// 5. Прямо в Telegram — бумажный самолётик (как было)
-const САМОЛЁТ = '<path d="M21.5 3.2 2.8 10.6c-.8.3-.8 1.4 0 1.7l4.6 1.6 1.8 5.6c.2.7 1.1.9 1.6.4l2.6-2.5 4.7 3.5c.6.4 1.4.1 1.6-.6l3.1-15.6c.2-.9-.6-1.6-1.3-1.5z" fill="#E4E2DC"/><path d="M7.4 13.9 18 6.4l-8.1 8.6" fill="none" stroke="#0B0D12" stroke-width="1.1" stroke-linejoin="round"/>';
-const самолёт = летун(4, "M-120 820 C 380 980, 620 300, 980 330 S 1640 120, 2060 260", САМОЛЁТ, 120, 40, "rgba(79,134,255,.55)");
+const мпПалец = палец(1);
+function слайдСети(p) {
+  const q = p / ДЛ;
+  въезд(мемпад, p);
+  // палец дважды жмёт переключатель: на SOL и обратно на GRAM
+  const k = E.io(prog(q, 0.26, 0.4)) - E.io(prog(q, 0.62, 0.76));
+  const цx = 1160 + lerp(255, 85, smooth(prog(q, 0.42, 0.56)));
+  const kc = E.out(prog(q, 0.12, 0.24)), pr = clamp(prog(q, 0.24, 0.27) - prog(q, 0.29, 0.33)) + clamp(prog(q, 0.58, 0.61) - prog(q, 0.63, 0.67));
+  S(мпПалец, { o: smooth(prog(q, 0.12, 0.17)) * (1 - smooth(prog(q, 0.8, 0.88))), x: lerp(цx + 220, цx, kc) - 14, y: lerp(300 + 380, 300, kc), s: 1 - 0.12 * pr });
+  бег.style.transform = `translateX(${(164 * k).toFixed(1)}px)`;
+  сг.style.color = k < 0.5 ? "#0B0B0F" : "#63625F"; сс.style.color = k >= 0.5 ? "#0B0B0F" : "#63625F";
+  const вход = smooth(prog(q, 0.08, 0.22));
+  рядыСети(МП_ТОН, вход * (1 - k), k > 0.5 ? -1 : 1);
+  рядыСети(МП_СОЛ, k, k > 0.5 ? 1 : -1);
+}
+
+// 3. Комиссия 0% — виджет сделки: комиссия тает с 1% до нуля, и сумма
+// к получению дорастает до всей суммы сделки
+const стр = (лев, cls, прав, цвет = "#F2F0EB") => `<div style="display:flex;justify-content:space-between;align-items:center;padding:20px 0;border-top:1px solid rgba(255,255,255,.07);font:500 26px/1 'Onest';color:#97958F"><span>${лев}</span><span class="${cls}" style="font:800 30px/1 'Nunito';color:${цвет};font-variant-numeric:tabular-nums">${прав}</span></div>`;
+const ком = виджет(2, 1160, 230, 660, `
+  <div style="padding:40px 44px 30px">
+    <div style="display:flex;align-items:center;gap:16px;font:600 26px/1 'Onest';color:#97958F"><img src="assets/app/gram.png" style="width:40px;height:40px"/>Продажа $LILY</div>
+    <div style="display:flex;align-items:baseline;gap:22px;margin:26px 0 8px">
+      <span class="кпроц" style="font:800 150px/1 'Nunito';color:#fff;letter-spacing:-.03em;font-variant-numeric:tabular-nums">1,0%</span>
+      <span style="font:600 26px/1.3 'Onest';color:#63625F">комиссия<br>Mintly</span></div>
+    <div class="кдр" style="font:500 22px/1 'Onest';color:#63625F;margin-bottom:26px">на других площадках — <span style="text-decoration:line-through">1%</span></div>
+    ${стр("Сумма сделки", "", "100 GRAM")}
+    ${стр("Комиссия", "ксум", "1,00 GRAM", "#FF5A63")}
+    ${стр("Вы получите", "кпол", "99,00 GRAM", "#2EE87A")}
+  </div>`);
+const кПроц = ком.querySelector(".кпроц"), кСум = ком.querySelector(".ксум"), кПол = ком.querySelector(".кпол"), кДр = ком.querySelector(".кдр");
+const чсл = (v) => v.toFixed(2).replace(".", ",");
+function слайдКомиссия(p) {
+  const q = p / ДЛ;
+  въезд(ком, p);
+  const k = E.io(prog(q, 0.3, 0.62)), ноль = k >= 1;
+  кПроц.textContent = ноль ? "0%" : `${(1 - k).toFixed(1).replace(".", ",")}%`;
+  // на нуле цифра коротко вспыхивает — тут вся мысль слайда
+  const всп = Math.sin(Math.PI * prog(q, 0.62, 0.8));
+  кПроц.style.transform = `scale(${(1 + 0.08 * всп).toFixed(3)})`; кПроц.style.transformOrigin = "0 70%";
+  кПроц.style.color = ноль ? "#2EE87A" : "#fff";
+  кПроц.style.textShadow = всп > 0.01 ? `0 0 ${(50 * всп).toFixed(0)}px rgba(46,232,122,${(0.7 * всп).toFixed(2)})` : "none";
+  кСум.textContent = `${чсл(1 - k)} GRAM`; кСум.style.color = ноль ? "#2EE87A" : "#FF5A63";
+  кПол.textContent = `${чсл(99 + k)} GRAM`;
+  кДр.style.opacity = smooth(prog(q, 0.55, 0.7));
+}
+
+// 4. Покупка за секунду — телефон со страницей токена: палец жмёт
+// «Купить», и рядом сразу плашка «Куплено» с секундомером до 0,9 с
+const тф4 = телефон(3, `
+  <div class="abs" style="left:20px;top:70px;display:flex;align-items:center;gap:16px">
+    <img src="assets/tok/frog.png" style="width:72px;height:72px;border-radius:50%;image-rendering:pixelated"/>
+    <div><div style="font:800 28px/1 'Nunito';color:#fff">Lily Frog</div><div style="font:500 16px/1.5 'Onest';color:#97958F">$LILY · Gram</div></div></div>
+  <div class="abs" style="left:20px;top:168px;font:800 44px/1 'Nunito';color:#F2F0EB">$30.1K</div>
+  <div class="abs" style="left:20px;top:220px;font:700 18px/1 'Onest';color:#2EE87A">+$3.4K (+12.6%)</div>
+  <svg class="abs" style="left:20px;top:258px" width="353" height="150" viewBox="0 0 353 150" fill="none">
+    <defs><linearGradient id="тф4г" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2EE87A" stop-opacity=".3"/><stop offset="1" stop-color="#2EE87A" stop-opacity="0"/></linearGradient></defs>
+    <path class="зал" d="M0 128 L30 120 L60 124 L90 104 L120 110 L150 86 L180 94 L210 72 L240 80 L270 54 L300 62 L330 34 L353 22 L353 150 L0 150Z" fill="url(#тф4г)"/>
+    <path class="лин" d="M0 128 L30 120 L60 124 L90 104 L120 110 L150 86 L180 94 L210 72 L240 80 L270 54 L300 62 L330 34 L353 22" stroke="#2EE87A" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1 1"/>
+  </svg>
+  <div class="abs" style="left:12px;right:12px;top:430px;bottom:12px;border-radius:40px;background:#14171F">
+    <div class="abs" style="left:20px;top:24px;font:800 22px/1 'Nunito';color:#F2F0EB">Купить $LILY</div>
+    <div class="abs" style="left:20px;top:66px;font:500 14px/1 'Onest';color:#97958F">Сумма</div>
+    <div class="abs" style="left:20px;top:88px;font:800 48px/1 'Nunito';color:#F2F0EB">0.5 <span style="color:#97958F;font-size:28px">GRAM</span></div>
+    <div class="abs" style="left:20px;top:154px;display:flex;gap:8px">
+      ${["0.1", "0.5", "1", "MAX"].map((v) => `<span style="padding:9px 16px;border-radius:999px;background:${v === "0.5" ? "#F2F0EB" : "#1F2430"};color:${v === "0.5" ? "#14151A" : "#F2F0EB"};font:700 14px/1 'Onest'">${v}</span>`).join("")}</div>
+    <div class="abs" style="left:20px;top:204px;font:500 14px/1.3 'Onest';color:#97958F">Получите ≈ <span style="color:#F2F0EB">12 400 LILY</span></div>
+    <div class="кн abs" style="left:20px;right:20px;top:250px;height:62px;border-radius:16px;background:#00E96B;display:flex;align-items:center;justify-content:center;font:800 20px/1 'Nunito';color:#04150B">Купить</div>
+  </div>`);
+const тф4Лин = тф4.querySelector(".лин"), тф4Зал = тф4.querySelector(".зал"), тф4Кн = тф4.querySelector(".кн");
+const пл4 = плашка(3, 1000, 230, "Куплено", "12 400 LILY · комиссия 0%", "0,0 с");
+const пл4Сек = пл4.querySelector(".сек");
+const пл4Палец = палец(3);
+function слайдПокупка(p) {
+  const q = p / ДЛ;
+  въезд(тф4, p);
+  const кл = E.out(prog(q, 0.1, 0.4));
+  тф4Лин.style.strokeDashoffset = (1 - кл).toFixed(4); тф4Зал.style.opacity = кл;
+  const pr = нажатие(пл4Палец, q, ЭX + 196, ЭY + 430 + 281, 0.34, 0.46);
+  тф4Кн.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
+  тф4Кн.style.boxShadow = `0 0 ${(40 * pr).toFixed(0)}px rgba(46,232,122,${(0.7 * pr).toFixed(2)})`;
+  const кп = E.back(prog(q, 0.5, 0.62));
+  S(пл4, { o: smooth(prog(q, 0.5, 0.56)), y: (1 - кп) * -40, s: lerp(0.94, 1, кп) });
+  пл4Сек.textContent = `${(0.9 * smooth(prog(q, 0.5, 0.64))).toFixed(1).replace(".", ",")} с`;
+}
+
+// 5. Прямо в Telegram — телефон с чатом бота: палец жмёт «Открыть Mintly»,
+// и приложение поднимается прямо поверх чата
+const тф5 = телефон(4, `
+  <div class="abs" style="left:0;right:0;top:0;bottom:0;background:#0E1621"></div>
+  <div class="abs" style="left:0;right:0;top:0;height:120px;background:#17212B;border-bottom:1px solid rgba(0,0,0,.4)"></div>
+  <div class="abs" style="left:20px;top:20px;font:700 17px/1 'Onest';color:#F2F0EB">9:41</div>
+  <div class="abs" style="left:18px;top:62px;font:400 34px/1 'Onest';color:#6AB2F2">‹</div>
+  <div class="abs" style="left:56px;top:58px;width:48px;height:48px;border-radius:50%;background:#0F0F13;display:flex;align-items:center;justify-content:center">${star(30, "#E4E2DC")}</div>
+  <div class="abs" style="left:116px;top:62px"><div style="font:700 19px/1.1 'Onest';color:#fff">Mintly</div><div style="font:400 15px/1.5 'Onest';color:#7F91A4">бот</div></div>
+  <div class="сооб abs" style="left:14px;top:168px;width:300px;border-radius:20px 20px 20px 6px;background:#182533;padding:16px 18px;font:400 18px/1.4 'Onest';color:#F2F0EB">Запускай и покупай мемкоины прямо здесь — Gram и Solana в одном приложении.<div style="text-align:right;font-size:13px;color:#6D7F8F;margin-top:4px">9:41</div></div>
+  <div class="ткн abs" style="left:14px;top:330px;width:300px;height:52px;border-radius:14px;background:#2B5278;display:flex;align-items:center;justify-content:center;font:600 18px/1 'Onest';color:#fff">Открыть Mintly</div>
+  <div class="abs" style="left:0;right:0;bottom:0;height:92px;background:#17212B;display:flex;align-items:flex-start;gap:12px;padding:14px 14px 0">
+    <div style="height:44px;padding:0 16px;border-radius:12px;background:#2B5278;display:flex;align-items:center;font:600 16px/1 'Onest';color:#fff">Открыть</div>
+    <div style="flex:1;height:44px;border-radius:22px;background:#0E1621;display:flex;align-items:center;padding:0 16px;font:400 17px/1 'Onest';color:#6D7F8F">Сообщение</div></div>
+  <div class="лист abs" style="left:0;right:0;top:70px;bottom:0;border-radius:28px 28px 0 0;background:#0B0D12;box-shadow:0 -20px 60px rgba(0,0,0,.6)">
+    <div class="abs" style="left:0;right:0;top:0;height:56px;display:flex;align-items:center;justify-content:center;font:700 17px/1 'Onest';color:#F2F0EB">Mintly <span style="color:#63625F;font-weight:500;margin-left:6px">мини-приложение</span></div>
+    <div class="знак abs" style="left:126px;top:250px">${star(140, "#E4E2DC")}</div>
+    <div class="имяп abs" style="left:0;right:0;top:420px;text-align:center;font:800 44px/1 'Nunito';color:#fff">Mintly</div>
+  </div>`);
+const тф5Соо = тф5.querySelector(".сооб"), тф5Ткн = тф5.querySelector(".ткн"), тф5Лист = тф5.querySelector(".лист"), тф5Знак = тф5.querySelector(".знак"), тф5Имя = тф5.querySelector(".имяп");
+const тф5Палец = палец(4);
+function слайдТелеграм(p) {
+  const q = p / ДЛ;
+  въезд(тф5, p);
+  // сообщение бота приходит, под ним — кнопка
+  const kс = E.back(prog(q, 0.12, 0.24)), kк = E.back(prog(q, 0.2, 0.32));
+  S(тф5Соо, { o: smooth(prog(q, 0.12, 0.18)), y: (1 - kс) * 24, s: lerp(0.92, 1, kс) });
+  S(тф5Ткн, { o: smooth(prog(q, 0.2, 0.26)), y: (1 - kк) * 24 });
+  тф5Соо.style.transformOrigin = "0 100%";
+  const pr = нажатие(тф5Палец, q, ЭX + 164, ЭY + 356, 0.3, 0.42);
+  тф5Ткн.style.transform += ` scale(${(1 - 0.05 * pr).toFixed(3)})`;
+  // мини-приложение выезжает снизу поверх чата
+  const kл = E.out5(prog(q, 0.48, 0.66));
+  S(тф5Лист, { o: q >= 0.48 ? 1 : 0, y: (1 - kл) * 800 });
+  const kз = E.back(prog(q, 0.6, 0.76));
+  S(тф5Знак, { o: smooth(prog(q, 0.6, 0.68)), s: lerp(0.6, 1, kз), r: lerp(-90, 0, kз) });
+  S(тф5Имя, { o: smooth(prog(q, 0.68, 0.78)), y: (1 - E.out(prog(q, 0.68, 0.82))) * 20 });
+}
+
+const СЛАЙД_ДВИЖ = [слайдЗапуск, слайдСети, слайдКомиссия, слайдПокупка, слайдТелеграм];
 function drawDeco(i, p) {
   const жизнь = smooth(prog(p, 0, 0.3)) * (1 - smooth(prog(p, ДЛ - 0.35, ДЛ)));
   ВСЕ_СЛАЙДЫ[i].deco.style.opacity = жизнь;
-  if (i === 0) drawRocket(p / ДЛ);
-  else if (i === 1) {
-    // бегунок едет на SOL и возвращается на GRAM — как пальцем
-    const q = p / ДЛ, k = E.io(prog(q, 0.2, 0.42)) - E.io(prog(q, 0.6, 0.82));
-    бег.style.transform = `translateX(${(226 * k).toFixed(1)}px)`;
-    сг.style.color = k < 0.5 ? "#0B0B0F" : "#63625F"; сс.style.color = k >= 0.5 ? "#0B0B0F" : "#63625F";
-    // список: Gram-токены уезжают влево, Solana-токены въезжают справа, и обратно
-    const вход = smooth(prog(q, 0.04, 0.16));
-    рядыСети(МП_ТОН, вход * (1 - k), k > 0.5 ? -1 : 1);
-    рядыСети(МП_СОЛ, k, k > 0.5 ? 1 : -1);
-    // фраза поднимается, освобождая место мемпаду
-    ВСЕ_СЛАЙДЫ[1].style.marginTop = "-300px";
-  } else if (i === 2) {
-    // падение с ускорением, лёгкий отскок кошелька при попадании
-    const q = p / ДЛ, k = E.inQ(prog(q, 0.12, 0.55)), y = lerp(-170, 770, k), сжатие = Math.sin(Math.PI * prog(q, 0.55, 0.72));
-    монета.style.transform = `translate3d(${W / 2 - 75}px,${y.toFixed(1)}px,0) rotate(${(k * 200).toFixed(1)}deg)`;
-    монета.style.opacity = q < 0.58 ? 1 : 1 - smooth(prog(q, 0.58, 0.64));
-    кошелёк.style.transform = `translateY(${(10 * сжатие).toFixed(1)}px) scale(${(1 + 0.08 * сжатие).toFixed(3)},${(1 - 0.06 * сжатие).toFixed(3)})`;
-  } else if (i === 3) вести(молния, E.io(prog(p / ДЛ, 0.05, 0.85)));
-  else if (i === 4) вести(самолёт, E.io(prog(p / ДЛ, 0.05, 0.88)));
+  СЛАЙД_ДВИЖ[i](p);
 }
 
 function drawSlides(р) {
@@ -569,6 +702,7 @@ function drawSlides(р) {
   drawDeco(ВСЕ_СЛАЙДЫ.indexOf(р.el), р.p);
   const out = smooth(prog(р.p, ДЛ - 0.32, ДЛ - 0.04));
   р.el.style.transform = `scale(${(1.03 - 0.03 * smooth(prog(р.p, 0, ДЛ))).toFixed(4)})`;
+  р.el.style.transformOrigin = "0 50%";
   р.el.spans.forEach((w, i) => {
     const k = E.out(prog(р.p, 0.16 + i * 0.08, 0.16 + i * 0.08 + 0.5));
     S(w, { o: k * (1 - out), y: (1 - k) * 34 - out * 14, b: (1 - k) * 12 + out * 8 });
