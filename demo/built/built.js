@@ -397,31 +397,53 @@ function drawS4(t) {
   tsec.textContent = `${сек.toFixed(1).replace(".", ",")} с`;
 }
 
-// ===================== ПОДПИСИ =====================
-// Короткие фразы о том, чем Mintly лучше, — в духе первого промо:
-// белым, с акцентом синим, слово за словом из размытия.
-const caps = $(`<div class="scene"></div>`); root.appendChild(caps);
-function cap(html, x, y, size, align = "left") {
-  const el = $(`<div class="abs" style="left:${x}px;top:${y}px;width:${align === "center" ? W - 2 * x : 760}px;text-align:${align};font:800 ${size}px/1.12 'Nunito';letter-spacing:-.015em;color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.6)">${html}</div>`);
-  caps.appendChild(el);
-  el.innerHTML = el.innerHTML.replace(/(<br>)|([^\s<]+(?:<\/?a>)?)/g, (m, br) => br ? br : `<span class="w" style="display:inline-block">${m}</span>`);
+// ===================== СЛАЙДЫ С ПРЕИМУЩЕСТВАМИ =====================
+// Каждое преимущество — отдельный слайд на чистом фоне, без интерфейса:
+// крупная фраза по словам из размытия, как в первом промо. Слайды
+// вклиниваются в действие: интерфейс на это время замирает и
+// растворяется, а потом продолжается с того же места.
+const ui = $(`<div class="scene"></div>`);
+const slides = $(`<div class="scene"></div>`);
+function slide(html) {
+  const box = $(`<div class="abs" style="left:120px;right:120px;top:0;height:${H}px;display:flex;align-items:center;justify-content:center"><div style="text-align:center;font:800 132px/1.12 'Nunito';letter-spacing:-.02em;color:#fff">${html}</div></div>`);
+  slides.appendChild(box);
+  const el = box.firstElementChild; el.box = box;
+  el.innerHTML = el.innerHTML.replace(/(<br>)|([^\s<]+)/g, (m, br) => br ? br : `<span class="w" style="display:inline-block;margin:0 .14em">${m}</span>`);
   el.spans = [...el.querySelectorAll(".w")];
-  el.spans.forEach((sp) => { if (sp.textContent.startsWith("*")) { sp.textContent = sp.textContent.slice(1); sp.style.color = "#7FA6FF"; } });
+  el.spans.forEach((sp) => { if (sp.textContent.startsWith("*")) { sp.textContent = sp.textContent.slice(1); sp.classList.add("grad"); } });
   return el;
 }
-const CAPS = [
-  [cap("Запуск токена<br>*за *секунды", 130, 400, 84), 3.72, 4.32],
-  [cap("Gram и Solana —<br>*в *одном *мемпаде", 160, 430, 92, "center"), 4.58, 5.3],
-  [cap("Комиссия *0%", 160, 60, 84, "center"), 5.72, 6.4],
-  [cap("Покупка —<br>*за *секунду", 130, 360, 84), 6.86, 8.2],
-  [cap("Прямо *в *Telegram", 160, 60, 84, "center"), 8.78, 9.86],
+const ДЛ = 1.5; // сколько живёт слайд
+const ВСТАВКИ = [
+  [4.42, slide("Запуск токена<br>*за *секунды")],
+  [5.25, slide("Gram и Solana<br>*в *одном *месте")],
+  [6.42, slide("Комиссия *0%")],
+  [8.28, slide("Покупка<br>*за *секунду")],
+  [10.0, slide("Прямо *в *Telegram")],
 ];
-function drawCaps(t) {
-  CAPS.forEach(([el, a, b]) => {
-    const on = t >= a - 0.05 && t < b + 0.3;
-    el.style.display = on ? "" : "none"; if (!on) return;
-    const out = smooth(prog(t, b - 0.12, b + 0.18));
-    el.spans.forEach((w, i) => { const k = E.out(prog(t, a + i * 0.07, a + i * 0.07 + 0.42)); S(w, { o: k * (1 - out), y: (1 - k) * 22 - out * 10, b: (1 - k) * 8 + out * 6 }); });
+// реальное время → время действия и текущий слайд
+function разложить(T) {
+  let сдвиг = 0;
+  for (const [t0, el] of ВСТАВКИ) {
+    const начало = t0 + сдвиг;
+    if (T < начало) break;
+    if (T < начало + ДЛ) return { t: t0, el, p: T - начало };
+    сдвиг += ДЛ;
+  }
+  return { t: T - сдвиг, el: null, p: 0 };
+}
+function drawSlides(р) {
+  ВСТАВКИ.forEach(([, el]) => { el.box.style.display = el === р.el ? "flex" : "none"; });
+  const вход = р.el ? smooth(prog(р.p, 0, 0.28)) * (1 - smooth(prog(р.p, ДЛ - 0.28, ДЛ))) : 0;
+  ui.style.opacity = 1 - вход;
+  ui.style.filter = вход > 0.01 ? `blur(${(вход * 14).toFixed(1)}px)` : "none";
+  ui.style.transform = `scale(${(1 + 0.04 * вход).toFixed(4)})`;
+  if (!р.el) return;
+  const out = smooth(prog(р.p, ДЛ - 0.32, ДЛ - 0.04));
+  р.el.style.transform = `scale(${(1.03 - 0.03 * smooth(prog(р.p, 0, ДЛ))).toFixed(4)})`;
+  р.el.spans.forEach((w, i) => {
+    const k = E.out(prog(р.p, 0.16 + i * 0.08, 0.16 + i * 0.08 + 0.5));
+    S(w, { o: k * (1 - out), y: (1 - k) * 34 - out * 14, b: (1 - k) * 12 + out * 8 });
   });
 }
 
@@ -507,8 +529,13 @@ function drawS6(t) {
   barIn.forEach((e) => { e.style.opacity = kin; e.style.transform = `translateX(${((1 - kin) * -16).toFixed(1)}px)`; });
 }
 
-window.renderAt = (t) => {
-  drawBG(t); shimmer(t); drawSilk(t); drawS1(t); drawS2(t); drawS3(t); drawS4(t); drawS5(t); drawS6(t); drawCaps(t);
+// интерфейс — в своём слое, чтобы на слайдах растворять его целиком
+[silkWrap, s1, s2, s3, s4, s5, s6].forEach((e) => ui.appendChild(e));
+root.appendChild(ui); root.appendChild(slides);
+window.renderAt = (T) => {
+  const р = разложить(T), t = р.t;
+  drawBG(t); shimmer(T); drawSilk(t); drawS1(t); drawS2(t); drawS3(t); drawS4(t); drawS5(t); drawS6(t);
+  drawSlides(р);
 };
 (async () => {
   await document.fonts.ready;

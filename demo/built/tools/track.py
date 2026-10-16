@@ -3,9 +3,13 @@
 # переходе камеры, звон на знаке, глитч-удар на концовке и тишина за ним.
 import numpy as np, wave, sys
 from scipy.signal import butter, lfilter
-SR = 44100; DUR = 17.0; n = int(SR * DUR); L = np.zeros(n); R = np.zeros(n)
+SR = 44100; DUR = 24.5; n = int(SR * DUR); L = np.zeros(n); R = np.zeros(n)
 rs = np.random.RandomState(5)
-def put(t, s, g=1.0, pan=0.0):
+# слайды с преимуществами вклиниваются в действие: время действия → время ролика
+INS = [4.42, 5.25, 6.42, 8.28, 10.0]; SLD = 1.5
+def M(t): return t + SLD * sum(1 for a in INS if t >= a)
+def put(t, s, g=1.0, pan=0.0): put_raw(M(t), s, g, pan)
+def put_raw(t, s, g=1.0, pan=0.0):
     i = int(t * SR)
     if i >= n or i < 0: return
     e = min(n, i + len(s)); s = s[:e - i] * g
@@ -55,16 +59,16 @@ def glitch(d):
 # бит 122 BPM от начала до знака
 B = 60 / 122; PROG = [(45, [57, 64, 69, 72]), (41, [53, 60, 65, 69]), (48, [55, 60, 64, 67]), (43, [55, 59, 62, 67])]
 t = 0.0; bar = 0
-while t < 9.95:
+while t < M(9.95):
     root, ch = PROG[bar % 4]
-    put(t, pad(ch, 4 * B + .3), .22)
+    put_raw(t, pad(ch, 4 * B + .3), .22)
     for b in range(4):
         tb = t + b * B
-        if tb >= 9.95: break
-        put(tb, kick(), .55)
-        if b in (1, 3): put(tb, clap(), .4)
-        for h in range(2): put(tb + h * B / 2 + B / 4, hat(h == 1), .6, pan=.3)
-        put(tb, bass(root, B * .85), .32)
+        if tb >= M(9.95): break
+        put_raw(tb, kick(), .55)
+        if b in (1, 3): put_raw(tb, clap(), .4)
+        for h in range(2): put_raw(tb + h * B / 2 + B / 4, hat(h == 1), .6, pan=.3)
+        put_raw(tb, bass(root, B * .85), .32)
     t += 4 * B; bar += 1
 # переходы и действия
 put(0.0, whoosh(.5), .25); put(0.12, chime(81), .16)
@@ -84,11 +88,15 @@ put(9.85, whoosh(.3, False), .3)
 put(10.08, chime(76), .3); put(10.08, chime(83), .14)
 for i in range(17): put(10.32 + .8 * i / 17, tick(), .3)
 put(11.0, pad([64, 71, 76, 83], 1.6, cut=3000, att=.4, rel=1.0), .18)
+# слайды: свист на входе и мягкий аккорд под фразой
+for a in INS:
+    r = M(a) - SLD
+    put_raw(r - .05, whoosh(.4), .3); put_raw(r + .15, pad([69, 76, 81, 88], 1.2, cut=3200, att=.2, rel=.6), .14); put_raw(r + .2, pop(1000), .12)
 # концовка: глитч и удар, потом тишина
 put(13.04, glitch(.5), .45); put(13.04, hit(), .7); put(13.42, pop(1600), .2)
 
 mix = np.stack([L, R], 1); mix = np.tanh(mix * 1.1) * .9
-fade = np.ones(n); a, b = int(13.75 * SR), int(14.0 * SR); fade[a:b] = np.linspace(1, 0, b - a); fade[b:] = 0
+fade = np.ones(n); a, b = int(M(13.75) * SR), int(M(14.0) * SR); fade[a:b] = np.linspace(1, 0, b - a); fade[b:] = 0
 mix *= fade[:, None]
 pcm = (mix / max(1e-6, np.abs(mix).max()) * .92 * 32767).astype(np.int16)
 with wave.open(sys.argv[1], "wb") as w:
