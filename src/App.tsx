@@ -8213,14 +8213,11 @@ function КотПланета({ size = 120, glow = true, качается = true
           background: `radial-gradient(circle, ${hexA(T.electric, 0.28)} 0%, ${hexA(T.electric, 0)} 68%)`,
         }} />
       )}
-      {/* Маскот — Минти в позе по умолчанию, неподвижный. */}
-      <img
-        src={`/mintie-icon.png?v=${ВЕРСИЯ_МИНТИ}`}
-        alt=""
-        width={size}
-        height={size}
-        style={{ position: "relative", width: size, height: size, display: "block", imageRendering: "pixelated" }}
-      />
+      {/* Маскота в приложении больше нет: в пустых местах, на загрузке и
+          в итогах запуска стоит знак приложения. */}
+      <div style={{ position: "relative", width: size, height: size, padding: size * 0.12 }}>
+        <ЗнакЗвезда size={size * 0.76} />
+      </div>
     </div>
   );
 }
@@ -11752,7 +11749,6 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
   const пункты = [
     { key: "profile", icon: User, label: t("navProfileItem") },
     { key: "achievements", icon: Crown, label: t("achTitleShort") },
-    { key: "shop", icon: ShoppingBag, label: t("navShop") },
     { key: "wallet", icon: Wallet, label: t("navWallet") },
     /* Пока копия фразы не сделана, пункт стоит здесь и с красной точкой.
        В самом кошельке он занимал первую строку над балансом — а нужен
@@ -12365,18 +12361,6 @@ const БАННЕРЫ = [
     // полторы секунды — вдвое быстрее прочих, отсюда и ощущение скорости.
     выделения: [{ RU: "быстрые", EN: "fastest", стиль: "молния" }],
   },
-  {
-    id: "shop",
-    строки: { RU: ["Собери свой облик", "в магазине"], EN: ["Build your look", "in the shop"] },
-    кнопка: { RU: "В магазин", EN: "Open shop" },
-    цвет: "#E4E1DA",
-    действие: "shop",
-    знак: "лист",
-    сцена: "магазин",
-    пиксель: `/banner-mx-shop.webp?v=${ВЕРСИЯ_МИНТИ}`,
-    маскот: { кадр: "shop", x0: 58, y0: 20.5, w: 28, h: 25.2, сдвиг: -4.3 },
-    выделения: [{ RU: "облик", EN: "look", стиль: "радуга" }],
-  },
 ];
 
 /* Картинка баннера. Не декоративная заставка, а маленькая сцена: в ней
@@ -12441,7 +12425,7 @@ function СценаПикселя({ src, маскот, onМаскот, окра�
           чёрный слева. */}
       <span style={{ position: "absolute", right: 0, bottom: 0, height: "100%", aspectRatio: `${СШ} / ${СВ}` }}>
         <img src={src} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", imageRendering: "pixelated" }} />
-        {маскот && (
+        {false && маскот && (
           <span
             onClick={onМаскот ? (e) => { e.stopPropagation(); haptic("light"); onМаскот(); } : undefined}
             style={{
@@ -15236,7 +15220,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
         .filter((р) => р.address && р.ticker)
         .map((р) => ({
           тикер: String(р.ticker).toUpperCase(), имя: t("swapAppToken"),
-          mint: р.address, знаки: 6, лого: р.logo_url || `/mintie-icon.png?v=${ВЕРСИЯ_МИНТИ}`,
+          mint: р.address, знаки: 6, лого: р.logo_url || "/logo-star.png",
         }));
       // В тестовой сети знакомых монет нет вовсе, но GRAM есть всегда:
       // он живёт в своей цепочке, и обмен с ним идёт через казначейство.
@@ -29508,7 +29492,7 @@ function mapTokenRow(row) {
           <div className="px-4">
           <KeepAlive show={view === "home"}>
             <HomeView
-              onOpenMintie={() => { setView("mintie"); }}
+              onOpenMintie={null}
               окрасМ={cosmetics.mintie}
               onGoTab={goTab}
               onGoCreate={openCreate}
@@ -29565,29 +29549,11 @@ function mapTokenRow(row) {
             />
           </KeepAlive>
           <div className="px-4">
-          <KeepAlive show={view === "shop"}>
-            <ShopView
-              cosmetics={cosmetics}
-              owned={owned}
-              coins={coins}
-              onBuy={buyCosmetic}
-              onOpenLook={openLookFromShop}
-              onEquip={equipCosmetic}
-              achievementsReady={achievementsReady}
-              onOpenAchievements={() => открытьДостижения("shop")}
-              showToast={showToast}
-              accountCreated={accountCreated}
-              onOpenLogin={openLoginProfile}
-            />
-          </KeepAlive>
-          {view === "mintie" && (
-            <div className={уходСтраницы ? "fx-view-out" : undefined}>
-              <ЭкранМинти onBack={backFromMintie} окрас={cosmetics.mintie} />
-            </div>
-          )}
+          {/* Магазина больше нет — раздел убран целиком. */}
+
           {view === "achievements" && (
             <div className={уходСтраницы ? "fx-view-out" : undefined}>
-              <AchievementsView achievements={achievements} onGoShop={() => goTab("shop")} onBack={backFromAchievements} />
+              <AchievementsView achievements={achievements} onGoShop={null} onBack={backFromAchievements} />
             </div>
           )}
           {view === "user" && (
@@ -29651,7 +29617,7 @@ function mapTokenRow(row) {
           onПункт={(ключ) => {
             if (ключ === "profile") { goTab("profile"); return; }
             if (ключ === "achievements") { открытьДостижения("home"); return; }
-            if (ключ === "shop" || ключ === "wallet") { goTab(ключ); return; }
+            if (ключ === "wallet") { goTab(ключ); return; }
             if (ключ === "secret") { goTab("wallet"); setЗапросФразы((н) => н + 1); return; }
             if (ключ === "settings") { setНастройкиОткрыты(true); return; }
             if (ключ === "support") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "support")); return; }
@@ -29675,7 +29641,7 @@ function mapTokenRow(row) {
               onOpenToken={openToken}
               myTokens={myTokens}
               cosmetics={cosmetics}
-              onGoShop={() => goTab("shop")}
+              onGoShop={undefined}
               onOpenAchievements={() => открытьДостижения("profile")}
               achievements={achievements}
               insetTop={insetTop}
@@ -29726,7 +29692,6 @@ function mapTokenRow(row) {
             { id: "home", label: t("navHome"), icon: ЗначокДом },
             { id: "mempad", label: t("navMempad"), icon: ЗначокОбмен },
             { id: "create", label: t("navCreate"), icon: ЗначокРакета },
-            { id: "shop", label: t("navShop"), icon: ЗначокСумка },
             { id: "wallet", label: t("navWallet"), icon: ЗначокСтолбики },
           ];
           const ШИР = ПОЛЕ * 2 + ПУНКТЫ.length * КРУГ + (ПУНКТЫ.length - 1) * ЗАЗОР;
@@ -29773,9 +29738,7 @@ function mapTokenRow(row) {
           </div>
           {/* Минти сидит на краю полной капсулы; на одном кружке ему места
               нет — прячется, пока панель свёрнута. */}
-          <div style={{ position: "absolute", inset: 0, pointerEvents: свёрнута ? "none" : "auto", opacity: свёрнута ? 0 : 1, transition: `opacity 260ms ease ${свёрнута ? "0ms" : "300ms"}` }}>
-            <НавМинти окрас={cosmetics.mintie} />
-          </div>
+          {/* Минти на капсуле убран вместе с маскотом. */}
           {/* Профиля в панели нет: туда ходят за своими делами, а не
               переключаются между ним и рынком. Вход — по аватарке в углу
               главной, как это устроено везде. Запуск — не раздел, а
