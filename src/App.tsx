@@ -28176,6 +28176,17 @@ function mapTokenRow(row) {
     return () => { жив = false; };
   }, []);
 
+  // Кошелёк приложения в TON: с ним запуск не просит внешний кошелёк.
+  const [тонВнутренний, setТонВнутренний] = useState(false);
+  useEffect(() => {
+    let жив = true;
+    import("./appWallet")
+      .then((m) => m.внутреннийTONДоступен())
+      .then((да) => { if (жив) setТонВнутренний(!!да); })
+      .catch(() => {});
+    return () => { жив = false; };
+  }, []);
+
   function handleLaunchRequest(req) {
     setLaunchRequest(req);
     runRealLaunch(req);
@@ -28206,9 +28217,12 @@ function mapTokenRow(row) {
     // an address that will never go active until it gives up. Catching that
     // here — before spending a wallet approval + a deploy attempt on it —
     // turns a dead-end retry-exhaustion message into an actionable one.
+    // Кошелёк приложения есть — запускаем им, внешний не нужен вовсе.
+    const кошелёкПриложения = await import("./appWallet");
+    const внутренний = await кошелёкПриложения.внутреннийTONДоступен().catch(() => false);
     const expectedChain = TON_TESTNET ? "-3" : "-239";
     const actualChain = wallet?.account?.chain;
-    if (actualChain && actualChain !== expectedChain) {
+    if (!внутренний && actualChain && actualChain !== expectedChain) {
       const actualNet = actualChain === "-239" ? "mainnet" : actualChain === "-3" ? "testnet" : actualChain;
       const expectedNet = TON_TESTNET ? "testnet" : "mainnet";
       setLaunchProgress({
@@ -28221,8 +28235,15 @@ function mapTokenRow(row) {
     }
 
     try {
-      const { launchRealToken } = await загрузитьЗапуск();
-      const chainResult = await launchRealToken({
+      const { launchRealToken, launchInternalToken } = await загрузитьЗапуск();
+      const chainResult = внутренний ? await launchInternalToken({
+        form: req.form,
+        logoFile: req.logoFile,
+        buyAmountTon: buyNum,
+        network: TON_TESTNET ? "testnet" : "mainnet",
+        onStage: (i) => setLaunchProgress((p) => ({ ...p, stepIndex: i })),
+        отправить: (тело) => кошелёкПриложения.запуститьВнутреннимTON(тело),
+      }) : await launchRealToken({
         tonConnectUI,
         walletAddress,
         form: req.form,
@@ -29592,7 +29613,7 @@ function mapTokenRow(row) {
               showToast={showToast}
               // TON-кошелёк приложения на сервере выключен (wallet-ton: enabled=false),
               // а запуск в Solana работает — без кошелька TON мемпад не закрываем.
-              unlocked={accountCreated && (connected || solЗапуск)}
+              unlocked={accountCreated && (connected || solЗапуск || тонВнутренний)}
               accountCreated={accountCreated}
               connected={connected}
               authChecked={authChecked}

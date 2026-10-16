@@ -996,3 +996,72 @@ export async function launchRealToken({
     mintedTokens,
   };
 }
+
+/* ---------------------------------------------------------
+   Запуск кошельком приложения.
+
+   Тот же токен, что и через TonConnect, только подписывает не внешний
+   кошелёк, а кошелёк приложения на сервере. Браузер делает то, что
+   может сделать только он, — кладёт логотип и метаданные в хранилище
+   от имени человека, — и отдаёт серверу адрес метаданных и сумму
+   покупки. Дальше — те же ожидания, что и при обычном запуске: жетон
+   появился в сети, запас доехал до кривой.
+--------------------------------------------------------- */
+export async function launchInternalToken({ form, logoFile, buyAmountTon, network = "mainnet", onStage, отправить }) {
+  const trail = [];
+  const log = (m) => { console.log("[launch]", m); trail.push(m); };
+  const warn = (m) => { console.warn("[launch]", m); trail.push(`⚠ ${m}`); };
+  const fail = (текст, e) => { throw new Error(`${текст}: ${describeError(e)}\n\nЛог:\n${trail.join("\n")}`); };
+  if (!logoFile) throw new Error("Logo file is required");
+
+  // ---- Этап 0: логотип и метаданные ----
+  onStage?.(0);
+  let uploaded;
+  try {
+    uploaded = await uploadJettonAssets({ logoFile, name: form.name.trim(), symbol: form.ticker.trim().toUpperCase(), description: form.desc.trim() });
+    log(`метаданные: ${uploaded.metadataUrl}`);
+  } catch (e) { fail("Не удалось загрузить метаданные токена", e); }
+
+  // ---- Этап 1: сервер собирает и подписывает запуск ----
+  onStage?.(1);
+  let ответ;
+  try {
+    ответ = await отправить({ metadataUrl: uploaded.metadataUrl, buyAmount: Math.max(0, Number(buyAmountTon) || 0) });
+    if (!ответ || !ответ.jettonMaster) throw new Error((ответ && ответ.error) || "сервер не ответил адресами");
+    log(`жетон ${ответ.jettonMaster}, кривая ${ответ.curve}`);
+  } catch (e) { fail("Кошелёк приложения не отправил запуск", e); }
+
+  const жетон = Address.parse(ответ.jettonMaster);
+  const кривая = Address.parse(ответ.curve);
+
+  // ---- Этап 2: жетон в сети ----
+  onStage?.(2);
+  try {
+    await waitForActive(жетон, network, { label: "jetton minter", timeoutMs: 180000, intervalMs: 4000, log, warn });
+  } catch (e) { fail(`Запуск отправлен, но жетон не появился в сети (${ответ.jettonMaster})`, e); }
+
+  // ---- Этап 3: запас на кривой и стартовая покупка ----
+  onStage?.(3);
+  let mintedTokens = 0;
+  try {
+    await waitForJettonBalance(кривая, жетон, network, { log, warn, timeoutMs: 120000 });
+  } catch (e) { fail("Жетон развёрнут, но запас не доехал до кривой", e); }
+  if ((Number(buyAmountTon) || 0) > 0 && ответ.bought) {
+    try {
+      const сырые = await waitForJettonBalance(Address.parse(ответ.wallet), жетон, network, { log, warn, timeoutMs: 90000 });
+      mintedTokens = Number(сырые / 10n ** 9n);
+    } catch (e) { warn("Стартовая покупка не подтвердилась — купить можно со страницы токена"); }
+  }
+
+  return {
+    jettonMasterAddress: ответ.jettonMaster,
+    logoUrl: uploaded.imageUrl,
+    creatorWallet: ответ.wallet,
+    curveAddress: ответ.curve,
+    curveJettonWallet: ответ.curveJettonWallet,
+    poolAddress: null,
+    curvePoolAddress: ответ.pool,
+    explorerUrl: `https://tonscan.org/address/${ответ.jettonMaster}`,
+    mintedTokens,
+  };
+}

@@ -392,6 +392,71 @@ export default async function handler(req, res) {
     if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
     const тело = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
 
+    /* Запуск токена кошельком приложения.
+       Из браузера приходит только адрес метаданных (их браузер уже
+       положил в хранилище площадки) и сумма стартовой покупки. Жетон,
+       кривую и пул сервер собирает сам — из адреса этого кошелька и
+       параметров площадки, — так что подписывается ровно запуск и
+       ничего больше. Админом контрактов становится сам кошелёк
+       приложения: им же потом платят и подписывают сделки. */
+    if (действие === "launch") {
+      const метаданные = String(тело.metadataUrl || "");
+      const покупка = Math.max(0, Number(тело.buyAmount) || 0);
+      // Метаданные — только из своего хранилища: чужой адрес мог бы
+      // подменить имя и картинку токена уже после запуска.
+      const своё = `${SUPABASE_URL}/storage/v1/object/public/token-assets/${user.id}/`;
+      if (!метаданные.startsWith(своё) || !метаданные.endsWith("/metadata.json") || метаданные.length > 300) {
+        return res.status(400).json({ error: "bad_metadata" });
+      }
+      if (покупка > 5000) return res.status(400).json({ error: "bad_request" });
+
+      // Газ четырёх контрактов и сети — около 0,3; покупке свой запас.
+      const есть = await баланс(строка.address);
+      const нужно = 0.35 + (покупка > 0 ? покупка + 0.2 : 0);
+      if (есть < нужно) return res.status(400).json({ error: "not_enough", have: есть, need: нужно });
+
+      const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || null;
+      const оп = await начать(db, user, {
+        дело: "launch", сумма: покупка, адрес: null,
+        ключЗапроса: String(тело.requestKey || "").slice(0, 64) || null, ip,
+      });
+      if (оп.повтор) return res.status(200).json({ ok: true, repeat: true });
+
+      const { internal, SendMode } = await библиотеки();
+      const { сообщенияЗапуска } = await import("./_tonLaunchCore.js");
+      const { пакеты, адреса } = await сообщенияЗапуска({ admin: строка.address, metadataUrl: метаданные, buyTon: покупка });
+      const { пара, кошелёк: открытый } = await подписант(строка, набор, user);
+
+      /* Кошелёк v4 отправляет не больше четырёх сообщений за раз, поэтому
+         запуск — два перевода: контракты и затем покупка. Второй ждёт,
+         пока сеть примет первый (счётчик seqno вырастет), иначе его
+         отвергнут как повтор. */
+      let seqno = await открытый.getSeqno();
+      const подписи = [];
+      for (let i = 0; i < пакеты.length; i += 1) {
+        if (i > 0) {
+          const было = seqno;
+          for (let ждём = 0; ждём < 30; ждём += 1) {
+            await new Promise((r) => setTimeout(r, 2000));
+            try { seqno = await открытый.getSeqno(); } catch { /* узел моргнул — спросим снова */ }
+            if (seqno > было) break;
+          }
+          if (seqno <= было) break; // покупку не шлём вслепую: её можно сделать со страницы токена
+        }
+        await открытый.sendTransfer({
+          seqno,
+          secretKey: пара.secretKey,
+          sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+          messages: пакеты[i].map((m) => internal({ to: m.to, value: m.value, body: m.body, init: m.init, bounce: m.bounce })),
+        });
+        подписи.push(`seqno:${seqno}`);
+      }
+
+      await завершить(db, оп.id, подписи.join(","));
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).json({ ok: true, ...адреса, wallet: строка.address, bought: подписи.length > 1 });
+    }
+
     /* Покупка на кривой — без подтверждения в кошельке.
        Адрес кривой не приходит из запроса: он берётся из базы по токену,
        который человек открыл. Подсунуть чужой контракт нельзя. */

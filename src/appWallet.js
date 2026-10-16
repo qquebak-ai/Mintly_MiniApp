@@ -136,6 +136,12 @@ export async function купитьВнутреннимTON({ tokenId, сумма 
   return await запрос("/api/wallet-ton?action=buy", { tokenId, amount: сумма, requestKey: ключЗапроса() });
 }
 
+/* Запуск токена в TON кошельком приложения: сервер получает адрес уже
+   загруженных метаданных и сумму покупки, остальное собирает сам. */
+export async function запуститьВнутреннимTON({ metadataUrl, buyAmount }) {
+  return await запрос("/api/wallet-ton?action=launch", { metadataUrl, buyAmount, requestKey: ключЗапроса() });
+}
+
 export async function продатьВнутреннимTON({ tokenId, количество }) {
   return await запрос("/api/wallet-ton?action=sell", { tokenId, amount: количество, requestKey: ключЗапроса() });
 }
