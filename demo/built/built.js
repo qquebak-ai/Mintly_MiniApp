@@ -465,39 +465,18 @@ const РАКЕТА = '<g transform="rotate(-45 12 12)" fill="none" stroke="#E4E2
 const Р_ОТ = [-260, 1060], Р_ДО = [1180, -380];
 const РУГОЛ = Math.atan2(Р_ДО[1] - Р_ОТ[1], Р_ДО[0] - Р_ОТ[0]) * 180 / Math.PI;
 const дым = Array.from({ length: 34 }, () => { const e = $(`<div class="abs" style="left:0;top:0;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,rgba(210,225,255,.55),rgba(150,180,255,.18) 55%,rgba(150,180,255,0) 72%)"></div>`); ВСЕ_СЛАЙДЫ[0].deco.appendChild(e); return e; });
-const ракетаВсё = $(`<div class="abs" style="left:0;top:0;width:360px;height:360px">
-  <svg class="abs" style="left:0;top:0;overflow:visible;filter:drop-shadow(0 18px 40px rgba(79,134,255,.55))" width="360" height="360" viewBox="-180 -180 360 360">
-    <defs>
-      <linearGradient id="рк" x1="-1" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9AA4B8"/><stop offset=".35" stop-color="#FFFFFF"/><stop offset=".6" stop-color="#E4E2DC"/><stop offset="1" stop-color="#7C869A"/></linearGradient>
-      <linearGradient id="рс" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7FA6FF"/><stop offset="1" stop-color="#1F4FD1"/></linearGradient>
-      <radialGradient id="ри" cx=".35" cy=".35" r=".8"><stop offset="0" stop-color="#E8F0FF"/><stop offset=".35" stop-color="#5A8CFF"/><stop offset="1" stop-color="#0B2C70"/></radialGradient>
-      <radialGradient id="рп" cx=".5" cy=".15" r=".9"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".25" stop-color="#FFF3B0"/><stop offset=".55" stop-color="#FFB13B"/><stop offset="1" stop-color="#FF5A1F" stop-opacity="0"/></radialGradient>
-      <radialGradient id="рп2" cx=".5" cy=".1" r=".9"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".4" stop-color="#BFD6FF"/><stop offset="1" stop-color="#5A8CFF" stop-opacity="0"/></radialGradient>
-    </defs>
-    <g class="пламя"><path class="п1" d="M-26 62 Q-34 120 0 190 Q34 120 26 62 Z" fill="url(#рп)"/><path class="п2" d="M-14 62 Q-18 104 0 146 Q18 104 14 62 Z" fill="url(#рп2)"/></g>
-    <path d="M-34 30 L-70 78 L-66 92 L-30 70 Z" fill="url(#рс)"/><path d="M34 30 L70 78 L66 92 L30 70 Z" fill="url(#рс)"/>
-    <path d="M-30 58 L30 58 L22 72 L-22 72 Z" fill="#3A4152"/>
-    <path d="M0 -150 C 36 -112 44 -40 36 58 L-36 58 C -44 -40 -36 -112 0 -150 Z" fill="url(#рк)"/>
-    <path d="M0 -150 C 18 -132 28 -110 32 -88 L-32 -88 C -28 -110 -18 -132 0 -150 Z" fill="url(#рс)"/>
-    <path d="M-36 30 L36 30 L36 42 L-36 42 Z" fill="#5A8CFF" opacity=".9"/>
-    <circle cx="0" cy="-38" r="22" fill="#3A4152"/><circle cx="0" cy="-38" r="16" fill="url(#ри)"/>
-    <path d="M-6 -48 a10 10 0 0 1 10 -4" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" fill="none" opacity=".85"/>
-    <path d="M-20 -110 C -26 -60 -26 0 -22 50" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" fill="none" opacity=".55"/>
-    <path d="M0 58 L0 72" stroke="#0F0F13" stroke-width="40" opacity="0"/>
-  </svg>
-</div>`);
+// Ракета — та самая анимированная эмодзи 🚀 из приложения (rocket.json):
+// её кадр выставляется по времени, чтобы рендер был покадрово точным.
+const ракетаВсё = $(`<div class="abs" style="left:0;top:0;width:360px;height:360px;filter:drop-shadow(0 18px 40px rgba(79,134,255,.45))"></div>`);
 ВСЕ_СЛАЙДЫ[0].deco.appendChild(ракетаВсё);
-const п1 = ракетаВсё.querySelector(".п1"), п2 = ракетаВсё.querySelector(".п2");
+const ракетаАним = lottie.loadAnimation({ container: ракетаВсё, renderer: "svg", loop: true, autoplay: false, animationData: window.РАКЕТА_ДАННЫЕ });
 function drawRocket(q) {
   // лёгкий разгон в начале и ровный ход дальше
   const k = q < 0.12 ? 0.12 * E.inQ(q / 0.12) : 0.12 + (q - 0.12) * 1.05;
   const x = lerp(Р_ОТ[0], Р_ДО[0], k), y = lerp(Р_ОТ[1], Р_ДО[1], k);
   const дрожь = Math.sin(q * 140) * 1.6;
-  ракетаВсё.style.transform = `translate3d(${(x - 180 + дрожь).toFixed(1)}px,${(y - 180).toFixed(1)}px,0) rotate(${(РУГОЛ + 90).toFixed(2)}deg)`;
-  // пламя дрожит и меняет длину
-  const f = 1 + 0.18 * Math.sin(q * 90) + 0.1 * Math.sin(q * 230);
-  п1.setAttribute("transform", `translate(0 62) scale(${(1 + 0.06 * Math.sin(q * 170)).toFixed(3)} ${f.toFixed(3)}) translate(0 -62)`);
-  п2.setAttribute("transform", `translate(0 62) scale(1 ${(0.9 + 0.2 * Math.sin(q * 120 + 1)).toFixed(3)}) translate(0 -62)`);
+  ракетаВсё.style.transform = `translate3d(${(x - 180 + дрожь).toFixed(1)}px,${(y - 180).toFixed(1)}px,0) rotate(${(РУГОЛ + 45).toFixed(2)}deg)`;
+  ракетаАним.goToAndStop((q * ДЛ * 60) % ракетаАним.totalFrames, true);
   // дым: клубы рождаются у сопла, отстают, растут и тают
   const ux = Math.cos(РУГОЛ * Math.PI / 180), uy = Math.sin(РУГОЛ * Math.PI / 180);
   дым.forEach((e, j) => {
