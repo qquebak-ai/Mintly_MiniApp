@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ru">
   <head>
+    <link rel="preload" href="/fonts/jost-latin.woff2" as="font" type="font/woff2" crossorigin />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>Mintly — запуск мемкоинов на TON и Solana</title>
@@ -111,7 +112,7 @@
         сообщить("promise", (r && (r.stack || r.message)) || String(r || "отказ без причины"));
       });
     </script>
-    <script type="module" crossorigin src="/assets/index-BMO4VXbA.js"></script>
+    <script type="module" crossorigin src="/assets/index-B1ursPSF.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/react-DS-kCp2g.js">
     <link rel="modulepreload" crossorigin href="/assets/supabase-QBHRJHLH.js">
     <link rel="modulepreload" crossorigin href="/assets/icons-DCT_GLlA.js">
@@ -185,9 +186,15 @@
       /* Имя приложения под знаком: проступает по буквам из лёгкого размытия
          вслед за знаком и уходит вместе с ним. Свечей внизу больше нет —
          они спорили со знаком и выглядели заглушкой. */
-      #ширма .слово { position: absolute; left: 0; right: 0; top: calc(46% + 98px); text-align: center;
-                      font-family: 'MintlyUI', 'Jost', -apple-system, 'Segoe UI', sans-serif; font-size: 40px; font-weight: 700;
-                      letter-spacing: -0.01em; color: #E4E2DC; }
+      /* Имя под знаком — геометричный Jost в разрядку заглавными: спокойнее
+         и строже округлого жирного, и не спорит со звездой над ним. Файл
+         шрифта объявлен прямо здесь и подгружается заранее: связка с
+         остальными шрифтами к этому моменту ещё не приехала. */
+      @font-face { font-family: 'ШрифтШирмы'; font-weight: 100 900; font-display: block;
+                   src: url('/fonts/jost-latin.woff2') format('woff2'); }
+      #ширма .слово { position: absolute; left: 0; right: 0; top: calc(46% + 104px); text-align: center;
+                      font-family: 'ШрифтШирмы', 'Jost', -apple-system, 'Segoe UI', sans-serif; font-size: 27px; font-weight: 500;
+                      text-transform: uppercase; letter-spacing: 0.36em; padding-left: 0.36em; color: #E4E2DC; }
       #ширма .слово b { display: inline-block; font-weight: inherit; will-change: opacity, transform, filter; }
       #ширма:not(.идёт):not(.уходит) .слово b { opacity: 0; }
       #ширма.идёт .слово b { animation: ширмаСлово 560ms cubic-bezier(0.22, 1, 0.36, 1) both; }

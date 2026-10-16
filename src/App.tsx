@@ -64,7 +64,7 @@ const DARK_THEME = {
   // и тонкие линии — строки лежат лентой прямо на чёрном.
   bg: "#000000",
   surface: "#0F0F13",
-  surfaceHi: "#14171F",
+  surfaceHi: "#1C1F27",
   line: "#1A1C22",
   lineHi: "#2A2D35",
   ice: "#F2F0EB",
@@ -1635,7 +1635,10 @@ const ГРАДИЕНТ_БРЕНДА = "linear-gradient(135deg, #F2F0EB 0%, #DCD9
  * так же идёт медленная волна от края к краю: оттенки соседние, надпись
  * читается ровно, а кнопка не выглядит наклейкой. */
 const ЦВЕТ_ВХОДА = "linear-gradient(112deg, #DEDBD4 0%, #F2F0EB 24%, #FFFFFF 50%, #F2F0EB 76%, #DEDBD4 100%)";
-const ЦВЕТ_КНОПКИ = "linear-gradient(112deg, #14171F 0%, #20242E 50%, #14171F 100%)";
+// Главные кнопки — светлые, как в промо-ролике. Графитовая заливка с
+// тёмной надписью на чёрном фоне читалась выключенной кнопкой: на неё
+// не хотелось нажимать, даже когда действие было доступно.
+const ЦВЕТ_КНОПКИ = ЦВЕТ_ВХОДА;
 const ЦВЕТ_КНОПКИ_НОЧЬ = ЦВЕТ_КНОПКИ;
 const ЦВЕТ_КНОПКИ_ХВОЯ = ЦВЕТ_КНОПКИ;
 /* Та же краска плоским цветом — для мест, где градиент не годится:
@@ -19820,8 +19823,35 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
     showToast(t("shareCardSaved"));
   }
 
+  /* Внутри Telegram отправляем в чат саму карточку: бот сохраняет
+     готовое сообщение с картинкой и кнопкой «Открыть токен», а Telegram
+     показывает выбор, кому его отправить. Если так не вышло (старый
+     клиент, бот не ответил) — открываем выбор чата хотя бы со ссылкой. */
+  async function sendTelegram(tg) {
+    const подпись = `$${String(token.ticker || "").toUpperCase()} в Mintly — ${link}`;
+    try {
+      const canvas = canvasRef.current;
+      if (tg.shareMessage && canvas) {
+        const { data } = await supabase.auth.getSession();
+        const ключ = data && data.session && data.session.access_token;
+        if (ключ) {
+          const r = await fetch(апи("/api/share-card"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${ключ}` },
+            body: JSON.stringify({ image: canvas.toDataURL("image/jpeg", 0.88), link, caption: подпись }),
+          });
+          const j = await r.json().catch(() => null);
+          if (j && j.id) { tg.shareMessage(j.id); return; }
+        }
+      }
+    } catch (e) { /* ниже — запасной путь */ }
+    tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(`$${String(token.ticker || "").toUpperCase()} в Mintly`)}`);
+  }
+
   async function send() {
     haptic("light");
+    const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    if (tg && tg.initData && (tg.shareMessage || tg.openTelegramLink)) { await sendTelegram(tg); return; }
     const f = file();
     if (f && navigator.canShare && navigator.canShare({ files: [f] })) {
       try {
