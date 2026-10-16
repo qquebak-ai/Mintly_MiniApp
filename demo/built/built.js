@@ -859,9 +859,17 @@ const платф = $(`<div class="abs" style="left:0;top:0;width:${W}px;height:$
 </div>`); vb.appendChild(платф);
 const абр = платф.querySelector(".абр");
 const текстКарты = словаВ("Доведи токен до *DEX —<br>получи *лимитированную *карту", 60);
+const КАРТА_ФОН = "linear-gradient(125deg,#FF3CAC 0%,#FF6B6B 18%,#FF9F43 34%,#FFD93D 50%,#FF9F43 66%,#FF6B6B 82%,#FF3CAC 100%)";
+// переливается только «карту» — главное слово фразы
+const словоКарта = текстКарты.spans.filter((w) => w.textContent === "карту");
+словоКарта.forEach((w) => {
+  // та же заливка, что у карты, и перетекает она так же
+  w.style.backgroundImage = КАРТА_ФОН;
+  w.style.backgroundSize = "300% 300%"; w.style.webkitBackgroundClip = "text"; w.style.backgroundClip = "text"; w.style.color = "transparent";
+});
 // --- карточка токена
 const карта = $(`<div class="abs" style="left:0;top:0;transform-origin:50% 50%">
-  <div class="кфон abs" style="inset:0;background:linear-gradient(125deg,#FF3CAC 0%,#FF6B6B 38%,#FF9F43 68%,#FFD93D 100%);box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 0 60px rgba(255,90,150,.55),0 40px 90px rgba(0,0,0,.55)"></div>
+  <div class="кфон abs" style="inset:0;background:${КАРТА_ФОН};background-size:300% 300%;box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 0 60px rgba(255,90,150,.55),0 40px 90px rgba(0,0,0,.55)"></div>
   <div class="ктк abs" style="inset:0">
     <img src="assets/coins/jimothy.png" style="position:absolute;left:40px;top:40px;width:84px;height:84px;border-radius:50%;box-shadow:0 0 0 3px rgba(255,255,255,.35)"/>
     <div style="position:absolute;left:40px;bottom:40px"><div style="font:800 54px/1 'Nunito';color:#fff">$JIM</div><div style="font:600 24px/1.5 'Onest';color:rgba(255,255,255,.75)">Jimothy</div></div>
@@ -869,6 +877,9 @@ const карта = $(`<div class="abs" style="left:0;top:0;transform-origin:50% 
     <div style="position:absolute;right:40px;top:40px;text-align:right"><div style="font:800 28px/1 'Nunito';color:rgba(255,255,255,.85)">Mintly</div><div style="margin-top:10px;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.18);font:700 17px/1 'Onest';color:#fff;letter-spacing:.06em">LIMITED · DEX</div></div>
   </div>
 </div>`); vb.appendChild(карта);
+const кфон = карта.querySelector(".кфон");
+const блик = $(`<div class="abs" style="inset:0;border-radius:34px;pointer-events:none;mix-blend-mode:overlay;background:linear-gradient(110deg,rgba(255,255,255,0) 35%,rgba(255,255,255,.75) 50%,rgba(255,255,255,0) 65%);background-size:250% 100%"></div>`);
+кфон.after(блик);
 // --- синие дуги через кадр: светящийся отрезок бежит по кривой
 const дуги = $(`<svg class="abs" style="left:0;top:0;overflow:visible;filter:drop-shadow(0 0 10px rgba(167,167,167,.8))" width="${W}" height="${H}">
   <path class="д1" d="M-200 420 C 300 130, 760 120, 1060 360 S 1520 980, 2100 640" fill="none" stroke="#9F9F9F" stroke-width="12" stroke-linecap="round" pathLength="1"/>
@@ -906,11 +917,23 @@ function drawV(v) {
   const ж = v; v = вВнутр(v);
   // 1. платформа и карточка токена
   const kP = smooth(prog(v, 0.05, 0.5)) * (1 - smooth(prog(v, 1.9, 2.25)));
-  платф.style.opacity = kP; луч.style.opacity = kP * (0.85 + 0.15 * Math.sin(ж * 5));
+  платф.style.opacity = kP; луч.style.opacity = 0;
   платф.firstElementChild.style.transform = `translateY(${(140 * smooth(prog(v, 1.9, 2.25))).toFixed(1)}px) rotateX(64deg)`;
   абр.style.filter = `brightness(${(1 + 0.25 * Math.sin(ж * 4)).toFixed(3)})`;
   поСловам(текстКарты, v, 0.2, 0.09, 0.4);
   S(текстКарты, { o: 1 - smooth(prog(v, 1.85, 2.1)), y: 90 - 30 * smooth(prog(v, 1.85, 2.1)) });
+  // карта: цвета медленно перетекают, по ней проходит голографический блик
+  кфон.style.backgroundPosition = `${(50 + 50 * Math.sin(ж * 0.9)).toFixed(2)}% ${(50 + 50 * Math.cos(ж * 0.7)).toFixed(2)}%`;
+  кфон.style.filter = `hue-rotate(${(18 * Math.sin(ж * 0.8)).toFixed(2)}deg)`;
+  блик.style.backgroundPosition = `${((ж * 0.45 % 1.6) * 100 - 30).toFixed(2)}% 0`;
+  // «карту» переливается цветами карты: заливка плывёт по буквам,
+  // а свечение вокруг них медленно меняет оттенок от розового к золотому
+  const оттенок = 340 + 28 * Math.sin(ж * 1.3), сила = 0.75 + 0.25 * Math.sin(ж * 2.1);
+  словоКарта.forEach((w) => {
+    w.style.backgroundPosition = кфон.style.backgroundPosition;
+    const blur = w.style.filter.match(/blur\(([\d.]+)px\)/);
+    w.style.filter = `${blur ? blur[0] + " " : ""}hue-rotate(${(18 * Math.sin(ж * 0.8)).toFixed(2)}deg) drop-shadow(0 0 ${(14 * сила).toFixed(1)}px hsla(${оттенок.toFixed(1)},100%,62%,${(0.85 * сила).toFixed(2)})) drop-shadow(0 0 ${(34 * сила).toFixed(1)}px hsla(${(оттенок + 25).toFixed(1)},100%,58%,.45))`;
+  });
   // карточка опускается на платформу, покачивается и уходит влево вместе с дугой
   const kD = E.out(prog(v, 0.1, 1.0));
   const cw = 600, ch = 370;
