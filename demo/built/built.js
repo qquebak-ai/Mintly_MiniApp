@@ -47,18 +47,21 @@ const ИКОНКИ = {
   bars: '<path d="M4.8 13.2v6"/><path d="M9.6 8.4v10.8"/><path d="M14.4 5.2v14"/><path d="M19.2 10.6v8.6"/>',
 };
 const ico = (k, cls = "") => `<svg class="${cls}" viewBox="0 0 24 24">${ИКОНКИ[k]}</svg>`;
-const СИНИЙ = "#4F86FF";
+const СИНИЙ = "#A7A7A7";
 
 // ===================== ФОН ПЕРВОГО ПРОМО =====================
 // чёрный, по нему медленно плывут и дышат синие пятна, снизу голубой туман
 const BG = $(`<div class="scene" style="background:#000"></div>`); root.appendChild(BG);
-const bgGrad = $(`<div class="abs" style="inset:-20%;background:linear-gradient(120deg,#000 0%,#06163D 18%,#000 34%,#0B2C70 52%,#000 68%,#081E52 84%,#000 100%);background-size:300% 300%"></div>`); BG.appendChild(bgGrad);
-const bgBlobs = [[300, 230, 420, "#123E9C"], [1650, 220, 380, "#0E3480"], [960, 1100, 540, "#1450B8"], [1520, 900, 360, "#0B2F73"], [380, 930, 380, "#103A8C"], [960, 380, 300, "#0A2560"]]
+const bgGrad = $(`<div class="abs" style="inset:-20%;background:linear-gradient(120deg,#000 0%,#222222 18%,#000 34%,#3E3E3E 52%,#000 68%,#2D2D2D 84%,#000 100%);background-size:300% 300%"></div>`); BG.appendChild(bgGrad);
+const bgBlobs = [[300, 230, 420, "#575757"], [1650, 220, 380, "#474747"], [960, 1100, 540, "#666666"], [1520, 900, 360, "#3F3F3F"], [380, 930, 380, "#4E4E4E"], [960, 380, 300, "#353535"]]
   .map(([x, y, r, c]) => { const b = $(`<div class="blob" style="left:${x - r}px;top:${y - r}px;width:${r * 2}px;height:${r * 2}px;background:${c};opacity:.55"></div>`); BG.appendChild(b); return b; });
 const bgFog = $(`<div class="fog"></div>`); BG.appendChild(bgFog);
-bgFog.parts = [[-2, 170, 520, "#0D3277"], [14, 120, 420, "#0A2862"], [30, 180, 560, "#123E95"], [47, 110, 460, "#0A2A66"], [63, 170, 540, "#103889"], [80, 120, 440, "#0B2C6C"], [96, 170, 520, "#123B8E"]]
+bgFog.parts = [[-2, 170, 520, "#424242"], [14, 120, 420, "#363636"], [30, 180, 560, "#545454"], [47, 110, 460, "#383838"], [63, 170, 540, "#4C4C4C"], [80, 120, 440, "#3C3C3C"], [96, 170, 520, "#505050"]]
   .map(([x, y, w, c]) => { const sp = $(`<span style="left:${x}%;top:${y}px;width:${w}px;height:${w * 0.55}px;background:${c};opacity:.45"></span>`); bgFog.appendChild(sp); return sp; });
 function drawBG(t, T = t) {
+  // фон — чистый чёрный: пятна и туман выключены, чтобы ничто не спорило с интерфейсом
+  [bgGrad, ...bgBlobs, bgFog].forEach((e) => { e.style.display = "none"; });
+  return;
   // в «тёмных» сценах референса фон приглушён, но не пропадает
   // в «тёмных» сценах фон приглушается плавно, а не щелчком
   BG.style.opacity = keys(t, [[0, 1], [2.4, 1], [2.85, 0.45], [3.45, 0.45], [3.85, 1], [9.85, 1], [10.25, 0.45], [12.7, 0.45], [13.15, 1]])[0];
@@ -77,8 +80,8 @@ function shimmer(t) { document.querySelectorAll(".grad").forEach((e) => { e.styl
 // Свечение из трёх размытых лент: синий край, ледяная середина, белое ядро.
 const silk = $(`<svg class="abs" style="left:0;top:0" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
-    <linearGradient id="sg1" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#06163D"/><stop offset=".4" stop-color="#1450B8"/><stop offset=".62" stop-color="#5A8CFF"/><stop offset=".8" stop-color="#123E9C"/><stop offset="1" stop-color="#0B2C70"/></linearGradient>
-    <linearGradient id="sg2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3F78FF" stop-opacity="0"/><stop offset=".5" stop-color="#9CC0FF"/><stop offset="1" stop-color="#3F78FF" stop-opacity="0"/></linearGradient>
+    <linearGradient id="sg1" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#222222"/><stop offset=".4" stop-color="#666666"/><stop offset=".62" stop-color="#ACACAC"/><stop offset=".8" stop-color="#575757"/><stop offset="1" stop-color="#3E3E3E"/></linearGradient>
+    <linearGradient id="sg2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#9F9F9F" stop-opacity="0"/><stop offset=".5" stop-color="#CECECE"/><stop offset="1" stop-color="#9F9F9F" stop-opacity="0"/></linearGradient>
     <filter id="sb" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="38"/></filter>
     <filter id="sb2" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="20"/></filter>
   </defs>
@@ -106,10 +109,10 @@ function drawSilk(t) {
 
 // ===================== 1. ЗНАК И СЛОВО → ПЛАШКА → ЧИПЫ =====================
 const s1 = $(`<div class="scene"></div>`); root.appendChild(s1);
-const logo1 = $(`<div class="abs" style="left:0;top:0;width:150px;height:150px;filter:drop-shadow(0 0 18px rgba(200,220,255,.8))">${star(150, "#F4F6FF")}</div>`); s1.appendChild(logo1);
+const logo1 = $(`<div class="abs" style="left:0;top:0;width:150px;height:150px;filter:drop-shadow(0 0 18px rgba(228,228,228,.8))">${star(150, "#F4F6FF")}</div>`); s1.appendChild(logo1);
 const WORD = "Mintly";
-const word1 = $(`<div class="abs" style="left:0;top:0;font:800 118px/1.1 'Nunito';letter-spacing:-.02em;white-space:nowrap;filter:drop-shadow(0 0 18px rgba(120,165,255,.55))">${[...WORD].map((c) => `<span class="ch grad">${c}</span>`).join("")}</div>`); s1.appendChild(word1);
-const pill = $(`<div class="abs" style="left:0;top:0;height:96px;border-radius:30px;background:#fff;box-shadow:0 0 40px rgba(220,232,255,.95),0 0 110px rgba(79,134,255,.6)"></div>`); s1.appendChild(pill);
+const word1 = $(`<div class="abs" style="left:0;top:0;font:800 118px/1.1 'Nunito';letter-spacing:-.02em;white-space:nowrap;filter:drop-shadow(0 0 18px rgba(188,188,188,.55))">${[...WORD].map((c) => `<span class="ch grad">${c}</span>`).join("")}</div>`); s1.appendChild(word1);
+const pill = $(`<div class="abs" style="left:0;top:0;height:96px;border-radius:30px;background:#fff;box-shadow:0 0 40px rgba(238,238,238,.95),0 0 110px rgba(167,167,167,.6)"></div>`); s1.appendChild(pill);
 // Панель разделов — та же капсула, что внизу приложения: пять круглых
 // кнопок, выбранная залита белым.
 const CHIPS = ["home", "swap", "rocket", "bag", "bars"];
@@ -189,7 +192,7 @@ function drawS1(t) {
 // баннер, «Название», «Тикер» и кнопка запуска. Размеры — точки
 // приложения (экран 393), камера их увеличивает.
 const s2 = $(`<div class="scene"></div>`); root.appendChild(s2);
-const glowTop = $(`<div class="abs" style="left:560px;top:-70px;width:800px;height:150px;border-radius:50%;background:radial-gradient(closest-side,rgba(79,134,255,.75),rgba(79,134,255,.18) 60%,rgba(79,134,255,0))"></div>`); s2.appendChild(glowTop);
+const glowTop = $(`<div class="abs" style="left:560px;top:-70px;width:800px;height:150px;border-radius:50%;background:radial-gradient(closest-side,rgba(167,167,167,.75),rgba(167,167,167,.18) 60%,rgba(167,167,167,0))"></div>`); s2.appendChild(glowTop);
 const поле = (y, ph, id) => `<div class="abs" style="left:16px;top:${y}px;width:361px;height:50px;border-radius:12px;background:#14171F;border:1px solid #22262F;display:flex;align-items:center;padding:0 14px;font:400 17px/1 'Onest'">
   <span class="ph ph-${id}" style="color:#63625F">${ph}</span><span class="val val-${id}" style="color:#F2F0EB;white-space:pre"></span></div>`;
 const подпись = (y, txt) => `<div class="abs" style="left:16px;top:${y}px;font:500 14px/1 'Onest';color:#97958F">${txt}</div>`;
@@ -209,7 +212,7 @@ const form = $(`<div class="abs" style="left:0;top:0;width:393px;height:540px;tr
     ${поле(226, "Prism Cat", "name")}
     ${подпись(302, "Тикер")}
     ${поле(324, "PRSM", "tick")}
-    <div class="fbtn abs" style="left:16px;top:410px;width:361px;height:52px;border-radius:12px;background:#F2F0EB;display:flex;align-items:center;justify-content:center;font:800 16px/1 'Nunito';color:#2A2C31;box-shadow:0 0 30px rgba(120,165,255,.45)">Запустить токен</div>
+    <div class="fbtn abs" style="left:16px;top:410px;width:361px;height:52px;border-radius:12px;background:#F2F0EB;display:flex;align-items:center;justify-content:center;font:800 16px/1 'Nunito';color:#2A2C31;box-shadow:0 0 30px rgba(188,188,188,.45)">Запустить токен</div>
   </div>
 </div>`);
 s2.appendChild(form);
@@ -221,7 +224,7 @@ valName.innerHTML = [...ИМЯ].map((c) => `<span class="ch">${c}</span>`).join(
 valTick.innerHTML = [...ТИКЕР].map((c) => `<span class="ch">${c}</span>`).join("");
 const charsName = [...valName.children], charsTick = [...valTick.children];
 // печать: свежие буквы синие и остывают в белый
-function typeChars(chars, t, a, b, accent = "#7FA9FF") {
+function typeChars(chars, t, a, b, accent = "#BFBFBF") {
   const n = chars.length;
   chars.forEach((ch, i) => {
     const ti = a + (b - a) * (i / n);
@@ -250,7 +253,7 @@ function drawS2(t) {
   // нажатие «Запустить токен» и улёт формы в камеру
   const pr = clamp(prog(t, 4.22, 4.28) - prog(t, 4.3, 4.38));
   fbtn.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
-  fbtn.style.boxShadow = `0 0 ${(30 + 40 * pr).toFixed(0)}px rgba(120,165,255,${(0.45 + 0.4 * pr).toFixed(2)})`;
+  fbtn.style.boxShadow = `0 0 ${(30 + 40 * pr).toFixed(0)}px rgba(188,188,188,${(0.45 + 0.4 * pr).toFixed(2)})`;
   const fly = E.io(prog(t, 4.34, 4.6)), вход = E.io(prog(t, 2.55, 2.85));
   s2.style.transform = `scale(${(1 + 1.4 * fly + 0.04 * (1 - вход)).toFixed(4)})`; s2.style.transformOrigin = "960px 760px";
   const бл = fly * 16 + (1 - вход) * 8;
@@ -299,7 +302,7 @@ const s4 = $(`<div class="scene" style="perspective:1700px;perspective-origin:96
 const CW = 1240, CH = 690;
 const card = $(`<div class="abs" style="left:${(W - CW) / 2}px;top:${(H - CH) / 2}px;width:${CW}px;height:${CH}px;transform-style:preserve-3d">
   <div class="abs" style="inset:0;border-radius:64px;overflow:hidden;background:#0F0F13">
-    <div class="ctint abs" style="inset:0;background:radial-gradient(70% 90% at 100% 0%, rgba(90,140,255,.22) 0%, rgba(90,140,255,.06) 45%, transparent 70%)"></div>
+    <div class="ctint abs" style="inset:0;background:radial-gradient(70% 90% at 100% 0%, rgba(172,172,172,.22) 0%, rgba(172,172,172,.06) 45%, transparent 70%)"></div>
     <div class="abs" style="inset:0;border-radius:64px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.08),inset 0 2px 30px rgba(255,255,255,.05)"></div>
     <div class="abs" style="left:84px;top:70px;display:flex;align-items:center;gap:30px">
       <img src="assets/tok/frog.png" style="width:120px;height:120px;border-radius:50%;image-rendering:pixelated"/>
@@ -354,7 +357,7 @@ function drawS4(t) {
   const куплено = t >= 8.3;
   cposv.textContent = куплено ? "12 400 LILY · $15.20" : "токенов пока нет";
   cposv.style.color = куплено ? "#2EE87A" : "#F2F0EB";
-  card.firstElementChild.style.boxShadow = `0 0 0 2px rgba(90,140,255,.25), 0 0 70px rgba(90,140,255,.35), 0 40px 120px rgba(0,0,0,.6)`;
+  card.firstElementChild.style.boxShadow = `0 0 0 2px rgba(172,172,172,.25), 0 0 70px rgba(172,172,172,.35), 0 40px 120px rgba(0,0,0,.6)`;
   let x = 0, y = 0, ry = -8, rx = 4, s = 1, b = 0, o = 1;
   if (t < 5.66) { const k = E.out(prog(t, 5.2, 5.66)); x = lerp(1100, 40, k); y = 60; ry = lerp(-62, -20, k); rx = lerp(10, 6, k); b = (1 - k) * 16; o = smooth(prog(t, 5.2, 5.45)); }
   else if (t < 6.42) { const k = E.out(prog(t, 5.66, 6.42)); x = lerp(40, -30, k); y = 60; ry = lerp(-20, -8, k); rx = lerp(6, 3, k); s = lerp(1, 1.04, k); }
@@ -415,7 +418,7 @@ function slide(html) {
 }
 const ДЛ = 2.4; // темп движения внутри слайда
 // сколько живёт каждый слайд: прочесть фразу и рассмотреть экран
-const ДЛИ = [3.6, 4.2, 3.4, 3.6, 3.8];
+const ДЛИ = [3.661, 4.365, 3.413, 3.855, 3.646]; // подогнано: каждая смена — на удар песни
 const С_ОТ = ДЛИ.map((_, i) => ДЛИ.slice(0, i).reduce((a, b) => a + b, 0));
 // [где встаёт слайд, откуда действие продолжается после него]: после
 // первого слайда действие сразу идёт к странице токена — пролёта сквозь
@@ -453,7 +456,7 @@ const ВИД_K = 1.22; // во сколько крупнее виджеты
 // точка экрана телефона → точка кадра: от неё считаются нажатия
 const наЭкране = (x, y) => [ПX + (12 + x) * П_K, ПY + (12 + y) * П_K];
 function телефон(i, html, y = ПY, h = 876, x = ПX) {
-  const ph = $(`<div class="abs" style="left:${x}px;top:${y}px;width:417px;height:${h}px;border-radius:66px;background:#1C1D22;box-shadow:inset 0 0 0 2px rgba(255,255,255,.14),0 50px 120px rgba(0,0,0,.65),0 0 90px rgba(79,134,255,.22)">
+  const ph = $(`<div class="abs" style="left:${x}px;top:${y}px;width:417px;height:${h}px;border-radius:66px;background:#1C1D22;box-shadow:inset 0 0 0 2px rgba(255,255,255,.14),0 50px 120px rgba(0,0,0,.65),0 0 90px rgba(167,167,167,.22)">
     <div class="scr abs" style="left:12px;top:12px;width:393px;height:${h - 24}px;border-radius:54px;overflow:hidden;background:#0B0D12">
       <div class="abs" style="left:34px;top:20px;font:700 17px/1 'Onest';color:#F2F0EB">9:41</div>
       ${html}
@@ -464,7 +467,7 @@ function телефон(i, html, y = ПY, h = 876, x = ПX) {
   return ph;
 }
 const виджет = (i, x, y, w, html, доп = "") => {
-  const e = $(`<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;border-radius:40px;background:#0F0F13;border:1.5px solid rgba(255,255,255,.09);box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 40px 110px rgba(0,0,0,.6),0 0 80px rgba(79,134,255,.16);${доп}">${html}</div>`);
+  const e = $(`<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;border-radius:40px;background:#0F0F13;border:1.5px solid rgba(255,255,255,.09);box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 40px 110px rgba(0,0,0,.6),0 0 80px rgba(167,167,167,.16);${доп}">${html}</div>`);
   ВСЕ_СЛАЙДЫ[i].deco.appendChild(e);
   return e;
 };
@@ -510,8 +513,8 @@ const тф1 = телефон(0, `
   ${сПодписью(318, "Название")}${сПолем(342, "Prism Cat", "имя")}
   ${сПодписью(418, "Тикер")}${сПолем(442, "PRSM", "тикер")}
   ${сПодписью(518, "Описание")}${сПолем(542, "Расскажите о токене", "опис", 96)}
-  <div class="кн abs" style="left:20px;top:676px;width:353px;height:58px;border-radius:14px;background:#F2F0EB;overflow:hidden;box-shadow:0 0 30px rgba(120,165,255,.4)">
-    <div class="пол abs" style="left:0;top:0;bottom:0;width:0;background:#9CC0FF"></div>
+  <div class="кн abs" style="left:20px;top:676px;width:353px;height:58px;border-radius:14px;background:#F2F0EB;overflow:hidden;box-shadow:0 0 30px rgba(188,188,188,.4)">
+    <div class="пол abs" style="left:0;top:0;bottom:0;width:0;background:#CECECE"></div>
     <div class="кнт abs" style="inset:0;display:flex;align-items:center;justify-content:center;font:800 18px/1 'Nunito';color:#2A2C31">Запустить токен</div>
   </div>`);
 тф1.querySelector(".сг").style.color = "#0B0B0F"; тф1.querySelector(".сс").style.color = "#63625F";
@@ -659,17 +662,17 @@ function слайдПокупка(p) {
 // 5. Прямо в Telegram — телефон с чатом бота: палец жмёт «Открыть Mintly»,
 // и приложение поднимается прямо поверх чата
 const тф5 = телефон(4, `
-  <div class="abs" style="left:0;right:0;top:0;bottom:0;background:#0E1621"></div>
-  <div class="abs" style="left:0;right:0;top:0;height:120px;background:#17212B;border-bottom:1px solid rgba(0,0,0,.4)"></div>
+  <div class="abs" style="left:0;right:0;top:0;bottom:0;background:#181818"></div>
+  <div class="abs" style="left:0;right:0;top:0;height:120px;background:#212121;border-bottom:1px solid rgba(0,0,0,.4)"></div>
   <div class="abs" style="left:20px;top:20px;font:700 17px/1 'Onest';color:#F2F0EB">9:41</div>
-  <div class="abs" style="left:18px;top:62px;font:400 34px/1 'Onest';color:#6AB2F2">‹</div>
+  <div class="abs" style="left:18px;top:62px;font:400 34px/1 'Onest';color:#AEAEAE">‹</div>
   <div class="abs" style="left:56px;top:58px;width:48px;height:48px;border-radius:50%;background:#0F0F13;display:flex;align-items:center;justify-content:center">${star(30, "#E4E2DC")}</div>
-  <div class="abs" style="left:116px;top:62px"><div style="font:700 19px/1.1 'Onest';color:#fff">Mintly</div><div style="font:400 15px/1.5 'Onest';color:#7F91A4">бот</div></div>
-  <div class="сооб abs" style="left:14px;top:168px;width:300px;border-radius:20px 20px 20px 6px;background:#182533;padding:16px 18px;font:400 18px/1.4 'Onest';color:#F2F0EB">Запускай и покупай мемкоины прямо здесь — Gram и Solana в одном приложении.<div style="text-align:right;font-size:13px;color:#6D7F8F;margin-top:4px">9:41</div></div>
-  <div class="ткн abs" style="left:14px;top:330px;width:300px;height:52px;border-radius:14px;background:#2B5278;display:flex;align-items:center;justify-content:center;font:600 18px/1 'Onest';color:#fff">Открыть Mintly</div>
-  <div class="abs" style="left:0;right:0;bottom:0;height:92px;background:#17212B;display:flex;align-items:flex-start;gap:12px;padding:14px 14px 0">
-    <div style="height:44px;padding:0 16px;border-radius:12px;background:#2B5278;display:flex;align-items:center;font:600 16px/1 'Onest';color:#fff">Открыть</div>
-    <div style="flex:1;height:44px;border-radius:22px;background:#0E1621;display:flex;align-items:center;padding:0 16px;font:400 17px/1 'Onest';color:#6D7F8F">Сообщение</div></div>
+  <div class="abs" style="left:116px;top:62px"><div style="font:700 19px/1.1 'Onest';color:#fff">Mintly</div><div style="font:400 15px/1.5 'Onest';color:#929292">бот</div></div>
+  <div class="сооб abs" style="left:14px;top:168px;width:300px;border-radius:20px 20px 20px 6px;background:#262626;padding:16px 18px;font:400 18px/1.4 'Onest';color:#F2F0EB">Запускай и покупай мемкоины прямо здесь — Gram и Solana в одном приложении.<div style="text-align:right;font-size:13px;color:#7E7E7E;margin-top:4px">9:41</div></div>
+  <div class="ткн abs" style="left:14px;top:330px;width:300px;height:52px;border-radius:14px;background:#525252;display:flex;align-items:center;justify-content:center;font:600 18px/1 'Onest';color:#fff">Открыть Mintly</div>
+  <div class="abs" style="left:0;right:0;bottom:0;height:92px;background:#212121;display:flex;align-items:flex-start;gap:12px;padding:14px 14px 0">
+    <div style="height:44px;padding:0 16px;border-radius:12px;background:#525252;display:flex;align-items:center;font:600 16px/1 'Onest';color:#fff">Открыть</div>
+    <div style="flex:1;height:44px;border-radius:22px;background:#181818;display:flex;align-items:center;padding:0 16px;font:400 17px/1 'Onest';color:#7E7E7E">Сообщение</div></div>
   <div class="лист abs" style="left:0;right:0;top:70px;bottom:0;border-radius:28px 28px 0 0;background:#0B0D12;box-shadow:0 -20px 60px rgba(0,0,0,.6)">
     <div class="abs" style="left:0;right:0;top:0;height:56px;display:flex;align-items:center;justify-content:center;font:700 17px/1 'Onest';color:#F2F0EB">Mintly <span style="color:#63625F;font-weight:500;margin-left:6px">мини-приложение</span></div>
     <div class="знак abs" style="left:126px;top:250px">${star(140, "#E4E2DC")}</div>
@@ -731,7 +734,7 @@ function drawSlides(р) {
 // синий экран с именем в белой плашке.
 // [где во внутреннем времени вставки встать, на сколько] — пока стоим,
 // фразу дочитывают; фон и покачивание при этом живут дальше
-const В_ПАУЗЫ = [[1.4, 1.4], [3.1, 0.9], [4.5, 1.2], [5.05, 0.4], [6.05, 0.8], [6.9, 0.6]];
+const В_ПАУЗЫ = [[1.4, 1.224], [3.1, 0.761], [4.5, 0.992], [5.05, 0.448], [6.05, 0.556], [6.9, 0.752]]; // конец каждой паузы — на удар
 const В_ДЛ = 7.1 + В_ПАУЗЫ.reduce((a, [, d]) => a + d, 0);
 function вВнутр(v) {
   for (const [т, d] of В_ПАУЗЫ) { if (v < т) return v; if (v < т + d) return т; v -= d; }
@@ -742,7 +745,7 @@ const словаВ = (html, size, extra = "") => {
   const e = $(`<div class="abs" style="left:0;width:${W}px;text-align:center;font:800 ${size}px/1.15 'Nunito';letter-spacing:-.01em;color:#fff;white-space:nowrap;${extra}">${html}</div>`);
   e.innerHTML = e.innerHTML.replace(/(<br>)|([^\s<]+)/g, (m, br) => br ? br : `<span class="w" style="display:inline-block;margin:0 .13em">${m}</span>`);
   e.spans = [...e.querySelectorAll(".w")];
-  e.spans.forEach((sp) => { if (sp.textContent.startsWith("*")) { sp.textContent = sp.textContent.slice(1); sp.style.color = "#5A8CFF"; } });
+  e.spans.forEach((sp) => { if (sp.textContent.startsWith("*")) { sp.textContent = sp.textContent.slice(1); sp.style.color = "#ACACAC"; } });
   vb.appendChild(e);
   return e;
 };
@@ -751,19 +754,19 @@ function поСловам(e, v, a, шаг, длит = 0.4) {
   e.spans.forEach((w, i) => { const k = E.out(prog(v, a + i * шаг, a + i * шаг + длит)); S(w, { o: k, y: (1 - k) * 26, b: (1 - k) * 10 }); });
 }
 // --- платформа: три слоя в перспективе, верхний со светящейся кромкой
-const луч = $(`<div class="abs" style="left:560px;top:-120px;width:800px;height:620px;background:radial-gradient(closest-side,rgba(79,134,255,.55),rgba(79,134,255,.12) 55%,rgba(79,134,255,0))"></div>`); vb.appendChild(луч);
+const луч = $(`<div class="abs" style="left:560px;top:-120px;width:800px;height:620px;background:radial-gradient(closest-side,rgba(167,167,167,.55),rgba(167,167,167,.12) 55%,rgba(167,167,167,0))"></div>`); vb.appendChild(луч);
 const платф = $(`<div class="abs" style="left:0;top:0;width:${W}px;height:${H}px;perspective:1300px;perspective-origin:960px 300px">
   <div class="пл abs" style="left:560px;top:520px;width:800px;height:480px;transform-style:preserve-3d;transform:rotateX(64deg)">
-    <div class="abs" style="inset:-90px;border-radius:120px;background:radial-gradient(closest-side,rgba(40,90,255,.7),rgba(20,60,200,0));filter:blur(30px)"></div>
-    <div class="abs" style="inset:0;border-radius:70px;background:linear-gradient(180deg,#0C2A9A,#06135A);box-shadow:0 0 0 2px rgba(90,140,255,.45)"></div>
-    <div class="абр abs" style="inset:70px;border-radius:52px;background:linear-gradient(180deg,#2457F0,#0B2CA8);box-shadow:0 0 0 4px rgba(220,232,255,.95),0 0 40px rgba(156,192,255,.95),0 0 120px rgba(79,134,255,.8),inset 0 0 80px rgba(150,190,255,.45)"></div>
+    <div class="abs" style="inset:-90px;border-radius:120px;background:radial-gradient(closest-side,rgba(148,148,148,.7),rgba(110,110,110,0));filter:blur(30px)"></div>
+    <div class="abs" style="inset:0;border-radius:70px;background:linear-gradient(180deg,#535353,#303030);box-shadow:0 0 0 2px rgba(172,172,172,.45)"></div>
+    <div class="абр abs" style="inset:70px;border-radius:52px;background:linear-gradient(180deg,#8A8A8A,#5A5A5A);box-shadow:0 0 0 4px rgba(238,238,238,.95),0 0 40px rgba(206,206,206,.95),0 0 120px rgba(167,167,167,.8),inset 0 0 80px rgba(202,202,202,.45)"></div>
   </div>
 </div>`); vb.appendChild(платф);
 const абр = платф.querySelector(".абр");
 const текстКарты = словаВ("Доведи токен до *DEX —<br>получи *лимитированную *карту", 60);
 // --- карточка токена
 const карта = $(`<div class="abs" style="left:0;top:0;transform-origin:50% 50%">
-  <div class="кфон abs" style="inset:0;background:linear-gradient(135deg,#4F86FF,#1D4FE0 55%,#0B2CA8);box-shadow:inset 0 2px 0 rgba(255,255,255,.35),0 40px 90px rgba(0,0,0,.55)"></div>
+  <div class="кфон abs" style="inset:0;background:linear-gradient(135deg,#A7A7A7,#7E7E7E 55%,#5A5A5A);box-shadow:inset 0 2px 0 rgba(255,255,255,.35),0 40px 90px rgba(0,0,0,.55)"></div>
   <div class="ктк abs" style="inset:0">
     <img src="assets/tok/frog.png" style="position:absolute;left:40px;top:40px;width:84px;height:84px;border-radius:50%;image-rendering:pixelated;box-shadow:0 0 0 3px rgba(255,255,255,.35)"/>
     <div style="position:absolute;left:40px;bottom:40px"><div style="font:800 54px/1 'Nunito';color:#fff">$LILY</div><div style="font:600 24px/1.5 'Onest';color:rgba(255,255,255,.75)">Lily Frog</div></div>
@@ -772,9 +775,9 @@ const карта = $(`<div class="abs" style="left:0;top:0;transform-origin:50% 
   </div>
 </div>`); vb.appendChild(карта);
 // --- синие дуги через кадр: светящийся отрезок бежит по кривой
-const дуги = $(`<svg class="abs" style="left:0;top:0;overflow:visible;filter:drop-shadow(0 0 10px rgba(79,134,255,.8))" width="${W}" height="${H}">
-  <path class="д1" d="M-200 420 C 300 130, 760 120, 1060 360 S 1520 980, 2100 640" fill="none" stroke="#3F78FF" stroke-width="12" stroke-linecap="round" pathLength="1"/>
-  <path class="д2" d="M2100 900 C 1500 1000, 1300 560, 1000 380 S 420 60, -200 300" fill="none" stroke="#3F78FF" stroke-width="10" stroke-linecap="round" pathLength="1"/>
+const дуги = $(`<svg class="abs" style="left:0;top:0;overflow:visible;filter:drop-shadow(0 0 10px rgba(167,167,167,.8))" width="${W}" height="${H}">
+  <path class="д1" d="M-200 420 C 300 130, 760 120, 1060 360 S 1520 980, 2100 640" fill="none" stroke="#9F9F9F" stroke-width="12" stroke-linecap="round" pathLength="1"/>
+  <path class="д2" d="M2100 900 C 1500 1000, 1300 560, 1000 380 S 420 60, -200 300" fill="none" stroke="#9F9F9F" stroke-width="10" stroke-linecap="round" pathLength="1"/>
 </svg>`); vb.appendChild(дуги);
 const д1 = дуги.querySelector(".д1"), д2 = дуги.querySelector(".д2");
 function дуга(e, k) {
@@ -789,15 +792,15 @@ const фразаБ = словаВ("С *Mintly твои токены — *в *Tel
 const ПЛ_W = 460, ПЛ_H = 118;
 const плашкаВ = (txt, фон) => { const e = $(`<div class="abs" style="left:${W / 2 - ПЛ_W / 2}px;top:${H / 2 - ПЛ_H / 2}px;width:${ПЛ_W}px;height:${ПЛ_H}px;border-radius:26px;background:${фон};display:flex;align-items:center;justify-content:center;font:800 56px/1 'Nunito';color:#fff;box-shadow:inset 0 2px 0 rgba(255,255,255,.25),0 24px 60px rgba(0,0,0,.5);transform-origin:50% 100%;backface-visibility:hidden">${txt}</div>`); vb.appendChild(e); return e; };
 const стопка = $(`<div class="abs" style="left:0;top:0;width:${W}px;height:${H}px;perspective:1100px;perspective-origin:960px 540px"></div>`); vb.appendChild(стопка);
-const пл3 = плашкаВ("Продавай", "linear-gradient(180deg,#0A1A66,#0F2C9E)");
-const пл2 = плашкаВ("Покупай", "linear-gradient(180deg,#0C2386,#1846D6)");
-const пл1В = плашкаВ("", "linear-gradient(180deg,#1E56F0,#3F86FF)");
+const пл3 = плашкаВ("Продавай", "linear-gradient(180deg,#383838,#565656)");
+const пл2 = плашкаВ("Покупай", "linear-gradient(180deg,#494949,#777777)");
+const пл1В = плашкаВ("", "linear-gradient(180deg,#878787,#9F9F9F)");
 [пл3, пл2].forEach((e) => стопка.appendChild(e)); стопка.appendChild(пл1В);
 const всегда = словаВ("Всегда.", 76);
 const запускай = $(`<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Запускай</span>`); пл1В.appendChild(запускай);
 // --- синий экран с именем в белой плашке
-const синий = $(`<div class="abs" style="inset:0;background:linear-gradient(180deg,#0A2BFF 0%,#1F5BFF 55%,#3F9BFF 100%)"></div>`); vb.appendChild(синий);
-const имяПл = $(`<div class="abs" style="left:${W / 2 - 220}px;top:${H / 2 - 64}px;width:440px;height:128px;border-radius:30px;background:#fff;box-shadow:0 30px 80px rgba(0,20,120,.45)"></div>`); vb.appendChild(имяПл);
+const синий = $(`<div class="abs" style="inset:0;background:linear-gradient(180deg,#FFFFFF 0%,#E9E9E9 55%,#D2D2D2 100%)"></div>`); vb.appendChild(синий);
+const имяПл = $(`<div class="abs" style="left:${W / 2 - 220}px;top:${H / 2 - 64}px;width:440px;height:128px;border-radius:30px;background:#0F0F13;box-shadow:0 30px 80px rgba(0,0,0,.35)"></div>`); vb.appendChild(имяПл);
 const имяВ = $(`<div class="abs" style="left:0;width:${W}px;top:${H / 2 - 42}px;text-align:center;font:800 76px/1.1 'Nunito';letter-spacing:-.01em">Mintly</div>`); vb.appendChild(имяВ);
 
 function drawV(v) {
@@ -860,14 +863,14 @@ function drawV(v) {
   имяПл.style.width = iw + "px"; имяПл.style.left = W / 2 - iw / 2 + "px";
   S(имяПл, { o: smooth(prog(u, 7.55, 7.62)) * (1 - kСх), s: lerp(0.5, 1, kИ) });
   S(имяВ, { o: smooth(prog(u, 7.6, 7.72)), s: lerp(0.6, 1, kИ) });
-  имяВ.style.color = kСх > 0.5 ? "#fff" : "#1F5BFF";
+  имяВ.style.color = kСх > 0.5 ? "#0F0F13" : "#FFFFFF";
 }
 
 // ===================== 5. ЗНАК И «СДЕЛАНО В MINTLY.» =====================
 const s5 = $(`<div class="scene"></div>`); root.appendChild(s5);
-const logo5 = $(`<div class="abs" style="left:0;top:0;width:128px;height:128px;filter:drop-shadow(0 0 16px rgba(190,215,255,.85)) drop-shadow(0 0 40px rgba(79,134,255,.45))">${star(128, "#F4F6FF")}</div>`); s5.appendChild(logo5);
+const logo5 = $(`<div class="abs" style="left:0;top:0;width:128px;height:128px;filter:drop-shadow(0 0 16px rgba(222,222,222,.85)) drop-shadow(0 0 40px rgba(167,167,167,.45))">${star(128, "#F4F6FF")}</div>`); s5.appendChild(logo5);
 const LINE = "Сделано в Mintly.";
-const line5 = $(`<div class="abs" style="left:0;top:0;font:800 70px/1 'Nunito';letter-spacing:-.01em;color:#fff;white-space:nowrap;text-shadow:0 0 16px rgba(190,215,255,.45)">${[...LINE].map((c, i) => `<span class="ch" style="position:absolute;left:0;top:0;color:${i >= 10 ? "#7FA6FF" : "#fff"}">${c === " " ? " " : c}</span>`).join("")}</div>`); s5.appendChild(line5);
+const line5 = $(`<div class="abs" style="left:0;top:0;font:800 70px/1 'Nunito';letter-spacing:-.01em;color:#fff;white-space:nowrap;text-shadow:0 0 16px rgba(222,222,222,.45)">${[...LINE].map((c, i) => `<span class="ch" style="position:absolute;left:0;top:0;color:${i >= 10 ? "#BFBFBF" : "#fff"}">${c === " " ? " " : c}</span>`).join("")}</div>`); s5.appendChild(line5);
 const lineChars = [...line5.children];
 let charX = [], lineW = 0;
 function layoutLine() {
