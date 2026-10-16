@@ -5,7 +5,7 @@
 // знак и «Сделано в Mintly.», буквы уезжают по дуге.
 // Кадр зависит только от t — renderAt(t) можно звать в любом порядке.
 "use strict";
-const W = 1920, H = 1080, DUR = 25.32;
+const W = 1920, H = 1080;
 const root = document.getElementById("root");
 const $ = (h) => { const d = document.createElement("div"); d.innerHTML = h.trim(); return d.firstElementChild; };
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -413,7 +413,10 @@ function slide(html) {
   el.spans.forEach((sp) => { if (sp.textContent.startsWith("*")) { sp.textContent = sp.textContent.slice(1); sp.classList.add("grad"); } });
   return el;
 }
-const ДЛ = 2.4; // сколько живёт слайд: фразу успевают прочесть
+const ДЛ = 2.4; // темп движения внутри слайда
+// сколько живёт каждый слайд: прочесть фразу и рассмотреть экран
+const ДЛИ = [3.6, 4.2, 3.4, 3.6, 3.8];
+const С_ОТ = ДЛИ.map((_, i) => ДЛИ.slice(0, i).reduce((a, b) => a + b, 0));
 // [где встаёт слайд, откуда действие продолжается после него]: после
 // первого слайда действие сразу идёт к странице токена — пролёта сквозь
 // ленту больше нет
@@ -427,14 +430,14 @@ const ВСЕ_СЛАЙДЫ = [
   slide("Прямо *в *Telegram"),
 ];
 const С_НАЧ = 4.42, С_КОН = 10.0; // где встают слайды и откуда действие продолжается
-const С_ДЛ = ДЛ * ВСЕ_СЛАЙДЫ.length;
+const С_ДЛ = ДЛИ.reduce((a, b) => a + b, 0);
 // реальное время → время действия, текущий слайд и место внутри блока
 function разложить(T) {
   if (T < С_НАЧ) return { t: T, el: null, p: 0, блок: -1 };
-  if (T < С_НАЧ + С_ДЛ) { const i = Math.floor((T - С_НАЧ) / ДЛ); // под концом блока интерфейс уже на следующей сцене — форма запуска
+  if (T < С_НАЧ + С_ДЛ) { let i = 0; while (i < 4 && T - С_НАЧ >= С_ОТ[i + 1]) i++; // под концом блока интерфейс уже на следующей сцене — форма запуска
     // не должна проступить обратно
     const t = T - С_НАЧ > С_ДЛ / 2 ? С_КОН : С_НАЧ;
-    return { t, el: ВСЕ_СЛАЙДЫ[i], p: T - С_НАЧ - i * ДЛ, блок: T - С_НАЧ }; }
+    return { t, el: ВСЕ_СЛАЙДЫ[i], p: T - С_НАЧ - С_ОТ[i], блок: T - С_НАЧ }; }
   // за слайдами — вставка по второму референсу, действие стоит
   if (T < С_НАЧ + С_ДЛ + В_ДЛ) return { t: С_КОН, el: null, p: 0, блок: T - С_НАЧ, v: T - С_НАЧ - С_ДЛ };
   return { t: T - С_ДЛ - В_ДЛ + (С_КОН - С_НАЧ), el: null, p: 0, блок: -1 };
@@ -445,9 +448,9 @@ function разложить(T) {
 // одна цифра или сравнение.
 const ПX = 1300, ПY = 102; // где стоит телефон
 const ЭX = ПX + 12, ЭY = ПY + 12; // начало экрана — от него считаются нажатия
-function телефон(i, html) {
-  const ph = $(`<div class="abs" style="left:${ПX}px;top:${ПY}px;width:417px;height:876px;border-radius:66px;background:#1C1D22;box-shadow:inset 0 0 0 2px rgba(255,255,255,.14),0 50px 120px rgba(0,0,0,.65),0 0 90px rgba(79,134,255,.22)">
-    <div class="scr abs" style="left:12px;top:12px;width:393px;height:852px;border-radius:54px;overflow:hidden;background:#0B0D12">
+function телефон(i, html, y = ПY, h = 876, x = ПX) {
+  const ph = $(`<div class="abs" style="left:${x}px;top:${y}px;width:417px;height:${h}px;border-radius:66px;background:#1C1D22;box-shadow:inset 0 0 0 2px rgba(255,255,255,.14),0 50px 120px rgba(0,0,0,.65),0 0 90px rgba(79,134,255,.22)">
+    <div class="scr abs" style="left:12px;top:12px;width:393px;height:${h - 24}px;border-radius:54px;overflow:hidden;background:#0B0D12">
       <div class="abs" style="left:34px;top:20px;font:700 17px/1 'Onest';color:#F2F0EB">9:41</div>
       ${html}
     </div>
@@ -471,9 +474,10 @@ const плашка = (i, x, y, заг, под, хвост) => виджет(i, x,
   </div>`, "border-radius:30px");
 const палец = (i) => { const c = cursor.cloneNode(true); ВСЕ_СЛАЙДЫ[i].deco.appendChild(c); return c; };
 // экран и виджеты въезжают справа из размытия
-function въезд(e, p, a = 0.05, сдвиг = 160) {
+function въезд(e, p, a = 0.05, сдвиг = 160, м = 1) {
   const k = E.out(prog(p, a, a + 0.6));
-  S(e, { o: smooth(prog(p, a, a + 0.3)), x: (1 - k) * сдвиг, b: (1 - k) * 10 });
+  e.style.transformOrigin = "0 0";
+  S(e, { o: smooth(prog(p, a, a + 0.3)), x: (1 - k) * сдвиг, b: (1 - k) * 10, s: м });
 }
 // палец подходит снизу к точке экрана и нажимает
 function нажатие(c, q, x, y, a, b) {
@@ -493,6 +497,7 @@ const переключательСети = (w, h) => `<div class="abs" style="le
 
 // 1. Запуск токена за секунды — телефон с формой: имя, тикер, «Запустить»,
 // и сразу плашка «Токен запущен» с секундомером
+const Т1_Y = 60, Т1_K = 1.32, Т1_X = 1180; // первый телефон ближе к камере — крупнее остальных
 const тф1 = телефон(0, `
   <div class="abs" style="left:20px;top:70px;font:800 28px/1 'Nunito';color:#fff">Создать токен</div>
   <div class="abs" style="left:20px;top:118px;width:180px;height:42px">${переключательСети(180, 42)}</div>
@@ -505,21 +510,21 @@ const тф1 = телефон(0, `
   <div class="кн abs" style="left:20px;top:676px;width:353px;height:58px;border-radius:14px;background:#F2F0EB;overflow:hidden;box-shadow:0 0 30px rgba(120,165,255,.4)">
     <div class="пол abs" style="left:0;top:0;bottom:0;width:0;background:#9CC0FF"></div>
     <div class="кнт abs" style="inset:0;display:flex;align-items:center;justify-content:center;font:800 18px/1 'Nunito';color:#2A2C31">Запустить токен</div>
-  </div>`);
+  </div>`, Т1_Y, 876, Т1_X);
 тф1.querySelector(".сг").style.color = "#0B0B0F"; тф1.querySelector(".сс").style.color = "#63625F";
 const тф1Имя = буквы(тф1.querySelector(".имя"), "Lily Frog"), тф1Тик = буквы(тф1.querySelector(".тикер"), "LILY");
 const тф1Пх = [...тф1.querySelectorAll(".ph")];
 const тф1Кн = тф1.querySelector(".кн"), тф1Пол = тф1.querySelector(".пол"), тф1Кнт = тф1.querySelector(".кнт"), тф1Лого = тф1.querySelector(".лого");
-const пл1 = плашка(0, 1000, 870, "Токен запущен", "$LILY · Gram", "0,0 с");
+const пл1 = плашка(0, 880, 820, "Токен запущен", "$LILY · Gram", "0,0 с");
 const пл1Сек = пл1.querySelector(".сек");
 const пл1Палец = палец(0);
 function слайдЗапуск(p) {
   const q = p / ДЛ;
-  въезд(тф1, p);
+  въезд(тф1, p, 0.05, 160, Т1_K);
   typeChars(тф1Имя, q, 0.14, 0.3); typeChars(тф1Тик, q, 0.32, 0.4);
   тф1Пх[0].style.display = q >= 0.14 ? "none" : ""; тф1Пх[1].style.display = q >= 0.32 ? "none" : "";
   тф1Лого.style.opacity = smooth(prog(q, 0.4, 0.46));
-  const pr = нажатие(пл1Палец, q, ЭX + 196, ЭY + 705, 0.4, 0.5);
+  const pr = нажатие(пл1Палец, q, Т1_X + (12 + 196) * Т1_K, Т1_Y + (12 + 705) * Т1_K, 0.4, 0.5);
   тф1Кн.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
   // после нажатия кнопка сама показывает ход запуска, а затем — готово
   const ход = prog(q, 0.54, 0.7), готово = q >= 0.7;
@@ -686,7 +691,7 @@ function слайдТелеграм(p) {
 
 const СЛАЙД_ДВИЖ = [слайдЗапуск, слайдСети, слайдКомиссия, слайдПокупка, слайдТелеграм];
 function drawDeco(i, p) {
-  const жизнь = smooth(prog(p, 0, 0.3)) * (1 - smooth(prog(p, ДЛ - 0.35, ДЛ)));
+  const жизнь = smooth(prog(p, 0, 0.3)) * (1 - smooth(prog(p, ДЛИ[i] - 0.35, ДЛИ[i])));
   ВСЕ_СЛАЙДЫ[i].deco.style.opacity = жизнь;
   СЛАЙД_ДВИЖ[i](p);
 }
@@ -701,8 +706,9 @@ function drawSlides(р) {
   ui.style.transform = `scale(${(1 + 0.04 * вход).toFixed(4)})`;
   if (!р.el) return;
   drawDeco(ВСЕ_СЛАЙДЫ.indexOf(р.el), р.p);
-  const out = smooth(prog(р.p, ДЛ - 0.32, ДЛ - 0.04));
-  р.el.style.transform = `scale(${(1.03 - 0.03 * smooth(prog(р.p, 0, ДЛ))).toFixed(4)})`;
+  const дл = ДЛИ[ВСЕ_СЛАЙДЫ.indexOf(р.el)];
+  const out = smooth(prog(р.p, дл - 0.32, дл - 0.04));
+  р.el.style.transform = `scale(${(1.03 - 0.03 * smooth(prog(р.p, 0, дл))).toFixed(4)})`;
   р.el.style.transformOrigin = "0 50%";
   р.el.spans.forEach((w, i) => {
     const k = E.out(prog(р.p, 0.16 + i * 0.08, 0.16 + i * 0.08 + 0.5));
@@ -717,7 +723,14 @@ function drawSlides(р) {
 // фраза по словам, наклоняется и улетает, на её место — вторая →
 // «Всегда.» становится плашкой, на неё сверху ложатся ещё две →
 // синий экран с именем в белой плашке.
-const В_ДЛ = 7.1;
+// [где во внутреннем времени вставки встать, на сколько] — пока стоим,
+// фразу дочитывают; фон и покачивание при этом живут дальше
+const В_ПАУЗЫ = [[1.4, 1.4], [3.1, 0.9], [4.5, 1.2], [5.05, 0.4], [6.05, 0.8], [6.9, 0.6]];
+const В_ДЛ = 7.1 + В_ПАУЗЫ.reduce((a, [, d]) => a + d, 0);
+function вВнутр(v) {
+  for (const [т, d] of В_ПАУЗЫ) { if (v < т) return v; if (v < т + d) return т; v -= d; }
+  return v;
+}
 const vb = $(`<div class="scene"></div>`);
 const словаВ = (html, size, extra = "") => {
   const e = $(`<div class="abs" style="left:0;width:${W}px;text-align:center;font:800 ${size}px/1.15 'Nunito';letter-spacing:-.01em;color:#fff;white-space:nowrap;${extra}">${html}</div>`);
@@ -786,11 +799,12 @@ function drawV(v) {
   // весь блок проявляется из слайдов и в конце уходит в знак
   const вх = smooth(prog(v, 0, 0.3)), вых = smooth(prog(v, В_ДЛ - 0.3, В_ДЛ));
   vb.style.opacity = вх * (1 - вых);
+  const ж = v; v = вВнутр(v);
   // 1. платформа и карточка токена
   const kP = smooth(prog(v, 0.05, 0.5)) * (1 - smooth(prog(v, 1.9, 2.25)));
-  платф.style.opacity = kP; луч.style.opacity = kP * (0.85 + 0.15 * Math.sin(v * 5));
+  платф.style.opacity = kP; луч.style.opacity = kP * (0.85 + 0.15 * Math.sin(ж * 5));
   платф.firstElementChild.style.transform = `translateY(${(140 * smooth(prog(v, 1.9, 2.25))).toFixed(1)}px) rotateX(64deg)`;
-  абр.style.filter = `brightness(${(1 + 0.25 * Math.sin(v * 4)).toFixed(3)})`;
+  абр.style.filter = `brightness(${(1 + 0.25 * Math.sin(ж * 4)).toFixed(3)})`;
   поСловам(текстКарты, v, 0.2, 0.12, 0.45);
   S(текстКарты, { o: 1 - smooth(prog(v, 1.85, 2.1)), y: 90 - 30 * smooth(prog(v, 1.85, 2.1)) });
   // карточка опускается на платформу, покачивается и уходит влево вместе с дугой
@@ -798,7 +812,7 @@ function drawV(v) {
   const cw = 600, ch = 370;
   карта.style.width = cw + "px"; карта.style.height = ch + "px";
   карта.querySelector(".кфон").style.borderRadius = "34px";
-  const кач = Math.sin(v * 2.2);
+  const кач = Math.sin(ж * 2.2);
   const cy = lerp(-480, 500, kD) + кач * 10 - ch / 2;
   const kL = E.io(prog(v, 1.85, 2.3));
   const cx = W / 2 - cw / 2 - 1300 * kL;
