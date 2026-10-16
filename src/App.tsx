@@ -10273,21 +10273,7 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
      весь экран разом, а не одна сетка: живой сундук и таблица лучших
      посреди плашек читались как поломка остального. */
   if (!achievementsReady) {
-    return (
-      <div className="flex flex-col gap-4 pt-2">
-        <ПлашкаЧисла width={132} height={26} radius={8} />
-        <ПлашкаБлока h={18} radius={6} />
-        <ПлашкаБлока h={132} radius={26} />
-        <ПлашкаБлока h={22} radius={6} />
-        <div className="flex flex-col" style={{ gap: 8 }}>
-          {[0, 1, 2].map((i) => <ПлашкаБлока key={i} h={56} radius={18} />)}
-        </div>
-        <ПлашкаБлока h={20} radius={6} />
-        <div className="grid grid-cols-2 gap-2.5">
-          {[0, 1, 2, 3].map((i) => <ПлашкаБлока key={i} h={190} radius={16} />)}
-        </div>
-      </div>
-    );
+    return <ЭкранЗагрузкиЗнака />;
   }
 
   return (
@@ -10783,21 +10769,7 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
           лента сама ходит за сделками, и без неё на экране ждать было бы
           нечего. На виду в это время — та же раскладка плашками: бегущая
           строка, центр внимания, ряд фильтров и первые строки списка. */}
-      {!разделГотов && (
-        <div className="flex flex-col" style={{ gap: 20 }}>
-          <ПлашкаБлока h={38} radius={12} />
-          <div className="flex flex-col" style={{ gap: 10 }}>
-            <ПлашкаЧисла width={146} height={13} radius={6} />
-            <ПлашкаБлока h={72} radius={16} />
-          </div>
-          <div className="flex items-center" style={{ gap: 18 }}>
-            {[54, 84, 108, 86].map((w, i) => <ПлашкаЧисла key={i} width={w} height={13} radius={6} />)}
-          </div>
-          <div className="flex flex-col gap-3">
-            {Array.from({ length: 4 }).map((_, i) => <MempadRowSkeleton key={i} index={i} />)}
-          </div>
-        </div>
-      )}
+      {!разделГотов && <ЭкранЗагрузкиЗнака />}
 
       <div
         className="flex flex-col"
@@ -10865,7 +10837,7 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
             листает, а рисовать и анимировать их браузер обязан — на
             переключении вкладки это заметная задержка. */}
         {идётЗагрузка
-          ? Array.from({ length: 4 }).map((_, i) => <MempadRowSkeleton key={i} index={i} />)
+          ? <div className="flex items-center justify-center" style={{ height: 260 }}><ЗнакЗагрузки size={56} /></div>
           : list.slice(0, 60).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)}
         {!идётЗагрузка && list.length === 0 && (
           <div className="flex flex-col items-center text-center" style={{ gap: 14, padding: "26px 0 10px" }}>
@@ -17065,33 +17037,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   }
 
   if ((текущий == null || фраза == null) && !ждёмДольше) {
-    return (
-      <div className="flex flex-col" style={{ paddingTop: 4 }}>
-        <div style={{ marginBottom: 14, padding: "0 16px" }}>
-          <ПлашкаЧисла width={132} height={24} radius={8} />
-        </div>
-        <div style={{ margin: "0 16px" }}>
-          <ПлашкаБлока h={168} radius={24} />
-        </div>
-        <div className="flex items-start" style={{ gap: 10, marginTop: 16, padding: "0 16px" }}>
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} style={{ flex: 1 }}><ПлашкаБлока h={64} radius={18} /></div>
-          ))}
-        </div>
-        <div style={{
-          marginTop: 22, width: "100vw", marginLeft: "calc(50% - 50vw)",
-          borderTopLeftRadius: 26, borderTopRightRadius: 26,
-          background: КОШ_СТРАНИЦА, padding: "18px 16px 120px", minHeight: 420,
-        }}>
-          <div style={{ marginBottom: 12 }}><ПлашкаЧисла width={104} height={16} radius={6} /></div>
-          <div className="flex flex-col" style={{ gap: 10 }}>
-            <ПлашкаБлока h={64} radius={20} />
-            <ПлашкаБлока h={64} radius={20} />
-            <ПлашкаБлока h={64} radius={20} />
-          </div>
-        </div>
-      </div>
-    );
+    return <ЭкранЗагрузкиЗнака />;
   }
 
   /* Доля в долларах меняется вместе с курсом, и в макете на карте стоит
@@ -18901,25 +18847,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const страницаГотова = ждёмДольше || (числаЕсть && chartReady);
 
   if (!страницаГотова) {
-    return (
-      <div className="fx-view flex flex-col pb-4" style={{ position: "relative", gap: 18, paddingTop: 8 }}>
-        <div className="flex items-center" style={{ gap: 12 }}>
-          <div aria-hidden className="fx-skeleton" style={{ width: 56, height: 56, borderRadius: "50%" }} />
-          <div className="flex flex-col" style={{ gap: 8, flex: 1 }}>
-            <ПлашкаБлока h={18} radius={6} />
-            <ПлашкаБлока h={12} radius={6} />
-          </div>
-        </div>
-        <div className="flex flex-col" style={{ gap: 10 }}>
-          <ПлашкаЧисла width={168} height={38} radius={10} />
-          <ПлашкаЧисла width={124} height={16} radius={8} />
-        </div>
-        <ПлашкаБлока h={360} radius={16} />
-        <ПлашкаБлока h={34} radius={999} />
-        <ПлашкаБлока h={96} radius={20} />
-        <ПлашкаБлока h={148} radius={20} />
-      </div>
-    );
+    return <ЭкранЗагрузкиЗнака />;
   }
 
   return (
@@ -23319,6 +23247,18 @@ function ЗнакЗагрузки({ size = 40, вид = "контур", оста
         style={{ strokeDasharray: 1, animation: остановлен ? "none" : "знакКонтур 2.4s ease-in-out infinite" }}
       />
     </svg>
+  );
+}
+
+/* Пока страница собирается, вместо плашек-заглушек — чёрный экран и
+   один знак, который прорисовывается и заливается. Он закрывает всё,
+   включая навигацию: полупустая страница с серыми блоками выглядела
+   сломанной, а знак ясно говорит «идёт загрузка». */
+function ЭкранЗагрузкиЗнака() {
+  return (
+    <div aria-busy style={{ position: "fixed", inset: 0, zIndex: 90, background: "#000000", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <ЗнакЗагрузки size={76} />
+    </div>
   );
 }
 
