@@ -60,10 +60,14 @@ function admin() {
   return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 }
 
+// Ключ принимаем в том же виде, что и кошелёк Solana: шестнадцатеричной
+// строкой или base64. Раньше здесь понимался только base64, а на сервере
+// ключ лежит hex-строкой — и кошелёк TON считался выключенным.
 function разобратьКлюч(строка) {
-  if (!строка) return null;
+  const s = String(строка || "").trim();
+  if (!s) return null;
   try {
-    const b = Buffer.from(String(строка), "base64");
+    const b = /^[0-9a-f]{64}$/i.test(s) ? Buffer.from(s, "hex") : Buffer.from(s, "base64");
     return b.length === 32 ? b : null;
   } catch { return null; }
 }
