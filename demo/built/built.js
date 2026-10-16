@@ -511,13 +511,37 @@ function drawRocket(q) {
   });
 }
 // 2. Две сети — тот самый переключатель GRAM / SOL из приложения
-const сети = $(`<div class="abs" style="left:${W / 2 - 230}px;top:150px;width:460px;height:104px;border-radius:999px;background:#14171F;box-shadow:0 20px 60px rgba(0,0,0,.45)">
+const сети = $(`<div class="abs" style="left:${W / 2 - 230}px;top:70px;width:460px;height:104px;border-radius:999px;background:#14171F;box-shadow:0 20px 60px rgba(0,0,0,.45)">
   <div class="бег abs" style="left:8px;top:8px;width:218px;height:88px;border-radius:999px;background:rgba(255,255,255,.92)"></div>
   <div class="сг abs" style="left:8px;top:0;width:218px;height:104px;display:flex;align-items:center;justify-content:center;gap:14px;font:800 36px/1 'Nunito'"><img src="assets/app/gram.png" style="width:40px;height:40px"/>GRAM</div>
   <div class="сс abs" style="left:234px;top:0;width:218px;height:104px;display:flex;align-items:center;justify-content:center;gap:14px;font:800 36px/1 'Nunito'"><img src="assets/app/sol.png" style="width:40px;height:40px;border-radius:50%"/>SOL</div>
 </div>`);
 ВСЕ_СЛАЙДЫ[1].deco.appendChild(сети);
 const бег = сети.querySelector(".бег"), сг = сети.querySelector(".сг"), сс = сети.querySelector(".сс");
+// под фразой — сам мемпад: строка фильтров и токены выбранной сети;
+// переключатель меняет список, как в приложении
+const МП_Y = 640, МП_W = 1000;
+const мемпад = $(`<div class="abs" style="left:${W / 2 - МП_W / 2}px;top:${МП_Y}px;width:${МП_W}px">
+  <div style="display:flex;gap:44px;padding:0 8px 22px;font:600 30px/1 'Onest';color:#63625F">
+    <span style="color:#F2F0EB">Новые</span><span>Трендовые</span><span>Скоро на бирже</span><span>По обороту</span></div>
+  <div class="мпряды" style="position:relative;height:330px;overflow:hidden"></div>
+</div>`);
+ВСЕ_СЛАЙДЫ[1].deco.appendChild(мемпад);
+const мпРяды = мемпад.querySelector(".мпряды");
+const ряд = ([lg, tk, nm, mc, ch, up]) => $(`<div class="abs" style="left:0;right:0;height:96px;display:flex;align-items:center;gap:22px;padding:0 26px;border-radius:24px;background:#0F0F13;border:1px solid rgba(255,255,255,.08)">
+  <img src="assets/tok/${lg}.png" style="width:62px;height:62px;border-radius:50%;image-rendering:pixelated;flex:none"/>
+  <div style="flex:1"><div style="font:800 30px/1.1 'Nunito';color:#fff">${tk}</div><div style="font:500 21px/1.35 'Onest';color:#97958F">${nm}</div></div>
+  <div style="text-align:right"><div style="font:800 30px/1.1 'Nunito';color:${up ? "#2EE87A" : "#FF5A63"}">${mc}</div><div style="font:600 21px/1.35 'Onest';color:${up ? "#2EE87A" : "#FF5A63"}">${ch}</div></div></div>`);
+const МП_ТОН = [["frog", "$LILY", "Lily Frog · 9 мин", "$30.1K", "+12.6%", 1], ["m", "$MINT", "Mintly · 2 мин", "$66.3K", "+38.2%", 1], ["pup", "$PUP", "Pixel Pup · 17 мин", "$46.8K", "+24.9%", 1]].map(ряд);
+const МП_СОЛ = [["boo", "$BOO", "Boo · 26 мин", "$18.0K", "-3.1%", 0], ["fire", "$WICK", "Hot Wick · 31 мин", "$12.7K", "+6.4%", 1], ["mcat", "$MCAT", "Moon Cat · 44 мин", "$9.4K", "+2.2%", 1]].map(ряд);
+[...МП_ТОН, ...МП_СОЛ].forEach((e) => мпРяды.appendChild(e));
+function рядыСети(список, вид, сдвиг) {
+  // вид: 0 — спрятаны, 1 — на месте; сдвиг ±1 — откуда въезжают
+  список.forEach((e, j) => {
+    const k = clamp(вид * 1.25 - j * 0.12);
+    S(e, { o: smooth(k), x: (1 - smooth(k)) * 140 * сдвиг, y: j * 112, b: (1 - k) * 6 });
+  });
+}
 // 3. Комиссия 0% — монета падает в кошелёк целиком, ничего не отщипывается
 const кошелёк = $(`<svg class="abs" style="left:${W / 2 - 150}px;top:740px" width="300" height="272" viewBox="0 0 24 22" fill="none" stroke="#E4E2DC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
   <path d="M3 6.5h16.5a1.5 1.5 0 0 1 1.5 1.5v10.5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 18.5z" fill="#14171F"/><path d="M3 6.5V5a1.5 1.5 0 0 1 1.5-1.5h12"/><path d="M21 11h-4a1.75 1.75 0 0 0 0 3.5h4" fill="#1B1F29"/></svg>`);
@@ -538,6 +562,12 @@ function drawDeco(i, p) {
     const q = p / ДЛ, k = E.io(prog(q, 0.2, 0.42)) - E.io(prog(q, 0.6, 0.82));
     бег.style.transform = `translateX(${(226 * k).toFixed(1)}px)`;
     сг.style.color = k < 0.5 ? "#0B0B0F" : "#63625F"; сс.style.color = k >= 0.5 ? "#0B0B0F" : "#63625F";
+    // список: Gram-токены уезжают влево, Solana-токены въезжают справа, и обратно
+    const вход = smooth(prog(q, 0.04, 0.16));
+    рядыСети(МП_ТОН, вход * (1 - k), k > 0.5 ? -1 : 1);
+    рядыСети(МП_СОЛ, k, k > 0.5 ? 1 : -1);
+    // фраза поднимается, освобождая место мемпаду
+    ВСЕ_СЛАЙДЫ[1].style.marginTop = "-300px";
   } else if (i === 2) {
     // падение с ускорением, лёгкий отскок кошелька при попадании
     const q = p / ДЛ, k = E.inQ(prog(q, 0.12, 0.55)), y = lerp(-170, 770, k), сжатие = Math.sin(Math.PI * prog(q, 0.55, 0.72));
