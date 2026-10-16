@@ -438,73 +438,64 @@ function разложить(T) {
   return { t: T - С_ДЛ + (С_КОН - С_НАЧ), el: null, p: 0, блок: -1 };
 }
 // ---- своё движение под каждой фразой: ни одно не повторяется ----
-// 1. Запуск за секунды — варп: световые полосы летят из центра
-const варп = Array.from({ length: 46 }, (_, i) => {
-  const ug = (i * 137.5) % 360, r0 = 120 + ((i * 53) % 260), dl = 0.35 + ((i * 29) % 40) / 100;
-  const e = $(`<div class="abs" style="left:960px;top:540px;height:4px;border-radius:2px;transform-origin:0 50%;background:linear-gradient(90deg,rgba(156,192,255,0),rgba(200,220,255,.95))"></div>`);
-  ВСЕ_СЛАЙДЫ[0].deco.appendChild(e); return { e, ug, r0, dl };
-});
-// 2. Gram и Solana — две монеты кружат по одной орбите вокруг фразы
-const орбита = $(`<svg class="abs" style="left:0;top:0" width="${W}" height="${H}"><ellipse cx="960" cy="540" rx="760" ry="300" fill="none" stroke="rgba(156,192,255,.22)" stroke-width="2" stroke-dasharray="6 14"/></svg>`);
-ВСЕ_СЛАЙДЫ[1].deco.appendChild(орбита);
-const монеты = ["gram", "sol"].map((k) => { const e = $(`<img class="abs" src="assets/app/${k}.png" style="left:0;top:0;width:150px;height:150px;border-radius:50%;filter:drop-shadow(0 0 30px rgba(120,165,255,.6))"/>`); ВСЕ_СЛАЙДЫ[1].deco.appendChild(e); return e; });
-// 3. Комиссия 0% — огромный ноль рисуется линией и медленно поворачивает
-const ноль = $(`<svg class="abs" style="left:${W / 2 - 330}px;top:${H / 2 - 420}px" width="660" height="840" viewBox="0 0 660 840"><ellipse cx="330" cy="420" rx="280" ry="380" fill="none" stroke="url(#нг)" stroke-width="26" stroke-linecap="round" pathLength="1"/><defs><linearGradient id="нг" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5A8CFF"/><stop offset="1" stop-color="#1450B8"/></linearGradient></defs></svg>`);
-ВСЕ_СЛАЙДЫ[2].deco.appendChild(ноль);
-const нольЛиния = ноль.querySelector("ellipse");
-// 4. Покупка за секунду — секундомер: стрелка-дуга обегает круг, затем волна подтверждения
-const часы = $(`<svg class="abs" style="left:${W / 2 - 470}px;top:${H / 2 - 470}px" width="940" height="940" viewBox="0 0 940 940">
-  <circle cx="470" cy="470" r="420" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="10"/>
-  <circle class="дуга" cx="470" cy="470" r="420" fill="none" stroke="#2EE87A" stroke-width="10" stroke-linecap="round" pathLength="1" transform="rotate(-90 470 470)"/>
-  <circle class="волна" cx="470" cy="470" r="420" fill="none" stroke="#2EE87A" stroke-width="4"/>
-  ${Array.from({ length: 60 }, (_, i) => `<line x1="470" y1="34" x2="470" y2="${i % 5 ? 52 : 70}" stroke="rgba(255,255,255,${i % 5 ? 0.12 : 0.3})" stroke-width="${i % 5 ? 3 : 5}" transform="rotate(${i * 6} 470 470)"/>`).join("")}
-</svg>`);
-ВСЕ_СЛАЙДЫ[3].deco.appendChild(часы);
-const дуга = часы.querySelector(".дуга"), волна = часы.querySelector(".волна");
-// 5. Прямо в Telegram — бумажный самолётик пролетает по дуге и оставляет пунктир
-const путьС = "M-120 820 C 380 980, 620 300, 980 330 S 1640 120, 2060 260";
-const след = $(`<svg class="abs" style="left:0;top:0" width="${W}" height="${H}"><path d="${путьС}" fill="none" stroke="rgba(156,192,255,.45)" stroke-width="4" stroke-dasharray="2 22" stroke-linecap="round" pathLength="1"/></svg>`);
-ВСЕ_СЛАЙДЫ[4].deco.appendChild(след);
-const следЛиния = след.querySelector("path");
-const самолёт = $(`<svg class="abs" style="left:0;top:0;filter:drop-shadow(0 10px 30px rgba(79,134,255,.55))" width="120" height="120" viewBox="0 0 24 24"><path d="M21.5 3.2 2.8 10.6c-.8.3-.8 1.4 0 1.7l4.6 1.6 1.8 5.6c.2.7 1.1.9 1.6.4l2.6-2.5 4.7 3.5c.6.4 1.4.1 1.6-.6l3.1-15.6c.2-.9-.6-1.6-1.3-1.5z" fill="#E4E2DC"/><path d="M7.4 13.9 18 6.4l-8.1 8.6" fill="none" stroke="#0B0D12" stroke-width="1.1" stroke-linejoin="round"/></svg>`);
-ВСЕ_СЛАЙДЫ[4].deco.appendChild(самолёт);
-const мерПуть = document.createElementNS("http://www.w3.org/2000/svg", "path"); мерПуть.setAttribute("d", путьС);
+// Летун по дуге с пунктирным следом — самолётик понравился, поэтому так
+// же летают ракета (запуск) и молния (покупка), каждый по своей кривой.
+const мер = (d) => { const p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("d", d); return p; };
+function летун(i, путь, иконка, размер, поворот, тень) {
+  const след = $(`<svg class="abs" style="left:0;top:0" width="${W}" height="${H}"><path d="${путь}" fill="none" stroke="rgba(156,192,255,.45)" stroke-width="4" stroke-dasharray="2 22" stroke-linecap="round"/></svg>`);
+  const тело = $(`<svg class="abs" style="left:0;top:0;filter:drop-shadow(0 10px 30px ${тень})" width="${размер}" height="${размер}" viewBox="0 0 24 24">${иконка}</svg>`);
+  ВСЕ_СЛАЙДЫ[i].deco.appendChild(след); ВСЕ_СЛАЙДЫ[i].deco.appendChild(тело);
+  return { линия: след.querySelector("path"), тело, м: мер(путь), размер, поворот };
+}
+function вести(л, k) {
+  const L = л.м.getTotalLength(), a = л.м.getPointAtLength(L * k), b = л.м.getPointAtLength(Math.min(L, L * k + 4));
+  const ug = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+  л.тело.style.transform = `translate3d(${(a.x - л.размер / 2).toFixed(1)}px,${(a.y - л.размер / 2).toFixed(1)}px,0) rotate(${(ug + л.поворот).toFixed(1)}deg)`;
+  // пунктир дорисовывается ровно до летуна
+  л.линия.style.strokeDasharray = "2 22";
+  л.линия.style.clipPath = "none";
+  л.линия.setAttribute("pathLength", "1");
+  л.линия.style.strokeDasharray = `${(k * 1).toFixed(4)} 1`;
+}
+// 1. Запуск — ракета из приложения уходит вверх по дуге
+const РАКЕТА = '<g transform="rotate(-45 12 12)" fill="none" stroke="#E4E2DC" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" fill="#5A8CFF" stroke="#5A8CFF"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" fill="#E4E2DC"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></g>';
+const ракета = летун(0, "M180 1200 C 230 720, 420 300, 900 250 S 1520 170, 1760 -170", РАКЕТА, 130, 90, "rgba(79,134,255,.6)");
+// 2. Две сети — тот самый переключатель GRAM / SOL из приложения
+const сети = $(`<div class="abs" style="left:${W / 2 - 230}px;top:150px;width:460px;height:104px;border-radius:999px;background:#14171F;box-shadow:0 20px 60px rgba(0,0,0,.45)">
+  <div class="бег abs" style="left:8px;top:8px;width:218px;height:88px;border-radius:999px;background:rgba(255,255,255,.92)"></div>
+  <div class="сг abs" style="left:8px;top:0;width:218px;height:104px;display:flex;align-items:center;justify-content:center;gap:14px;font:800 36px/1 'Nunito'"><img src="assets/app/gram.png" style="width:40px;height:40px"/>GRAM</div>
+  <div class="сс abs" style="left:234px;top:0;width:218px;height:104px;display:flex;align-items:center;justify-content:center;gap:14px;font:800 36px/1 'Nunito'"><img src="assets/app/sol.png" style="width:40px;height:40px;border-radius:50%"/>SOL</div>
+</div>`);
+ВСЕ_СЛАЙДЫ[1].deco.appendChild(сети);
+const бег = сети.querySelector(".бег"), сг = сети.querySelector(".сг"), сс = сети.querySelector(".сс");
+// 3. Комиссия 0% — монета падает в кошелёк целиком, ничего не отщипывается
+const кошелёк = $(`<svg class="abs" style="left:${W / 2 - 150}px;top:740px" width="300" height="272" viewBox="0 0 24 22" fill="none" stroke="#E4E2DC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3 6.5h16.5a1.5 1.5 0 0 1 1.5 1.5v10.5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 18.5z" fill="#14171F"/><path d="M3 6.5V5a1.5 1.5 0 0 1 1.5-1.5h12"/><path d="M21 11h-4a1.75 1.75 0 0 0 0 3.5h4" fill="#1B1F29"/></svg>`);
+const монета = $(`<img class="abs" src="assets/app/gram.png" style="left:0;top:0;width:150px;height:150px;filter:drop-shadow(0 12px 30px rgba(79,134,255,.6))"/>`);
+ВСЕ_СЛАЙДЫ[2].deco.appendChild(монета); ВСЕ_СЛАЙДЫ[2].deco.appendChild(кошелёк);
+// 4. Покупка за секунду — молния пролетает по своей дуге
+const МОЛНИЯ = '<path d="M13.2 2 4.8 13.4h6l-1.2 8.6L19.2 10h-6.2z" fill="#2EE87A" stroke="#2EE87A" stroke-width="1" stroke-linejoin="round"/>';
+const молния = летун(3, "M-140 880 C 400 1000, 700 780, 980 840 S 1600 1000, 2080 720", МОЛНИЯ, 120, 0, "rgba(46,232,122,.55)");
+// 5. Прямо в Telegram — бумажный самолётик (как было)
+const САМОЛЁТ = '<path d="M21.5 3.2 2.8 10.6c-.8.3-.8 1.4 0 1.7l4.6 1.6 1.8 5.6c.2.7 1.1.9 1.6.4l2.6-2.5 4.7 3.5c.6.4 1.4.1 1.6-.6l3.1-15.6c.2-.9-.6-1.6-1.3-1.5z" fill="#E4E2DC"/><path d="M7.4 13.9 18 6.4l-8.1 8.6" fill="none" stroke="#0B0D12" stroke-width="1.1" stroke-linejoin="round"/>';
+const самолёт = летун(4, "M-120 820 C 380 980, 620 300, 980 330 S 1640 120, 2060 260", САМОЛЁТ, 120, 40, "rgba(79,134,255,.55)");
 function drawDeco(i, p) {
   const жизнь = smooth(prog(p, 0, 0.3)) * (1 - smooth(prog(p, ДЛ - 0.35, ДЛ)));
-  const d = ВСЕ_СЛАЙДЫ[i].deco; d.style.opacity = жизнь;
-  if (i === 0) {
-    варп.forEach(({ e, ug, r0, dl }) => {
-      const k = ((p * 1.1 + dl) % 1), r = r0 + k * 1100, len = 60 + k * 260;
-      e.style.width = len + "px";
-      e.style.transform = `rotate(${ug}deg) translateX(${r.toFixed(1)}px)`;
-      e.style.opacity = (Math.sin(k * Math.PI) * 0.9).toFixed(3);
-    });
-  } else if (i === 1) {
-    const a = p * 1.4;
-    монеты.forEach((e, j) => {
-      const ug = a + j * Math.PI, x = 960 + Math.cos(ug) * 760 - 75, y = 540 + Math.sin(ug) * 300 - 75;
-      const перед = Math.sin(ug) > 0;
-      e.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) scale(${(0.8 + 0.25 * Math.sin(ug)).toFixed(3)})`;
-      e.style.zIndex = перед ? 2 : 0; e.style.opacity = перед ? 1 : 0.55;
-    });
+  ВСЕ_СЛАЙДЫ[i].deco.style.opacity = жизнь;
+  if (i === 0) вести(ракета, E.io(prog(p, 0.05, 1.35)));
+  else if (i === 1) {
+    // бегунок едет на SOL и возвращается на GRAM — как пальцем
+    const k = E.io(prog(p, 0.35, 0.7)) - E.io(prog(p, 0.95, 1.3));
+    бег.style.transform = `translateX(${(226 * k).toFixed(1)}px)`;
+    сг.style.color = k < 0.5 ? "#0B0B0F" : "#63625F"; сс.style.color = k >= 0.5 ? "#0B0B0F" : "#63625F";
   } else if (i === 2) {
-    нольЛиния.style.strokeDasharray = "1 1";
-    нольЛиния.style.strokeDashoffset = (1 - E.io(prog(p, 0.05, 1.0))).toFixed(4);
-    ноль.style.opacity = 0.32;
-    ноль.style.transform = `rotate(${(-8 + 10 * prog(p, 0, ДЛ)).toFixed(2)}deg) scale(${(0.94 + 0.06 * smooth(prog(p, 0, ДЛ))).toFixed(3)})`;
-  } else if (i === 3) {
-    дуга.style.strokeDasharray = "1 1";
-    дуга.style.strokeDashoffset = (1 - E.io(prog(p, 0.1, 0.95))).toFixed(4);
-    const k = E.out(prog(p, 0.95, 1.45));
-    волна.setAttribute("r", (420 + 160 * k).toFixed(1));
-    волна.style.opacity = (k > 0 ? 1 - k : 0).toFixed(3);
-  } else if (i === 4) {
-    const k = E.io(prog(p, 0.05, 1.35)), L = мерПуть.getTotalLength();
-    const pt = мерПуть.getPointAtLength(L * k), pt2 = мерПуть.getPointAtLength(Math.min(L, L * k + 4));
-    const ug = Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180 / Math.PI;
-    самолёт.style.transform = `translate3d(${(pt.x - 60).toFixed(1)}px,${(pt.y - 60).toFixed(1)}px,0) rotate(${(ug + 40).toFixed(1)}deg)`;
-    следЛиния.style.strokeDasharray = `${k.toFixed(4)} 1`;
-  }
+    // падение с ускорением, лёгкий отскок кошелька при попадании
+    const k = E.inQ(prog(p, 0.15, 0.85)), y = lerp(-170, 770, k), сжатие = Math.sin(Math.PI * prog(p, 0.85, 1.1));
+    монета.style.transform = `translate3d(${W / 2 - 75}px,${y.toFixed(1)}px,0) rotate(${(k * 200).toFixed(1)}deg)`;
+    монета.style.opacity = p < 0.9 ? 1 : 1 - smooth(prog(p, 0.9, 1.0));
+    кошелёк.style.transform = `translateY(${(10 * сжатие).toFixed(1)}px) scale(${(1 + 0.08 * сжатие).toFixed(3)},${(1 - 0.06 * сжатие).toFixed(3)})`;
+  } else if (i === 3) вести(молния, E.io(prog(p, 0.05, 1.3)));
+  else if (i === 4) вести(самолёт, E.io(prog(p, 0.05, 1.35)));
 }
 
 function drawSlides(р) {
