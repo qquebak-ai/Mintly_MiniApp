@@ -501,6 +501,29 @@ function барабан(el, целых, дробных, разд = ",") {
 // Рынок «тикает»: значение стоит, потом коротко перекатывается к новому —
 // так цифры большую часть времени читаются, а не размыты в движении.
 const шум = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return (x - Math.floor(x)) * 2 - 1; };
+// Цена сменилась: каждая цифра едет прямо от старой к новой, без
+// прокрутки через все промежуточные — меняются только те разряды,
+// что поменялись. Значения — шаги рынка: [было, стало, ход перехода].
+function барабанЦены(el, целых, дробных, разд = ".") {
+  барабан(el, целых, дробных, разд);
+  const кол = [...el.querySelectorAll(".бк")].reverse();
+  const цифры = (v) => { const n = Math.round(Math.abs(v) * Math.pow(10, дробных)); return кол.map((_, j) => Math.floor(n / Math.pow(10, j)) % 10); };
+  return (a, b, k) => {
+    const da = цифры(a), db = цифры(b);
+    кол.forEach((c, j) => {
+      c.firstElementChild.style.transform = `translateY(${(-lerp(da[j], db[j], k) * 1.12).toFixed(4)}em)`;
+      if (j > дробных) {
+        // старший ноль не показываем: «3.88», а не «03.88»
+        const пор = Math.pow(10, j - дробных), вид = lerp(Math.abs(a) >= пор ? 1 : 0, Math.abs(b) >= пор ? 1 : 0, k);
+        c.style.width = `${(0.6 * вид).toFixed(3)}em`; c.style.opacity = вид;
+      }
+    });
+  };
+}
+function шагРынка(p, фаза, период = 0.7) {
+  const x = p / период + фаза, i = Math.floor(x), f = x - i;
+  return [шум(i), шум(i + 1), E.io(clamp((f - 0.6) / 0.4))];
+}
 function тик(p, фаза, период = 0.55) {
   const x = p / период + фаза, i = Math.floor(x), f = x - i;
   return lerp(шум(i), шум(i + 1), smooth(clamp((f - 0.55) / 0.45)));
@@ -633,7 +656,7 @@ const ряд = ([lg, имя, цена, зн, изм], j) => {
   <div style="flex:1;min-width:0"><div style="font:800 28px/1.1 'Nunito';color:#fff">${имя}</div><div style="font:500 20px/1.35 'Onest';color:#97958F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Рыночная капитализация</div></div>
   <div style="text-align:right;font-variant-numeric:tabular-nums"><div style="font:800 28px/1.12 'Nunito';color:#fff;display:flex;justify-content:flex-end">$<span class="цн"></span></div>
     <div class="изм" style="font:700 22px/1.12 'Onest';color:#2EE87A;display:flex;justify-content:flex-end"><span class="зн">+</span><span class="пр"></span>%</div></div></div>`);
-  e.цена = барабан(e.querySelector(".цн"), 1, зн, "."); e.проц = барабан(e.querySelector(".пр"), 2, 2, ".");
+  e.цена = барабанЦены(e.querySelector(".цн"), 1, зн); e.проц = барабанЦены(e.querySelector(".пр"), 2, 2);
   e.изм = e.querySelector(".изм"); e.зн = e.querySelector(".зн"); e.база = [цена, изм]; e.фаза = j * 1.7 + цена * 3;
   return e;
 };
@@ -646,8 +669,8 @@ function рядыСети(список, вид, сдвиг, p) {
     const k = clamp(вид * 1.25 - j * 0.12);
     S(e, { o: smooth(k), x: (1 - smooth(k)) * 120 * сдвиг, y: j * 110, b: (1 - k) * 6 });
     // рынок живёт: цена и процент плавно гуляют вокруг своих значений
-    const [ц, и] = e.база, в = тик(p, e.фаза);
-    e.цена(ц * (1 + 0.035 * в)); e.проц(Math.abs(и + 2.4 * в));
+    const [ц, и] = e.база, [в1, в2, kт] = шагРынка(p, e.фаза);
+    e.цена(ц * (1 + 0.035 * в1), ц * (1 + 0.035 * в2), kт); e.проц(и + 2.4 * в1, и + 2.4 * в2, kт);
   });
 }
 const мпПалец = палец(1);
@@ -727,15 +750,15 @@ const тф4 = телефон(3, `
     <div class="кн abs" style="left:20px;right:20px;top:250px;height:62px;border-radius:16px;background:#00E96B;display:flex;align-items:center;justify-content:center;font:800 20px/1 'Nunito';color:#04150B">Купить</div>
   </div>`);
 const тф4Лин = тф4.querySelector(".лин"), тф4Зал = тф4.querySelector(".зал"), тф4Кн = тф4.querySelector(".кн");
-const тф4Цена = барабан(тф4.querySelector(".цн"), 1, 5, "."), тф4Проц = барабан(тф4.querySelector(".пр"), 1, 2, ".");
+const тф4Цена = барабанЦены(тф4.querySelector(".цн"), 1, 5), тф4Проц = барабанЦены(тф4.querySelector(".пр"), 1, 2);
 const пл4 = плашка(3, 800, 190, ["Покупаем…", "Куплено"], "48 200 JIM · комиссия 0%");
 const пл4Палец = палец(3);
 function слайдПокупка(p) {
   появление(тф4, p, "поворот", П_K);
   const кл = E.out(prog(p, 0.25, 1.0));
   тф4Лин.style.strokeDashoffset = (1 - кл).toFixed(4); тф4Зал.style.opacity = кл;
-  const в = тик(p, 0.3, 0.6);
-  тф4Цена(0.00310754 * (1 + 0.02 * в)); тф4Проц(9.85 + 0.9 * в);
+  const [в1, в2, kт] = шагРынка(p, 0.3, 0.8);
+  тф4Цена(0.00310754 * (1 + 0.02 * в1), 0.00310754 * (1 + 0.02 * в2), kт); тф4Проц(9.85 + 0.9 * в1, 9.85 + 0.9 * в2, kт);
   const pr = нажатие(пл4Палец, p, ...наЭкране(196, 430 + 281), 0.8, 1.12);
   тф4Кн.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
   тф4Кн.style.boxShadow = `0 0 ${(40 * pr).toFixed(0)}px rgba(46,232,122,${(0.7 * pr).toFixed(2)})`;
@@ -849,27 +872,19 @@ function поСловам(e, v, a, шаг, длит = 0.4) {
   e.spans.forEach((w, i) => { const k = E.out(prog(v, a + i * шаг, a + i * шаг + длит)); S(w, { o: k, y: (1 - k) * 26, b: (1 - k) * 10 }); });
 }
 // --- платформа: три слоя в перспективе, верхний со светящейся кромкой
-const луч = $(`<div class="abs" style="left:560px;top:-120px;width:800px;height:620px;background:radial-gradient(closest-side,rgba(255,80,160,.5),rgba(255,140,70,.12) 55%,rgba(255,140,70,0))"></div>`); vb.appendChild(луч);
+const луч = $(`<div class="abs" style="left:560px;top:-120px;width:800px;height:620px;background:radial-gradient(closest-side,rgba(167,167,167,.55),rgba(167,167,167,.12) 55%,rgba(167,167,167,0))"></div>`); vb.appendChild(луч);
 const платф = $(`<div class="abs" style="left:0;top:0;width:${W}px;height:${H}px;perspective:1300px;perspective-origin:960px 300px">
   <div class="пл abs" style="left:560px;top:520px;width:800px;height:480px;transform-style:preserve-3d;transform:rotateX(64deg)">
-    <div class="abs" style="inset:-90px;border-radius:120px;background:radial-gradient(closest-side,rgba(255,70,150,.75),rgba(255,120,60,0));filter:blur(30px)"></div>
-    <div class="abs" style="inset:0;border-radius:70px;background:linear-gradient(180deg,#7A1550,#3A0A2A);box-shadow:0 0 0 2px rgba(255,120,180,.5)"></div>
-    <div class="абр abs" style="inset:70px;border-radius:52px;background:linear-gradient(180deg,#FF4FA3,#C2185B);box-shadow:0 0 0 4px rgba(255,236,245,.95),0 0 40px rgba(255,140,200,.95),0 0 120px rgba(255,80,160,.8),inset 0 0 80px rgba(255,200,150,.45)"></div>
+    <div class="abs" style="inset:-90px;border-radius:120px;background:radial-gradient(closest-side,rgba(148,148,148,.7),rgba(110,110,110,0));filter:blur(30px)"></div>
+    <div class="abs" style="inset:0;border-radius:70px;background:linear-gradient(180deg,#535353,#303030);box-shadow:0 0 0 2px rgba(172,172,172,.45)"></div>
+    <div class="абр abs" style="inset:70px;border-radius:52px;background:linear-gradient(180deg,#8A8A8A,#5A5A5A);box-shadow:0 0 0 4px rgba(238,238,238,.95),0 0 40px rgba(206,206,206,.95),0 0 120px rgba(167,167,167,.8),inset 0 0 80px rgba(202,202,202,.45)"></div>
   </div>
 </div>`); vb.appendChild(платф);
 const абр = платф.querySelector(".абр");
 const текстКарты = словаВ("Доведи токен до *DEX —<br>получи *лимитированную *карту", 60);
-const КАРТА_ФОН = "linear-gradient(125deg,#FF3CAC 0%,#FF6B6B 18%,#FF9F43 34%,#FFD93D 50%,#FF9F43 66%,#FF6B6B 82%,#FF3CAC 100%)";
-// переливается только «карту» — главное слово фразы
-const словоКарта = текстКарты.spans.filter((w) => w.textContent === "карту");
-словоКарта.forEach((w) => {
-  // та же заливка, что у карты, и перетекает она так же
-  w.style.backgroundImage = КАРТА_ФОН;
-  w.style.backgroundSize = "300% 300%"; w.style.webkitBackgroundClip = "text"; w.style.backgroundClip = "text"; w.style.color = "transparent";
-});
 // --- карточка токена
 const карта = $(`<div class="abs" style="left:0;top:0;transform-origin:50% 50%">
-  <div class="кфон abs" style="inset:0;background:${КАРТА_ФОН};background-size:300% 300%;box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 0 60px rgba(255,90,150,.55),0 40px 90px rgba(0,0,0,.55)"></div>
+  <div class="кфон abs" style="inset:0;background:linear-gradient(135deg,#A7A7A7,#7E7E7E 55%,#5A5A5A);box-shadow:inset 0 2px 0 rgba(255,255,255,.35),0 40px 90px rgba(0,0,0,.55)"></div>
   <div class="ктк abs" style="inset:0">
     <img src="assets/coins/jimothy.png" style="position:absolute;left:40px;top:40px;width:84px;height:84px;border-radius:50%;box-shadow:0 0 0 3px rgba(255,255,255,.35)"/>
     <div style="position:absolute;left:40px;bottom:40px"><div style="font:800 54px/1 'Nunito';color:#fff">$JIM</div><div style="font:600 24px/1.5 'Onest';color:rgba(255,255,255,.75)">Jimothy</div></div>
@@ -878,7 +893,7 @@ const карта = $(`<div class="abs" style="left:0;top:0;transform-origin:50% 
   </div>
 </div>`); vb.appendChild(карта);
 const кфон = карта.querySelector(".кфон");
-const блик = $(`<div class="abs" style="inset:0;border-radius:34px;pointer-events:none;mix-blend-mode:overlay;background:linear-gradient(110deg,rgba(255,255,255,0) 35%,rgba(255,255,255,.75) 50%,rgba(255,255,255,0) 65%);background-size:250% 100%"></div>`);
+const блик = $(`<div class="abs" style="inset:0;border-radius:34px;pointer-events:none;background:linear-gradient(115deg,rgba(0,0,0,0) 20%,rgba(0,0,0,.5) 38%,rgba(0,0,0,.08) 50%,rgba(0,0,0,.55) 62%,rgba(0,0,0,0) 80%);background-size:260% 100%"></div>`);
 кфон.after(блик);
 // --- синие дуги через кадр: светящийся отрезок бежит по кривой
 const дуги = $(`<svg class="abs" style="left:0;top:0;overflow:visible;filter:drop-shadow(0 0 10px rgba(167,167,167,.8))" width="${W}" height="${H}">
@@ -917,23 +932,13 @@ function drawV(v) {
   const ж = v; v = вВнутр(v);
   // 1. платформа и карточка токена
   const kP = smooth(prog(v, 0.05, 0.5)) * (1 - smooth(prog(v, 1.9, 2.25)));
-  платф.style.opacity = kP; луч.style.opacity = 0;
+  платф.style.opacity = kP; луч.style.opacity = kP * (0.85 + 0.15 * Math.sin(ж * 5));
   платф.firstElementChild.style.transform = `translateY(${(140 * smooth(prog(v, 1.9, 2.25))).toFixed(1)}px) rotateX(64deg)`;
   абр.style.filter = `brightness(${(1 + 0.25 * Math.sin(ж * 4)).toFixed(3)})`;
   поСловам(текстКарты, v, 0.2, 0.09, 0.4);
   S(текстКарты, { o: 1 - smooth(prog(v, 1.85, 2.1)), y: 90 - 30 * smooth(prog(v, 1.85, 2.1)) });
-  // карта: цвета медленно перетекают, по ней проходит голографический блик
-  кфон.style.backgroundPosition = `${(50 + 50 * Math.sin(ж * 0.9)).toFixed(2)}% ${(50 + 50 * Math.cos(ж * 0.7)).toFixed(2)}%`;
-  кфон.style.filter = `hue-rotate(${(18 * Math.sin(ж * 0.8)).toFixed(2)}deg)`;
-  блик.style.backgroundPosition = `${((ж * 0.45 % 1.6) * 100 - 30).toFixed(2)}% 0`;
-  // «карту» переливается цветами карты: заливка плывёт по буквам,
-  // а свечение вокруг них медленно меняет оттенок от розового к золотому
-  const оттенок = 340 + 28 * Math.sin(ж * 1.3), сила = 0.75 + 0.25 * Math.sin(ж * 2.1);
-  словоКарта.forEach((w) => {
-    w.style.backgroundPosition = кфон.style.backgroundPosition;
-    const blur = w.style.filter.match(/blur\(([\d.]+)px\)/);
-    w.style.filter = `${blur ? blur[0] + " " : ""}hue-rotate(${(18 * Math.sin(ж * 0.8)).toFixed(2)}deg) drop-shadow(0 0 ${(14 * сила).toFixed(1)}px hsla(${оттенок.toFixed(1)},100%,62%,${(0.85 * сила).toFixed(2)})) drop-shadow(0 0 ${(34 * сила).toFixed(1)}px hsla(${(оттенок + 25).toFixed(1)},100%,58%,.45))`;
-  });
+  // по серой карте плавно переливается чёрный отлив — туда и обратно
+  блик.style.backgroundPosition = `${(50 + 55 * Math.sin(ж * 0.9)).toFixed(2)}% 0`;
   // карточка опускается на платформу, покачивается и уходит влево вместе с дугой
   const kD = E.out(prog(v, 0.1, 1.0));
   const cw = 600, ch = 370;
