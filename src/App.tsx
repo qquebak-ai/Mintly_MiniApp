@@ -2741,8 +2741,7 @@ function GlobalStyle() {
         7%   { opacity: 1; }
         /* До самого конца летит в полную величину: уменьшать её на
            подлёте незачем, гаснет она у самой рамки. */
-        88%  { transform: translate(-50%, calc(var(--fly-to) + 46px)) rotate(-45deg); opacity: 1; }
-        100% { transform: translate(-50%, var(--fly-to)) rotate(-45deg); opacity: 0; }
+        100% { transform: translate(-50%, var(--fly-to)) rotate(-45deg); opacity: 1; }
       }
       /* Косметика: рамки аватарки и карточки профиля.
 
@@ -20732,6 +20731,28 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
   // помечает себя классом закрытия, и без этого значения экран запуска
   // падал на первом же открытии.
   const [видно, closing] = useClosing(open);
+  /* Этапы показываются по одному: сеть иногда отвечает на два-три шага
+     разом, и раньше они проскакивали мгновенно, будто их и не было.
+     Каждый этап стоит на экране не меньше 0,9 с, и только потом
+     загорается следующий; окно успеха ждёт, пока пройдут все. */
+  const [показан, setПоказан] = useState(0);
+  useEffect(() => { if (open) setПоказан(0); }, [open]);
+  const цель = done ? LAUNCH_STEPS.length : stepIndex;
+  useEffect(() => {
+    if (!open || error || показан >= цель) return undefined;
+    const id = setTimeout(() => setПоказан((п) => п + 1), 900);
+    return () => clearTimeout(id);
+  }, [open, error, показан, цель]);
+  const всёПоказано = done && показан >= LAUNCH_STEPS.length;
+  // Запуск прошёл — никакого окна поздравлений: сразу на страницу
+  // токена, а там пролетает ракета.
+  const ушли = useRef(false);
+  useEffect(() => { if (open) ушли.current = false; }, [open]);
+  useEffect(() => {
+    if (!всёПоказано || ушли.current || !result) return undefined;
+    const id = setTimeout(() => { ушли.current = true; onViewToken && onViewToken(result); }, 350);
+    return () => clearTimeout(id);
+  }, [всёПоказано, result]);
   const [copied, setCopied] = useState(false);
   const [logCopied, setLogCopied] = useState(false);
   useEffect(() => { if (open) setCopied(false); }, [open]);
@@ -20752,7 +20773,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
   }
 
   return (
-    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "absolute", inset: 0, zIndex: 80, background: done || error ? "rgba(0,0,0,0.92)" : "#000000", backdropFilter: done || error ? "blur(6px)" : "none", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(20px + var(--tg-inset-top, 0px)) 24px calc(20px + var(--tg-inset-bottom, 0px))", overflowY: "auto" }}>
+    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "absolute", inset: 0, zIndex: 80, background: error ? "rgba(0,0,0,0.92)" : "#000000", backdropFilter: error ? "blur(6px)" : "none", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(20px + var(--tg-inset-top, 0px)) 24px calc(20px + var(--tg-inset-bottom, 0px))", overflowY: "auto" }}>
       {error ? (
         <div className="fx-modal-card flex flex-col items-center text-center gap-4" style={{ width: "100%", maxWidth: 340, background: T.surface, border: "none", borderRadius: 24, padding: 24 }}>
           {/* Ошибку встречает маскот, а не безликий значок: тот же
@@ -20784,7 +20805,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
             </button>
           </div>
         </div>
-      ) : !done ? (
+      ) : (
         <div className="fx-modal-card flex flex-col" style={{ width: "100%", maxWidth: 360, alignSelf: "stretch", justifyContent: "center" }}>
           {/* Лента шагов, как в промо-ролике: на чёрном — лицо токена и
               список этапов без карточек. Пройденный этап — зелёная
@@ -20805,7 +20826,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
           </div>
           <div className="flex flex-col">
             {LAUNCH_STEPS.map((step, i) => {
-              const state = i < stepIndex ? "done" : i === stepIndex ? "active" : "pending";
+              const state = i < показан ? "done" : i === показан ? "active" : "pending";
               const последний = i === LAUNCH_STEPS.length - 1;
               return (
                 <div key={step.key} className="flex" style={{ gap: 16, minHeight: последний ? 0 : 58 }}>
@@ -20816,7 +20837,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
                         : null}
                     </div>
                     {!последний && (
-                      <div style={{ flex: 1, width: 2, borderRadius: 1, margin: "6px 0", background: i < stepIndex ? hexA(T.up, 0.55) : T.line, transition: `background ${EASE}` }} />
+                      <div style={{ flex: 1, width: 2, borderRadius: 1, margin: "6px 0", background: i < показан ? hexA(T.up, 0.55) : T.line, transition: `background ${EASE}` }} />
                     )}
                   </div>
                   <span style={{
@@ -20828,72 +20849,6 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
                 </div>
               );
             })}
-          </div>
-        </div>
-      ) : (
-        <div className="fx-modal-card fx-view flex flex-col items-center text-center gap-4" style={{ position: "relative", width: "100%", maxWidth: 360, background: T.surface, border: "none", borderRadius: 24, padding: 24 }}>
-          {/* Запуск токена — то самое событие, ради которого сюда шли:
-              маскот уходит вверх, как планета со старта, и следом летят
-              частицы. */}
-          <ВзлётПланеты />
-          <Конфетти />
-          <div style={{ width: 68, height: 68, borderRadius: "50%", overflow: "hidden", background: result.logoUrl ? `center/cover no-repeat url(${result.logoUrl})` : T.surfaceHi, border: `1px solid ${T.lineHi}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {/* Без логотипа место занимает маскот: он же встречает и в
-                других пустых местах, поэтому экран остаётся своим. */}
-            {!result.logoUrl && <КотПланета size={52} glow={false} />}
-          </div>
-          <div className="flex items-center gap-1.5 rounded-full px-3 py-1" style={{ background: hexA(T.up, 0.12), border: `1px solid ${hexA(T.up, 0.35)}` }}>
-            <ShieldCheck size={13} color={T.up} />
-            <span style={{ fontFamily: bodyFont, fontSize: 12, fontWeight: 600, color: T.up }}>{t("tokenCreatedStatus")}</span>
-          </div>
-          <div>
-            <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 20.5, fontWeight: 700 }}>{result.name}</div>
-            <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 13, marginTop: 2 }}>${result.ticker}</div>
-          </div>
-          <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5, marginTop: -6 }}>{t("launchSuccessSub")}</p>
-
-          <div className="w-full flex flex-col gap-2 mt-1">
-            <div className="flex items-center justify-between rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: "none" }}>
-              <span style={{ fontFamily: bodyFont, fontSize: 12, color: T.muted }}>{t("totalSupply")}</span>
-              <span style={{ fontFamily: monoFont, fontSize: 13, color: T.ice }}>{result.supply}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: "none" }}>
-              <span style={{ fontFamily: bodyFont, fontSize: 12, color: T.muted }}>{t("initialBuy")}</span>
-              <span style={{ fontFamily: monoFont, fontSize: 13, color: T.ice, textAlign: "right" }}>
-                {result.buyAmount} {result.chain === "solana" ? "SOL" : ТИКЕР_TON}<br />
-                <span style={{ fontSize: 11.5, color: T.muted }}>
-                  <ТекстСЧислами text={(Number(result.buyTokens) || 0).toLocaleString("ru-RU")} /> ${result.ticker} · <ТекстСЧислами text={(Number(result.buyPct) || 0).toFixed((Number(result.buyPct) || 0) < 1 ? 3 : 1)} />%
-                </span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between rounded-[20px] px-3 py-2.5 gap-2" style={{ background: T.surfaceHi, border: "none" }}>
-              <div className="flex flex-col items-start min-w-0">
-                <span style={{ fontFamily: bodyFont, fontSize: 12, color: T.muted }}>{t("contractAddress")}</span>
-                <span style={{ fontFamily: monoFont, fontSize: 12.5, color: T.ice, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 190 }}>{result.address}</span>
-              </div>
-              <button onClick={copyAddr} className="fx-tap flex-shrink-0">
-                {copied ? <CheckCircle2 size={15} color={T.turquoise} /> : <Copy size={15} color={T.muted} />}
-              </button>
-            </div>
-            {result.explorerUrl && (
-              <a href={result.explorerUrl} target="_blank" rel="noreferrer" className="fx-tap flex items-center justify-center gap-1.5 rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: "none", textDecoration: "none" }}>
-                <ExternalLink size={13} color={T.muted} />
-                <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: T.muted }}>{t("viewOnExplorer")}</span>
-              </a>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-2 w-full mt-2">
-            <button
-              onClick={() => onViewToken && onViewToken(result)}
-              className="fx-tap w-full rounded-[12px] min-h-[52px] py-3"
-              style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
-            >
-              {t("launchBuyCta")}
-            </button>
-            <button onClick={() => onClose && onClose(result)} className="fx-tap w-full rounded-[12px] min-h-[52px] py-3" style={{ background: "transparent", border: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>
-              {t("doneClose")}
-            </button>
           </div>
         </div>
       )}
@@ -21530,12 +21485,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         })()}
       </div>
 
-      {!connected && !вSolana && (
-        <div className="rounded-[22px] p-4 flex items-center gap-2.5" style={{ background: ink(0.07), border: `1px solid ${ink(0.22)}` }}>
-          <Wallet size={16} color={T.electric} />
-          <span style={{ fontFamily: bodyFont, color: T.electric, fontSize: 14 }}>{t("connectToConfirm")}</span>
-        </div>
-      )}
+
 
       {/* Кнопка стоит в конце формы, а не липнет к низу экрана: липкой
           она ложилась поверх переключателей механик, и половина списка
@@ -26113,14 +26063,14 @@ function LaunchRocket({ targetTop = ROCKET_TOUCH_TOP, variant = "default" }) {
           // поэтому отрицательного поля здесь быть не должно: вместе они
           // сдвигали ракету на её же ширину влево. По вертикали поле
           // нужно — чтобы --fly-to означала центр, а не верхний край.
-          position: "absolute", left: "50%", top: 0, width: 168, height: 168, marginTop: -84,
+          position: "absolute", left: "50%", top: 0, width: 340, height: 340, marginTop: -170,
           animation: `rocketFly ${ROCKET_FLIGHT_MS}ms cubic-bezier(0.45,0,0.5,1) forwards`,
         }}
       >
         {/* Поправка на то, что в исходном кадре ракета нарисована не по
             центру холста: измерено по отрисовке, смещение около 13 на 11
             точек для этого размера. */}
-        <div ref={holderRef} style={{ width: "100%", height: "100%", transform: "translate(13px, -11px)" }} />
+        <div ref={holderRef} style={{ width: "100%", height: "100%", transform: "translate(26px, -22px)" }} />
       </div>
     </div>
   );
@@ -28518,7 +28468,7 @@ function mapTokenRow(row) {
     // дважды. На страницу токена он попадёт кнопкой с экрана успеха.
     // Токен Solana сюда не идёт: карточка читает состояние у кривой на
     // TON, и открывать её для чужой сети — значит показывать прочерки.
-    if (result && result.chain !== "solana") openLaunchBuy(result, { openTradeSheet: false });
+    if (result) openLaunchBuy(result, { openTradeSheet: false });
   }
   // Создатель покупает первым: кроме него о токене ещё никто не знает,
   // а размер этой покупки и задаёт стартовую цену — кривая сдвигается
@@ -29369,7 +29319,7 @@ function mapTokenRow(row) {
           «Динамического острова» и контура экрана, которые она
           поджигала, убраны: на разных телефонах они ложились по-разному,
           а на тех, где острова нет, рамка выглядела случайной деталью. */}
-      {rocketFlying && <LaunchRocket variant={rocketVariant} />}
+      {rocketFlying && <LaunchRocket variant={rocketVariant} targetTop={-420} />}
       {/* Знакомства перед входом больше нет: три страницы о приложении
           стояли между человеком и аккаунтом, а рассказать они успевали
           ровно столько, сколько видно на главной. */}
