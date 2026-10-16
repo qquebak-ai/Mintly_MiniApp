@@ -405,7 +405,7 @@ function drawS4(t) {
 const ui = $(`<div class="scene"></div>`);
 const slides = $(`<div class="scene"></div>`);
 function slide(html) {
-  const box = $(`<div class="abs" style="left:0;right:0;top:0;height:${H}px;display:flex;align-items:center;justify-content:flex-start;padding-left:150px"><div class="deco abs" style="inset:0"></div><div style="position:relative;text-align:left;font:800 118px/1.12 'Nunito';letter-spacing:-.02em;color:#fff;text-shadow:0 8px 40px rgba(0,0,0,.55)">${html}</div></div>`);
+  const box = $(`<div class="abs" style="left:0;right:0;top:0;height:${H}px;display:flex;align-items:center;justify-content:flex-start;padding-left:110px"><div class="deco abs" style="inset:0"></div><div style="position:relative;text-align:left;font:800 118px/1.12 'Nunito';letter-spacing:-.02em;color:#fff;text-shadow:0 8px 40px rgba(0,0,0,.55)">${html}</div></div>`);
   slides.appendChild(box);
   const el = box.lastElementChild; el.box = box; el.deco = box.firstElementChild;
   el.innerHTML = el.innerHTML.replace(/(<br>)|([^\s<]+)/g, (m, br) => br ? br : `<span class="w" style="display:inline-block;margin:0 .26em 0 0">${m}</span>`);
@@ -446,8 +446,12 @@ function разложить(T) {
 // Фраза слева только называет преимущество, а справа его видно в деле:
 // телефон там, где важно действие пальцем, отдельный виджет — где важна
 // одна цифра или сравнение.
-const ПX = 1300, ПY = 102; // где стоит телефон
-const ЭX = ПX + 12, ЭY = ПY + 12; // начало экрана — от него считаются нажатия
+// Все телефоны стоят близко к камере — крупно, низ уходит за край кадра;
+// виджеты тоже крупнее, чтобы читались с телефона.
+const ПX = 1180, ПY = 36, П_K = 1.32; // где стоит телефон и во сколько он крупнее
+const ВИД_K = 1.22; // во сколько крупнее виджеты
+// точка экрана телефона → точка кадра: от неё считаются нажатия
+const наЭкране = (x, y) => [ПX + (12 + x) * П_K, ПY + (12 + y) * П_K];
 function телефон(i, html, y = ПY, h = 876, x = ПX) {
   const ph = $(`<div class="abs" style="left:${x}px;top:${y}px;width:417px;height:${h}px;border-radius:66px;background:#1C1D22;box-shadow:inset 0 0 0 2px rgba(255,255,255,.14),0 50px 120px rgba(0,0,0,.65),0 0 90px rgba(79,134,255,.22)">
     <div class="scr abs" style="left:12px;top:12px;width:393px;height:${h - 24}px;border-radius:54px;overflow:hidden;background:#0B0D12">
@@ -497,7 +501,6 @@ const переключательСети = (w, h) => `<div class="abs" style="le
 
 // 1. Запуск токена за секунды — телефон с формой: имя, тикер, «Запустить»,
 // и сразу плашка «Токен запущен» с секундомером
-const Т1_Y = 60, Т1_K = 1.32, Т1_X = 1180; // первый телефон ближе к камере — крупнее остальных
 const тф1 = телефон(0, `
   <div class="abs" style="left:20px;top:70px;font:800 28px/1 'Nunito';color:#fff">Создать токен</div>
   <div class="abs" style="left:20px;top:118px;width:180px;height:42px">${переключательСети(180, 42)}</div>
@@ -510,21 +513,21 @@ const тф1 = телефон(0, `
   <div class="кн abs" style="left:20px;top:676px;width:353px;height:58px;border-radius:14px;background:#F2F0EB;overflow:hidden;box-shadow:0 0 30px rgba(120,165,255,.4)">
     <div class="пол abs" style="left:0;top:0;bottom:0;width:0;background:#9CC0FF"></div>
     <div class="кнт abs" style="inset:0;display:flex;align-items:center;justify-content:center;font:800 18px/1 'Nunito';color:#2A2C31">Запустить токен</div>
-  </div>`, Т1_Y, 876, Т1_X);
+  </div>`);
 тф1.querySelector(".сг").style.color = "#0B0B0F"; тф1.querySelector(".сс").style.color = "#63625F";
 const тф1Имя = буквы(тф1.querySelector(".имя"), "Lily Frog"), тф1Тик = буквы(тф1.querySelector(".тикер"), "LILY");
 const тф1Пх = [...тф1.querySelectorAll(".ph")];
 const тф1Кн = тф1.querySelector(".кн"), тф1Пол = тф1.querySelector(".пол"), тф1Кнт = тф1.querySelector(".кнт"), тф1Лого = тф1.querySelector(".лого");
-const пл1 = плашка(0, 880, 820, "Токен запущен", "$LILY · Gram", "0,0 с");
+const пл1 = плашка(0, 820, 800, "Токен запущен", "$LILY · Gram", "0,0 с");
 const пл1Сек = пл1.querySelector(".сек");
 const пл1Палец = палец(0);
 function слайдЗапуск(p) {
   const q = p / ДЛ;
-  въезд(тф1, p, 0.05, 160, Т1_K);
+  въезд(тф1, p, 0.05, 160, П_K);
   typeChars(тф1Имя, q, 0.14, 0.3); typeChars(тф1Тик, q, 0.32, 0.4);
   тф1Пх[0].style.display = q >= 0.14 ? "none" : ""; тф1Пх[1].style.display = q >= 0.32 ? "none" : "";
   тф1Лого.style.opacity = smooth(prog(q, 0.4, 0.46));
-  const pr = нажатие(пл1Палец, q, Т1_X + (12 + 196) * Т1_K, Т1_Y + (12 + 705) * Т1_K, 0.4, 0.5);
+  const pr = нажатие(пл1Палец, q, ...наЭкране(196, 705), 0.4, 0.5);
   тф1Кн.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
   // после нажатия кнопка сама показывает ход запуска, а затем — готово
   const ход = prog(q, 0.54, 0.7), готово = q >= 0.7;
@@ -534,14 +537,16 @@ function слайдЗапуск(p) {
   тф1Кнт.textContent = готово ? "Запущен" : q >= 0.54 ? "Запускаем…" : "Запустить токен";
   тф1Кнт.style.color = готово ? "#04150B" : "#2A2C31";
   const kp = E.back(prog(q, 0.7, 0.8));
-  S(пл1, { o: smooth(prog(q, 0.7, 0.76)), y: (1 - kp) * 40, s: lerp(0.94, 1, kp) });
+  пл1.style.transformOrigin = "0 0";
+  S(пл1, { o: smooth(prog(q, 0.7, 0.76)), y: (1 - kp) * 40, s: lerp(0.94, 1, kp) * ВИД_K });
   пл1Сек.textContent = `${(2.8 * ход).toFixed(1).replace(".", ",")} с`;
 }
 
 // 2. Gram и Solana в одном месте — виджет мемпада: переключатель сети,
 // строка фильтров и токены выбранной сети
-const МП_W = 720;
-const мемпад = виджет(1, 1130, 250, МП_W, `
+const МП_W = 700;
+const МП_X = 1040, МП_Y = 190;
+const мемпад = виджет(1, МП_X, МП_Y, МП_W, `
   <div style="padding:32px 30px 34px">
     <div class="abs" style="left:30px;top:32px;width:340px;height:76px">${переключательСети(340, 76)}</div>
     <div style="display:flex;gap:26px;padding:104px 4px 24px;font:600 22px/1 'Onest';color:#63625F;white-space:nowrap">
@@ -567,12 +572,12 @@ function рядыСети(список, вид, сдвиг) {
 const мпПалец = палец(1);
 function слайдСети(p) {
   const q = p / ДЛ;
-  въезд(мемпад, p);
+  въезд(мемпад, p, 0.05, 160, ВИД_K);
   // палец дважды жмёт переключатель: на SOL и обратно на GRAM
   const k = E.io(prog(q, 0.26, 0.4)) - E.io(prog(q, 0.62, 0.76));
-  const цx = 1160 + lerp(255, 85, smooth(prog(q, 0.42, 0.56)));
+  const цx = МП_X + (30 + lerp(255, 85, smooth(prog(q, 0.42, 0.56)))) * ВИД_K, цy = МП_Y + 50 * ВИД_K;
   const kc = E.out(prog(q, 0.12, 0.24)), pr = clamp(prog(q, 0.24, 0.27) - prog(q, 0.29, 0.33)) + clamp(prog(q, 0.58, 0.61) - prog(q, 0.63, 0.67));
-  S(мпПалец, { o: smooth(prog(q, 0.12, 0.17)) * (1 - smooth(prog(q, 0.8, 0.88))), x: lerp(цx + 220, цx, kc) - 14, y: lerp(300 + 380, 300, kc), s: 1 - 0.12 * pr });
+  S(мпПалец, { o: smooth(prog(q, 0.12, 0.17)) * (1 - smooth(prog(q, 0.8, 0.88))), x: lerp(цx + 220, цx, kc) - 14, y: lerp(цy + 380, цy, kc), s: 1 - 0.12 * pr });
   бег.style.transform = `translateX(${(164 * k).toFixed(1)}px)`;
   сг.style.color = k < 0.5 ? "#0B0B0F" : "#63625F"; сс.style.color = k >= 0.5 ? "#0B0B0F" : "#63625F";
   const вход = smooth(prog(q, 0.08, 0.22));
@@ -583,7 +588,7 @@ function слайдСети(p) {
 // 3. Комиссия 0% — виджет сделки: комиссия тает с 1% до нуля, и сумма
 // к получению дорастает до всей суммы сделки
 const стр = (лев, cls, прав, цвет = "#F2F0EB") => `<div style="display:flex;justify-content:space-between;align-items:center;padding:20px 0;border-top:1px solid rgba(255,255,255,.07);font:500 26px/1 'Onest';color:#97958F"><span>${лев}</span><span class="${cls}" style="font:800 30px/1 'Nunito';color:${цвет};font-variant-numeric:tabular-nums">${прав}</span></div>`;
-const ком = виджет(2, 1160, 230, 660, `
+const ком = виджет(2, 1040, 160, 660, `
   <div style="padding:40px 44px 30px">
     <div style="display:flex;align-items:center;gap:16px;font:600 26px/1 'Onest';color:#97958F"><img src="assets/app/gram.png" style="width:40px;height:40px"/>Продажа $LILY</div>
     <div style="display:flex;align-items:baseline;gap:22px;margin:26px 0 8px">
@@ -598,7 +603,7 @@ const кПроц = ком.querySelector(".кпроц"), кСум = ком.queryS
 const чсл = (v) => v.toFixed(2).replace(".", ",");
 function слайдКомиссия(p) {
   const q = p / ДЛ;
-  въезд(ком, p);
+  въезд(ком, p, 0.05, 160, ВИД_K);
   const k = E.io(prog(q, 0.3, 0.62)), ноль = k >= 1;
   кПроц.textContent = ноль ? "0%" : `${(1 - k).toFixed(1).replace(".", ",")}%`;
   // на нуле цифра коротко вспыхивает — тут вся мысль слайда
@@ -634,19 +639,20 @@ const тф4 = телефон(3, `
     <div class="кн abs" style="left:20px;right:20px;top:250px;height:62px;border-radius:16px;background:#00E96B;display:flex;align-items:center;justify-content:center;font:800 20px/1 'Nunito';color:#04150B">Купить</div>
   </div>`);
 const тф4Лин = тф4.querySelector(".лин"), тф4Зал = тф4.querySelector(".зал"), тф4Кн = тф4.querySelector(".кн");
-const пл4 = плашка(3, 1000, 230, "Куплено", "12 400 LILY · комиссия 0%", "0,0 с");
+const пл4 = плашка(3, 820, 210, "Куплено", "12 400 LILY · комиссия 0%", "0,0 с");
 const пл4Сек = пл4.querySelector(".сек");
 const пл4Палец = палец(3);
 function слайдПокупка(p) {
   const q = p / ДЛ;
-  въезд(тф4, p);
+  въезд(тф4, p, 0.05, 160, П_K);
   const кл = E.out(prog(q, 0.1, 0.4));
   тф4Лин.style.strokeDashoffset = (1 - кл).toFixed(4); тф4Зал.style.opacity = кл;
-  const pr = нажатие(пл4Палец, q, ЭX + 196, ЭY + 430 + 281, 0.34, 0.46);
+  const pr = нажатие(пл4Палец, q, ...наЭкране(196, 430 + 281), 0.34, 0.46);
   тф4Кн.style.transform = `scale(${(1 - 0.05 * pr).toFixed(3)})`;
   тф4Кн.style.boxShadow = `0 0 ${(40 * pr).toFixed(0)}px rgba(46,232,122,${(0.7 * pr).toFixed(2)})`;
   const кп = E.back(prog(q, 0.5, 0.62));
-  S(пл4, { o: smooth(prog(q, 0.5, 0.56)), y: (1 - кп) * -40, s: lerp(0.94, 1, кп) });
+  пл4.style.transformOrigin = "0 0";
+  S(пл4, { o: smooth(prog(q, 0.5, 0.56)), y: (1 - кп) * -40, s: lerp(0.94, 1, кп) * ВИД_K });
   пл4Сек.textContent = `${(0.9 * smooth(prog(q, 0.5, 0.64))).toFixed(1).replace(".", ",")} с`;
 }
 
@@ -673,13 +679,13 @@ const тф5Соо = тф5.querySelector(".сооб"), тф5Ткн = тф5.queryS
 const тф5Палец = палец(4);
 function слайдТелеграм(p) {
   const q = p / ДЛ;
-  въезд(тф5, p);
+  въезд(тф5, p, 0.05, 160, П_K);
   // сообщение бота приходит, под ним — кнопка
   const kс = E.back(prog(q, 0.12, 0.24)), kк = E.back(prog(q, 0.2, 0.32));
   S(тф5Соо, { o: smooth(prog(q, 0.12, 0.18)), y: (1 - kс) * 24, s: lerp(0.92, 1, kс) });
   S(тф5Ткн, { o: smooth(prog(q, 0.2, 0.26)), y: (1 - kк) * 24 });
   тф5Соо.style.transformOrigin = "0 100%";
-  const pr = нажатие(тф5Палец, q, ЭX + 164, ЭY + 356, 0.3, 0.42);
+  const pr = нажатие(тф5Палец, q, ...наЭкране(164, 356), 0.3, 0.42);
   тф5Ткн.style.transform += ` scale(${(1 - 0.05 * pr).toFixed(3)})`;
   // мини-приложение выезжает снизу поверх чата
   const kл = E.out5(prog(q, 0.48, 0.66));
