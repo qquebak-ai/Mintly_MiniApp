@@ -11108,7 +11108,7 @@ function сгладить(pts, бакетов) {
 
 /* Карточка курса — цена монеты (SOL / GRAM) с суточным изменением и
    простой кривой без делений и подписей, просто ход цены за сутки. */
-function КартаКурсаМонеты({ title, монета }) {
+function КартаКурсаМонеты({ title, монета, onOpen = null }) {
   const [данные, setДанные] = useState(() => КЕШ_КУРСА_МОНЕТЫ.get(монета) || null);
   const [готово, setГотово] = useState(() => {
     const кеш = КЕШ_КУРСА_МОНЕТЫ.get(монета);
@@ -11157,8 +11157,11 @@ function КартаКурсаМонеты({ title, монета }) {
 
   return (
     <div
-      className="fx-card fx-card-static w-full rounded-[24px]"
+      className={`fx-card fx-card-static w-full rounded-[24px]${onOpen ? " fx-tap" : ""}`}
+      role={onOpen ? "button" : undefined}
+      onClick={onOpen ? () => { haptic("light"); onOpen(монета); } : undefined}
       style={{
+        cursor: onOpen ? "pointer" : undefined,
         position: "relative", overflow: "hidden", height: 132, padding: 14, display: "flex", flexDirection: "column",
         // Фон в стиле кошелька: графитовая плитка с тонкой кромкой и
         // мягким отсветом цвета рынка снизу — вместо цветных клеток,
@@ -11225,13 +11228,114 @@ function КартаКурсаМонеты({ title, монета }) {
   );
 }
 
-function ЖивыеКарточки() {
+function ЖивыеКарточки({ onOpen = null }) {
   return (
     <section className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "start" }}>
-      <КартаКурсаМонеты title="SOL" монета="sol" />
-      <КартаКурсаМонеты title={ТИКЕР_TON} монета="gram" />
+      <КартаКурсаМонеты title="SOL" монета="sol" onOpen={onOpen} />
+      <КартаКурсаМонеты title={ТИКЕР_TON} монета="gram" onOpen={onOpen} />
     </section>
   );
+}
+
+/* Карточка монеты сети — SOL или GRAM. Открывается нажатием на курс в
+   кошельке: крупная цена, изменение за сутки, график, сколько этой
+   монеты лежит на кошельке и те же три действия, что под балансом. */
+function КарточкаМонеты({ монета, сколько = 0, onClose, onSend, onReceive, onSwap }) {
+  const [данные, setДанные] = useState(() => (монета ? КЕШ_КУРСА_МОНЕТЫ.get(монета) : null) || null);
+  useEffect(() => {
+    if (!монета) return undefined;
+    let живо = true;
+    const обновить = () => получитьКурсМонеты(монета).then((д) => { if (живо && д) setДанные(д); }).catch(() => {});
+    обновить();
+    const таймер = setInterval(обновить, 2000);
+    return () => { живо = false; clearInterval(таймер); };
+  }, [монета]);
+  // «Назад» Telegram закрывает карточку, а не уводит из кошелька.
+  useEffect(() => {
+    const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    const кн = tg && tg.BackButton;
+    if (!монета || !кн) return undefined;
+    const н = () => onClose();
+    try { кн.show(); кн.onClick(н); } catch (e) { /* старый клиент */ }
+    return () => { try { кн.offClick(н); кн.hide(); } catch (e) { /* старый клиент */ } };
+  }, [монета]);
+  const путь = useMemo(() => {
+    const исходные = (данные && данные.points) || [];
+    if (исходные.length < 2) return "";
+    const pts = сгладить(исходные, 48);
+    const H = 100, W = 100;
+    const v = pts.map((p) => p.p), max = Math.max(...v), min = Math.min(...v), д = (max - min) || 1;
+    return pts.map((p, i) => `${i ? "L" : "M"}${((i / (pts.length - 1)) * W).toFixed(2)},${(6 + (H - 12) * (1 - (p.p - min) / д)).toFixed(2)}`).join(" ");
+  }, [данные]);
+  if (!монета) return null;
+  const sol = монета === "sol";
+  const цена = (данные && данные.price) || 0;
+  const изм = Math.round(((данные && данные.change24) || 0) * 100) / 100;
+  const цвет = изм === 0 ? T.faint : изм > 0 ? T.up : T.down;
+  const тикер = sol ? "SOL" : ТИКЕР_TON;
+  const кнопка = (Icon, подпись, действие) => (
+    <button
+      onClick={() => { haptic("light"); onClose(); действие && действие(); }}
+      className="fx-tap flex-1 flex flex-col items-center justify-center"
+      style={{ gap: 7, height: 74, borderRadius: 18, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: bodyFont, fontSize: 13, fontWeight: 600 }}
+    >
+      <Icon size={20} color={T.ice} /> {подпись}
+    </button>
+  );
+  const лист = (
+    <div className="fx-view" style={{ position: "fixed", inset: 0, zIndex: 85, background: "#000000", overflowY: "auto", padding: "calc(16px + var(--tg-inset-top, 0px)) 16px calc(28px + var(--tg-inset-bottom, 0px))" }}>
+      <div className="flex items-center justify-between" style={{ marginBottom: 22 }}>
+        <button onClick={onClose} className="fx-tap flex items-center justify-center" style={{ width: 42, height: 42, borderRadius: 999, border: "none", background: T.surfaceHi }}>
+          <ChevronLeft size={22} color={T.ice} />
+        </button>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{sol ? "Solana" : "TON"}</span>
+      </div>
+      <div className="flex items-center" style={{ gap: 14 }}>
+        <img src={sol ? "/coins/sol.png" : "/coins/gram.png"} alt="" width={56} height={56} style={{ borderRadius: "50%" }} />
+        <div>
+          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 26, fontWeight: 800, lineHeight: 1.1 }}>{sol ? "Solana" : "Gram"}</div>
+          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 3 }}>{тикер}</div>
+        </div>
+      </div>
+      <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 46, fontWeight: 800, marginTop: 22, lineHeight: 1 }}>
+        <ТекстСЧислами text={fmtКурс(цена)} />
+      </div>
+      <div style={{ fontFamily: bodyFont, color: цвет, fontSize: 15, fontWeight: 700, marginTop: 8 }}>
+        <ТекстСЧислами text={`${изм > 0 ? "+" : ""}${изм.toFixed(2)}% за сутки`} />
+      </div>
+      <div style={{ margin: "22px -16px 0", height: 200 }}>
+        {путь && (
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="200" aria-hidden>
+            <defs>
+              <linearGradient id={`монета-${монета}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor={цвет} stopOpacity="0.26" />
+                <stop offset="1" stopColor={цвет} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d={`${путь} L100,100 L0,100 Z`} fill={`url(#монета-${монета})`} />
+            <path d={путь} fill="none" stroke={цвет} strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          </svg>
+        )}
+      </div>
+      <div className="flex items-center justify-between" style={{ padding: "18px 2px", borderTop: `1px solid ${T.line}`, borderBottom: `1px solid ${T.line}`, marginTop: 18 }}>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14.5 }}>На кошельке</span>
+        <span className="flex flex-col items-end" style={{ gap: 3 }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800 }}>
+            <ТекстСЧислами text={`${сколько.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${тикер}`} />
+          </span>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
+            <ТекстСЧислами text={цена > 0 ? `≈ $${(сколько * цена).toFixed(2)}` : "—"} />
+          </span>
+        </span>
+      </div>
+      <div className="flex" style={{ gap: 10, marginTop: 20 }}>
+        {кнопка(ArrowUpRight, t("walletActBuy"), onSend)}
+        {кнопка(ArrowDownLeft, t("walletActReceive"), onReceive)}
+        {кнопка(Repeat, t("walletActSwap"), onSwap)}
+      </div>
+    </div>
+  );
+  return typeof document !== "undefined" ? createPortal(лист, document.body) : лист;
 }
 
 /* Бегущая строка сделок.
@@ -16949,6 +17053,8 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const вTON = сетьКошелька === "ton";
   const текущий = вTON ? внутрTON : внутр;
   const годен = текущий && !текущий.нуженВход && !текущий.ошибка;
+  // Какая монета сети открыта карточкой (нажатием на её курс).
+  const [монетаОткрыта, setМонетаОткрыта] = useState(null);
   const солНаКошельке = внутр && !внутр.нуженВход && !внутр.ошибка ? Number(внутр.sol) || 0 : 0;
   const тонНаКошельке = внутрTON && !внутрTON.нуженВход && !внутрTON.ошибка ? Number(внутрTON.ton) || 0 : 0;
   const сыройОстаток = вTON ? (годен ? Number(текущий.ton) || 0 : 0) : солНаКошельке;
@@ -17414,8 +17520,16 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         />
       </div>
       <div style={{ margin: "22px 16px 0" }}>
-        <ЖивыеКарточки />
+        <ЖивыеКарточки onOpen={setМонетаОткрыта} />
       </div>
+      <КарточкаМонеты
+        монета={монетаОткрыта}
+        сколько={монетаОткрыта === "sol" ? солНаКошельке : тонНаКошельке}
+        onClose={() => setМонетаОткрыта(null)}
+        onSend={() => setВыводОткрыт(true)}
+        onReceive={() => setПолучитьОткрыт(true)}
+        onSwap={() => setОбменОткрыт(true)}
+      />
 
 
 
