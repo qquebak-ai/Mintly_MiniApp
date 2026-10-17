@@ -13598,7 +13598,8 @@ function HomeView({
         <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} />
       </div>
       <div className="fx-view flex flex-col" style={{ gap: 26 }}>
-        <ЖивыеКарточки />
+        {/* Курсы SOL и GRAM переехали в кошелёк — под кнопки действий:
+            там на них смотрят, решая, что отправить или обменять. */}
         <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} onOpenMintie={onOpenMintie} окрас={окрасМ} />
       </div>
     </div>
@@ -17401,6 +17402,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           label={t("walletActHistory")}
           onClick={() => setИсторияОткрыта(true)}
         />
+      </div>
+      <div style={{ margin: "22px 16px 0" }}>
+        <ЖивыеКарточки />
       </div>
 
 
