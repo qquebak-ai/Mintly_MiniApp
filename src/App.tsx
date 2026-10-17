@@ -11158,14 +11158,17 @@ function КартаКурсаМонеты({ title, монета }) {
   return (
     <div
       className="fx-card fx-card-static w-full rounded-[24px]"
-      style={{ position: "relative", overflow: "hidden", height: 132, padding: 14, background: T.surface, display: "flex", flexDirection: "column" }}
+      style={{
+        position: "relative", overflow: "hidden", height: 132, padding: 14, display: "flex", flexDirection: "column",
+        // Фон в стиле кошелька: графитовая плитка с тонкой кромкой и
+        // мягким отсветом цвета рынка снизу — вместо цветных клеток,
+        // которые спорили с балансом над ними.
+        background: `radial-gradient(120% 80% at 50% 120%, ${hexA(цвет, 0.16)} 0%, ${hexA(цвет, 0)} 70%), ${T.surface}`,
+        border: "1px solid rgba(255,255,255,0.07)",
+      }}
     >
-      {/* Тот же фон, что у витрины «В центре внимания»: сетка с
-          вспыхивающими клетками — здесь она не привязана к токену, но
-          выглядит и живёт точно так же. */}
-      <ФонКлеток />
-
-      <div style={{ position: "relative", zIndex: 1, fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.01em" }}>
+      <div className="flex items-center" style={{ position: "relative", zIndex: 1, gap: 7, fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700, letterSpacing: "-0.01em" }}>
+        <img src={монета === "sol" ? "/coins/sol.png" : "/coins/gram.png"} alt="" width={20} height={20} style={{ borderRadius: "50%", flexShrink: 0 }} />
         {title}
       </div>
 
@@ -11196,6 +11199,13 @@ function КартаКурсаМонеты({ title, монета }) {
             transition: "filter 480ms ease",
           }}
         >
+          <defs>
+            <linearGradient id={`курс-${монета}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor={цвет} stopOpacity="0.28" />
+              <stop offset="1" stopColor={цвет} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={`${путь} L96,44 L4,44 Z`} fill={`url(#курс-${монета})`} stroke="none" />
           <path d={путь} fill="none" stroke={цвет} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         </svg>
       )}
