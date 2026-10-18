@@ -190,15 +190,20 @@
       #ширма .слово { position: absolute; left: 0; right: 0; top: calc(46% + 104px); text-align: center;
                       font-family: 'ШрифтШирмы', 'Jost', -apple-system, 'Segoe UI', sans-serif; font-size: 27px; font-weight: 500;
                       text-transform: uppercase; letter-spacing: 0.36em; padding-left: 0.36em; color: #E4E2DC; }
-      #ширма .слово b { display: inline-block; font-weight: inherit; will-change: opacity, transform, filter; }
+      #ширма .слово b { display: inline-block; font-weight: inherit; will-change: opacity, transform; }
       #ширма:not(.идёт):not(.уходит) .слово b { opacity: 0; }
-      #ширма.идёт .слово b { animation: ширмаСлово 560ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+      /* Имя — это и есть загрузка: буквы по очереди слева направо
+         проступают, а потом в том же порядке гаснут, и так по кругу, пока
+         приложение не готово. Только прозрачность и сдвиг — их браузер
+         считает на видеокарте, и цикл не дёргается, пока грузится связка. */
+      #ширма.идёт .слово b { animation: ширмаСловоЦикл 1900ms cubic-bezier(0.45, 0, 0.25, 1) infinite both; }
       #ширма.идёт .слово b:nth-child(1) { animation-delay: 560ms; }
-      #ширма.идёт .слово b:nth-child(2) { animation-delay: 610ms; }
-      #ширма.идёт .слово b:nth-child(3) { animation-delay: 660ms; }
-      #ширма.идёт .слово b:nth-child(4) { animation-delay: 710ms; }
-      #ширма.идёт .слово b:nth-child(5) { animation-delay: 760ms; }
-      #ширма.идёт .слово b:nth-child(6) { animation-delay: 810ms; }
+      #ширма.идёт .слово b:nth-child(2) { animation-delay: 660ms; }
+      #ширма.идёт .слово b:nth-child(3) { animation-delay: 760ms; }
+      #ширма.идёт .слово b:nth-child(4) { animation-delay: 860ms; }
+      #ширма.идёт .слово b:nth-child(5) { animation-delay: 960ms; }
+      #ширма.идёт .слово b:nth-child(6) { animation-delay: 1060ms; }
+      @keyframes ширмаСловоЦикл { 0% { opacity: 0; transform: translateX(-6px); } 22%, 58% { opacity: 1; transform: none; } 82%, 100% { opacity: 0; transform: translateX(6px); } }
       #ширма.уходит .слово { animation: ширмаЗнакУходСлово 420ms cubic-bezier(0.4, 0, 1, 1) both; }
       @keyframes ширмаСлово { from { opacity: 0; transform: translateY(10px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
       @keyframes ширмаЗнакУходСлово { to { opacity: 0; filter: blur(6px); } }
