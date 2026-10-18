@@ -46,8 +46,37 @@ const СЕТИ = {
   },
 };
 
+/* Тестовые сети — по умолчанию, пока площадка проверяется. Газ там
+   бесплатный, с кранов:
+     BNB testnet  — https://www.bnbchain.org/en/testnet-faucet
+     Base Sepolia — https://portal.cdp.coinbase.com/products/faucet
+     Sepolia      — https://cloud.google.com/application/web3/faucet/ethereum/sepolia
+   Боевые — только с EVM_MAINNET=1. Виртуальный запас в тестовых сетях
+   в сто раз меньше: кранов не хватит, чтобы дойти до выхода на биржу
+   при боевых суммах, а проверить хочется весь путь. */
+const ТЕСТОВЫЕ = {
+  bsc: {
+    chainId: 97, rpc: "https://bsc-testnet-rpc.publicnode.com",
+    weth: "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",       // WBNB testnet
+    dexFactory: "0x6725F303b657a9451d8BA641348b6761A6CC7a17", // PancakeSwap V2 testnet
+    virtualNative: "0.06", env: "EVM_CURVE_BSC",
+  },
+  base: {
+    chainId: 84532, rpc: "https://sepolia.base.org",
+    weth: "0x4200000000000000000000000000000000000006",
+    dexFactory: "0x7Ae58f10f7849cA6F5fB71b7f45CB416c9204b1e", // Uniswap V2, Base Sepolia
+    virtualNative: "0.015", env: "EVM_CURVE_BASE",
+  },
+  eth: {
+    chainId: 11155111, rpc: "https://ethereum-sepolia-rpc.publicnode.com",
+    weth: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+    dexFactory: "0xF62c03E08ada871A0bEb309762E260a7a6a880E6", // Uniswap V2, Sepolia
+    virtualNative: "0.015", env: "EVM_CURVE_ETH",
+  },
+};
+
 const сеть = process.argv[2];
-const с = СЕТИ[сеть];
+const с = (process.env.EVM_MAINNET === "1" ? СЕТИ : ТЕСТОВЫЕ)[сеть];
 if (!с) {
   console.error("Укажите сеть: bsc, base или eth");
   process.exit(1);
@@ -64,7 +93,7 @@ const получатель = process.env.FEE_RECIPIENT || w.address;
 const комиссия = Number(process.env.FEE_BPS || 0);
 
 const баланс = await п.getBalance(w.address);
-console.log(`Сеть ${сеть}, владелец ${w.address}, на газ ${ethers.formatEther(баланс)}`);
+console.log(`${process.env.EVM_MAINNET === "1" ? "БОЕВАЯ" : "тестовая"} сеть ${сеть}, владелец ${w.address}, на газ ${ethers.formatEther(баланс)}`);
 
 const { MintlyCurve } = собрать();
 const фабрика = await new ethers.ContractFactory(MintlyCurve.abi, MintlyCurve.bytecode, w)

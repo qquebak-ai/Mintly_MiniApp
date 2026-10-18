@@ -305,6 +305,8 @@ export async function сетиEVMВключены() {
   try {
     const j = await fetch(апи("/api/wallet-evm?action=enabled")).then((r) => r.json());
     сетиEVM = j && j.enabled ? j.chains || {} : {};
+    // Тестовые ли сети — одной пометкой на все три.
+    Object.defineProperty(сетиEVM, "тестовые", { value: !!(j && j.testnet), enumerable: false });
   } catch {
     сетиEVM = {};
   }

@@ -26,6 +26,7 @@ const биржа = await развернуть("MockDexFactory");
 const фабрика = await развернуть("MintlyCurve", await weth.getAddress(), await биржа.getAddress(), ethers.parseEther("6"), await владелец.getAddress(), 100);
 
 process.env.EVM_RPC_BSC = rpc;
+process.env.EVM_CHAIN_BSC = "56";
 process.env.EVM_CURVE_BSC = await фабрика.getAddress();
 process.env.APP_WALLET_KEY = crypto.randomBytes(32).toString("hex");
 process.env.SUPABASE_URL = "https://db.test";

@@ -30,35 +30,53 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 export const ПУТЬ_EVM = "m/44'/60'/0'/0/0";
 
-export const СЕТИ = {
+/* Пока площадка проверяется, сети EVM — тестовые: BNB Chain testnet,
+   Base Sepolia и Sepolia, монеты на газ там бесплатные. Боевые сети —
+   только явно, EVM_MAINNET=1. Адрес кошелька в обоих режимах один: он
+   выводится из фразы и от сети не зависит. */
+export const ТЕСТОВЫЕ = process.env.EVM_MAINNET !== "1";
+
+const БОЕВЫЕ = {
   bsc: {
-    chainId: 56, имя: "BNB Chain", монета: "BNB",
+    chainId: 56, имя: "BNB Chain", монета: "BNB", обозреватель: "https://bscscan.com",
     rpc: process.env.EVM_RPC_BSC || "https://bsc-dataseed.bnbchain.org",
-    фабрика: (process.env.EVM_CURVE_BSC || "").trim(),
     стейблы: [
       { тикер: "USDT", адрес: "0x55d398326f99059fF775485246999027B3197955", знаков: 18 },
       { тикер: "USDC", адрес: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", знаков: 18 },
     ],
   },
   base: {
-    chainId: 8453, имя: "Base", монета: "ETH",
+    chainId: 8453, имя: "Base", монета: "ETH", обозреватель: "https://basescan.org",
     rpc: process.env.EVM_RPC_BASE || "https://mainnet.base.org",
-    фабрика: (process.env.EVM_CURVE_BASE || "").trim(),
     стейблы: [
       { тикер: "USDC", адрес: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", знаков: 6 },
       { тикер: "USDT", адрес: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2", знаков: 6 },
     ],
   },
   eth: {
-    chainId: 1, имя: "Ethereum", монета: "ETH",
+    chainId: 1, имя: "Ethereum", монета: "ETH", обозреватель: "https://etherscan.io",
     rpc: process.env.EVM_RPC_ETH || "https://ethereum-rpc.publicnode.com",
-    фабрика: (process.env.EVM_CURVE_ETH || "").trim(),
     стейблы: [
       { тикер: "USDT", адрес: "0xdAC17F958D2ee523a2206206994597C13D831ec7", знаков: 6 },
       { тикер: "USDC", адрес: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", знаков: 6 },
     ],
   },
 };
+
+// В тестовых сетях настоящих стейблов нет — только монета сети.
+const ТЕСТОВЫЕ_СЕТИ = {
+  bsc: { chainId: 97, имя: "BNB Chain", монета: "BNB", обозреватель: "https://testnet.bscscan.com", rpc: process.env.EVM_RPC_BSC || "https://bsc-testnet-rpc.publicnode.com", стейблы: [] },
+  base: { chainId: 84532, имя: "Base", монета: "ETH", обозреватель: "https://sepolia.basescan.org", rpc: process.env.EVM_RPC_BASE || "https://sepolia.base.org", стейблы: [] },
+  eth: { chainId: 11155111, имя: "Ethereum", монета: "ETH", обозреватель: "https://sepolia.etherscan.io", rpc: process.env.EVM_RPC_ETH || "https://ethereum-sepolia-rpc.publicnode.com", стейблы: [] },
+};
+
+export const СЕТИ = Object.fromEntries(Object.entries(ТЕСТОВЫЕ ? ТЕСТОВЫЕ_СЕТИ : БОЕВЫЕ).map(([к, с]) => [к, {
+  ...с,
+  // Номер сети можно задать явно — так проверка на локальной сети
+  // подставляет свой.
+  chainId: Number(process.env[`EVM_CHAIN_${к.toUpperCase()}`]) || с.chainId,
+  фабрика: (process.env[`EVM_CURVE_${к.toUpperCase()}`] || "").trim(),
+}]));
 
 // Только то, что сервер вызывает у фабрики и токена.
 const ABI_КРИВОЙ = [
@@ -260,6 +278,20 @@ export async function состояниеКривой(сеть, токен) {
   };
 }
 
+let кешЗапасов = null;
+async function виртуальныеЗапасы() {
+  if (кешЗапасов) return кешЗапасов;
+  const { Contract, formatUnits } = await ethersLib();
+  const итог = {};
+  await Promise.all(Object.entries(СЕТИ).filter(([, с]) => с.фабрика).map(async ([к, с]) => {
+    try {
+      итог[к] = Number(formatUnits(await new Contract(с.фабрика, ABI_КРИВОЙ, await провайдер(к)).virtualNative(), 18));
+    } catch { /* узел не ответил — экран возьмёт запасной */ }
+  }));
+  if (Object.keys(итог).length) кешЗапасов = итог;
+  return итог;
+}
+
 function сетьИз(значение) {
   const с = String(значение || "").trim();
   return Object.prototype.hasOwnProperty.call(СЕТИ, с) ? с : null;
@@ -275,9 +307,13 @@ export default async function handler(req, res) {
   // а запуск — только в сетях, где развёрнута фабрика.
   if (действие === "enabled") {
     res.setHeader("Cache-Control", "public, max-age=60");
+    // Виртуальный запас фабрики — из самого контракта: от него зависит
+    // обещание «получишь столько-то» на экране запуска.
+    const запасы = await виртуальныеЗапасы();
     return res.status(200).json({
       enabled: !!(db && набор),
-      chains: Object.fromEntries(Object.entries(СЕТИ).map(([к, с]) => [к, { launch: !!с.фабрика, coin: с.монета, name: с.имя }])),
+      testnet: ТЕСТОВЫЕ,
+      chains: Object.fromEntries(Object.entries(СЕТИ).map(([к, с]) => [к, { launch: !!с.фабрика, coin: с.монета, name: с.имя, explorer: с.обозреватель, virtual: запасы[к] || null }])),
     });
   }
 
@@ -383,7 +419,7 @@ export default async function handler(req, res) {
         куплено = Number(formatUnits(b, 18));
       }
       res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ ok: true, token: токен, factory: с.фабрика, tx: tx.hash, wallet: строка.address, bought: куплено });
+      return res.status(200).json({ ok: true, token: токен, factory: с.фабрика, tx: tx.hash, wallet: строка.address, bought: куплено, testnet: ТЕСТОВЫЕ, explorer: с.обозреватель });
     }
 
     if (действие === "buy" || действие === "sell") {

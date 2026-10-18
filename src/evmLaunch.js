@@ -55,6 +55,7 @@ export async function запуститьТокенEVM({ сеть, имя, тик
     wallet: итог.wallet,
     bought: Number(итог.bought) || 0,
     logoUrl: imageUrl,
-    explorerUrl: `${ОБОЗРЕВАТЕЛИ[сеть] || ОБОЗРЕВАТЕЛИ.eth}/tx/${итог.tx}`,
+    testnet: !!итог.testnet,
+    explorerUrl: `${итог.explorer || ОБОЗРЕВАТЕЛИ[сеть] || ОБОЗРЕВАТЕЛИ.eth}/tx/${итог.tx}`,
   };
 }

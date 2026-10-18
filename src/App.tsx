@@ -3320,9 +3320,9 @@ const GT_NETWORK_SOL = "solana";
    именем в справочнике GeckoTerminal — так одна строка ведёт и в ленту,
    и в график, и в описание токена. */
 const СЕТИ_EVM = {
-  bsc: { имя: "BNB Chain", лого: "/coins/bnb.svg", монета: "BNB", обозреватель: "https://bscscan.com/token/" },
-  base: { имя: "Base", лого: "/coins/base.svg", монета: "ETH", обозреватель: "https://basescan.org/token/" },
-  eth: { имя: "Ethereum", лого: "/coins/eth.svg", монета: "ETH", обозреватель: "https://etherscan.io/token/" },
+  bsc: { имя: "BNB Chain", лого: "/coins/bnb.svg", монета: "BNB", обозреватель: "https://bscscan.com/token/", обозревательТест: "https://testnet.bscscan.com/token/" },
+  base: { имя: "Base", лого: "/coins/base.svg", монета: "ETH", обозреватель: "https://basescan.org/token/", обозревательТест: "https://sepolia.basescan.org/token/" },
+  eth: { имя: "Ethereum", лого: "/coins/eth.svg", монета: "ETH", обозреватель: "https://etherscan.io/token/", обозревательТест: "https://sepolia.etherscan.io/token/" },
 };
 const этоEVM = (с) => typeof с === "string" && Object.prototype.hasOwnProperty.call(СЕТИ_EVM, с);
 // Мем-ленту оставляем только для настоящих "мемов" по капитализации —
@@ -11286,7 +11286,7 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
         </button>
       )}
       <button
-        onClick={() => { haptic("light"); ссылка(`${с.обозреватель}${адрес}`); }}
+        onClick={() => { haptic("light"); ссылка(`${токен.network === "testnet" ? с.обозревательТест : с.обозреватель}${адрес}`); }}
         className="fx-tap w-full"
         style={{ marginTop: 10, padding: "15px 0", borderRadius: 16, border: `1px solid ${T.lineHi}`, background: "transparent", color: T.ice, fontFamily: displayFont, fontSize: 15.5, fontWeight: 700 }}
       >
@@ -14683,6 +14683,8 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", а
     : адрес;
   const сетьПунктом = ВСЕ_СЕТИ.find((с) => с.ключ === сетьПрихода) || ВСЕ_СЕТИ[1];
   const подписьСети = адреса ? (сетьПрихода === "ton" ? ТИКЕР_TON : сетьПунктом.имя) : сеть;
+  const сетиEVM = useСетиEVM();
+  const тестоваяEVM = этоEVM(сетьПрихода) && !!(сетиEVM && сетиEVM.тестовые);
   const [код, setКод] = useState(null);
   // Кнопка отвечает сама: подтверждение прямо на ней надёжнее всплывающей
   // подсказки — та живёт наверху экрана, а палец в этот момент внизу.
@@ -14799,6 +14801,13 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", а
               список, которого нет. */}
           <Copy size={15} color={T.muted} />
         </button>
+        {/* Пока сети EVM тестовые, настоящие монеты сюда слать нельзя:
+            приложение их не увидит, а вернуть их будет сложно. */}
+        {тестоваяEVM && (
+          <span style={{ fontFamily: bodyFont, color: T.warning, fontSize: 13, textAlign: "center", lineHeight: 1.4, maxWidth: 330 }}>
+            Тестовая сеть ({сетьПрихода === "bsc" ? "BNB testnet" : сетьПрихода === "base" ? "Base Sepolia" : "Sepolia"}): присылай только тестовые монеты с крана
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col" style={{ gap: 10, padding: "0 18px 22px", flexShrink: 0 }}>
@@ -16302,6 +16311,16 @@ function useКурсыEVM() {
   }, []);
   return курсы;
 }
+// Что включено в сетях EVM и тестовые ли они — один запрос на сеанс.
+function useСетиEVM() {
+  const [сети, setСети] = useState(null);
+  useEffect(() => {
+    let живо = true;
+    import("./appWallet").then((m) => m.сетиEVMВключены()).then((с) => { if (живо) setСети(с); }).catch(() => {});
+    return () => { живо = false; };
+  }, []);
+  return сети;
+}
 const курсМонетыEVM = (сеть, курсы) => (СЕТИ_EVM[сеть] && СЕТИ_EVM[сеть].монета === "BNB" ? курсы.bnb : курсы.eth) || 0;
 
 function useSolUsd() {
@@ -17722,6 +17741,8 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     return () => { жив = false; clearInterval(id); };
   }, [userId]);
   const курсыEVM = useКурсыEVM();
+  const сетиEVMКошелька = useСетиEVM();
+  const пометкаТеста = сетиEVMКошелька && сетиEVMКошелька.тестовые ? " · тест" : "";
   const остатокEVM = (сеть) => (внутрEVM && внутрEVM.chains && внутрEVM.chains[сеть]) || null;
   const вДолларахEVM = Object.keys(СЕТИ_EVM).reduce((сумма, к) => {
     const о = остатокEVM(к);
@@ -18266,11 +18287,12 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             // Монеты сетей EVM — каждая своей строкой, даже с нулём: так
             // видно, куда ещё можно положить деньги.
             ...Object.entries(СЕТИ_EVM).map(([к, с]) => ({
-              ключ: к, тикер: `${с.монета} · ${с.имя}`, имя: к === "bsc" ? "BNB" : "Ethereum",
+              ключ: к, тикер: `${с.монета} · ${с.имя}${пометкаТеста}`, имя: к === "bsc" ? "BNB" : "Ethereum",
               лого: к === "base" ? "/coins/eth.svg" : с.лого, сеть: к === "base" ? с.лого : null,
               сколько: Number(остатокEVM(к) && остатокEVM(к).native) || 0, курс: курсМонетыEVM(к, курсыEVM),
             })),
-            ...Object.entries(СЕТИ_EVM).flatMap(([к, с]) => ["USDT", "USDC"].map((т) => ({
+            // В тестовых сетях настоящих стейблов нет — и строк под них тоже.
+            ...(пометкаТеста ? [] : Object.entries(СЕТИ_EVM)).flatMap(([к, с]) => ["USDT", "USDC"].map((т) => ({
               ключ: `${к}-${т}`, тикер: `${т} · ${с.имя}`, имя: т === "USDT" ? "Tether" : "USD Coin",
               лого: т === "USDT" ? "/coins/usdt.svg" : "/coins/usdc.png", сеть: с.лого,
               сколько: Number(остатокEVM(к) && остатокEVM(к).tokens && остатокEVM(к).tokens[т]) || 0, курс: 1,
@@ -21863,7 +21885,9 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   const единицаЗапуска = вEVM ? СЕТИ_EVM[сетьЗапуска].монета : единицаЗапуска;
   const курсЗапуска = () => (вEVM ? курсМонетыEVM(сетьЗапуска, КЕШ_КУРСОВ_EVM) : курсЗапуска());
   // Виртуальный запас фабрики — тот же, что в contracts/evm/deploy.mjs.
-  const ВИРТ_EVM = вEVM ? (сетьЗапуска === "bsc" ? 6 : 1.5) : 0;
+  const ВИРТ_EVM = вEVM
+    ? (Number(сетиEVMЗапуска[сетьЗапуска] && сетиEVMЗапуска[сетьЗапуска].virtual) || (сетиEVMЗапуска.тестовые ? (сетьЗапуска === "bsc" ? 0.06 : 0.015) : (сетьЗапуска === "bsc" ? 6 : 1.5)))
+    : 0;
   const ВИРТ_ТОКЕНОВ_EVM = 1_073_000_000;
   const ПРОДАЖА_EVM = 800_000_000;
 
@@ -29423,7 +29447,8 @@ function mapTokenRow(row) {
           logoUrl: итог.logoUrl,
           bannerUrl: баннер,
           chain: req.chain,
-          network: "mainnet",
+          // Пометка «тест» в ленте — как у токенов TON в тестовой сети.
+          network: итог.testnet ? "testnet" : "mainnet",
           address: итог.token,
           // Адрес кривой — это фабрика: у всех токенов сети она одна, а
           // сам токен различается адресом.
