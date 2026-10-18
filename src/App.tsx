@@ -12108,7 +12108,7 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
       {/* Ника на главной больше нет — аватарки достаточно, чтобы узнать
           себя. Остаётся только строка для того, у кого аккаунта нет:
           без неё кнопка входа была бы пустым кружком. */}
-      {!грузится && !(accountCreated && profile && profile.nickname) && (
+      {!грузится && !accountCreated && (
         <span style={{ display: "block", alignSelf: "center", fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 600 }}>
           {t("accountNotCreated")}
         </span>
@@ -13485,6 +13485,9 @@ function БаннерыГлавной({ onGoTab, onGoCreate, onOpenMintie, ок�
  * Снимаем через два кадра: первый отдаёт разметку, второй — отрисовку.
  * Без этой отсрочки поле исчезало ровно на том кадре, где окно входа ещё
  * не успело появиться. */
+// Копия профиля на телефоне для мгновенного старта.
+const КЛЮЧ_ПРОФИЛЯ = "mintly_profile_cache";
+
 function снятьШирму({ уйти = false } = {}) {
   if (typeof document === "undefined") return;
   const поле = document.getElementById("ширма");
@@ -27000,28 +27003,48 @@ const FEE_PERCENT = 0; // комиссии площадки нет
     // отвечал ошибкой — и человек оказывался «без аккаунта», хотя вход
     // прошёл. Лишние поля строки нам не мешают, а недостающие просто
     // приходят пустыми.
-    const { data: prof, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
+    /* Медленная или рваная связь до базы раньше оставляла человека с
+       аккаунтом на колёсике и «Повторить»: один потерянный ответ — и
+       приложение закрыто. Теперь три попытки с паузой. */
+    let prof = null, error = null;
+    for (let попытка = 0; попытка < 3; попытка++) {
+      if (попытка) await new Promise((r) => setTimeout(r, 800 * попытка));
+      ({ data: prof, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single());
+      if (!error || error.code === "PGRST116") break;
+    }
     /* Строки нет (PGRST116 — «ноль строк» у .single()) — профиля правда
        нет. Любая другая ошибка — связь или сервер: состояние не трогаем,
        иначе человек с аккаунтом оказывался бы «без аккаунта» от одной
        потерянной секунды сети. */
-    if (error && error.code !== "PGRST116") { console.warn("[mintly] профиль не загрузился:", error.message); return; }
+    if (error && error.code !== "PGRST116") {
+      console.warn("[mintly] профиль не загрузился:", error.message);
+      // База не ответила, но аккаунт на этом телефоне уже был — пускаем
+      // в приложение, а не держим на «Повторить»: профиль доедет при
+      // следующем обновлении сессии.
+      try { if (localStorage.getItem("mintly_has_account") === "1") setAccountCreated(true); } catch (e) { /* приватный режим */ }
+      return;
+    }
     // Строка без ника — заготовка базы, а не аккаунт (см. профильЕсть).
     // Сессия есть, а профиля точно нет — значит, дверь должна открыться
     // сама, когда бы это ни выяснилось: не только при запуске, но и после
     // позднего входа или обновления сессии.
     if (!prof || !prof.nickname) {
-      try { localStorage.removeItem("mintly_has_account"); } catch (e) { /* приватный режим */ }
+      try { localStorage.removeItem("mintly_has_account"); localStorage.removeItem(КЛЮЧ_ПРОФИЛЯ); } catch (e) { /* приватный режим */ }
       // Аккаунта нет или из него вышли — с телефона стирается всё, кроме
       // языка и отметок входа; недоведённая сессия не переживёт перезапуск.
       try { window.__хранилище && window.__хранилище.аккаунтаНет(); } catch (e) { /* без хранилища */ }
       setAccountCreated(false); setProfile(EMPTY_PROFILE); setMyTokens([]); setНужнаРегистрация(true); return;
     }
     setProfile({ nickname: prof.nickname, email: prof.email, bio: prof.bio || "", avatarUrl: prof.avatar_url, emoji: prof.emoji, verified: !!prof.verified });
+    // Копия на телефоне — по ней следующий запуск открывает приложение
+    // сразу, не дожидаясь базы (см. молчаливый вход ниже).
+    try {
+      localStorage.setItem(КЛЮЧ_ПРОФИЛЯ, JSON.stringify({ id: user.id, nickname: prof.nickname, email: prof.email, bio: prof.bio || "", avatarUrl: prof.avatar_url, emoji: prof.emoji, verified: !!prof.verified }));
+    } catch (e) { /* приватный режим */ }
     // Ступень знака создателя лежит в профиле, а не только на устройстве:
     // её должны видеть другие. Здесь только читаем, повышает её эффект
     // ниже, когда посчитается лучшая капитализация.
@@ -27583,7 +27606,21 @@ function mapTokenRow(row) {
           метка = localStorage.getItem("mintly_has_account") === "1"
             && new URLSearchParams(window.location.search).get("auto") !== "1";
         } catch (e) { /* хранилище закрыто */ }
-        if (метка) снятьШирму({ уйти: true });
+        if (метка) {
+          /* Профиль с прошлого раза — сразу на экран: приложение
+             открывается, а свежая строка из базы приедет следом и
+             заменит его. Чужая копия (другой аккаунт) не годится. */
+          try {
+            const копия = JSON.parse(localStorage.getItem(КЛЮЧ_ПРОФИЛЯ) || "null");
+            if (копия && копия.id === session.user.id && копия.nickname) {
+              const { id: _id, ...поля } = копия;
+              setUserId(session.user.id);
+              setProfile(поля);
+              setAccountCreated(true);
+            }
+          } catch (e) { /* испорченная копия — ждём базу */ }
+          снятьШирму({ уйти: true });
+        }
         // Пришли по чужой ссылке приглашения, будучи уже внутри —
         // засчитываем её отдельно: вход, который обычно передаёт метку,
         // здесь не понадобится. Ответа не ждём, приложению это не мешает.
@@ -29233,7 +29270,7 @@ function mapTokenRow(row) {
     await supabase.auth.signOut();
     setAccountCreated(false);
     setНужнаРегистрация(true);
-    try { localStorage.removeItem("mintly_has_account"); } catch (e) { /* приватный режим */ }
+    try { localStorage.removeItem("mintly_has_account"); localStorage.removeItem(КЛЮЧ_ПРОФИЛЯ); } catch (e) { /* приватный режим */ }
     // Аккаунта нет или из него вышли — с телефона стирается всё, кроме
     // языка и отметок входа; недоведённая сессия не переживёт перезапуск.
     try { window.__хранилище && window.__хранилище.аккаунтаНет(); } catch (e) { /* без хранилища */ }
@@ -29274,7 +29311,7 @@ function mapTokenRow(row) {
     await supabase.auth.signOut();
     setAccountCreated(false);
     setНужнаРегистрация(true);
-    try { localStorage.removeItem("mintly_has_account"); } catch (e) { /* приватный режим */ }
+    try { localStorage.removeItem("mintly_has_account"); localStorage.removeItem(КЛЮЧ_ПРОФИЛЯ); } catch (e) { /* приватный режим */ }
     // Аккаунта нет или из него вышли — с телефона стирается всё, кроме
     // языка и отметок входа; недоведённая сессия не переживёт перезапуск.
     try { window.__хранилище && window.__хранилище.аккаунтаНет(); } catch (e) { /* без хранилища */ }
@@ -29801,7 +29838,7 @@ function mapTokenRow(row) {
               onOpenProfile={openUserProfile}
               profile={profile}
               accountCreated={accountCreated}
-              профильГрузится={!authChecked}
+              профильГрузится={!authChecked && !accountCreated}
               грузится={!communityLoaded || tokensLoading}
               тик={balanceRefreshTick}
               myTokens={myTokens}
