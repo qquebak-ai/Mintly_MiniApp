@@ -17656,26 +17656,44 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     setСловаНаОбороте(null);
     setБедаСлов("");
   }
+  /* Слова просим у сервера заранее — в тот миг, когда карта
+     переворачивается, а не по нажатию «Показать»: иначе после нажатия
+     человек ждал ответа сети, и кнопка казалась неработающей. На экран
+     слова попадают всё равно только после галочки и нажатия. */
+  const заранееСлова = useRef(null);
+  function запроситьСловаЗаранее() {
+    if (заранееСлова.current) return заранееСлова.current;
+    заранееСлова.current = import("./appWallet")
+      .then(({ показатьФразу }) => показатьФразу())
+      .then((о) => {
+        const список = (о && о.words) || [];
+        if (список.length < 12) throw new Error("пусто");
+        if (заранееСлова.current) заранееСлова.current.__список = список;
+        return список;
+      })
+      .catch((e) => { заранееСлова.current = null; throw e; });
+    return заранееСлова.current;
+  }
+  useEffect(() => {
+    if (переворотКарты) запроситьСловаЗаранее().catch(() => {});
+    // Карта вернулась лицом — забываем слова: в памяти страницы они
+    // не должны лежать дольше, чем видны.
+    else заранееСлова.current = null;
+  }, [переворотКарты]); // eslint-disable-line react-hooks/exhaustive-deps
   function показатьСОборота() {
     if (загрузкаСлов) return;
     haptic("light");
-    setЗагрузкаСлов(true);
     setБедаСлов("");
-    (async () => {
-      try {
-        const { показатьФразу } = await import("./appWallet");
-        const о = await показатьФразу();
-        const список = (о && о.words) || [];
-        if (список.length < 12) throw new Error("пусто");
-        setСловаНаОбороте(список);
-        haptic("light");
-      } catch (e) {
-        setБедаСлов(t("seedFailed"));
-        haptic("error");
-      } finally {
-        setЗагрузкаСлов(false);
-      }
-    })();
+    const готово = заранееСлова.current;
+    // Ответ уже пришёл — показываем на этом же кадре, без «загрузки».
+    let сразу = null;
+    if (готово && готово.__список) сразу = готово.__список;
+    if (сразу) { setСловаНаОбороте(сразу); return; }
+    setЗагрузкаСлов(true);
+    запроситьСловаЗаранее()
+      .then((список) => { setСловаНаОбороте(список); haptic("light"); })
+      .catch(() => { setБедаСлов(t("seedFailed")); haptic("error"); })
+      .finally(() => setЗагрузкаСлов(false));
   }
 
   const [внутрTON, setВнутрTON] = useState(null);
