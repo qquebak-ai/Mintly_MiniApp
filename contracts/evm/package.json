@@ -1,0 +1,18 @@
+{
+  "name": "mintly-evm-contracts",
+  "private": true,
+  "type": "module",
+  "description": "Контракты Mintly для сетей EVM: сборка, проверка на локальной сети, развёртывание. Ставится отдельно от приложения: ganache тянет нативные модули, которым не место на сервере сайта.",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test.mjs && node test-server.mjs",
+    "deploy": "node deploy.mjs"
+  },
+  "dependencies": {
+    "ethers": "^6.17.0",
+    "solc": "0.8.26"
+  },
+  "devDependencies": {
+    "ganache": "^7.9.2"
+  }
+}
