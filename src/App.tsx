@@ -13805,9 +13805,7 @@ function HomeView({
         <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} />
       </div>
       <div className="fx-view flex flex-col" style={{ gap: 26 }}>
-        {/* Баннеров больше нет: главная показывает то, что растёт прямо
-            сейчас, — токены с наибольшим ростом за сутки. */}
-        <ВТренде tokens={curveTokens} onOpen={onOpenToken} onAll={() => onGoTab("mempad")} />
+        {/* Баннеров и «В тренде» на главной больше нет — по просьбе. */}
       </div>
     </div>
   );
