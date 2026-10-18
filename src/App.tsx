@@ -6425,7 +6425,7 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
     if (!своиПоАдресу.size) { setLoaded(true); return undefined; }
     let брошено = false;
 
-    const нужная = сеть === "sol" ? "solana" : "ton";
+    const нужная = этоEVM(сеть) ? сеть : сеть === "sol" ? "solana" : "ton";
 
     async function прочитать() {
       let j = null;
@@ -6676,7 +6676,8 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
               Solana цифры в TON были просто неправдой. */}
           {b.kind === "sell" ? t("tickerSoldFor") : t("tickerBoughtFor")} {(() => {
             const соло = b.token && b.token.chain === "solana";
-            const курс = соло ? solUsd() : tonUsd();
+            const evm = b.token && этоEVM(b.token.chain);
+            const курс = evm ? курсМонетыEVM(b.token.chain, КЕШ_КУРСОВ_EVM) : соло ? solUsd() : tonUsd();
             // Сумма сделки известна в монете — её и показываем; доллары
             // остаются запасным путём, когда монеты в записи нет.
             const сумма = b.volCoin > 0 ? b.volCoin : (курс > 0 ? b.volUsd / курс : 0);
@@ -6687,7 +6688,7 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
             // SOL стоит сотни долларов, поэтому обычная сделка на доллар —
             // это тысячные доли монеты. Прежние три знака округляли их в
             // ноль, и лента писала «купил 0 SOL».
-            return `${fmtCoin(сумма)} ${соло ? "SOL" : ТИКЕР_TON}`;
+            return `${fmtCoin(сумма)} ${evm ? СЕТИ_EVM[b.token.chain].монета : соло ? "SOL" : ТИКЕР_TON}`;
           })()}
           </>
         </span>
@@ -8374,7 +8375,7 @@ function localTokenToFeedShape(entry) {
   // иначе честнее показать ноль, чем выдуманное число.
   // Курс — монеты той цепочки, в которой считается кривая: цена токена
   // Solana выражена в SOL, и пересчёт по TON давал число втрое мимо.
-  const курс = entry.chain === "solana" ? solUsd() : tonUsd();
+  const курс = этоEVM(entry.chain) ? курсМонетыEVM(entry.chain, КЕШ_КУРСОВ_EVM) : entry.chain === "solana" ? solUsd() : tonUsd();
   const price = entry.priceTon != null
     ? entry.priceTon * курс
     : (entry.mcapNum ? entry.mcapNum / 1_000_000_000 : 0);
@@ -8400,7 +8401,7 @@ function localTokenToFeedShape(entry) {
     ownerId: entry.ownerId || null,
     curveAddress: entry.curveAddress || null,
     curveJettonWallet: entry.curveJettonWallet || null,
-    chain: entry.chain === "solana" ? "solana" : "ton",
+    chain: этоEVM(entry.chain) ? entry.chain : entry.chain === "solana" ? "solana" : "ton",
     // Сеть тащим дальше: по ней в списке ставится пометка «тест», и без
     // неё пробный токен неотличим от настоящего.
     network: entry.network || null,
@@ -10438,6 +10439,73 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
  * Ползунок ведётся указателем, а не касанием: одни и те же события
  * приходят и от пальца, и от мыши, и захват указателя не теряется, если
  * палец ушёл за пределы дорожки. */
+/* Все сети приложения в одном порядке: две свои первыми, за ними EVM.
+   Один список на мемпад, запуск и получение — чтобы сеть везде
+   называлась и выглядела одинаково. */
+const ВСЕ_СЕТИ = [
+  { ключ: "ton", имя: "Gram", лого: "/coins/gram.png" },
+  { ключ: "sol", имя: "Solana", лого: "/coins/sol.png" },
+  ...Object.entries(СЕТИ_EVM).map(([ключ, с]) => ({ ключ, имя: с.имя, лого: с.лого })),
+];
+
+/* Выбор сети выпадающим списком — как кружок сети в мемпаде: одна
+   кнопка с текущей сетью, по нажатию — список всех. Недоступные сети
+   видны, но не выбираются: подпись справа говорит почему. */
+function ВыборСети({ value, onChange, недоступны = {}, сети = ВСЕ_СЕТИ, style }) {
+  const [открыт, setОткрыт] = useState(false);
+  const текущая = сети.find((с) => с.ключ === value) || сети[0];
+  return (
+    <div style={{ position: "relative", ...style }}>
+      <button
+        type="button"
+        onClick={() => { haptic("light"); setОткрыт((v) => !v); }}
+        className="fx-tap flex items-center"
+        style={{ gap: 10, padding: "9px 14px 9px 10px", borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: bodyFont, fontSize: 15, fontWeight: 700 }}
+      >
+        <img src={текущая.лого} alt="" width={24} height={24} style={{ borderRadius: "50%", display: "block" }} />
+        <span>{текущая.имя}</span>
+        <ChevronDown size={16} color={T.muted} style={{ transform: открыт ? "rotate(180deg)" : "none", transition: "transform 220ms ease" }} />
+      </button>
+      {открыт && (
+        <>
+          <div onClick={() => setОткрыт(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+          <div
+            style={{
+              position: "absolute", left: 0, top: "calc(100% + 8px)", zIndex: 41, minWidth: 220, padding: 6, whiteSpace: "nowrap",
+              borderRadius: 18, background: T.surface, border: `1px solid ${T.line}`, boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
+              transformOrigin: "0 0", animation: "навМенюСети 260ms cubic-bezier(0.2, 1.1, 0.4, 1)",
+            }}
+          >
+            {сети.map((с) => {
+              const выбрана = с.ключ === value;
+              const почему = недоступны[с.ключ];
+              return (
+                <button
+                  key={с.ключ}
+                  type="button"
+                  disabled={!!почему}
+                  onClick={() => { haptic("light"); setОткрыт(false); if (!выбрана) onChange(с.ключ); }}
+                  className="fx-tap flex items-center"
+                  style={{
+                    width: "100%", gap: 12, padding: "10px 12px", border: "none", borderRadius: 12,
+                    background: выбрана ? T.surfaceHi : "transparent", color: выбрана ? T.ice : T.muted,
+                    opacity: почему ? 0.45 : 1,
+                    fontFamily: bodyFont, fontSize: 15, fontWeight: выбрана ? 700 : 500, textAlign: "left",
+                  }}
+                >
+                  <img src={с.лого} alt="" width={24} height={24} style={{ borderRadius: "50%", display: "block" }} />
+                  <span style={{ flex: 1 }}>{с.имя}</span>
+                  {почему ? <span style={{ fontSize: 12, color: T.faint }}>{почему}</span> : выбрана ? <Check size={16} color={T.ice} /> : null}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function NetworkSlider({ value, onChange, ширина = 168, высота = 38 }) {
   const дорожка = useRef(null);
   const тяга = useRef(null);
@@ -10739,7 +10807,7 @@ function MempadView(props) {
   // У сетей EVM своего запуска пока нет — там лента токенов с биржи и их
   // карточки. Отдельный компонент, а не ветки внутри: у мемпада TON и
   // Solana всё завязано на кривую площадки, которой здесь нет.
-  if (этоEVM(props.сеть)) return <МемпадEVM key={props.сеть} сеть={props.сеть} />;
+  if (этоEVM(props.сеть)) return <МемпадEVM key={props.сеть} сеть={props.сеть} onOpen={props.onOpen} myTokens={props.myTokens} />;
   return <МемпадПлощадки {...props} />;
 }
 
@@ -10786,11 +10854,40 @@ async function лентаEVM(сеть, фильтр) {
   return один;
 }
 
-function МемпадEVM({ сеть }) {
+function МемпадEVM({ сеть, onOpen, myTokens = [] }) {
   const [фильтр, setФильтр] = useState("trend");
   const [список, setСписок] = useState(null);
   const [беда, setБеда] = useState(false);
-  const [открыт, setОткрыт] = useState(null);
+  // Запуски Mintly в этой сети — первыми: их можно купить прямо здесь.
+  const свои = useMemo(() => (myTokens || [])
+    .filter((tok) => tok && tok.chain === сеть)
+    .map(localTokenToFeedShape)
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)), [myTokens, сеть]);
+  /* Цифры своих запусков — с их кривых: капитализация и путь до биржи
+     для кольца вокруг логотипа. Раз в двадцать секунд, не чаще. */
+  const [рынкиСвоих, setРынкиСвоих] = useState({});
+  const курсыEVM = useКурсыEVM();
+  useEffect(() => {
+    if (!свои.length) return undefined;
+    let живо = true;
+    const читать = async () => {
+      const { криваяEVM } = await import("./appWallet");
+      const ответы = await Promise.all(свои.slice(0, 30).map((tok) => криваяEVM({ сеть, токен: tok.tokenAddress }).catch(() => null)));
+      if (!живо) return;
+      const карта = {};
+      свои.slice(0, 30).forEach((tok, i) => { if (ответы[i]) карта[tok.id] = ответы[i]; });
+      setРынкиСвоих(карта);
+    };
+    читать();
+    const id = setInterval(читать, 20000);
+    return () => { живо = false; clearInterval(id); };
+  }, [свои, сеть]);
+  const своиСЦифрами = useMemo(() => свои.map((tok) => {
+    const к = рынкиСвоих[tok.id];
+    if (!к) return tok;
+    const цена = к.price * курсМонетыEVM(сеть, курсыEVM);
+    return { ...tok, price: цена, mcapNum: цена * TOKEN_FIXED_SUPPLY, raisedTon: к.realNative, graduationTon: к.graduationNative, graduated: к.graduated };
+  }), [свои, рынкиСвоих, курсыEVM, сеть]);
   useEffect(() => {
     let живо = true;
     const ф = ФИЛЬТРЫ_EVM.find((x) => x.id === фильтр) || ФИЛЬТРЫ_EVM[0];
@@ -10833,9 +10930,20 @@ function МемпадEVM({ сеть }) {
           );
         })}
       </div>
+      {/* Бегущая строка — сделки именно этой сети: и запуски Mintly здесь,
+          и пулы с биржи. */}
+      <RecentBuysTicker сеть={сеть} tokens={список || []} curveTokens={свои} onOpen={onOpen} />
+      {свои.length > 0 && (
+        <div className="flex flex-col">
+          <div style={{ fontFamily: displayFont, color: T.muted, fontSize: 13, fontWeight: 500, letterSpacing: "0.02em", textTransform: "uppercase", marginBottom: 4 }}>
+            Запуски Mintly
+          </div>
+          {своиСЦифрами.slice(0, 30).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)}
+        </div>
+      )}
       <div className="flex flex-col" key={`${сеть}:${фильтр}`}>
         {список
-          ? список.slice(0, 60).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={setОткрыт} index={i} />)
+          ? список.slice(0, 60).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)
           : беда
             ? (
               <div className="flex flex-col items-center" style={{ gap: 14, padding: "60px 0" }}>
@@ -10847,52 +10955,183 @@ function МемпадEVM({ сеть }) {
             )
             : <div className="flex items-center justify-center" style={{ height: 260 }}><ЗнакЗагрузки size={56} /></div>}
       </div>
-      <КарточкаТокенаEVM токен={открыт} onClose={() => setОткрыт(null)} />
     </div>
   );
 }
 
-/* Карточка токена из сети EVM: цена, изменение, график по часам и
-   цифры пула. Своей кривой у такого токена нет, торгуется он на бирже
-   сети. */
-function КарточкаТокенаEVM({ токен: вход, onClose }) {
+/* Карточка токена из сети EVM.
+ *
+ * Два вида токенов. Запуски Mintly (у них есть адрес фабрики) торгуются
+ * прямо здесь, на кривой, кошельком приложения: цена и путь до биржи
+ * читаются у контракта. Токены с биржи показываются ценой, графиком и
+ * цифрами пула. Запуск Mintly, вышедший на биржу, дальше живёт как токен
+ * с биржи — его пул находится по адресу токена. */
+function КарточкаТокенаEVM({ токен: вход, onClose, userId = null, showToast = () => {} }) {
   const [токен, уходит] = useClosing(вход, 220);
   useНазадТелеграм(!!вход, onClose);
+  const сеть = токен && этоEVM(токен.chain) ? токен.chain : "eth";
+  const с = СЕТИ_EVM[сеть];
+  const адрес = (токен && (токен.tokenAddress || токен.address)) || "";
+  const своя = !!(токен && токен.curveAddress);
+  const курсы = useКурсыEVM();
+  const курс = курсМонетыEVM(сеть, курсы);
+
   const [свечи, setСвечи] = useState(null);
   const [инфо, setИнфо] = useState(null);
+  const [пул, setПул] = useState(null);
+  const [кривая, setКривая] = useState(null);
+  const [мои, setМои] = useState({ токенов: null, raw: null, монеты: null });
+  const [режим, setРежим] = useState("buy");
+  const [сумма, setСумма] = useState("");
+  const [котировка, setКотировка] = useState(null);
+  const [идёт, setИдёт] = useState(false);
+  const [обновить, setОбновить] = useState(0);
+
+  useEffect(() => {
+    setСвечи(null); setИнфо(null); setПул(null); setКривая(null);
+    setМои({ токенов: null, raw: null, монеты: null }); setСумма(""); setКотировка(null); setРежим("buy");
+  }, [токен && токен.id]);
+
+  // Кривая своего токена — живая, раз в пять секунд.
+  useEffect(() => {
+    if (!токен || !своя || !адрес) return undefined;
+    let живо = true;
+    const читать = async () => {
+      try {
+        const { криваяEVM } = await import("./appWallet");
+        const к = await криваяEVM({ сеть, токен: адрес });
+        if (живо && к) setКривая(к);
+      } catch { /* узел не ответил — прежнее остаётся */ }
+    };
+    читать();
+    const id = setInterval(читать, 5000);
+    return () => { живо = false; clearInterval(id); };
+  }, [токен && токен.id, своя, адрес, сеть, обновить]);
+
+  // Пул на бирже: у токена из ленты он есть сразу, у своего — после выхода.
   useEffect(() => {
     if (!токен) return undefined;
+    if (токен.poolAddress) { setПул(токен.poolAddress); return undefined; }
+    if (!своя || !кривая || !кривая.graduated || пул) return undefined;
     let живо = true;
-    setСвечи(null); setИнфо(null);
-    fetchPoolOHLCV(токен.poolAddress, "H1", GT_PRIORITY.chart, undefined, токен.chain)
+    gtFetch(`${GT_BASE}/networks/${сеть}/tokens/${адрес}/pools?page=1`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { const p = j && j.data && j.data[0] && j.data[0].attributes && j.data[0].attributes.address; if (живо && p) setПул(p); })
+      .catch(() => {});
+    return () => { живо = false; };
+  }, [токен && токен.id, кривая && кривая.graduated]);
+
+  useEffect(() => {
+    if (!токен || !пул) return undefined;
+    let живо = true;
+    fetchPoolOHLCV(пул, "H1", GT_PRIORITY.chart, undefined, сеть)
       .then((r) => { if (живо) setСвечи((r && r.candles) || []); })
       .catch(() => { if (живо) setСвечи([]); });
-    fetchTokenInfo(токен.tokenAddress, токен.chain).then((и) => { if (живо) setИнфо(и); }).catch(() => {});
+    return () => { живо = false; };
+  }, [пул]);
+
+  useEffect(() => {
+    if (!токен || !адрес || своя) return undefined;
+    let живо = true;
+    fetchTokenInfo(адрес, сеть).then((и) => { if (живо) setИнфо(и); }).catch(() => {});
     return () => { живо = false; };
   }, [токен && токен.id]);
+
+  // Что лежит на кошельке: токены и монета сети на газ и покупку.
+  useEffect(() => {
+    if (!токен || !своя || !userId) return undefined;
+    let живо = true;
+    (async () => {
+      try {
+        const m = await import("./appWallet");
+        const [т, е] = await Promise.all([m.остатокТокенаEVM({ сеть, токен: адрес }).catch(() => null), m.состояниеEVM()]);
+        const о = е && е.chains && е.chains[сеть];
+        if (живо) setМои({ токенов: т ? Number(т.token) || 0 : null, raw: т ? т.raw : null, монеты: о && о.native != null ? Number(о.native) : null });
+      } catch { /* без входа кошелька нет */ }
+    })();
+    return () => { живо = false; };
+  }, [токен && токен.id, userId, обновить]);
+
+  // Котировка на каждое изменение суммы — с короткой паузой, чтобы не
+  // спрашивать узел на каждую цифру.
+  const числоСуммы = parseFloat(String(сумма).replace(",", "."));
+  useEffect(() => {
+    setКотировка(null);
+    if (!своя || !(числоСуммы > 0) || (кривая && кривая.graduated)) return undefined;
+    let живо = true;
+    const id = setTimeout(async () => {
+      try {
+        const { котировкаEVM } = await import("./appWallet");
+        const к = await котировкаEVM({ сеть, токен: адрес, продажа: режим === "sell", сумма: числоСуммы });
+        if (живо) setКотировка(к);
+      } catch { /* без котировки — просто без подсказки */ }
+    }, 350);
+    return () => { живо = false; clearTimeout(id); };
+  }, [числоСуммы, режим, своя, адрес]);
+
   const путь = useMemo(() => {
     const ряд = (свечи || []).filter((c) => c && c.close > 0).slice(-96);
     if (ряд.length < 2) return "";
     const v = ряд.map((c) => c.close), max = Math.max(...v), min = Math.min(...v), д = (max - min) || 1;
     return ряд.map((c, i) => `${i ? "L" : "M"}${((i / (ряд.length - 1)) * 100).toFixed(2)},${(6 + 88 * (1 - (c.close - min) / д)).toFixed(2)}`).join(" ");
   }, [свечи]);
+
   if (!токен) return null;
-  const с = СЕТИ_EVM[токен.chain] || СЕТИ_EVM.eth;
+  const наКривой = своя && кривая && !кривая.graduated;
+  const цена = наКривой ? кривая.price * курс : Number(токен.price) || 0;
+  const кап = наКривой ? цена * TOKEN_FIXED_SUPPLY : Number(токен.mcapNum) || 0;
   const изм = Number(токен.change) || 0;
-  const цвет = изм === 0 ? T.faint : изм > 0 ? T.up : T.down;
+  const цвет = наКривой ? T.up : изм === 0 ? T.faint : изм > 0 ? T.up : T.down;
   const строка = (подпись, значение) => (
     <div className="flex items-center justify-between" style={{ padding: "14px 2px", borderBottom: `1px solid ${T.line}` }}>
       <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14.5 }}>{подпись}</span>
       <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 800 }}>{значение}</span>
     </div>
   );
-  const адрес = токен.tokenAddress || "";
   const ссылка = (url) => { try { const tg = window.Telegram && window.Telegram.WebApp; if (tg && tg.openLink) tg.openLink(url); else window.open(url, "_blank"); } catch { /* ссылка не открылась */ } };
+  const дробь = (v, знаков = 4) => (Number(v) || 0).toLocaleString("ru-RU", { maximumFractionDigits: знаков });
+  const быстрые = режим === "buy"
+    ? (сеть === "bsc" ? [0.01, 0.05, 0.1] : [0.001, 0.005, 0.01])
+    : [0.25, 0.5, 1];
+
+  async function сделка() {
+    if (идёт || !(числоСуммы > 0)) return;
+    if (!userId) { showToast(t("needAccountShort")); return; }
+    if (режим === "buy" && мои.монеты != null && числоСуммы > мои.монеты) { showToast(`На кошельке ${дробь(мои.монеты)} ${с.монета}`); return; }
+    if (режим === "sell" && мои.токенов != null && числоСуммы > мои.токенов + 1e-9) { showToast(`На кошельке ${дробь(мои.токенов, 0)} ${токен.ticker}`); return; }
+    setИдёт(true);
+    haptic("light");
+    try {
+      const { сделкаEVM } = await import("./appWallet");
+      // «Всё» продаём точной строкой: округление оставило бы пылинку.
+      const всё = режим === "sell" && мои.токенов != null && Math.abs(числоСуммы - мои.токенов) < 1e-6;
+      await сделкаEVM({ сеть, токен: адрес, продажа: режим === "sell", сумма: числоСуммы, raw: всё ? мои.raw : null });
+      // В историю — сумма в монете сети и токенах, курс той же монеты.
+      const монеты = режим === "buy" ? числоСуммы : Number(котировка && котировка.out) || 0;
+      const токенов = режим === "buy" ? Number(котировка && котировка.out) || 0 : числоСуммы;
+      supabase.from("trades").insert({
+        user_id: userId, token_id: токен.id || null, token_address: адрес, ticker: токен.ticker,
+        side: режим, ton_amount: монеты, token_amount: токенов, ton_price_usd: курс || 0,
+      }).then(() => {}, () => {});
+      haptic("success");
+      showToast(режим === "buy" ? `Куплено $${токен.ticker}` : `Продано $${токен.ticker}`);
+      setСумма("");
+      setОбновить((n) => n + 1);
+      try { window.dispatchEvent(new Event("mintly:сделка")); } catch { /* старый браузер */ }
+    } catch (e) {
+      const сырое = String((e && e.message) || e);
+      showToast(сырое === "not_enough" ? `Не хватает ${с.монета} на сделку и газ` : сырое === "rate_limited" ? t("errTooOften") : сырое.slice(0, 90));
+      haptic("error");
+    } finally {
+      setИдёт(false);
+    }
+  }
+
   const лист = (
     <div className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 85, background: "#000000", overflowY: "auto", padding: "calc(24px + var(--tg-inset-top, 0px)) 16px calc(28px + var(--tg-inset-bottom, 0px))" }}>
       <div className="flex items-center justify-end" style={{ gap: 8, marginBottom: 14 }}>
         <img src={с.лого} alt="" width={18} height={18} style={{ borderRadius: "50%" }} />
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{с.имя}</span>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{с.имя}{своя ? " · запуск Mintly" : ""}</span>
       </div>
       <div className="flex items-center" style={{ gap: 14 }}>
         <TokenAvatar size={56} tone={изм >= 0 ? "up" : "down"} src={токен.logoUrl} />
@@ -10902,44 +11141,142 @@ function КарточкаТокенаEVM({ токен: вход, onClose }) {
         </div>
       </div>
       <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 40, fontWeight: 800, marginTop: 22, lineHeight: 1 }}>
-        <ТекстСЧислами text={fmtЦенаМелкая(токен.price)} />
+        {/* Курс монеты ещё не пришёл — цену своего токена показываем в
+            самой монете сети: она известна контракту всегда. */}
+        <ТекстСЧислами text={цена > 0 ? fmtЦенаМелкая(цена) : наКривой ? `${fmtЦенаМелкая(кривая.price).slice(1)} ${с.монета}` : "—"} />
       </div>
-      <div style={{ fontFamily: bodyFont, color: цвет, fontSize: 15, fontWeight: 700, marginTop: 8 }}>
-        <ТекстСЧислами text={`${изм > 0 ? "+" : ""}${изм.toFixed(2)}% за сутки`} />
-      </div>
-      <div style={{ margin: "22px -16px 0", height: 200 }}>
-        {путь ? (
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="200" aria-hidden>
-            <defs>
-              <linearGradient id="evm-график" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor={цвет} stopOpacity="0.26" />
-                <stop offset="1" stopColor={цвет} stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d={`${путь} L100,100 L0,100 Z`} fill="url(#evm-график)" />
-            <path d={путь} fill="none" stroke={цвет} strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-          </svg>
-        ) : (
-          <div className="flex items-center justify-center" style={{ height: 200 }}>
-            {свечи === null ? <ЗнакЗагрузки size={40} /> : <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 13 }}>{t("chartNoData")}</span>}
-          </div>
-        )}
-      </div>
-      <div style={{ marginTop: 18, borderTop: `1px solid ${T.line}` }}>
-        {строка("Капитализация", fmtUSD(токен.mcapNum))}
-        {строка("Ликвидность", токен.liq ? `$${токен.liq}` : "—")}
-        {строка("Оборот за сутки", токен.vol ? `$${токен.vol}` : "—")}
-        {строка("Сделок за сутки", (токен.tx24h || 0).toLocaleString("ru-RU"))}
-        {инфо && инфо.holders ? строка("Держателей", инфо.holders.toLocaleString("ru-RU")) : null}
-        {строка("Биржа", токен.dexName || "—")}
-      </div>
-      {инфо && инфо.description && (
-        <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, marginTop: 16 }}>{инфо.description.slice(0, 400)}</p>
+      {!наКривой && (
+        <div style={{ fontFamily: bodyFont, color: цвет, fontSize: 15, fontWeight: 700, marginTop: 8 }}>
+          <ТекстСЧислами text={`${изм > 0 ? "+" : ""}${изм.toFixed(2)}% за сутки`} />
+        </div>
       )}
+
+      {/* Путь до биржи: сколько собрано из нужного. */}
+      {наКривой && (
+        <div style={{ marginTop: 18 }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>До выхода на биржу</span>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 800 }}>{Math.round((кривая.progress || 0) * 100)}%</span>
+          </div>
+          <div style={{ height: 8, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
+            <div style={{ width: `${Math.max(2, Math.min(100, (кривая.progress || 0) * 100))}%`, height: "100%", borderRadius: 999, background: T.up, transition: "width 600ms ease" }} />
+          </div>
+          <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5, marginTop: 8 }}>
+            Собрано {дробь(кривая.realNative)} из {дробь(кривая.graduationNative, 2)} {с.монета} — потом токен уходит в пул {сеть === "bsc" ? "PancakeSwap" : "Uniswap"}
+          </div>
+        </div>
+      )}
+
+      {пул && (
+        <div style={{ margin: "22px -16px 0", height: 200 }}>
+          {путь ? (
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="200" aria-hidden>
+              <defs>
+                <linearGradient id="evm-график" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor={цвет} stopOpacity="0.26" />
+                  <stop offset="1" stopColor={цвет} stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d={`${путь} L100,100 L0,100 Z`} fill="url(#evm-график)" />
+              <path d={путь} fill="none" stroke={цвет} strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            </svg>
+          ) : (
+            <div className="flex items-center justify-center" style={{ height: 200 }}>
+              {свечи === null ? <ЗнакЗагрузки size={40} /> : <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 13 }}>{t("chartNoData")}</span>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Сделка на кривой — кошельком приложения, без подписи снаружи. */}
+      {наКривой && (
+        <div style={{ marginTop: 22, padding: 14, borderRadius: 20, background: T.surfaceHi }}>
+          <div className="flex" style={{ gap: 6, padding: 4, borderRadius: 14, background: T.surface }}>
+            {[["buy", "Купить"], ["sell", "Продать"]].map(([к, подпись]) => (
+              <button
+                key={к}
+                onClick={() => { haptic("light"); setРежим(к); setСумма(""); }}
+                className="fx-tap"
+                style={{
+                  flex: 1, padding: "10px 0", borderRadius: 11, border: "none",
+                  background: режим === к ? (к === "buy" ? T.up : T.down) : "transparent",
+                  color: режим === к ? "#04120A" : T.muted, fontFamily: displayFont, fontSize: 14.5, fontWeight: 800,
+                }}
+              >
+                {подпись}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center" style={{ gap: 10, marginTop: 14 }}>
+            <input
+              id="evm-сумма"
+              inputMode="decimal"
+              value={сумма}
+              onChange={(e) => setСумма(e.target.value.replace(/[^0-9.,]/g, ""))}
+              placeholder="0"
+              style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: T.ice, fontFamily: displayFont, fontSize: 30, fontWeight: 800 }}
+            />
+            <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 16, fontWeight: 700 }}>{режим === "buy" ? с.монета : `$${токен.ticker}`}</span>
+          </div>
+          <div className="flex" style={{ gap: 8, marginTop: 10 }}>
+            {быстрые.map((v) => (
+              <button
+                key={v}
+                onClick={() => {
+                  haptic("light");
+                  if (режим === "buy") setСумма(String(v));
+                  else if (мои.токенов) setСумма(String(v === 1 ? мои.токенов : Math.floor(мои.токенов * v)));
+                }}
+                className="fx-tap"
+                style={{ flex: 1, padding: "8px 0", borderRadius: 10, border: `1px solid ${T.lineHi}`, background: "transparent", color: T.ice, fontFamily: bodyFont, fontSize: 13, fontWeight: 700 }}
+              >
+                {режим === "buy" ? `${v} ${с.монета}` : v === 1 ? "Всё" : `${v * 100}%`}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 12, minHeight: 18 }}>
+            {котировка && котировка.out > 0
+              ? (режим === "buy" ? `≈ ${дробь(котировка.out, 0)} $${токен.ticker}` : `≈ ${дробь(котировка.out, 6)} ${с.монета}`)
+              : режим === "buy"
+                ? (мои.монеты != null ? `На кошельке ${дробь(мои.монеты)} ${с.монета}` : "")
+                : (мои.токенов != null ? `На кошельке ${дробь(мои.токенов, 0)} $${токен.ticker}` : "")}
+          </div>
+          <button
+            onClick={сделка}
+            disabled={идёт || !(числоСуммы > 0)}
+            className="fx-tap w-full"
+            style={{
+              marginTop: 12, padding: "15px 0", borderRadius: 16, border: "none",
+              background: числоСуммы > 0 ? T.ice : hexA("#FFFFFF", 0.12), color: числоСуммы > 0 ? "#0B0B0F" : T.faint,
+              fontFamily: displayFont, fontSize: 16, fontWeight: 800,
+            }}
+          >
+            {идёт ? "Отправляем…" : режим === "buy" ? `Купить $${токен.ticker}` : `Продать $${токен.ticker}`}
+          </button>
+        </div>
+      )}
+      {своя && кривая && кривая.graduated && (
+        <div style={{ marginTop: 18, padding: "14px 16px", borderRadius: 16, background: hexA(T.up, 0.1), fontFamily: bodyFont, color: T.ice, fontSize: 14 }}>
+          Токен вышел на {сеть === "bsc" ? "PancakeSwap" : "Uniswap"}: торги идут в пуле биржи, ликвидность заблокирована навсегда.
+        </div>
+      )}
+
+      <div style={{ marginTop: 18, borderTop: `1px solid ${T.line}` }}>
+        {строка("Капитализация", кап > 0 ? fmtUSD(кап) : наКривой ? `${дробь(кривая.price * TOKEN_FIXED_SUPPLY, 2)} ${с.монета}` : "—")}
+        {!своя && строка("Ликвидность", токен.liq ? `$${токен.liq}` : "—")}
+        {!своя && строка("Оборот за сутки", токен.vol ? `$${токен.vol}` : "—")}
+        {!своя && строка("Сделок за сутки", (токен.tx24h || 0).toLocaleString("ru-RU"))}
+        {инфо && инфо.holders ? строка("Держателей", инфо.holders.toLocaleString("ru-RU")) : null}
+        {!своя && строка("Биржа", токен.dexName || "—")}
+        {своя && мои.токенов != null && строка("У вас", `${дробь(мои.токенов, 0)} $${токен.ticker}`)}
+      </div>
+      {(инфо && инфо.description) || (своя && токен.description) ? (
+        <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, marginTop: 16 }}>{String((инфо && инфо.description) || токен.description).slice(0, 400)}</p>
+      ) : null}
       {адрес && (
         <button
           onClick={() => {
-            try { navigator.clipboard && navigator.clipboard.writeText(адрес); haptic("light"); } catch { /* буфер закрыт */ }
+            try { navigator.clipboard && navigator.clipboard.writeText(адрес); haptic("light"); showToast("Адрес скопирован"); } catch { /* буфер закрыт */ }
           }}
           className="fx-tap w-full flex items-center justify-between"
           style={{ marginTop: 18, padding: "14px 16px", borderRadius: 16, border: "none", background: T.surfaceHi }}
@@ -10951,7 +11288,7 @@ function КарточкаТокенаEVM({ токен: вход, onClose }) {
       <button
         onClick={() => { haptic("light"); ссылка(`${с.обозреватель}${адрес}`); }}
         className="fx-tap w-full"
-        style={{ marginTop: 10, padding: "15px 0", borderRadius: 16, border: "none", background: T.ice, color: "#0B0B0F", fontFamily: displayFont, fontSize: 15.5, fontWeight: 700 }}
+        style={{ marginTop: 10, padding: "15px 0", borderRadius: 16, border: `1px solid ${T.lineHi}`, background: "transparent", color: T.ice, fontFamily: displayFont, fontSize: 15.5, fontWeight: 700 }}
       >
         Открыть в обозревателе
       </button>
@@ -14339,8 +14676,13 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", а
      не где-то в настройках экрана. */
   const [сетьПрихода, setСетьПрихода] = useState("sol");
   useEffect(() => { if (открыт) setСетьПрихода("sol"); }, [открыт]);
-  const адресСети = адреса ? (сетьПрихода === "ton" ? адреса.ton : адреса.sol) || "" : адрес;
-  const подписьСети = адреса ? (сетьПрихода === "ton" ? ТИКЕР_TON : "Solana") : сеть;
+  // У трёх сетей EVM адрес один и тот же — но сеть выбирать всё равно
+  // нужно: монета, отправленная в BNB Chain, на Ethereum не появится.
+  const адресСети = адреса
+    ? (этоEVM(сетьПрихода) ? адреса.evm : сетьПрихода === "ton" ? адреса.ton : адреса.sol) || ""
+    : адрес;
+  const сетьПунктом = ВСЕ_СЕТИ.find((с) => с.ключ === сетьПрихода) || ВСЕ_СЕТИ[1];
+  const подписьСети = адреса ? (сетьПрихода === "ton" ? ТИКЕР_TON : сетьПунктом.имя) : сеть;
   const [код, setКод] = useState(null);
   // Кнопка отвечает сама: подтверждение прямо на ней надёжнее всплывающей
   // подсказки — та живёт наверху экрана, а палец в этот момент внизу.
@@ -14397,24 +14739,8 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", а
         {/* Сеть выбирают здесь же: перевод, ушедший не в ту сеть, не
             возвращается, и выбор должен стоять рядом с кодом. */}
         {адреса && (
-          <div className="flex" style={{ gap: 8, width: "100%", maxWidth: 330 }}>
-            {[{ ключ: "sol", имя: "Solana", лого: "/coins/sol.png" }, { ключ: "ton", имя: "Gram", лого: "/coins/gram.png" }].map((м) => (
-              <button
-                key={м.ключ}
-                onClick={() => { setСетьПрихода(м.ключ); haptic("light"); }}
-                className="fx-tap flex items-center justify-center"
-                style={{
-                  flex: 1, gap: 8, padding: "12px 0", borderRadius: 12, border: "none",
-                  background: сетьПрихода === м.ключ ? T.surfaceHi : "transparent",
-                  color: сетьПрихода === м.ключ ? T.ice : T.muted,
-                  fontFamily: displayFont, fontSize: 14.5, fontWeight: 700,
-                  transition: "background 200ms ease, color 200ms ease",
-                }}
-              >
-                <img src={м.лого} alt="" style={{ width: 20, height: 20, borderRadius: "50%" }} />
-                {м.имя}
-              </button>
-            ))}
+          <div className="flex justify-center" style={{ width: "100%", maxWidth: 330 }}>
+            <ВыборСети value={сетьПрихода} onChange={setСетьПрихода} />
           </div>
         )}
         <div
@@ -14451,7 +14777,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", а
                   стоял Solana всегда, и над адресом TON висел чужой
                   знак — самая дорогая ошибка из возможных. */}
               <img
-                src={подписьСети === "Solana" ? "/coins/sol.png" : "/coins/gram.png"}
+                src={адреса ? сетьПунктом.лого : подписьСети === "Solana" ? "/coins/sol.png" : "/coins/gram.png"}
                 alt=""
                 width={44}
                 height={44}
@@ -15953,6 +16279,31 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
  * экране. Хук переспрашивает её, пока цена не появится, и только тогда
  * перерисовывает: до этого на месте суммы честнее держать плашку.
  */
+/* Курсы монет сетей EVM — BNB и ETH (на Base тоже ETH). Один общий
+   запрос на всё приложение и не чаще раза в минуту. */
+const КЕШ_КУРСОВ_EVM = { bnb: 0, eth: 0, ts: 0 };
+function useКурсыEVM() {
+  const [курсы, setКурсы] = useState(() => ({ ...КЕШ_КУРСОВ_EVM }));
+  useEffect(() => {
+    let живо = true;
+    const загрузить = async () => {
+      if (Date.now() - КЕШ_КУРСОВ_EVM.ts < 60000 && КЕШ_КУРСОВ_EVM.eth > 0) { if (живо) setКурсы({ ...КЕШ_КУРСОВ_EVM }); return; }
+      try {
+        const j = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=binancecoin,ethereum&vs_currencies=usd").then((r) => r.json());
+        const bnb = Number(j && j.binancecoin && j.binancecoin.usd) || 0;
+        const eth = Number(j && j.ethereum && j.ethereum.usd) || 0;
+        if (bnb > 0 || eth > 0) Object.assign(КЕШ_КУРСОВ_EVM, { bnb: bnb || КЕШ_КУРСОВ_EVM.bnb, eth: eth || КЕШ_КУРСОВ_EVM.eth, ts: Date.now() });
+        if (живо) setКурсы({ ...КЕШ_КУРСОВ_EVM });
+      } catch { /* курс не пришёл — остаётся прежний */ }
+    };
+    загрузить();
+    const id = setInterval(загрузить, 60000);
+    return () => { живо = false; clearInterval(id); };
+  }, []);
+  return курсы;
+}
+const курсМонетыEVM = (сеть, курсы) => (СЕТИ_EVM[сеть] && СЕТИ_EVM[сеть].монета === "BNB" ? курсы.bnb : курсы.eth) || 0;
+
 function useSolUsd() {
   const [курс, setКурс] = useState(() => solUsd());
   useEffect(() => {
@@ -17353,6 +17704,31 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const [монетаОткрыта, setМонетаОткрыта] = useState(null);
   const солНаКошельке = внутр && !внутр.нуженВход && !внутр.ошибка ? Number(внутр.sol) || 0 : 0;
   const тонНаКошельке = внутрTON && !внутрTON.нуженВход && !внутрTON.ошибка ? Number(внутрTON.ton) || 0 : 0;
+  /* Кошелёк EVM: один адрес на BNB Chain, Base и Ethereum, остатки по
+     каждой сети отдельно. Спрашиваем реже, чем свои сети: здесь три узла
+     за один ответ. */
+  const [внутрEVM, setВнутрEVM] = useState(null);
+  useEffect(() => {
+    let жив = true;
+    const шаг = async () => {
+      try {
+        const { состояниеEVM } = await import("./appWallet");
+        const св = await состояниеEVM();
+        if (жив && св) setВнутрEVM(св);
+      } catch { /* сеть не ответила — держим прежнее */ }
+    };
+    шаг();
+    const id = setInterval(шаг, 20000);
+    return () => { жив = false; clearInterval(id); };
+  }, [userId]);
+  const курсыEVM = useКурсыEVM();
+  const остатокEVM = (сеть) => (внутрEVM && внутрEVM.chains && внутрEVM.chains[сеть]) || null;
+  const вДолларахEVM = Object.keys(СЕТИ_EVM).reduce((сумма, к) => {
+    const о = остатокEVM(к);
+    if (!о) return сумма;
+    const стейблы = Object.values(о.tokens || {}).reduce((а, v) => а + (Number(v) || 0), 0);
+    return сумма + (Number(о.native) || 0) * курсМонетыEVM(к, курсыEVM) + стейблы;
+  }, 0);
   const сыройОстаток = вTON ? (годен ? Number(текущий.ton) || 0 : 0) : солНаКошельке;
   /* Сколько ещё можно вывести за сутки. Предел стоит на сервере, и
      раньше о нём узнавали только отказом: кнопка «100%» подставляла весь
@@ -17388,7 +17764,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   /* На карте — весь кошелёк одной суммой в долларах. Монет две, и
      показывать одну из них значило врать про остаток: человек видел
      ноль SOL и считал, что кошелёк пуст, пока на нём лежал GRAM. */
-  const всегоВДолларах = солНаКошельке * курсSol + тонНаКошельке * tonPriceUsd;
+  const всегоВДолларах = солНаКошельке * курсSol + тонНаКошельке * tonPriceUsd + вДолларахEVM;
   // Без счётчика: сумма сменяется умным текстом — общие цифры стоят,
   // новые проступают из размытия.
   const итог = адресВнутри ? всегоВДолларах : 0;
@@ -17887,6 +18263,18 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           {[
             { ключ: "sol", тикер: "SOL", имя: "Solana", лого: "/coins/sol.png", сколько: солНаКошельке, курс: курсSol },
             { ключ: "ton", тикер: ТИКЕР_TON, имя: "Gram", лого: "/coins/gram.png", сколько: тонНаКошельке, курс: tonPriceUsd },
+            // Монеты сетей EVM — каждая своей строкой, даже с нулём: так
+            // видно, куда ещё можно положить деньги.
+            ...Object.entries(СЕТИ_EVM).map(([к, с]) => ({
+              ключ: к, тикер: `${с.монета} · ${с.имя}`, имя: к === "bsc" ? "BNB" : "Ethereum",
+              лого: к === "base" ? "/coins/eth.svg" : с.лого, сеть: к === "base" ? с.лого : null,
+              сколько: Number(остатокEVM(к) && остатокEVM(к).native) || 0, курс: курсМонетыEVM(к, курсыEVM),
+            })),
+            ...Object.entries(СЕТИ_EVM).flatMap(([к, с]) => ["USDT", "USDC"].map((т) => ({
+              ключ: `${к}-${т}`, тикер: `${т} · ${с.имя}`, имя: т === "USDT" ? "Tether" : "USD Coin",
+              лого: т === "USDT" ? "/coins/usdt.svg" : "/coins/usdc.png", сеть: с.лого,
+              сколько: Number(остатокEVM(к) && остатокEVM(к).tokens && остатокEVM(к).tokens[т]) || 0, курс: 1,
+            }))),
           ].map((монета) => (
             /* Строка, а не кнопка: выбирать тут нечего — сеть перевода
                спрашивается там, где она и нужна, на пополнении. */
@@ -17898,13 +18286,20 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
               // читаются одним.
               style={{ gap: 14, padding: "13px 2px" }}
             >
-              <img
-                src={монета.лого}
-                alt=""
-                width={44}
-                height={44}
-                style={{ width: 44, height: 44, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }}
-              />
+              <span style={{ position: "relative", width: 44, height: 44, flexShrink: 0 }}>
+                <img
+                  src={монета.лого}
+                  alt=""
+                  width={44}
+                  height={44}
+                  style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", display: "block" }}
+                />
+                {/* Значок сети в углу: USDT в BNB Chain и USDT в Ethereum —
+                    разные деньги, и перепутать их нельзя. */}
+                {монета.сеть && (
+                  <img src={монета.сеть} alt="" width={18} height={18} style={{ position: "absolute", right: -2, bottom: -2, borderRadius: "50%", border: "2px solid #000" }} />
+                )}
+              </span>
               <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 3 }}>
                 <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>
                   {монета.имя}
@@ -18016,6 +18411,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         адреса={{
           sol: внутр && внутр.address ? внутр.address : "",
           ton: внутрTON && внутрTON.address ? внутрTON.address : "",
+          evm: внутрEVM && внутрEVM.address ? внутрEVM.address : "",
         }}
         сеть={вTON ? ТИКЕР_TON : "Solana"}
         showToast={showToast}
@@ -21435,7 +21831,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
     // запускать, скорее всего, тоже там.
     try {
       const с = typeof window !== "undefined" && window.localStorage.getItem("mintly.network");
-      return с === "sol" ? "sol" : "ton";
+      return с === "sol" || этоEVM(с) ? с : "ton";
     } catch {
       return "ton";
     }
@@ -21449,6 +21845,27 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
      недоступность сказано прямо. */
   const вSolana = сетьЗапуска === "sol";
   const solЗакрыт = вSolana && !solДоступен;
+  /* Сети EVM: своя фабрика с кривой (contracts/evm). Запуск открыт там,
+     где фабрика развёрнута; остальные сети видны в списке с пометкой. */
+  const вEVM = этоEVM(сетьЗапуска);
+  const [сетиEVMЗапуска, setСетиEVMЗапуска] = useState({});
+  useEffect(() => {
+    let живо = true;
+    import("./appWallet").then((m) => m.сетиEVMВключены()).then((с) => { if (живо) setСетиEVMЗапуска(с || {}); }).catch(() => {});
+    return () => { живо = false; };
+  }, []);
+  const evmЗакрыт = вEVM && !(сетиEVMЗапуска[сетьЗапуска] && сетиEVMЗапуска[сетьЗапуска].launch);
+  // Из мемпада могла приехать сеть, где запуска ещё нет, — тогда
+  // начинаем с TON, а не с закрытой формы.
+  const [проверилиEVM, setПроверилиEVM] = useState(false);
+  useEffect(() => { if (Object.keys(сетиEVMЗапуска).length) setПроверилиEVM(true); }, [сетиEVMЗапуска]);
+  useEffect(() => { if (проверилиEVM && evmЗакрыт) setСетьЗапуска("ton"); }, [проверилиEVM]); // eslint-disable-line react-hooks/exhaustive-deps
+  const единицаЗапуска = вEVM ? СЕТИ_EVM[сетьЗапуска].монета : единицаЗапуска;
+  const курсЗапуска = () => (вEVM ? курсМонетыEVM(сетьЗапуска, КЕШ_КУРСОВ_EVM) : курсЗапуска());
+  // Виртуальный запас фабрики — тот же, что в contracts/evm/deploy.mjs.
+  const ВИРТ_EVM = вEVM ? (сетьЗапуска === "bsc" ? 6 : 1.5) : 0;
+  const ВИРТ_ТОКЕНОВ_EVM = 1_073_000_000;
+  const ПРОДАЖА_EVM = 800_000_000;
 
   /* Остаток кошелька приложения в той сети, где запускают. Без него
      форма пропускала запуск на сумму, которой нет: человек доходил до
@@ -21467,7 +21884,14 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
     return () => { брошено = true; };
   }, [вSolana, кривScolana]);
 
-  const посчитатьВыход = (сумма) => (вSolana ? токеновЗаSol(сумма, кривScolana) : tokensForTon(сумма));
+  const посчитатьВыход = (сумма) => {
+    if (вEVM) {
+      const n = Math.max(0, Number(сумма) || 0);
+      const tokens = n > 0 ? Math.min(ПРОДАЖА_EVM, ВИРТ_ТОКЕНОВ_EVM - (ВИРТ_EVM * ВИРТ_ТОКЕНОВ_EVM) / (ВИРТ_EVM + n)) : 0;
+      return { tokens, pct: Math.min(100, (tokens / TOKEN_FIXED_SUPPLY) * 100) };
+    }
+    return вSolana ? токеновЗаSol(сумма, кривScolana) : tokensForTon(сумма);
+  };
   // Запуск в Solana открыт — просим сервер держать свежий блок наготове.
   useEffect(() => { if (вSolana) прогретьSolana(); }, [вSolana]);
   /* Что станет с рынком после стартовой покупки: цена одной штуки и
@@ -21477,6 +21901,13 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   const итогПокупки = (сумма) => {
     const n = Math.max(0, Number(сумма) || 0);
     if (!(n > 0)) return null;
+    if (вEVM) {
+      const x = ВИРТ_EVM + n;
+      const y = (ВИРТ_EVM * ВИРТ_ТОКЕНОВ_EVM) / x;
+      const цена = x / y;
+      const сбор = ВИРТ_EVM * (ВИРТ_ТОКЕНОВ_EVM / (ВИРТ_ТОКЕНОВ_EVM - ПРОДАЖА_EVM) - 1);
+      return { цена, кап: цена * TOKEN_FIXED_SUPPLY, закроется: n >= сбор };
+    }
     if (вSolana) {
       const к = кривScolana;
       if (!к || !(к.virtualSol > 0) || !(к.virtualTokens > 0)) return null;
@@ -21497,12 +21928,21 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   };
 
   const [остатокСети, setОстатокСети] = useState(null);
+  // Переспрашиваем остаток на каждом шаге: форма живёт открытой, и
+  // пополнение, пришедшее после её открытия, иначе не было бы видно.
+  const [ключОстатка, setКлючОстатка] = useState(0);
   useEffect(() => {
     let брошено = false;
     setОстатокСети(null);
     (async () => {
       try {
         const кошелёк = await import("./appWallet");
+        if (вEVM) {
+          const е = await кошелёк.состояниеEVM();
+          const о = е && е.chains && е.chains[сетьЗапуска];
+          if (!брошено && о && о.native != null) setОстатокСети(Number(о.native) || 0);
+          return;
+        }
         const св = вSolana
           ? await кошелёк.состояниеВнутреннего()
           : await кошелёк.состояниеВнутреннегоTON();
@@ -21511,11 +21951,13 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
       } catch { /* без входа кошелька нет — тогда и проверять нечего */ }
     })();
     return () => { брошено = true; };
-  }, [вSolana, accountCreated]);
+  }, [вSolana, вEVM, сетьЗапуска, accountCreated, ключОстатка]);
 
   /* Запас на комиссию сети и аренду счёта токена. В Solana запуск платит
      за создание счёта и метаданные, в TON — за газ контракта. */
-  const ЗАПАС_ЗАПУСКА = вSolana ? 0.02 : 0.3;
+  // В EVM запас — на газ запуска: в BNB Chain и Base это копейки, в
+  // Ethereum заметнее.
+  const ЗАПАС_ЗАПУСКА = вEVM ? ({ bsc: 0.003, base: 0.0005, eth: 0.008 }[сетьЗапуска] || 0.005) : вSolana ? 0.02 : 0.3;
   const суммаПокупки = parseFloat(String(form.buyAmount).replace(",", "."));
   const нехватка = остатокСети != null
     && Number.isFinite(суммаПокупки) && суммаПокупки > 0
@@ -21538,17 +21980,19 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   const ШАГОВ_ЗАПУСКА = 3;
   const [шаг, setШаг] = useState(0);
   const шагГотов = шаг === 0
-    ? !!logoUrl && !!form.name.trim() && !!form.ticker.trim() && !solЗакрыт
+    ? !!logoUrl && !!form.name.trim() && !!form.ticker.trim() && !solЗакрыт && !evmЗакрыт
     : шаг === 1 ? !!form.desc.trim() : true;
   function дальше() {
     setTouched(true);
     if (шаг === 0) {
       if (solЗакрыт) { showToast(t("solLaunchClosedTitle")); return; }
+      if (evmЗакрыт) { showToast("Запуск в этой сети скоро откроется"); return; }
       if (!logoUrl) { showToast(t("logoRequired")); return; }
       if (!form.name.trim() || !form.ticker.trim()) { showToast(t("nameTickerRequired")); return; }
     }
     if (шаг === 1 && !form.desc.trim()) { showToast(t("descRequiredWarning")); return; }
     haptic("light");
+    setКлючОстатка((n) => n + 1);
     // Подсказки об ошибках — только о том шаге, где человек сейчас.
     setTouched(false);
     setШаг((ш) => Math.min(ШАГОВ_ЗАПУСКА - 1, ш + 1));
@@ -21627,6 +22071,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   function handleLaunch() {
     setTouched(true);
     if (solЗакрыт) { showToast(t("solLaunchClosedTitle")); return; }
+    if (evmЗакрыт) { showToast("Запуск в этой сети скоро откроется"); return; }
     if (!logoUrl) {
       showToast(t("logoRequired"));
       return;
@@ -21648,19 +22093,19 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
     // при нуле любая сумма выглядела бы недостаточной. Курс берётся той
     // сети, в которой идёт запуск, — иначе доллары считались бы по чужой
     // монете.
-    const rate = вSolana ? solUsd() : tonUsd();
-    const минимумНужен = вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED;
+    const rate = курсЗапуска();
+    const минимумНужен = (вEVM ? false : вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED);
     if (минимумНужен && rate > 0) {
       const минимум = MIN_LAUNCH_USD / rate;
       if (buyNum * rate < MIN_LAUNCH_USD) {
-        showToast(trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: минимум.toFixed(вSolana ? 3 : 2), unit: вSolana ? "SOL" : ТИКЕР_TON }));
+        showToast(trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: минимум.toFixed(вSolana ? 3 : 2), unit: единицаЗапуска }));
         return;
       }
     }
     if (нехватка) {
       showToast(trf("launchNotEnough", {
-        have: `${(остатокСети || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${вSolana ? "SOL" : ТИКЕР_TON}`,
-        need: `${(buyNum + ЗАПАС_ЗАПУСКА).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${вSolana ? "SOL" : ТИКЕР_TON}`,
+        have: `${(остатокСети || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${единицаЗапуска}`,
+        need: `${(buyNum + ЗАПАС_ЗАПУСКА).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${единицаЗапуска}`,
       }));
       return;
     }
@@ -21670,7 +22115,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
     onLaunch({
       form, category, logoUrl, logoFile, bannerFile,
       buyAmount: form.buyAmount.trim(),
-      chain: вSolana ? "solana" : "ton",
+      chain: вEVM ? сетьЗапуска : вSolana ? "solana" : "ton",
       механики, замок,
       onFinish: finishLaunch,
     });
@@ -21749,7 +22194,16 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           когда выбора сети ещё нет, и раздел начинается на том же
           уровне, что «Главная» и «Мемпад». */}
       {шаг === 0 && (<div key="ш=" className="fx-step-in flex flex-col gap-7">
-      {solДоступен && <NetworkSlider value={сетьЗапуска} onChange={setСетьЗапуска} />}
+      {/* Сеть — тем же выпадающим списком, что и в мемпаде. */}
+      <ВыборСети
+        value={сетьЗапуска}
+        onChange={setСетьЗапуска}
+        style={{ alignSelf: "flex-start" }}
+        недоступны={{
+          ...(solДоступен ? {} : { sol: "скоро" }),
+          ...Object.fromEntries(Object.keys(СЕТИ_EVM).filter((к) => !(сетиEVMЗапуска[к] && сетиEVMЗапуска[к].launch)).map((к) => [к, "скоро"])),
+        }}
+      />
 
       {solЗакрыт && (
         <div className="rounded-[22px] p-4 flex flex-col" style={{ gap: 10, background: hexA(T.warning, 0.12) }}>
@@ -21823,8 +22277,8 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             больше, чем есть, нельзя. Пока остатка не знаем — шкала по
             умолчанию, и нехватку подскажет строка ниже. */}
         {(() => {
-          const единица = вSolana ? "SOL" : ТИКЕР_TON;
-          const шаг = вSolana ? 0.01 : 0.1;
+          const единица = единицаЗапуска;
+          const шаг = вEVM ? 0.001 : вSolana ? 0.01 : 0.1;
           /* Верх шкалы — та же логика, что у самой кривой: покупка, которая
              берёт порог листинга (1500 GRAM в TON, 35 SOL в Solana). На
              нём кривая закрывается и уходит в пул, а капитализация выходит
@@ -21834,6 +22288,10 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
              подскажет строка под ползунком. */
           const ДОЛЯ_ВЕРХА = 0.999;
           const верхПоКривой = (() => {
+            if (вEVM) {
+              const хочу = ПРОДАЖА_EVM * ДОЛЯ_ВЕРХА;
+              return (ВИРТ_EVM * хочу) / (ВИРТ_ТОКЕНОВ_EVM - хочу);
+            }
             if (вSolana) {
               const к = кривScolana;
               if (!к || !(к.virtualSol > 0) || !(к.virtualTokens > 0) || !(к.tokensForSale > 0)) return 0;
@@ -21850,12 +22308,12 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             return Math.min(потолок, порог) / (1 - Number(CURVE_PARAMS.feeBps) / 10000);
           })();
           const верх = верхПоКривой > 0
-            ? Number((Math.ceil(верхПоКривой / шаг - 1e-9) * шаг).toFixed(2))
-            : (вSolana ? 2 : 50);
+            ? Number((Math.ceil(верхПоКривой / шаг - 1e-9) * шаг).toFixed(вEVM ? 3 : 2))
+            : (вEVM ? 1 : вSolana ? 2 : 50);
           const сейчас = Math.min(верх, Number.isFinite(суммаПокупки) ? суммаПокупки : 0);
-          const число = (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: вSolana ? 2 : 1 });
-          const плохо = touched && (вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED) && (вSolana ? solUsd() : tonUsd()) > 0
-            && !(сейчас * (вSolana ? solUsd() : tonUsd()) >= MIN_LAUNCH_USD);
+          const число = (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: вEVM ? 3 : вSolana ? 2 : 1 });
+          const плохо = touched && ((вEVM ? false : вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED)) && (курсЗапуска()) > 0
+            && !(сейчас * (курсЗапуска()) >= MIN_LAUNCH_USD);
           const применитьСумму = () => {
             const v = Math.max(0, Math.min(верх, parseFloat(суммаЧерновик.replace(",", ".")) || 0));
             setForm((f) => ({ ...f, buyAmount: v > 0 ? String(v) : "" }));
@@ -21915,30 +22373,30 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         })()}
         {(() => {
           const buyNum = parseFloat(form.buyAmount.replace(",", "."));
-          const rate = вSolana ? solUsd() : tonUsd();
+          const rate = курсЗапуска();
           const minBuyTon = rate > 0 ? MIN_LAUNCH_USD / rate : 0;
           if (!Number.isFinite(buyNum) || buyNum <= 0) return null;
-          const минимумНужен = вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED;
+          const минимумНужен = (вEVM ? false : вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED);
           let беда = null;
           if (минимумНужен && rate > 0 && buyNum * rate < MIN_LAUNCH_USD) {
             беда = (
               <p style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, lineHeight: 1.5 }}>
-                <ТекстСЧислами text={trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: minBuyTon.toFixed(вSolana ? 3 : 2), unit: вSolana ? "SOL" : ТИКЕР_TON })} />
+                <ТекстСЧислами text={trf("buyAmountTooLow", { min: MIN_LAUNCH_USD, tons: minBuyTon.toFixed(вSolana ? 3 : 2), unit: единицаЗапуска })} />
               </p>
             );
           } else if (нехватка) {
             беда = (
               <p style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, lineHeight: 1.5 }}>
                 <ТекстСЧислами text={trf("launchNotEnough", {
-                  have: `${(остатокСети || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${вSolana ? "SOL" : ТИКЕР_TON}`,
-                  need: `${(buyNum + ЗАПАС_ЗАПУСКА).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${вSolana ? "SOL" : ТИКЕР_TON}`,
+                  have: `${(остатокСети || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${единицаЗапуска}`,
+                  need: `${(buyNum + ЗАПАС_ЗАПУСКА).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${единицаЗапуска}`,
                 })} />
               </p>
             );
           }
           const { tokens, pct } = посчитатьВыход(buyNum);
           const после = итогПокупки(buyNum);
-          const единицаСети = вSolana ? "SOL" : ТИКЕР_TON;
+          const единицаСети = единицаЗапуска;
           // В долларах, если курс уже есть; иначе — в монете сети.
           const деньги = (v, мелко) => (rate > 0
             ? (мелко ? fmtPrice(v * rate) : fmtUSD(v * rate))
@@ -27420,6 +27878,7 @@ const FEE_PERCENT = 0; // комиссии площадки нет
    адресу. Без этого мемкоин Solana, записанный до появления колонки,
    показывался как TON-овский — с ценой в TON и шкалой до 85 TON. */
 function цепочкаПоАдресу(chain, address) {
+  if (этоEVM(chain)) return chain;
   if (chain) return chain === "solana" ? "solana" : "ton";
   const адрес = String(address || "").trim();
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(адрес) && !/^(EQ|UQ|kQ|0Q)/.test(адрес) ? "solana" : "ton";
@@ -28633,7 +29092,7 @@ function mapTokenRow(row) {
         token_amount: Number(result.buyTokens) || 0,
         // Курс монеты запуска, а не TON: токены площадки живут в обеих
         // цепочках, и доллары считаются из этой цифры.
-        ton_price_usd: ((row.chain === "solana" ? solUsd() : tonPriceUsd) || 0),
+        ton_price_usd: ((этоEVM(row.chain) ? курсМонетыEVM(row.chain, КЕШ_КУРСОВ_EVM) : row.chain === "solana" ? solUsd() : tonPriceUsd) || 0),
       }).then(({ error }) => {
         if (error) console.warn("[mintly] стартовая покупка не записалась:", error.message);
       });
@@ -28742,6 +29201,7 @@ function mapTokenRow(row) {
     // поэтому дальше идёт отдельная ветка, а не ещё десяток условий
     // внутри этой.
     if (req.chain === "solana") return runSolanaLaunch(req);
+    if (этоEVM(req.chain)) return runEvmLaunch(req);
 
     setLaunchProgress({ stepIndex: 0, done: false, error: null, result: null });
     const buyNum = parseFloat(String(req.buyAmount || "0").replace(",", "."));
@@ -28925,6 +29385,60 @@ function mapTokenRow(row) {
     }
   }
 
+  /* Запуск в сети EVM: логотип и описание — в хранилище, дальше сервер
+     сам подписывает создание токена на фабрике кошельком приложения и
+     стартовую покупку в той же транзакции. */
+  async function runEvmLaunch(req) {
+    setLaunchProgress({ stepIndex: 0, done: false, error: null, result: null });
+    const buyNum = parseFloat(String(req.buyAmount || "0").replace(",", "."));
+    const имя = req.form.name.trim() || t("unnamedToken");
+    const тикер = (req.form.ticker.trim() || "TOKEN").toUpperCase();
+    try {
+      const баннер = await загрузитьБаннер(req.bannerFile);
+      const { запуститьТокенEVM } = await import("./evmLaunch");
+      const итог = await запуститьТокенEVM({
+        сеть: req.chain,
+        имя, тикер,
+        описание: req.form.desc.trim(),
+        logoFile: req.logoFile,
+        взнос: Number.isFinite(buyNum) && buyNum > 0 ? buyNum : 0,
+        onStage: (i) => setLaunchProgress((p) => ({ ...p, stepIndex: i })),
+      });
+      setLaunchProgress((p) => ({ ...p, stepIndex: 3 }));
+      setLaunchProgress({
+        stepIndex: LAUNCH_STEPS.length,
+        done: true,
+        error: null,
+        result: {
+          name: имя,
+          ticker: тикер,
+          supply: (1_000_000_000).toLocaleString("ru-RU"),
+          buyAmount: req.buyAmount && String(req.buyAmount).trim() ? req.buyAmount : "0",
+          buyTokens: итог.bought,
+          buyPct: (итог.bought / 1_000_000_000) * 100,
+          category: req.category || null,
+          механики: req.механики || {},
+          замок: req.замок || "none",
+          description: req.form.desc.trim(),
+          logoUrl: итог.logoUrl,
+          bannerUrl: баннер,
+          chain: req.chain,
+          network: "mainnet",
+          address: итог.token,
+          // Адрес кривой — это фабрика: у всех токенов сети она одна, а
+          // сам токен различается адресом.
+          curveAddress: итог.factory,
+          creatorWallet: итог.wallet,
+          explorerUrl: итог.explorerUrl,
+          createdAt: Date.now(),
+        },
+      });
+    } catch (err) {
+      const сырое = String((err && err.message) || err);
+      setLaunchProgress({ stepIndex: 0, done: false, error: сырое === "not_enough" ? t("errNotEnough") : сырое, result: null });
+    }
+  }
+
   async function runSolanaLaunch(req) {
     setLaunchProgress({ stepIndex: 0, done: false, error: null, result: null });
     const buyNum = parseFloat(String(req.buyAmount || "0").replace(",", "."));
@@ -29056,7 +29570,7 @@ function mapTokenRow(row) {
       createdAt: result.createdAt || Date.now(),
       // Сеть обязательна: без неё токен Solana открывался как токен TON —
       // страница искала его кривую не в той цепочке и показывала нули.
-      chain: result.chain === "solana" ? "solana" : "ton",
+      chain: этоEVM(result.chain) ? result.chain : result.chain === "solana" ? "solana" : "ton",
       network: result.network || null,
       ownerId: userId || null,
     });
@@ -29114,10 +29628,17 @@ function mapTokenRow(row) {
     // объёма — их считает кривая, и приходят они отдельно. В таком виде
     // карточка попадала прямо на экран токена, и он падал на первом же
     // обращении к цене. Приводим к общему виду ленты.
+    // Токены сетей EVM открываются своей карточкой: экран токена TON и
+    // Solana читает кривую своих цепочек и в EVM показал бы нули.
+    if (этоEVM(t.chain)) {
+      setEvmТокен(t.price == null ? localTokenToFeedShape(t) : t);
+      return;
+    }
     setToken(t.price == null ? localTokenToFeedShape(t) : t);
     setView("token");
     запомнитьТокен(t);
   }
+  const [evmТокен, setEvmТокен] = useState(null);
   // Пришли из чата прямо за подписью: интерфейс в этот момент не нужен,
   // человек ждёт окно кошелька и ничего больше. Сумма лежит здесь, пока
   // не подтянутся кошелёк и курс — TonConnect восстанавливает сессию
@@ -29885,6 +30406,7 @@ function mapTokenRow(row) {
       }}
     >
       <GlobalStyle />
+      <КарточкаТокенаEVM токен={evmТокен} onClose={() => setEvmТокен(null)} userId={userId} showToast={showToast} />
       {/* Окна входа ещё нет (проверяем аккаунт или связь пропала), а
           приложение закрыто: вместо пустого экрана — колёсико. Потомок
           с visibility: visible остаётся видимым внутри скрытого корня. */}

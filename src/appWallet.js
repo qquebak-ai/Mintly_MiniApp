@@ -291,3 +291,68 @@ export async function отметитьФразу() {
 export async function отложитьФразу() {
   return запрос(апи("/api/wallet-seed?action=skip"), {});
 }
+
+/* --- Сети EVM: BNB Chain, Base, Ethereum --------------------------------
+ *
+ * Адрес один на все три сети и выводится из той же фразы, что и TON с
+ * Solana (тот же, что покажет MetaMask по этой фразе). Как и в других
+ * сетях, отсюда уходит только намерение: «запусти токен с таким именем»,
+ * «купи этот токен на столько-то». Контракт фабрики сервер берёт из
+ * своих настроек. */
+let сетиEVM = null;
+export async function сетиEVMВключены() {
+  if (сетиEVM) return сетиEVM;
+  try {
+    const j = await fetch(апи("/api/wallet-evm?action=enabled")).then((r) => r.json());
+    сетиEVM = j && j.enabled ? j.chains || {} : {};
+  } catch {
+    сетиEVM = {};
+  }
+  return сетиEVM;
+}
+
+let прежнееEVM = null;
+export async function состояниеEVM() {
+  if (!(await токен())) return null;
+  try {
+    const св = await запрос(апи("/api/wallet-evm?action=state"));
+    // Сеть, которая не ответила, держит прежнее число, а не ноль.
+    if (св && св.chains && прежнееEVM && прежнееEVM.chains) {
+      for (const [к, v] of Object.entries(св.chains)) {
+        if (v && v.native == null && прежнееEVM.chains[к]) св.chains[к] = прежнееEVM.chains[к];
+      }
+    }
+    if (св) прежнееEVM = св;
+    return св;
+  } catch {
+    return прежнееEVM;
+  }
+}
+
+export async function запуститьEVM({ сеть, имя, тикер, metadataUrl, взнос = 0 }) {
+  return await запрос(апи("/api/wallet-evm?action=launch"), {
+    chain: сеть, name: имя, ticker: тикер, metadataUrl, buyAmount: взнос, requestKey: ключЗапроса(),
+  });
+}
+
+export async function сделкаEVM({ сеть, токен: адрес, продажа = false, сумма, raw = null }) {
+  return await запрос(апи(`/api/wallet-evm?action=${продажа ? "sell" : "buy"}`), {
+    chain: сеть, token: адрес, amount: сумма, raw, requestKey: ключЗапроса(),
+  });
+}
+
+export async function остатокТокенаEVM({ сеть, токен: адрес }) {
+  return await запрос(апи(`/api/wallet-evm?action=token-balance&chain=${сеть}&token=${адрес}`));
+}
+
+export async function криваяEVM({ сеть, токен: адрес }) {
+  const r = await fetch(апи(`/api/wallet-evm?action=curve&chain=${сеть}&token=${адрес}`));
+  if (!r.ok) return null;
+  return r.json();
+}
+
+export async function котировкаEVM({ сеть, токен: адрес, продажа = false, сумма }) {
+  const r = await fetch(апи(`/api/wallet-evm?action=quote&chain=${сеть}&token=${адрес}&side=${продажа ? "sell" : "buy"}&amount=${encodeURIComponent(String(сумма))}`));
+  if (!r.ok) return null;
+  return r.json();
+}

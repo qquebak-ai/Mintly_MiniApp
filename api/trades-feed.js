@@ -44,7 +44,9 @@ export default async function handler(req, res) {
      полсотни сделок площадки скопом, и раздел GRAM оставался пустым:
      все свежие сделки шли в Solana, а до TON окно просто не доставало.
      Теперь за строками ходим по токенам нужной цепочки. */
-  const цепочка = String((req.query && req.query.chain) || "").toLowerCase() === "ton" ? "ton" : "solana";
+  // Сети EVM — каждая своей лентой, как TON и Solana.
+  const запрошена = String((req.query && req.query.chain) || "").toLowerCase();
+  const цепочка = ["ton", "bsc", "base", "eth"].includes(запрошена) ? запрошена : "solana";
   const ключКеша = цепочка;
   const было = кеш.get(ключКеша);
   if (было && было.до > Date.now()) {
@@ -126,6 +128,8 @@ export default async function handler(req, res) {
   /* Кошелёк у человека свой на каждую цепочку, поэтому ключ составной:
      иначе в строке о покупке за SOL стоял адрес из TON. */
   const поЧеловеку = new Map((кошельки || []).map((к) => [`${к.user_id}:${к.chain}`, к.address]));
+  // У сетей EVM кошелёк один на все три — он записан под «evm».
+  const кошелёкСети = (ц) => (["bsc", "base", "eth"].includes(ц) ? "evm" : ц);
 
   const строкиЗапусков = (запуски || []).filter((т) => {
     const к = Array.isArray(т.curve_cache) ? т.curve_cache[0] : т.curve_cache;
@@ -143,7 +147,7 @@ export default async function handler(req, res) {
     // стартовая покупка придёт следом обычной сделкой.
     amount: 0,
     usd: 0,
-    from: поЧеловеку.get(`${т.owner_id}:${т.chain || "ton"}`) || null,
+    from: поЧеловеку.get(`${т.owner_id}:${кошелёкСети(т.chain || "ton")}`) || null,
   }));
 
   /* Курсы обеих монет — на случай, когда в записи сделки цены нет или
@@ -169,9 +173,10 @@ export default async function handler(req, res) {
       const т = поАдресу.get(с.token_address) || поИд.get(с.token_id) || null;
       const сумма = Number(с.ton_amount) || 0;
       const цепочка = (т && т.chain) || "ton";
+      // У сделок EVM курс монеты записан самой сделкой — другого здесь нет.
       const курс = цепочка === "solana"
         ? курсSolСейчас
-        : (Number(с.ton_price_usd) || курсTonСейчас);
+        : цепочка === "ton" ? (Number(с.ton_price_usd) || курсTonСейчас) : (Number(с.ton_price_usd) || 0);
       return {
         id: String(с.id),
         kind: с.side === "sell" ? "sell" : "buy",
@@ -186,7 +191,7 @@ export default async function handler(req, res) {
         // относится к тому мгновению.
         amount: сумма,
         usd: курс > 0 ? сумма * курс : 0,
-        from: поЧеловеку.get(`${с.user_id}:${(т && т.chain) || "ton"}`) || null,
+        from: поЧеловеку.get(`${с.user_id}:${кошелёкСети((т && т.chain) || "ton")}`) || null,
       };
     })]
       // Хроника: и запуски, и сделки — по времени, новое сверху.
