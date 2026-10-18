@@ -2111,6 +2111,8 @@ function GlobalStyle() {
       /* Знак-загрузчик: «прорисовка» — контур бежит линией и заливается;
          «раскрытие» — плавно распускается из точки с поворотом и так же
          плавно сворачивается: без отдачи, она читалась рывком. */
+      @keyframes знакЗаливка { 0% { transform: translateY(100%); opacity: 1; } 70% { transform: translateY(0); opacity: 1; } 88% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(0); opacity: 0; } }
+      @keyframes знакЗаливкаВнутри { 0% { transform: translateY(-100%); } 70%, 100% { transform: translateY(0); } }
       @keyframes знакКонтур { 0% { stroke-dashoffset: 1; fill-opacity: 0; } 55% { stroke-dashoffset: 0; fill-opacity: 0; } 75%, 90% { stroke-dashoffset: 0; fill-opacity: 1; } 100% { stroke-dashoffset: -1; fill-opacity: 0; } }
       @keyframes знакРаскрытие { 0% { transform: scale(0.2) rotate(-60deg); opacity: 0; } 42%, 72% { transform: scale(1) rotate(0deg); opacity: 1; } 100% { transform: scale(0.2) rotate(50deg); opacity: 0; } }
       @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
@@ -23555,16 +23557,24 @@ function ЗнакЗагрузки({ size = 40, вид = "контур", оста
       </svg>
     );
   }
-  return (
-    <svg width={size} height={size} viewBox={ВИД_ЗВЕЗДЫ} aria-hidden style={{ display: "block", overflow: "visible", flex: "none" }}>
-      <path
-        d={ПУТЬ_ЗВЕЗДЫ} fill={цвет} stroke={цвет} pathLength={1}
-        // Толщина линии в единицах рисунка: у мелкого знака тоньше
-        // 1,5 точки на экране она уже не читается.
-        strokeWidth={Math.max(2.5, 160 / size)} strokeLinejoin="round"
-        style={{ strokeDasharray: 1, animation: остановлен ? "none" : "знакКонтур 2.4s ease-in-out infinite" }}
-      />
+  /* Заполнение снизу вверх. Раньше знак прорисовывался контуром через
+     stroke-dashoffset — это считается в главном потоке, и пока строился
+     тяжёлый экран (мемпад), анимация дёргалась. Теперь двигаются только
+     два слоя transform'ом: шторка уезжает вверх, а знак внутри неё —
+     навстречу, так что он стоит на месте и заливается. Такое движение
+     целиком на видеокарте и не зависит от занятости страницы. */
+  const знак = (
+    <svg width={size} height={size} viewBox={ВИД_ЗВЕЗДЫ} aria-hidden style={{ display: "block", overflow: "visible" }}>
+      <path d={ПУТЬ_ЗВЕЗДЫ} fill={цвет} />
     </svg>
+  );
+  return (
+    <div aria-hidden style={{ position: "relative", width: size, height: size, flex: "none" }}>
+      <div style={{ position: "absolute", inset: 0, opacity: 0.16 }}>{знак}</div>
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden", willChange: "transform", animation: остановлен ? "none" : "знакЗаливка 1.8s cubic-bezier(0.45,0,0.25,1) infinite" }}>
+        <div style={{ willChange: "transform", animation: остановлен ? "none" : "знакЗаливкаВнутри 1.8s cubic-bezier(0.45,0,0.25,1) infinite" }}>{знак}</div>
+      </div>
+    </div>
   );
 }
 
