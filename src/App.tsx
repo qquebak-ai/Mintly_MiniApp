@@ -2440,7 +2440,8 @@ function GlobalStyle() {
          изменилась, даже если смотришь не туда. */
       /* Волна от нажатия: расходится из точки касания и гаснет. */
       @keyframes волнаОтНажатия {
-        from { transform: translate(-50%, -50%) scale(0); opacity: 0.34; }
+        from { transform: translate(-50%, -50%) scale(0); opacity: 0.7; }
+        55%  { opacity: 0.45; }
         to   { transform: translate(-50%, -50%) scale(1); opacity: 0; }
       }
       /* Кнопка копирования: короткий кивок и вспышка — по нему видно, что
@@ -16956,7 +16957,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     const т = e.touches && e.touches[0] ? e.touches[0] : e;
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     setВолны((было) => [...было, { id, x: т.clientX - блок.left, y: т.clientY - блок.top }]);
-    setTimeout(() => setВолны((было) => было.filter((в) => в.id !== id)), 900);
+    setTimeout(() => setВолны((было) => было.filter((в) => в.id !== id)), 1600);
   }
 
   /* Свайп слева направо по карте — короткая дорога к секретной фразе:
@@ -17362,9 +17363,13 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             aria-hidden
             style={{
               position: "absolute", left: в.x, top: в.y, width: 460, height: 460, borderRadius: "50%",
-              background: `radial-gradient(circle, ${hexA("#FFFFFF", 0.5)} 0%, ${hexA("#FFFFFF", 0)} 70%)`,
+              // Светлое пятно с более яркой кромкой: расходящееся кольцо
+              // видно на карте любого цвета, а не только на тёмной.
+              background: `radial-gradient(circle, ${hexA("#FFFFFF", 0.3)} 0%, ${hexA("#FFFFFF", 0.18)} 50%, ${hexA("#FFFFFF", 0.75)} 64%, ${hexA("#FFFFFF", 0)} 71%)`,
               pointerEvents: "none",
-              animation: "волнаОтНажатия 300ms cubic-bezier(0.22, 1, 0.36, 1) both",
+              // Медленнее, чем отклик кнопки: волна по карте — это жест,
+              // её должно быть видно, как она доходит до края.
+              animation: "волнаОтНажатия 1400ms cubic-bezier(0.3, 0.55, 0.4, 1) both",
             }}
           />
         ))}
