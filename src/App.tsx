@@ -12086,7 +12086,7 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
   return (
     <button
       onClick={onOpenMyProfile}
-      className="fx-tap flex items-center text-left"
+      className="fx-tap flex items-end text-left"
       style={{ gap: 11, background: "transparent", border: "none", padding: 0, alignSelf: "flex-start" }}
     >
       <span
@@ -12118,9 +12118,11 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
           <span className="fx-skeleton" style={{ display: "block", width: 88, height: 10, borderRadius: 4 }} />
         </span>
       ) : (
+      // Имя стоит по низу аватарки, а не по её середине: строка с
+      // lineHeight 1 ложится буквами на нижний край кружка.
       <span>
         {accountCreated && profile && profile.nickname ? (
-          <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em" }}>
+          <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1 }}>
             {profile.nickname}
           </span>
         ) : (
