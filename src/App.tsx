@@ -2843,6 +2843,14 @@ function GlobalStyle() {
          между вкладками читаются задержкой, а не плавностью — особенно
          теперь, когда отклик на нажатие приходит сразу. */
       .fx-view { animation: viewIn 260ms cubic-bezier(0.22,1,0.36,1) backwards; }
+      .fx-tab-in { animation: вкладкаВход 240ms cubic-bezier(0.22,1,0.36,1) backwards; }
+      @keyframes вкладкаВход { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+      .fx-step-in { animation: шагВход 280ms cubic-bezier(0.22,1,0.36,1) backwards; }
+      @keyframes шагВход { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
+      .fx-sheet-in { animation: листВход 300ms cubic-bezier(0.22,1,0.36,1) backwards; }
+      .fx-sheet-out { animation: листУход 220ms cubic-bezier(0.4,0,1,1) forwards; pointer-events: none; }
+      @keyframes листВход { from { opacity: 0; transform: translateY(28px) scale(0.985); } to { opacity: 1; transform: none; } }
+      @keyframes листУход { to { opacity: 0; transform: translateY(24px) scale(0.985); } }
       @keyframes viewIn {
         from { opacity: 0; transform: translateY(16px); }
         to   { opacity: 1; transform: none; }
@@ -9613,13 +9621,44 @@ function СтраницаПрофиля({ открыт, уходит = false, in
   );
 }
 
+/* «Назад» — только кнопкой Telegram. Своих стрелок в приложении нет:
+   всё, что открывается поверх (шаги запуска, карточка монеты, шаги
+   вывода, чат поддержки), кладёт сюда своё «назад», и кнопка Telegram
+   выполняет верхнее. Пусто — работает обычный переход по разделам. */
+const СТЕК_НАЗАД = [];
+function сообщитьНазад() { if (typeof window !== "undefined") window.dispatchEvent(new Event("mintly:назад")); }
+function useНазадТелеграм(активно, действие) {
+  const реф = useRef(действие);
+  реф.current = действие;
+  useEffect(() => {
+    if (!активно) return undefined;
+    const f = () => реф.current && реф.current();
+    СТЕК_НАЗАД.push(f);
+    сообщитьНазад();
+    return () => {
+      const i = СТЕК_НАЗАД.lastIndexOf(f);
+      if (i >= 0) СТЕК_НАЗАД.splice(i, 1);
+      сообщитьНазад();
+    };
+  }, [активно]);
+}
+
 function KeepAlive({ show, children }) {
   // Вкладки собираются сразу, все, ещё под заставкой запуска: к моменту
   // первого перехода данные уже на месте. Раньше вкладка начинала
   // грузиться в тот момент, когда на неё переходили, и первые полсекунды
   // человек смотрел на пустоту.
+  // Вкладка не выскакивает, а проявляется с лёгким подъёмом — при каждом
+  // переходе на неё.
+  const [вход, setВход] = useState(0);
+  const было = useRef(show);
+  useEffect(() => { if (show && !было.current) setВход((в) => в + 1); было.current = show; }, [show]);
   return (
-    <div style={show ? undefined : { display: "none" }} aria-hidden={show ? undefined : true} inert={show ? undefined : ""}>
+    <div
+      key={вход}
+      className={show && вход > 0 ? "fx-tab-in" : undefined}
+      style={show ? undefined : { display: "none" }} aria-hidden={show ? undefined : true} inert={show ? undefined : ""}
+    >
       {children}
     </div>
   );
@@ -11230,17 +11269,62 @@ function КартаКурсаМонеты({ title, монета, onOpen = null }
 
 function ЖивыеКарточки({ onOpen = null }) {
   return (
-    <section className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "start" }}>
-      <КартаКурсаМонеты title="SOL" монета="sol" onOpen={onOpen} />
-      <КартаКурсаМонеты title={ТИКЕР_TON} монета="gram" onOpen={onOpen} />
+    <section className="flex flex-col">
+      <СтрокаКурса имя="Gram" тикер={ТИКЕР_TON} монета="gram" onOpen={onOpen} />
+      <СтрокаКурса имя="Solana" тикер="SOL" монета="sol" onOpen={onOpen} />
     </section>
+  );
+}
+
+/* Курс монеты сети строкой ленты — тем же видом, что токены в мемпаде:
+   значок, имя, маленький график, цена и изменение справа. Нажатие
+   открывает карточку монеты. */
+function СтрокаКурса({ имя, тикер, монета, onOpen = null }) {
+  const [данные, setДанные] = useState(() => КЕШ_КУРСА_МОНЕТЫ.get(монета) || null);
+  useEffect(() => {
+    let живо = true;
+    const обновить = () => получитьКурсМонеты(монета).then((д) => { if (живо && д) setДанные(д); }).catch(() => {});
+    обновить();
+    const таймер = setInterval(обновить, 2000);
+    return () => { живо = false; clearInterval(таймер); };
+  }, [монета]);
+  const цена = (данные && данные.price) || 0;
+  const изм = Math.round(((данные && данные.change24) || 0) * 100) / 100;
+  const цвет = изм === 0 ? T.faint : изм > 0 ? T.up : T.down;
+  const путь = useMemo(() => {
+    const исходные = (данные && данные.points) || [];
+    if (исходные.length < 2) return "";
+    const pts = сгладить(исходные, 24);
+    const v = pts.map((p) => p.p), max = Math.max(...v), min = Math.min(...v), д = (max - min) || 1;
+    return pts.map((p, i) => `${i ? "L" : "M"}${((i / (pts.length - 1)) * 100).toFixed(1)},${(3 + 26 * (1 - (p.p - min) / д)).toFixed(1)}`).join(" ");
+  }, [данные]);
+  return (
+    <button
+      onClick={onOpen ? () => { haptic("light"); onOpen(монета); } : undefined}
+      className="fx-tap w-full flex items-center text-left"
+      style={{ gap: 14, padding: "13px 2px", background: "transparent", border: "none", borderBottom: `1px solid ${T.line}` }}
+    >
+      <img src={монета === "sol" ? "/coins/sol.png" : "/coins/gram.png"} alt="" width={44} height={44} style={{ borderRadius: "50%", flexShrink: 0 }} />
+      <span className="flex flex-col" style={{ minWidth: 0, gap: 3 }}>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>{имя}</span>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{тикер}</span>
+      </span>
+      <svg viewBox="0 0 100 32" preserveAspectRatio="none" width="64" height="26" aria-hidden style={{ marginLeft: "auto", flexShrink: 0 }}>
+        {путь && <path d={путь} fill="none" stroke={цвет} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+      </svg>
+      <span className="flex flex-col items-end" style={{ gap: 3, minWidth: 86, flexShrink: 0 }}>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}><ТекстСЧислами text={fmtКурс(цена)} /></span>
+        <span style={{ fontFamily: bodyFont, color: цвет, fontSize: 13, fontWeight: 700 }}><ТекстСЧислами text={`${изм > 0 ? "+" : ""}${изм.toFixed(2)}%`} /></span>
+      </span>
+    </button>
   );
 }
 
 /* Карточка монеты сети — SOL или GRAM. Открывается нажатием на курс в
    кошельке: крупная цена, изменение за сутки, график, сколько этой
    монеты лежит на кошельке и те же три действия, что под балансом. */
-function КарточкаМонеты({ монета, сколько = 0, onClose, onSend, onReceive, onSwap }) {
+function КарточкаМонеты({ монета: монетаВход, сколько = 0, onClose, onSend, onReceive, onSwap }) {
+  const [монета, уходит] = useClosing(монетаВход, 220);
   const [данные, setДанные] = useState(() => (монета ? КЕШ_КУРСА_МОНЕТЫ.get(монета) : null) || null);
   useEffect(() => {
     if (!монета) return undefined;
@@ -11251,14 +11335,7 @@ function КарточкаМонеты({ монета, сколько = 0, onClos
     return () => { живо = false; clearInterval(таймер); };
   }, [монета]);
   // «Назад» Telegram закрывает карточку, а не уводит из кошелька.
-  useEffect(() => {
-    const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
-    const кн = tg && tg.BackButton;
-    if (!монета || !кн) return undefined;
-    const н = () => onClose();
-    try { кн.show(); кн.onClick(н); } catch (e) { /* старый клиент */ }
-    return () => { try { кн.offClick(н); кн.hide(); } catch (e) { /* старый клиент */ } };
-  }, [монета]);
+  useНазадТелеграм(!!монетаВход, onClose);
   const путь = useMemo(() => {
     const исходные = (данные && данные.points) || [];
     if (исходные.length < 2) return "";
@@ -11283,11 +11360,8 @@ function КарточкаМонеты({ монета, сколько = 0, onClos
     </button>
   );
   const лист = (
-    <div className="fx-view" style={{ position: "fixed", inset: 0, zIndex: 85, background: "#000000", overflowY: "auto", padding: "calc(16px + var(--tg-inset-top, 0px)) 16px calc(28px + var(--tg-inset-bottom, 0px))" }}>
-      <div className="flex items-center justify-between" style={{ marginBottom: 22 }}>
-        <button onClick={onClose} className="fx-tap flex items-center justify-center" style={{ width: 42, height: 42, borderRadius: 999, border: "none", background: T.surfaceHi }}>
-          <ChevronLeft size={22} color={T.ice} />
-        </button>
+    <div className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 85, background: "#000000", overflowY: "auto", padding: "calc(24px + var(--tg-inset-top, 0px)) 16px calc(28px + var(--tg-inset-bottom, 0px))" }}>
+      <div className="flex justify-end" style={{ marginBottom: 14 }}>
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{sol ? "Solana" : "TON"}</span>
       </div>
       <div className="flex items-center" style={{ gap: 14 }}>
@@ -11336,6 +11410,24 @@ function КарточкаМонеты({ монета, сколько = 0, onClos
     </div>
   );
   return typeof document !== "undefined" ? createPortal(лист, document.body) : лист;
+}
+
+function ВТренде({ tokens = [], onOpen, onAll }) {
+  const список = useMemo(() => [...(tokens || [])]
+    .filter((т) => т && т.ticker)
+    .sort((а, б) => (Number(б.change) || 0) - (Number(а.change) || 0))
+    .slice(0, 8), [tokens]);
+  return (
+    <section className="flex flex-col">
+      <div className="flex items-baseline justify-between" style={{ marginBottom: 6 }}>
+        <h2 style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800, margin: 0 }}>В тренде</h2>
+        <button onClick={() => { haptic("light"); onAll && onAll(); }} className="fx-tap" style={{ background: "transparent", border: "none", fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600 }}>Все</button>
+      </div>
+      {список.length
+        ? список.map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)
+        : <div className="flex items-center justify-center" style={{ height: 200 }}><ЗнакЗагрузки size={48} /></div>}
+    </section>
+  );
 }
 
 /* Бегущая строка сделок.
@@ -13699,6 +13791,7 @@ function завестиЗнаки() {
 }
 
 function HomeView({
+  curveTokens = [], onOpenToken = () => {},
   onGoTab, onGoCreate, profile = null, accountCreated = false, userId = null,
   onOpenMyProfile, профильГрузится = false, грузится = false, insetTop = 0, insetBottom = 0, onOpenMintie, окрасМ = "mint",
 }) {
@@ -13712,9 +13805,9 @@ function HomeView({
         <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} />
       </div>
       <div className="fx-view flex flex-col" style={{ gap: 26 }}>
-        {/* Курсы SOL и GRAM переехали в кошелёк — под кнопки действий:
-            там на них смотрят, решая, что отправить или обменять. */}
-        <БаннерыГлавной onGoTab={onGoTab} onGoCreate={onGoCreate} onOpenMintie={onOpenMintie} окрас={окрасМ} />
+        {/* Баннеров больше нет: главная показывает то, что растёт прямо
+            сейчас, — токены с наибольшим ростом за сутки. */}
+        <ВТренде tokens={curveTokens} onOpen={onOpenToken} onAll={() => onGoTab("mempad")} />
       </div>
     </div>
   );
@@ -14338,6 +14431,12 @@ function ЭкранВывода({
       setКод(""); setКодБеда(""); setДобавляем(false); setНовый(""); setМетка("");
     }
   }, [открыт]);
+  // «Назад» Telegram: с кода — к сумме, с суммы — к адресу, с адреса — закрыть.
+  useНазадТелеграм(открыт, () => {
+    if (шаг === "код") setШаг("сумма");
+    else if (шаг === "сумма") setШаг("адрес");
+    else onClose && onClose();
+  });
 
   /* Запас, который остаётся на кошельке. В TON перевод стоит заметно
      дороже, и остаток «под ноль» там не уходит вовсе. В Solana дело не в
@@ -14795,13 +14894,6 @@ function ЭкранВывода({
 
         <div className="flex" style={{ gap: 10, padding: "14px 18px 22px", flexShrink: 0 }}>
           <button
-            onClick={() => { setШаг("сумма"); haptic("light"); }}
-            className="fx-tap flex items-center justify-center flex-shrink-0"
-            style={{ width: 54, height: 54, borderRadius: 999, background: T.surface, border: "none", color: T.ice }}
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <button
             onClick={подтвердитьИОтправить}
             disabled={!кодГоден || идёт}
             className="fx-tap"
@@ -14827,13 +14919,6 @@ function ЭкранВывода({
   return (
     <ЭкранСнизу открыт={открыт} onClose={onClose} insetTop={insetTop} insetBottom={insetBottom}>
       <div className="flex items-center" style={{ gap: 12, padding: "2px 18px 0", flexShrink: 0 }}>
-        <button
-          onClick={() => { setШаг("адрес"); haptic("light"); }}
-          className="fx-tap flex items-center justify-center flex-shrink-0"
-          style={{ width: 44, height: 44, borderRadius: 999, background: T.surface, border: "none", color: T.ice }}
-        >
-          <ChevronLeft size={20} />
-        </button>
         <div className="flex flex-col" style={{ minWidth: 0, flex: 1 }}>
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>
             {t("withdrawSendTitle")}
@@ -21239,16 +21324,8 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
     setШаг((ш) => Math.min(ШАГОВ_ЗАПУСКА - 1, ш + 1));
   }
   function назадШаг() { haptic("light"); setTouched(false); setШаг((ш) => Math.max(0, ш - 1)); }
-  /* Системная «Назад» Telegram на втором и третьем шаге ведёт на шаг
-     назад, а не уводит из запуска. */
-  useEffect(() => {
-    const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
-    const кн = tg && tg.BackButton;
-    if (!кн || шаг === 0) return undefined;
-    const н = () => назадШаг();
-    try { кн.show(); кн.onClick(н); } catch (e) { /* старый клиент */ }
-    return () => { try { кн.offClick(н); кн.hide(); } catch (e) { /* старый клиент */ } };
-  }, [шаг]);
+  // «Назад» Telegram на втором и третьем шаге ведёт на шаг назад.
+  useНазадТелеграм(шаг > 0, назадШаг);
   /* Что включено при запуске. Хранится вместе с токеном и показывается
      покупателю: механика ценна не тем, что она есть, а тем, что о ней
      знают до покупки. */
@@ -21434,19 +21511,14 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           </div>
         }
       >
-        {шаг > 0 ? (
-          <button onClick={назадШаг} className="fx-tap flex items-center" style={{ background: "transparent", border: "none", padding: 0, gap: 4, color: T.ice, font: "inherit" }}>
-            <ChevronLeft size={30} color={T.ice} style={{ marginLeft: -8 }} />
-            {["Запуск", "Описание", "Покупка"][шаг]}
-          </button>
-        ) : "Запуск"}
+        <span key={шаг} className="fx-step-in" style={{ display: "inline-block" }}>{["Запуск", "Описание", "Покупка"][шаг]}</span>
       </ЗаголовокРаздела>
       {/* Сеть выбирается тем же ползунком, что и в мемпаде: это один и
           тот же выбор рынка, и выглядеть он должен одинаково. Пустой
           обёртки здесь нет: без неё gap не добавляет фантомный отступ,
           когда выбора сети ещё нет, и раздел начинается на том же
           уровне, что «Главная» и «Мемпад». */}
-      {шаг === 0 && (<>
+      {шаг === 0 && (<div key="ш=" className="fx-step-in flex flex-col gap-7">
       {solДоступен && <NetworkSlider value={сетьЗапуска} onChange={setСетьЗапуска} />}
 
       {solЗакрыт && (
@@ -21480,9 +21552,9 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
 
       <Field label={t("nameLabel")} placeholder="Prism Cat" value={form.name} onChange={set("name")} />
       <Field label={t("tickerLabel")} placeholder="PRSM" value={form.ticker} onChange={set("ticker")} />
-      </>)}
+      </div>)}
 
-      {шаг === 1 && (<>
+      {шаг === 1 && (<div key="ш=" className="fx-step-in flex flex-col gap-7">
 
       <div>
         <Field label={t("descLabel")} placeholder={t("descPlaceholder")} area value={form.desc} onChange={set("desc")} error={touched && !form.desc.trim()} />
@@ -21494,7 +21566,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         <Field label="X" placeholder="x.com/..." value={form.x} onChange={set("x")} />
         <Field label={t("siteLabel")} placeholder="site.xyz" value={form.site} onChange={set("site")} />
       </div>
-      </>)}
+      </div>)}
 
       {шаг < ШАГОВ_ЗАПУСКА - 1 && (
         <button
@@ -21513,7 +21585,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         </button>
       )}
 
-      {шаг === 2 && (<>
+      {шаг === 2 && (<div key="ш=" className="fx-step-in flex flex-col gap-7">
 
       <div className="flex flex-col gap-1.5">
         {/* Сумму задают ползунком, а не клавиатурой: верх шкалы — весь
@@ -21689,7 +21761,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
       >
         {t("launchTokenCta")}
       </button>
-      </>)}
+      </div>)}
 
       <ImageCropModal file={logoCropFile} shape="circle" выход={256} onCancel={() => setLogoCropFile(null)} onConfirm={handleLogoCropConfirm} />
     </div>
@@ -22102,6 +22174,8 @@ function SupportChat({ accountCreated, showToast, onRead }) {
   // Начинаем с частых вопросов, а не с пустого поля: у большинства вопрос
   // из списка, и ответ нужен сейчас.
   const [mode, setMode] = useState("faq");
+  // Из чата — обратно к вопросам кнопкой «Назад» Telegram.
+  useНазадТелеграм(mode !== "faq", () => setMode("faq"));
   const [openQuestion, setOpenQuestion] = useState(null);
   const дно = useRef(null);
 
@@ -22218,13 +22292,6 @@ function SupportChat({ accountCreated, showToast, onRead }) {
 
   return (
     <div className="fx-swap flex flex-col">
-      <button
-        onClick={() => setMode("faq")}
-        className="fx-tap flex items-center gap-1"
-        style={{ background: "transparent", border: "none", fontFamily: bodyFont, fontSize: 13, color: T.muted, alignSelf: "flex-start" }}
-      >
-        <ChevronLeft size={13} color={T.muted} /> {t("supportBackToFaq")}
-      </button>
       <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5, textAlign: "center", marginTop: 8 }}>
         {t("supportDesc")}
       </p>
@@ -29109,19 +29176,26 @@ function mapTokenRow(row) {
     return null;
   }, [pinLocked, pinModal, launchRequest, profileModalOpen, profileModalMode, settingsItem, tradeModal, manageToken_, назадФразы, view, tab, token, откудаДостижения]);
 
+  const [стекНазад, setСтекНазад] = useState(0);
+  useEffect(() => {
+    const н = () => setСтекНазад((x) => x + 1);
+    window.addEventListener("mintly:назад", н);
+    return () => window.removeEventListener("mintly:назад", н);
+  }, []);
   useEffect(() => {
     const tg = typeof window !== "undefined" ? window.Telegram && window.Telegram.WebApp : null;
     const btn = tg && tg.BackButton;
     if (!btn) return;
-    if (!backAction) { btn.hide(); return; }
-    const handler = () => backAction();
+    const верх = СТЕК_НАЗАД.length ? СТЕК_НАЗАД[СТЕК_НАЗАД.length - 1] : null;
+    if (!backAction && !верх) { btn.hide(); return; }
+    const handler = () => { haptic("light"); (верх || backAction)(); };
     btn.onClick(handler);
     btn.show();
     return () => {
       btn.offClick(handler);
       btn.hide();
     };
-  }, [backAction]);
+  }, [backAction, стекНазад]);
 
   function handleHeaderWalletClick() { goTab("profile"); }
 
