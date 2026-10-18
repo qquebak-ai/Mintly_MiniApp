@@ -16961,7 +16961,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
     if (!пятно) return;
     const т = e.touches && e.touches[0] ? e.touches[0] : e;
     const блок = e.currentTarget.getBoundingClientRect();
-    пятно.style.transform = `translate(${(т.clientX - блок.left).toFixed(1)}px, ${(т.clientY - блок.top).toFixed(1)}px) translate(-50%, -50%)`;
+    пятно.style.transform = `translate(${(т.clientX - блок.left).toFixed(1)}px, ${(т.clientY - блок.top).toFixed(1)}px) translate(-50%, -50%) rotate(18deg)`;
     пятно.style.opacity = "1";
   }
   function светПогас() {
@@ -17370,10 +17370,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         }} />
         {ткань && <СлойКарбона fill={видКарты.fill} size={видКарты.size} />}
         {/* Волны от касаний — поверх заливки, но под текстом. */}
-        {/* Свет за пальцем — поверх заливки, но под текстом. */}
+        {/* Свет за пальцем — тонкая белая полоска блика наискосок через
+            всю карту, как отсвет на пластике; поверх заливки, под текстом. */}
         <span ref={пятноКарты} aria-hidden style={{
-          position: "absolute", left: 0, top: 0, width: 240, height: 240, borderRadius: "50%", pointerEvents: "none",
-          background: `radial-gradient(circle, ${hexA("#FFFFFF", 0.42)} 0%, ${hexA("#FFFFFF", 0.16)} 38%, ${hexA("#FFFFFF", 0)} 70%)`,
+          position: "absolute", left: 0, top: 0, width: 30, height: 420, pointerEvents: "none",
+          background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.14)} 38%, ${hexA("#FFFFFF", 0.7)} 50%, ${hexA("#FFFFFF", 0.14)} 62%, ${hexA("#FFFFFF", 0)} 100%)`,
           opacity: 0, transition: "opacity 420ms ease", willChange: "transform, opacity",
         }} />
         <div key={ключПереливаКарты} aria-hidden style={{
