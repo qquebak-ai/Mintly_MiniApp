@@ -2438,6 +2438,11 @@ function GlobalStyle() {
       /* Смена числа: цифры не подменяются молча, а коротко вспыхивают
          цветом движения и подскакивают. Так видно, что цена только что
          изменилась, даже если смотришь не туда. */
+      @keyframes словоФразы {
+        from { opacity: 0; transform: translateY(5px); filter: blur(3px); }
+        to   { opacity: 1; transform: none; filter: none; }
+      }
+      @media (prefers-reduced-motion: reduce) { @keyframes словоФразы { from { opacity: 0; } to { opacity: 1; } } }
       /* Волна от нажатия: расходится из точки касания и гаснет. */
       @keyframes волнаОтНажатия {
         from { transform: translate(-50%, -50%) scale(0); opacity: 0.7; }
@@ -17527,7 +17532,13 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
                 высоту карты. */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "3px 6px" }}>
               {словаНаОбороте.map((с, i) => (
-                <div key={i} className="flex items-baseline" style={{ minWidth: 0, gap: 4, lineHeight: "15px" }}>
+                // Слова проступают по одному в порядке чтения — слева
+                // направо, сверху вниз: так видно, какое за каким, и
+                // глаз сразу идёт по фразе в нужном порядке.
+                <div key={i} className="flex items-baseline" style={{
+                  minWidth: 0, gap: 4, lineHeight: "15px",
+                  animation: `словоФразы 420ms cubic-bezier(0.22, 1, 0.36, 1) ${i * 45}ms both`,
+                }}>
                   <span style={{ fontFamily: monoFont, color: hexA("#FFFFFF", 0.55), fontSize: 9.5, fontWeight: 700, width: 13, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
                   <span className="truncate" style={{ fontFamily: bodyFont, color: "#FFFFFF", fontSize: 12, fontWeight: 700 }}>{с}</span>
                 </div>
