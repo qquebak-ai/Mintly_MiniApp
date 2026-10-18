@@ -11960,13 +11960,9 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
   const пункты = [
     { key: "profile", icon: User, label: t("navProfileItem") },
     { key: "achievements", icon: Crown, label: t("achTitleShort") },
-    { key: "wallet", icon: Wallet, label: t("navWallet") },
-    /* Пока копия фразы не сделана, пункт стоит здесь и с красной точкой.
-       В самом кошельке он занимал первую строку над балансом — а нужен
-       он один раз, и место над деньгами дороже. */
-    /* Пункт остаётся и после записи: фразу иногда нужно посмотреть
-       заново, а красная точка на нём горит, только пока копии нет. */
-    ...(фразаЕсть ? [{ key: "secret", icon: Lock, label: t("secretTitle"), точка: фразаЖдёт }] : []),
+    /* Кошелька и секретной фразы в меню больше нет: кошелёк — своя
+       вкладка внизу, а фраза открывается с оборота карты в нём. Два входа
+       в одно и то же только путали. */
   ];
   const низ = [
     { key: "settings", icon: Settings, label: t("settings") },
@@ -16855,7 +16851,7 @@ function МастерФразы({
   );
 }
 
-function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none", фраза = null, setФраза = () => {}, запросФразы = 0, onСтрелкаФразы = () => {} }) {
+function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none", фраза = null, setФраза = () => {}, запросФразы = 0, onСтрелкаФразы = () => {}, ник = "" }) {
   // Вид карты берём из купленного в магазине; неизвестный id — обычная
   // карта Mintly, а не пустая заливка.
   const видКарты = WALLET_SKIN_BY_ID[скинКарты] || WALLET_SKIN_BY_ID.none;
@@ -17402,6 +17398,34 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           </span>
         )}
 
+        {/* Карта оформлена как банковская. Название «банка» идёт наискосок
+            через всю карту, от нижнего левого угла к верхнему правому,
+            растянутым шрифтом и полупрозрачно: оно читается как часть
+            рисунка карты и не спорит с балансом. Угол взят по диагонали
+            карты (210 на ~358 точек). */}
+        <span aria-hidden style={{
+          position: "absolute", left: "50%", top: "50%", pointerEvents: "none", whiteSpace: "nowrap",
+          transform: "translate(-50%, -50%) rotate(-30deg) scaleX(1.55)",
+          fontFamily: "'ШрифтШирмы', 'Jost', sans-serif", fontSize: 40, fontWeight: 600,
+          letterSpacing: "0.14em", textTransform: "uppercase", color: hexA("#FFFFFF", 0.08),
+        }}>
+          Mintly
+        </span>
+        {/* Знак приложения — в углу, где у карт стоит логотип банка. */}
+        <svg aria-hidden width={30} height={30} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: 14, right: 16, pointerEvents: "none" }}>
+          <path d={ПУТЬ_ЗВЕЗДЫ} fill={hexA("#FFFFFF", 0.9)} />
+        </svg>
+        {/* Имя держателя, как на дебетовой карте: ник заглавными, с
+            разрядкой, прямо над чипом с монетами. */}
+        {ник && (
+          <span aria-hidden style={{
+            position: "absolute", left: 18, bottom: 58, maxWidth: "70%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            fontFamily: monoFont, fontSize: 13, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase",
+            color: hexA("#FFFFFF", 0.82), textShadow: `0 1px 0 ${hexA("#000000", 0.25)}`, pointerEvents: "none",
+          }}>
+            {ник}
+          </span>
+        )}
         <div className="flex items-center justify-between" style={{ position: "relative", gap: 10 }}>
           <span style={{ fontFamily: displayFont, color: hexA("#FFFFFF", 0.85), fontSize: 16, fontWeight: 700 }}>
             {t("walletBalanceLabel")}
@@ -29862,6 +29886,7 @@ function mapTokenRow(row) {
                 чужой кошелёк, хотя в базе у него ничего нет. */}
             <WalletView
               key={userId || "гость"}
+              ник={accountCreated && profile ? profile.nickname : ""}
               скинКарты="none"
               connected={connected}
               walletAddress={walletAddress}
