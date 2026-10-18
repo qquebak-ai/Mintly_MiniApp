@@ -12105,34 +12105,13 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
           ? <БукваАватара ник={profile.nickname} size={58} />
           : <User size={22} color={T.muted} />)}
       </span>
-      {/* Без аккаунта имени нет. Раньше на его месте стояло «Mintly» —
-          человек читал это как своё имя, хотя так называется само
-          приложение; остаётся одна честная строка о том, что аккаунта
-          пока нет. */}
-      {/* Пока не известно, кто вошёл, на месте имени стоят плашки той же
-          формы. Раньше здесь на долю секунды загоралось «аккаунт не
-          создан» — и человек с аккаунтом читал это про себя. */}
-      {грузится ? (
-        <span className="flex flex-col" style={{ gap: 5 }}>
-          <span className="fx-skeleton" style={{ display: "block", width: 124, height: 17, borderRadius: 6 }} />
-          <span className="fx-skeleton" style={{ display: "block", width: 88, height: 10, borderRadius: 4 }} />
+      {/* Ника на главной больше нет — аватарки достаточно, чтобы узнать
+          себя. Остаётся только строка для того, у кого аккаунта нет:
+          без неё кнопка входа была бы пустым кружком. */}
+      {!грузится && !(accountCreated && profile && profile.nickname) && (
+        <span style={{ display: "block", alignSelf: "center", fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 600 }}>
+          {t("accountNotCreated")}
         </span>
-      ) : (
-      // Имя стоит по низу аватарки, а не по её середине: строка с
-      // lineHeight 1 ложится буквами на нижний край кружка.
-      <span>
-        {accountCreated && profile && profile.nickname ? (
-          <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1 }}>
-            {profile.nickname}
-          </span>
-        ) : (
-          // Подтекста под именем больше нет — но без имени эта строка
-          // единственная, и её нужно оставить: иначе кнопка входа пустая.
-          <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 600 }}>
-            {t("accountNotCreated")}
-          </span>
-        )}
-      </span>
       )}
     </button>
   );
