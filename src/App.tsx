@@ -15690,7 +15690,7 @@ const КОШ_ПОЛОТНО = [
 ].join(", ");
 /* Мгла поверх пятен: у верхнего края приглушает цвет, ниже заголовка
    уже глухая. Без неё пятна слепят и текст по ним не прочитать. */
-const КОШ_ПОЛОТНО_МГЛА = "linear-gradient(180deg, rgba(11,13,18,0.2) 0%, rgba(11,13,18,0.5) 30%, rgba(11,13,18,0.9) 62%, #0B0D12 84%)";
+const КОШ_ПОЛОТНО_МГЛА = "linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.5) 30%, rgba(0,0,0,0.9) 62%, #000000 84%)";
 const КОШ_КАРТОЧКА = "#14171F";   // строки на ней
 const КОШ_РОСТ_ФОН = hexA("#F2F0EB", 0.20);
 const КОШ_РОСТ_ТЕКСТ = "#E4E1DA";
@@ -23445,7 +23445,7 @@ function telegramStartParam() {
    правкой одного объекта. Эти же числа продублированы в index.html
    (заставка): окно входа продолжает её, расхождение видно как скачок. */
 const ОНБ = {
-  фон: "#0B0D12",
+  фон: "#000000", // абсолютно чёрный, как всё приложение
   поле: "#14171F",
   текст: "#F2F0EB",
   приглушённый: "rgba(242, 240, 235, 0.55)",
@@ -26350,6 +26350,8 @@ function useTelegramViewport() {
         if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
         if (tg.setHeaderColor) { try { tg.setHeaderColor(T.bg); } catch (e) {} }
         if (tg.setBackgroundColor) { try { tg.setBackgroundColor(T.bg); } catch (e) {} }
+        // Нижняя полоса Telegram тоже чёрная — иначе под приложением светлела кайма.
+        if (tg.setBottomBarColor) { try { tg.setBottomBarColor("#000000"); } catch (e) {} }
       } catch (e) { /* older client, some methods may be missing */ }
 
       const update = () => {
