@@ -17301,9 +17301,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           это не подмена одной картинки другой, а поворот объёма. */}
       <div style={{
         position: "relative", transformStyle: "preserve-3d",
-        // Высота задана явно и общая для обеих сторон: с показанными
-        // словами карта вырастает, а не выносит их за край.
-        height: словаНаОбороте ? 330 : 210,
+        // Высота задана явно и общая для обеих сторон. Слова на обороте
+        // сложены плотной сеткой, поэтому карта при показе не растёт и
+        // не толкает вниз всё, что под ней.
+        height: 210,
         transform: переворотКарты ? "rotateY(180deg)" : "rotateY(0deg)",
         // Лёгкий перелёт в конце: карта докручивается чуть дальше и
         // садится на место — поворот читается весом, а не механикой.
@@ -17498,16 +17499,17 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       >
         {словаНаОбороте ? (
           <>
-            <span style={{ fontFamily: displayFont, color: "#FFFFFF", fontSize: 13.5, fontWeight: 800, letterSpacing: "-0.01em" }}>
+            <span style={{ fontFamily: displayFont, color: "#FFFFFF", fontSize: 13, fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.2 }}>
               {t("saveTitle")}
             </span>
-            {/* Каждое слово — под своим номером, по четыре в ряд: двадцать
-                четыре слова должны уместиться на карте без прокрутки. */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "7px 8px" }}>
+            {/* Номер стоит в одной строке со словом, а не над ним: так все
+                двадцать четыре слова, по четыре в ряд, влезают в обычную
+                высоту карты. */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "3px 6px" }}>
               {словаНаОбороте.map((с, i) => (
-                <div key={i} className="flex flex-col" style={{ minWidth: 0, gap: 1 }}>
-                  <span style={{ fontFamily: monoFont, color: hexA("#FFFFFF", 0.6), fontSize: 10.5, fontWeight: 700 }}>{i + 1}</span>
-                  <span className="truncate" style={{ fontFamily: bodyFont, color: "#FFFFFF", fontSize: 13, fontWeight: 700 }}>{с}</span>
+                <div key={i} className="flex items-baseline" style={{ minWidth: 0, gap: 4, lineHeight: "15px" }}>
+                  <span style={{ fontFamily: monoFont, color: hexA("#FFFFFF", 0.55), fontSize: 9.5, fontWeight: 700, width: 13, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
+                  <span className="truncate" style={{ fontFamily: bodyFont, color: "#FFFFFF", fontSize: 12, fontWeight: 700 }}>{с}</span>
                 </div>
               ))}
             </div>
@@ -17515,7 +17517,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
               onClick={закрытьОборот}
               className="fx-tap"
               style={{
-                marginTop: "auto", padding: "10px 0", borderRadius: 13, border: "none",
+                marginTop: "auto", padding: "7px 0", borderRadius: 11, border: "none",
                 background: "#FFFFFF", color: "#1A0B33", fontFamily: displayFont, fontSize: 14, fontWeight: 700,
               }}
             >
