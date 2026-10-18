@@ -3316,6 +3316,15 @@ const GT_NETWORK = "ton";
 // карточки токенов читаются одним и тем же кодом — отличается только
 // это слово в адресе запроса.
 const GT_NETWORK_SOL = "solana";
+/* Сети EVM: BNB Chain, Base и Ethereum. Ключ сети совпадает с её
+   именем в справочнике GeckoTerminal — так одна строка ведёт и в ленту,
+   и в график, и в описание токена. */
+const СЕТИ_EVM = {
+  bsc: { имя: "BNB Chain", лого: "/coins/bnb.svg", монета: "BNB", обозреватель: "https://bscscan.com/token/" },
+  base: { имя: "Base", лого: "/coins/base.svg", монета: "ETH", обозреватель: "https://basescan.org/token/" },
+  eth: { имя: "Ethereum", лого: "/coins/eth.svg", монета: "ETH", обозреватель: "https://etherscan.io/token/" },
+};
+const этоEVM = (с) => typeof с === "string" && Object.prototype.hasOwnProperty.call(СЕТИ_EVM, с);
 // Мем-ленту оставляем только для настоящих "мемов" по капитализации —
 // токены с капой от 1 млрд $ и выше выглядят как established/blue-chip
 // активы, а не как мемкоины, поэтому отсекаем их ещё на этапе фетча.
@@ -3698,7 +3707,7 @@ function normalizePools(json, network = GT_NETWORK) {
         // Сеть токена. От неё зависит и график, и то, каким кошельком
         // человек будет платить: TON-токены подписывает TonConnect,
         // Solana — Phantom, и перепутать их нельзя.
-        chain: network === GT_NETWORK_SOL ? "solana" : "ton",
+        chain: network === GT_NETWORK_SOL ? "solana" : (этоEVM(network) ? network : "ton"),
         poolAddress: a.address,
         tokenAddress: bt.address || null,
         name,
@@ -3769,6 +3778,7 @@ async function fetchPoolByAddress(poolAddress, network = GT_NETWORK) {
 // Сеть токена в терминах справочника: у пришедших из ленты Solana она
 // своя, у всех остальных — TON.
 function сетьТокена(tok) {
+  if (tok && этоEVM(tok.chain)) return tok.chain;
   return tok && tok.chain === "solana" ? GT_NETWORK_SOL : GT_NETWORK;
 }
 
@@ -10725,7 +10735,232 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
   );
 }
 
-function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solДоступен = false, currentUserId = null, сеть = "ton" }) {
+function MempadView(props) {
+  // У сетей EVM своего запуска пока нет — там лента токенов с биржи и их
+  // карточки. Отдельный компонент, а не ветки внутри: у мемпада TON и
+  // Solana всё завязано на кривую площадки, которой здесь нет.
+  if (этоEVM(props.сеть)) return <МемпадEVM key={props.сеть} сеть={props.сеть} />;
+  return <МемпадПлощадки {...props} />;
+}
+
+/* Цена мемкоина бывает в десятимиллионных долях доллара, и обычные
+   два знака после запятой показали бы ноль. Берём четыре значащие
+   цифры, сколько бы нулей ни стояло впереди. */
+function fmtЦенаМелкая(p) {
+  const n = Number(p);
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  if (n >= 1) return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const нулей = Math.max(0, Math.floor(-Math.log10(n)));
+  return "$" + n.toFixed(Math.min(14, нулей + 4)).replace(/0+$/, "");
+}
+
+/* Крупные монеты и стейблы торгуются в тех же пулах, что и мемкоины, и
+   в «трендах» биржи стоят наверху. Мемпад — не про них. */
+const НЕ_МЕМЫ_EVM = new Set(["WETH", "ETH", "WBNB", "BNB", "USDT", "USDC", "DAI", "WBTC", "BTCB", "CBBTC", "USDE", "FDUSD", "BUSD", "STETH", "WSTETH", "USD1", "TUSD", "PYUSD", "USDS", "CBETH", "RETH", "WEETH", "EURC", "SOL", "XRP", "LINK", "UNI", "AAVE", "CAKE"]);
+const ФИЛЬТРЫ_EVM = [
+  { id: "trend", путь: "trending_pools", подпись: "В тренде" },
+  { id: "new", путь: "new_pools", подпись: "Новые" },
+  { id: "vol", путь: "pools?sort=h24_volume_usd_desc", подпись: "По обороту" },
+];
+const кешЛентыEVM = new Map(); // `${сеть}:${фильтр}` -> { ts, list }
+
+async function лентаEVM(сеть, фильтр) {
+  const ключ = `${сеть}:${фильтр.id}`;
+  const было = кешЛентыEVM.get(ключ);
+  if (было && Date.now() - было.ts < 30000) return было.list;
+  const связка = фильтр.путь.includes("?") ? "&" : "?";
+  const res = await gtFetch(`${GT_BASE}/networks/${сеть}/${фильтр.путь}${связка}page=1&include=base_token,dex`);
+  if (!res.ok) throw new Error(`GeckoTerminal ${res.status}`);
+  const list = normalizePools(await res.json(), сеть)
+    .filter((tok) => !НЕ_МЕМЫ_EVM.has(String(tok.ticker || "").toUpperCase()));
+  // Один токен бывает в нескольких пулах — оставляем самый ликвидный,
+  // то есть первый: биржа отдаёт их по убыванию.
+  const виден = new Set();
+  const один = list.filter((tok) => {
+    const к = (tok.tokenAddress || tok.id).toLowerCase();
+    if (виден.has(к)) return false;
+    виден.add(к);
+    return true;
+  });
+  кешЛентыEVM.set(ключ, { ts: Date.now(), list: один });
+  return один;
+}
+
+function МемпадEVM({ сеть }) {
+  const [фильтр, setФильтр] = useState("trend");
+  const [список, setСписок] = useState(null);
+  const [беда, setБеда] = useState(false);
+  const [открыт, setОткрыт] = useState(null);
+  useEffect(() => {
+    let живо = true;
+    const ф = ФИЛЬТРЫ_EVM.find((x) => x.id === фильтр) || ФИЛЬТРЫ_EVM[0];
+    setСписок(null); setБеда(false);
+    const загрузить = () => лентаEVM(сеть, ф)
+      .then((l) => { if (живо) { setСписок(l); setБеда(false); } })
+      .catch(() => { if (живо) setБеда(true); });
+    загрузить();
+    // Лента живая: числа на бирже меняются каждую минуту.
+    const таймер = setInterval(() => { if (document.visibilityState === "visible") загрузить(); }, 45000);
+    return () => { живо = false; clearInterval(таймер); };
+  }, [сеть, фильтр]);
+  const с = СЕТИ_EVM[сеть];
+  return (
+    <div className="flex flex-col" style={{ gap: 20, paddingTop: 8, paddingBottom: 16 }}>
+      <ЗаголовокРаздела>Мемпад</ЗаголовокРаздела>
+      <div className="flex items-center" style={{ gap: 10, marginTop: -8 }}>
+        <img src={с.лого} alt="" width={22} height={22} style={{ borderRadius: "50%" }} />
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600 }}>{с.имя} · токены с биржи</span>
+      </div>
+      <div className="no-scrollbar flex items-center overflow-x-auto" style={{ gap: 8, touchAction: "pan-x", overscrollBehaviorX: "contain", overflowY: "hidden" }}>
+        {ФИЛЬТРЫ_EVM.map((f) => {
+          const active = фильтр === f.id;
+          return (
+            <button
+              key={f.id}
+              onClick={() => { haptic("light"); setФильтр(f.id); }}
+              className="fx-tap whitespace-nowrap flex-shrink-0"
+              style={{
+                background: active ? T.ice : "transparent",
+                border: `1px solid ${active ? T.ice : hexA("#FFFFFF", 0.12)}`,
+                padding: "9px 15px", borderRadius: 999,
+                fontFamily: bodyFont, fontSize: 14, fontWeight: 600,
+                color: active ? "#0B0B0F" : T.muted,
+                transition: `color ${EASE}, background ${EASE}`,
+              }}
+            >
+              {f.подпись}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex flex-col" key={`${сеть}:${фильтр}`}>
+        {список
+          ? список.slice(0, 60).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={setОткрыт} index={i} />)
+          : беда
+            ? (
+              <div className="flex flex-col items-center" style={{ gap: 14, padding: "60px 0" }}>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>Биржа не ответила</span>
+                <button onClick={() => setФильтр((ф) => ф)} className="fx-tap" style={{ padding: "10px 22px", borderRadius: 12, border: "none", background: T.ice, color: "#0B0B0F", fontFamily: bodyFont, fontSize: 14, fontWeight: 700 }}>
+                  {t("retry")}
+                </button>
+              </div>
+            )
+            : <div className="flex items-center justify-center" style={{ height: 260 }}><ЗнакЗагрузки size={56} /></div>}
+      </div>
+      <КарточкаТокенаEVM токен={открыт} onClose={() => setОткрыт(null)} />
+    </div>
+  );
+}
+
+/* Карточка токена из сети EVM: цена, изменение, график по часам и
+   цифры пула. Своей кривой у такого токена нет, торгуется он на бирже
+   сети. */
+function КарточкаТокенаEVM({ токен: вход, onClose }) {
+  const [токен, уходит] = useClosing(вход, 220);
+  useНазадТелеграм(!!вход, onClose);
+  const [свечи, setСвечи] = useState(null);
+  const [инфо, setИнфо] = useState(null);
+  useEffect(() => {
+    if (!токен) return undefined;
+    let живо = true;
+    setСвечи(null); setИнфо(null);
+    fetchPoolOHLCV(токен.poolAddress, "H1", GT_PRIORITY.chart, undefined, токен.chain)
+      .then((r) => { if (живо) setСвечи((r && r.candles) || []); })
+      .catch(() => { if (живо) setСвечи([]); });
+    fetchTokenInfo(токен.tokenAddress, токен.chain).then((и) => { if (живо) setИнфо(и); }).catch(() => {});
+    return () => { живо = false; };
+  }, [токен && токен.id]);
+  const путь = useMemo(() => {
+    const ряд = (свечи || []).filter((c) => c && c.close > 0).slice(-96);
+    if (ряд.length < 2) return "";
+    const v = ряд.map((c) => c.close), max = Math.max(...v), min = Math.min(...v), д = (max - min) || 1;
+    return ряд.map((c, i) => `${i ? "L" : "M"}${((i / (ряд.length - 1)) * 100).toFixed(2)},${(6 + 88 * (1 - (c.close - min) / д)).toFixed(2)}`).join(" ");
+  }, [свечи]);
+  if (!токен) return null;
+  const с = СЕТИ_EVM[токен.chain] || СЕТИ_EVM.eth;
+  const изм = Number(токен.change) || 0;
+  const цвет = изм === 0 ? T.faint : изм > 0 ? T.up : T.down;
+  const строка = (подпись, значение) => (
+    <div className="flex items-center justify-between" style={{ padding: "14px 2px", borderBottom: `1px solid ${T.line}` }}>
+      <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14.5 }}>{подпись}</span>
+      <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 800 }}>{значение}</span>
+    </div>
+  );
+  const адрес = токен.tokenAddress || "";
+  const ссылка = (url) => { try { const tg = window.Telegram && window.Telegram.WebApp; if (tg && tg.openLink) tg.openLink(url); else window.open(url, "_blank"); } catch { /* ссылка не открылась */ } };
+  const лист = (
+    <div className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 85, background: "#000000", overflowY: "auto", padding: "calc(24px + var(--tg-inset-top, 0px)) 16px calc(28px + var(--tg-inset-bottom, 0px))" }}>
+      <div className="flex items-center justify-end" style={{ gap: 8, marginBottom: 14 }}>
+        <img src={с.лого} alt="" width={18} height={18} style={{ borderRadius: "50%" }} />
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{с.имя}</span>
+      </div>
+      <div className="flex items-center" style={{ gap: 14 }}>
+        <TokenAvatar size={56} tone={изм >= 0 ? "up" : "down"} src={токен.logoUrl} />
+        <div style={{ minWidth: 0 }}>
+          <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 26, fontWeight: 800, lineHeight: 1.1 }}>${токен.ticker}</div>
+          <div className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 3 }}>{токен.name}</div>
+        </div>
+      </div>
+      <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 40, fontWeight: 800, marginTop: 22, lineHeight: 1 }}>
+        <ТекстСЧислами text={fmtЦенаМелкая(токен.price)} />
+      </div>
+      <div style={{ fontFamily: bodyFont, color: цвет, fontSize: 15, fontWeight: 700, marginTop: 8 }}>
+        <ТекстСЧислами text={`${изм > 0 ? "+" : ""}${изм.toFixed(2)}% за сутки`} />
+      </div>
+      <div style={{ margin: "22px -16px 0", height: 200 }}>
+        {путь ? (
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="200" aria-hidden>
+            <defs>
+              <linearGradient id="evm-график" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor={цвет} stopOpacity="0.26" />
+                <stop offset="1" stopColor={цвет} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d={`${путь} L100,100 L0,100 Z`} fill="url(#evm-график)" />
+            <path d={путь} fill="none" stroke={цвет} strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          </svg>
+        ) : (
+          <div className="flex items-center justify-center" style={{ height: 200 }}>
+            {свечи === null ? <ЗнакЗагрузки size={40} /> : <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 13 }}>{t("chartNoData")}</span>}
+          </div>
+        )}
+      </div>
+      <div style={{ marginTop: 18, borderTop: `1px solid ${T.line}` }}>
+        {строка("Капитализация", fmtUSD(токен.mcapNum))}
+        {строка("Ликвидность", токен.liq ? `$${токен.liq}` : "—")}
+        {строка("Оборот за сутки", токен.vol ? `$${токен.vol}` : "—")}
+        {строка("Сделок за сутки", (токен.tx24h || 0).toLocaleString("ru-RU"))}
+        {инфо && инфо.holders ? строка("Держателей", инфо.holders.toLocaleString("ru-RU")) : null}
+        {строка("Биржа", токен.dexName || "—")}
+      </div>
+      {инфо && инфо.description && (
+        <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, marginTop: 16 }}>{инфо.description.slice(0, 400)}</p>
+      )}
+      {адрес && (
+        <button
+          onClick={() => {
+            try { navigator.clipboard && navigator.clipboard.writeText(адрес); haptic("light"); } catch { /* буфер закрыт */ }
+          }}
+          className="fx-tap w-full flex items-center justify-between"
+          style={{ marginTop: 18, padding: "14px 16px", borderRadius: 16, border: "none", background: T.surfaceHi }}
+        >
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>Адрес токена</span>
+          <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 700 }}>{адрес.slice(0, 6)}…{адрес.slice(-4)}</span>
+        </button>
+      )}
+      <button
+        onClick={() => { haptic("light"); ссылка(`${с.обозреватель}${адрес}`); }}
+        className="fx-tap w-full"
+        style={{ marginTop: 10, padding: "15px 0", borderRadius: 16, border: "none", background: T.ice, color: "#0B0B0F", fontFamily: displayFont, fontSize: 15.5, fontWeight: 700 }}
+      >
+        Открыть в обозревателе
+      </button>
+    </div>
+  );
+  return typeof document !== "undefined" ? createPortal(лист, document.body) : лист;
+}
+
+function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpen, onLaunch, solДоступен = false, currentUserId = null, сеть = "ton" }) {
   const [filter, setFilter] = useState("new");
   // Сеть выбирается кружком рядом со свёрнутой панелью разделов: это не
   // «ещё один способ отсортировать», а другой рынок целиком, и держит её
@@ -26574,7 +26809,7 @@ const FEE_PERCENT = 0; // комиссии площадки нет
   const [сетьМемпада, setСетьМемпада] = useState(() => {
     try {
       const с = typeof window !== "undefined" && window.localStorage.getItem("mintly.network");
-      return с === "sol" || с === "ton" ? с : "ton";
+      return с === "sol" || с === "ton" || этоEVM(с) ? с : "ton";
     } catch {
       return "ton";
     }
@@ -30025,7 +30260,9 @@ function mapTokenRow(row) {
           // У картинки Соланы знак занимает половину кадра внутри чёрного
           // круга, а у Грама — всю ширину без фона. Поэтому Солана здесь
           // нарисована векторно, без круга и того же размера, что Грам.
-          const ЗнакСети = ({ сеть: с, size, style }) => с === "sol" ? (
+          const ЗнакСети = ({ сеть: с, size, style }) => этоEVM(с) ? (
+            <img src={СЕТИ_EVM[с].лого} alt="" width={size} height={size} style={{ display: "block", flex: "none", borderRadius: "50%", ...style }} />
+          ) : с === "sol" ? (
             <svg width={size} height={size} viewBox="-8 -51 414 414" aria-hidden style={{ display: "block", flex: "none", ...style }}>
               <defs>
                 <linearGradient id="навСол" x1="360.9" y1="-37.5" x2="141.2" y2="383.3" gradientUnits="userSpaceOnUse">
@@ -30190,13 +30427,13 @@ function mapTokenRow(row) {
               <div onClick={() => setМенюСети(false)} style={{ position: "fixed", inset: -2000, zIndex: -1 }} />
               <div
                 style={{
-                  position: "absolute", right: 0, bottom: "calc(100% + 10px)", minWidth: 168, padding: 6,
+                  position: "absolute", right: 0, bottom: "calc(100% + 10px)", minWidth: 196, padding: 6, whiteSpace: "nowrap",
                   borderRadius: 18, background: T.surface, border: `1px solid ${T.line}`,
                   boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
                   transformOrigin: "100% 100%", animation: "навМенюСети 260ms cubic-bezier(0.2, 1.1, 0.4, 1)",
                 }}
               >
-                {[["ton", "Gram"], ["sol", "Solana"]].map(([ключ, имя]) => {
+                {[["ton", "Gram"], ["sol", "Solana"], ...Object.entries(СЕТИ_EVM).map(([к, с]) => [к, с.имя])].map(([ключ, имя]) => {
                   const выбрана = сетьМемпада === ключ;
                   return (
                     <button
