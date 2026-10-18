@@ -21900,8 +21900,8 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   const [проверилиEVM, setПроверилиEVM] = useState(false);
   useEffect(() => { if (Object.keys(сетиEVMЗапуска).length) setПроверилиEVM(true); }, [сетиEVMЗапуска]);
   useEffect(() => { if (проверилиEVM && evmЗакрыт) setСетьЗапуска("ton"); }, [проверилиEVM]); // eslint-disable-line react-hooks/exhaustive-deps
-  const единицаЗапуска = вEVM ? СЕТИ_EVM[сетьЗапуска].монета : единицаЗапуска;
-  const курсЗапуска = () => (вEVM ? курсМонетыEVM(сетьЗапуска, КЕШ_КУРСОВ_EVM) : курсЗапуска());
+  const единицаЗапуска = вEVM ? СЕТИ_EVM[сетьЗапуска].монета : вSolana ? "SOL" : ТИКЕР_TON;
+  const курсЗапуска = () => (вEVM ? курсМонетыEVM(сетьЗапуска, КЕШ_КУРСОВ_EVM) : вSolana ? solUsd() : tonUsd());
   // Виртуальный запас фабрики — тот же, что в contracts/evm/deploy.mjs.
   const ВИРТ_EVM = вEVM
     ? (Number(сетиEVMЗапуска[сетьЗапуска] && сетиEVMЗапуска[сетьЗапуска].virtual) || (сетиEVMЗапуска.тестовые ? (сетьЗапуска === "bsc" ? 0.06 : 0.015) : (сетьЗапуска === "bsc" ? 6 : 1.5)))
