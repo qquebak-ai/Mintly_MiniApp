@@ -8249,6 +8249,10 @@ function ЗначокСтолбики({ size = 22, color = "#FFFFFF", strokeWidt
 }
 
 function КотПланета({ size = 120, glow = true, качается = true, стиль = null }) {
+  // Знака со свечением в пустых местах больше нет — по просьбе: пустой
+  // экран говорит за себя сам или своей подписью.
+  return null;
+  // eslint-disable-next-line no-unreachable
   return (
     <div style={{ position: "relative", width: size, height: size, flexShrink: 0, ...(стиль || {}) }}>
       {glow && (
@@ -10914,14 +10918,7 @@ function MempadView({ myTokensLoading = false, myTokens, onOpen, onLaunch, solД
         {идётЗагрузка
           ? <div className="flex items-center justify-center" style={{ height: 260 }}><ЗнакЗагрузки size={56} /></div>
           : list.slice(0, 60).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)}
-        {!идётЗагрузка && list.length === 0 && (
-          <div className="flex flex-col items-center text-center" style={{ gap: 14, padding: "26px 0 10px" }}>
-            {/* Пустой раздел — место для маскота: он объясняет, что это
-                не поломка, лучше любой надписи. */}
-            <КотПланета size={116} />
-            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("emptyFilter")}</div>
-          </div>
-        )}
+        {/* Пустой фильтр — просто пусто: ни знака, ни надписи. */}
       </div>
       </div>
     </div>
@@ -21047,16 +21044,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
           {/* Ошибку встречает маскот, а не безликий значок: тот же
               персонаж, что и в удачных местах, — так неудача остаётся
               частью приложения, а не аварийным экраном. */}
-          <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <КотПланета size={78} />
-            <span style={{
-              position: "absolute", right: -2, bottom: -2, width: 26, height: 26, borderRadius: 999,
-              background: T.bg, border: `1px solid ${hexA(T.down, 0.5)}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <ShieldAlert size={14} color={T.down} />
-            </span>
-          </div>
+          <ShieldAlert size={30} color={T.down} />
           <div style={{ maxHeight: 220, overflowY: "auto", width: "100%" }}>
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700 }}>{t("launchFailedTitle")}</div>
             <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 6, lineHeight: 1.5, whiteSpace: "pre-wrap", textAlign: "left" }}>{error}</div>
