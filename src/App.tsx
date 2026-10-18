@@ -2443,12 +2443,6 @@ function GlobalStyle() {
         to   { opacity: 1; transform: none; filter: none; }
       }
       @media (prefers-reduced-motion: reduce) { @keyframes словоФразы { from { opacity: 0; } to { opacity: 1; } } }
-      /* Волна от нажатия: расходится из точки касания и гаснет. */
-      @keyframes волнаОтНажатия {
-        from { transform: translate(-50%, -50%) scale(0); opacity: 0.7; }
-        55%  { opacity: 0.45; }
-        to   { transform: translate(-50%, -50%) scale(1); opacity: 0; }
-      }
       /* Кнопка копирования: короткий кивок и вспышка — по нему видно, что
          нажатие принято, даже если всплывающую подсказку человек не
          заметил. */
@@ -11309,7 +11303,7 @@ function СтрокаКурса({ имя, тикер, монета, onOpen = nul
     <button
       onClick={onOpen ? () => { haptic("light"); onOpen(монета); } : undefined}
       className="fx-tap w-full flex items-center text-left"
-      style={{ gap: 14, padding: "13px 2px", background: "transparent", border: "none", borderBottom: `1px solid ${T.line}` }}
+      style={{ gap: 14, padding: "13px 2px", background: "transparent", border: "none" }}
     >
       <img src={монета === "sol" ? "/coins/sol.png" : "/coins/gram.png"} alt="" width={44} height={44} style={{ borderRadius: "50%", flexShrink: 0 }} />
       <span className="flex flex-col" style={{ minWidth: 0, gap: 3 }}>
@@ -16912,7 +16906,8 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const [историяОткрыта, setИсторияОткрыта] = useState(false);
   /* Волны от касаний карты. Каждая живёт своё время и убирается сама —
      иначе их накапливались бы десятки за один сеанс. */
-  const [волны, setВолны] = useState([]);
+  // Белое пятно света, которое ходит за пальцем по карте.
+  const пятноКарты = useRef(null);
   /* Ход перелива у каждого запуска свой: одинаковая на всех устройствах
      анимация выдаёт заготовку, а разная читается как живая поверхность. */
   const перелив = useMemo(() => ({
@@ -16957,12 +16952,20 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   }, []);
   const ключПереливаКарты = `${скинКарты}-${ключОжива}`;
 
-  function волнаОт(e) {
-    const блок = e.currentTarget.getBoundingClientRect();
+  /* Свет за пальцем вместо волны от нажатия: пятно стоит под пальцем,
+     пока он на карте, и плавно гаснет, когда палец убран. Двигаем его
+     напрямую через стиль, без состояния React — иначе каждое движение
+     перерисовывало бы всю карту. */
+  function светЗаПальцем(e) {
+    const пятно = пятноКарты.current;
+    if (!пятно) return;
     const т = e.touches && e.touches[0] ? e.touches[0] : e;
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    setВолны((было) => [...было, { id, x: т.clientX - блок.left, y: т.clientY - блок.top }]);
-    setTimeout(() => setВолны((было) => было.filter((в) => в.id !== id)), 1600);
+    const блок = e.currentTarget.getBoundingClientRect();
+    пятно.style.transform = `translate(${(т.clientX - блок.left).toFixed(1)}px, ${(т.clientY - блок.top).toFixed(1)}px) translate(-50%, -50%)`;
+    пятно.style.opacity = "1";
+  }
+  function светПогас() {
+    if (пятноКарты.current) пятноКарты.current.style.opacity = "0";
   }
 
   /* Свайп слева направо по карте — короткая дорога к секретной фразе:
@@ -17315,10 +17318,15 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         }} />
       ))}
       <section
-        onPointerDown={волнаОт}
-        onTouchStart={началоСвайпаКарты}
-        onTouchEnd={концаСвайпаКарты}
-        onTouchCancel={() => { жестКарты.current = null; }}
+        onPointerDown={светЗаПальцем}
+        onPointerMove={(e) => { if (e.pointerType !== "mouse" || e.buttons) светЗаПальцем(e); }}
+        onPointerUp={светПогас}
+        onPointerLeave={светПогас}
+        onPointerCancel={светПогас}
+        onTouchStart={(e) => { началоСвайпаКарты(e); светЗаПальцем(e); }}
+        onTouchMove={светЗаПальцем}
+        onTouchEnd={(e) => { концаСвайпаКарты(e); светПогас(); }}
+        onTouchCancel={() => { жестКарты.current = null; светПогас(); }}
         style={{
           position: "absolute", inset: 0, overflow: "hidden", borderRadius: 24, padding: "12px 18px 16px",
           // Высоту даёт родитель (см. выше): marginTop: auto у чипа
@@ -17362,22 +17370,12 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         }} />
         {ткань && <СлойКарбона fill={видКарты.fill} size={видКарты.size} />}
         {/* Волны от касаний — поверх заливки, но под текстом. */}
-        {волны.map((в) => (
-          <span
-            key={в.id}
-            aria-hidden
-            style={{
-              position: "absolute", left: в.x, top: в.y, width: 460, height: 460, borderRadius: "50%",
-              // Светлое пятно с более яркой кромкой: расходящееся кольцо
-              // видно на карте любого цвета, а не только на тёмной.
-              background: `radial-gradient(circle, ${hexA("#FFFFFF", 0.3)} 0%, ${hexA("#FFFFFF", 0.18)} 50%, ${hexA("#FFFFFF", 0.75)} 64%, ${hexA("#FFFFFF", 0)} 71%)`,
-              pointerEvents: "none",
-              // Медленнее, чем отклик кнопки: волна по карте — это жест,
-              // её должно быть видно, как она доходит до края.
-              animation: "волнаОтНажатия 1400ms cubic-bezier(0.3, 0.55, 0.4, 1) both",
-            }}
-          />
-        ))}
+        {/* Свет за пальцем — поверх заливки, но под текстом. */}
+        <span ref={пятноКарты} aria-hidden style={{
+          position: "absolute", left: 0, top: 0, width: 240, height: 240, borderRadius: "50%", pointerEvents: "none",
+          background: `radial-gradient(circle, ${hexA("#FFFFFF", 0.42)} 0%, ${hexA("#FFFFFF", 0.16)} 38%, ${hexA("#FFFFFF", 0)} 70%)`,
+          opacity: 0, transition: "opacity 420ms ease", willChange: "transform, opacity",
+        }} />
         <div key={ключПереливаКарты} aria-hidden style={{
           position: "absolute", top: -70, left: -90, width: 260, height: 320,
           background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.13)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
@@ -17689,26 +17687,31 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             <div
               key={монета.ключ}
               className="w-full flex items-center"
-              style={{ gap: 12, padding: "12px 10px" }}
+              // Строка один в один как в курсах выше: тот же размер
+              // иконки, те же кегли и жирность — два списка подряд
+              // читаются одним.
+              style={{ gap: 14, padding: "13px 2px" }}
             >
               <img
                 src={монета.лого}
                 alt=""
-                style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }}
+                width={44}
+                height={44}
+                style={{ width: 44, height: 44, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }}
               />
-              <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>
+              <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>
                   {монета.имя}
                 </span>
-                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
                   {монета.тикер}
                 </span>
               </span>
-              <span className="flex flex-col items-end" style={{ gap: 2, flexShrink: 0, ...туман }}>
-                <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+              <span className="flex flex-col items-end" style={{ gap: 3, flexShrink: 0, ...туман }}>
+                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
                   <УмныйТекст text={монета.сколько.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} />
                 </span>
-                <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
                   <УмныйТекст text={монета.курс > 0 ? `≈ $${(монета.сколько * монета.курс).toFixed(2)}` : "—"} />
                 </span>
               </span>
