@@ -16906,8 +16906,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   const [историяОткрыта, setИсторияОткрыта] = useState(false);
   /* Волны от касаний карты. Каждая живёт своё время и убирается сама —
      иначе их накапливались бы десятки за один сеанс. */
-  // Белое пятно света, которое ходит за пальцем по карте.
-  const пятноКарты = useRef(null);
   /* Ход перелива у каждого запуска свой: одинаковая на всех устройствах
      анимация выдаёт заготовку, а разная читается как живая поверхность. */
   const перелив = useMemo(() => ({
@@ -16952,21 +16950,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
   }, []);
   const ключПереливаКарты = `${скинКарты}-${ключОжива}`;
 
-  /* Свет за пальцем вместо волны от нажатия: пятно стоит под пальцем,
-     пока он на карте, и плавно гаснет, когда палец убран. Двигаем его
-     напрямую через стиль, без состояния React — иначе каждое движение
-     перерисовывало бы всю карту. */
-  function светЗаПальцем(e) {
-    const пятно = пятноКарты.current;
-    if (!пятно) return;
-    const т = e.touches && e.touches[0] ? e.touches[0] : e;
-    const блок = e.currentTarget.getBoundingClientRect();
-    пятно.style.transform = `translate(${(т.clientX - блок.left).toFixed(1)}px, ${(т.clientY - блок.top).toFixed(1)}px) translate(-50%, -50%) rotate(18deg)`;
-    пятно.style.opacity = "1";
-  }
-  function светПогас() {
-    if (пятноКарты.current) пятноКарты.current.style.opacity = "0";
-  }
 
   /* Свайп слева направо по карте — короткая дорога к секретной фразе:
      карта по-настоящему переворачивается в 3D, и на обороте сразу же,
@@ -17318,15 +17301,9 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         }} />
       ))}
       <section
-        onPointerDown={светЗаПальцем}
-        onPointerMove={(e) => { if (e.pointerType !== "mouse" || e.buttons) светЗаПальцем(e); }}
-        onPointerUp={светПогас}
-        onPointerLeave={светПогас}
-        onPointerCancel={светПогас}
-        onTouchStart={(e) => { началоСвайпаКарты(e); светЗаПальцем(e); }}
-        onTouchMove={светЗаПальцем}
-        onTouchEnd={(e) => { концаСвайпаКарты(e); светПогас(); }}
-        onTouchCancel={() => { жестКарты.current = null; светПогас(); }}
+        onTouchStart={началоСвайпаКарты}
+        onTouchEnd={концаСвайпаКарты}
+        onTouchCancel={() => { жестКарты.current = null; }}
         style={{
           position: "absolute", inset: 0, overflow: "hidden", borderRadius: 24, padding: "12px 18px 16px",
           // Высоту даёт родитель (см. выше): marginTop: auto у чипа
@@ -17370,13 +17347,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         }} />
         {ткань && <СлойКарбона fill={видКарты.fill} size={видКарты.size} />}
         {/* Волны от касаний — поверх заливки, но под текстом. */}
-        {/* Свет за пальцем — тонкая белая полоска блика наискосок через
-            всю карту, как отсвет на пластике; поверх заливки, под текстом. */}
-        <span ref={пятноКарты} aria-hidden style={{
-          position: "absolute", left: 0, top: 0, width: 30, height: 420, pointerEvents: "none",
-          background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.14)} 38%, ${hexA("#FFFFFF", 0.7)} 50%, ${hexA("#FFFFFF", 0.14)} 62%, ${hexA("#FFFFFF", 0)} 100%)`,
-          opacity: 0, transition: "opacity 420ms ease", willChange: "transform, opacity",
-        }} />
         <div key={ключПереливаКарты} aria-hidden style={{
           position: "absolute", top: -70, left: -90, width: 260, height: 320,
           background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.13)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
