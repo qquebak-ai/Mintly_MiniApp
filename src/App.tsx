@@ -11845,12 +11845,12 @@ function ЭкранНастроек({ открыт, onClose, profile, accountCre
           style={{ gap: 13, padding: "13px 16px", borderRadius: 20, background: T.surfaceHi, border: "none", marginBottom: 16 }}
         >
           <span className="flex items-center justify-center" style={{
-            width: 42, height: 42, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+            width: 60, height: 60, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
             background: аватар ? `center/cover no-repeat url(${аватар})` : T.surface,
             border: ОБОД_ЛИЦА,
           }}>
             {!аватар && accountCreated && profile && profile.nickname && (
-              <БукваАватара ник={profile.nickname} size={42} />
+              <БукваАватара ник={profile.nickname} size={60} />
             )}
           </span>
           <span className="flex-1 truncate text-left" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>
@@ -12092,7 +12092,7 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
       <span
         className={грузится ? "fx-skeleton" : undefined}
         style={{
-          width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
+          width: 58, height: 58, borderRadius: "50%", flexShrink: 0,
           border: ОБОД_ЛИЦА, overflow: "hidden",
           // Пока картинки нет — ровный тёмный кружок, а не серое пятно с
           // чужим значком внутри. А пока неизвестно, есть ли она вообще,
@@ -12102,8 +12102,8 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
         }}
       >
         {!грузится && !аватар && (accountCreated && profile && profile.nickname
-          ? <БукваАватара ник={profile.nickname} size={46} />
-          : <User size={17} color={T.muted} />)}
+          ? <БукваАватара ник={profile.nickname} size={58} />
+          : <User size={22} color={T.muted} />)}
       </span>
       {/* Без аккаунта имени нет. Раньше на его месте стояло «Mintly» —
           человек читал это как своё имя, хотя так называется само
@@ -23571,11 +23571,15 @@ function ЗнакЗагрузки({ size = 40, вид = "контур", оста
    включая навигацию: полупустая страница с серыми блоками выглядела
    сломанной, а знак ясно говорит «идёт загрузка». */
 function ЭкранЗагрузкиЗнака() {
-  return (
+  // Порталом в документ: внутри вкладки, которая въезжает transform'ом,
+  // «fixed» отсчитывался от неё, и знак сначала стоял выше, а после
+  // анимации прыгал на место.
+  const экран = (
     <div aria-busy style={{ position: "fixed", inset: 0, zIndex: 90, background: "#000000", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <ЗнакЗагрузки size={76} />
     </div>
   );
+  return typeof document !== "undefined" ? createPortal(экран, document.body) : экран;
 }
 
 function ОнбЛоготип({ size = 64 }) {
