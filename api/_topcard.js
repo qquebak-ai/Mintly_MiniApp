@@ -20,12 +20,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 const Ц = {
-  плашка: "#0E1428",
-  обвод: "#1B2545",
-  текст: "#F4F6FB",
-  тусклый: "#8C97C4",
-  акцент: "#6C7CFF",
-  светлый: "#CFCBFF",
+  плашка: "#111214",
+  обвод: "#202227",
+  текст: "#F4F3EF",
+  тусклый: "#8D8B86",
+  акцент: "#E4E2DC",
+  светлый: "#E4E2DC",
   ton: "#0098EA",
   sol1: "#9945FF",
   sol2: "#14F195",
@@ -77,7 +77,7 @@ const экран = (с) => String(с || "").replace(/&/g, "&amp;").replace(/</g,
 function знакСети(сеть, x, y, r = 16) {
   if (сеть === "solana") {
     return `<g transform="translate(${x}, ${y})">
-      <circle r="${r}" fill="#150F2B" stroke="${Ц.sol1}" stroke-opacity="0.8" stroke-width="1.5"/>
+      <circle r="${r}" fill="#111214" stroke="${Ц.sol1}" stroke-opacity="0.8" stroke-width="1.5"/>
       <g transform="translate(-9.5, -7) scale(0.048)" fill="url(#солГрад)">
         <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z"/>
         <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z"/>
@@ -109,7 +109,7 @@ async function логотип(url, тикер, r, номер) {
       }
     } catch { /* чужой сервер молчит — не беда */ }
   }
-  return `<circle r="${r}" fill="#1A2140"/>
+  return `<circle r="${r}" fill="#1A1B1F"/>
     <text y="${r * 0.34}" text-anchor="middle" fill="${Ц.тусклый}" font-family="${шрифт}"
       font-size="${r * 0.8}" font-weight="700">${экран(String(тикер || "?").slice(0, 2).toUpperCase())}</text>`;
 }
@@ -132,7 +132,7 @@ async function разметка(строки, адресСайта) {
     const лого = логотипы[i];
     плашки.push(`<g transform="translate(60, ${y})">
       <rect width="960" height="104" rx="52" fill="${Ц.плашка}" stroke="${Ц.обвод}" stroke-width="1.5"/>
-      <circle cx="66" cy="52" r="30" fill="#131A33"/>
+      <circle cx="66" cy="52" r="30" fill="#1A1B1F"/>
       <text x="66" y="62" text-anchor="middle" fill="${Ц.светлый}" font-family="${шрифт}" font-size="27" font-weight="800">${i + 1}</text>
       <g transform="translate(158, 52)">${лого}</g>
       ${знакСети(т.сеть, 186, 78, 16)}
@@ -147,13 +147,13 @@ async function разметка(строки, адресСайта) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${Ш}" height="${В}" viewBox="0 0 ${Ш} ${В}">
   <defs>
     <linearGradient id="фон" x1="0" y1="0" x2="0.2" y2="1">
-      <stop offset="0%" stop-color="#060A19"/>
-      <stop offset="55%" stop-color="#070B1B"/>
-      <stop offset="100%" stop-color="#04060F"/>
+      <stop offset="0%" stop-color="#000000"/>
+      <stop offset="55%" stop-color="#000000"/>
+      <stop offset="100%" stop-color="#000000"/>
     </linearGradient>
     <linearGradient id="стык" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#0A1024" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#0A1024" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#000000" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
     </linearGradient>
     <linearGradient id="солГрад" x1="0" y1="1" x2="1" y2="0">
       <stop offset="0%" stop-color="${Ц.sol1}"/>
