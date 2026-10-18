@@ -17636,7 +17636,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         {ник && (
           <span aria-hidden style={{
             position: "absolute", left: 22, bottom: 58, maxWidth: "70%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            fontFamily: monoFont, fontSize: 13, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase",
+            fontFamily: displayFont, fontSize: 13.5, fontWeight: 900, letterSpacing: "0.16em", textTransform: "uppercase",
             color: hexA("#FFFFFF", 0.82), textShadow: `0 1px 0 ${hexA("#000000", 0.25)}`, pointerEvents: "none",
           }}>
             {ник}
