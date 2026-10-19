@@ -12662,7 +12662,7 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
       <div
         onClick={закрыть}
         style={{
-          position: "fixed", inset: 0, zIndex: 398, background: hexA("#000000", 0.55),
+          position: "fixed", inset: 0, zIndex: 398, background: hexA("#000000", 0.25),
           opacity: уходит ? 0 : 1, transition: `opacity ${УХОД_МЕНЮ}ms ease`,
         }}
       />
@@ -12675,13 +12675,17 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
         className="no-scrollbar"
         style={{
           position: "fixed", top: 0, bottom: 0, left: 0, zIndex: 399,
-          width: "min(78%, 320px)", background: T.bg,
+          // Стекло вместо чёрного листа: приложение просвечивает размытым,
+          // и меню читается слоем поверх него, а не отдельным экраном.
+          width: "min(78%, 320px)", background: "rgba(18,18,20,0.5)",
+          backdropFilter: "blur(26px) saturate(160%)", WebkitBackdropFilter: "blur(26px) saturate(160%)",
+          borderRight: "1px solid rgba(255,255,255,0.06)",
           display: "flex", flexDirection: "column",
           overflowY: "auto", overscrollBehavior: "contain",
           transform: уходит ? "translateX(-100%)" : `translateX(${-тяга}px)`,
           transition: жест.current ? "none" : `transform ${уходит ? УХОД_МЕНЮ : 240}ms cubic-bezier(0.4, 0, 0.2, 1)`,
           animation: уходит ? "none" : "менюВъезжает 260ms cubic-bezier(0.22, 1, 0.36, 1)",
-          boxShadow: "18px 0 40px rgba(0,0,0,0.5)",
+          boxShadow: "18px 0 40px rgba(0,0,0,0.35)",
           touchAction: "pan-y",
         }}
       >
