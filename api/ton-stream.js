@@ -16,6 +16,8 @@
  * Переменные окружения: TONAPI_KEY, TON_TESTNET.
  */
 
+import { записатьЖивое } from "./_live.js";
+
 const TONAPI = process.env.TON_TESTNET === "1" ? "https://testnet.tonapi.io" : "https://tonapi.io";
 const КЛЮЧ = (process.env.TONAPI_KEY || "").trim();
 const ПУЛЬС_МС = 20000;
@@ -46,6 +48,7 @@ function написать(res, событие) {
 export function протолкнутьЦену(address, { price, raised, graduation, graduated }) {
   if (!адресОк(address) || !(price > 0)) return;
   const событие = { address, price, raised, graduation, graduated: !!graduated, at: Math.floor(Date.now() / 1000) };
+  записатьЖивое(address, { price, raised, graduation, graduated: !!graduated });
   const запись = кривые.get(address);
   if (запись) for (const res of запись.зрители) написать(res, { tx: null, ...событие });
   for (const res of общие) написать(res, событие);

@@ -10888,6 +10888,11 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
   );
 }
 
+/* Темп живых цифр: капитализация в ленте, сделки и график токена.
+   Читается из памяти своего сервера (api/live.js), поэтому так часто
+   спрашивать можно. */
+const ЖИВОЙ_ОПРОС_МС = 300;
+
 function MempadView(props) {
   // У сетей EVM своего запуска пока нет — там лента токенов с биржи и их
   // карточки. Отдельный компонент, а не ветки внутри: у мемпада TON и
@@ -10907,64 +10912,38 @@ function fmtЦенаМелкая(p) {
   return "$" + n.toFixed(Math.min(14, нулей + 4)).replace(/0+$/, "");
 }
 
-/* Крупные монеты и стейблы торгуются в тех же пулах, что и мемкоины, и
-   в «трендах» биржи стоят наверху. Мемпад — не про них. */
-const НЕ_МЕМЫ_EVM = new Set(["WETH", "ETH", "WBNB", "BNB", "USDT", "USDC", "DAI", "WBTC", "BTCB", "CBBTC", "USDE", "FDUSD", "BUSD", "STETH", "WSTETH", "USD1", "TUSD", "PYUSD", "USDS", "CBETH", "RETH", "WEETH", "EURC", "SOL", "XRP", "LINK", "UNI", "AAVE", "CAKE"]);
-const ФИЛЬТРЫ_EVM = [
-  { id: "trend", путь: "trending_pools", подпись: "В тренде" },
-  { id: "new", путь: "new_pools", подпись: "Новые" },
-  { id: "vol", путь: "pools?sort=h24_volume_usd_desc", подпись: "По обороту" },
-];
-const кешЛентыEVM = new Map(); // `${сеть}:${фильтр}` -> { ts, list }
-
-async function лентаEVM(сеть, фильтр) {
-  const ключ = `${сеть}:${фильтр.id}`;
-  const было = кешЛентыEVM.get(ключ);
-  if (было && Date.now() - было.ts < 30000) return было.list;
-  const связка = фильтр.путь.includes("?") ? "&" : "?";
-  const res = await gtFetch(`${GT_BASE}/networks/${сеть}/${фильтр.путь}${связка}page=1&include=base_token,dex`);
-  if (!res.ok) throw new Error(`GeckoTerminal ${res.status}`);
-  const list = normalizePools(await res.json(), сеть)
-    .filter((tok) => !НЕ_МЕМЫ_EVM.has(String(tok.ticker || "").toUpperCase()));
-  // Один токен бывает в нескольких пулах — оставляем самый ликвидный,
-  // то есть первый: биржа отдаёт их по убыванию.
-  const виден = new Set();
-  const один = list.filter((tok) => {
-    const к = (tok.tokenAddress || tok.id).toLowerCase();
-    if (виден.has(к)) return false;
-    виден.add(к);
-    return true;
-  });
-  кешЛентыEVM.set(ключ, { ts: Date.now(), list: один });
-  return один;
-}
 
 function МемпадEVM({ сеть, onOpen, myTokens = [] }) {
-  const [фильтр, setФильтр] = useState("trend");
-  const [список, setСписок] = useState(null);
-  const [беда, setБеда] = useState(false);
-  // Запуски Mintly в этой сети — первыми: их можно купить прямо здесь.
+  // Только запуски Mintly: токены с биржи убраны — их цифры приходят
+  // раз в полминуты, а лента должна жить в реальном времени.
   const свои = useMemo(() => (myTokens || [])
     .filter((tok) => tok && tok.chain === сеть)
     .map(localTokenToFeedShape)
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)), [myTokens, сеть]);
-  /* Цифры своих запусков — с их кривых: капитализация и путь до биржи
-     для кольца вокруг логотипа. Раз в двадцать секунд, не чаще. */
+  /* Цифры своих запусков — с их кривых, каждые 0,4 с. Следующий круг не
+     начинается, пока не вернулся прошлый: на медленной сети запросы
+     иначе копились бы очередью. */
   const [рынкиСвоих, setРынкиСвоих] = useState({});
   const курсыEVM = useКурсыEVM();
   useEffect(() => {
     if (!свои.length) return undefined;
     let живо = true;
+    let идёт = false;
     const читать = async () => {
-      const { криваяEVM } = await import("./appWallet");
-      const ответы = await Promise.all(свои.slice(0, 30).map((tok) => криваяEVM({ сеть, токен: tok.tokenAddress }).catch(() => null)));
-      if (!живо) return;
-      const карта = {};
-      свои.slice(0, 30).forEach((tok, i) => { if (ответы[i]) карта[tok.id] = ответы[i]; });
-      setРынкиСвоих(карта);
+      if (идёт || document.visibilityState === "hidden") return;
+      идёт = true;
+      try {
+        const { криваяEVM } = await import("./appWallet");
+        const ряд = свои.slice(0, 20);
+        const ответы = await Promise.all(ряд.map((tok) => криваяEVM({ сеть, токен: tok.tokenAddress }).catch(() => null)));
+        if (!живо) return;
+        const карта = {};
+        ряд.forEach((tok, i) => { if (ответы[i]) карта[tok.id] = ответы[i]; });
+        setРынкиСвоих(карта);
+      } finally { идёт = false; }
     };
     читать();
-    const id = setInterval(читать, 20000);
+    const id = setInterval(читать, ЖИВОЙ_ОПРОС_МС);
     return () => { живо = false; clearInterval(id); };
   }, [свои, сеть]);
   const своиСЦифрами = useMemo(() => свои.map((tok) => {
@@ -10973,73 +10952,24 @@ function МемпадEVM({ сеть, onOpen, myTokens = [] }) {
     const цена = к.price * курсМонетыEVM(сеть, курсыEVM);
     return { ...tok, price: цена, mcapNum: цена * TOKEN_FIXED_SUPPLY, raisedTon: к.realNative, graduationTon: к.graduationNative, graduated: к.graduated };
   }), [свои, рынкиСвоих, курсыEVM, сеть]);
-  useEffect(() => {
-    let живо = true;
-    const ф = ФИЛЬТРЫ_EVM.find((x) => x.id === фильтр) || ФИЛЬТРЫ_EVM[0];
-    setСписок(null); setБеда(false);
-    const загрузить = () => лентаEVM(сеть, ф)
-      .then((l) => { if (живо) { setСписок(l); setБеда(false); } })
-      .catch(() => { if (живо) setБеда(true); });
-    загрузить();
-    // Лента живая: числа на бирже меняются каждую минуту.
-    const таймер = setInterval(() => { if (document.visibilityState === "visible") загрузить(); }, 45000);
-    return () => { живо = false; clearInterval(таймер); };
-  }, [сеть, фильтр]);
   const с = СЕТИ_EVM[сеть];
   return (
     <div className="flex flex-col" style={{ gap: 20, paddingTop: 8, paddingBottom: 16 }}>
       <ЗаголовокРаздела>Мемпад</ЗаголовокРаздела>
       <div className="flex items-center" style={{ gap: 10, marginTop: -8 }}>
         <img src={с.лого} alt="" width={22} height={22} style={{ borderRadius: "50%" }} />
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600 }}>{с.имя} · токены с биржи</span>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600 }}>{с.имя} · запуски Mintly</span>
       </div>
-      <div className="no-scrollbar flex items-center overflow-x-auto" style={{ gap: 8, touchAction: "pan-x", overscrollBehaviorX: "contain", overflowY: "hidden" }}>
-        {ФИЛЬТРЫ_EVM.map((f) => {
-          const active = фильтр === f.id;
-          return (
-            <button
-              key={f.id}
-              onClick={() => { haptic("light"); setФильтр(f.id); }}
-              className="fx-tap whitespace-nowrap flex-shrink-0"
-              style={{
-                background: active ? T.ice : "transparent",
-                border: `1px solid ${active ? T.ice : hexA("#FFFFFF", 0.12)}`,
-                padding: "9px 15px", borderRadius: 999,
-                fontFamily: bodyFont, fontSize: 14, fontWeight: 600,
-                color: active ? "#0B0B0F" : T.muted,
-                transition: `color ${EASE}, background ${EASE}`,
-              }}
-            >
-              {f.подпись}
-            </button>
-          );
-        })}
-      </div>
-      {/* Бегущая строка — сделки именно этой сети: и запуски Mintly здесь,
-          и пулы с биржи. */}
-      <RecentBuysTicker сеть={сеть} tokens={список || []} curveTokens={свои} onOpen={onOpen} />
-      {свои.length > 0 && (
+      <RecentBuysTicker сеть={сеть} tokens={[]} curveTokens={свои} onOpen={onOpen} />
+      {свои.length > 0 ? (
         <div className="flex flex-col">
-          <div style={{ fontFamily: displayFont, color: T.muted, fontSize: 13, fontWeight: 500, letterSpacing: "0.02em", textTransform: "uppercase", marginBottom: 4 }}>
-            Запуски Mintly
-          </div>
           {своиСЦифрами.slice(0, 30).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)}
         </div>
+      ) : (
+        <div className="flex items-center justify-center" style={{ padding: "80px 0", fontFamily: bodyFont, color: T.muted, fontSize: 14.5 }}>
+          В этой сети пока нет токенов
+        </div>
       )}
-      <div className="flex flex-col" key={`${сеть}:${фильтр}`}>
-        {список
-          ? список.slice(0, 60).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)
-          : беда
-            ? (
-              <div className="flex flex-col items-center" style={{ gap: 14, padding: "60px 0" }}>
-                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>Биржа не ответила</span>
-                <button onClick={() => setФильтр((ф) => ф)} className="fx-tap" style={{ padding: "10px 22px", borderRadius: 12, border: "none", background: T.ice, color: "#0B0B0F", fontFamily: bodyFont, fontSize: 14, fontWeight: 700 }}>
-                  {t("retry")}
-                </button>
-              </div>
-            )
-            : <div className="flex items-center justify-center" style={{ height: 260 }}><ЗнакЗагрузки size={56} /></div>}
-      </div>
     </div>
   );
 }
@@ -19865,6 +19795,87 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const [infoLoading, setInfoLoading] = useState(false);
   const [trades, setTrades] = useState(() => cachedPoolTrades(token.poolAddress, сетьТокена(token)));
   const [tradesLoading, setTradesLoading] = useState(false);
+
+  /* Живое на карточке — каждые 0,3 секунды с памяти своего сервера
+     (api/live.js): капитализация в шапке, последняя свеча графика и
+     свежие сделки сверху ленты. Остальное (полный ряд свечей, кошельки
+     в сделках) дочитывают обычные опросы ниже — уже не торопясь. */
+  const [живыеСделки, setЖивыеСделки] = useState([]);
+  useEffect(() => {
+    setЖивыеСделки([]);
+    const sol = token.chain === "solana" ? (token.tokenAddress || token.address) : null;
+    const ton = !sol && !этоEVM(token.chain) && !token.poolAddress ? token.curveAddress : null;
+    const ключ = sol || ton;
+    if (!ключ) return undefined;
+    let живо = true;
+    let идёт = false;
+    let прошлаяЦена = 0;
+    const шаг = async () => {
+      if (идёт || document.visibilityState === "hidden") return;
+      идёт = true;
+      try {
+        const r = await fetch(апи(`/api/live?${sol ? "sol" : "ton"}=${encodeURIComponent(ключ)}`), { cache: "no-store" });
+        const j = r.ok ? await r.json() : null;
+        const к = j && j.curves && j.curves[ключ];
+        if (!живо || !к || !(к.price > 0)) return;
+        const курс = sol ? solUsd() : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
+        const курсГрафика = sol ? (курсSolДляГрафика > 0 ? курсSolДляГрафика : курс) : курс;
+        const сделки = (j.trades && j.trades[ключ]) || [];
+        setЖивыеСделки((было) => (было.length === сделки.length && (!сделки.length || было[0].id === `live-${сделки[0].id}`)) ? было
+          : сделки.map((с) => ({
+            id: `live-${с.id}`, kind: с.side, volTon: с.coin, volUsd: с.coin * курс,
+            priceUsd: с.price * курс, txHash: null, from: null, at: new Date(с.at).toISOString(),
+          })));
+        if (к.price === прошлаяЦена) return;
+        прошлаяЦена = к.price;
+        setСвоя((было) => ({
+          ...(было || {}),
+          priceCoin: к.price,
+          priceUsd: курс > 0 ? к.price * курс : 0,
+          mcapUsd: курс > 0 ? к.price * курс * 1_000_000_000 : 0,
+          raised: к.raised,
+          цель: к.graduation != null ? к.graduation : было && было.цель,
+          продано: к.sold != null ? к.sold : было && было.продано,
+          graduated: !!к.graduated,
+          резервы: было && было.резервы
+            ? { ...было.резервы, собрано: к.raised, продано: к.sold != null ? к.sold : было.резервы.продано }
+            : было && было.резервы,
+        }));
+        const цена = sol && к.vSol > 0 && к.vTokens > 0 && к.realSol != null
+          ? curvePriceFromReserve(BigInt(Math.max(0, Math.round(к.realSol))), {
+            virtualTon: BigInt(Math.round(к.vSol)),
+            virtualTokens: BigInt(Math.round(к.vTokens)) * 1000n,
+            feeBps: 0n,
+          }) * курсГрафика
+          : к.price * курсГрафика;
+        if (цена > 0) setChartData((prev) => {
+          if (!prev || !prev.candles || !prev.candles.length) return prev;
+          const свечи = prev.candles.slice();
+          const последняя = { ...свечи[свечи.length - 1] };
+          if (последняя.close === цена) return prev;
+          последняя.close = цена;
+          последняя.high = Math.max(последняя.high, цена);
+          последняя.low = Math.min(последняя.low, цена);
+          свечи[свечи.length - 1] = последняя;
+          return { ...prev, candles: свечи };
+        });
+      } catch { /* сеть моргнула — следующий круг */ } finally { идёт = false; }
+    };
+    шаг();
+    const id = setInterval(шаг, ЖИВОЙ_ОПРОС_МС);
+    return () => { живо = false; clearInterval(id); };
+  }, [token.id, token.chain, token.tokenAddress, token.address, token.curveAddress, token.poolAddress, tonPriceUsd, курсSolДляГрафика]);
+  /* Живые сделки — сверху ленты, пока их не дочитала обычная лента:
+     та же сторона, почти та же сумма и рядом по времени — значит, это
+     она и есть, и второй раз её не показываем. */
+  const сделкиНаЭкране = useMemo(() => {
+    const база = trades || [];
+    const новые = живыеСделки.filter((ж) => !база.some((б) => б.kind === ж.kind
+      && Math.abs(new Date(б.at).getTime() - new Date(ж.at).getTime()) < 30000
+      && Math.abs((б.volTon || 0) - ж.volTon) <= Math.max(1e-9, ж.volTon * 0.05)));
+    if (!trades && !новые.length) return trades;
+    return [...новые, ...база];
+  }, [trades, живыеСделки]);
   // У токена на кривой сделок в агрегаторах нет: список собирается из
   // транзакций самого контракта.
   useEffect(() => {
@@ -20448,15 +20459,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               сверху вниз, рамка вокруг каждой сделке ничего не добавляла. */}
           {!token.poolAddress && !token.curveAddress ? (
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{tr("txUnavailable")}</span>
-          ) : tradesLoading && !trades ? (
+          ) : tradesLoading && !сделкиНаЭкране ? (
             <div className="flex items-center justify-center" style={{ height: 100 }}><ЗнакЗагрузки size={40} вид="раскрытие" /></div>
-          ) : !trades ? (
+          ) : !сделкиНаЭкране ? (
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{tr("txLoadFailed")}</span>
-          ) : trades.length === 0 ? (
+          ) : сделкиНаЭкране.length === 0 ? (
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{tr("txEmpty")}</span>
           ) : (
             <div className="flex flex-col">
-              {trades.map(tx => (
+              {сделкиНаЭкране.map(tx => (
                 <div key={tx.id} className="flex items-center justify-between" style={{ padding: "9px 0" }}>
                   <span style={{ fontFamily: displayFont, fontWeight: 600, fontSize: 13, color: tx.kind === "buy" ? T.up : T.down }}>
                     {tx.kind === "buy" ? tr("buy") : tr("sell")}
@@ -27949,47 +27960,10 @@ const FEE_PERCENT = 0; // комиссии площадки нет
   // had the moment it was tapped.
   const [tokens, setTokens] = useState([]);
   const [tokensLoading, setTokensLoading] = useState(true);
-  useEffect(() => {
-    let cancelled = false;
-    let tick = 0;
-
-    // Глубокий проход собирает много страниц — им наполняются «Горячие» и
-    // «DEX». Гонять столько запросов каждые 15 секунд нельзя (упрёмся в
-    // лимит API), поэтому обычный опрос обновляет только первую страницу,
-    // а остальное освежается раз в пару минут.
-    async function poll(deep) {
-      // Лента бирж читается всегда, даже когда свои контракты в тестовой
-      // сети: с появлением выбора сети в мемпаде она перестала мешаться
-      // со своими токенами — те лежат под фильтром «Новые», — а без неё
-      // раздел TON был пустым рядом с полным разделом Solana.
-      // Сначала готовая лента из базы — она приходит за один запрос.
-      // В источник идём, только если обход молчит.
-      const live = (await fetchFeedFromCache(GT_NETWORK))
-        || (deep ? await fetchTonMemePools(FEED_LIMIT, FEED_PAGES) : await fetchTonMemePools(20, 1));
-      if (cancelled || !live || !live.length) { setTokensLoading(false); return; }
-
-      setTokens((prev) => {
-        if (deep || !prev.length) return live;
-        // Свежие цифры по верхушке накладываем на уже собранный список,
-        // не теряя пулы с дальних страниц.
-        const fresh = new Map(live.map((tok) => [tok.id, tok]));
-        const merged = prev.map((tok) => fresh.get(tok.id) || tok);
-        const known = new Set(prev.map((tok) => tok.id));
-        live.forEach((tok) => { if (!known.has(tok.id)) merged.push(tok); });
-        return merged;
-      });
-      setTokensLoading(false);
-    }
-
-    // Сначала быстрый проход по первой странице — он снимает заставку, —
-    // и только потом добор остальных страниц в фоне.
-    poll(false).then(() => { if (!cancelled) poll(true); });
-    const iv = setInterval(() => {
-      tick += 1;
-      poll(tick % FEED_DEEP_EVERY === 0);
-    }, TOKEN_REFRESH_MS);
-    return () => { cancelled = true; clearInterval(iv); };
-  }, []);
+  /* Лента бирж (GeckoTerminal) выключена: её цифры обновляются раз в
+     полминуты, а площадка показывает только свои токены, которые живут
+     в реальном времени (см. ЖИВОЙ_ОПРОС_МС). Список остаётся пустым. */
+  useEffect(() => { setTokensLoading(false); }, []);
   // Whenever a fresh poll comes in, refresh the currently-viewed token (if
   // any) with its updated row from that same poll — so price, market cap
   // and the header stats on the detail screen move in step with the feed
@@ -29326,6 +29300,63 @@ function mapTokenRow(row) {
   // loadMyTokens/loadProfileForUser above), scoped per-account instead of
   // per-browser. Starts empty and is populated once the session resolves.
   const [myTokens, setMyTokens] = useState([]);
+
+  /* Живые цифры ленты — опросом каждые 0,3 секунды.
+   *
+   * Потоки выше приносят цену на сделку, но рвутся на слабой связи и в
+   * фоне. Опрос своего сервера (api/live.js) отвечает из памяти и стоит
+   * копейки, поэтому капитализация в ленте и на главной не отстаёт от
+   * сети больше чем на треть секунды. Следующий круг не уходит, пока не
+   * вернулся прошлый. */
+  const списокДляЖивого = useRef([]);
+  useEffect(() => {
+    const все = new Map();
+    [...communityTokens, ...myTokens].forEach((tok) => { if (tok && tok.id != null) все.set(tok.id, tok); });
+    списокДляЖивого.current = [...все.values()].filter((tok) => !tok.graduated).slice(0, 60);
+  }, [communityTokens, myTokens]);
+  useEffect(() => {
+    let живо = true;
+    let идёт = false;
+    const шаг = async () => {
+      if (идёт || (typeof document !== "undefined" && document.visibilityState === "hidden")) return;
+      const ряд = списокДляЖивого.current;
+      const sol = ряд.filter((tok) => tok.chain === "solana" && tok.address).map((tok) => tok.address);
+      const ton = ряд.filter((tok) => tok.chain !== "solana" && !этоEVM(tok.chain) && tok.curveAddress).map((tok) => tok.curveAddress);
+      if (!sol.length && !ton.length) return;
+      идёт = true;
+      try {
+        const r = await fetch(апи(`/api/live?sol=${sol.join(",")}&ton=${ton.join(",")}`), { cache: "no-store" });
+        const j = r.ok ? await r.json() : null;
+        if (!живо || !j || !j.curves) return;
+        const курсSol = solUsd();
+        const курсTon = tonPriceUsd > 0 ? tonPriceUsd : tonUsd();
+        const подставить = (prev) => {
+          let тронуто = false;
+          const следующий = prev.map((tok) => {
+            const к = j.curves[tok.chain === "solana" ? tok.address : tok.curveAddress];
+            if (!к || !(к.price > 0) || (tok.priceTon === к.price && tok.raisedTon === к.raised)) return tok;
+            const курс = tok.chain === "solana" ? курсSol : курсTon;
+            тронуто = true;
+            return {
+              ...tok,
+              priceTon: к.price,
+              price: курс > 0 ? к.price * курс : tok.price,
+              mcapNum: курс > 0 ? к.price * курс * 1_000_000_000 : tok.mcapNum,
+              raisedTon: к.raised,
+              graduationTon: к.graduation != null ? к.graduation : tok.graduationTon,
+              graduated: !!к.graduated,
+            };
+          });
+          return тронуто ? следующий : prev;
+        };
+        setCommunityTokens(подставить);
+        setMyTokens(подставить);
+      } catch { /* сеть моргнула — следующий круг */ } finally { идёт = false; }
+    };
+    const id = setInterval(шаг, ЖИВОЙ_ОПРОС_МС);
+    return () => { живо = false; clearInterval(id); };
+  }, [tonPriceUsd]);
+
 
   // Лучшая капитализация среди своих токенов — на ней держатся
   // достижения «довести токен до $1K/$10K/$100K». Это рекорд, а не
