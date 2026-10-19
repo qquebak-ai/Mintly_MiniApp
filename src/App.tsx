@@ -30082,9 +30082,6 @@ function mapTokenRow(row) {
     })();
     return () => { жив = false; };
   }, [accountCreated, userId]);
-  // Заказан ли залп конфетти: ставится, когда аккаунт создан и карточка
-  // уходит с экрана.
-  const [залпНаГлавной, setЗалпНаГлавной] = useState(false);
 
   /* Без аккаунта приложение не показывается вовсе.
    *
@@ -30826,9 +30823,8 @@ function mapTokenRow(row) {
       {/* Заставки на входе больше нет: приложение открывается сразу, а
           то, что ещё не приехало, стоит серыми плашками на своих местах.
           Ждать чёрный экран с котом ради тех же двух секунд незачем. */}
-      {/* Залп конфетти — уже на главной, а не поверх карточки: человек
-          должен увидеть приложение, в которое только что вошёл. */}
-      <КонфеттиЗалп включено={залпНаГлавной} onКонец={() => setЗалпНаГлавной(false)} />
+      {/* Конфетти после создания аккаунта больше нет — по просьбе: аккаунт
+          создан, и человек просто оказывается на главной. */}
       <Toast
         key={toast ? toast.номер : 0}
         toast={toast}
@@ -30885,7 +30881,7 @@ function mapTokenRow(row) {
           мимо него не видно ни на кадр, сколько бы ни занял ответ
           сервера и в каком бы порядке ни пришли флаги. */}
 
-      <AuthModal open={profileModalOpen} язык={appSettings.language} onЯзык={(v) => updateAppSetting("language", v)} onСоздан={() => setЗалпНаГлавной(true)} onClose={() => { setProfileModalOpen(false); setLookFocus(null); }} onSubmit={submitProfile} initial={profile} mode={profileModalMode} walletAddress={walletAddress} onChangeNickname={changeNickname} cosmetics={cosmetics} owned={owned} onEquip={equipCosmetic} lookFocus={lookFocus} />
+      <AuthModal open={profileModalOpen} язык={appSettings.language} onЯзык={(v) => updateAppSetting("language", v)} onClose={() => { setProfileModalOpen(false); setLookFocus(null); }} onSubmit={submitProfile} initial={profile} mode={profileModalMode} walletAddress={walletAddress} onChangeNickname={changeNickname} cosmetics={cosmetics} owned={owned} onEquip={equipCosmetic} lookFocus={lookFocus} />
       <SettingsPanel
         item={settingsItem}
         onClose={() => setSettingsItem(null)}
