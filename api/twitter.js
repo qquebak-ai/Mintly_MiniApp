@@ -343,6 +343,18 @@ export default async function handler(req, res) {
   // своего входа при нём нет вовсе, кто есть кто узнаём по state.
   if (действие === "callback") return колбэкX(req, res, db);
 
+  // Открытая карточка X автора токена — для ленты и страницы токена.
+  // Только для аккаунтов, подтверждённых у нас: иначе это был бы
+  // бесплатный прокси к fxtwitter для кого угодно.
+  if (действие === "profile") {
+    const handle = String((req.query && req.query.handle) || "").replace(/^@/, "");
+    if (!/^[A-Za-z0-9_]{1,15}$/.test(handle)) return res.status(400).json({ error: "bad_handle" });
+    const { data } = await db.from("profiles").select("x_handle").ilike("x_handle", handle).limit(1);
+    if (!data || !data.length) return res.status(404).json({ error: "not_linked" });
+    res.setHeader("Cache-Control", "public, max-age=300");
+    return res.status(200).json({ handle: data[0].x_handle, profile: await профильX(data[0].x_handle) });
+  }
+
   // Вход через X до создания аккаунта: кто это — по подписи Telegram.
   if (действие === "signup-start" || действие === "signup-data") {
     res.setHeader("Cache-Control", "no-store");

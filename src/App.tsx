@@ -8118,7 +8118,93 @@ function ЧислоКарточки({ подпись, значение, цвет
  * Теперь карточка отвечает на это сразу: описание (его пишут при
  * запуске), возраст, шкала до листинга и четыре цифры, по которым
  * мемкоины и сравнивают. Открывать имеет смысл уже осознанно. */
+/* Ник X автора токена — для строк ленты. Строк на экране десятки, и
+   запрос на каждую положил бы базу: собираем id за один тик и читаем
+   одним запросом, ответ держим в памяти до перезагрузки. */
+const кешXАвторов = new Map(); // ownerId -> handle | null
+const ждутXАвторов = new Map(); // ownerId -> [resolve]
+let таймерXАвторов = null;
+function xАвтора(ownerId) {
+  if (!ownerId) return Promise.resolve(null);
+  if (кешXАвторов.has(ownerId)) return Promise.resolve(кешXАвторов.get(ownerId));
+  return new Promise((resolve) => {
+    if (!ждутXАвторов.has(ownerId)) ждутXАвторов.set(ownerId, []);
+    ждутXАвторов.get(ownerId).push(resolve);
+    if (таймерXАвторов) return;
+    таймерXАвторов = setTimeout(async () => {
+      таймерXАвторов = null;
+      const пачка = new Map(ждутXАвторов);
+      ждутXАвторов.clear();
+      const ids = [...пачка.keys()];
+      let строки = [];
+      try {
+        const { data } = await supabase.from("profiles").select("id, x_handle").in("id", ids);
+        строки = data || [];
+      } catch { /* нет сети — строки останутся без X */ }
+      const по = new Map(строки.map((r) => [r.id, r.x_handle || null]));
+      for (const [id, ждущие] of пачка) {
+        const h = по.get(id) || null;
+        кешXАвторов.set(id, h);
+        ждущие.forEach((f) => f(h));
+      }
+    }, 30);
+  });
+}
+function useXАвтора(ownerId) {
+  const [handle, setHandle] = useState(() => (ownerId && кешXАвторов.get(ownerId)) || null);
+  useEffect(() => {
+    let живо = true;
+    xАвтора(ownerId).then((h) => { if (живо) setHandle(h); });
+    return () => { живо = false; };
+  }, [ownerId]);
+  return handle;
+}
+/* Карточку X открывает один общий слой в корне приложения: строки ленты
+   и страница токена только зовут его событием, не таская пропсы. */
+function открытьПрофильX(handle) {
+  if (!handle || typeof window === "undefined") return;
+  haptic("light");
+  window.dispatchEvent(new CustomEvent("mintly:x-profile", { detail: { handle } }));
+}
+function ЧужойПрофильX() {
+  const [handle, setHandle] = useState(null);
+  const [профиль, setПрофиль] = useState(null);
+  useEffect(() => {
+    const открыть = async (e) => {
+      const h = e.detail && e.detail.handle;
+      if (!h) return;
+      setПрофиль(null);
+      setHandle(h);
+      try {
+        const r = await fetch(апи(`/api/twitter?action=profile&handle=${encodeURIComponent(h)}`));
+        if (r.ok) { const j = await r.json(); setПрофиль(j.profile || null); }
+      } catch { /* покажем карточку без цифр */ }
+    };
+    window.addEventListener("mintly:x-profile", открыть);
+    return () => window.removeEventListener("mintly:x-profile", открыть);
+  }, []);
+  return <ПрофильX открыт={!!handle} onClose={() => setHandle(null)} handle={handle} профиль={профиль} />;
+}
+function СсылкаXАвтора({ handle, size = 12.5, style = {} }) {
+  if (!handle) return null;
+  // span, а не button: строка ленты сама кнопка, вложенная кнопка в ней
+  // недопустима — и нажатие не должно открывать ещё и токен.
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={(e) => { e.stopPropagation(); открытьПрофильX(handle); }}
+      className="fx-tap inline-flex items-center min-w-0"
+      style={{ gap: 4, color: T.ice, fontFamily: bodyFont, fontSize: size, fontWeight: 600, ...style }}
+    >
+      <ЗнакX size={size - 1.5} color={T.ice} />
+      <span className="truncate">@{handle}</span>
+    </span>
+  );
+}
+
 const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
+  const xHandle = useXАвтора(tok.ownerId);
   const картинкаГотова = useКартинкаГотова(tok.logoUrl ? превьюКартинки(tok.logoUrl, 48) : null);
   const рост = (tok.change || 0) >= 0;
   const возраст = (fmtAge(tok.createdAt) || "")
@@ -8168,6 +8254,7 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
             {своя ? <span style={{ color: доляДоБиржи >= 0.8 ? T.up : T.faint }}>{` · до DEX ${Math.round(доляДоБиржи * 100)}%`}</span> : ""}
             {tok.dexName ? ` · ${tok.dexName}` : ""}
           </div>
+          {xHandle && <div className="flex" style={{ marginTop: 4, minWidth: 0 }}><СсылкаXАвтора handle={xHandle} /></div>}
         </div>
 
         <div className="text-right flex-shrink-0">
@@ -8500,13 +8587,7 @@ function TokenCreatorCard({ ownerId, currentUserId, onNeedAuth, showToast, onOpe
             <span
               role="link"
               tabIndex={0}
-              onClick={(e) => {
-                e.stopPropagation();
-                const url = `https://x.com/${creator.x_handle}`;
-                const wa = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
-                if (wa && wa.openLink) wa.openLink(url);
-                else if (typeof window !== "undefined") window.open(url, "_blank", "noopener,noreferrer");
-              }}
+              onClick={(e) => { e.stopPropagation(); открытьПрофильX(creator.x_handle); }}
               className="flex items-center"
               style={{ gap: 4, marginTop: 2 }}
             >
@@ -31165,6 +31246,7 @@ function mapTokenRow(row) {
           insetBottom={insetBottom}
         />
 
+        <ЧужойПрофильX />
         <БоковоеМеню
           открыто={менюОткрыто}
           onClose={() => setМенюОткрыто(false)}
