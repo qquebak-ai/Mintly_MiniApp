@@ -12541,6 +12541,7 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
     // Аккаунт X — здесь, рядом с профилем: это часть того, кто ты, а не
     // настройка приложения.
     { key: "x", icon: ЗнакX, label: t("xTitle") },
+    { key: "referral", icon: Gift, label: t("referral") },
     /* Кошелька и секретной фразы в меню больше нет: кошелёк — своя
        вкладка внизу, а фраза открывается с оборота карты в нём. Два входа
        в одно и то же только путали. */
@@ -22787,7 +22788,8 @@ function PinLockScreen({ pin, profile, onUnlock, onForgot }) {
  */
 const ГРУППЫ_НАСТРОЕК = [
   ["security", "notify", "language"],
-  ["referral", "support"],
+  // Поддержка живёт в боковом меню, реферальная программа — там же, рядом
+  // с аккаунтом X: в настройках они только дублировались.
   ["architecture", "privacy"],
 ];
 
@@ -30971,7 +30973,7 @@ function mapTokenRow(row) {
             if (ключ === "secret") { goTab("wallet"); setЗапросФразы((н) => н + 1); return; }
             if (ключ === "settings") { setНастройкиОткрыты(true); return; }
             if (ключ === "support") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "support")); return; }
-            if (ключ === "x") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "x")); return; }
+            if (ключ === "x" || ключ === "referral") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === ключ)); return; }
           }}
         />
 
