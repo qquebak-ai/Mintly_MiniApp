@@ -19510,6 +19510,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     // Запросы брошенного интервала снимаются с очереди: иначе свечи
     // выбранного ждут, пока отработают все, что нажали до него.
     const abort = typeof AbortController !== "undefined" ? new AbortController() : null;
+    // Демо-токен рисует свечи сам, из живых цен (см. ниже): запросы к
+    // сети ему не нужны, а их «ничего не нашлось» стирало его график.
+    if (token.демо) { setChartLoading(false); return undefined; }
     setChartLoading(true);
     async function attempt(allowFlat) {
       let result = null;
@@ -19844,12 +19847,30 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     let живо = true;
     let идёт = false;
     let прошлаяЦена = 0;
+    let историяЕсть = false;
     const шаг = async () => {
       if (идёт || document.visibilityState === "hidden") return;
       идёт = true;
       try {
-        const r = await fetch(апи(token.демо ? "/api/live?demo=1" : `/api/live?${sol ? "sol" : "ton"}=${encodeURIComponent(ключ)}`), { cache: "no-store" });
+        const r = await fetch(апи(token.демо ? `/api/live?demo=1${историяЕсть ? "" : "&history=1"}` : `/api/live?${sol ? "sol" : "ton"}=${encodeURIComponent(ключ)}`), { cache: "no-store" });
         const j = r.ok ? await r.json() : null;
+        /* Демо: свечи из истории цен, что копит сервер, — по одной на
+           шаг выбранного интервала, без пустых свечей впереди. */
+        if (token.демо && !историяЕсть && j && Array.isArray(j.history)) {
+          историяЕсть = true;
+          const курсИ = tonPriceUsd > 0 ? tonPriceUsd : tonUsd();
+          const шагTf = TF_SECONDS[tf] || 60;
+          const свечи = [];
+          for (const [мс, ц] of j.history) {
+            const цена = ц * курсИ;
+            const время = Math.floor(мс / 1000 / шагTf) * шагTf;
+            const п = свечи[свечи.length - 1];
+            if (п && п.time === время) { п.close = цена; п.high = Math.max(п.high, цена); п.low = Math.min(п.low, цена); }
+            else свечи.push({ time: время, open: п ? п.close : цена, high: цена, low: цена, close: цена });
+          }
+          const ряд = свечи.slice(-CHART_TOTAL);
+          if (живо && ряд.length) setChartData({ candles: ряд, volume: ряд.map((с) => ({ time: с.time, value: 0, color: hexA(T.up, 0.32) })), tf, isLive: true });
+        }
         const к = j && j.curves && j.curves[ключ];
         if (!живо || !к || !(к.price > 0)) return;
         const курс = sol ? solUsd() : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
@@ -19888,7 +19909,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           const шагTf = TF_SECONDS[tf] || 60;
           const сейчас = Math.floor(Date.now() / 1000 / шагTf) * шагTf;
           const база = prev && prev.tf === tf && prev.candles && prev.candles.length
-            ? prev : { ...(flatCandles(цена, tf, 40) || { candles: [], volume: [] }), tf, isLive: true };
+            ? prev : { candles: [], volume: [], tf, isLive: true };
           const свечи = база.candles.slice();
           const объём = (база.volume || []).slice();
           const последняя = свечи[свечи.length - 1];

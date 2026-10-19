@@ -30,11 +30,23 @@ const ДЕМО_V_SOL = 1000;
 const ДЕМО_V_TOK = 1_073_000_000;
 const демо = { realSol: 400, sold: 0, прошлый: 0 };
 демо.sold = ДЕМО_V_TOK - (ДЕМО_V_SOL * ДЕМО_V_TOK) / (ДЕМО_V_SOL + демо.realSol);
+/* История цены демо-токена — для графика: свечи собираются из неё у
+   телефона. Точка не чаще раза в секунду, двенадцать часов назад. */
+const демоИстория = []; // [мс, цена]
 function записатьДемо() {
   записатьЖивое(ДЕМО_MINT, {
     price: (ДЕМО_V_SOL + демо.realSol) / (ДЕМО_V_TOK - демо.sold),
     raised: демо.realSol, sold: демо.sold, graduation: 1500, graduated: false,
   });
+}
+function запомнитьДемо() {
+  const з = прочитатьЖивое(ДЕМО_MINT);
+  if (!з || !з.событие) return;
+  const сейчас = Date.now();
+  const последняя = демоИстория[демоИстория.length - 1];
+  if (последняя && сейчас - последняя[0] < 1000) { последняя[1] = з.событие.price; return; }
+  демоИстория.push([сейчас, з.событие.price]);
+  while (демоИстория.length && сейчас - демоИстория[0][0] > 12 * 3600 * 1000) демоИстория.shift();
 }
 function шагДемо() {
   const сейчас = Date.now();
@@ -55,6 +67,7 @@ function шагДемо() {
     // Продано — по той же кривой: x·y = k, где k = V_SOL · V_TOK.
     демо.sold = ДЕМО_V_TOK - (ДЕМО_V_SOL * ДЕМО_V_TOK) / (ДЕМО_V_SOL + демо.realSol);
     записатьДемо();
+    запомнитьДемо();
   }
 }
 
@@ -130,5 +143,6 @@ export default async function handler(req, res) {
     };
     if (з.сделки.length) сделки[ключ] = з.сделки.slice(0, 30);
   }
-  return res.status(200).json({ at: Date.now(), curves: кривые, trades: сделки });
+  const история = сДемо && String((req.query && req.query.history) || "") === "1" ? демоИстория : undefined;
+  return res.status(200).json({ at: Date.now(), curves: кривые, trades: сделки, ...(история ? { history: история } : null) });
 }
