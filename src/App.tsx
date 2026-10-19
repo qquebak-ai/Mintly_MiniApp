@@ -25532,6 +25532,59 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const isLogin = !isEdit && authTab === "login";
   const [tgNick, setTgNick] = useState("");
   const [tgNickTouched, setTgNickTouched] = useState(false);
+  /* Создание через X: ник, фото и описание приходят из X. Человек уходит
+     в браузер X и возвращается — заготовку тогда забираем с сервера и
+     подставляем в анкету; занят ник — поле остаётся для своего. */
+  const [xЗаготовка, setXЗаготовка] = useState(null); // { handle, profile, taken }
+  const [xИдёт, setXИдёт] = useState(false);
+  const [xЖдёмВозврата, setXЖдёмВозврата] = useState(false);
+  const [xБеда, setXБеда] = useState("");
+  async function создатьЧерезX() {
+    if (xИдёт) return;
+    setXБеда("");
+    setXИдёт(true);
+    haptic("light");
+    try {
+      const r = await fetch(апи("/api/twitter?action=signup-start"), {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initData: telegramInitData() }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.url) throw new Error(j.error || `http ${r.status}`);
+      setXЖдёмВозврата(true);
+      const wa = window.Telegram && window.Telegram.WebApp;
+      if (wa && wa.openLink) wa.openLink(j.url); else window.open(j.url, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      setXБеда("Не получилось открыть X — попробуй ещё раз");
+    } finally {
+      setXИдёт(false);
+    }
+  }
+  useEffect(() => {
+    if (!xЖдёмВозврата) return undefined;
+    const вернулся = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const r = await fetch(апи("/api/twitter?action=signup-data"), {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initData: telegramInitData() }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!j || !j.handle) return; // ещё не вернулись из X или отменили
+        setXЖдёмВозврата(false);
+        setXЗаготовка(j);
+        setTgNick(String(j.handle).replace(/[^A-Za-z0-9_.]/g, "").slice(0, 20));
+        setTgNickTouched(true);
+        // Фото из X — если это не стандартная заглушка самого X.
+        const фото = j.profile && j.profile.avatar;
+        if (фото && !/default_profile/.test(фото)) setAvatarUrl(фото);
+        haptic("success");
+        сменитьШагВхода("ник");
+      } catch { /* сеть не ответила — спросим на следующем возврате */ }
+    };
+    document.addEventListener("visibilitychange", вернулся);
+    return () => document.removeEventListener("visibilitychange", вернулся);
+  }, [xЖдёмВозврата]); // eslint-disable-line react-hooks/exhaustive-deps
   // Смена ника в режиме правки профиля.
   const [nickEditing, setNickEditing] = useState(false);
   const [newNick, setNewNick] = useState("");
@@ -25781,6 +25834,21 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
             const id = data && data.user && data.user.id;
             if (id) await supabase.from("profiles").update({ email: почтаЧистая }).eq("id", id);
           } catch (e) { console.warn("[mintly] почта не легла в профиль:", e && e.message); }
+        }
+        /* Создавали через X — привязываем X к новому аккаунту; фото и
+           описание из X сервер ставит сам, если своих не выбрали. */
+        if (xЗаготовка) {
+          try {
+            const { data } = await supabase.auth.getSession();
+            const токен = data && data.session && data.session.access_token;
+            if (токен) {
+              await fetch(апи("/api/twitter?action=signup-link"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${токен}` },
+                body: JSON.stringify({ initData: telegramInitData() }),
+              });
+            }
+          } catch (e) { console.warn("[mintly] X не привязался:", e && e.message); }
         }
         /* Страницы «Аккаунт готов» больше нет: создан — сразу внутрь. */
         onСоздан(); onClose();
@@ -26262,6 +26330,22 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 {t("onbContinue")}
               </ОнбКнопка>
 
+              {/* Быстрый путь: ник, фото и описание — из X. Почту можно
+                  добавить потом, с главной. */}
+              {внутриTelegram && (
+                <button
+                  onClick={создатьЧерезX}
+                  disabled={xИдёт}
+                  className="fx-tap w-full flex items-center justify-center"
+                  style={{
+                    gap: 9, height: 52, borderRadius: ОНБ.радиус, border: `1px solid ${hexA("#FFFFFF", 0.16)}`,
+                    background: "transparent", color: ОНБ.текст, fontFamily: displayFont, fontSize: 15.5, fontWeight: 700,
+                  }}
+                >
+                  <ЗнакX size={16} color={ОНБ.текст} /> {xИдёт ? "Открываем X…" : "Создать через X"}
+                </button>
+              )}
+              {xБеда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{xБеда}</span>}
 
               {!внутриTelegram && (
                 <a
@@ -26487,6 +26571,16 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   себя решает. */}
               <ОнбЗаголовок title={входБезНика ? t("authSignInCta") : t("onbUserTitle")} lead={!внутриTelegram ? t("createOutside") : (входБезНика ? "" : t("onbUserLead"))} />
 
+              {внутриTelegram && !входБезНика && xЗаготовка && (
+                <div className="flex items-center" style={{ gap: 8, padding: "10px 12px", borderRadius: 14, background: hexA("#FFFFFF", 0.06) }}>
+                  <ЗнакX size={14} color={ОНБ.текст} />
+                  <span style={{ fontFamily: bodyFont, color: xЗаготовка.taken ? T.down : ОНБ.приглушённый, fontSize: 13, lineHeight: 1.4 }}>
+                    {xЗаготовка.taken
+                      ? `@${xЗаготовка.handle} уже занят в Mintly — придумай другой ник`
+                      : `Из X: @${xЗаготовка.handle} — ник, фото и описание`}
+                  </span>
+                </div>
+              )}
               {внутриTelegram && !входБезНика && (
                 <div className="flex flex-col" style={{ gap: 6 }}>
                   {/* Собачка приклеена к полю, а не набирается руками: ник
@@ -26927,6 +27021,29 @@ function ProfileView({
   // Прошлый выбор хранится и вернётся сам, как только человек войдёт.
   const cosmetics = accountCreated ? cosmeticsProp : { frame: "none", card: "none" };
 
+  /* Аккаунт X — строкой под описанием: подключён — @handle с логотипом,
+     нажатие открывает его карточку; нет — кнопка «Подключить X».
+     Перечитываем при возврате в приложение: могли только что подключить. */
+  const [xСостояние, setXСостояние] = useState(null);
+  const [xПрофильОткрыт, setXПрофильОткрыт] = useState(false);
+  useEffect(() => {
+    if (!accountCreated || !userId) { setXСостояние(null); return undefined; }
+    let живо = true;
+    const читать = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const токен = data && data.session && data.session.access_token;
+        if (!токен) return;
+        const r = await fetch(апи("/api/twitter?action=state"), { headers: { Authorization: `Bearer ${токен}` } });
+        if (r.ok && живо) setXСостояние(await r.json());
+      } catch { /* сеть не ответила — строки просто нет */ }
+    };
+    читать();
+    const приВозврате = () => { if (document.visibilityState === "visible") читать(); };
+    document.addEventListener("visibilitychange", приВозврате);
+    return () => { живо = false; document.removeEventListener("visibilitychange", приВозврате); };
+  }, [accountCreated, userId]);
+
   const unlocked = accountCreated;
   function requireUnlock(missingMsg) {
     if (!accountCreated) { onOpenCreateProfile(); showToast(t("firstAccountFirst")); return false; }
@@ -27024,6 +27141,27 @@ function ProfileView({
               <div className="flex items-center gap-3" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>
                 <span className="flex items-center gap-1"><Clock size={12} /> {t("memberSince")}</span>
               </div>
+              {xСостояние && (xСостояние.handle ? (
+                <button
+                  onClick={() => { haptic("light"); setXПрофильОткрыт(true); }}
+                  className="fx-tap flex items-center"
+                  style={{ gap: 7, padding: "7px 12px", borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700 }}
+                >
+                  <ЗнакX size={13} color={T.ice} /> @{xСостояние.handle}
+                  <CheckCircle2 size={13} color={T.up} />
+                </button>
+              ) : (
+                <button
+                  onClick={() => { haptic("light"); onOpenSetting(SETTINGS_ITEMS.find((s) => s.key === "x")); }}
+                  className="fx-tap flex items-center"
+                  style={{ gap: 7, padding: "7px 12px", borderRadius: 999, border: `1px solid ${T.lineHi}`, background: "transparent", color: T.ice, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700 }}
+                >
+                  <ЗнакX size={13} color={T.ice} /> Подключить X
+                </button>
+              ))}
+              {xСостояние && xСостояние.handle && (
+                <ПрофильX открыт={xПрофильОткрыт} onClose={() => setXПрофильОткрыт(false)} handle={xСостояние.handle} профиль={xСостояние.profile} />
+              )}
             </>
           ) : (
             <>

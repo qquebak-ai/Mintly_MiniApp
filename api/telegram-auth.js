@@ -64,7 +64,7 @@ function fail(res, status, error, detail) {
    присланным hash. Возвращает { user } либо { reason } — по причине
    видно, что именно не сошлось: не тот токен бота, протухшая строка или
    мусор вместо initData. Сам токен наружу, разумеется, не уходит. */
-function verifyInitData(initData) {
+export function verifyInitData(initData) {
   if (typeof initData !== "string" || !initData) return { reason: "empty_init_data" };
 
   const params = new URLSearchParams(initData);

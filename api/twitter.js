@@ -77,6 +77,45 @@ async function профильX(handle) {
   }
 }
 
+/* Создание аккаунта через X.
+ *
+ * Аккаунта ещё нет, значит нет ни входа, ни строки, к которой привязать
+ * state. Поэтому state здесь самоподписанный: в нём номер Telegram и срок,
+ * под ними — подпись секретом сервера. PKCE-ключ не хранится, а выводится
+ * той же подписью из случайной части state. Кто начал вход, проверяется
+ * подписью Telegram (initData) — подделать её без токена бота нельзя.
+ *
+ * Что пришло из X, сервер держит в памяти четверть часа: человек
+ * возвращается в Telegram, приложение забирает ник, фото и описание и
+ * подставляет их в анкету. */
+const СЕКРЕТ_STATE = X_CLIENT_SECRET || String(process.env.APP_WALLET_KEY || "") || String(process.env.TELEGRAM_BOT_TOKEN || "");
+const подписьState = (строка) => crypto.createHmac("sha256", СЕКРЕТ_STATE).update(строка).digest("base64url");
+const ЗАГОТОВКИ_X = new Map(); // telegram id -> { handle, профиль, ts }
+const ЖИЗНЬ_ЗАГОТОВКИ_МС = 15 * 60 * 1000;
+
+function состояниеЗаписи(tg) {
+  const срок = Date.now() + ЖИЗНЬ_STATE_МС;
+  const соль = crypto.randomBytes(12).toString("base64url");
+  const тело = `${tg}.${срок}.${соль}`;
+  return { state: `su.${тело}.${подписьState(тело)}`, verifier: подписьState(`v.${соль}`) };
+}
+function разобратьStateЗаписи(state) {
+  const ч = String(state || "").split(".");
+  if (ч.length !== 5 || ч[0] !== "su") return null;
+  const [, tg, срок, соль, подпись] = ч;
+  const тело = `${tg}.${срок}.${соль}`;
+  const ждём = подписьState(тело);
+  if (подпись.length !== ждём.length || !crypto.timingSafeEqual(Buffer.from(подпись), Buffer.from(ждём))) return null;
+  if (Date.now() > Number(срок)) return { устарел: true };
+  return { tg: String(tg), verifier: подписьState(`v.${соль}`) };
+}
+
+async function telegramИз(тело) {
+  const { verifyInitData } = await import("./telegram-auth.js");
+  const итог = verifyInitData(String((тело && тело.initData) || ""));
+  return итог && итог.user && итог.user.id ? String(итог.user.id) : null;
+}
+
 async function колбэкX(req, res, db) {
   const { code, state, error: xОтказ } = req.query || {};
   // Не через res.redirect — его здесь нет (см. дополнить() в
@@ -85,6 +124,7 @@ async function колбэкX(req, res, db) {
      внешнем браузере, и сайт там — это сайт без входа: человек видел
      регистрацию и решал, что всё сломалось. Мини-приложение же осталось
      открытым в Telegram и само переспросит X, когда в него вернутся. */
+  const запись = String(state || "").startsWith("su.");
   const назад = (статус, причина = "") => {
     const удача = статус === "ok";
     if (!удача) console.warn("[twitter] вход X не прошёл:", причина);
@@ -93,7 +133,9 @@ async function колбэкX(req, res, db) {
     const подробно = String(причина || "").replace(/[<>&"]/g, "").slice(0, 160);
     const бот = String(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "").replace(/[^A-Za-z0-9_]/g, "");
     const заголовок = удача ? "Аккаунт X подключён" : "Не получилось подключить X";
-    const текст = удача ? "Вернитесь в Telegram — аккаунт уже виден в Mintly." : "Вернитесь в Telegram и попробуйте ещё раз.";
+    const текст = удача
+      ? (запись ? "Вернитесь в Telegram — ник, фото и описание уже подставлены в анкету." : "Вернитесь в Telegram — аккаунт уже виден в Mintly.")
+      : "Вернитесь в Telegram и попробуйте ещё раз.";
     res.statusCode = 200;
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
@@ -112,10 +154,19 @@ ${удача || !подробно ? "" : `<p style="font-size:12px;color:#5E5D59
   if (xОтказ) return назад("error", `X отказал: ${xОтказ}`);
   if (!code || !state) return назад("error", "X не вернул код входа");
   try {
-    const { data: строка } = await db.from("x_oauth_state").select("*").eq("state", String(state)).maybeSingle();
-    if (строка) await db.from("x_oauth_state").delete().eq("state", String(state));
-    if (!строка) return назад("error", "запрос входа не найден — нажмите «Подключить» ещё раз");
-    if (Date.now() - new Date(строка.created_at).getTime() > ЖИЗНЬ_STATE_МС) return назад("error", "запрос входа устарел");
+    let строка = null;
+    if (запись) {
+      const р = разобратьStateЗаписи(state);
+      if (!р) return назад("error", "запрос входа не сходится — нажмите «Через X» ещё раз");
+      if (р.устарел) return назад("error", "запрос входа устарел");
+      строка = { code_verifier: р.verifier, tg: р.tg };
+    } else {
+      const { data } = await db.from("x_oauth_state").select("*").eq("state", String(state)).maybeSingle();
+      строка = data;
+      if (строка) await db.from("x_oauth_state").delete().eq("state", String(state));
+      if (!строка) return назад("error", "запрос входа не найден — нажмите «Подключить» ещё раз");
+      if (Date.now() - new Date(строка.created_at).getTime() > ЖИЗНЬ_STATE_МС) return назад("error", "запрос входа устарел");
+    }
 
     /* Обмен кода на токен. Приложение в X бывает двух видов: с секретом
        (Web App — X ждёт заголовок Basic) и публичное (Native App — без
@@ -149,6 +200,12 @@ ${удача || !подробно ? "" : `<p style="font-size:12px;color:#5E5D59
     const handle = профиль && профиль.data && профиль.data.username;
     if (!профильОтвет.ok || !имяОк(handle)) {
       return назад("error", `профиль X: ${профильОтвет.status} ${(профиль && (профиль.title || профиль.detail)) || ""}`);
+    }
+
+    // Аккаунта ещё нет — откладываем X до его создания.
+    if (строка.tg) {
+      ЗАГОТОВКИ_X.set(строка.tg, { handle, профиль: await профильX(handle), ts: Date.now() });
+      return назад("ok");
     }
 
     // Один аккаунт X — один профиль: у чужого его тут же снимаем, иначе
@@ -286,9 +343,54 @@ export default async function handler(req, res) {
   // своего входа при нём нет вовсе, кто есть кто узнаём по state.
   if (действие === "callback") return колбэкX(req, res, db);
 
+  // Вход через X до создания аккаунта: кто это — по подписи Telegram.
+  if (действие === "signup-start" || действие === "signup-data") {
+    res.setHeader("Cache-Control", "no-store");
+    if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
+    const тело = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    const tg = await telegramИз(тело);
+    if (!tg) return res.status(401).json({ error: "invalid_init_data" });
+    if (действие === "signup-start") {
+      if (!X_CLIENT_ID || !СЕКРЕТ_STATE) return res.status(503).json({ error: "x_oauth_disabled" });
+      const { state, verifier } = состояниеЗаписи(tg);
+      const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
+      const параметры = new URLSearchParams({
+        response_type: "code", client_id: X_CLIENT_ID, redirect_uri: X_REDIRECT_URI,
+        scope: "users.read tweet.read", state, code_challenge: challenge, code_challenge_method: "S256",
+      });
+      return res.status(200).json({ url: `https://twitter.com/i/oauth2/authorize?${параметры}` });
+    }
+    const з = ЗАГОТОВКИ_X.get(tg);
+    if (!з || Date.now() - з.ts > ЖИЗНЬ_ЗАГОТОВКИ_МС) return res.status(200).json({ handle: null });
+    // Свободен ли ник: такой же юзернейм в Mintly мог уже кто-то занять.
+    const { data: занят } = await db.from("profiles").select("id").ilike("nickname", з.handle).limit(1);
+    return res.status(200).json({ handle: з.handle, profile: з.профиль, taken: !!(занят && занят.length) });
+  }
+
   const user = await хозяин(req, db);
   if (!user) return res.status(401).json({ error: "unauthorized" });
   res.setHeader("Cache-Control", "no-store");
+
+  /* Аккаунт только что создан после входа через X: привязываем X и
+     ставим фото и описание из него, если своих человек не выбрал.
+     Telegram тот же — иначе чужая заготовка легла бы не тому человеку. */
+  if (действие === "signup-link") {
+    const тело = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    const tg = await telegramИз(тело);
+    if (!tg) return res.status(401).json({ error: "invalid_init_data" });
+    const з = ЗАГОТОВКИ_X.get(tg);
+    if (!з || Date.now() - з.ts > ЖИЗНЬ_ЗАГОТОВКИ_МС) return res.status(404).json({ error: "no_x_data" });
+    const { data: моя } = await db.from("profiles").select("telegram_id, avatar_url, bio").eq("id", user.id).maybeSingle();
+    if (!моя || String(моя.telegram_id) !== tg) return res.status(403).json({ error: "wrong_telegram" });
+    await db.from("profiles").update({ x_handle: null, x_verified_at: null }).ilike("x_handle", з.handle).neq("id", user.id);
+    const правка = { x_handle: з.handle, x_verified_at: new Date().toISOString(), x_code: null, x_code_at: null };
+    if (!моя.avatar_url && з.профиль && з.профиль.avatar) правка.avatar_url = з.профиль.avatar;
+    if (!моя.bio && з.профиль && з.профиль.description) правка.bio = String(з.профиль.description).slice(0, 200);
+    const { error } = await db.from("profiles").update(правка).eq("id", user.id);
+    if (error) return res.status(500).json({ error: "db", detail: error.message });
+    ЗАГОТОВКИ_X.delete(tg);
+    return res.status(200).json({ ok: true, handle: з.handle });
+  }
 
   try {
     if (действие === "start") {
