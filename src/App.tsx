@@ -18049,10 +18049,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           <path d={ПУТЬ_ЗВЕЗДЫ} fill={hexA("#FFFFFF", 0.9)} />
         </svg>
         {/* Имя держателя, как на дебетовой карте: ник заглавными, с
-            разрядкой, прямо над чипом с монетами. */}
+            разрядкой, внизу карты. Чипа с монетами там больше нет —
+            монеты видны в активах ниже. */}
         {ник && (
           <span aria-hidden style={{
-            position: "absolute", left: 22, bottom: 58, maxWidth: "70%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            position: "absolute", left: 22, bottom: 20, maxWidth: "70%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             fontFamily: displayFont, fontSize: 13.5, fontWeight: 900, letterSpacing: "0.16em", textTransform: "uppercase",
             color: hexA("#FFFFFF", 0.82), textShadow: `0 1px 0 ${hexA("#000000", 0.25)}`, pointerEvents: "none",
           }}>
@@ -18082,17 +18083,6 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             );
           })()}
         </div>
-        <span
-          className="inline-flex items-center"
-          style={{
-            position: "relative", marginTop: "auto", alignSelf: "flex-start", padding: "8px 14px", borderRadius: 999,
-            background: hexA("#FFFFFF", 0.18), color: "#FFFFFF",
-            fontFamily: monoFont, fontSize: 14.5, fontWeight: 700,
-            minHeight: 30,
-          }}
-        >
-          <span style={туман}><УмныйТекст text={`${fmtСумма(солНаКошельке)} SOL · ${fmtСумма(тонНаКошельке)} ${ТИКЕР_TON}`} /></span>
-        </span>
         {/* Мягкая кромка: рисунок сходит на нет у самого края, и карта
             не выглядит обрезанной по линейке.
             Раньше кромка размывала подложку (backdrop-filter). Пока по
