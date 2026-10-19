@@ -8661,7 +8661,6 @@ function TokenCreatorCard({ ownerId, currentUserId, onNeedAuth, showToast, onOpe
             >
               <ЗнакX size={12} color={T.electric} />
               <span className="truncate" style={{ fontFamily: bodyFont, color: T.electric, fontSize: 12.5 }}>@{creator.x_handle}</span>
-              <CheckCircle2 size={12} color={T.up} />
             </span>
           ) : null}
         </div>
@@ -8772,7 +8771,6 @@ function PublicProfileView({ userId: ownerId, currentUserId, onBack, onOpenToken
               position: "absolute", left: "100%", top: "50%", transform: "translateY(-50%)",
               marginLeft: 6, gap: 6,
             }}>
-              <VerifiedBadge verified={!!profile.verified} size={16} />
               <CreatorWreathBadge tier={creatorTier} size={19} />
             </span>
           </span>
@@ -20231,7 +20229,6 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em" }}>
               {token.name}
             </span>
-            {token.verified && <ShieldCheck size={15} color={T.electric} style={{ flexShrink: 0, alignSelf: "center" }} />}
           </div>
           {/* Тикер повторять незачем, если он и есть имя. */}
           {String(token.ticker || "").toUpperCase() !== String(token.name || "").toUpperCase() && (
@@ -20486,7 +20483,6 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       <КарточкаСтрок
         заголовок={tr("securityTitle")}
         строки={[
-          [tr("securityVerified"), token.verified ? tr("yes") : tr("no"), token.verified ? T.up : T.warning],
           [tr("securityNetwork"), token.chain === "solana" ? "Solana" : "TON"],
           [tr("securityCurve"), token.curveAddress ? tr("yes") : tr("no")],
         ]}
@@ -22854,7 +22850,6 @@ function MyTokenCard({ t, onOpen }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 600 }}>{t.name}</span>
-          {t.verified && <ShieldCheck size={12} color={T.electric} />}
           <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11 }}>${t.ticker}</span>
           <ПометкаТест сеть={t.network} size={9.5} />
         </div>
@@ -23560,13 +23555,8 @@ function ПрофильX({ открыт, onClose, handle, профиль }) {
         </div>
         <div className="flex items-center" style={{ gap: 6, marginTop: 12 }}>
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800 }}>{п.name || handle}</span>
-          {п.verified && <CheckCircle2 size={18} color="#1D9BF0" />}
         </div>
         <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 15, marginTop: 2 }}>@{handle}</div>
-        <div className="flex items-center" style={{ gap: 6, marginTop: 10 }}>
-          <CheckCircle2 size={14} color={T.up} />
-          <span style={{ fontFamily: bodyFont, color: T.up, fontSize: 13 }}>Аккаунт подтверждён в Mintly</span>
-        </div>
         {п.description ? (
           <p style={{ fontFamily: bodyFont, color: T.ice, fontSize: 15, lineHeight: 1.5, marginTop: 14, whiteSpace: "pre-wrap" }}>{п.description}</p>
         ) : null}
@@ -27332,15 +27322,8 @@ function ProfileView({
   cosmetics: cosmeticsProp = { frame: "none", card: "none" }, onGoShop, onOpenAchievements, insetTop = 0, userId = null,
   // Достижения считаются в корне: их же показывает магазин и отдельная
   // страница достижений, дублировать запрос незачем.
-  achievements = [], creatorTier = 0, onVerified, supportUnread = 0,
+  achievements = [], creatorTier = 0, supportUnread = 0,
 }) {
-  // Подтверждение хранится в профиле, а не только на экране: иначе
-  // значок пропадал при первом же обновлении страницы.
-  const [verifyStatus, setVerifyStatus] = useState(profile.verified ? "verified" : "none");
-  useEffect(() => {
-    setVerifyStatus((cur) => (profile.verified ? "verified" : cur === "pending" ? "pending" : "none"));
-  }, [profile.verified]);
-
   // Без аккаунта украшений нет: пустой профиль с чужой рамкой и фоном
   // выглядит как чей-то чужой, хотя войти ещё даже не предлагали.
   // Прошлый выбор хранится и вернётся сам, как только человек войдёт.
@@ -27418,16 +27401,6 @@ function ProfileView({
     if (!accountCreated) { onOpenCreateProfile(); showToast(t("firstAccountFirst")); return false; }
     return true;
   }
-  function startVerify() {
-    if (!requireUnlock()) return;
-    setVerifyStatus("pending");
-    showToast(t("verifyRequestSent"));
-    setTimeout(() => {
-      setVerifyStatus("verified");
-      showToast(t("profileVerified"));
-      if (onVerified) onVerified();
-    }, 2200);
-  }
   function goCreateToken() {
     if (!requireUnlock()) return;
     onGoCreate();
@@ -27476,7 +27449,6 @@ function ProfileView({
                     marginLeft: 6, gap: 6,
                   }}>
                     <CreatorWreathBadge tier={creatorTier} size={19} />
-                    <VerifiedBadge verified={verifyStatus === "verified"} size={16} />
                   </span>
                 </span>
               </div>
@@ -27510,9 +27482,6 @@ function ProfileView({
                   {profile.bio || t("bioEmptyPlaceholder")}
                 </p>
               )}
-              <div className="flex items-center gap-3" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>
-                <span className="flex items-center gap-1"><Clock size={12} /> {t("memberSince")}</span>
-              </div>
               {xСостояние && (xСостояние.handle ? (
                 <button
                   onClick={() => { haptic("light"); setXПрофильОткрыт(true); }}
@@ -27520,7 +27489,6 @@ function ProfileView({
                   style={{ gap: 7, padding: "7px 12px", borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700 }}
                 >
                   <ЗнакX size={13} color={T.ice} /> @{xСостояние.handle}
-                  <CheckCircle2 size={13} color={T.up} />
                 </button>
               ) : (
                 <button
@@ -27568,38 +27536,6 @@ function ProfileView({
             <ДостиженияСтрокой achievements={achievements} onOpenAchievements={onOpenAchievements} />
           </div>
         )}
-
-        {/* Подтверждённый профиль эту строку не показывает: о том, что он
-            подтверждён, уже говорит значок у ника, а целый раздел ради
-            повтора съедал экран — из-за него профиль переставал помещаться
-            целиком и начинал прокручиваться. */}
-        <div className="mt-5" style={{ display: verifyStatus === "verified" ? "none" : undefined }}>
-          <SectionTitle>{t("verificationTitle")}</SectionTitle>
-          {/* Без подложки: это строка состояния, а не отдельный объект —
-              карточка вокруг двух строк текста только добавляла слой. */}
-          <div className="flex items-center gap-3" style={{ padding: "4px 0" }}>
-            {verifyStatus === "pending" ? (
-              <>
-                <ShieldAlert size={22} color={T.violet} />
-                <div className="flex-1">
-                  <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 600 }}>{t("pendingStatus")}</div>
-                  <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("verifyPending")}</div>
-                </div>
-              </>
-            ) : (
-              <>
-                <ShieldAlert size={22} color={T.muted} />
-                <div className="flex-1">
-                  <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 600 }}>{t("notVerifiedStatus")}</div>
-                  <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("verifyCta")}</div>
-                </div>
-                <button onClick={startVerify} className="fx-tap rounded-[16px] px-3 py-2 flex items-center gap-1.5" style={{ background: T.surfaceHi, border: "none", fontFamily: bodyFont, fontSize: 13, color: T.ice, opacity: unlocked ? 1 : 0.55 }}>
-                  {!unlocked && <Lock size={11} color={T.muted} />} {t("verifyAccountBtn")}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
 
         {/* Настроек здесь больше нет: они живут отдельным экраном и
             открываются из бокового меню по аватарке. Дублировать их
@@ -29573,16 +29509,6 @@ function mapTokenRow(row) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myCurveKey, tonPriceUsd, mcapPeakKey, myTokens]);
-
-  // Подтверждение аккаунта. Тоже в профиле: значок у ника должен
-  // переживать перезапуск приложения и быть виден другим.
-  function markProfileVerified() {
-    setProfile((p) => ({ ...p, verified: true }));
-    if (!userId) return;
-    supabase.from("profiles").update({ verified: true }).eq("id", userId).then(({ error }) => {
-      if (error) console.warn("[mintly] failed to save verification:", error.message);
-    });
-  }
 
   // Ступень знака создателя. Живёт в профиле, потому что её видят другие,
   // и только растёт: если токен просядет, знак остаётся.
@@ -31561,7 +31487,6 @@ function mapTokenRow(row) {
               insetTop={insetTop}
               userId={userId}
               creatorTier={creatorTier}
-              onVerified={markProfileVerified}
             />
         </СтраницаПрофиля>
 
