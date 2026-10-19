@@ -12665,7 +12665,7 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
       <div
         onClick={закрыть}
         style={{
-          position: "fixed", inset: 0, zIndex: 398, background: hexA("#000000", 0.25),
+          position: "fixed", inset: 0, zIndex: 398, background: hexA("#000000", 0.18),
           opacity: уходит ? 0 : 1, transition: `opacity ${УХОД_МЕНЮ}ms ease`,
         }}
       />
@@ -12680,9 +12680,12 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
           position: "fixed", top: 0, bottom: 0, left: 0, zIndex: 399,
           // Стекло вместо чёрного листа: приложение просвечивает размытым,
           // и меню читается слоем поверх него, а не отдельным экраном.
-          width: "min(78%, 320px)", background: "rgba(18,18,20,0.5)",
-          backdropFilter: "blur(26px) saturate(160%)", WebkitBackdropFilter: "blur(26px) saturate(160%)",
-          borderRight: "1px solid rgba(255,255,255,0.06)",
+          // Насыщенность не поднимаем и яркость чуть гасим: с saturate
+          // яркие картинки за стеклом вспыхивали пятнами, а плотная
+          // заливка делала его мутным. Тонкая светлая кромка — край стекла.
+          width: "min(78%, 320px)", background: "rgba(10,10,12,0.28)",
+          backdropFilter: "blur(30px) brightness(0.72)", WebkitBackdropFilter: "blur(30px) brightness(0.72)",
+          borderRight: "1px solid rgba(255,255,255,0.09)",
           display: "flex", flexDirection: "column",
           overflowY: "auto", overscrollBehavior: "contain",
           transform: уходит ? "translateX(-100%)" : `translateX(${-тяга}px)`,
@@ -17170,9 +17173,12 @@ function МастерФразы({
      незачем, а не дойдёт — следующий запуск просто покажет этот экран. */
   function создатьСразу() {
     if (идёт) return;
-    setИдёт(true);
-    onПропустить();
+    // Кошелёк считается заведённым с этого нажатия: отметку «отложено»
+    // шлём сразу, в фоне. Тогда уход со слов — кнопкой «Назад» или
+    // закрытием приложения — не возвращает к «Создать кошелёк», а
+    // кошелёк сам напомнит про резервную копию.
     import("./appWallet").then(({ отложитьФразу }) => отложитьФразу()).catch(() => {});
+    показать();
   }
 
   async function показать() {
@@ -17273,24 +17279,16 @@ function МастерФразы({
     haptic("light");
   }
 
-  /* Назад со слов — это назад, а не «пропустить». Раньше стрелка
-     звала отложить(): кошелёк заводился сам, с фразой, которую человек
-     ещё не записал. Пропустить можно только осознанно — кнопкой
-     «Пропустить» внизу. Слова при возврате забываются: новый показ
-     выдаст свежую фразу, а деньгам на этом шаге взяться неоткуда. */
-  function вернутьсяКНачалу() {
-    setСлова([]);
-    setБеда("");
-    setСогласен(false);
-    setШаг("начало");
-  }
+  /* Назад со слов при заведении — это «отложить»: кошелёк уже заведён
+     нажатием «Создать кошелёк», и возвращать человека к этой кнопке
+     незачем. Слова он перепишет потом — кошелёк напомнит плашкой. */
 
   /* Стрелка Telegram знает, куда ведёт назад с каждого шага. Раньше в
      шапке оставалось одно «Закрыть»: выход из приложения целиком вместо
      шага назад — и это посреди записи фразы, которую человек как раз и
      переписывал. */
   const назад = шаг === "викторина" ? () => setШаг("слова")
-    : шаг === "слова" ? (режим === "фраза" ? () => setШаг("безопасность") : вернутьсяКНачалу)
+    : шаг === "слова" ? (режим === "фраза" ? () => setШаг("безопасность") : () => onПропустить())
     : шаг === "безопасность" ? () => setШаг("вручную")
     : шаг === "вручную" ? onНазад
     : null;
@@ -17343,7 +17341,7 @@ function МастерФразы({
             {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
           </div>
           <div style={{ marginTop: "auto" }}>
-            <Кнопка надпись={t("walletMakeCta")} onClick={создатьСразу} активна={!идёт} мгновенно />
+            <Кнопка надпись={идёт ? t("walletMakeWait") : t("walletMakeCta")} onClick={создатьСразу} активна={!идёт} мгновенно />
           </div>
         </>
       ) : шаг === "вручную" ? (
@@ -31503,6 +31501,11 @@ function mapTokenRow(row) {
                   strokeWidth={active ? 2 : 1.8}
                   color={active ? "#14151A" : "#9B9FA9"}
                 />
+                {/* Кошелёк ещё не заведён — точка зовёт туда, иначе раздел
+                    легко пропустить: всё остальное в приложении работает и без него. */}
+                {id === "wallet" && accountCreated && фразаКошелька && !фразаКошелька.начато && (
+                  <span aria-hidden style={{ position: "absolute", top: 9, right: 9, width: 9, height: 9, borderRadius: "50%", background: T.down }} />
+                )}
                 {locked && (
                   <div style={{ position: "absolute", top: -3, right: -3, width: 14, height: 14, borderRadius: "50%", background: T.surface, border: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Lock size={8} color={T.muted} />
