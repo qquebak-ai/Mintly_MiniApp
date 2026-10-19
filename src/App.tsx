@@ -8086,6 +8086,30 @@ function SpotlightAura({ src, ticker }) {
 /* Пометка «тест» у токена из пробной сети. Монеты там ничего не стоят, а
    выглядит такой токен точно так же, как настоящий, — без подписи это
    ловушка для того, кто пришёл покупать. */
+/* Демо-токен — для всех, с пометкой «демо». Сделки по нему каждые
+   0,3 с разыгрывает сервер (api/live.js), в сети его нет: купить или
+   продать его нельзя, он только показывает, как быстро живут цифры. */
+const ДЕМО_MINT = "MintDemo1111111111111111111111111111111111";
+function создатьДемоТокен() {
+  return {
+    id: "demo-speed", демо: true, name: "Demo Speed", ticker: "DEMO", emoji: "⚡",
+    verified: false, mcapNum: 0, liq: "0", vol: "0", change: 0, tx24h: 0,
+    address: null, tokenAddress: null, poolAddress: null, dexPoolAddress: null, curveAddress: null,
+    logoUrl: null, description: "Тестовый токен: сделки каждые 0,3 секунды, чтобы видеть скорость обновления.",
+    network: "mainnet", chain: "ton", механики: { fair_start: false, buyback: false, live_chart: false },
+    замок: "none", ownerId: null, createdAt: Date.now() - 60 * 1000, graduationTon: 85, raisedTon: 0,
+  };
+}
+function ПометкаДемо({ size = 10 }) {
+  return (
+    <span style={{
+      fontFamily: monoFont, fontSize: size, lineHeight: 1.6, letterSpacing: 0.4,
+      color: "#7FB5FF", border: "1px solid #7FB5FF55",
+      borderRadius: 6, padding: "0 5px", flexShrink: 0, textTransform: "uppercase",
+    }}>демо</span>
+  );
+}
+
 function ПометкаТест({ сеть, size = 10 }) {
   if (!пробнаяСеть(сеть)) return null;
   return (
@@ -8245,6 +8269,7 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
           <div className="flex items-center" style={{ gap: 6 }}>
             <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800 }}>${tok.ticker}</span>
             <ПометкаТест сеть={tok.network} />
+            {tok.демо && <ПометкаДемо />}
           </div>
           <div className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 3 }}>
             {tok.name || "—"}
@@ -8487,6 +8512,7 @@ function localTokenToFeedShape(entry) {
     live: false,
     dexName: null,
     ownerId: entry.ownerId || null,
+    демо: !!entry.демо,
     curveAddress: entry.curveAddress || null,
     curveJettonWallet: entry.curveJettonWallet || null,
     chain: этоEVM(entry.chain) ? entry.chain : entry.chain === "solana" ? "solana" : "ton",
@@ -19812,7 +19838,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     setЖивыеСделки([]);
     const sol = token.chain === "solana" ? (token.tokenAddress || token.address) : null;
     const ton = !sol && !этоEVM(token.chain) && !token.poolAddress ? token.curveAddress : null;
-    const ключ = sol || ton;
+    const ключ = token.демо ? ДЕМО_MINT : sol || ton;
     if (!ключ) return undefined;
     let живо = true;
     let идёт = false;
@@ -19821,7 +19847,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       if (идёт || document.visibilityState === "hidden") return;
       идёт = true;
       try {
-        const r = await fetch(апи(`/api/live?${sol ? "sol" : "ton"}=${encodeURIComponent(ключ)}`), { cache: "no-store" });
+        const r = await fetch(апи(token.демо ? "/api/live?demo=1" : `/api/live?${sol ? "sol" : "ton"}=${encodeURIComponent(ключ)}`), { cache: "no-store" });
         const j = r.ok ? await r.json() : null;
         const к = j && j.curves && j.curves[ключ];
         if (!живо || !к || !(к.price > 0)) return;
@@ -19855,7 +19881,27 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             feeBps: 0n,
           }) * курсГрафика
           : к.price * курсГрафика;
-        if (цена > 0) setChartData((prev) => {
+        /* У демо-токена истории нет нигде — свечи собираем прямо из
+           живых цен: новая свеча на каждом шаге интервала. */
+        if (token.демо && цена > 0) setChartData((prev) => {
+          const шагTf = TF_SECONDS[tf] || 60;
+          const сейчас = Math.floor(Date.now() / 1000 / шагTf) * шагTf;
+          const база = prev && prev.tf === tf && prev.candles && prev.candles.length
+            ? prev : { ...(flatCandles(цена, tf, 40) || { candles: [], volume: [] }), tf, isLive: true };
+          const свечи = база.candles.slice();
+          const объём = (база.volume || []).slice();
+          const последняя = свечи[свечи.length - 1];
+          if (!последняя || последняя.time < сейчас) {
+            const откр = последняя ? последняя.close : цена;
+            свечи.push({ time: сейчас, open: откр, high: Math.max(откр, цена), low: Math.min(откр, цена), close: цена });
+            объём.push({ time: сейчас, value: 0, color: hexA(T.up, 0.32) });
+            if (свечи.length > CHART_TOTAL) { свечи.shift(); объём.shift(); }
+          } else {
+            свечи[свечи.length - 1] = { ...последняя, close: цена, high: Math.max(последняя.high, цена), low: Math.min(последняя.low, цена) };
+          }
+          return { ...база, candles: свечи, volume: объём };
+        });
+        else if (цена > 0) setChartData((prev) => {
           if (!prev || !prev.candles || !prev.candles.length) return prev;
           const свечи = prev.candles.slice();
           const последняя = { ...свечи[свечи.length - 1] };
@@ -19871,7 +19917,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     шаг();
     const id = setInterval(шаг, ЖИВОЙ_ОПРОС_МС);
     return () => { живо = false; clearInterval(id); };
-  }, [token.id, token.chain, token.tokenAddress, token.address, token.curveAddress, token.poolAddress, tonPriceUsd, курсSolДляГрафика]);
+  }, [token.id, token.chain, token.tokenAddress, token.address, token.curveAddress, token.poolAddress, tonPriceUsd, курсSolДляГрафика, tf]);
   /* Живые сделки — сверху ленты, пока их не дочитала обычная лента:
      та же сторона, почти та же сумма и рядом по времени — значит, это
      она и есть, и второй раз её не показываем. */
@@ -20464,7 +20510,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
 
           {/* Сделки строками, без карточек: столбцы читаются глазом
               сверху вниз, рамка вокруг каждой сделке ничего не добавляла. */}
-          {!token.poolAddress && !token.curveAddress ? (
+          {!token.poolAddress && !token.curveAddress && !token.демо ? (
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{tr("txUnavailable")}</span>
           ) : tradesLoading && !сделкиНаЭкране ? (
             <div className="flex items-center justify-center" style={{ height: 100 }}><ЗнакЗагрузки size={40} вид="раскрытие" /></div>
@@ -28717,7 +28763,9 @@ function mapTokenRow(row) {
       const кеш = Array.isArray(row.curve_cache) ? row.curve_cache[0] : row.curve_cache;
       return применитьКеш(mapTokenRow(row), кеш, tonPriceUsd);
     });
-    setCommunityTokens(rows);
+    // Демо-токен держим первым и не пересоздаём: иначе каждое
+    // перечитывание ленты сбрасывало бы его живые цифры.
+    setCommunityTokens((prev) => [prev.find((tok) => tok.демо) || создатьДемоТокен(), ...rows]);
     setCommunityLoaded(true);
     дополнитьSolanaРынком(rows);
 
@@ -29321,10 +29369,11 @@ function mapTokenRow(row) {
       const ряд = списокДляЖивого.current;
       const sol = ряд.filter((tok) => tok.chain === "solana" && tok.address).map((tok) => tok.address);
       const ton = ряд.filter((tok) => tok.chain !== "solana" && !этоEVM(tok.chain) && tok.curveAddress).map((tok) => tok.curveAddress);
-      if (!sol.length && !ton.length) return;
+      const демо = ряд.some((tok) => tok.демо);
+      if (!sol.length && !ton.length && !демо) return;
       идёт = true;
       try {
-        const r = await fetch(апи(`/api/live?sol=${sol.join(",")}&ton=${ton.join(",")}`), { cache: "no-store" });
+        const r = await fetch(апи(`/api/live?sol=${sol.join(",")}&ton=${ton.join(",")}${демо ? "&demo=1" : ""}`), { cache: "no-store" });
         const j = r.ok ? await r.json() : null;
         if (!живо || !j || !j.curves) return;
         const курсSol = solUsd();
@@ -29332,7 +29381,7 @@ function mapTokenRow(row) {
         const подставить = (prev) => {
           let тронуто = false;
           const следующий = prev.map((tok) => {
-            const к = j.curves[tok.chain === "solana" ? tok.address : tok.curveAddress];
+            const к = j.curves[tok.демо ? ДЕМО_MINT : tok.chain === "solana" ? tok.address : tok.curveAddress];
             if (!к || !(к.price > 0) || (tok.priceTon === к.price && tok.raisedTon === к.raised)) return tok;
             const курс = tok.chain === "solana" ? курсSol : курсTon;
             тронуто = true;
@@ -30720,8 +30769,8 @@ function mapTokenRow(row) {
     // кошельком приложения, он заводится вместе с аккаунтом.
     return true;
   }
-  function handleBuy() { if (requireUnlockRoot()) setTradeModal({ mode: "buy" }); }
-  function handleSell() { if (requireUnlockRoot()) setTradeModal({ mode: "sell" }); }
+  function handleBuy() { if (token && token.демо) { showToast("Это демо-токен — его нельзя купить"); return; } if (requireUnlockRoot()) setTradeModal({ mode: "buy" }); }
+  function handleSell() { if (token && token.демо) { showToast("Это демо-токен — его нельзя продать"); return; } if (requireUnlockRoot()) setTradeModal({ mode: "sell" }); }
   // Своя запись о сделке. Цепочка знает о переводе, но не знает, кто
   // его сделал из приложения и по какому курсу — а без этого не
   // посчитать ни портфель, ни прибыль. Пишем после того, как кошелёк
