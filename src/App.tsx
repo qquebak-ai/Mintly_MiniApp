@@ -9815,6 +9815,10 @@ function useНазадТелеграм(активно, действие) {
   }, [активно]);
 }
 
+// Видна ли вкладка: загрузчик рисуется порталом поверх всего, и у
+// скрытой вкладки он закрывал бы чужой раздел.
+const ВкладкаВидна = React.createContext(true);
+
 function KeepAlive({ show, children }) {
   // Вкладки собираются сразу, все, ещё под заставкой запуска: к моменту
   // первого перехода данные уже на месте. Раньше вкладка начинала
@@ -9835,7 +9839,7 @@ function KeepAlive({ show, children }) {
       className={show && вход > 0 ? (вход % 2 ? "fx-tab-in" : "fx-tab-in2") : undefined}
       style={show ? undefined : { display: "none" }} aria-hidden={show ? undefined : true} inert={show ? undefined : ""}
     >
-      {children}
+      <ВкладкаВидна.Provider value={!!show}>{children}</ВкладкаВидна.Provider>
     </div>
   );
 }
@@ -11775,7 +11779,8 @@ async function получитьКурсМонеты(ключ) {
   }
   const json = await курсМонетЗапрос;
   for (const к of Object.keys(МОНЕТЫ_КУРСА)) {
-    const д = json && json[к];
+    // Base платит газ тем же ETH — курс общий, строка своя.
+    const д = json && json[(МОНЕТЫ_КУРСА[к] && МОНЕТЫ_КУРСА[к].курсИз) || к];
     if (!д) continue;
     КЕШ_КУРСА_МОНЕТЫ.set(к, { at: Date.now(), points: д.points || [], price: д.price || 0, change24: д.change24 || 0 });
   }
@@ -11790,13 +11795,14 @@ if (typeof window !== "undefined") {
   получитьКурсМонеты("gram").catch(() => {});
 }
 
-/* Монеты всех сетей кошелька — для курсов. Base платит за газ тем же
-   ETH, что и Ethereum, поэтому ETH одной строкой на обе сети. */
+/* Монеты всех сетей кошелька — для курсов. У Base своя строка, хотя
+   газ там платится тем же ETH: курс берётся у ETH, а остаток — свой. */
 const МОНЕТЫ_КУРСА = {
   gram: { имя: "Gram", тикер: ТИКЕР_TON, лого: "/coins/gram.png", сеть: "TON" },
   sol: { имя: "Solana", тикер: "SOL", лого: "/coins/sol.png", сеть: "Solana" },
   bnb: { имя: "BNB", тикер: "BNB", лого: "/coins/bnb.svg", сеть: "BNB Chain" },
-  eth: { имя: "Ethereum", тикер: "ETH", лого: "/coins/eth.svg", сеть: "Ethereum · Base" },
+  eth: { имя: "Ethereum", тикер: "ETH", лого: "/coins/eth.svg", сеть: "Ethereum" },
+  base: { имя: "Base", тикер: "ETH", лого: "/coins/base.svg", сеть: "Base", курсИз: "eth" },
 };
 
 function fmtКурс(p) {
@@ -18439,7 +18445,8 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         монета={монетаОткрыта}
         сколько={монетаОткрыта === "sol" ? солНаКошельке
           : монетаОткрыта === "bnb" ? Number((остатокEVM("bsc") || {}).native) || 0
-          : монетаОткрыта === "eth" ? (Number((остатокEVM("eth") || {}).native) || 0) + (Number((остатокEVM("base") || {}).native) || 0)
+          : монетаОткрыта === "eth" ? Number((остатокEVM("eth") || {}).native) || 0
+          : монетаОткрыта === "base" ? Number((остатокEVM("base") || {}).native) || 0
           : тонНаКошельке}
         onClose={() => setМонетаОткрыта(null)}
         onSend={() => setВыводОткрыт(true)}
@@ -24766,6 +24773,8 @@ function useМинимумЗагрузки(готово) {
 }
 
 function ЭкранЗагрузкиЗнака() {
+  const видна = React.useContext(ВкладкаВидна);
+  if (!видна) return null;
   // Порталом в документ: внутри вкладки, которая въезжает transform'ом,
   // «fixed» отсчитывался от неё, и знак сначала стоял выше, а после
   // анимации прыгал на место.
