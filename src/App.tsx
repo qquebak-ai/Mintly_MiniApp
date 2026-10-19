@@ -17148,6 +17148,17 @@ function МастерФразы({
     }
   }
 
+  /* «Создать кошелёк» открывает кошелёк сразу: сам он на сервере уже
+     заведён, а слова человек перепишет потом — кошелёк напомнит об этом
+     плашкой. Отметку «отложено» шлём в фоне: ждать сеть ради перехода
+     незачем, а не дойдёт — следующий запуск просто покажет этот экран. */
+  function создатьСразу() {
+    if (идёт) return;
+    setИдёт(true);
+    onПропустить();
+    import("./appWallet").then(({ отложитьФразу }) => отложитьФразу()).catch(() => {});
+  }
+
   async function показать() {
     if (идёт) return;
     setИдёт(true);
@@ -17275,12 +17286,15 @@ function МастерФразы({
   }, [шаг, режим]);
 
   // Кнопка внизу — одна на все шаги, и выглядит одинаково.
-  function Кнопка({ надпись, onClick, активна = true, краска = ЦВЕТ_КНОПКИ_НОЧЬ }) {
+  function Кнопка({ надпись, onClick, активна = true, краска = ЦВЕТ_КНОПКИ_НОЧЬ, мгновенно = false }) {
     return (
       <button
         // Отклик в ладонь на каждое нажатие: экран длинный, и по нему
         // идут вслепую, переписывая слова на бумагу.
-        onClick={() => { haptic("light"); onClick(); }}
+        // «Мгновенно» — срабатывает на касание, а не на отпускание:
+        // click ждёт, пока палец поднимется, и кнопка казалась тугой.
+        onPointerDown={мгновенно ? (e) => { if (!активна || e.button > 0) return; e.preventDefault(); haptic("light"); onClick(); } : undefined}
+        onClick={мгновенно ? undefined : () => { haptic("light"); onClick(); }}
         disabled={!активна}
         className="fx-tap w-full"
         style={{
@@ -17313,7 +17327,7 @@ function МастерФразы({
             {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
           </div>
           <div style={{ marginTop: "auto" }}>
-            <Кнопка надпись={идёт ? t("walletMakeWait") : t("walletMakeCta")} onClick={показать} активна={!идёт} />
+            <Кнопка надпись={t("walletMakeCta")} onClick={создатьСразу} активна={!идёт} мгновенно />
           </div>
         </>
       ) : шаг === "вручную" ? (
@@ -18039,6 +18053,22 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
        отрицательных отступов и пересчёта ширины окна. */
     <div className={`flex flex-col${приходКошелька ? " fx-view" : ""}`} style={{ paddingTop: 8 }}>
       <ЗаголовокРаздела style={{ margin: "0 16px 16px" }}>Кошелёк</ЗаголовокРаздела>
+      {/* Копии фразы ещё нет — просим сделать её, но кошелёк не держим:
+          деньги в нём уже работают, а слова перепишут, когда будет время. */}
+      {фраза && фраза.начато && !фраза.готово && (
+        <button
+          onClick={() => { haptic("light"); setФразаОткрыта(true); }}
+          className="fx-tap flex items-center text-left"
+          style={{ margin: "0 16px 14px", gap: 12, padding: "13px 14px", borderRadius: 18, border: "none", background: "rgba(245,166,35,0.12)" }}
+        >
+          <AlertTriangle size={20} color="#F5A623" strokeWidth={2.4} style={{ flexShrink: 0 }} />
+          <span className="flex flex-col" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800 }}>Сделайте резервную копию</span>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.4 }}>Запишите секретную фразу — без неё кошелёк не вернуть</span>
+          </span>
+          <ChevronRight size={18} color={T.muted} style={{ flexShrink: 0 }} />
+        </button>
+      )}
       {/* Карта баланса. Сумма читается одним взглядом: целые рубли
           крупно и белым, копейки приглушены — так глаз не спотыкается о
           мелкую часть, которая на решение не влияет. */}
