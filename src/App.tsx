@@ -23255,7 +23255,9 @@ function ПрофильX({ открыт, onClose, handle, профиль }) {
   const лист = (
     <div onTouchStart={стоп} onTouchMove={стоп} onTouchEnd={стоп} onTouchCancel={стоп} data-sheet="1" className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 500, overscrollBehavior: "contain", background: "#000000", overflowY: "auto", paddingBottom: "calc(28px + var(--tg-inset-bottom, 0px))" }}>
       {/* Баннер — как шапка профиля в X; нет баннера — ровная плашка. */}
-      <div style={{ height: 150, marginTop: "var(--tg-inset-top, 0px)", background: п.banner ? `center/cover no-repeat url(${п.banner})` : T.surfaceHi }} />
+      {/* Шапка уходит под панель Telegram до самого верха: с отступом
+          над ней оставалась чёрная полоса, и фон выглядел обрезанным. */}
+      <div style={{ height: "calc(150px + var(--tg-inset-top, 0px))", background: п.banner ? `center/cover no-repeat url(${п.banner})` : T.surfaceHi }} />
       <div style={{ padding: "0 16px" }}>
         <div className="flex items-end justify-between" style={{ marginTop: -44 }}>
           <span style={{ width: 88, height: 88, borderRadius: "50%", border: "4px solid #000", background: T.surfaceHi, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
