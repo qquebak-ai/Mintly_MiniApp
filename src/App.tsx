@@ -23200,7 +23200,64 @@ function ReferralShare({ showToast }) {
  * же аккаунтом, а обратно возвращается уже подтверждённым. Ни ника, ни
  * ручного поста никто больше не набирает.
  */
+/* Профиль X целиком: баннер, аватар, имя, юзернейм, описание и цифры —
+   как карточка аккаунта в самом X. Данные открытые, их отдаёт сервер
+   вместе с состоянием подключения. */
+function ПрофильX({ открыт, onClose, handle, профиль }) {
+  const [видно, уходит] = useClosing(открыт ? true : null, 220);
+  useНазадТелеграм(!!открыт, onClose);
+  if (!видно) return null;
+  const п = профиль || {};
+  const число = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(".0", "")} млн` : n >= 1e4 ? `${(n / 1e3).toFixed(1).replace(".0", "")} тыс.` : (n || 0).toLocaleString("ru-RU"));
+  const присоединился = п.joined ? new Date(п.joined) : null;
+  const ссылка = (url) => { try { const tg = window.Telegram && window.Telegram.WebApp; if (tg && tg.openLink) tg.openLink(url); else window.open(url, "_blank"); } catch { /* ссылка не открылась */ } };
+  const лист = (
+    <div className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 500, background: "#000000", overflowY: "auto", paddingBottom: "calc(28px + var(--tg-inset-bottom, 0px))" }}>
+      {/* Баннер — как шапка профиля в X; нет баннера — ровная плашка. */}
+      <div style={{ height: 150, marginTop: "var(--tg-inset-top, 0px)", background: п.banner ? `center/cover no-repeat url(${п.banner})` : T.surfaceHi }} />
+      <div style={{ padding: "0 16px" }}>
+        <div className="flex items-end justify-between" style={{ marginTop: -44 }}>
+          <span style={{ width: 88, height: 88, borderRadius: "50%", border: "4px solid #000", background: T.surfaceHi, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {п.avatar ? <img src={п.avatar} alt="" width={88} height={88} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Twitter size={30} color={T.muted} />}
+          </span>
+          <button
+            onClick={() => { haptic("light"); ссылка(`https://x.com/${handle}`); }}
+            className="fx-tap"
+            style={{ padding: "10px 18px", borderRadius: 999, border: "none", background: T.ice, color: "#0B0B0F", fontFamily: displayFont, fontSize: 14.5, fontWeight: 800 }}
+          >
+            Открыть в X
+          </button>
+        </div>
+        <div className="flex items-center" style={{ gap: 6, marginTop: 12 }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800 }}>{п.name || handle}</span>
+          {п.verified && <CheckCircle2 size={18} color="#1D9BF0" />}
+        </div>
+        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 15, marginTop: 2 }}>@{handle}</div>
+        <div className="flex items-center" style={{ gap: 6, marginTop: 10 }}>
+          <CheckCircle2 size={14} color={T.up} />
+          <span style={{ fontFamily: bodyFont, color: T.up, fontSize: 13 }}>Аккаунт подтверждён в Mintly</span>
+        </div>
+        {п.description ? (
+          <p style={{ fontFamily: bodyFont, color: T.ice, fontSize: 15, lineHeight: 1.5, marginTop: 14, whiteSpace: "pre-wrap" }}>{п.description}</p>
+        ) : null}
+        <div className="flex flex-wrap" style={{ gap: "6px 16px", marginTop: 12, fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>
+          {п.location ? <span>📍 {п.location}</span> : null}
+          {п.website ? <button onClick={() => ссылка(п.website)} className="fx-tap" style={{ background: "none", border: "none", padding: 0, color: "#1D9BF0", fontSize: 14 }}>🔗 {String(п.website).replace(/^https?:\/\//, "")}</button> : null}
+          {присоединился && !isNaN(присоединился) ? <span>В X с {присоединился.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}</span> : null}
+        </div>
+        <div className="flex" style={{ gap: 18, marginTop: 14, fontFamily: bodyFont, fontSize: 14.5 }}>
+          <span><b style={{ color: T.ice }}>{число(п.following)}</b> <span style={{ color: T.muted }}>в читаемых</span></span>
+          <span><b style={{ color: T.ice }}>{число(п.followers)}</b> <span style={{ color: T.muted }}>читателей</span></span>
+          <span><b style={{ color: T.ice }}>{число(п.tweets)}</b> <span style={{ color: T.muted }}>постов</span></span>
+        </div>
+      </div>
+    </div>
+  );
+  return typeof document !== "undefined" ? createPortal(лист, document.body) : лист;
+}
+
 function ПодключениеX({ showToast }) {
+  const [профильОткрыт, setПрофильОткрыт] = useState(false);
   const [состояние, setСостояние] = useState(null); // { handle } | null
   const [грузится, setГрузится] = useState(true);
   const [подключаю, setПодключаю] = useState(false);
@@ -23292,14 +23349,22 @@ function ПодключениеX({ showToast }) {
   if (состояние && состояние.handle) {
     return (
       <div className="flex flex-col mt-2" style={{ gap: 12 }}>
-        <div className="flex items-center" style={{ gap: 12, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
-          <Twitter size={18} color={T.ice} />
+        <button
+          onClick={() => { haptic("light"); setПрофильОткрыт(true); }}
+          className="fx-tap flex items-center text-left"
+          style={{ gap: 12, padding: 14, borderRadius: 18, background: T.surfaceHi, border: "none", width: "100%" }}
+        >
+          {состояние.profile && состояние.profile.avatar
+            ? <img src={состояние.profile.avatar} alt="" width={36} height={36} style={{ borderRadius: "50%", flexShrink: 0 }} />
+            : <Twitter size={18} color={T.ice} />}
           <div className="flex-1 min-w-0">
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>@{состояние.handle}</div>
             <div style={{ fontFamily: bodyFont, color: T.up, fontSize: 12.5 }}>{t("xConnected")}</div>
           </div>
           <CheckCircle2 size={18} color={T.up} />
-        </div>
+          <ChevronRight size={16} color={T.faint} />
+        </button>
+        <ПрофильX открыт={профильОткрыт} onClose={() => setПрофильОткрыт(false)} handle={состояние.handle} профиль={состояние.profile} />
         <button
           onClick={отключить}
           className="fx-tap w-full rounded-[12px] min-h-[52px] py-3"

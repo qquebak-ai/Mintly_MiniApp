@@ -42,6 +42,41 @@ const X_REDIRECT_URI = (process.env.X_REDIRECT_URI || "https://api.mintly.compan
 // Полчаса на туда-обратно с лишним запасом — потом строка мусор.
 const ЖИЗНЬ_STATE_МС = 30 * 60 * 1000;
 
+/* Открытый профиль X: аватар, баннер, имя, описание и цифры. Берём у
+   fxtwitter — он отдаёт публичную страницу аккаунта без ключей и без
+   лимита бесплатного X API (на нём users/me даётся считанные разы в
+   сутки). Десять минут держим в памяти: профиль меняется редко. */
+const кешПрофилейX = new Map();
+async function профильX(handle) {
+  const ключ = String(handle).toLowerCase();
+  const было = кешПрофилейX.get(ключ);
+  if (было && Date.now() - было.ts < 10 * 60 * 1000) return было.профиль;
+  try {
+    const r = await fetch(`https://api.fxtwitter.com/${encodeURIComponent(handle)}`, { signal: AbortSignal.timeout(6000) });
+    const j = r.ok ? await r.json() : null;
+    const u = j && j.user;
+    if (!u) return было ? было.профиль : null;
+    const профиль = {
+      name: u.name || handle,
+      // Аватар в полном размере: «_normal» — это 48 точек.
+      avatar: u.avatar_url ? String(u.avatar_url).replace("_normal.", "_400x400.") : null,
+      banner: u.banner_url || null,
+      description: u.description || "",
+      location: u.location || "",
+      website: (u.website && u.website.url) || null,
+      followers: Number(u.followers) || 0,
+      following: Number(u.following) || 0,
+      tweets: Number(u.tweets) || 0,
+      joined: u.joined || null,
+      verified: !!(u.verification && u.verification.verified),
+    };
+    кешПрофилейX.set(ключ, { ts: Date.now(), профиль });
+    return профиль;
+  } catch {
+    return было ? было.профиль : null;
+  }
+}
+
 async function колбэкX(req, res, db) {
   const { code, state, error: xОтказ } = req.query || {};
   // Не через res.redirect — его здесь нет (см. дополнить() в
@@ -272,9 +307,11 @@ export default async function handler(req, res) {
 
     if (действие === "state") {
       const { data } = await db.from("profiles").select("x_handle, x_verified_at").eq("id", user.id).maybeSingle();
+      const handle = (data && data.x_handle) || null;
       return res.status(200).json({
-        handle: (data && data.x_handle) || null,
+        handle,
         verifiedAt: (data && data.x_verified_at) || null,
+        profile: handle ? await профильX(handle) : null,
       });
     }
 
