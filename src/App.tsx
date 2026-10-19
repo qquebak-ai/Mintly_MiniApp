@@ -23217,13 +23217,24 @@ function ЗнакX({ size = 24, color = "currentColor", style }) {
 function ПрофильX({ открыт, onClose, handle, профиль }) {
   const [видно, уходит] = useClosing(открыт ? true : null, 220);
   useНазадТелеграм(!!открыт, onClose);
+  // Свайп вниз не сворачивает и само мини-приложение, пока карточка открыта.
+  useEffect(() => {
+    if (!открыт) return undefined;
+    const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    try { tg && tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch { /* старый клиент */ }
+    return undefined;
+  }, [открыт]);
   if (!видно) return null;
   const п = профиль || {};
   const число = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(".0", "")} млн` : n >= 1e4 ? `${(n / 1e3).toFixed(1).replace(".0", "")} тыс.` : (n || 0).toLocaleString("ru-RU"));
   const присоединился = п.joined ? new Date(п.joined) : null;
   const ссылка = (url) => { try { const tg = window.Telegram && window.Telegram.WebApp; if (tg && tg.openLink) tg.openLink(url); else window.open(url, "_blank"); } catch { /* ссылка не открылась */ } };
+  /* Закрывается только кнопкой «Назад» Telegram. Карточка лежит порталом,
+     но события React всё равно всплывают к листу настроек под ней — и его
+     жест «смахнуть вниз» закрывал всё разом. Касания здесь дальше не идут. */
+  const стоп = (e) => e.stopPropagation();
   const лист = (
-    <div className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 500, background: "#000000", overflowY: "auto", paddingBottom: "calc(28px + var(--tg-inset-bottom, 0px))" }}>
+    <div onTouchStart={стоп} onTouchMove={стоп} onTouchEnd={стоп} onTouchCancel={стоп} data-sheet="1" className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 500, overscrollBehavior: "contain", background: "#000000", overflowY: "auto", paddingBottom: "calc(28px + var(--tg-inset-bottom, 0px))" }}>
       {/* Баннер — как шапка профиля в X; нет баннера — ровная плашка. */}
       <div style={{ height: 150, marginTop: "var(--tg-inset-top, 0px)", background: п.banner ? `center/cover no-repeat url(${п.banner})` : T.surfaceHi }} />
       <div style={{ padding: "0 16px" }}>
