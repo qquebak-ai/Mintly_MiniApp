@@ -50,8 +50,12 @@ async function колбэкX(req, res, db) {
      внешнем браузере, и сайт там — это сайт без входа: человек видел
      регистрацию и решал, что всё сломалось. Мини-приложение же осталось
      открытым в Telegram и само переспросит X, когда в него вернутся. */
-  const назад = (статус) => {
+  const назад = (статус, причина = "") => {
     const удача = статус === "ok";
+    if (!удача) console.warn("[twitter] вход X не прошёл:", причина);
+    // Причина — мелко внизу: по ней видно, на каком шаге сорвалось,
+    // без доступа к журналу сервера.
+    const подробно = String(причина || "").replace(/[<>&"]/g, "").slice(0, 160);
     const бот = String(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "").replace(/[^A-Za-z0-9_]/g, "");
     const заголовок = удача ? "Аккаунт X подключён" : "Не получилось подключить X";
     const текст = удача ? "Вернитесь в Telegram — аккаунт уже виден в Mintly." : "Вернитесь в Telegram и попробуйте ещё раз.";
@@ -66,14 +70,17 @@ a{margin-top:18px;display:block;width:100%;max-width:320px;padding:16px 0;border
 .знак{font-size:46px;color:${удача ? "#2ED47A" : "#FF5C6C"}}</style></head><body>
 <div class="знак">${удача ? "✓" : "✕"}</div><h1>${заголовок}</h1><p>${текст}</p>
 <a href="tg://resolve?domain=${бот}">Вернуться в Telegram</a>
+${удача || !подробно ? "" : `<p style="font-size:12px;color:#5E5D59;margin-top:10px">Причина: ${подробно}</p>`}
 <script>setTimeout(function(){location.href="tg://resolve?domain=${бот}"},600)</script>
 </body></html>`);
   };
-  if (xОтказ || !code || !state) return назад("error");
+  if (xОтказ) return назад("error", `X отказал: ${xОтказ}`);
+  if (!code || !state) return назад("error", "X не вернул код входа");
   try {
     const { data: строка } = await db.from("x_oauth_state").select("*").eq("state", String(state)).maybeSingle();
     if (строка) await db.from("x_oauth_state").delete().eq("state", String(state));
-    if (!строка || Date.now() - new Date(строка.created_at).getTime() > ЖИЗНЬ_STATE_МС) return назад("error");
+    if (!строка) return назад("error", "запрос входа не найден — нажмите «Подключить» ещё раз");
+    if (Date.now() - new Date(строка.created_at).getTime() > ЖИЗНЬ_STATE_МС) return назад("error", "запрос входа устарел");
 
     const токенОтвет = await fetch("https://api.twitter.com/2/oauth2/token", {
       method: "POST",
@@ -87,14 +94,18 @@ a{margin-top:18px;display:block;width:100%;max-width:320px;padding:16px 0;border
       }),
     });
     const токен = await токенОтвет.json().catch(() => null);
-    if (!токенОтвет.ok || !токен || !токен.access_token) return назад("error");
+    if (!токенОтвет.ok || !токен || !токен.access_token) {
+      return назад("error", `обмен кода: ${токенОтвет.status} ${(токен && (токен.error_description || токен.error)) || ""}`);
+    }
 
     const профильОтвет = await fetch("https://api.twitter.com/2/users/me", {
       headers: { Authorization: `Bearer ${токен.access_token}` },
     });
     const профиль = await профильОтвет.json().catch(() => null);
     const handle = профиль && профиль.data && профиль.data.username;
-    if (!профильОтвет.ok || !имяОк(handle)) return назад("error");
+    if (!профильОтвет.ok || !имяОк(handle)) {
+      return назад("error", `профиль X: ${профильОтвет.status} ${(профиль && (профиль.title || профиль.detail)) || ""}`);
+    }
 
     // Один аккаунт X — один профиль: у чужого его тут же снимаем, иначе
     // второй вход тем же X-аккаунтом остался бы недоступен навсегда.
@@ -102,10 +113,10 @@ a{margin-top:18px;display:block;width:100%;max-width:320px;padding:16px 0;border
     const { error } = await db.from("profiles").update({
       x_handle: handle, x_verified_at: new Date().toISOString(), x_code: null, x_code_at: null,
     }).eq("id", строка.user_id);
-    if (error) return назад("error");
+    if (error) return назад("error", `база: ${error.message}`);
     return назад("ok");
-  } catch {
-    return назад("error");
+  } catch (e) {
+    return назад("error", `сбой: ${(e && e.message) || e}`);
   }
 }
 
