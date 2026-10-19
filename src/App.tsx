@@ -2849,7 +2849,9 @@ function GlobalStyle() {
          теперь, когда отклик на нажатие приходит сразу. */
       .fx-view { animation: viewIn 260ms cubic-bezier(0.22,1,0.36,1) backwards; }
       .fx-tab-in { animation: вкладкаВход 240ms cubic-bezier(0.22,1,0.36,1) backwards; }
+      .fx-tab-in2 { animation: вкладкаВход2 240ms cubic-bezier(0.22,1,0.36,1) backwards; }
       @keyframes вкладкаВход { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+      @keyframes вкладкаВход2 { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
       .fx-step-in { animation: шагВход 280ms cubic-bezier(0.22,1,0.36,1) backwards; }
       @keyframes шагВход { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
       .fx-sheet-in { animation: листВход 300ms cubic-bezier(0.22,1,0.36,1) backwards; }
@@ -8125,6 +8127,31 @@ function ПометкаДемо({ size = 10 }) {
   );
 }
 
+const ЛОГО_СЕТИ = { ton: "/coins/gram.png", sol: "/coins/sol.png" };
+// У картинки Соланы знак занимает половину кадра внутри чёрного
+// круга, а у Грама — всю ширину без фона. Поэтому Солана здесь
+// нарисована векторно, без круга и того же размера, что Грам.
+function ЗнакСетиНав({ сеть: с, size, style }) {
+  return этоEVM(с) ? (
+  <img src={СЕТИ_EVM[с].лого} alt="" width={size} height={size} style={{ display: "block", flex: "none", borderRadius: "50%", ...style }} />
+) : с === "sol" ? (
+  <svg width={size} height={size} viewBox="-8 -51 414 414" aria-hidden style={{ display: "block", flex: "none", ...style }}>
+    <defs>
+      <linearGradient id="навСол" x1="360.9" y1="-37.5" x2="141.2" y2="383.3" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#00FFA3" /><stop offset="1" stopColor="#DC1FFF" />
+      </linearGradient>
+    </defs>
+    <g fill="url(#навСол)">
+      <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" />
+      <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" />
+      <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" />
+    </g>
+  </svg>
+) : (
+  <img src={ЛОГО_СЕТИ[с]} alt="" width={size} height={size} style={{ display: "block", flex: "none", ...style }} />
+);
+}
+
 function ПометкаТест({ сеть, size = 10 }) {
   if (!пробнаяСеть(сеть)) return null;
   return (
@@ -9795,13 +9822,17 @@ function KeepAlive({ show, children }) {
   // человек смотрел на пустоту.
   // Вкладка не выскакивает, а проявляется с лёгким подъёмом — при каждом
   // переходе на неё.
+  /* Вкладка не пересобирается заново при каждом переходе — раньше
+     key менялся, и всё внутри монтировалось с нуля: уже загруженный
+     раздел мелькал на кадр, а потом снова вставал загрузчик. Анимацию
+     входа перезапускаем сменой имени класса (два одинаковых), а счёт
+     ведём до отрисовки кадра — без промежуточного кадра со старым видом. */
   const [вход, setВход] = useState(0);
   const было = useRef(show);
-  useEffect(() => { if (show && !было.current) setВход((в) => в + 1); было.current = show; }, [show]);
+  useLayoutEffect(() => { if (show && !было.current) setВход((в) => в + 1); было.current = show; }, [show]);
   return (
     <div
-      key={вход}
-      className={show && вход > 0 ? "fx-tab-in" : undefined}
+      className={show && вход > 0 ? (вход % 2 ? "fx-tab-in" : "fx-tab-in2") : undefined}
       style={show ? undefined : { display: "none" }} aria-hidden={show ? undefined : true} inert={show ? undefined : ""}
     >
       {children}
@@ -31541,28 +31572,10 @@ function mapTokenRow(row) {
           // меняла ширину, и браузер на каждом кадре заново раскладывал
           // панель и пересчитывал размытие под ней — отсюда рывки.
           const ХОД = "560ms cubic-bezier(0.65, 0, 0.25, 1)";
-          const ЛОГО_СЕТИ = { ton: "/coins/gram.png", sol: "/coins/sol.png" };
-          // У картинки Соланы знак занимает половину кадра внутри чёрного
-          // круга, а у Грама — всю ширину без фона. Поэтому Солана здесь
-          // нарисована векторно, без круга и того же размера, что Грам.
-          const ЗнакСети = ({ сеть: с, size, style }) => этоEVM(с) ? (
-            <img src={СЕТИ_EVM[с].лого} alt="" width={size} height={size} style={{ display: "block", flex: "none", borderRadius: "50%", ...style }} />
-          ) : с === "sol" ? (
-            <svg width={size} height={size} viewBox="-8 -51 414 414" aria-hidden style={{ display: "block", flex: "none", ...style }}>
-              <defs>
-                <linearGradient id="навСол" x1="360.9" y1="-37.5" x2="141.2" y2="383.3" gradientUnits="userSpaceOnUse">
-                  <stop offset="0" stopColor="#00FFA3" /><stop offset="1" stopColor="#DC1FFF" />
-                </linearGradient>
-              </defs>
-              <g fill="url(#навСол)">
-                <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" />
-                <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" />
-                <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" />
-              </g>
-            </svg>
-          ) : (
-            <img src={ЛОГО_СЕТИ[с]} alt="" width={size} height={size} style={{ display: "block", flex: "none", ...style }} />
-          );
+          // Знак сети — отдельным компонентом снаружи: объявленный здесь, он
+          // был новым на каждой перерисовке, монтировался заново и
+          // повторял анимацию смены сети — значок скакал от каждой цены.
+          const ЗнакСети = ЗнакСетиНав;
           const КРУГ = 58, ЗАЗОР = 8, ПОЛЕ = 9;
           const ПУНКТЫ = [
             { id: "home", label: t("navHome"), icon: ЗначокДом },
