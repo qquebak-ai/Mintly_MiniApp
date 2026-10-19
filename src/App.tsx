@@ -5,7 +5,7 @@ import {
   Wallet, Home as HomeIcon, PlusCircle, User, ChevronLeft, Share2, Star,
   ShieldCheck, ShieldAlert, Globe, Globe2, Send, Image as ImageIcon, Upload,
   Copy, ExternalLink, LogOut, ChevronRight, ChevronDown, Rocket, HeartCrack,
-  Lock, Gift, LifeBuoy, Plus, ArrowDownLeft, Repeat,
+  Lock, LockOpen, Gift, LifeBuoy, Plus, ArrowDownLeft, Repeat,
   FileText, CheckCircle2, AlertTriangle, Info, RefreshCw, X,
   Eye, EyeOff, LogIn, ShoppingBag, Trash2, Crown, Bell, Check, Cpu, Settings,
   Mail, CalendarDays, Pencil
@@ -5375,7 +5375,7 @@ const CHART_GUTTER = 76;
 /* Обёртка в memo намеренно: шапка пересчитывается на каждом кадре
    прокрутки, и без неё весь холст перерисовывался бы шестьдесят раз в
    секунду просто потому, что наверху сдвинулась подпись. */
-const TerminalChart = React.memo(function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt, onОкно = null }) {
+const TerminalChart = React.memo(function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt, onОкно = null, фиксШкалы = false }) {
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
   const [widthPx, setWidthPx] = useState(320);
@@ -5441,6 +5441,12 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
   // свечам. Ref оставлен как признак «человек задал сам» на случай, если
   // ручной масштаб когда-нибудь вернётся.
   const yUserRef = useRef(false);
+  /* Второй режим шкалы — «зафиксирована»: шкала цены стоит там, где
+     была, и сама не растягивается и не сжимается; свечи, вышедшие из
+     неё, просто уходят за край. Включили обычный режим — шкала снова
+     подгоняется под видимые свечи. */
+  const фиксRef = useRef(фиксШкалы);
+  фиксRef.current = фиксШкалы;
   // Vertical (price) window — { min, max } in price units. Unlike before,
   // this is NOT recomputed from whatever candles happen to be visible;
   // it's set once (auto-fit on first draw) and from then on only changes
@@ -5602,7 +5608,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     yАнимация.current = false;
     if (!yViewRef.current) {
       yViewRef.current = цель;
-    } else if (!yUserRef.current) {
+    } else if (!yUserRef.current && !фиксRef.current) {
       const текущее = yViewRef.current;
       const размах = (текущее.max - текущее.min) || 1;
       const дельта = Math.max(Math.abs(цель.min - текущее.min), Math.abs(цель.max - текущее.max));
@@ -5960,6 +5966,15 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       кадрЖивой.current = requestAnimationFrame(() => { кадрЖивой.current = null; draw(); });
     }
   }
+
+  // Сняли фиксацию — шкала заново подстраивается под свечи, плавно.
+  useEffect(() => {
+    if (фиксШкалы) return;
+    yUserRef.current = false;
+    if (кадрШкалы.current) cancelAnimationFrame(кадрШкалы.current);
+    кадрШкалы.current = requestAnimationFrame(() => { кадрШкалы.current = null; draw(); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [фиксШкалы]);
 
   // Redraw on data refresh (live tick), resize, or theme swap — but this
   // never touches viewRef, so the user's pan/zoom position survives a
@@ -19242,6 +19257,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     row.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
   }, [tf, tab]);
   const [chartData, setChartData] = useState(null); // { candles, volume, isLive }
+  // Режим шкалы графика помним между заходами: это привычка человека.
+  const [фиксШкалы, setФиксШкалы] = useState(() => { try { return localStorage.getItem("mintly_chart_fixed") === "1"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("mintly_chart_fixed", фиксШкалы ? "1" : "0"); } catch { /* приватный режим */ } }, [фиксШкалы]);
   const [chartLoading, setChartLoading] = useState(true);
   const chartSrcRef = useRef(null);
   // Нажатие «Повторить» на пустом графике: меняем число — и загрузка
@@ -20250,7 +20268,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               </button>
             </div>
           ) : (
-            <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} onОкно={chartMode === "price" ? setОкноГрафика : null} />
+            <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} onОкно={chartMode === "price" ? setОкноГрафика : null} фиксШкалы={фиксШкалы} />
           )}
         </div>
 
@@ -20274,13 +20292,24 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               {lang === "EN" ? п.en : п.ru}
             </button>
           ))}
+          {/* Фиксация шкалы: замок закрыт — шкала стоит, свечи уходят за
+              края; открыт — подгоняется под свечи, как раньше. */}
+          <button
+            onClick={() => { haptic("light"); setФиксШкалы((ф) => !ф); }}
+            className="fx-tap flex items-center justify-center flex-shrink-0"
+            aria-label={фиксШкалы ? "Шкала зафиксирована" : "Шкала подстраивается"}
+            aria-pressed={фиксШкалы}
+            style={{ marginLeft: "auto", width: 30, height: 28, borderRadius: 999, border: "none", background: фиксШкалы ? T.surfaceHi : "transparent" }}
+          >
+            {фиксШкалы ? <Lock size={15} color={T.ice} /> : <LockOpen size={15} color={T.faint} />}
+          </button>
           {/* Цена или капитализация — одной кнопкой в конце ряда, как
               значок вида графика в биржевых приложениях. */}
           <button
             onClick={() => setChartMode((м) => (м === "price" ? "mcap" : "price"))}
             className="fx-tap flex items-center justify-center flex-shrink-0"
             aria-label={t("chartModeMcap")}
-            style={{ marginLeft: "auto", width: 30, height: 28, borderRadius: 999, border: "none", background: chartMode === "mcap" ? T.surfaceHi : "transparent" }}
+            style={{ width: 30, height: 28, borderRadius: 999, border: "none", background: chartMode === "mcap" ? T.surfaceHi : "transparent" }}
           >
             <TrendingUp size={16} color={chartMode === "mcap" ? T.ice : T.faint} />
           </button>
