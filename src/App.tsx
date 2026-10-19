@@ -19431,7 +19431,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
      отстаёт на круг обхода, и после покупки число в шапке стояло
      прежним, хотя свеча уже выросла. У биржевого токена живой цены нет —
      там лента и есть источник. */
-  const своя_кривая = !!(token.curveAddress || (token.chain === "solana" && token.tokenAddress));
+  // Демо-токен тоже живёт на «кривой» — её цена приходит с сервера.
+  const своя_кривая = !!(token.демо || token.curveAddress || (token.chain === "solana" && token.tokenAddress));
   const живаяЦена = (своя && своя.priceUsd > 0) ? своя.priceUsd : ценаТокена;
   const капОкна = своя_кривая
     ? живаяЦена * выпускТокена
