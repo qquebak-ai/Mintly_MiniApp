@@ -10918,6 +10918,15 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
    Читается из памяти своего сервера (api/live.js), поэтому так часто
    спрашивать можно. */
 const ЖИВОЙ_ОПРОС_МС = 300;
+/* Запрос живых цифр с пределом в три секунды. Свёрнутый Telegram
+   замораживает сеть, и запрос, ушедший перед сворачиванием, мог не
+   вернуться никогда — опрос ждал его и после возвращения стоял. */
+function живойЗапрос(путь) {
+  const стоп = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const таймер = стоп ? setTimeout(() => стоп.abort(), 3000) : null;
+  return fetch(апи(путь), { cache: "no-store", signal: стоп ? стоп.signal : undefined })
+    .finally(() => { if (таймер) clearTimeout(таймер); });
+}
 
 function MempadView(props) {
   // У сетей EVM своего запуска пока нет — там лента токенов с биржи и их
@@ -10961,7 +10970,10 @@ function МемпадEVM({ сеть, onOpen, myTokens = [] }) {
       try {
         const { криваяEVM } = await import("./appWallet");
         const ряд = свои.slice(0, 20);
-        const ответы = await Promise.all(ряд.map((tok) => криваяEVM({ сеть, токен: tok.tokenAddress }).catch(() => null)));
+        // Предел в три секунды: запрос, замороженный свёрнутым Telegram,
+        // иначе держал бы опрос и после возвращения.
+        const предел = () => new Promise((r) => setTimeout(() => r(null), 3000));
+        const ответы = await Promise.all(ряд.map((tok) => Promise.race([криваяEVM({ сеть, токен: tok.tokenAddress }).catch(() => null), предел()])));
         if (!живо) return;
         const карта = {};
         ряд.forEach((tok, i) => { if (ответы[i]) карта[tok.id] = ответы[i]; });
@@ -19852,7 +19864,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       if (идёт || document.visibilityState === "hidden") return;
       идёт = true;
       try {
-        const r = await fetch(апи(token.демо ? `/api/live?demo=1${историяЕсть ? "" : "&history=1"}` : `/api/live?${sol ? "sol" : "ton"}=${encodeURIComponent(ключ)}`), { cache: "no-store" });
+        const r = await живойЗапрос(token.демо ? `/api/live?demo=1${историяЕсть ? "" : "&history=1"}` : `/api/live?${sol ? "sol" : "ton"}=${encodeURIComponent(ключ)}`);
         const j = r.ok ? await r.json() : null;
         /* Демо: свечи из истории цен, что копит сервер, — по одной на
            шаг выбранного интервала, без пустых свечей впереди. */
@@ -27791,7 +27803,13 @@ function useTelegramViewport() {
       } catch (e) { /* older client, some methods may be missing */ }
 
       const update = () => {
-        const h = tg.viewportStableHeight || tg.viewportHeight || window.innerHeight;
+        /* Свёрнутое мини-приложение Telegram сообщает высоту свёрнутой
+           шторки, а после возвращения «устойчивая» высота так и остаётся
+           той, маленькой: экран обрезался посередине. Берём большее из
+           двух чисел Telegram и не опускаемся ниже окна браузера, пока
+           страница на экране. */
+        let h = Math.max(tg.viewportStableHeight || 0, tg.viewportHeight || 0) || window.innerHeight;
+        if (document.visibilityState === "visible" && window.innerHeight > h) h = window.innerHeight;
         /* Пока открыта клавиатура, окно не ужимаем. Telegram сообщает
            новую высоту уже после того, как клавиатура выехала: вся
            раскладка перестраивалась под меньшее окно, прокрутка
@@ -27824,6 +27842,19 @@ function useTelegramViewport() {
       };
       update();
       tg.onEvent && tg.onEvent("viewportChanged", update);
+      /* Возврат в приложение: просим окно развернуться снова и
+         перечитываем размеры несколько раз — Telegram дорисовывает
+         разворот не сразу, и события о новой высоте может не прислать. */
+      const таймерыВозврата = [];
+      const приВозврате = () => {
+        if (document.visibilityState !== "visible") return;
+        try { if (!tg.isExpanded) tg.expand(); } catch (e) { /* старый клиент */ }
+        update();
+        таймерыВозврата.push(setTimeout(update, 250), setTimeout(update, 800), setTimeout(update, 1600));
+      };
+      document.addEventListener("visibilitychange", приВозврате);
+      window.addEventListener("focus", приВозврате);
+      window.addEventListener("resize", update);
       // Клавиатуру убрали — высота должна вернуться к настоящей: событие
       // окна к этому времени могло уже пройти.
       const послеКлавиатуры = () => setTimeout(() => { if (!сКлавиатурой(document.activeElement)) update(); }, 350);
@@ -27835,6 +27866,10 @@ function useTelegramViewport() {
       tg.onEvent && tg.onEvent("fullscreenChanged", update);
       return () => {
         tg.offEvent && tg.offEvent("viewportChanged", update);
+        document.removeEventListener("visibilitychange", приВозврате);
+        window.removeEventListener("focus", приВозврате);
+        window.removeEventListener("resize", update);
+        таймерыВозврата.forEach(clearTimeout);
         document.removeEventListener("focusout", послеКлавиатуры);
         tg.offEvent && tg.offEvent("safeAreaChanged", update);
         tg.offEvent && tg.offEvent("contentSafeAreaChanged", update);
@@ -29395,7 +29430,7 @@ function mapTokenRow(row) {
       if (!sol.length && !ton.length && !демо) return;
       идёт = true;
       try {
-        const r = await fetch(апи(`/api/live?sol=${sol.join(",")}&ton=${ton.join(",")}${демо ? "&demo=1" : ""}`), { cache: "no-store" });
+        const r = await живойЗапрос(`/api/live?sol=${sol.join(",")}&ton=${ton.join(",")}${демо ? "&demo=1" : ""}`);
         const j = r.ok ? await r.json() : null;
         if (!живо || !j || !j.curves) return;
         const курсSol = solUsd();
