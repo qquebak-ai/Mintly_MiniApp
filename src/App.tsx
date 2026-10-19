@@ -23208,6 +23208,17 @@ function ReferralShare({ showToast }) {
  * же аккаунтом, а обратно возвращается уже подтверждённым. Ни ника, ни
  * ручного поста никто больше не набирает.
  */
+// Вызывает действие один раз — когда появляется на экране.
+function ОдинРаз({ действие }) {
+  const было = useRef(false);
+  useEffect(() => {
+    if (было.current) return;
+    было.current = true;
+    действие();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
 /* Знак X — нынешний логотип, а не птица Twitter: сеть называется X,
    и старая птица читалась как что-то устаревшее. Принимает те же
    size и color, что значки lucide, поэтому встаёт на их место. */
@@ -25701,6 +25712,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     const никНеСвободен = никФормат && никОтвет === true;
     const никСвободен = никФормат && никОтвет === false;
     const никГоден = никФормат && !никПроверяется && !никНеСвободен;
+    // Из X пришёл свободный ник — аккаунт создаётся сам, без поля и кнопки.
+    const автоX = внутриTelegram && шагВхода === "ник" && !!xЗаготовка && !xЗаготовка.taken && никФормат && !никНеСвободен && !tgError;
     const ждём = внутриTelegram && естьАккаунт == null;
     const почтаЧистая = почтаВвод.trim().toLowerCase();
     const почтаПохожа = ПОЧТА_RE.test(почтаЧистая);
@@ -26571,7 +26584,18 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   себя решает. */}
               <ОнбЗаголовок title={входБезНика ? t("authSignInCta") : t("onbUserTitle")} lead={!внутриTelegram ? t("createOutside") : (входБезНика ? "" : t("onbUserLead"))} />
 
-              {внутриTelegram && !входБезНика && xЗаготовка && (
+              {/* Пришли из X со свободным ником — вводить нечего: аккаунт
+                  создаётся сам. Поле появится, только если создание
+                  сорвётся (ник успели занять или сеть не ответила). */}
+              {автоX ? (
+                <div className="flex flex-col items-center" style={{ gap: 14, padding: "8px 0" }}>
+                  {/* Запускаем, только когда база ответила «свободно»: до
+                      ответа создание само себя остановило бы. */}
+                  {никГоден && <ОдинРаз действие={создать} />}
+                  <ЗнакЗагрузки size={44} />
+                  <span style={{ fontFamily: bodyFont, color: ОНБ.приглушённый, fontSize: 14 }}>Создаём @{ник} из X…</span>
+                </div>
+              ) : внутриTelegram && !входБезНика && xЗаготовка && (
                 <div className="flex items-center" style={{ gap: 8, padding: "10px 12px", borderRadius: 14, background: hexA("#FFFFFF", 0.06) }}>
                   <ЗнакX size={14} color={ОНБ.текст} />
                   <span style={{ fontFamily: bodyFont, color: xЗаготовка.taken ? T.down : ОНБ.приглушённый, fontSize: 13, lineHeight: 1.4 }}>
@@ -26581,7 +26605,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   </span>
                 </div>
               )}
-              {внутриTelegram && !входБезНика && (
+              {внутриTelegram && !входБезНика && !автоX && (
                 <div className="flex flex-col" style={{ gap: 6 }}>
                   {/* Собачка приклеена к полю, а не набирается руками: ник
                       хранится без неё, и человеку не нужно про это знать. */}
@@ -26624,6 +26648,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
 
               {/* Последний шаг — та самая жидкая кнопка: сжимается, внутри
                   слипаются капли, пока сервер создаёт аккаунт. */}
+              {!автоX && (
               <ЖидкаяКнопка
                 onClick={создать}
                 disabled={!можно}
@@ -26633,6 +26658,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
               >
                 {входБезНика ? t("authSignInCta") : t("onbCreate")}
               </ЖидкаяКнопка>
+              )}
 
               {/* Мимо этого экрана хода нет: без аккаунта в приложении
                   нечего делать — ни кошелька, ни сделок, ни своих
