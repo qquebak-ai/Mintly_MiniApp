@@ -12523,6 +12523,8 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
     setУходит(true);
     setTimeout(() => { setУходит(false); setТяга(0); onClose(); }, УХОД_МЕНЮ);
   }, [onClose]);
+  // Свайпа больше нет: закрывают кнопкой «Назад» Telegram или касанием мимо.
+  useНазадТелеграм(!!открыто, закрыть);
 
   // Пока меню открыто, вертикальный жест окна не нужен: тянут его вбок,
   // а Telegram по вертикали сворачивает всё приложение.
@@ -12611,10 +12613,6 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
       />
       <div
         data-sheet="1"
-        onTouchStart={началоЖеста}
-        onTouchMove={ходЖеста}
-        onTouchEnd={конецЖеста}
-        onTouchCancel={конецЖеста}
         className="no-scrollbar"
         style={{
           position: "fixed", top: 0, bottom: 0, left: 0, zIndex: 399,
@@ -14526,6 +14524,7 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
        страница будто пропала, а не закрылась. */
     setTimeout(() => { setУходит(false); setТяга(0); onClose(); }, УХОД_ЛИСТА);
   }, [onClose]);
+  useНазадТелеграм(!!открыт, закрыть);
 
   function прокрученныйПредок(эл) {
     for (let у = эл; у && у !== document.body; у = у.parentElement) {
@@ -14603,10 +14602,6 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
       // и отдавать его Telegram нельзя — иначе потягивание вниз сворачивает
       // всё окно вместо того, чтобы закрыть страницу.
       data-sheet="1"
-      onTouchStart={началоЖеста}
-      onTouchMove={ходЖеста}
-      onTouchEnd={конецЖеста}
-      onTouchCancel={конецЖеста}
       style={{
         /* Лист начинается там, где его ручка, — под шапкой Telegram, а не
            у самого верха экрана: над ним видна затемнённая страница, и
@@ -14626,9 +14621,8 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
         touchAction: "pan-y",
       }}
     >
-      <div className="flex flex-col items-center" style={{ padding: "8px 16px 4px", flexShrink: 0, gap: 8 }}>
-        <span aria-hidden style={{ width: 40, height: 4, borderRadius: 999, background: hexA("#FFFFFF", 0.22) }} />
-      </div>
+      {/* Ручки и свайпа нет: страница закрывается кнопкой «Назад» Telegram. */}
+      <div style={{ height: 14, flexShrink: 0 }} />
       {заголовок && (
         <div style={{ padding: "6px 18px 10px", flexShrink: 0 }}>
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>{заголовок}</span>
@@ -20847,6 +20841,8 @@ async function ссылкаНаТокен(token) {
    картинку прямо в чат Telegram; там, где такого окна нет, файл просто
    сохраняется, и переслать его человек может сам. */
 function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, showToast }) {
+  // Крестика нет — закрывает кнопка «Назад» Telegram.
+  useНазадТелеграм(!!tokenProp, onClose);
   // Пока шторка уезжает, токена в пропсах уже нет — держим последний,
   // иначе на кадрах закрытия рисовать нечего и всё падает.
   const [token, closing] = useClosing(tokenProp);
@@ -20976,7 +20972,6 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
       <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={sheetCard(18, { paddingBottom: 22 })}>
         <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>{t("shareCardTitle")}</span>
-          <button onClick={onClose} className="fx-tap fx-close"><X size={16} color={T.muted} /></button>
         </div>
         <canvas
           ref={canvasRef}
@@ -21338,10 +21333,6 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
         className={`fx-modal-card${уходит || тяга > 0 ? " fx-no-anim" : ""}`}
         data-sheet="1"
         onClick={(e) => e.stopPropagation()}
-        onTouchStart={началоЖестаС}
-        onTouchMove={ходЖестаС}
-        onTouchEnd={конецЖестаС}
-        onTouchCancel={конецЖестаС}
         style={sheetCard(20, {
           transform: уходит ? "translateY(110%)" : `translateY(${тяга}px)`,
           transition: жест.current ? "none" : `transform ${УХОД_ЛИСТА}ms cubic-bezier(0.22, 0.85, 0.25, 1)`,
@@ -21363,7 +21354,6 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
               <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 11.5 }}>${token.ticker} · {fmtUSD(token.mcapNum || 0)}</div>
             </div>
           </div>
-          <button onClick={onClose} className="fx-tap fx-close"><X size={16} color={T.muted} /></button>
         </div>
 
         <div className="flex rounded-[20px] p-1" style={{ background: T.bg, border: "none" }}>
@@ -22792,6 +22782,8 @@ function PinKeypad({ onDigit, onBackspace }) {
 }
 
 function PinSetupModal({ mode: modeProp, currentPin, onClose, onComplete, onDisable, showToast }) {
+  // Крестика нет — закрывает кнопка «Назад» Telegram.
+  useНазадТелеграм(!!modeProp, onClose);
   // Первым делом: ниже на mode завязаны и состояние, и эффекты.
   const [mode, closing] = useClosing(modeProp);
   const [stage, setStage] = useState(mode === "change" || mode === "disable" ? "verify" : "new");
@@ -22859,8 +22851,7 @@ function PinSetupModal({ mode: modeProp, currentPin, onClose, onComplete, onDisa
   return (
     <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ ...SHEET_BACK, zIndex: 70, background: "rgba(0,0,0,0.82)" }} onClick={onClose}>
       <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={sheetCard(22, { paddingBottom: 30 })}>
-        <div className="flex justify-end"><button onClick={onClose} className="fx-tap fx-close"><X size={16} color={T.muted} /></button></div>
-        <div className="flex flex-col items-center text-center gap-1" style={{ marginTop: -8 }}>
+        <div className="flex flex-col items-center text-center gap-1" style={{ marginTop: 6 }}>
           <MintlyFrame size={52} glow={`${T.electric}55`}><Lock size={20} color={T.electric} /></MintlyFrame>
           <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700, marginTop: 8 }}>{titles[stage]}</div>
         </div>
@@ -23663,6 +23654,7 @@ function SettingsPanel({
     setУходит(true);
     setTimeout(() => onClose(), УХОД_ЛИСТА);
   }, [onClose]);
+  useНазадТелеграм(!!itemProp, закрытьПанель);
 
   function прокрученныйПредокП(эл) {
     for (let у = эл; у && у !== document.body; у = у.parentElement) {
@@ -23958,10 +23950,6 @@ function SettingsPanel({
         className={`fx-modal-card${уходит ? " fx-no-anim" : ""}`}
         data-sheet="1"
         onClick={(e) => e.stopPropagation()}
-        onTouchStart={началоЖестаП}
-        onTouchMove={ходЖестаП}
-        onTouchEnd={конецЖестаП}
-        onTouchCancel={конецЖестаП}
         style={{
           transform: уходит || спрятан ? "translateY(110%)" : `translateY(${тяга}px)`,
           transition: жест.current ? "none" : `transform ${УХОД_ЛИСТА}ms cubic-bezier(0.22, 0.85, 0.25, 1)`,
@@ -23979,12 +23967,10 @@ function SettingsPanel({
           boxShadow: "0 -16px 44px rgba(0,0,0,0.45)",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "center", paddingTop: 10, flexShrink: 0 }}>
-          <div style={{ width: 36, height: 4, borderRadius: 2, background: T.line }} />
-        </div>
-        <div style={{ padding: "4px 22px 0", flexShrink: 0 }}>
-          <div className="flex justify-end"><button onClick={onClose} className="fx-tap fx-close"><X size={16} color={T.muted} /></button></div>
-          <div className="flex flex-col items-center text-center gap-2" style={{ marginTop: -8 }}>
+        {/* Ни ручки, ни крестика: раздел закрывается кнопкой «Назад»
+            Telegram или касанием мимо листа. */}
+        <div style={{ padding: "22px 22px 0", flexShrink: 0 }}>
+          <div className="flex flex-col items-center text-center gap-2">
             <MintlyFrame size={52} glow={`${T.electric}44`}><Icon size={20} color={T.electric} /></MintlyFrame>
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700, marginTop: 6 }}>{t(item.tKey)}</div>
           </div>
@@ -24017,6 +24003,8 @@ function SettingsPanel({
    surfaces real controls (copy link, verify, edit info) rather than
    a dead button. */
 function TokenManageSheet({ token: tokenProp, onClose, showToast, onDelete, загрузитьКартинку = null, onLogoChanged = null }) {
+  // Крестика нет — закрывает кнопка «Назад» Telegram.
+  useНазадТелеграм(!!tokenProp, onClose);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [token, closing] = useClosing(tokenProp);
   const [меняем, setМеняем] = useState(false);
@@ -24051,8 +24039,7 @@ function TokenManageSheet({ token: tokenProp, onClose, showToast, onDelete, за
   return (
     <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ ...SHEET_BACK, zIndex: 60 }} onClick={onClose}>
       <div className="fx-modal-card" onClick={(e) => e.stopPropagation()} style={sheetCard(22)}>
-        <div className="flex justify-end"><button onClick={onClose} className="fx-tap fx-close"><X size={16} color={T.muted} /></button></div>
-        <div className="flex items-center gap-3" style={{ marginTop: -8, marginBottom: 14 }}>
+        <div className="flex items-center gap-3" style={{ marginTop: 4, marginBottom: 14 }}>
           <TokenAvatar size={44} src={token.logoUrl} />
           <div>
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 700 }}>{token.name}</div>
@@ -27044,7 +27031,6 @@ async function uploadAvatarIfNeeded(userId) {
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700 }}>
             {isEdit ? t("editProfile") : t("accountLabel")}
           </span>
-          <button onClick={onClose} className="fx-tap fx-close"><X size={16} color={T.muted} /></button>
         </div>
 
         {!isEdit && (
