@@ -82,23 +82,32 @@ ${удача || !подробно ? "" : `<p style="font-size:12px;color:#5E5D59
     if (!строка) return назад("error", "запрос входа не найден — нажмите «Подключить» ещё раз");
     if (Date.now() - new Date(строка.created_at).getTime() > ЖИЗНЬ_STATE_МС) return назад("error", "запрос входа устарел");
 
-    const токенОтвет = await fetch("https://api.twitter.com/2/oauth2/token", {
+    /* Обмен кода на токен. Приложение в X бывает двух видов: с секретом
+       (Web App — X ждёт заголовок Basic) и публичное (Native App — без
+       секрета, его заменяет PKCE). Раньше заголовок слался всегда, и без
+       X_CLIENT_SECRET это был пустой Basic — X отвечал 401 «Missing valid
+       authorization header». Теперь с секретом — Basic, а если X его не
+       принял или секрета нет вовсе, — как публичное приложение. */
+    const тело = () => new URLSearchParams({
+      grant_type: "authorization_code", code: String(code), redirect_uri: X_REDIRECT_URI,
+      code_verifier: строка.code_verifier, client_id: X_CLIENT_ID,
+    });
+    const обменять = (сСекретом) => fetch("https://api.x.com/2/oauth2/token", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${Buffer.from(`${X_CLIENT_ID}:${X_CLIENT_SECRET}`).toString("base64")}`,
+        ...(сСекретом ? { Authorization: `Basic ${Buffer.from(`${X_CLIENT_ID}:${X_CLIENT_SECRET}`).toString("base64")}` } : {}),
       },
-      body: new URLSearchParams({
-        grant_type: "authorization_code", code: String(code), redirect_uri: X_REDIRECT_URI,
-        code_verifier: строка.code_verifier, client_id: X_CLIENT_ID,
-      }),
+      body: тело(),
     });
+    let токенОтвет = await обменять(!!X_CLIENT_SECRET);
+    if (токенОтвет.status === 401 && X_CLIENT_SECRET) токенОтвет = await обменять(false);
     const токен = await токенОтвет.json().catch(() => null);
     if (!токенОтвет.ok || !токен || !токен.access_token) {
       return назад("error", `обмен кода: ${токенОтвет.status} ${(токен && (токен.error_description || токен.error)) || ""}`);
     }
 
-    const профильОтвет = await fetch("https://api.twitter.com/2/users/me", {
+    const профильОтвет = await fetch("https://api.x.com/2/users/me", {
       headers: { Authorization: `Bearer ${токен.access_token}` },
     });
     const профиль = await профильОтвет.json().catch(() => null);
