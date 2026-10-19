@@ -164,5 +164,25 @@ await проверка("чужая сеть и кривой адрес отби�
   assert.equal(r.код, 400);
 });
 
+await проверка("вывод: плохой адрес и свой адрес отбиваются, «всё» уходит за вычетом газа", async () => {
+  let r = await вызвать("withdraw", { method: "POST", body: { chain: "bsc", address: "0x123", amount: 1, requestKey: "w0" } });
+  assert.equal(r.ответ.error, "bad_address");
+  // Испорченная контрольная сумма: та же буква в другом регистре.
+  const чужой = "0x8ba1f109551bD432803012645Ac136ddd64DBA72";
+  r = await вызвать("withdraw", { method: "POST", body: { chain: "bsc", address: чужой.replace("bD", "Bd"), amount: 1, requestKey: "w1" } });
+  assert.equal(r.ответ.error, "bad_address");
+  r = await вызвать("withdraw", { method: "POST", body: { chain: "bsc", address: адрес, amount: 1, requestKey: "w2" } });
+  assert.equal(r.ответ.error, "same_address");
+  r = await вызвать("withdraw", { method: "POST", body: { chain: "bsc", address: чужой, amount: 1, requestKey: "w3" } });
+  assert.equal(r.код, 200, JSON.stringify(r.ответ));
+  assert.equal(await п.getBalance(чужой), ethers.parseEther("1"));
+  // Узел кеширует одинаковые запросы четверть секунды — даём кешу остыть.
+  await new Promise((r2) => setTimeout(r2, 400));
+  r = await вызвать("withdraw", { method: "POST", body: { chain: "bsc", address: чужой, all: true, requestKey: "w4" } });
+  assert.equal(r.код, 200, JSON.stringify(r.ответ));
+  const осталось = Number(ethers.formatEther(await п.getBalance(адрес)));
+  assert.ok(осталось < 0.001, `осталось ${осталось}`);
+});
+
 console.log(`\n${пройдено} проверок сервера пройдено`);
 await сервер.close();

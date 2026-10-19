@@ -358,3 +358,11 @@ export async function котировкаEVM({ сеть, токен: адрес, 
   if (!r.ok) return null;
   return r.json();
 }
+
+/* Вывод монеты сети EVM на чужой адрес. Адрес и сумму сервер проверяет
+   сам (контрольная сумма, запас на газ). */
+export async function вывестиEVM({ сеть, amount, all = false, адрес = "" }) {
+  return await запрос(апи("/api/wallet-evm?action=withdraw"), {
+    chain: сеть, amount, all, address: адрес, requestKey: ключЗапроса(),
+  });
+}

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { Address, beginCell, toNano } from "@ton/core";
+import { keccak_256 } from "@noble/hashes/sha3";
 import { supabase } from "./supabaseClient";
 import { апи, запрос } from "./апи";
 import {
@@ -14907,6 +14908,36 @@ function байтыБазы58(строка) {
   return число.reverse();
 }
 
+/* Адрес EVM: 0x и сорок шестнадцатеричных знаков. Если буквы в разном
+   регистре — это контрольная сумма EIP-55, и она обязана сойтись:
+   опечатка в таком адресе ловится до отправки, а не после. Адрес целиком
+   в одном регистре контрольной суммы не несёт и принимается как есть. */
+function адресEVMОк(строка) {
+  const с = String(строка || "").trim();
+  if (!/^0x[0-9a-fA-F]{40}$/.test(с)) return false;
+  const тело = с.slice(2);
+  if (тело === тело.toLowerCase() || тело === тело.toUpperCase()) return с !== "0x0000000000000000000000000000000000000000";
+  const хеш = Array.from(keccak_256(new TextEncoder().encode(тело.toLowerCase()))).map((б) => б.toString(16).padStart(2, "0")).join("");
+  for (let i = 0; i < 40; i++) {
+    const ц = тело[i];
+    if (/[a-f]/i.test(ц) && ((parseInt(хеш[i], 16) >= 8) !== (ц === ц.toUpperCase()))) return false;
+  }
+  return true;
+}
+// Проверка адреса для своей сети.
+function адресСетиОк(сеть, строка) {
+  if (сеть === "ton") return адресTonОк(строка);
+  if (сеть === "sol") return адресSolanaОк(строка);
+  return адресEVMОк(строка);
+}
+// Какой сети адрес принадлежит по виду — для подсказки «это адрес другой сети».
+function сетьПоАдресу(строка) {
+  if (адресTonОк(строка)) return "ton";
+  if (адресSolanaОк(строка)) return "sol";
+  if (адресEVMОк(строка)) return "evm";
+  return null;
+}
+
 function адресSolanaОк(строка) {
   const байты = байтыБазы58(String(строка || "").trim());
   return !!байты && байты.length === 32;
@@ -14944,17 +14975,13 @@ function ЭкранВывода({
   // потерянные деньги, и его стоит подтвердить отдельно.
   const [шаг, setШаг] = useState("адрес");
   const [адрес, setАдрес] = useState("");
-  /* Сеть спрашивать не надо: её видно по самому адресу. У TON он
-     начинается с UQ/EQ и длиной в сорок восемь знаков, у Solana это
-     base58 без такого начала — перепутать нельзя, а лишний переключатель
-     перед вводом только заставлял помнить, куда именно идёт перевод. */
-  const сеть = useMemo(() => {
-    const чист = String(адрес || "").trim();
-    if (!чист) return сетьПоУмолчанию;
-    if (адресTonОк(чист)) return "ton";
-    if (адресSolanaОк(чист)) return "sol";
-    return /^[UEK]Q/i.test(чист) ? "ton" : сетьПоУмолчанию;
-  }, [адрес, сетьПоУмолчанию]);
+  /* Сеть выбирают явно, списком, как в получении. По адресу её угадать
+     больше нельзя: у BNB Chain, Base и Ethereum адреса одинакового вида,
+     и монета, ушедшая не в ту из них, обратно не вернётся. */
+  const [сеть, setСеть] = useState(сетьПоУмолчанию);
+  useEffect(() => { if (открыт) setСеть(сетьПоУмолчанию); }, [открыт]); // eslint-disable-line react-hooks/exhaustive-deps
+  const вEVM = этоEVM(сеть);
+  const сетиEVM = useСетиEVM();
   const [ввод, setВвод] = useState("");
   /* В чём считаем. По умолчанию — в самой монете: выводят SOL и GRAM, а
      не доллары, и пересчёт по курсу в такой сумме только мешает — на
@@ -15000,10 +15027,11 @@ function ЭкранВывода({
   /* Остаток, курс и подпись — той сети, что определилась по адресу.
      Снаружи приходят обе, иначе при смене сети на лету экран показывал
      бы чужие деньги. */
-  const остатокСети = остатки ? Number(сеть === "ton" ? остатки.ton : остатки.sol) || 0 : остаток;
-  const курсСети2 = курсы ? Number(сеть === "ton" ? курсы.ton : курсы.sol) || 0 : курс;
-  const единицаСети = сеть === "ton" ? ТИКЕР_TON : "SOL";
-  const запас = сеть === "ton" ? 0.05 : 0.0014;
+  const остатокСети = остатки ? Number(остатки[сеть]) || 0 : остаток;
+  const курсСети2 = курсы ? Number(курсы[сеть]) || 0 : курс;
+  const единицаСети = вEVM ? СЕТИ_EVM[сеть].монета : сеть === "ton" ? ТИКЕР_TON : "SOL";
+  // В EVM запас — на газ простого перевода; точную сумму досчитает сервер.
+  const запас = вEVM ? ({ bsc: 0.0003, base: 0.00005, eth: 0.002 }[сеть] || 0.001) : сеть === "ton" ? 0.05 : 0.0014;
   /* Свободно — не весь остаток: из него уходит запас на комиссию, а
      сверху лежит суточный предел вывода. Без предела «100%» набирала
      сумму, которую сервер всё равно отклонял. */
@@ -15014,18 +15042,26 @@ function ЭкранВывода({
   const набрано = Number(String(ввод).replace(",", ".")) || 0;
   // Сколько монет уйдёт на самом деле.
   const монет = вДолларах ? (курсСети2 > 0 ? набрано / курсСети2 : 0) : набрано;
-  const вДеньгах = вДолларах ? набрано : набрано * курс;
+  const вДеньгах = вДолларах ? набрано : набрано * курсСети2;
   const многовато = монет > свободно + 1e-9;
   /* Разбор адреса. Пока человек набирает первые знаки, молчим: красная
      строка под наполовину введённым адресом ругается на то, что ещё не
      дописано. */
   // Тестовая сеть: SOL живёт в devnet, GRAM — в testnet.
-  const тестовая = сеть === "ton" ? TON_TESTNET_NETWORK : SOL_NETWORK !== "mainnet";
+  const тестовая = вEVM ? !!(сетиEVM && сетиEVM.тестовые) : сеть === "ton" ? TON_TESTNET_NETWORK : SOL_NETWORK !== "mainnet";
   const чистый = адрес.trim();
-  const адресОкей = сеть === "ton" ? адресTonОк(чистый) : адресSolanaОк(чистый);
+  const адресОкей = адресСетиОк(сеть, чистый);
+  const имяСети = (к) => (ВСЕ_СЕТИ.find((с) => с.ключ === к) || {}).имя || к;
   const беда = (() => {
-    if (!чистый || (!адресОкей && чистый.length < (сеть === "ton" ? 48 : 32))) return null;
-    if (!адресОкей) return t("withdrawBadAddress");
+    const полная = вEVM ? 42 : сеть === "ton" ? 48 : 32;
+    if (!чистый || (!адресОкей && чистый.length < полная)) return null;
+    if (!адресОкей) {
+      // Адрес верный, но другой сети — говорим прямо, какой.
+      const чей = сетьПоАдресу(чистый);
+      if (чей === "evm") return "Это адрес сети EVM — выберите BNB Chain, Base или Ethereum";
+      if (чей && чей !== сеть) return `Это адрес сети ${имяСети(чей)} — выберите её в списке`;
+      return вEVM && /^0x[0-9a-fA-F]{40}$/.test(чистый) ? "Ошибка в адресе: не сходится контрольная сумма" : t("withdrawBadAddress");
+    }
     if (свой && чистый === свой) return t("withdrawSelfAddress");
     return null;
   })();
@@ -15095,7 +15131,7 @@ function ЭкранВывода({
   // в списке проверенных опаснее, чем набранный руками.
   async function вКнигу(строка, имя) {
     const чист = String(строка || "").trim();
-    const годен = сеть === "ton" ? адресTonОк(чист) : адресSolanaОк(чист);
+    const годен = адресСетиОк(сеть, чист);
     if (!годен) { showToast(t("bookBadAddress")); haptic("error"); return; }
     if (книга.some((з) => з.address === чист)) { showToast(t("bookExists")); return; }
     if (!userId) return;
@@ -15176,8 +15212,9 @@ function ЭкранВывода({
     setИдёт(true);
     try {
       const кошелёк = await import("./appWallet");
-      const шлём = сеть === "ton" ? кошелёк.вывестиСВнутреннегоTON : кошелёк.вывестиСВнутреннего;
-      const ответ = await шлём({ amount: монет, all: всё, адрес: адрес.trim() });
+      const ответ = вEVM
+        ? await кошелёк.вывестиEVM({ сеть, amount: монет, all: всё, адрес: адрес.trim() })
+        : await (сеть === "ton" ? кошелёк.вывестиСВнутреннегоTON : кошелёк.вывестиСВнутреннего)({ amount: монет, all: всё, адрес: адрес.trim() });
       const ушло = ответ && ответ.sent != null ? Number(ответ.sent) : (ответ && ответ.amount != null ? Number(ответ.amount) : монет);
       showToast(tf("withdrawSent", { sum: `${fmtСумма(ушло)} ${единицаСети}` }));
       // В тестовой сети перевод легко счесть пропавшим: кошелёк
@@ -15213,7 +15250,7 @@ function ЭкранВывода({
       <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок={t("withdrawTitle")} insetTop={insetTop} insetBottom={insetBottom}>
         <div className="flex flex-col" style={{ flex: 1, minHeight: 0, padding: "0 18px", gap: 12 }}>
           <div className="flex items-center justify-between" style={{ gap: 8 }}>
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("withdrawTo")}</span>
+            <ВыборСети value={сеть} onChange={(с) => { setСеть(с); setВвод(""); setВсё(false); }} />
             {/* Какая это сеть — видно до отправки. Деньги в devnet
                 доходят исправно, но обычный кошелёк их не показывает,
                 пока в нём самом не переключить сеть, и перевод выглядит
@@ -15223,7 +15260,7 @@ function ЭкранВывода({
                 padding: "3px 9px", borderRadius: 999, background: hexA("#F0B429", 0.16),
                 color: "#F0B429", fontFamily: monoFont, fontSize: 11, fontWeight: 700,
               }}>
-                {сеть === "ton" ? "testnet" : "devnet"}
+                {сеть === "sol" ? "devnet" : "testnet"}
               </span>
             )}
           </div>
@@ -15232,7 +15269,7 @@ function ЭкранВывода({
               <ПолеСЖивымТекстом
                 value={адрес}
                 onChange={(e) => setАдрес(e.target.value)}
-                placeholder={сеть === "ton" ? "UQ…" : "5x…"}
+                placeholder={вEVM ? "0x…" : сеть === "ton" ? "UQ…" : "5x…"}
                 spellCheck={false}
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -15306,7 +15343,7 @@ function ЭкранВывода({
               <ПолеСЖивымТекстом
                 value={новый}
                 onChange={(e) => setНовый(e.target.value)}
-                placeholder={сеть === "ton" ? "UQ…" : "5x…"}
+                placeholder={вEVM ? "0x…" : сеть === "ton" ? "UQ…" : "5x…"}
                 spellCheck={false}
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -18457,8 +18494,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         сеть={вTON ? "ton" : "sol"}
         свой={адресВнутри}
         userId={userId}
-        остатки={{ sol: солНаКошельке, ton: тонНаКошельке }}
-        курсы={{ sol: курсSol, ton: tonPriceUsd }}
+        остатки={{
+          sol: солНаКошельке, ton: тонНаКошельке,
+          ...Object.fromEntries(Object.keys(СЕТИ_EVM).map((к) => [к, Number(остатокEVM(к) && остатокEVM(к).native) || 0])),
+        }}
+        курсы={{ sol: курсSol, ton: tonPriceUsd, ...Object.fromEntries(Object.keys(СЕТИ_EVM).map((к) => [к, курсМонетыEVM(к, курсыEVM)])) }}
         остаток={наКошельке}
         пределЗаСутки={пределЗаСутки}
         курс={курсСети}

@@ -377,7 +377,7 @@ export default async function handler(req, res) {
     const сеть = сетьИз(тело.chain);
     if (!сеть) return res.status(400).json({ error: "bad_chain" });
     const с = СЕТИ[сеть];
-    if (!с.фабрика) return res.status(400).json({ error: "launch_disabled" });
+    if (!с.фабрика && действие !== "withdraw") return res.status(400).json({ error: "launch_disabled" });
     const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || null;
     const ключЗапроса = String(тело.requestKey || "").slice(0, 64) || null;
     const { Contract, parseUnits, formatUnits } = await ethersLib();
@@ -449,10 +449,48 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, tx: tx.hash });
     }
 
+    /* Перевод монеты сети на чужой адрес. Адрес сверяется по контрольной
+       сумме (EIP-55): опечатка в смешанном регистре не уйдёт. На газ
+       оставляем ровно столько, сколько сеть просит за простой перевод;
+       «всё» — это остаток за вычетом этого газа. */
+    if (действие === "withdraw") {
+      const { getAddress, parseUnits, formatUnits } = await ethersLib();
+      let кому;
+      try { кому = getAddress(String(тело.address || "").trim()); } catch { return res.status(400).json({ error: "bad_address" }); }
+      if (кому.toLowerCase() === String(строка.address).toLowerCase()) return res.status(400).json({ error: "same_address" });
+      if (кому === "0x0000000000000000000000000000000000000000") return res.status(400).json({ error: "bad_address" });
+      const п = await провайдер(сеть);
+      const [есть, газ] = await Promise.all([п.getBalance(строка.address, "pending"), п.getFeeData()]);
+      // Цена газа с запасом на скачок — одна и та же и в расчёте «всё»,
+      // и в самой транзакции.
+      const цена = ((газ.maxFeePerGas || газ.gasPrice || 0n) * 12n) / 10n;
+      const наГаз = 21000n * цена;
+      const всё = !!тело.all;
+      const сумма = всё ? есть - наГаз : parseUnits(Number(тело.amount || 0).toFixed(18), 18);
+      if (!(сумма > 0n) || сумма + наГаз > есть) return res.status(400).json({ error: "bad_amount" });
+      const оп = await начать(db, user, { дело: "withdraw", сеть, сумма: Number(formatUnits(сумма, 18)), ключЗапроса, ip });
+      if (оп.повтор) return res.status(200).json({ ok: true, repeat: true, tx: оп.signature });
+      const w = await подписант(строка, набор, user, сеть);
+      // Цену газа задаём сами — ту же, из которой посчитан запас: иначе
+      // библиотека взяла бы свою, и «всё» упиралось в нехватку на газ.
+      const плата = газ.maxFeePerGas
+        ? { maxFeePerGas: цена, maxPriorityFeePerGas: газ.maxPriorityFeePerGas && газ.maxPriorityFeePerGas < цена ? газ.maxPriorityFeePerGas : цена }
+        : { gasPrice: цена };
+      const tx = await w.sendTransaction({ to: кому, value: сумма, gasLimit: 21000n, ...плата });
+      // Ждём подтверждения, как у сделок: иначе следующий перевод считал
+      // бы остаток без этого и упирался в нехватку.
+      const r = await tx.wait(1, 120_000);
+      if (!r || r.status !== 1) throw new Error("перевод не прошёл");
+      await завершить(db, оп.id, tx.hash);
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).json({ ok: true, tx: tx.hash, sent: Number(formatUnits(сумма, 18)), signature: tx.hash });
+    }
+
     return res.status(400).json({ error: "bad_action" });
   } catch (e) {
     const код = e && e.код ? e.код : 500;
     const текст = String((e && e.shortMessage) || (e && e.message) || e);
+    if (process.env.EVM_DEBUG) console.warn("[wallet-evm]", текст, e && e.info && JSON.stringify(e.info).slice(0, 400));
     // Нехватка монеты на газ — частая и понятная причина: говорим прямо.
     if (/insufficient funds/i.test(текст)) return res.status(400).json({ error: "not_enough" });
     return res.status(код).json({ error: код === 429 ? "rate_limited" : "failed", detail: текст.slice(0, 200) });
