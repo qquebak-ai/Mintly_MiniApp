@@ -29386,8 +29386,15 @@ function mapTokenRow(row) {
             if (!к || !(к.price > 0) || (tok.priceTon === к.price && tok.raisedTon === к.raised)) return tok;
             const курс = tok.chain === "solana" ? курсSol : курсTon;
             тронуто = true;
+            /* Процент за сутки — вместе с ценой. Цену суточной давности
+               выводим один раз из того процента, что пришёл с лентой, и
+               дальше считаем от неё: иначе цена бежала, а процент стоял. */
+            const цена24 = tok.цена24 > 0 ? tok.цена24
+              : tok.priceTon > 0 ? tok.priceTon / (1 + (Number(tok.change) || 0) / 100) : к.price;
             return {
               ...tok,
+              цена24,
+              change: (к.price / цена24 - 1) * 100,
               priceTon: к.price,
               price: курс > 0 ? к.price * курс : tok.price,
               mcapNum: курс > 0 ? к.price * курс * 1_000_000_000 : tok.mcapNum,
