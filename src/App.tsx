@@ -12692,6 +12692,14 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
         {/* Сверху — запас под шапку Telegram: там висят часы и кнопка
             «Закрыть», и аватар уходил прямо под них. */}
         <div style={{ padding: `${insetTop + 18}px 18px 10px` }}>
+          {/* Аватарка и ник — тот же вход в профиль, что и строка
+              «Профиль»: в шапку меню тыкают первым делом. Без аккаунта
+              ведут к созданию — профиля ещё нет. */}
+          <button
+            onClick={() => { haptic("light"); if (accountCreated) onПункт("profile"); else onВход(); закрыть(); }}
+            className="fx-tap flex flex-col items-start text-left"
+            style={{ background: "transparent", border: "none", padding: 0, maxWidth: "100%" }}
+          >
           <span
             className="flex items-center justify-center"
             style={{
@@ -12704,9 +12712,10 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
               <БукваАватара ник={profile.nickname} size={72} />
             )}
           </span>
-          <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 800, marginTop: 14, letterSpacing: "-0.02em" }}>
+          <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 25, fontWeight: 800, marginTop: 14, letterSpacing: "-0.02em", maxWidth: "100%" }}>
             {ник}
           </div>
+          </button>
           {!accountCreated && (
             <button
               onClick={() => { onВход(); закрыть(); }}
