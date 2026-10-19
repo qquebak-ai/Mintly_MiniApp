@@ -27028,7 +27028,7 @@ async function uploadAvatarIfNeeded(userId) {
 
 function ProfileView({
   connected, showToast,
-  accountCreated, profile, onOpenCreateProfile, onOpenLogin, onOpenEditProfile,
+  accountCreated, profile, onOpenCreateProfile, onOpenLogin, onProfileChange,
   onOpenSetting, onGoCreate, onOpenToken, myTokens = [],
   cosmetics: cosmeticsProp = { frame: "none", card: "none" }, onGoShop, onOpenAchievements, insetTop = 0, userId = null,
   // Достижения считаются в корне: их же показывает магазин и отдельная
@@ -27070,6 +27070,50 @@ function ProfileView({
     return () => { живо = false; document.removeEventListener("visibilitychange", приВозврате); };
   }, [accountCreated, userId]);
 
+  /* Правка прямо на экране профиля, без отдельного окна: нажал на
+     аватарку — выбрал и обрезал фото, нажал на описание — поле на месте.
+     Ник не правится: он неизменяем (supabase_nickname_lock.sql). */
+  const полеАватарки = useRef(null);
+  const [файлОбрезки, setФайлОбрезки] = useState(null);
+  const [грузимАватарку, setГрузимАватарку] = useState(false);
+  const [правимОписание, setПравимОписание] = useState(false);
+  const [черновикОписания, setЧерновикОписания] = useState("");
+  function выбратьАватарку(e) {
+    const файл = e.target.files && e.target.files[0];
+    e.target.value = ""; // тот же файл можно выбрать повторно
+    if (файл) setФайлОбрезки(файл);
+  }
+  async function сохранитьАватарку(обрезанный) {
+    setФайлОбрезки(null);
+    if (!userId || !обрезанный) return;
+    setГрузимАватарку(true);
+    try {
+      const путь = `${userId}/${Date.now()}.${safeImageExt(обрезанный)}`;
+      // contentType свой: без него Supabase ставит octet-stream, и
+      // картинка отдаётся браузеру как файл на скачивание.
+      const { error } = await supabase.storage.from("avatars")
+        .upload(путь, обрезанный, { upsert: true, contentType: обрезанный.type || "image/jpeg", cacheControl: "31536000" });
+      if (error) { showToast(t("saveFailed")); return; }
+      const ссылка = supabase.storage.from("avatars").getPublicUrl(путь).data.publicUrl;
+      const { error: ошибка } = await supabase.from("profiles").update({ avatar_url: ссылка, emoji: null }).eq("id", userId);
+      if (ошибка) { showToast(t("saveFailed")); return; }
+      onProfileChange && onProfileChange({ avatarUrl: ссылка, emoji: null });
+    } finally {
+      setГрузимАватарку(false);
+    }
+  }
+  async function сохранитьОписание() {
+    setПравимОписание(false);
+    const текст = черновикОписания.trim();
+    if (текст === (profile.bio || "").trim() || !userId) return;
+    // Показываем сразу, а при отказе базы возвращаем как было: ждать ответа
+    // ради строки текста незачем.
+    const было = profile.bio || "";
+    onProfileChange && onProfileChange({ bio: текст });
+    const { error } = await supabase.from("profiles").update({ bio: текст }).eq("id", userId);
+    if (error) { onProfileChange && onProfileChange({ bio: было }); showToast(t("saveFailed")); }
+  }
+
   const unlocked = accountCreated;
   function requireUnlock(missingMsg) {
     if (!accountCreated) { onOpenCreateProfile(); showToast(t("firstAccountFirst")); return false; }
@@ -27100,33 +27144,15 @@ function ProfileView({
               поднимает её выше шапки — так у карточки не остаётся видимых
               обрезанных краёв. */}
           <ProfileCardBg cardId={cosmetics.card} height={320} radius={0} bleed={16} top={PROFILE_CARD_TOP(insetTop)} />
-          {/* «Изм.» в верхнем углу, как в самом Telegram: отдельной кнопки
-              под описанием больше нет. Пока аккаунта нет, править нечего. */}
-          {accountCreated && (
-            <button
-              onClick={onOpenEditProfile}
-              aria-label={t("editProfile")}
-              className="fx-tap flex items-center"
-              style={{
-                position: "absolute", top: 0, right: 0, zIndex: 3, gap: 7,
-                padding: "9px 15px", borderRadius: 999,
-                background: "rgba(38,38,40,0.78)",
-                backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                color: T.ice, fontFamily: displayFont, fontSize: 14.5, fontWeight: 800,
-              }}
-            >
-              <Pencil size={15} strokeWidth={2.4} /> {t("editShort")}
-            </button>
-          )}
           {/* Отступ сверху — не украшение: вплотную к плашке висят свои
               кнопки Telegram («свернуть» и «ещё»), и без зазора она
               читалась как их кривой сосед, а не как часть профиля.
               Подложка отделяет её от картинки карточки. */}
+          <input ref={полеАватарки} type="file" accept="image/*" onChange={выбратьАватарку} style={{ display: "none" }} />
           <button
-            onClick={onGoShop}
+            onClick={() => { if (accountCreated && !грузимАватарку) полеАватарки.current && полеАватарки.current.click(); }}
             className="fx-tap"
-            style={{ position: "relative", zIndex: 1, background: "transparent", border: "none", padding: 0, lineHeight: 0 }}
+            style={{ position: "relative", zIndex: 1, background: "transparent", border: "none", padding: 0, lineHeight: 0, opacity: грузимАватарку ? 0.55 : 1 }}
           >
             <AvatarFrame frameId={cosmetics.frame} size={100}>
                 <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: profile.avatarUrl ? `center/cover no-repeat url(${profile.avatarUrl})` : T.surfaceHi, border: cosmetics.frame === "none" ? ОБОД_ЛИЦА : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: accountCreated ? 52 : 40 }}>
@@ -27158,12 +27184,33 @@ function ProfileView({
               {/* Описание в две строки: длинное всё равно дочитывают на
                   своей странице токена, а здесь оно раздвигало экран так,
                   что настройки уезжали за нижний край. */}
-              <p style={{
-                fontFamily: bodyFont, color: T.muted, fontSize: 13.5, maxWidth: 280, lineHeight: 1.45,
-                display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-              }}>
-                {profile.bio || t("bioEmptyPlaceholder")}
-              </p>
+              {правимОписание ? (
+                <textarea
+                  autoFocus
+                  value={черновикОписания}
+                  maxLength={160}
+                  rows={2}
+                  onChange={(e) => setЧерновикОписания(e.target.value)}
+                  onBlur={сохранитьОписание}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur(); } }}
+                  placeholder={t("bioEmptyPlaceholder")}
+                  style={{
+                    fontFamily: bodyFont, color: T.ice, fontSize: 13.5, width: "100%", maxWidth: 280, lineHeight: 1.45,
+                    textAlign: "center", resize: "none", background: T.surfaceHi, border: `1px solid ${T.lineHi}`,
+                    borderRadius: 12, padding: "6px 10px", outline: "none",
+                  }}
+                />
+              ) : (
+                <p
+                  onClick={() => { setЧерновикОписания(profile.bio || ""); setПравимОписание(true); }}
+                  style={{
+                    fontFamily: bodyFont, color: T.muted, fontSize: 13.5, maxWidth: 280, lineHeight: 1.45, cursor: "text",
+                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                  }}
+                >
+                  {profile.bio || t("bioEmptyPlaceholder")}
+                </p>
+              )}
               <div className="flex items-center gap-3" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>
                 <span className="flex items-center gap-1"><Clock size={12} /> {t("memberSince")}</span>
               </div>
@@ -27261,6 +27308,7 @@ function ProfileView({
 
         </div>
       </div>
+      <ImageCropModal file={файлОбрезки} shape="circle" onCancel={() => setФайлОбрезки(null)} onConfirm={(f) => сохранитьАватарку(f)} />
     </div>
   );
 }
@@ -31147,7 +31195,7 @@ function mapTokenRow(row) {
               profile={profile}
               onOpenCreateProfile={openCreateProfile}
               onOpenLogin={openLoginProfile}
-              onOpenEditProfile={openEditProfile}
+              onProfileChange={(правка) => setProfile((p) => ({ ...p, ...правка }))}
               supportUnread={supportUnread}
               onOpenSetting={(item) => setSettingsItem(item)}
               onGoCreate={openCreate}
