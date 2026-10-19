@@ -23598,6 +23598,19 @@ function SettingsPanel({
   const [deleting, setDeleting] = useState(false);
   // Почта для второго ключа: открывается из раздела «Безопасность».
   const [почтаОткрыта, setПочтаОткрыта] = useState(false);
+  /* Пока открыт экран почты, лист «Безопасность» уезжает вниз и ждёт:
+     экран почты лежит ниже по слою, и лист иначе висел бы поверх него.
+     Закрыли почту — лист возвращается тем же движением. */
+  const [спрятан, setСпрятан] = useState(false);
+  function открытьПочту() {
+    haptic("light");
+    setСпрятан(true);
+    setTimeout(() => setПочтаОткрыта(true), УХОД_ЛИСТА);
+  }
+  function закрытьПочту() {
+    setПочтаОткрыта(false);
+    setСпрятан(false);
+  }
   // Окно держится на экране, пока идёт анимация ухода, поэтому и
   // содержимое берём последнее — иначе на кадр уходило бы пустое.
   const [item, closing] = useClosing(itemProp);
@@ -23718,7 +23731,7 @@ function SettingsPanel({
               хорошо ровно до дня, когда телеграм пропадает. */}
           {accountCreated && (
             <button
-              onClick={() => setПочтаОткрыта(true)}
+              onClick={открытьПочту}
               className="fx-tap w-full flex items-center gap-2 rounded-[20px] px-3.5 py-3 mt-3"
               style={{ background: T.surfaceHi, border: "none" }}
             >
@@ -23729,7 +23742,7 @@ function SettingsPanel({
               <ChevronRight size={16} color={T.faint} />
             </button>
           )}
-          <ЭкранПочты открыт={почтаОткрыта} onClose={() => setПочтаОткрыта(false)} insetTop={insetTop} insetBottom={insetBottom} />
+          <ЭкранПочты открыт={почтаОткрыта} onClose={закрытьПочту} insetTop={insetTop} insetBottom={insetBottom} />
           {/* Удаление аккаунта переехало сюда из «Профиля»: пункт с
               одной кнопкой «Редактировать» дублировал такую же кнопку на
               самом экране профиля, а удаление по смыслу и так о
@@ -23918,7 +23931,7 @@ function SettingsPanel({
      страницы, она оказывалась под листом — нажатие как будто открывало
      что-то «на странице за настройками». */
   return createPortal(
-    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "fixed", inset: 0, zIndex: 460, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: `0 12px ${insetBottom + 14}px` }} onClick={onClose}>
+    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "fixed", inset: 0, zIndex: 460, background: спрятан ? "rgba(0,0,0,0)" : "rgba(0,0,0,0.75)", backdropFilter: спрятан ? "none" : "blur(4px)", pointerEvents: спрятан ? "none" : undefined, transition: `background ${УХОД_ЛИСТА}ms ease`, display: "flex", alignItems: "flex-end", justifyContent: "center", padding: `0 12px ${insetBottom + 14}px` }} onClick={onClose}>
       <div
         className={`fx-modal-card${уходит ? " fx-no-anim" : ""}`}
         data-sheet="1"
@@ -23928,7 +23941,7 @@ function SettingsPanel({
         onTouchEnd={конецЖестаП}
         onTouchCancel={конецЖестаП}
         style={{
-          transform: уходит ? "translateY(110%)" : `translateY(${тяга}px)`,
+          transform: уходит || спрятан ? "translateY(110%)" : `translateY(${тяга}px)`,
           transition: жест.current ? "none" : `transform ${УХОД_ЛИСТА}ms cubic-bezier(0.22, 0.85, 0.25, 1)`,
           touchAction: "pan-y",
           width: "100%", maxWidth: 440, background: T.surface, border: "none", borderRadius: 26,
