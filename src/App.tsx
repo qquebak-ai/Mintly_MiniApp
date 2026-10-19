@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import {
   Search, Flame, TrendingUp, Clock, Sparkles, ArrowUpRight, ArrowDownRight,
   Wallet, Home as HomeIcon, PlusCircle, User, ChevronLeft, Share2, Star,
-  ShieldCheck, ShieldAlert, Globe, Globe2, Send, Twitter, Image as ImageIcon, Upload,
+  ShieldCheck, ShieldAlert, Globe, Globe2, Send, Image as ImageIcon, Upload,
   Copy, ExternalLink, LogOut, ChevronRight, ChevronDown, Rocket, HeartCrack,
   Lock, Gift, LifeBuoy, Plus, ArrowDownLeft, Repeat,
   FileText, CheckCircle2, AlertTriangle, Info, RefreshCw, X,
@@ -7748,7 +7748,7 @@ const NOTIFY_THRESHOLDS = [0.05, 0.5, 1, 5, 10, 50];
 // Пункта «Профиль» здесь нет: «Редактировать профиль» и так стоит на
 // самом экране профиля, а удаление аккаунта переехало в «Безопасность».
 const SETTINGS_ITEMS = [
-  { key: "x", icon: Twitter, tKey: "xTitle" },
+  { key: "x", icon: ЗнакX, tKey: "xTitle" },
   { key: "security", icon: Lock, tKey: "security" },
   { key: "notify", icon: Bell, tKey: "notifyTitle" },
   { key: "language", icon: Globe2, tKey: "langTitle" },
@@ -8510,7 +8510,7 @@ function TokenCreatorCard({ ownerId, currentUserId, onNeedAuth, showToast, onOpe
               className="flex items-center"
               style={{ gap: 4, marginTop: 2 }}
             >
-              <Twitter size={12} color={T.electric} />
+              <ЗнакX size={12} color={T.electric} />
               <span className="truncate" style={{ fontFamily: bodyFont, color: T.electric, fontSize: 12.5 }}>@{creator.x_handle}</span>
               <CheckCircle2 size={12} color={T.up} />
             </span>
@@ -20368,7 +20368,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               {(info.telegram || info.twitter || info.website) && (
                 <div className="flex items-center gap-4">
                   {info.telegram && <button onClick={() => openSocial(info.telegram)} className="fx-tap"><Send size={16} color={T.muted} /></button>}
-                  {info.twitter && <button onClick={() => openSocial(info.twitter)} className="fx-tap"><Twitter size={16} color={T.muted} /></button>}
+                  {info.twitter && <button onClick={() => openSocial(info.twitter)} className="fx-tap"><ЗнакX size={16} color={T.muted} /></button>}
                   {info.website && <button onClick={() => openSocial(info.website)} className="fx-tap"><Globe size={16} color={T.muted} /></button>}
                 </div>
               )}
@@ -23200,6 +23200,17 @@ function ReferralShare({ showToast }) {
  * же аккаунтом, а обратно возвращается уже подтверждённым. Ни ника, ни
  * ручного поста никто больше не набирает.
  */
+/* Знак X — нынешний логотип, а не птица Twitter: сеть называется X,
+   и старая птица читалась как что-то устаревшее. Принимает те же
+   size и color, что значки lucide, поэтому встаёт на их место. */
+function ЗнакX({ size = 24, color = "currentColor", style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden style={{ display: "block", flex: "none", ...style }}>
+      <path fill={color} d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
 /* Профиль X целиком: баннер, аватар, имя, юзернейм, описание и цифры —
    как карточка аккаунта в самом X. Данные открытые, их отдаёт сервер
    вместе с состоянием подключения. */
@@ -23218,7 +23229,7 @@ function ПрофильX({ открыт, onClose, handle, профиль }) {
       <div style={{ padding: "0 16px" }}>
         <div className="flex items-end justify-between" style={{ marginTop: -44 }}>
           <span style={{ width: 88, height: 88, borderRadius: "50%", border: "4px solid #000", background: T.surfaceHi, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {п.avatar ? <img src={п.avatar} alt="" width={88} height={88} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Twitter size={30} color={T.muted} />}
+            {п.avatar ? <img src={п.avatar} alt="" width={88} height={88} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ЗнакX size={30} color={T.muted} />}
           </span>
           <button
             onClick={() => { haptic("light"); ссылка(`https://x.com/${handle}`); }}
@@ -23356,7 +23367,7 @@ function ПодключениеX({ showToast }) {
         >
           {состояние.profile && состояние.profile.avatar
             ? <img src={состояние.profile.avatar} alt="" width={36} height={36} style={{ borderRadius: "50%", flexShrink: 0 }} />
-            : <Twitter size={18} color={T.ice} />}
+            : <ЗнакX size={18} color={T.ice} />}
           <div className="flex-1 min-w-0">
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>@{состояние.handle}</div>
             <div style={{ fontFamily: bodyFont, color: T.up, fontSize: 12.5 }}>{t("xConnected")}</div>
@@ -23395,7 +23406,7 @@ function ПодключениеX({ showToast }) {
           opacity: занята ? 0.75 : 1,
         }}
       >
-        <Twitter size={15} color={PRISM_TEXT} /> {текстКнопки}
+        <ЗнакX size={15} color={PRISM_TEXT} /> {текстКнопки}
       </button>
 
       {беда && (
