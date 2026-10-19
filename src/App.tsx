@@ -12492,9 +12492,12 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
 
   useEffect(() => { if (!открыто) { setУходит(false); setТяга(0); } }, [открыто]);
 
+  /* Закрытие — плавным уездом, а не рывком: прежние 240 мс с резким
+     стартом читались как пропажа, особенно по нажатию мимо меню. */
+  const УХОД_МЕНЮ = 380;
   const закрыть = useCallback(() => {
     setУходит(true);
-    setTimeout(() => { setУходит(false); setТяга(0); onClose(); }, 240);
+    setTimeout(() => { setУходит(false); setТяга(0); onClose(); }, УХОД_МЕНЮ);
   }, [onClose]);
 
   // Пока меню открыто, вертикальный жест окна не нужен: тянут его вбок,
@@ -12535,6 +12538,9 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
   const пункты = [
     { key: "profile", icon: User, label: t("navProfileItem") },
     { key: "achievements", icon: Crown, label: t("achTitleShort") },
+    // Аккаунт X — здесь, рядом с профилем: это часть того, кто ты, а не
+    // настройка приложения.
+    { key: "x", icon: ЗнакX, label: t("xTitle") },
     /* Кошелька и секретной фразы в меню больше нет: кошелёк — своя
        вкладка внизу, а фраза открывается с оборота карты в нём. Два входа
        в одно и то же только путали. */
@@ -12575,7 +12581,7 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
         onClick={закрыть}
         style={{
           position: "fixed", inset: 0, zIndex: 398, background: hexA("#000000", 0.55),
-          opacity: уходит ? 0 : 1, transition: "opacity 240ms ease-out",
+          opacity: уходит ? 0 : 1, transition: `opacity ${УХОД_МЕНЮ}ms ease`,
         }}
       />
       <div
@@ -12591,7 +12597,7 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
           display: "flex", flexDirection: "column",
           overflowY: "auto", overscrollBehavior: "contain",
           transform: уходит ? "translateX(-100%)" : `translateX(${-тяга}px)`,
-          transition: жест.current ? "none" : "transform 240ms cubic-bezier(0.22, 1, 0.36, 1)",
+          transition: жест.current ? "none" : `transform ${уходит ? УХОД_МЕНЮ : 240}ms cubic-bezier(0.4, 0, 0.2, 1)`,
           animation: уходит ? "none" : "менюВъезжает 260ms cubic-bezier(0.22, 1, 0.36, 1)",
           boxShadow: "18px 0 40px rgba(0,0,0,0.5)",
           touchAction: "pan-y",
@@ -14352,7 +14358,7 @@ function завестиЗнаки() {
 function HomeView({
   curveTokens = [], onOpenToken = () => {},
   onGoTab, onGoCreate, profile = null, accountCreated = false, userId = null,
-  onOpenMyProfile, профильГрузится = false, грузится = false, insetTop = 0, insetBottom = 0, onOpenMintie, окрасМ = "mint",
+  onOpenMyProfile, профильГрузится = false, грузится = false, insetTop = 0, insetBottom = 0, onOpenMintie, окрасМ = "mint", onOpenX = null,
 }) {
   // Главная сведена к баннерам и курсу — сводка, лента, токен дня,
   // движение и топ убраны по просьбе. Заголовок и шапка (аватар, ник,
@@ -14361,7 +14367,7 @@ function HomeView({
     <div className="flex flex-col" style={{ gap: 26, paddingTop: 8, paddingBottom: 40 }}>
       <div className="flex items-center justify-between" style={{ gap: 12 }}>
         <ШапкаГлавной profile={profile} accountCreated={accountCreated} onOpenMyProfile={onOpenMyProfile} грузится={профильГрузится || грузится} />
-        <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} />
+        <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} onOpenX={onOpenX} />
       </div>
       <div className="fx-view flex flex-col" style={{ gap: 26 }}>
         {/* Баннеров и «В тренде» на главной больше нет — по просьбе. */}
@@ -22780,7 +22786,7 @@ function PinLockScreen({ pin, profile, onUnlock, onForgot }) {
  * разделы.
  */
 const ГРУППЫ_НАСТРОЕК = [
-  ["x", "security", "notify", "language"],
+  ["security", "notify", "language"],
   ["referral", "support"],
   ["architecture", "privacy"],
 ];
@@ -25002,7 +25008,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
  * просьба о коде должна исходить от него, а не заставать посреди входа.
  * Плашка и есть эта просьба: нажал — письмо ушло, открылось поле кода.
  * Почта подтвердилась — плашка исчезает сама. */
-function НапоминаниеПочты({ accountCreated = false, userId = null, insetTop = 0, insetBottom = 0 }) {
+function НапоминаниеПочты({ accountCreated = false, userId = null, insetTop = 0, insetBottom = 0, onOpenX = null }) {
   const [черновик, setЧерновик] = useState("");
   const [открыт, setОткрыт] = useState(false);
 
@@ -25022,6 +25028,29 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
      снова на экране — человек как раз вернулся из бота. */
   const [ботЕсть, setБотЕсть] = useState(true);
   const проверкаБота = useRef(null);
+  /* Подключён ли X. Пока не ответили — считаем, что да: колокольчик не
+     должен загораться от одного медленного ответа. Перечитываем, когда
+     приложение снова на экране — человек мог только что подключить. */
+  const [xЕсть, setXЕсть] = useState(true);
+  useEffect(() => {
+    if (!accountCreated || !userId) { setXЕсть(true); return undefined; }
+    let живо = true;
+    const проверить = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const токен = data && data.session && data.session.access_token;
+        if (!токен) return;
+        const r = await fetch(апи("/api/twitter?action=state"), { headers: { Authorization: `Bearer ${токен}` } });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (живо) setXЕсть(!!(j && j.handle));
+      } catch { /* сеть не ответила — не тревожим */ }
+    };
+    проверить();
+    const приВозврате = () => { if (document.visibilityState === "visible") проверить(); };
+    document.addEventListener("visibilitychange", приВозврате);
+    return () => { живо = false; document.removeEventListener("visibilitychange", приВозврате); };
+  }, [accountCreated, userId]);
   useEffect(() => {
     if (!accountCreated || !userId) { setБотЕсть(true); return undefined; }
     let живо = true;
@@ -25074,7 +25103,7 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
     setПанельУходит(true);
     setTimeout(() => { setПанель(false); setПанельУходит(false); if (потом) потом(); }, 200);
   };
-  if (!черновик && ботЕсть) return null;
+  if (!черновик && ботЕсть && xЕсть) return null;
 
   /* Сама просьба больше не висит на главной: справа от имени стоит
      колокольчик с красной точкой, а плашка «подтверди почту» лежит в его
@@ -25106,6 +25135,29 @@ function НапоминаниеПочты({ accountCreated = false, userId = nul
             transformOrigin: "calc(100% - 21px) -8px",
           }}>
       <div className="flex flex-col" style={{ gap: 8 }}>
+      {/* X — первым: подтверждённый аккаунт видят все, кто открывает
+          токены человека, и это первое, чего не хватает новому профилю. */}
+      {!xЕсть && onOpenX && (
+        <button
+          onClick={() => { закрытьПанель(onOpenX); haptic("light"); }}
+          className="fx-tap w-full flex items-center"
+          style={{
+            gap: 12, padding: "13px 14px", borderRadius: 20,
+            background: hexA(T.electric, 0.1), border: `1px solid ${hexA(T.electric, 0.28)}`,
+          }}
+        >
+          <span className="flex items-center justify-center flex-shrink-0" style={{
+            width: 36, height: 36, borderRadius: 999, background: hexA(T.electric, 0.16), color: T.electric,
+          }}>
+            <ЗнакX size={16} color={T.ice} />
+          </span>
+          <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 800 }}>Подключить X</span>
+            <span className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>Подтверждённый аккаунт видят все, кто открывает твои токены</span>
+          </span>
+          <ChevronRight size={16} color={T.faint} />
+        </button>
+      )}
       {!ботЕсть && (
         <button
           onClick={() => { закрытьПанель(открытьБота); haptic("light"); }}
@@ -30788,6 +30840,7 @@ function mapTokenRow(row) {
           <div className="px-4">
           <KeepAlive show={view === "home"}>
             <HomeView
+              onOpenX={() => setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "x"))}
               onOpenMintie={null}
               окрасМ={cosmetics.mintie}
               onGoTab={goTab}
@@ -30918,6 +30971,7 @@ function mapTokenRow(row) {
             if (ключ === "secret") { goTab("wallet"); setЗапросФразы((н) => н + 1); return; }
             if (ключ === "settings") { setНастройкиОткрыты(true); return; }
             if (ключ === "support") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "support")); return; }
+            if (ключ === "x") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "x")); return; }
           }}
         />
 
