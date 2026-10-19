@@ -39,13 +39,6 @@ const X_CLIENT_SECRET = (process.env.X_CLIENT_SECRET || "").trim();
 // Ровно этот адрес нужно внести в настройках приложения на
 // developer.x.com — X сверяет redirect_uri дословно.
 const X_REDIRECT_URI = (process.env.X_REDIRECT_URI || "https://api.mintly.company/api/twitter?action=callback").trim();
-// Куда вернуть человека после X — просто сайт: Telegram открывал сайт X
-// своим встроенным браузером, и обратно в приложение он выходит тем же
-// движением, каким туда попал (крестик/смахивание браузера).
-// Только www: у голого mintly.company сертификат на другое имя (см.
-// ту же поправку в api/_trading.js) — редирект на него отвечал бы
-// ошибкой TLS вместо страницы.
-const ГЛАВНАЯ_СТРАНИЦА = "https://www.mintly.company";
 // Полчаса на туда-обратно с лишним запасом — потом строка мусор.
 const ЖИЗНЬ_STATE_МС = 30 * 60 * 1000;
 
@@ -53,10 +46,28 @@ async function колбэкX(req, res, db) {
   const { code, state, error: xОтказ } = req.query || {};
   // Не через res.redirect — его здесь нет (см. дополнить() в
   // server/index.mjs, повторяющую только часть Vercel-обвязки).
+  /* Не на сайт, а короткая страница «вернитесь в Telegram». X открыт во
+     внешнем браузере, и сайт там — это сайт без входа: человек видел
+     регистрацию и решал, что всё сломалось. Мини-приложение же осталось
+     открытым в Telegram и само переспросит X, когда в него вернутся. */
   const назад = (статус) => {
-    res.statusCode = 302;
-    res.setHeader("Location", `${ГЛАВНАЯ_СТРАНИЦА}/?x=${статус}`);
-    res.end();
+    const удача = статус === "ok";
+    const бот = String(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "").replace(/[^A-Za-z0-9_]/g, "");
+    const заголовок = удача ? "Аккаунт X подключён" : "Не получилось подключить X";
+    const текст = удача ? "Вернитесь в Telegram — аккаунт уже виден в Mintly." : "Вернитесь в Telegram и попробуйте ещё раз.";
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.end(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mintly</title><style>
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#000;color:#F4F3EF;font-family:-apple-system,"Segoe UI",sans-serif;text-align:center;padding:0 24px}
+h1{font-size:26px;margin:8px 0 0}p{color:#8D8B86;font-size:16px;margin:0;max-width:300px;line-height:1.45}
+a{margin-top:18px;display:block;width:100%;max-width:320px;padding:16px 0;border-radius:16px;background:#F4F3EF;color:#0B0B0F;font-weight:700;font-size:16px;text-decoration:none}
+.знак{font-size:46px;color:${удача ? "#2ED47A" : "#FF5C6C"}}</style></head><body>
+<div class="знак">${удача ? "✓" : "✕"}</div><h1>${заголовок}</h1><p>${текст}</p>
+<a href="tg://resolve?domain=${бот}">Вернуться в Telegram</a>
+<script>setTimeout(function(){location.href="tg://resolve?domain=${бот}"},600)</script>
+</body></html>`);
   };
   if (xОтказ || !code || !state) return назад("error");
   try {
