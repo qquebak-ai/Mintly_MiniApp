@@ -11690,7 +11690,7 @@ async function получитьКурсМонеты(ключ) {
       .finally(() => { курсМонетЗапрос = null; });
   }
   const json = await курсМонетЗапрос;
-  for (const к of ["sol", "gram"]) {
+  for (const к of Object.keys(МОНЕТЫ_КУРСА)) {
     const д = json && json[к];
     if (!д) continue;
     КЕШ_КУРСА_МОНЕТЫ.set(к, { at: Date.now(), points: д.points || [], price: д.price || 0, change24: д.change24 || 0 });
@@ -11705,6 +11705,15 @@ if (typeof window !== "undefined") {
   получитьКурсМонеты("sol").catch(() => {});
   получитьКурсМонеты("gram").catch(() => {});
 }
+
+/* Монеты всех сетей кошелька — для курсов. Base платит за газ тем же
+   ETH, что и Ethereum, поэтому ETH одной строкой на обе сети. */
+const МОНЕТЫ_КУРСА = {
+  gram: { имя: "Gram", тикер: ТИКЕР_TON, лого: "/coins/gram.png", сеть: "TON" },
+  sol: { имя: "Solana", тикер: "SOL", лого: "/coins/sol.png", сеть: "Solana" },
+  bnb: { имя: "BNB", тикер: "BNB", лого: "/coins/bnb.svg", сеть: "BNB Chain" },
+  eth: { имя: "Ethereum", тикер: "ETH", лого: "/coins/eth.svg", сеть: "Ethereum · Base" },
+};
 
 function fmtКурс(p) {
   if (!(p > 0)) return "—";
@@ -11858,8 +11867,9 @@ function КартаКурсаМонеты({ title, монета, onOpen = null }
 function ЖивыеКарточки({ onOpen = null }) {
   return (
     <section className="flex flex-col">
-      <СтрокаКурса имя="Gram" тикер={ТИКЕР_TON} монета="gram" onOpen={onOpen} />
-      <СтрокаКурса имя="Solana" тикер="SOL" монета="sol" onOpen={onOpen} />
+      {Object.entries(МОНЕТЫ_КУРСА).map(([к, м]) => (
+        <СтрокаКурса key={к} имя={м.имя} тикер={м.тикер} монета={к} onOpen={onOpen} />
+      ))}
     </section>
   );
 }
@@ -11892,7 +11902,7 @@ function СтрокаКурса({ имя, тикер, монета, onOpen = nul
       className="fx-tap w-full flex items-center text-left"
       style={{ gap: 14, padding: "13px 2px", background: "transparent", border: "none" }}
     >
-      <img src={монета === "sol" ? "/coins/sol.png" : "/coins/gram.png"} alt="" width={44} height={44} style={{ borderRadius: "50%", flexShrink: 0 }} />
+      <img src={(МОНЕТЫ_КУРСА[монета] || МОНЕТЫ_КУРСА.gram).лого} alt="" width={44} height={44} style={{ borderRadius: "50%", flexShrink: 0 }} />
       <span className="flex flex-col" style={{ minWidth: 0, gap: 3 }}>
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>{имя}</span>
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{тикер}</span>
@@ -11933,11 +11943,11 @@ function КарточкаМонеты({ монета: монетаВход, ск
     return pts.map((p, i) => `${i ? "L" : "M"}${((i / (pts.length - 1)) * W).toFixed(2)},${(6 + (H - 12) * (1 - (p.p - min) / д)).toFixed(2)}`).join(" ");
   }, [данные]);
   if (!монета) return null;
-  const sol = монета === "sol";
+  const м = МОНЕТЫ_КУРСА[монета] || МОНЕТЫ_КУРСА.gram;
   const цена = (данные && данные.price) || 0;
   const изм = Math.round(((данные && данные.change24) || 0) * 100) / 100;
   const цвет = изм === 0 ? T.faint : изм > 0 ? T.up : T.down;
-  const тикер = sol ? "SOL" : ТИКЕР_TON;
+  const тикер = м.тикер;
   const кнопка = (Icon, подпись, действие) => (
     <button
       onClick={() => { haptic("light"); onClose(); действие && действие(); }}
@@ -11950,12 +11960,12 @@ function КарточкаМонеты({ монета: монетаВход, ск
   const лист = (
     <div className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 85, background: "#000000", overflowY: "auto", padding: "calc(24px + var(--tg-inset-top, 0px)) 16px calc(28px + var(--tg-inset-bottom, 0px))" }}>
       <div className="flex justify-end" style={{ marginBottom: 14 }}>
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{sol ? "Solana" : "TON"}</span>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{м.сеть}</span>
       </div>
       <div className="flex items-center" style={{ gap: 14 }}>
-        <img src={sol ? "/coins/sol.png" : "/coins/gram.png"} alt="" width={56} height={56} style={{ borderRadius: "50%" }} />
+        <img src={м.лого} alt="" width={56} height={56} style={{ borderRadius: "50%" }} />
         <div>
-          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 26, fontWeight: 800, lineHeight: 1.1 }}>{sol ? "Solana" : "Gram"}</div>
+          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 26, fontWeight: 800, lineHeight: 1.1 }}>{м.имя}</div>
           <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 3 }}>{тикер}</div>
         </div>
       </div>
@@ -18349,7 +18359,10 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
       </div>
       <КарточкаМонеты
         монета={монетаОткрыта}
-        сколько={монетаОткрыта === "sol" ? солНаКошельке : тонНаКошельке}
+        сколько={монетаОткрыта === "sol" ? солНаКошельке
+          : монетаОткрыта === "bnb" ? Number((остатокEVM("bsc") || {}).native) || 0
+          : монетаОткрыта === "eth" ? (Number((остатокEVM("eth") || {}).native) || 0) + (Number((остатокEVM("base") || {}).native) || 0)
+          : тонНаКошельке}
         onClose={() => setМонетаОткрыта(null)}
         onSend={() => setВыводОткрыт(true)}
         onReceive={() => setПолучитьОткрыт(true)}

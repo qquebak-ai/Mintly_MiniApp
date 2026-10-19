@@ -17,7 +17,7 @@ const TTL_КРИВОЙ_МС = 5 * 60 * 1000;
 const TTL_ЦЕНЫ_МС = 3000;
 const ПАУЗА_ПОСЛЕ_ОТКАЗА_МС = 15000;
 
-const МОНЕТЫ = { sol: "solana", gram: "the-open-network" };
+const МОНЕТЫ = { sol: "solana", gram: "the-open-network", bnb: "binancecoin", eth: "ethereum" };
 const ЗАГОЛОВКИ = { accept: "application/json", "user-agent": "Mintly/1.0 (+https://mintly.company)" };
 
 const кешКривой = new Map(); // id -> { at, points, price, change24 }
@@ -59,23 +59,27 @@ async function получитьКривую(coingeckoId) {
    тикер — Kraken отдаёт последнюю сделку по обеим монетам одним
    запросом и не просит ключа. CoinGecko остаётся запасным источником на
    случай, если Kraken недоступен из сети самого сервера. */
-const KRAKEN_ПАРА = { sol: "SOLUSD", gram: "TONUSD" };
+const KRAKEN_ПАРА = { sol: "SOLUSD", gram: "TONUSD", eth: "ETHUSD", bnb: "BNBUSD" };
 
 const кешЦены = new Map(); // "sol" | "gram" -> цена
 let ценаAt = 0;
 let ценаЗапрос = null;
 
 async function сКракена() {
-  const res = await fetch(`https://api.kraken.com/0/public/Ticker?pair=${Object.values(KRAKEN_ПАРА).join(",")}`, { headers: ЗАГОЛОВКИ });
-  if (!res.ok) throw new Error(String(res.status));
-  const json = await res.json();
-  if (json.error && json.error.length) throw new Error(json.error.join(","));
+  // По паре на запрос: незнакомая Kraken пара роняет весь общий ответ, и
+  // из-за одной монеты пропадали бы цены остальных.
   const итог = {};
-  for (const [ключ, пара] of Object.entries(KRAKEN_ПАРА)) {
-    const d = json.result && json.result[пара];
-    const цена = Number(d && d.c && d.c[0]);
-    if (цена > 0) итог[ключ] = цена;
-  }
+  await Promise.all(Object.entries(KRAKEN_ПАРА).map(async ([ключ, пара]) => {
+    try {
+      const res = await fetch(`https://api.kraken.com/0/public/Ticker?pair=${пара}`, { headers: ЗАГОЛОВКИ });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.error && json.error.length) return;
+      const d = json.result && Object.values(json.result)[0];
+      const цена = Number(d && d.c && d.c[0]);
+      if (цена > 0) итог[ключ] = цена;
+    } catch { /* эту монету доберёт CoinGecko */ }
+  }));
   if (!Object.keys(итог).length) throw new Error("пусто");
   return итог;
 }
@@ -100,7 +104,10 @@ async function получитьЦену() {
     ценаЗапрос = (async () => {
       let итог = null;
       try { итог = await сКракена(); } catch { итог = null; }
-      if (!итог) { try { итог = await сCoinGecko(); } catch { итог = null; } }
+      // Чего не нашлось на Kraken — с CoinGecko.
+      if (!итог || Object.keys(МОНЕТЫ).some((к) => !(к in итог))) {
+        try { итог = { ...(await сCoinGecko()), ...(итог || {}) }; } catch { /* остаётся что есть */ }
+      }
       if (!итог) return;
       for (const [ключ, цена] of Object.entries(итог)) кешЦены.set(ключ, цена);
       ценаAt = Date.now();
@@ -110,7 +117,7 @@ async function получитьЦену() {
 }
 
 export default async function handler(req, res) {
-  const [sol, gram] = await Promise.all([получитьКривую(МОНЕТЫ.sol), получитьКривую(МОНЕТЫ.gram)]);
+  const [sol, gram, bnb, eth] = await Promise.all([МОНЕТЫ.sol, МОНЕТЫ.gram, МОНЕТЫ.bnb, МОНЕТЫ.eth].map(получитьКривую));
   await получитьЦену();
 
   // Суточный процент считается от точки отсчёта, которую даёт кривая
@@ -126,5 +133,5 @@ export default async function handler(req, res) {
   };
 
   res.setHeader("Cache-Control", "public, max-age=2");
-  res.status(200).json({ sol: собрать(sol, "sol"), gram: собрать(gram, "gram") });
+  res.status(200).json({ sol: собрать(sol, "sol"), gram: собрать(gram, "gram"), bnb: собрать(bnb, "bnb"), eth: собрать(eth, "eth") });
 }
