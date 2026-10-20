@@ -200,6 +200,9 @@ const СТИЛЬ_ПРИВЕТСТВИЯ = `
 .прив-ссылка:hover { background: var(--прив-над); color: var(--прив-лёд) !important }
 /* Наведение: приглушённый текст кнопок и виджетов становится белым. */
 .прив-т { transition: color .2s }
+/* Серый текст над светлым шёлком терялся. Мягкий тёмный ореол вокруг
+   букв на чёрном незаметен, а на свечении отделяет их от фона. */
+.прив-серый { text-shadow: 0 0 2px rgba(0,0,0,.55), 0 0 14px rgba(0,0,0,.85), 0 0 34px rgba(0,0,0,.7) }
 .прив-виджет:hover .прив-т { color: var(--прив-лёд) !important }
 .прив-ряд { transition: background .35s, color .2s }
 .прив-ряд:not(.вкл):hover { color: var(--прив-лёд) !important }
@@ -238,7 +241,7 @@ function Строки({ верх, низ, размер = 64 }) {
   return (
     <h2 style={{ margin: 0, fontSize: размер, lineHeight: 1.04, fontWeight: 800, letterSpacing: "-0.035em", textWrap: "balance" }}>
       <span style={{ color: Ц.лёд }}>{верх}</span><br />
-      <span style={{ color: Ц.тусклый }}>{низ}</span>
+      <span className="прив-серый" style={{ color: Ц.тусклый }}>{низ}</span>
     </h2>
   );
 }
@@ -500,6 +503,7 @@ function Комиссия() {
   );
 }
 
+const ТОЛЩИНА_КАРТЫ = 9;
 function КартаDEX() {
   /* Карту можно взять курсором и повернуть: до 40° вбок и 28° по
      вертикали. Отпустил — плавно встаёт на место. Без захвата она
@@ -524,28 +528,45 @@ function КартаDEX() {
   };
   const отпустить = () => { старт.current = null; setДержу(false); setНаклон({ x: 0, y: 0 }); };
   return (
-    <div style={{ perspective: 1200, padding: 40, cursor: держу ? "grabbing" : "grab", touchAction: "none" }}
+    <div style={{ padding: 40, cursor: держу ? "grabbing" : "grab", touchAction: "none" }}
       onPointerMove={двигать} onPointerDown={взять} onPointerUp={отпустить} onPointerCancel={отпустить}
       onPointerLeave={() => { if (!старт.current) setНаклон({ x: 0, y: 0 }); }}>
-      <div style={{ animation: "прив-плыть 6s ease-in-out infinite" }}>
+      {/* Перспектива — у прямого родителя карты: на деде она не
+          действовала, и поворот выглядел плоским сжатием. */}
+      <div style={{ animation: "прив-плыть 6s ease-in-out infinite", perspective: 1100 }}>
         <div style={{
-          width: 420, height: 264, borderRadius: 24, padding: 26, boxSizing: "border-box", position: "relative", overflow: "hidden",
-          background: "linear-gradient(135deg,#8E8E93 0%,#3A3A3E 38%,#D9D9DE 62%,#4A4A4F 100%)",
-          boxShadow: "0 50px 120px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.12) inset",
+          width: 420, height: 264, position: "relative", transformStyle: "preserve-3d",
           transform: `rotateX(${наклон.x}deg) rotateY(${наклон.y}deg)`,
           transition: держу ? "transform .06s linear" : "transform .7s cubic-bezier(.2,1.4,.4,1)",
         }}>
-          <div style={{ position: "absolute", top: 0, bottom: 0, width: "60%", background: "linear-gradient(105deg,transparent 0%,rgba(255,255,255,.45) 50%,transparent 100%)", animation: "прив-блик 4.5s ease-in-out infinite" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", position: "relative" }}>
-            <Звезда size={34} цвет="#FFFFFF" />
-            <div style={{ textAlign: "right", color: "#fff" }}>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>Mintly</div>
-              <div style={{ fontSize: 10, letterSpacing: ".18em", opacity: .8, marginTop: 4 }}>LIMITED · DEX</div>
+          {/* Толщина: слои металла один за другим вглубь — на повороте
+              виден торец, и карта читается пластиной, а не картинкой. */}
+          {Array.from({ length: ТОЛЩИНА_КАРТЫ }, (_, i) => (
+            <div key={i} style={{
+              position: "absolute", inset: 0, borderRadius: 24,
+              background: i === ТОЛЩИНА_КАРТЫ - 1 ? "linear-gradient(135deg,#55555A,#2C2C30 50%,#606065)" : "linear-gradient(135deg,#B9B9BE,#5E5E63 45%,#C9C9CE 70%,#6A6A6F)",
+              transform: `translateZ(${-(i + 1) * 0.9}px)`,
+              boxShadow: i === ТОЛЩИНА_КАРТЫ - 1 ? "0 50px 120px rgba(0,0,0,.6)" : "none",
+            }} />
+          ))}
+          <div style={{
+            position: "absolute", inset: 0, borderRadius: 24, padding: 26, boxSizing: "border-box", overflow: "hidden",
+            background: "linear-gradient(135deg,#8E8E93 0%,#3A3A3E 38%,#D9D9DE 62%,#4A4A4F 100%)",
+            boxShadow: "0 0 0 1px rgba(255,255,255,.18) inset, 0 1px 0 rgba(255,255,255,.35) inset",
+            transform: "translateZ(0.5px)",
+          }}>
+            <div style={{ position: "absolute", top: 0, bottom: 0, width: "60%", background: "linear-gradient(105deg,transparent 0%,rgba(255,255,255,.45) 50%,transparent 100%)", animation: "прив-блик 4.5s ease-in-out infinite" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", position: "relative" }}>
+              <Звезда size={34} цвет="#FFFFFF" />
+              <div style={{ textAlign: "right", color: "#fff" }}>
+                <div style={{ fontWeight: 800, fontSize: 15 }}>Mintly</div>
+                <div style={{ fontSize: 10, letterSpacing: ".18em", opacity: .8, marginTop: 4 }}>LIMITED · DEX</div>
+              </div>
             </div>
-          </div>
-          <div style={{ position: "absolute", left: 26, bottom: 24, color: "#fff" }}>
-            <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em" }}>$MINT</div>
-            <div style={{ fontSize: 13, opacity: .8 }}>Mintly</div>
+            <div style={{ position: "absolute", left: 26, bottom: 24, color: "#fff" }}>
+              <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em" }}>$MINT</div>
+              <div style={{ fontSize: 13, opacity: .8 }}>Mintly</div>
+            </div>
           </div>
         </div>
       </div>
@@ -597,21 +618,24 @@ function useГотовоПриветствие() {
  * шёлк рисуется один раз в холст (вместе с шумом против ступеней на
  * плавных переходах), а двигается уже готовая картинка — только
  * трансформацией, которую видеокарта делает бесплатно. */
-const КАДР_Ш = 1920, КАДР_В = 1080, ЗАПАС = 420;
+const КАДР_Ш = 1920, КАДР_В = 1080, ЗАПАС = 1300;
+// Холст — в половину разрешения: ленты размыты, разницы не видно, а
+// полотно с продлёнными концами в полном размере весило бы 18 Мп.
+const ПЛОТНОСТЬ = 0.5;
 // Шёлк отодвинут вглубь: в ролике он на весь кадр, на сайте за текстом
 // это слишком близко. Края лент гасит маска холста.
 const ДАЛЬ = 0.58;
-const ШЁЛК_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="${КАДР_Ш + 2 * ЗАПАС}" height="${КАДР_В + 2 * ЗАПАС}" viewBox="${-ЗАПАС} ${-ЗАПАС} ${КАДР_Ш + 2 * ЗАПАС} ${КАДР_В + 2 * ЗАПАС}">
+const ШЁЛК_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="${(КАДР_Ш + 2 * ЗАПАС) * ПЛОТНОСТЬ}" height="${(КАДР_В + 2 * ЗАПАС) * ПЛОТНОСТЬ}" viewBox="${-ЗАПАС} ${-ЗАПАС} ${КАДР_Ш + 2 * ЗАПАС} ${КАДР_В + 2 * ЗАПАС}">
   <defs>
     <linearGradient id="sg1" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#222222"/><stop offset=".4" stop-color="#666666"/><stop offset=".62" stop-color="#ACACAC"/><stop offset=".8" stop-color="#575757"/><stop offset="1" stop-color="#3E3E3E"/></linearGradient>
     <linearGradient id="sg2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#9F9F9F" stop-opacity="0"/><stop offset=".5" stop-color="#CECECE"/><stop offset="1" stop-color="#9F9F9F" stop-opacity="0"/></linearGradient>
-    <filter id="sb" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="38"/></filter>
-    <filter id="sb2" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="20"/></filter>
+    <filter id="sb" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="38"/></filter>
+    <filter id="sb2" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="20"/></filter>
   </defs>
-  <path filter="url(#sb)" fill="url(#sg1)" d="M-300 1350C250 1050 520 760 860 560S1450 120 2200 -260L2300 160C1650 430 1350 760 1000 920S380 1300 -200 1600Z"/>
-  <path filter="url(#sb)" fill="url(#sg1)" opacity=".75" d="M300 1400C620 1100 760 860 1060 700S1600 420 2250 360L2250 760C1700 760 1420 880 1180 1040S760 1400 520 1500Z"/>
-  <path filter="url(#sb2)" fill="url(#sg2)" opacity=".9" d="M120 1250C520 980 700 760 940 620S1450 300 1950 40L1990 110C1500 380 1180 640 980 760S560 1100 220 1330Z"/>
-  <path filter="url(#sb2)" fill="url(#sg2)" opacity=".7" d="M560 1300C800 1080 960 900 1180 800S1660 600 2050 560L2050 620C1680 660 1400 760 1220 880S900 1150 660 1360Z"/>
+  <path filter="url(#sb)" fill="url(#sg1)" d="M-1500 2120L-300 1350C250 1050 520 760 860 560S1450 120 2200 -260L3400 -1030L3500 -610L2300 160C1650 430 1350 760 1000 920S380 1300 -200 1600L-1400 2370Z"/>
+  <path filter="url(#sb)" fill="url(#sg1)" opacity=".75" d="M-900 2040L300 1400C620 1100 760 860 1060 700S1600 420 2250 360L3450 -280L3450 120L2250 760C1700 760 1420 880 1180 1040S760 1400 520 1500L-680 2140Z"/>
+  <path filter="url(#sb2)" fill="url(#sg2)" opacity=".9" d="M-1080 2040L120 1250C520 980 700 760 940 620S1450 300 1950 40L3150 -750L3190 -680L1990 110C1500 380 1180 640 980 760S560 1100 220 1330L-980 2120Z"/>
+  <path filter="url(#sb2)" fill="url(#sg2)" opacity=".7" d="M-640 1900L560 1300C800 1080 960 900 1180 800S1660 600 2050 560L3250 -40L3250 20L2050 620C1680 660 1400 760 1220 880S900 1150 660 1360L-540 1960Z"/>
 </svg>`;
 
 /* Положение шёлка по прокрутке: [доля страницы, яркость, сдвиг x, сдвиг y,
@@ -680,7 +704,7 @@ function ФонШёлк() {
   return (
     <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: -1, overflow: "hidden", pointerEvents: "none" }}>
       <canvas ref={холст} style={{ position: "absolute", visibility: "hidden", willChange: "transform, opacity",
-        WebkitMaskImage: "radial-gradient(closest-side, #000 62%, transparent 100%)", maskImage: "radial-gradient(closest-side, #000 62%, transparent 100%)", ...(СВЕТЛАЯ ? { filter: "invert(1)" } : null) }} />
+        WebkitMaskImage: "radial-gradient(closest-side, #000 78%, transparent 100%)", maskImage: "radial-gradient(closest-side, #000 78%, transparent 100%)", ...(СВЕТЛАЯ ? { filter: "invert(1)" } : null) }} />
     </div>
   );
 }
@@ -782,7 +806,7 @@ function Приветствие() {
             <div style={{ animation: "прив-звезда 1.1s cubic-bezier(.2,.8,.2,1) both" }}><Звезда size={92} /></div>
             <div style={{ fontSize: 128, fontWeight: 800, letterSpacing: "-0.05em", lineHeight: 1, animation: "прив-вход 1s .25s cubic-bezier(.2,.7,.2,1) both" }}>Mintly</div>
           </div>
-          <div style={{ fontSize: 26, color: Ц.тусклый, marginTop: 26, fontWeight: 600, animation: "прив-вход 1s .55s cubic-bezier(.2,.7,.2,1) both" }}>
+          <div className="прив-серый" style={{ fontSize: 26, color: Ц.тусклый, marginTop: 26, fontWeight: 600, animation: "прив-вход 1s .55s cubic-bezier(.2,.7,.2,1) both" }}>
             Почувствуй <span style={{ color: Ц.лёд }}>лёгкость</span> мемкоинов.
           </div>
           <div style={{ display: "flex", gap: 12, marginTop: 40, animation: "прив-вход 1s .8s cubic-bezier(.2,.7,.2,1) both" }}>
@@ -793,11 +817,11 @@ function Приветствие() {
       </section>
 
       <Раздел id="запуск"
-        текст={<><Строки верх="Запуск токена" низ="за секунды" /><p style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Логотип, название, тикер — и монета уже торгуется на кривой. Без кода и без биржи.</p></>}
+        текст={<><Строки верх="Запуск токена" низ="за секунды" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Логотип, название, тикер — и монета уже торгуется на кривой. Без кода и без биржи.</p></>}
         картинка={<СценаЗапуска />} />
 
       <Раздел id="сети" обратно
-        текст={<><Строки верх="Все сети" низ="в одном месте" /><p style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Gram, Solana, BNB Chain, Base и Ethereum — живая лента запусков всех сетей.</p></>}
+        текст={<><Строки верх="Все сети" низ="в одном месте" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Gram, Solana, BNB Chain, Base и Ethereum — живая лента запусков всех сетей.</p></>}
         картинка={<СценаСетей />} />
 
       <Раздел id="комиссия"
@@ -805,13 +829,13 @@ function Приветствие() {
         картинка={<Комиссия />} />
 
       <Раздел id="покупка" обратно
-        текст={<><Строки верх="Покупка" низ="за секунду" /><p style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Сумма, одно нажатие — и токены в кошельке. Свечи графика двигаются вместе со сделками.</p></>}
+        текст={<><Строки верх="Покупка" низ="за секунду" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Сумма, одно нажатие — и токены в кошельке. Свечи графика двигаются вместе со сделками.</p></>}
         картинка={<СценаПокупки />} />
 
       <section style={{ minHeight: "92vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 70, padding: "80px 40px" }}>
         <Появись style={{ textAlign: "center" }}>
           <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.2 }}>
-            Доведи токен до <span style={{ color: Ц.тусклый }}>DEX</span> —<br />получи <span style={{ color: Ц.тусклый }}>лимитированную</span> карту
+            Доведи токен до <span className="прив-серый" style={{ color: Ц.тусклый }}>DEX</span> —<br />получи <span className="прив-серый" style={{ color: Ц.тусклый }}>лимитированную</span> карту
           </div>
         </Появись>
         <Появись задержка={150}><КартаDEX /></Появись>
@@ -820,13 +844,10 @@ function Приветствие() {
       <section style={{ minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 40px" }}>
         <Появись style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <Строки верх="Один аккаунт" низ="на телефоне и ПК" размер={80} />
-          <p style={{ color: Ц.тусклый, fontSize: 19, marginTop: 22 }}>Токены, кошелёк и история — те же, что в приложении.</p>
+          <p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, marginTop: 22 }}>Токены, кошелёк и история — те же, что в приложении.</p>
+          <button onClick={() => setОкно(true)} style={{ ...кнопкаГлавная, height: 66, padding: "0 64px", fontSize: 20, borderRadius: 18, marginTop: 38 }}>Начать</button>
         </Появись>
       </section>
-
-      <footer style={{ display: "flex", justifyContent: "center", padding: "40px 0 90px" }}>
-        <button onClick={() => setОкно(true)} style={{ ...кнопкаГлавная, height: 60, padding: "0 56px", fontSize: 19, borderRadius: 18 }}>Начать</button>
-      </footer>
 
       {окно && (
         <div onClick={() => setОкно(false)} style={{
