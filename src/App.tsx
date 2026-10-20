@@ -88,25 +88,27 @@ const DARK_THEME = {
    near-black ink, identical Ember accent so the brand reads the same in
    either mode. Kept flat (no translucency), same reason as Dark below. */
 const WHITE_THEME = {
-  bg: "#F7F8FA",
-  surface: "#FFFFFF",
-  surfaceHi: "#F1F3F7",
-  line: "#E3E6EC",
-  lineHi: "#D3D7E0",
-  ice: "#12141A",
-  paper: "#12141A",
-  muted: "#666D79",
-  faint: "#8A919C",
-  electric: "#4F5DE8",
-  turquoise: "#4F5DE8",
-  violet: "#4F5DE8",
-  rose: "#666D79",
+  // Чистый белый и чёрный, между ними только серые: цвет остаётся лишь
+  // у смысла — рост, падение, предупреждение. Зеркало тёмной темы.
+  bg: "#FFFFFF",
+  surface: "#F5F5F5",
+  surfaceHi: "#EEEEEE",
+  line: "#E6E6E6",
+  lineHi: "#D6D6D6",
+  ice: "#000000",
+  paper: "#111111",
+  muted: "#6E6E73",
+  faint: "#A1A1A6",
+  electric: "#000000",
+  turquoise: "#000000",
+  violet: "#000000",
+  rose: "#6E6E73",
   // Те же тона, что на графике, но потемнее: неон со свечей на белом
   // листе не читается вовсе.
   up: "#00A34C",
   down: "#E11D2A",
   warning: "#C77A16",
-  mintGlass: "#2F9E7A",
+  mintGlass: "#000000",
 };
 
 const THEMES = { Dark: DARK_THEME, White: WHITE_THEME };
@@ -133,9 +135,20 @@ function hexA(hex, alpha) {
    (grid line / vignette) effects that used to assume a dark backdrop. */
 let T = { ...DARK_THEME };
 function applyTheme(mode) {
-  // Светлой темы больше нет: весь интерфейс собран под чёрный фон ролика,
-  // и сохранённое когда-то «White» тоже открывается тёмным.
-  mode = "Dark";
+  mode = mode === "White" ? "White" : "Dark";
+  // Цвет страницы под приложением — тот же, что у темы: иначе при
+  // прокрутке за край и на заставке просвечивал бы чёрный.
+  if (typeof document !== "undefined") {
+    document.documentElement.dataset.theme = mode === "White" ? "light" : "dark";
+    document.documentElement.style.background = mode === "White" ? "#FFFFFF" : "#000000";
+    try {
+      const tg = window.Telegram && window.Telegram.WebApp;
+      const цвет = mode === "White" ? "#FFFFFF" : "#000000";
+      if (tg && tg.setHeaderColor) tg.setHeaderColor(цвет);
+      if (tg && tg.setBackgroundColor) tg.setBackgroundColor(цвет);
+      if (tg && tg.setBottomBarColor) tg.setBottomBarColor(цвет);
+    } catch { /* старый клиент */ }
+  }
   Object.assign(T, THEMES[mode] || DARK_THEME);
   PRISM = mode === "White" ? LIGHT_PRISM : DARK_PRISM;
   PRISM_TEXT = "#2A2C31";
@@ -7863,6 +7876,7 @@ const SETTINGS_ITEMS = [
   { key: "security", icon: Lock, tKey: "security" },
   { key: "notify", icon: Bell, tKey: "notifyTitle" },
   { key: "language", icon: Globe2, tKey: "langTitle" },
+  { key: "theme", icon: Sparkles, tKey: "themeTitle" },
   { key: "referral", icon: Gift, tKey: "referral" },
   { key: "support", icon: LifeBuoy, tKey: "support" },
   { key: "architecture", icon: Cpu, tKey: "archTitle" },
@@ -10935,7 +10949,7 @@ function NetworkSlider({ value, onChange, ширина = 168, высота = 38 
               /* Выбранная сеть — чёрным по белой плашке, остальное
                  приглушено. Цветного свечения здесь больше нет: оно
                  тянуло взгляд сильнее самого списка токенов. */
-              color: близость > 0.5 ? "#0B0B0F" : T.faint,
+              color: близость > 0.5 ? T.bg : T.faint,
               transition: сдвиг == null ? "color 220ms ease-out" : "none",
               pointerEvents: "none",
             }}
@@ -11408,7 +11422,7 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
   }
 
   const лист = (
-    <div className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 85, background: "#000000", overflowY: "auto", padding: "calc(24px + var(--tg-inset-top, 0px)) 16px calc(28px + var(--tg-inset-bottom, 0px))" }}>
+    <div className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 85, background: T.bg, overflowY: "auto", padding: "calc(24px + var(--tg-inset-top, 0px)) 16px calc(28px + var(--tg-inset-bottom, 0px))" }}>
       <div className="flex items-center justify-end" style={{ gap: 8, marginBottom: 14 }}>
         <img src={с.лого} alt="" width={18} height={18} style={{ borderRadius: "50%" }} />
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{с.имя}{своя ? " · запуск Mintly" : ""}</span>
@@ -11527,7 +11541,7 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
             className="fx-tap w-full"
             style={{
               marginTop: 12, padding: "15px 0", borderRadius: 16, border: "none",
-              background: числоСуммы > 0 ? T.ice : hexA("#FFFFFF", 0.12), color: числоСуммы > 0 ? "#0B0B0F" : T.faint,
+              background: числоСуммы > 0 ? T.ice : hexA("#FFFFFF", 0.12), color: числоСуммы > 0 ? T.bg : T.faint,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             }}
           >
@@ -11762,7 +11776,7 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
                 border: `1px solid ${active ? T.ice : hexA("#FFFFFF", 0.12)}`,
                 padding: "9px 15px", borderRadius: 999,
                 fontFamily: bodyFont, fontSize: 14, fontWeight: 600,
-                color: active ? "#0B0B0F" : T.muted,
+                color: active ? T.bg : T.muted,
                 transition: `color ${EASE}, background ${EASE}`,
               }}
             >
@@ -12236,7 +12250,7 @@ function КарточкаМонеты({ монета: монетаВход, ск
     </button>
   );
   const лист = (
-    <div className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 85, background: "#000000", overflowY: "auto", padding: "calc(24px + var(--tg-inset-top, 0px)) 16px calc(28px + var(--tg-inset-bottom, 0px))" }}>
+    <div className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 85, background: T.bg, overflowY: "auto", padding: "calc(24px + var(--tg-inset-top, 0px)) 16px calc(28px + var(--tg-inset-bottom, 0px))" }}>
       <div className="flex justify-end" style={{ marginBottom: 14 }}>
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{м.сеть}</span>
       </div>
@@ -12743,7 +12757,8 @@ function ЭкранНастроек({ открыт, onClose, profile, accountCre
                 <СтрокаНастройки
                   key={item.key}
                   item={item}
-                  значение={item.key === "language" ? (lang === "RU" ? "Русский" : "English") : null}
+                  значение={item.key === "language" ? (lang === "RU" ? "Русский" : "English")
+                    : item.key === "theme" ? (T.bg === "#FFFFFF" ? (lang === "EN" ? "Light" : "Светлая") : (lang === "EN" ? "Dark" : "Тёмная")) : null}
                   метка={item.key === "support" ? supportUnread : 0}
                   последняя={j === группа.length - 1}
                   onClick={() => onПункт(item)}
@@ -12910,9 +12925,10 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
           // Насыщенность не поднимаем и яркость чуть гасим: с saturate
           // яркие картинки за стеклом вспыхивали пятнами, а плотная
           // заливка делала его мутным. Тонкая светлая кромка — край стекла.
-          width: "min(78%, 320px)", background: "rgba(10,10,12,0.28)",
-          backdropFilter: "blur(30px) brightness(0.72)", WebkitBackdropFilter: "blur(30px) brightness(0.72)",
-          borderRight: "1px solid rgba(255,255,255,0.09)",
+          width: "min(78%, 320px)", background: T.bg === "#FFFFFF" ? "rgba(255,255,255,0.62)" : "rgba(10,10,12,0.28)",
+          backdropFilter: T.bg === "#FFFFFF" ? "blur(30px) brightness(1.08)" : "blur(30px) brightness(0.72)",
+          WebkitBackdropFilter: T.bg === "#FFFFFF" ? "blur(30px) brightness(1.08)" : "blur(30px) brightness(0.72)",
+          borderRight: T.bg === "#FFFFFF" ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.09)",
           display: "flex", flexDirection: "column",
           overflowY: "auto", overscrollBehavior: "contain",
           transform: уходит ? "translateX(-100%)" : `translateX(${-тяга}px)`,
@@ -22320,7 +22336,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
   }
 
   return (
-    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "absolute", inset: 0, zIndex: 80, background: error ? "rgba(0,0,0,0.92)" : "#000000", backdropFilter: error ? "blur(6px)" : "none", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(20px + var(--tg-inset-top, 0px)) 24px calc(20px + var(--tg-inset-bottom, 0px))", overflowY: "auto" }}>
+    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ position: "absolute", inset: 0, zIndex: 80, background: error ? "rgba(0,0,0,0.92)" : T.bg, backdropFilter: error ? "blur(6px)" : "none", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(20px + var(--tg-inset-top, 0px)) 24px calc(20px + var(--tg-inset-bottom, 0px))", overflowY: "auto" }}>
       {error ? (
         <div className="fx-modal-card flex flex-col items-center text-center gap-4" style={{ width: "100%", maxWidth: 340, background: T.surface, border: "none", borderRadius: 24, padding: 24 }}>
           {/* Ошибку встречает маскот, а не безликий значок: тот же
@@ -22906,7 +22922,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             fontFamily: displayFont, fontWeight: 700, fontSize: 17.5, padding: "18px 0", marginTop: 4,
             // Готово — белая кнопка, как главное действие в ролике; пока
             // шаг не заполнен — тихая графитовая.
-            color: шагГотов ? "#14151A" : T.faint,
+            color: шагГотов ? T.bg : T.faint,
             background: шагГотов ? T.ice : T.surfaceHi,
             transition: "background 220ms ease, color 220ms ease",
           }}
@@ -23087,7 +23103,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         className="cta-launch fx-tap rounded-[22px]"
         style={{
           fontFamily: displayFont, fontWeight: 700, fontSize: 17.5,
-          color: нехватка ? T.muted : "#14151A",
+          color: нехватка ? T.muted : T.bg,
           background: нехватка ? T.surfaceHi : T.ice,
           opacity: нехватка ? 0.7 : 1,
           padding: "18px 0", marginTop: 4,
@@ -23352,7 +23368,7 @@ function PinLockScreen({ pin, profile, onUnlock, onForgot }) {
  * разделы.
  */
 const ГРУППЫ_НАСТРОЕК = [
-  ["security", "notify", "language"],
+  ["security", "notify", "language", "theme"],
   // Поддержка живёт в боковом меню, реферальная программа — там же, рядом
   // с аккаунтом X: в настройках они только дублировались.
   ["architecture", "privacy"],
@@ -23818,7 +23834,7 @@ function ПрофильX({ открыт, onClose, handle, профиль }) {
      жест «смахнуть вниз» закрывал всё разом. Касания здесь дальше не идут. */
   const стоп = (e) => e.stopPropagation();
   const лист = (
-    <div onTouchStart={стоп} onTouchMove={стоп} onTouchEnd={стоп} onTouchCancel={стоп} data-sheet="1" className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 500, overscrollBehavior: "contain", background: "#000000", overflowY: "auto", paddingBottom: "calc(28px + var(--tg-inset-bottom, 0px))" }}>
+    <div onTouchStart={стоп} onTouchMove={стоп} onTouchEnd={стоп} onTouchCancel={стоп} data-sheet="1" className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 500, overscrollBehavior: "contain", background: T.bg, overflowY: "auto", paddingBottom: "calc(28px + var(--tg-inset-bottom, 0px))" }}>
       {/* Баннер — как шапка профиля в X; нет баннера — ровная плашка. */}
       {/* Шапка уходит под панель Telegram до самого верха: с отступом
           над ней оставалась чёрная полоса, и фон выглядел обрезанным. */}
@@ -23831,7 +23847,7 @@ function ПрофильX({ открыт, onClose, handle, профиль }) {
           <button
             onClick={() => { haptic("light"); ссылка(`https://x.com/${handle}`); }}
             className="fx-tap"
-            style={{ padding: "10px 18px", borderRadius: 999, border: "none", background: T.ice, color: "#0B0B0F", fontFamily: displayFont, fontSize: 14.5, fontWeight: 800 }}
+            style={{ padding: "10px 18px", borderRadius: 999, border: "none", background: T.ice, color: T.bg, fontFamily: displayFont, fontSize: 14.5, fontWeight: 800 }}
           >
             Открыть в X
           </button>
@@ -24280,6 +24296,21 @@ function SettingsPanel({
             </button>
           ))}
           <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.5, marginTop: 2 }}>{t("langFullNote")}</p>
+        </div>
+      );
+      break;
+    case "theme":
+      body = (
+        <div className="flex flex-col gap-2 mt-2">
+          {[["Dark", lang === "EN" ? "Dark" : "Тёмная"], ["White", lang === "EN" ? "Light" : "Светлая"]].map(([к, имя]) => (
+            <button key={к} onClick={() => { haptic("light"); onUpdateSetting("theme", к); }} className="fx-tap w-full flex items-center justify-between rounded-[20px] py-3 px-3.5" style={{ background: T.surfaceHi, border: `1px solid ${appSettings.theme === к ? T.ice : T.line}` }}>
+              <span className="flex items-center" style={{ gap: 12, fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>
+                <span aria-hidden style={{ width: 22, height: 22, borderRadius: "50%", background: к === "White" ? "#FFFFFF" : "#000000", border: "1px solid #8E8E93" }} />
+                {имя}
+              </span>
+              {appSettings.theme === к && <CheckCircle2 size={16} color={T.ice} />}
+            </button>
+          ))}
         </div>
       );
       break;
@@ -25078,7 +25109,7 @@ function ЭкранЗагрузкиЗнака() {
   // «fixed» отсчитывался от неё, и знак сначала стоял выше, а после
   // анимации прыгал на место.
   const экран = (
-    <div aria-busy style={{ position: "fixed", inset: 0, zIndex: 90, background: "#000000", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div aria-busy style={{ position: "fixed", inset: 0, zIndex: 90, background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <ЗнакЗагрузки size={76} />
     </div>
   );
@@ -28117,7 +28148,7 @@ function useTelegramViewport() {
         if (tg.setHeaderColor) { try { tg.setHeaderColor(T.bg); } catch (e) {} }
         if (tg.setBackgroundColor) { try { tg.setBackgroundColor(T.bg); } catch (e) {} }
         // Нижняя полоса Telegram тоже чёрная — иначе под приложением светлела кайма.
-        if (tg.setBottomBarColor) { try { tg.setBottomBarColor("#000000"); } catch (e) {} }
+        if (tg.setBottomBarColor) { try { tg.setBottomBarColor(T.bg); } catch (e) {} }
       } catch (e) { /* older client, some methods may be missing */ }
 
       const update = () => {
@@ -31852,7 +31883,10 @@ function mapTokenRow(row) {
           // поэтому вся панель целиком съезжает на эту величину.
           const сдвиг = ШИР / 2 - (ЦМ - ВЫС / 2 + (ВЫС * 2 + ОТСТУП_СЕТИ) / 2);
           const стекло = {
-            background: hexA("#000000", 0.22),
+            // В светлой теме стекло светлое: тёмная дымка на белом
+            // выглядела серой грязью.
+            background: T.bg === "#FFFFFF" ? hexA("#FFFFFF", 0.72) : hexA("#000000", 0.22),
+            boxShadow: T.bg === "#FFFFFF" ? `0 8px 30px ${hexA("#000000", 0.12)}, inset 0 0 0 1px ${hexA("#000000", 0.06)}` : undefined,
             backdropFilter: "blur(26px) saturate(1.5)",
             WebkitBackdropFilter: "blur(26px) saturate(1.5)",
           };
@@ -31930,7 +31964,7 @@ function mapTokenRow(row) {
                   position: "absolute", left: центр(i) - КРУГ / 2, top: ПОЛЕ,
                   border: "none", padding: 0,
                   width: КРУГ, height: КРУГ, borderRadius: "50%",
-                  background: active ? "#FFFFFF" : "transparent",
+                  background: active ? T.ice : "transparent",
                   opacity: скрыт ? 0 : 1,
                   transform: `translateX(${к}px) scale(${скрыт ? 0.5 : 1})`,
                   pointerEvents: скрыт ? "none" : "auto",
@@ -31944,7 +31978,7 @@ function mapTokenRow(row) {
                   // меньше, чтобы верх и низ совпали с общим рядом.
                   size={id === "create" ? 22 : 26}
                   strokeWidth={active ? 2 : 1.8}
-                  color={active ? "#14151A" : "#9B9FA9"}
+                  color={active ? T.bg : "#9B9FA9"}
                 />
                 {/* Кошелёк ещё не заведён — точка зовёт туда, иначе раздел
                     легко пропустить: всё остальное в приложении работает и без него. */}

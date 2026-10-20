@@ -232,7 +232,7 @@
       (function () {
         try {
           var ls = window.localStorage;
-          var ОСТАВИТЬ = /^(mintly_language|mintly_has_account|mintly_signed_out|mintly_seen_session|mintly_probe)$/;
+          var ОСТАВИТЬ = /^(mintly_language|mintly_theme|mintly_has_account|mintly_signed_out|mintly_seen_session|mintly_probe)$/;
           var память = new Map();
           var гость = ls.getItem("mintly_has_account") !== "1";
           var P = Storage.prototype, взять = P.getItem, положить = P.setItem, убрать = P.removeItem, ключ = P.key;
@@ -287,6 +287,14 @@
          анимация стартует на первом кадре, который правда нарисован. */
       try { window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.ready(); } catch (e) {}
 
+      // Светлая тема — светлая и заставка, без чёрной вспышки на входе.
+      try {
+        if (localStorage.getItem("mintly_theme") === "White") {
+          document.documentElement.style.background = "#FFFFFF";
+          var ш = document.getElementById("ширма");
+          if (ш) ш.style.filter = "invert(1)";
+        }
+      } catch (e) { /* хранилище закрыто */ }
       (function () {
         var поле = document.getElementById("ширма");
         var естьАккаунт = false;
