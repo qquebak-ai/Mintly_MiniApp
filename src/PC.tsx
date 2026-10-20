@@ -181,17 +181,20 @@ function ВходПК({ вОкне = false }) {
  * серым», экраны приложения и плавное появление по мере прокрутки. Вход
  * открывается окном поверх, из шапки или из любого раздела меню. */
 const СТИЛЬ_ПРИВЕТСТВИЯ = `
-@keyframes прив-вход { from { opacity: 0; transform: translateY(26px); filter: blur(8px) } to { opacity: 1; transform: none; filter: none } }
+@keyframes прив-вход { from { opacity: 0; transform: translate3d(0, 26px, 0) } to { opacity: 1; transform: none } }
 @keyframes прив-свет { 0% { transform: translate(-30%, -10%) rotate(-18deg) } 50% { transform: translate(10%, 6%) rotate(-12deg) } 100% { transform: translate(-30%, -10%) rotate(-18deg) } }
 @keyframes прив-плыть { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-12px) } }
 @keyframes прив-звезда { from { transform: rotate(-90deg) scale(.4); opacity: 0 } to { transform: none; opacity: 1 } }
 @keyframes прив-окно { from { opacity: 0; transform: translateY(18px) scale(.97) } to { opacity: 1; transform: none } }
 @keyframes прив-фон { from { opacity: 0 } to { opacity: 1 } }
-.прив-появись { opacity: 0; transform: translateY(40px); filter: blur(10px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1), filter .9s cubic-bezier(.2,.7,.2,1) }
-.прив-появись.видно { opacity: 1; transform: none; filter: none }
+.прив-появись { opacity: 0; transform: translate3d(0, 40px, 0); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); will-change: opacity, transform }
+.прив-появись.слева { transform: translate3d(-160px, 0, 0); transition-duration: 1.2s }
+.прив-появись.видно { opacity: 1; transform: none }
+.прив-фон { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; contain: strict }
+
 .прив-ссылка { background: none; border: none; cursor: pointer; padding: 8px 14px; border-radius: 10px; transition: background .15s, color .15s }
 .прив-ссылка:hover { background: var(--прив-над) }
-@media (prefers-reduced-motion: reduce) { .прив-появись { opacity: 1; transform: none; filter: none; transition: none } * { animation-duration: 0s !important } }
+@media (prefers-reduced-motion: reduce) { .прив-появись, .прив-появись.слева { opacity: 1; transform: none; transition: none } * { animation-duration: 0s !important } }
 `;
 
 function useПоявление() {
@@ -207,9 +210,9 @@ function useПоявление() {
   return [реф, видно];
 }
 
-function Появись({ children, задержка = 0, style = {} }) {
+function Появись({ children, задержка = 0, style = {}, слева = false }) {
   const [реф, видно] = useПоявление();
-  return <div ref={реф} className={"прив-появись" + (видно ? " видно" : "")} style={{ transitionDelay: `${задержка}ms`, ...style }}>{children}</div>;
+  return <div ref={реф} className={"прив-появись" + (слева ? " слева" : "") + (видно ? " видно" : "")} style={{ transitionDelay: `${задержка}ms`, ...style }}>{children}</div>;
 }
 
 // Знак организации — тот же файл, что на иконке приложения. Цвет
@@ -231,13 +234,13 @@ function Строки({ верх, низ, размер = 64 }) {
 
 function Телефон({ src, наклон = 0, children }) {
   return (
-    <div style={{ position: "relative", animation: "прив-плыть 7s ease-in-out infinite" }}>
+    <div style={{ position: "relative", animation: "прив-плыть 7s ease-in-out infinite", willChange: "transform" }}>
       <div style={{
         width: 330, aspectRatio: "1179 / 2394", borderRadius: 52, padding: 10, background: СВЕТЛАЯ ? "#E9E9EB" : "#151517",
         border: `1px solid ${Ц.линия}`, boxShadow: СВЕТЛАЯ ? "0 40px 90px rgba(0,0,0,.16)" : "0 40px 120px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.04) inset",
-        transform: `perspective(1400px) rotateY(${наклон}deg)`,
+        transform: `rotate(${наклон / 4}deg)`,
       }}>
-        <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 42, display: "block" }} />
+        <img src={src} alt="" width={1179} height={2394} decoding="async" loading="eager" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 42, display: "block" }} />
       </div>
       {children}
     </div>
@@ -333,16 +336,81 @@ function Раздел({ id, текст, картинка, обратно = false
     <section id={id} style={{ minHeight: "92vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 64px", boxSizing: "border-box" }}>
       <div style={{ width: "100%", maxWidth: 1180, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 80, flexDirection: обратно ? "row-reverse" : "row" }}>
         <Появись style={{ flex: 1 }}>{текст}</Появись>
-        <Появись задержка={150} style={{ flexShrink: 0 }}>{картинка}</Появись>
+        <Появись задержка={150} слева style={{ flexShrink: 0 }}>{картинка}</Появись>
       </div>
     </section>
   );
 }
 
+/* Всё, что приветствие показывает, — заранее: шрифты и экраны телефонов.
+   С font-display: swap текст сначала рисовался запасным шрифтом и на
+   глазах перескакивал, а телефоны догружались уже на прокрутке. Заставка
+   из index.html держится, пока это не готово (не дольше 2,5 с). */
+const КАРТИНКИ_ПРИВЕТСТВИЯ = ["/landing/create-12.webp", "/landing/pad.webp", "/landing/buy.webp", "/logo-star.png"];
+function useГотовоПриветствие() {
+  const [готово, setГотово] = useState(false);
+  useEffect(() => {
+    let жив = true;
+    const шрифты = document.fonts ? ["400", "600", "800"].flatMap((в) => [
+      document.fonts.load(`${в} 20px MintlyUI`, "Мintly"), document.fonts.load(`${в} 20px MintlyUI`, "Ая"),
+    ]) : [];
+    const картинки = КАРТИНКИ_ПРИВЕТСТВИЯ.map((src) => { const и = new Image(); и.src = src; return и.decode ? и.decode().catch(() => {}) : Promise.resolve(); });
+    const стоп = new Promise((r) => setTimeout(r, 2500));
+    Promise.race([Promise.all([...шрифты, ...картинки]).catch(() => {}), стоп]).then(() => { if (жив) setГотово(true); });
+    return () => { жив = false; };
+  }, []);
+  useEffect(() => { if (!готово) return; const ш = document.getElementById("ширма"); if (ш) ш.remove(); }, [готово]);
+  return готово;
+}
+
+/* Фон страницы рисуется один раз на холсте: мягкие светлые пятна,
+   затемнение к краям и шум прямо в пикселях. Шум убирает ступени на
+   плавном сером переходе, а готовая картинка ничего не стоит при
+   прокрутке — CSS-градиенты с наложением зерна перерисовывались каждый
+   кадр, и страница дёргалась. */
+function ФонПриветствия() {
+  const холст = useRef(null);
+  useEffect(() => {
+    const к = холст.current;
+    if (!к) return;
+    const рисовать = () => {
+      const ш = Math.round(window.innerWidth), в = Math.round(window.innerHeight);
+      к.width = ш; к.height = в;
+      const г = к.getContext("2d");
+      г.fillStyle = Ц.фон; г.fillRect(0, 0, ш, в);
+      const цвет = СВЕТЛАЯ ? "0,0,0" : "255,255,255";
+      const пятна = СВЕТЛАЯ
+        ? [[0.12, 0.05, 0.75, 0.05], [0.88, 0.45, 0.6, 0.035], [0.5, 1.05, 0.55, 0.03]]
+        : [[0.14, 0.02, 0.8, 0.16], [0.9, 0.42, 0.62, 0.1], [0.48, 1.08, 0.6, 0.08]];
+      for (const [x, y, р, а] of пятна) {
+        const r = р * Math.max(ш, в);
+        const гр = г.createRadialGradient(x * ш, y * в, 0, x * ш, y * в, r);
+        for (let i = 0; i <= 10; i++) { const t = i / 10; гр.addColorStop(t, `rgba(${цвет},${а * Math.pow(1 - t, 2.2)})`); }
+        г.fillStyle = гр; г.fillRect(0, 0, ш, в);
+      }
+      const вин = г.createRadialGradient(ш / 2, в * 0.42, Math.min(ш, в) * 0.35, ш / 2, в * 0.42, Math.max(ш, в) * 0.8);
+      вин.addColorStop(0, "rgba(0,0,0,0)"); вин.addColorStop(1, СВЕТЛАЯ ? "rgba(0,0,0,0.04)" : "rgba(0,0,0,0.55)");
+      г.fillStyle = вин; г.fillRect(0, 0, ш, в);
+      const д = г.getImageData(0, 0, ш, в), п = д.data, сила = СВЕТЛАЯ ? 5 : 7;
+      for (let i = 0; i < п.length; i += 4) {
+        const н = (Math.random() + Math.random() - 1) * сила;
+        п[i] += н; п[i + 1] += н; п[i + 2] += н;
+      }
+      г.putImageData(д, 0, 0);
+    };
+    рисовать();
+    let таймер;
+    const поРазмеру = () => { clearTimeout(таймер); таймер = setTimeout(рисовать, 200); };
+    window.addEventListener("resize", поРазмеру);
+    return () => { window.removeEventListener("resize", поРазмеру); clearTimeout(таймер); };
+  }, []);
+  return <canvas ref={холст} className="прив-фон" aria-hidden style={{ width: "100vw", height: "100vh" }} />;
+}
+
 function Приветствие() {
+  const готово = useГотовоПриветствие();
   const [окно, setОкно] = useState(false);
   const [прокручено, setПрокручено] = useState(false);
-  useEffect(() => { const ш = document.getElementById("ширма"); if (ш) ш.remove(); }, []);
   useEffect(() => {
     const н = () => setПрокручено(window.scrollY > 20);
     window.addEventListener("scroll", н, { passive: true });
@@ -360,23 +428,25 @@ function Приветствие() {
   const кнопкаГлавная = { height: 48, padding: "0 26px", borderRadius: 14, border: "none", cursor: "pointer", background: Ц.лёд, color: Ц.наЛьду, fontFamily: ШРИФТ, fontSize: 16, fontWeight: 800 };
   const кнопкаВторая = { ...кнопкаГлавная, background: "transparent", color: Ц.лёд, border: `1px solid ${Ц.линия}`, textDecoration: "none", display: "inline-flex", alignItems: "center" };
 
+  if (!готово) return null;
   return (
-    <div style={{ background: Ц.фон, color: Ц.лёд, fontFamily: ШРИФТ, minHeight: "100vh", overflowX: "hidden", "--прив-над": СВЕТЛАЯ ? "rgba(0,0,0,.05)" : "rgba(255,255,255,.06)" }}>
+    <div style={{ background: Ц.фон, color: Ц.лёд, fontFamily: ШРИФТ, minHeight: "100vh", overflowX: "hidden", isolation: "isolate", position: "relative", "--прив-над": СВЕТЛАЯ ? "rgba(0,0,0,.05)" : "rgba(255,255,255,.06)" }}>
       <style>{СТИЛЬ_ПРИВЕТСТВИЯ}</style>
+      <ФонПриветствия />
 
       <header style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 20, height: 72, display: "flex", alignItems: "center", justifyContent: "space-between",
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 20, height: 84, display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 40px", boxSizing: "border-box", transition: "background .3s, border-color .3s",
         background: прокручено ? (СВЕТЛАЯ ? "rgba(255,255,255,.78)" : "rgba(0,0,0,.6)") : "transparent",
-        backdropFilter: прокручено ? "blur(20px) saturate(1.4)" : "none", borderBottom: `1px solid ${прокручено ? Ц.линия : "transparent"}`,
+        backdropFilter: прокручено ? "blur(14px)" : "none", borderBottom: `1px solid ${прокручено ? Ц.линия : "transparent"}`,
       }}>
         <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: Ц.лёд, fontFamily: ШРИФТ }}>
-          <Звезда size={34} />
-          <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Mintly</span>
+          <Звезда size={44} />
+          <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.03em" }}>Mintly</span>
         </button>
-        <nav style={{ display: "flex", gap: 4, position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
+        <nav style={{ display: "flex", gap: 10, position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
           {МЕНЮ.map(([имя, д]) => (
-            <button key={имя} className="прив-ссылка" onClick={д} style={{ color: Ц.тусклый, fontFamily: ШРИФТ, fontSize: 15, fontWeight: 600 }}>{имя}</button>
+            <button key={имя} className="прив-ссылка" onClick={д} style={{ color: Ц.тусклый, fontFamily: ШРИФТ, fontSize: 19, fontWeight: 600, padding: "10px 20px" }}>{имя}</button>
           ))}
         </nav>
         <button onClick={() => setОкно(true)} style={{ ...кнопкаГлавная, height: 42, padding: "0 22px", fontSize: 15 }}>Войти</button>
@@ -384,11 +454,6 @@ function Приветствие() {
 
       {/* Начало — как первый кадр ролика: знак и имя, за ними медленный свет. */}
       <section style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-        <div aria-hidden style={{
-          position: "absolute", width: "140%", height: 420, top: "30%", left: "-20%", filter: "blur(70px)",
-          background: СВЕТЛАЯ ? "linear-gradient(90deg,transparent,rgba(0,0,0,.08),transparent)" : "linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent)",
-          animation: "прив-свет 14s ease-in-out infinite",
-        }} />
         <div style={{ position: "relative", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
             <div style={{ animation: "прив-звезда 1.1s cubic-bezier(.2,.8,.2,1) both" }}><Звезда size={92} /></div>
