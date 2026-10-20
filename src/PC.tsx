@@ -197,7 +197,14 @@ const СТИЛЬ_ПРИВЕТСТВИЯ = `
 .прив-фон { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; contain: strict }
 
 .прив-ссылка { background: none; border: none; cursor: pointer; padding: 8px 14px; border-radius: 10px; transition: background .15s, color .15s }
-.прив-ссылка:hover { background: var(--прив-над) }
+.прив-ссылка:hover { background: var(--прив-над); color: var(--прив-лёд) !important }
+/* Наведение: приглушённый текст кнопок и виджетов становится белым. */
+.прив-т { transition: color .2s }
+.прив-виджет:hover .прив-т { color: var(--прив-лёд) !important }
+.прив-ряд { transition: background .35s, color .2s }
+.прив-ряд:not(.вкл):hover { color: var(--прив-лёд) !important }
+.прив-стрелка svg { transition: stroke .2s }
+.прив-стрелка:hover svg { stroke: var(--прив-лёд) }
 @media (prefers-reduced-motion: reduce) { .прив-появись, .прив-появись.слева { opacity: 1; transform: none; transition: none } * { animation-duration: 0s !important } }
 `;
 
@@ -342,7 +349,7 @@ function Колесо() {
    идёт — колесо и бегущие секунды, по готовности — зелёная галочка. */
 function Плашка({ заголовок, подпись, время, style, ждём = false, видна = true }) {
   return (
-    <div style={{
+    <div className="прив-виджет" style={{
       position: "absolute", display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 16, minWidth: 250,
       background: СВЕТЛАЯ ? "rgba(255,255,255,.94)" : "rgba(20,20,22,.94)",
       border: `1px solid ${ждём ? Ц.линия : СВЕТЛАЯ ? "rgba(0,163,76,.35)" : "rgba(46,232,122,.35)"}`, boxShadow: "0 18px 50px rgba(0,0,0,.35)",
@@ -354,7 +361,7 @@ function Плашка({ заголовок, подпись, время, style, �
       </div>
       <div style={{ flex: 1 }}>
         <div style={{ color: Ц.лёд, fontSize: 15, fontWeight: 800 }}>{заголовок}</div>
-        <div style={{ color: Ц.тусклый, fontSize: 12.5, marginTop: 2 }}>{подпись}</div>
+        <div className="прив-т" style={{ color: Ц.тусклый, fontSize: 12.5, marginTop: 2 }}>{подпись}</div>
       </div>
       <div style={{ color: ждём ? Ц.лёд : "#2EE87A", fontSize: 15, fontWeight: 800, marginLeft: 14, fontVariantNumeric: "tabular-nums", minWidth: 44, textAlign: "right" }}>{время}</div>
     </div>
@@ -406,13 +413,13 @@ function СценаСетей() {
           {СЕТИ_ПРИВЕТСТВИЯ.map((н, i) => {
             const вкл = мс >= 0 && i === номер;
             return (
-              <div key={н.имя} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 13, fontSize: 14.5, fontWeight: 700, transition: "background .35s, color .35s", background: вкл ? Ц.лёд : "transparent", color: вкл ? Ц.наЛьду : Ц.тусклый }}>
+              <div key={н.имя} className={"прив-ряд" + (вкл ? " вкл" : "")} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 13, fontSize: 14.5, fontWeight: 700, cursor: "default", background: вкл ? Ц.лёд : "transparent", color: вкл ? Ц.наЛьду : Ц.тусклый }}>
                 <img src={н.лого} alt="" width={22} height={22} style={{ borderRadius: 999, display: "block" }} />{н.имя}
               </div>
             );
           })}
         </div>
-        <div style={{
+        <div className="прив-виджет" style={{
           position: "absolute", left: -290, top: 330, width: 260, display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 16,
           background: Ц.поверхность, border: `1px solid ${Ц.линия}`, boxShadow: "0 18px 50px rgba(0,0,0,.35)",
           transition: "opacity .35s, transform .45s cubic-bezier(.2,.8,.2,1)", opacity: видна ? 1 : 0, transform: видна ? "none" : "translate3d(0,12px,0)",
@@ -420,7 +427,7 @@ function СценаСетей() {
           <div style={{ width: 36, height: 36, borderRadius: 999, background: с.цвет, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, color: "#fff", flexShrink: 0 }}>{с.токен[1]}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ color: Ц.лёд, fontSize: 14.5, fontWeight: 800 }}>Новый запуск {с.токен}</div>
-            <div style={{ color: Ц.тусклый, fontSize: 12.5, marginTop: 2 }}>{с.имя} · 1 с назад</div>
+            <div className="прив-т" style={{ color: Ц.тусклый, fontSize: 12.5, marginTop: 2 }}>{с.имя} · 1 с назад</div>
           </div>
           <div style={{ color: "#2EE87A", fontSize: 13.5, fontWeight: 800 }}>{с.рост}</div>
         </div>
@@ -466,17 +473,17 @@ function Комиссия() {
   const комиссия = (100 * доля / 100).toFixed(2).replace(".", ",");
   const ряд = (а, б, цвет) => (
     <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderTop: `1px solid ${Ц.линия}`, fontSize: 15 }}>
-      <span style={{ color: Ц.тусклый }}>{а}</span><span style={{ color: цвет || Ц.лёд, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{б}</span>
+      <span className="прив-т" style={{ color: Ц.тусклый }}>{а}</span><span style={{ color: цвет || Ц.лёд, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{б}</span>
     </div>
   );
   return (
-    <div ref={реф} style={{ width: 420, padding: 28, borderRadius: 24, background: Ц.поверхность, border: `1px solid ${Ц.линия}` }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: Ц.тусклый, fontSize: 14 }}><Звезда size={16} цвет={Ц.тусклый} /> Продажа $MINT</div>
+    <div ref={реф} className="прив-виджет" style={{ width: 420, padding: 28, borderRadius: 24, background: Ц.поверхность, border: `1px solid ${Ц.линия}` }}>
+      <div className="прив-т" style={{ display: "flex", alignItems: "center", gap: 8, color: Ц.тусклый, fontSize: 14 }}><Звезда size={16} цвет={Ц.тусклый} /> Продажа $MINT</div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 12, margin: "14px 0 18px" }}>
         <div style={{ fontSize: 96, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.04em", color: ноль ? "#2EE87A" : Ц.лёд, fontVariantNumeric: "tabular-nums", transition: "color .4s" }}>
           {ноль ? "0" : доля.toFixed(1).replace(".", ",")}%
         </div>
-        <div style={{ color: Ц.тусклый, fontSize: 13, paddingBottom: 12, lineHeight: 1.3 }}>комиссия<br />Mintly</div>
+        <div className="прив-т" style={{ color: Ц.тусклый, fontSize: 13, paddingBottom: 12, lineHeight: 1.3 }}>комиссия<br />Mintly</div>
       </div>
       {ряд("Сумма сделки", "100,00 GRAM")}
       {ряд("Комиссия", `${комиссия} GRAM`, ноль ? "#2EE87A" : Ц.вниз)}
@@ -679,7 +686,7 @@ function Выезд({ откуда = "left", children, style = {} }) {
 // Стрелка вниз: падает, ударяется о невидимый пол и отскакивает.
 function СтрелкаВниз({ onClick }) {
   return (
-    <button onClick={onClick} aria-label="Дальше" style={{ position: "absolute", bottom: 34, left: "50%", marginLeft: -22, width: 44, height: 56, background: "none", border: "none", cursor: "pointer", animation: "прив-вход 1s 1.4s both" }}>
+    <button onClick={onClick} aria-label="Дальше" className="прив-стрелка" style={{ position: "absolute", bottom: 34, left: "50%", marginLeft: -22, width: 44, height: 56, background: "none", border: "none", cursor: "pointer", animation: "прив-вход 1s 1.4s both" }}>
       <span style={{ display: "block", animation: "прив-удар 1.6s cubic-bezier(.45,0,.55,1) infinite", transformOrigin: "50% 100%" }}>
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={Ц.тусклый} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block", margin: "0 auto" }}><path d="M6 9.5l6 6 6-6" /></svg>
       </span>
@@ -710,7 +717,7 @@ function Приветствие() {
 
   if (!готово) return null;
   return (
-    <div style={{ background: Ц.фон, color: Ц.лёд, fontFamily: ШРИФТ, minHeight: "100vh", overflowX: "hidden", isolation: "isolate", position: "relative", "--прив-над": СВЕТЛАЯ ? "rgba(0,0,0,.05)" : "rgba(255,255,255,.06)" }}>
+    <div style={{ background: Ц.фон, color: Ц.лёд, fontFamily: ШРИФТ, minHeight: "100vh", overflowX: "hidden", isolation: "isolate", position: "relative", "--прив-над": СВЕТЛАЯ ? "rgba(0,0,0,.05)" : "rgba(255,255,255,.06)", "--прив-лёд": СВЕТЛАЯ ? "#000000" : "#FFFFFF" }}>
       <style>{СТИЛЬ_ПРИВЕТСТВИЯ}</style>
       <ФонШёлк />
 
