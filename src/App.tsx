@@ -5595,7 +5595,9 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
        краю и её плашка с ценой не наезжала на шкалу.
        Ограничение только для руки: начальное положение график
        выставляет себе сам, и у молодой монеты оно с запасом. */
-    if (ручной && n > 0) v.start = Math.min(v.start, n + 1 - v.count);
+    /* Влево свечи можно увести дальше: последняя доходит до трети
+       ширины от левого края, справа — пустое поле под будущие свечи. */
+    if (ручной && n > 0) v.start = Math.min(v.start, Math.max(n + 1 - v.count, n - 0.5 - v.count * 0.3));
     /* Влево — не дальше первой свечи, с тем же запасом в одну, что и
        справа. Пустое поле там показывать нечего: истории раньше этой
        свечи не существует, а уехавший в пустоту график читался как
@@ -6085,17 +6087,17 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     inertiaRaf.current = null;
   }
   function panByPixels(dxScreen) {
-    // В стартовом масштабе двигать нечего: график и так показывает всё,
-    // что есть. Как только масштаб тронули — хоть в плюс, хоть в
-    // минус, — движение разрешено.
-    if (!зумРукой.current && viewRef.current.count >= стартовыйСчёт.current - 0.5) return;
+    // Двигать можно всегда, и в стартовом масштабе тоже: свечи уводят
+    // влево, освобождая место справа.
     const layout = computeLayout();
     if (!layout) return;
     viewRef.current.start -= dxScreen / layout.slot;
     clampView(true);
-    // Отпустили у самого правого края — снова держимся за него.
+    // Отпустили у самого правого края — снова держимся за него. Увели
+    // свечи влево, в пустое поле, — окно стоит, где оставили.
     const v = viewRef.current;
-    pinnedRef.current = v.start + v.count >= n - 0.75;
+    const правый = v.start + v.count;
+    pinnedRef.current = правый >= n - 0.75 && правый <= n + хвостСправа(v.count) + 0.75;
     const left = candles[Math.max(0, Math.min(n - 1, Math.floor(v.start)))];
     anchorTimeRef.current = left && Number.isFinite(left.time) ? left.time : null;
     запомнитьРазмахОкна();
@@ -6112,6 +6114,17 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
   // продолжала везти окно цены сама, и это читалось как «шкала стоит,
   // пока держишь, и разъезжается, как только отпустил». Пока палец на
   // экране, цена по-прежнему двигается вместе с ним.
+  /* Вертикальный сдвиг — только при зафиксированной шкале: там она
+     стоит, пока её не тронет человек, и тянуть её пальцем вверх-вниз
+     можно куда угодно. В обычном режиме шкала садится по свечам сама. */
+  function panY(dyScreen) {
+    if (!фиксRef.current || !yViewRef.current) return;
+    const layout = computeLayout();
+    if (!layout) return;
+    const цена = (dyScreen * layout.range) / layout.drawHeight;
+    yViewRef.current = { min: yViewRef.current.min + цена, max: yViewRef.current.max + цена };
+    draw();
+  }
   function startInertia(vxPxPerMs) {
     let vx = vxPxPerMs;
     function step() {
@@ -6143,7 +6156,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       const layout = computeLayout();
       if (!layout) return;
       const mx = midX(e.touches);
-      pinchRef.current = { startDist: dist(e.touches), startCount: viewRef.current.count, anchorIdx: viewRef.current.start + mx / layout.slot };
+      pinchRef.current = { startDist: dist(e.touches), startCount: viewRef.current.count, anchorIdx: viewRef.current.start + mx / layout.slot, startY: yViewRef.current ? { ...yViewRef.current } : null };
       return;
     }
     cancelInertia();
@@ -6164,6 +6177,14 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       // залипал — отдаляешь, а он возвращается в прежнее приближение.
       viewRef.current = { start: pinchRef.current.anchorIdx - mx / newSlot, count: newCount };
       clampView(true);
+      // Зафиксированная шкала щипком тоже растягивается и сжимается —
+      // рукой, вокруг своей середины; сама она по-прежнему стоит.
+      const нач = pinchRef.current.startY;
+      if (фиксRef.current && нач) {
+        const середина = (нач.min + нач.max) / 2;
+        const пол = ((нач.max - нач.min) / 2) / scale;
+        yViewRef.current = { min: середина - пол, max: середина + пол };
+      }
       запомнитьРазмахОкна();
       draw();
       return;
@@ -6186,6 +6207,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       dragRef.current.vy = dy / dt;
       dragRef.current.lastX = x; dragRef.current.lastY = y; dragRef.current.lastT = now;
       panByPixels(dx);
+      panY(dy);
     }
   }
   function onTouchEnd(e) {
@@ -6220,6 +6242,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       dragRef.current.vy = dy / dt;
       dragRef.current.lastX = e.clientX; dragRef.current.lastY = e.clientY; dragRef.current.lastT = now;
       panByPixels(dx);
+      panY(dy);
     }
   }
   function onMouseUp() {
