@@ -14595,6 +14595,73 @@ function завестиЗнаки() {
   return () => { clearInterval(обход); clearInterval(такт); if (наблюдатель) наблюдатель.disconnect(); завестиЗнаки.пущено = false; };
 }
 
+/* Канал и бот площадки. Канал ещё не заведён — пока ссылки нет, его
+   баннер стоит с пометкой «скоро» и никуда не ведёт. */
+const КАНАЛ_MINTLY = "";
+const БОТ_MINTLY = "https://t.me/MintlyTrading_bot?start=app";
+
+function открытьТелеграм(ссылка) {
+  if (!ссылка) return;
+  const wa = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+  if (wa && wa.openTelegramLink) wa.openTelegramLink(ссылка);
+  else if (typeof window !== "undefined") window.open(ссылка, "_blank");
+}
+
+/* Баннеры главной: две широкие двери наружу (канал и уведомления в
+   боте) и две плитки внутрь — к запуску и в мемпад. Появляются по
+   одной, с небольшим сдвигом: экран собирается, а не выпрыгивает. */
+function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} }) {
+  const широкий = (ключ, i, { заголовок, текст, кнопка, Значок, цвет, onClick, скоро = false }) => (
+    <button
+      key={ключ}
+      onClick={скоро ? undefined : () => { haptic("light"); onClick(); }}
+      className="fx-tap fx-card w-full flex items-center text-left"
+      style={{
+        gap: 14, padding: "16px 16px", borderRadius: 22, border: "none",
+        background: `linear-gradient(120deg, ${hexA(цвет, 0.22)} 0%, ${hexA(цвет, 0.06)} 60%, ${T.surface} 100%)`,
+        boxShadow: `inset 0 0 0 1px ${hexA(цвет, 0.18)}`,
+        animationDelay: `${i * 60}ms`, opacity: скоро ? 0.75 : 1,
+      }}
+    >
+      <span className="flex items-center justify-center flex-shrink-0" style={{ width: 46, height: 46, borderRadius: 14, background: hexA(цвет, 0.18) }}>
+        <Значок size={22} color={цвет} />
+      </span>
+      <span className="flex flex-col" style={{ flex: 1, minWidth: 0, gap: 3 }}>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 800 }}>{заголовок}</span>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.35 }}>{текст}</span>
+      </span>
+      <span style={{
+        flexShrink: 0, padding: "7px 12px", borderRadius: 999, fontFamily: displayFont, fontSize: 12.5, fontWeight: 800,
+        background: скоро ? T.surfaceHi : цвет, color: скоро ? T.muted : "#0B0B0F",
+      }}>{скоро ? "Скоро" : кнопка}</span>
+    </button>
+  );
+  const плитка = (ключ, i, { заголовок, текст, Значок, onClick }) => (
+    <button
+      key={ключ}
+      onClick={() => { haptic("light"); onClick(); }}
+      className="fx-tap fx-card flex flex-col text-left"
+      style={{ flex: 1, minWidth: 0, gap: 10, padding: 16, borderRadius: 22, border: "none", background: T.surface, animationDelay: `${i * 60}ms` }}
+    >
+      <Значок size={24} color={T.ice} />
+      <span className="flex flex-col" style={{ gap: 3 }}>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 800 }}>{заголовок}</span>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.35 }}>{текст}</span>
+      </span>
+    </button>
+  );
+  return (
+    <section className="flex flex-col" style={{ gap: 12 }}>
+      {широкий("канал", 0, { заголовок: "Канал Mintly", текст: "Новости и громкие запуски", кнопка: "Открыть", Значок: Send, цвет: "#2AABEE", onClick: () => открытьТелеграм(КАНАЛ_MINTLY), скоро: !КАНАЛ_MINTLY })}
+      {широкий("бот", 1, { заголовок: "Уведомления", текст: "Покупки ваших токенов — в боте", кнопка: "Включить", Значок: Bell, цвет: "#F5C04E", onClick: () => открытьТелеграм(БОТ_MINTLY) })}
+      <div className="flex" style={{ gap: 12 }}>
+        {плитка("запуск", 2, { заголовок: "Запустить", текст: "Свой мемкоин за минуту", Значок: Rocket, onClick: onGoCreate })}
+        {плитка("мемпад", 3, { заголовок: "Мемпад", текст: "Все свежие токены", Значок: ЗначокОбмен, onClick: () => onGoTab("mempad") })}
+      </div>
+    </section>
+  );
+}
+
 function HomeView({
   curveTokens = [], onOpenToken = () => {},
   onGoTab, onGoCreate, profile = null, accountCreated = false, userId = null,
@@ -14610,7 +14677,7 @@ function HomeView({
         <НапоминаниеПочты accountCreated={accountCreated} userId={userId} insetTop={insetTop} insetBottom={insetBottom} onOpenX={onOpenX} />
       </div>
       <div className="fx-view flex flex-col" style={{ gap: 26 }}>
-        {/* Баннеров и «В тренде» на главной больше нет — по просьбе. */}
+        <ДвериГлавной onGoCreate={onGoCreate} onGoTab={onGoTab} />
       </div>
     </div>
   );
@@ -16871,8 +16938,10 @@ const ГРАДИЕНТ_КАРТЫ =
  * иначе карта и её ореол расходятся. */
 const WALLET_SKINS = [
   {
+    // Минимализм: почти чёрная карта с едва заметным светом сверху —
+    // на ней только баланс, ник и маленький знак.
     id: "none", label: { RU: "Mintly", EN: "Mintly" }, price: 0,
-    fill: ГРАДИЕНТ_КАРТЫ, glow: "#000000",
+    fill: "linear-gradient(160deg, #1A1B1F 0%, #0E0F12 55%, #0A0A0C 100%)", glow: "#000000", минимал: true,
   },
   {
     id: "midnight", label: { RU: "Полночь", EN: "Midnight" }, price: 140,
@@ -18297,17 +18366,19 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           // отдельным слоем ниже, иначе его не сдвинуть плавно.
           background: ткань ? "#131319" : видКарты.fill,
           backgroundSize: ткань ? undefined : (видКарты.size || "320% 320%"),
-          animation: ткань
+          animation: ткань || видКарты.минимал
             ? "none"
             : `картаПереливается ${ходКарты.длительность}s ease-in-out ${ходКарты.сдвиг}s infinite`,
         }} />
         {ткань && <СлойКарбона fill={видКарты.fill} size={видКарты.size} />}
         {/* Волны от касаний — поверх заливки, но под текстом. */}
-        <div key={ключПереливаКарты} aria-hidden style={{
+        {!видКарты.минимал && <div key={ключПереливаКарты} aria-hidden style={{
           position: "absolute", top: -70, left: -90, width: 260, height: 320,
           background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.13)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
           transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
-        }} />
+        }} />}
+        {/* Тонкая светлая кромка — край минимальной карты на чёрном фоне. */}
+        {видКарты.минимал && <span aria-hidden style={{ position: "absolute", inset: 0, borderRadius: 24, boxShadow: `inset 0 0 0 1px ${hexA("#FFFFFF", 0.07)}`, pointerEvents: "none" }} />}
         {/* Отблеск наклона: полоса света едет по карте вслед за углом и
             гаснет, когда карта встаёт ровно. */}
         <span aria-hidden style={{
@@ -18340,17 +18411,17 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             растянутым шрифтом и полупрозрачно: оно читается как часть
             рисунка карты и не спорит с балансом. Угол взят по диагонали
             карты (210 на ~358 точек). */}
-        <span aria-hidden style={{
+        {!видКарты.минимал && <span aria-hidden style={{
           position: "absolute", left: "50%", top: "50%", pointerEvents: "none", whiteSpace: "nowrap",
           transform: "translate(-50%, -50%) rotate(-30deg) scaleX(1.55)",
           fontFamily: "'ШрифтШирмы', 'Jost', sans-serif", fontSize: 40, fontWeight: 600,
           letterSpacing: "0.14em", textTransform: "uppercase", color: hexA("#FFFFFF", 0.08),
         }}>
           Mintly
-        </span>
+        </span>}
         {/* Знак приложения — в углу, где у карт стоит логотип банка. */}
-        <svg aria-hidden width={30} height={30} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: 14, right: 16, pointerEvents: "none" }}>
-          <path d={ПУТЬ_ЗВЕЗДЫ} fill={hexA("#FFFFFF", 0.9)} />
+        <svg aria-hidden width={видКарты.минимал ? 20 : 30} height={видКарты.минимал ? 20 : 30} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: видКарты.минимал ? 18 : 14, right: видКарты.минимал ? 20 : 16, pointerEvents: "none" }}>
+          <path d={ПУТЬ_ЗВЕЗДЫ} fill={hexA("#FFFFFF", видКарты.минимал ? 0.7 : 0.9)} />
         </svg>
         {/* Имя держателя, как на дебетовой карте: ник заглавными, с
             разрядкой, внизу карты. Чипа с монетами там больше нет —
