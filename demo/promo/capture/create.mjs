@@ -2,7 +2,7 @@
 import { p, b } from "./lib.mjs";
 const OUT = "/home/user/Facet_MiniApp/demo/promo/assets/scr";
 const shot = (n) => p.screenshot({ path: `${OUT}/${n}.png` });
-await p.getByText("Создать токен", { exact: true }).first().click();
+await p.mouse.click(230, 754);
 await p.waitForTimeout(2500);
 await shot("create-00");
 await p.locator('input[type=file]').first().setInputFiles("/home/user/Facet_MiniApp/demo/promo/assets/tok/m.png");

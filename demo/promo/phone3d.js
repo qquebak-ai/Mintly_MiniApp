@@ -41,7 +41,7 @@ function homography(w, h, q) {
 }
 
 class Phone {
-  constructor(parent, screenEl, { color = "#3B4658" } = {}) {
+  constructor(parent, screenEl, { color = "#3A3A3E" } = {}) {
     this.box = document.createElement("div");
     this.box.style.cssText = "position:absolute;left:0;top:0;width:1920px;height:1080px;pointer-events:none";
     this.shadow = document.createElement("div");
@@ -59,7 +59,7 @@ class Phone {
     sc.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.03).texture;
     sc.environmentIntensity = 0.9;
     const key = new THREE.DirectionalLight("#ffffff", 2.2); key.position.set(-300, 500, 600); sc.add(key);
-    const rim = new THREE.DirectionalLight("#d8ecff", 1.8); rim.position.set(500, 120, -200); sc.add(rim);
+    const rim = new THREE.DirectionalLight("#ffffff", 1.6); rim.position.set(500, 120, -200); sc.add(rim);
     sc.add(new THREE.AmbientLight("#ffffff", 0.25));
     this.cam = new THREE.PerspectiveCamera(FOV, VW / VH, 10, 3000); this.cam.position.set(0, 0, DIST); this.cam.lookAt(0, 0, 0);
 
@@ -70,7 +70,7 @@ class Phone {
     const frame = new THREE.Mesh(new THREE.ExtrudeGeometry(rrect(W - bev * 2, H - bev * 2, R - bev), { depth: D - bev * 2, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 10, curveSegments: 40 }), ti);
     frame.position.z = -D / 2 + bev; g.add(frame);
     // антенные вставки — тонкие полоски на рёбрах, по ним глаз узнаёт айфон
-    const band = new THREE.MeshStandardMaterial({ color: "#20252d", roughness: 0.6 });
+    const band = new THREE.MeshStandardMaterial({ color: "#232325", roughness: 0.6 });
     for (const [x, y, w, h] of [[-W / 2 + 0.2, H / 2 - 14, 0.6, 1.2], [W / 2 - 0.2, H / 2 - 14, 0.6, 1.2], [-W / 2 + 0.2, -H / 2 + 14, 0.6, 1.2], [W / 2 - 0.2, -H / 2 + 14, 0.6, 1.2], [W / 2 - 16, -H / 2 + 0.2, 1.2, 0.6]]) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, D * 0.62), band); m.position.set(x, y, 0); g.add(m);
     }

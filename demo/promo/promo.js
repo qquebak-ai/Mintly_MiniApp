@@ -57,11 +57,11 @@ function words(l, t, a, { stag = 0.1, dur = 1.05, out = null, outDur = 0.6, rise
 // ---- общий фон: светлые пятна и голубой туман снизу ----
 // фон как в приложении — чёрный, по нему медленно плывут и дышат синие пятна
 const BG = $(`<div class="abs" style="inset:0;background:#000"></div>`); root.appendChild(BG);
-const bgGrad = $(`<div class="abs" style="inset:-20%;background:linear-gradient(120deg,#000 0%,#06163D 18%,#000 34%,#0B2C70 52%,#000 68%,#081E52 84%,#000 100%);background-size:300% 300%"></div>`); BG.appendChild(bgGrad);
-const bgBlobs = [[300, 230, 420, "#123E9C"], [1650, 220, 380, "#0E3480"], [960, 1100, 540, "#1450B8"], [1520, 900, 360, "#0B2F73"], [380, 930, 380, "#103A8C"], [960, 380, 300, "#0A2560"]]
+const bgGrad = $(`<div class="abs" style="inset:-20%;background:linear-gradient(120deg,#000 0%,#151517 18%,#000 34%,#232326 52%,#000 68%,#1A1A1D 84%,#000 100%);background-size:300% 300%"></div>`); BG.appendChild(bgGrad);
+const bgBlobs = [[300, 230, 420, "#2A2A2E"], [1650, 220, 380, "#222225"], [960, 1100, 540, "#303034"], [1520, 900, 360, "#1E1E21"], [380, 930, 380, "#26262A"], [960, 380, 300, "#1B1B1E"]]
   .map(([x, y, r, c], i) => { const b = $(`<div class="blob" style="left:${x - r}px;top:${y - r}px;width:${r * 2}px;height:${r * 2}px;background:${c};opacity:.55"></div>`); b.i = i; BG.appendChild(b); return b; });
 const bgFog = $(`<div class="fog"></div>`); BG.appendChild(bgFog);
-bgFog.parts = [[-2, 170, 520, "#0D3277"], [14, 120, 420, "#0A2862"], [30, 180, 560, "#123E95"], [47, 110, 460, "#0A2A66"], [63, 170, 540, "#103889"], [80, 120, 440, "#0B2C6C"], [96, 170, 520, "#123B8E"]]
+bgFog.parts = [[-2, 170, 520, "#232326"], [14, 120, 420, "#1D1D20"], [30, 180, 560, "#2A2A2E"], [47, 110, 460, "#1E1E21"], [63, 170, 540, "#262629"], [80, 120, 440, "#202023"], [96, 170, 520, "#29292C"]]
   .map(([x, y, w, c]) => { const s = $(`<span style="left:${x}%;top:${y}px;width:${w}px;height:${w * 0.55}px;background:${c};opacity:.45"></span>`); bgFog.appendChild(s); return s; });
 
 // ---- данные ----
@@ -76,6 +76,10 @@ function spark(arr, w, h, col, fill = true) {
     ${fill ? `<polygon points="0,${h} ${p} ${w},${h}" fill="url(#${id})"/>` : ""}<polyline points="${p}" fill="none" stroke="${col}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
     <circle cx="${pts[pts.length - 1][0]}" cy="${pts[pts.length - 1][1]}" r="4" fill="${col}" stroke="#0F0F13" stroke-width="2"/></svg>`;
 }
+// Карта кошелька — как в приложении теперь: почти чёрная, тонкая кромка,
+// баланс, ник держателя и маленький знак в углу.
+const КАРТА = "linear-gradient(160deg,#1A1B1F 0%,#0E0F12 55%,#0A0A0C 100%)";
+const ЗВЕЗДА = `<svg width="34" height="34" viewBox="0 0 24 24"><path d="M12 1.5l2.2 6.3 6.3-2.2-3.6 5.6 5.6 3.6-6.6.6.6 6.6-4.5-4.9-4.5 4.9.6-6.6-6.6-.6 5.6-3.6L3.5 5.6l6.3 2.2z" fill="rgba(255,255,255,.75)"/></svg>`;
 const GRAD = "linear-gradient(115deg,#E44BC8 0%,#C13AE6 18%,#8E2DE2 36%,#6A17E8 54%,#4A00E0 70%,#7B1FE0 84%,#2C0A78 100%)";
 // токены: пиксельные логотипы и скины Минти — то, что люди и правда запускают
 const SKIN = { gold: "#F4B73A,#B9770E", neon: "#28D7FF,#0A5BD8", violet: "#B26BFF,#5A20C9", mint: "#4BE3A6,#0E8A64" };
@@ -183,7 +187,7 @@ function mLogo(parent, { F, base, fill, text, glow = "none", tail = "intly", lef
 // ============ A · ИНТРО 0–5.6 ============
 const A = scene(0, 5.7);
 const OCEAN_TXT = "background:linear-gradient(95deg,#FFFFFF,#E9ECF1 50%,#A7AFBA);-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:.14em;margin-bottom:-.14em";
-const aLogo = mLogo(A, { F: 270, base: 268, fill: "#FFFFFF,#E3E7ED,#A7AFBA", text: OCEAN_TXT, glow: "drop-shadow(0 10px 40px rgba(140,180,255,.22))" });
+const aLogo = mLogo(A, { F: 270, base: 268, fill: "#FFFFFF,#E3E7ED,#A7AFBA", text: OCEAN_TXT, glow: "drop-shadow(0 10px 40px rgba(255,255,255,.18))" });
 const aScr = screen(frames(["home"])); showFrame(aScr, 0);
 const aPhone = new Phone3D(A, aScr);
 const aW = [
@@ -214,7 +218,7 @@ b4w.style.position = "relative"; b4w.style.textAlign = "left";
 const [b4a, b4b] = b4w.children;
 const b5 = line(B, "Тогда знакомься —", { top: 486, size: 64 });
 const B5F = 124, B5_BASE = 486 + 0.829 * 64 + 0.105 * 64;
-const b5Logo = mLogo(B, { F: B5F, base: 540 + 0.705 * B5F / 2, fill: "#FFFFFF,#E3E7ED,#A7AFBA", text: OCEAN_TXT, glow: "drop-shadow(0 0 30px rgba(140,180,255,.22))" });
+const b5Logo = mLogo(B, { F: B5F, base: 540 + 0.705 * B5F / 2, fill: "#FFFFFF,#E3E7ED,#A7AFBA", text: OCEAN_TXT, glow: "drop-shadow(0 0 30px rgba(255,255,255,.18))" });
 
 // ряды виджетов над и под фразой: на каждом слайде своя механика —
 // B1 бегущая лента, B2 перелистывание карточек, B3 лента сделок с толчком
@@ -328,11 +332,11 @@ function runB3(t, a, b) {
 const ORB = [
   wg(B, 260, 112, `<div class="row" style="justify-content:space-between"><span style="font:800 18px Nunito">SOL</span><span class="chip up" style="background:rgba(46,232,122,.14)">+2.07%</span></div><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:4px"><span class="num tn" style="font-size:24px">$120.48</span>${spark(SOL.slice(12), 100, 34, "#2EE87A")}</div>`),
   wg(B, 320, 92, `<div class="row">${logo("m", 56)}<div style="flex:1"><div style="font:800 19px Nunito">Mintly</div><div class="lb" style="font-size:14px">$MINT · 61% до биржи</div></div><span class="up" style="font:800 17px Nunito">+38%</span></div>`),
-  wg(B, 270, 120, `<div style="position:absolute;inset:0;border-radius:26px;background:${GRAD}"></div><div style="position:relative;color:#fff"><div style="font:500 14px Onest;opacity:.85">Баланс</div><div style="font:800 32px Nunito" class="tn">$1 284.50</div><div style="font:600 13px Onest;opacity:.9;margin-top:4px">12.4 SOL · 8 420 GRAM</div></div>`),
+  wg(B, 270, 120, `<div style="position:absolute;inset:0;border-radius:26px;background:${КАРТА};box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)"></div><div style="position:relative;color:#fff"><div style="font:500 14px Onest;opacity:.85">Баланс</div><div style="font:800 32px Nunito" class="tn">$1 284.50</div><div style="font:900 12px Nunito;letter-spacing:.16em;opacity:.8;margin-top:6px">LEO_BUILDS</div></div>`),
   wg(B, 236, 92, `<div class="row"><div style="width:50px;height:50px;border-radius:16px;background:#fff;display:flex;align-items:center;justify-content:center">${ICO.bolt("#0A0A0F", 24)}</div><div><div class="lb" style="font-size:14px">Подтверждено за</div><div class="num tn" style="font-size:23px">0.4 с</div></div></div>`),
   wg(B, 320, 88, `<div class="row">${logo("pup", 50)}<div style="flex:1"><div style="font:800 17px Nunito">Купил 2.1M PUP</div><div class="lb" style="font-size:13px">за 3 GRAM · комиссия 0%</div></div>${ICO.check()}</div>`),
   wg(B, 230, 112, `<div class="lb">Комиссия платформы</div><div style="font:800 50px/1.05 Nunito;letter-spacing:-.03em" class="accent">0%</div>`),
-  wg(B, 290, 112, `<div class="row"><div style="width:76px;height:76px;border-radius:20px;background:#0B0A12;display:flex;align-items:center;justify-content:center"><img src="assets/app/gold-preview.webp" style="width:64px;image-rendering:pixelated"/></div><div><div style="font:800 18px Nunito">Золотой скин</div><div class="lb" style="font-size:13px">магазин Минти</div><span class="chip" style="background:rgba(255,196,60,.14);color:#FFC93C;margin-top:6px">300 монет</span></div></div>`),
+  wg(B, 290, 112, `<div class="row"><div style="width:64px;height:64px;border-radius:20px;background:#fff;display:flex;align-items:center;justify-content:center;font:900 30px Nunito;color:#000">𝕏</div><div><div style="font:800 18px Nunito">@leo_builds</div><div class="lb" style="font-size:13px">автор токена в ленте</div><span class="chip" style="background:rgba(255,255,255,.1);color:#fff;margin-top:6px">X привязан</span></div></div>`),
   wg(B, 260, 112, `<div class="row" style="justify-content:space-between"><span style="font:800 18px Nunito">GRAM</span><span class="chip dn" style="background:rgba(255,90,99,.16)">−4.52%</span></div><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:4px"><span class="num tn" style="font-size:24px">$1.54</span>${spark(TON.slice(12), 100, 34, "#E5484D")}</div>`),
 ];
 
@@ -355,7 +359,7 @@ C_GROUPS.forEach((_, gi) => [0, 1].forEach((side) => {
 const cDots = [];
 C_GROUPS.forEach((_, gi) => [0, 1].forEach((side) => [C_CAP, C_BASE].forEach((y) => { const d = $(`<div class="abs" style="left:0;top:0;width:7px;height:7px;background:#FFFFFF"></div>`); d.gi = gi; d.side = side; d.y = y; C.appendChild(d); cDots.push(d); })));
 const cAlt = $(`<div class="c" style="top:40px;font:800 ${C_SIZE}px/1 'Nunito';letter-spacing:-0.03em;color:#FFFFFF;white-space:nowrap"><span class="grad" style="display:inline-block">Быстро.</span></div>`); cBand.appendChild(cAlt);
-const cLogo = mLogo(C, { F: 132, tail: "intly.company", base: 540 + 0.705 * 150 / 2, fill: "#FFFFFF,#E3E7ED,#A7AFBA", text: "color:#FFFFFF", glow: "drop-shadow(0 12px 36px rgba(140,180,255,.22))" });
+const cLogo = mLogo(C, { F: 132, tail: "intly.company", base: 540 + 0.705 * 150 / 2, fill: "#FFFFFF,#E3E7ED,#A7AFBA", text: "color:#FFFFFF", glow: "drop-shadow(0 12px 36px rgba(255,255,255,.18))" });
 
 // ============ D · ВОЗМОЖНОСТИ 19.5–37.1 ============
 const D = scene(19.5, 37.15);
@@ -410,11 +414,11 @@ d3Card.style.display = "flex"; d3Card.style.alignItems = "center";
 // D4 — кошелёк
 const d4Wrap = $(`<div class="abs" style="left:380px;top:330px;width:620px;height:390px;perspective:1800px"></div>`); D.appendChild(d4Wrap);
 const d4Card = $(`<div style="position:relative;width:100%;height:100%;transform-style:preserve-3d"></div>`); d4Wrap.appendChild(d4Card);
-for (let i = 0; i < 10; i++) d4Card.appendChild($(`<div style="position:absolute;inset:0;border-radius:40px;background:linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.3)),${GRAD};transform:translateZ(${(-5 + i).toFixed(1)}px)"></div>`));
-d4Card.appendChild($(`<div style="position:absolute;inset:0;border-radius:40px;background:${GRAD};transform:translateZ(5.5px);padding:34px 40px;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 40px 80px rgba(60,20,160,.25)">
+for (let i = 0; i < 10; i++) d4Card.appendChild($(`<div style="position:absolute;inset:0;border-radius:40px;background:linear-gradient(rgba(0,0,0,.3),rgba(0,0,0,.3)),${КАРТА};transform:translateZ(${(-5 + i).toFixed(1)}px)"></div>`));
+d4Card.appendChild($(`<div style="position:absolute;inset:0;border-radius:40px;background:${КАРТА};transform:translateZ(5.5px);padding:34px 40px;color:#fff;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.09),0 40px 80px rgba(0,0,0,.5)"><div style="position:absolute;top:34px;right:40px">${ЗВЕЗДА}</div>
   <div style="font:600 30px 'Onest';opacity:.9">Баланс</div><div style="font:800 96px/1.1 'Nunito';letter-spacing:-0.03em" class="tn d4bal">$1 284.50</div>
-  <div style="position:absolute;left:40px;bottom:34px;display:inline-flex;padding:12px 22px;border-radius:999px;background:rgba(255,255,255,.18);font:700 24px 'Onest'">12.4 SOL · 8 420 GRAM</div></div>`));
-const d4Mintie = $(`<div class="abs" style="left:430px;top:-118px;width:140px;height:153px;background:url(assets/app/nav-breath.webp) 0 0/1200% 100% no-repeat;image-rendering:pixelated;transform:translateZ(6px)"></div>`); d4Card.appendChild(d4Mintie);
+  <div style="position:absolute;left:44px;bottom:40px;font:900 26px Nunito;letter-spacing:.16em;color:rgba(255,255,255,.82)">LEO_BUILDS</div></div>`));
+const d4Mintie = $(`<div class="abs" style="display:none;left:430px;top:-118px;width:140px;height:153px;background:url(assets/app/nav-breath.webp) 0 0/1200% 100% no-repeat;image-rendering:pixelated;transform:translateZ(6px)"></div>`); d4Card.appendChild(d4Mintie);
 const d4T1 = line(D, "Твой кошелёк.", { top: 410, size: 96, weight: 600 }); d4T1.style.left = "1130px"; d4T1.style.textAlign = "left";
 const d4T2 = line(D, "Прямо в *Telegram.*", { top: 530, size: 64, weight: 500, color: "#8E8E99" }); d4T2.style.left = "1134px"; d4T2.style.textAlign = "left";
 // D5 — печать
@@ -422,7 +426,7 @@ const d5 = $(`<div class="c" style="top:450px;font:600 120px/1 'Onest';letter-sp
 
 // ============ E · ФИНАЛ 37–45 ============
 const Esc = scene(37, 45);
-const eRays = [-28, -14, -3, 9, 20, 33].map((a, i) => { const r = $(`<div class="abs" style="left:${700 + i * 90}px;top:-200px;width:${120 + (i % 3) * 60}px;height:1500px;transform-origin:50% 0;background:linear-gradient(180deg,rgba(170,205,255,.16),rgba(170,205,255,0) 75%);filter:blur(28px);mix-blend-mode:screen"></div>`); r.a = a; Esc.appendChild(r); return r; });
+const eRays = [-28, -14, -3, 9, 20, 33].map((a, i) => { const r = $(`<div class="abs" style="left:${700 + i * 90}px;top:-200px;width:${120 + (i % 3) * 60}px;height:1500px;transform-origin:50% 0;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,0) 75%);filter:blur(28px);mix-blend-mode:screen"></div>`); r.a = a; Esc.appendChild(r); return r; });
 // фон финала — стена мелких стеклянных пузырей, по которой идёт 3D-волна
 const eBubbles = [];
 // поле мелких пузырей: сетка разрежена и без box-shadow — 1560 теней роняли swiftshader,
@@ -434,7 +438,7 @@ for (let r = 0; r < 20; r++) for (let c = 0; c < 34; c++) {
   Esc.appendChild(b); eBubbles.push(b);
 }
 // логотип и имя одной строкой по общей оси — раньше имя сидело ниже знака
-const eLogo = mLogo(Esc, { F: 160, base: 390 + 0.705 * 160 / 2, fill: "#FFFFFF,#E3E7ED,#A7AFBA", text: "color:#fff", glow: "drop-shadow(0 0 30px rgba(190,235,255,.45))" });
+const eLogo = mLogo(Esc, { F: 160, base: 390 + 0.705 * 160 / 2, fill: "#FFFFFF,#E3E7ED,#A7AFBA", text: "color:#fff", glow: "drop-shadow(0 0 30px rgba(255,255,255,.35))" });
 const ePill = $(`<div class="abs" style="left:50%;top:600px;transform:translateX(-50%);display:flex;align-items:center;gap:18px;padding:22px 38px 22px 26px;border-radius:999px;background:rgba(255,255,255,.9);box-shadow:0 20px 60px rgba(0,20,60,.35);white-space:nowrap">
   <div style="width:62px;height:62px;border-radius:50%;background:#2AABEE;display:flex;align-items:center;justify-content:center">${ICO.tg()}</div>
   <div><div style="font:500 26px 'Onest';color:#5C5F68">Открыть в Telegram</div><div style="font:800 40px 'Nunito';color:#0A0A0F">@MintlyAppbot</div></div></div>`); Esc.appendChild(ePill);

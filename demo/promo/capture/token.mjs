@@ -2,7 +2,7 @@
 import { p, b } from "./lib.mjs";
 const OUT = "/home/user/Facet_MiniApp/demo/promo/assets/scr";
 await p.screenshot({ path: `${OUT}/home.png` });
-await p.mouse.click(131, 752);
+await p.mouse.click(164, 754);
 await p.waitForTimeout(2000);
 await p.waitForTimeout(200);
 await p.screenshot({ path: `${OUT}/pad.png` });
