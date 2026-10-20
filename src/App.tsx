@@ -9888,6 +9888,28 @@ function СтраницаПрофиля({ открыт, уходит = false, in
    выполняет верхнее. Пусто — работает обычный переход по разделам. */
 const СТЕК_НАЗАД = [];
 function сообщитьНазад() { if (typeof window !== "undefined") window.dispatchEvent(new Event("mintly:назад")); }
+/* Ошибка — человеческими словами.
+   Сеть, база и узлы отвечают по-английски и кодами («Failed to fetch»,
+   «insufficient funds», «23505»). Показывать это человеку незачем: он
+   не поймёт, что делать. Знакомые случаи переводим, короткий русский
+   текст оставляем как есть, всё остальное — общей фразой. */
+function человечнаяОшибка(e, запас = "Что-то пошло не так. Попробуй ещё раз") {
+  const т = String((e && (e.message || e.error_description || e.error)) || e || "").trim();
+  if (!т) return запас;
+  const н = т.toLowerCase();
+  if (/failed to fetch|network|load failed|timeout|timed out|aborted|econn|socket/.test(н)) return "Нет связи с сервером. Проверь интернет и попробуй ещё раз";
+  if (/insufficient|not enough|not_enough|недостаточно/.test(н)) return "Не хватает средств";
+  if (/rate limit|too many|429|слишком часто/.test(н)) return "Слишком часто. Подожди немного и попробуй снова";
+  if (/jwt|unauthorized|401|not authenticated|session/.test(н)) return "Сессия устарела. Открой приложение заново";
+  if (/duplicate|already exists|unique|23505/.test(н)) return "Такое уже есть";
+  if (/payload too large|too large|413/.test(н)) return "Файл слишком большой";
+  if (/invalid address|bad_address|checksum/.test(н)) return "Неверный адрес";
+  if (/user rejected|denied|cancel/.test(н)) return "Отменено";
+  // Уже по-русски и коротко — это наш собственный текст, его и показываем.
+  if (/[а-яё]/i.test(т) && т.length <= 120) return т;
+  return запас;
+}
+
 function useНазадТелеграм(активно, действие) {
   const реф = useRef(действие);
   реф.current = действие;
@@ -11312,7 +11334,7 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
       try { window.dispatchEvent(new Event("mintly:сделка")); } catch { /* старый браузер */ }
     } catch (e) {
       const сырое = String((e && e.message) || e);
-      showToast(сырое === "not_enough" ? `Не хватает ${с.монета} на сделку и газ` : сырое === "rate_limited" ? t("errTooOften") : сырое.slice(0, 90));
+      showToast(сырое === "not_enough" ? `Не хватает ${с.монета} на сделку и газ` : сырое === "rate_limited" ? t("errTooOften") : человечнаяОшибка(сырое, "Сделка не прошла. Попробуй ещё раз"));
       haptic("error");
     } finally {
       setИдёт(false);
@@ -15449,7 +15471,7 @@ function ЭкранВывода({
       .insert({ owner_id: userId, chain: сеть, address: чист, label: String(имя || "").trim() || null })
       .select("id, address, label")
       .single();
-    if (error) { showToast(`${t("bookSave")}: ${error.message.slice(0, 70)}`); haptic("error"); return; }
+    if (error) { showToast(человечнаяОшибка(error, "Адрес не сохранился. Попробуй ещё раз")); haptic("error"); return; }
     setКнига((б) => [data, ...б]);
     setДобавляем(false);
     setНовый("");
@@ -15462,7 +15484,7 @@ function ЭкранВывода({
     setКнига((б) => б.filter((з) => з.id !== id));
     haptic("light");
     const { error } = await supabase.from("address_book").delete().eq("id", id);
-    if (error) showToast(error.message.slice(0, 70));
+    if (error) showToast(человечнаяОшибка(error));
     else showToast(t("bookRemoved"));
   }
 
@@ -15478,7 +15500,7 @@ function ЭкранВывода({
       showToast(tf("withdrawCodeSent", { mail: почта }));
       return true;
     } catch (e) {
-      showToast(`${t("withdrawFailed")}: ${String((e && e.message) || "").slice(0, 80)}`);
+      showToast(человечнаяОшибка(e, t("withdrawFailed")));
       return false;
     } finally {
       setПисьмоИдёт(false);
@@ -15539,7 +15561,7 @@ function ЭкранВывода({
       else if (текст.includes("bad_address") || текст.includes("same_address")) showToast(t("withdrawBadAddress"));
       else if (текст.includes("daily_limit")) showToast(t("withdrawDailyLimit"));
       else if (текст.includes("bad_amount")) showToast(t("withdrawNotEnough"));
-      else showToast(`${t("withdrawFailed")}: ${текст.slice(0, 90)}`);
+      else showToast(человечнаяОшибка(текст, t("withdrawFailed")));
       haptic("error");
     } finally {
       setИдёт(false);
@@ -16448,7 +16470,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
       // Экран закрывается не мгновенно: конфетти должно успеть отыграть.
       setTimeout(() => { setПраздник(false); закрыть(); }, 1500);
     } catch (e) {
-      showToast(`${t("swapFailed")}: ${String((e && e.message) || e).slice(0, 60)}`);
+      showToast(человечнаяОшибка(e, t("swapFailed")));
     } finally {
       setИдёт(false);
     }
@@ -17364,7 +17386,7 @@ function МастерФразы({
       await отложитьФразу();
       onПропустить();
     } catch (e) {
-      setБеда(String((e && e.message) || "").slice(0, 120));
+      setБеда(человечнаяОшибка(e));
       haptic("error");
     } finally {
       setИдёт(false);
@@ -17458,7 +17480,7 @@ function МастерФразы({
       await new Promise((готово) => setTimeout(готово, 700));
       onГотово();
     } catch (e) {
-      setБеда(String((e && e.message) || "").slice(0, 120));
+      setБеда(человечнаяОшибка(e));
       haptic("error");
     } finally {
       setИдёт(false);
@@ -19204,7 +19226,7 @@ function ЧатТокена({ tokenId, свой = false, currentUserId, onNeedAu
       setЧерновик("");
       await загрузить();
     } catch (e) {
-      showToast && showToast(String((e && e.message) || e).slice(0, 90));
+      showToast && showToast(человечнаяОшибка(e));
     } finally {
       setШлём(false);
     }
@@ -25283,7 +25305,7 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
       // приложения. Говорим то же самое, но своими словами.
       setБеда(/rate|seconds|too many/i.test(т) ? t("authMailTooOften")
         : /sending|smtp|mail server/i.test(т) ? t("mailSendFailed")
-        : т.slice(0, 120));
+        : человечнаяОшибка(т));
       haptic("error");
     } finally {
       setИдёт(false);
@@ -26343,7 +26365,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
            Так «аккаунт готов» не зависит от чужого почтового сервера. */
         if (почтаЧистая) {
           try { await запомнитьПочту(почтаЧистая); setПочтаБеда(""); }
-          catch (e) { setПочтаБеда(String((e && e.message) || "").slice(0, 120)); }
+          catch (e) { setПочтаБеда(человечнаяОшибка(e)); }
           /* Тот же адрес кладём в профиль: следующий, кто наберёт его на
              первом шаге, увидит «аккаунт уже заведён» до нажатия кнопки. */
           try {
@@ -27293,7 +27315,7 @@ async function uploadAvatarIfNeeded(userId) {
     .from("avatars")
     .upload(path, avatarFile, { upsert: true, contentType: avatarFile.type || "image/jpeg", cacheControl: "31536000" });
   if (uploadError) {
-    setServerError(tf("authErrAvatarUpload", { msg: uploadError.message }));
+    setServerError(человечнаяОшибка(uploadError, "Фото не загрузилось. Попробуй другое"));
     return null;
   }
   const { data } = supabase.storage.from("avatars").getPublicUrl(path);
@@ -29966,7 +29988,7 @@ function mapTokenRow(row) {
     if (error || !row) {
       console.error("[mintly] failed to save token to Supabase:", error);
       сохранитьПотерянный(строка);
-      showToast(tf("tokenSaveFailed", { reason: (error && error.message) || "нет ответа базы" }));
+      showToast(человечнаяОшибка(error, "Токен не сохранился. Попробуй ещё раз"));
       return;
     }
 
@@ -31065,7 +31087,7 @@ function mapTokenRow(row) {
       "слишком часто": "errTooOften",
     };
     const ключ = словарь[сырое];
-    return ключ ? t(ключ) : сырое.slice(0, 90);
+    return ключ ? t(ключ) : человечнаяОшибка(сырое);
   }
 
   function recordTrade(side, tonAmount, tokenAmount) {
@@ -31471,7 +31493,7 @@ function mapTokenRow(row) {
         buyAmount={launchRequest ? launchRequest.buyAmount : ""}
         stepIndex={launchProgress.stepIndex}
         done={launchProgress.done}
-        error={launchProgress.error}
+        error={launchProgress.error ? человечнаяОшибка(launchProgress.error, "Запуск не прошёл. Попробуй ещё раз") : null}
         result={launchProgress.result}
         onClose={closeLaunchOverlay}
         onRetry={retryLaunch}
