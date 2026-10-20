@@ -50,3 +50,4 @@ demo/built/snap/
 demo/built/node_modules
 demo/built/fullrender.log
 demo/built/assets/track.wav
+.state/
