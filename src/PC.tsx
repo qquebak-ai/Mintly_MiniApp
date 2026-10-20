@@ -187,6 +187,9 @@ const СТИЛЬ_ПРИВЕТСТВИЯ = `
 @keyframes прив-звезда { from { transform: rotate(-90deg) scale(.4); opacity: 0 } to { transform: none; opacity: 1 } }
 @keyframes прив-окно { from { opacity: 0; transform: translateY(18px) scale(.97) } to { opacity: 1; transform: none } }
 @keyframes прив-фон { from { opacity: 0 } to { opacity: 1 } }
+@keyframes прив-крутись { to { transform: rotate(360deg) } }
+@keyframes прив-галка { from { transform: scale(.3); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes прив-блик { 0% { left: -70% } 55%,100% { left: 130% } }
 .прив-появись { opacity: 0; transform: translate3d(0, 40px, 0); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); will-change: opacity, transform }
 .прив-появись.слева { transform: translate3d(-160px, 0, 0); transition-duration: 1.2s }
 .прив-появись.видно { opacity: 1; transform: none }
@@ -232,48 +235,214 @@ function Строки({ верх, низ, размер = 64 }) {
   );
 }
 
-function Телефон({ src, наклон = 0, children }) {
+/* Виден ли блок почти целиком — с этого момента запускается его сцена.
+   Ушёл из кадра — сцена останавливается и при возвращении идёт заново. */
+function useВКадре(порог = 0.85) {
+  const реф = useRef(null);
+  const [в, setВ] = useState(false);
+  useEffect(() => {
+    const эл = реф.current;
+    if (!эл || typeof IntersectionObserver === "undefined") { setВ(true); return; }
+    const н = new IntersectionObserver(([з]) => setВ(з.intersectionRatio >= порог), { threshold: [0, порог, 1] });
+    н.observe(эл);
+    return () => н.disconnect();
+  }, [порог]);
+  return [реф, в];
+}
+
+/* Часы сцены: сколько миллисекунд прошло с начала, по кругу длиной
+   «цикл». Начинает, когда телефон доехал на место (задержка), и стоит,
+   пока его не видно. */
+function useЧасы(идёт, цикл, задержка = 1300) {
+  const [мс, setМс] = useState(-1);
+  useEffect(() => {
+    if (!идёт) { setМс(-1); return; }
+    let кадр; const старт = performance.now() + задержка;
+    const шаг = (т) => { setМс(т < старт ? -1 : (т - старт) % цикл); кадр = requestAnimationFrame(шаг); };
+    кадр = requestAnimationFrame(шаг);
+    return () => cancelAnimationFrame(кадр);
+  }, [идёт, цикл, задержка]);
+  return мс;
+}
+
+// Строка статуса iPhone: время слева, связь, Wi-Fi и батарея справа.
+function СтрокаСтатуса() {
+  return (
+    <div style={{ height: 50, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 30px 0 34px", boxSizing: "border-box", color: "#fff", fontFamily: "-apple-system, 'SF Pro Text', " + ШРИФТ, fontSize: 15.5, fontWeight: 600 }}>
+      <span style={{ letterSpacing: "-0.01em" }}>9:41</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="#fff"><rect x="0" y="8" width="3" height="4" rx="1" /><rect x="5" y="5.5" width="3" height="6.5" rx="1" /><rect x="10" y="3" width="3" height="9" rx="1" /><rect x="15" y="0" width="3" height="12" rx="1" /></svg>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="#fff"><path d="M8 2.4c2.3 0 4.4.9 6 2.4l1.2-1.3A10.2 10.2 0 0 0 8 .6 10.2 10.2 0 0 0 .8 3.5L2 4.8a8.4 8.4 0 0 1 6-2.4zm0 3.5c1.4 0 2.6.5 3.6 1.4l1.2-1.3A7 7 0 0 0 8 4.1 7 7 0 0 0 3.2 6l1.2 1.3c1-.9 2.2-1.4 3.6-1.4zm0 3.4c.6 0 1.1.2 1.5.6L8 11.5 6.5 9.9c.4-.4.9-.6 1.5-.6z" /></svg>
+        <span style={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <span style={{ width: 25, height: 12, borderRadius: 4, border: "1.2px solid rgba(255,255,255,.45)", padding: 1.5, boxSizing: "border-box", display: "flex" }}><span style={{ width: "86%", background: "#fff", borderRadius: 2 }} /></span>
+          <span style={{ width: 1.5, height: 4, background: "rgba(255,255,255,.45)", borderRadius: 1 }} />
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/* Касание пальца по экрану: светлое пятно расходится и гаснет. Координаты —
+   в долях экрана приложения (без строки статуса). */
+function Касание({ x, y, мс, когда }) {
+  const т = мс - когда;
+  if (мс < 0 || т < 0 || т > 600) return null;
+  const п = т / 600;
+  return <div style={{ position: "absolute", left: `${x * 100}%`, top: `${y * 100}%`, width: 44, height: 44, marginLeft: -22, marginTop: -22, borderRadius: 999, background: "rgba(255,255,255,.55)", transform: `scale(${0.5 + п * 1.2})`, opacity: 1 - п, pointerEvents: "none" }} />;
+}
+
+/* Телефон — последний iPhone: узкие рамки, титановый корпус, Dynamic
+   Island и кнопки по бокам. Экран по пропорциям ровно как снимок
+   приложения плюс строка статуса — ничего не обрезается. */
+const ШИРИНА_ЭКРАНА = 326;
+function Телефон({ src, наклон = 0, children, наЭкране = null }) {
+  const рамка = 3, ободок = 5;
+  const высотаСнимка = Math.round(ШИРИНА_ЭКРАНА * 2394 / 1179);
+  const кнопка = (стиль) => <div style={{ position: "absolute", width: 3, borderRadius: 2, background: "linear-gradient(90deg,#3a3a3e,#8d8d92,#3a3a3e)", ...стиль }} />;
   return (
     <div style={{ position: "relative", animation: "прив-плыть 7s ease-in-out infinite", willChange: "transform" }}>
-      <div style={{
-        width: 330, aspectRatio: "1179 / 2394", borderRadius: 52, padding: 10, background: СВЕТЛАЯ ? "#E9E9EB" : "#151517",
-        border: `1px solid ${Ц.линия}`, boxShadow: СВЕТЛАЯ ? "0 40px 90px rgba(0,0,0,.16)" : "0 40px 120px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.04) inset",
-        transform: `rotate(${наклон / 4}deg)`,
-      }}>
-        <img src={src} alt="" width={1179} height={2394} decoding="async" loading="eager" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 42, display: "block" }} />
+      <div style={{ position: "relative", transform: `rotate(${наклон / 4}deg)` }}>
+        {кнопка({ left: -2, top: 120, height: 30 })}
+        {кнопка({ left: -2, top: 170, height: 56 })}
+        {кнопка({ left: -2, top: 236, height: 56 })}
+        {кнопка({ right: -2, top: 196, height: 88 })}
+        <div style={{
+          padding: рамка, borderRadius: 62,
+          background: "linear-gradient(145deg,#9a9aa0 0%,#4b4b50 18%,#2b2b2f 50%,#57575c 82%,#a3a3a8 100%)",
+          boxShadow: СВЕТЛАЯ ? "0 50px 100px rgba(0,0,0,.22), 0 10px 30px rgba(0,0,0,.12)" : "0 60px 140px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.06)",
+        }}>
+          <div style={{ padding: ободок, borderRadius: 59, background: "#050505", boxShadow: "inset 0 0 0 1px rgba(255,255,255,.07)" }}>
+            <div style={{ position: "relative", width: ШИРИНА_ЭКРАНА, borderRadius: 54, overflow: "hidden", background: "#000", transform: "translateZ(0)" }}>
+              <СтрокаСтатуса />
+              <div style={{ position: "relative" }}>
+                <img src={src} alt="" width={1179} height={2394} decoding="async" loading="eager" style={{ width: ШИРИНА_ЭКРАНА, height: высотаСнимка, display: "block" }} />
+                {наЭкране}
+              </div>
+              <div style={{ position: "absolute", top: 11, left: "50%", width: 104, height: 31, marginLeft: -52, borderRadius: 999, background: "#000" }}>
+                <div style={{ position: "absolute", right: 12, top: 10, width: 11, height: 11, borderRadius: 999, background: "radial-gradient(circle at 35% 35%,#2a3550,#0a0c12 70%)" }} />
+              </div>
+              {/* Блик стекла — едва заметный, по диагонали. */}
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(125deg,rgba(255,255,255,.07) 0%,rgba(255,255,255,0) 32%)", pointerEvents: "none" }} />
+            </div>
+          </div>
+        </div>
       </div>
       {children}
     </div>
   );
 }
 
-// Плашка-уведомление, как всплывает в приложении после действия.
-function Плашка({ заголовок, подпись, время, style }) {
+// Колёсико ожидания для плашек.
+function Колесо() {
+  return <div style={{ width: 18, height: 18, borderRadius: 999, border: "2.2px solid rgba(255,255,255,.18)", borderTopColor: Ц.лёд, animation: "прив-крутись .8s linear infinite" }} />;
+}
+
+/* Плашка-уведомление, как всплывает в приложении после действия: пока
+   идёт — колесо и бегущие секунды, по готовности — зелёная галочка. */
+function Плашка({ заголовок, подпись, время, style, ждём = false, видна = true }) {
   return (
     <div style={{
-      position: "absolute", display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 16,
-      background: СВЕТЛАЯ ? "rgba(255,255,255,.9)" : "rgba(20,20,22,.88)", backdropFilter: "blur(16px)",
-      border: `1px solid ${СВЕТЛАЯ ? "rgba(0,163,76,.35)" : "rgba(46,232,122,.35)"}`, boxShadow: "0 18px 50px rgba(0,0,0,.35)", ...style,
+      position: "absolute", display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 16, minWidth: 250,
+      background: СВЕТЛАЯ ? "rgba(255,255,255,.94)" : "rgba(20,20,22,.94)",
+      border: `1px solid ${ждём ? Ц.линия : СВЕТЛАЯ ? "rgba(0,163,76,.35)" : "rgba(46,232,122,.35)"}`, boxShadow: "0 18px 50px rgba(0,0,0,.35)",
+      transition: "opacity .35s ease, transform .45s cubic-bezier(.2,.8,.2,1), border-color .3s",
+      opacity: видна ? 1 : 0, transform: видна ? "none" : "translate3d(0,14px,0) scale(.96)", ...style,
     }}>
-      <div style={{ width: 28, height: 28, borderRadius: 999, background: "rgba(46,232,122,.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2EE87A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+      <div style={{ width: 28, height: 28, borderRadius: 999, background: ждём ? "transparent" : "rgba(46,232,122,.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {ждём ? <Колесо /> : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2EE87A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "прив-галка .4s cubic-bezier(.2,.8,.2,1) both" }}><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
       </div>
-      <div>
+      <div style={{ flex: 1 }}>
         <div style={{ color: Ц.лёд, fontSize: 15, fontWeight: 800 }}>{заголовок}</div>
         <div style={{ color: Ц.тусклый, fontSize: 12.5, marginTop: 2 }}>{подпись}</div>
       </div>
-      <div style={{ color: "#2EE87A", fontSize: 15, fontWeight: 800, marginLeft: 14, fontVariantNumeric: "tabular-nums" }}>{время}</div>
+      <div style={{ color: ждём ? Ц.лёд : "#2EE87A", fontSize: 15, fontWeight: 800, marginLeft: 14, fontVariantNumeric: "tabular-nums", minWidth: 44, textAlign: "right" }}>{время}</div>
+    </div>
+  );
+}
+
+const сек = (мс) => (мс / 1000).toFixed(1).replace(".", ",") + " с";
+
+/* Запуск: палец жмёт «Далее», всплывает «Запускаем…», секунды бегут от
+   нуля до 2,8 — и плашка становится «Токен запущен». */
+function СценаЗапуска() {
+  const [реф, в] = useВКадре();
+  const мс = useЧасы(в, 7000);
+  const нажал = 400, длится = 2800;
+  const т = мс - нажал;
+  const идёт = мс >= 0 && т >= 0 && т < длится;
+  const готово = мс >= 0 && т >= длится;
+  return (
+    <div ref={реф}>
+      <Телефон src="/landing/create-12.webp" наклон={-8} наЭкране={<Касание x={0.5} y={0.641} мс={мс} когда={нажал} />}>
+        <Плашка видна={идёт || готово} ждём={!готово} заголовок={готово ? "Токен запущен" : "Запускаем…"} подпись="$MINT · Gram"
+          время={сек(готово ? длится : Math.max(0, т))} style={{ left: -170, bottom: 150 }} />
+      </Телефон>
+    </div>
+  );
+}
+
+/* Сети: рядом с телефоном — переключатель Gram/Solana, он сам ходит туда
+   и обратно, и всплывает свежий запуск в выбранной сети. */
+function СценаСетей() {
+  const [реф, в] = useВКадре();
+  const мс = useЧасы(в, 6400);
+  const sol = мс >= 3200;
+  const фаза = мс < 0 ? -1 : мс % 3200;
+  const запуск = sol ? { т: "$PEPE", с: "Solana · 2 с назад", ц: "+18,4%" } : { т: "$LILY", с: "Gram · 1 с назад", ц: "+12,6%" };
+  const кнопка = (имя, вкл, цвет) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 16px", borderRadius: 999, fontSize: 14, fontWeight: 800, transition: "background .35s, color .35s", background: вкл ? Ц.лёд : "transparent", color: вкл ? Ц.наЛьду : Ц.тусклый }}>
+      <span style={{ width: 10, height: 10, borderRadius: 999, background: цвет }} />{имя}
+    </div>
+  );
+  return (
+    <div ref={реф}>
+      <Телефон src="/landing/pad.webp" наклон={8}>
+        <div style={{ position: "absolute", left: -190, top: 90, display: "flex", padding: 5, borderRadius: 999, background: Ц.поверхность, border: `1px solid ${Ц.линия}`, boxShadow: "0 18px 50px rgba(0,0,0,.35)" }}>
+          {кнопка("GRAM", !sol, "#2AABEE")}{кнопка("SOL", sol, "#14F195")}
+        </div>
+        <div style={{
+          position: "absolute", left: -250, top: 170, width: 290, display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 16,
+          background: Ц.поверхность, border: `1px solid ${Ц.линия}`, boxShadow: "0 18px 50px rgba(0,0,0,.35)",
+          transition: "opacity .35s, transform .45s cubic-bezier(.2,.8,.2,1)", opacity: фаза > 500 && фаза < 2900 ? 1 : 0,
+          transform: фаза > 500 && фаза < 2900 ? "none" : "translate3d(0,12px,0)",
+        }}>
+          <div style={{ width: 36, height: 36, borderRadius: 999, background: sol ? "linear-gradient(135deg,#14F195,#0E8A64)" : "linear-gradient(135deg,#2AABEE,#1B6FB0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, color: "#fff" }}>{запуск.т[1]}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: Ц.лёд, fontSize: 14.5, fontWeight: 800 }}>Новый запуск {запуск.т}</div>
+            <div style={{ color: Ц.тусклый, fontSize: 12.5, marginTop: 2 }}>{запуск.с}</div>
+          </div>
+          <div style={{ color: "#2EE87A", fontSize: 13.5, fontWeight: 800 }}>{запуск.ц}</div>
+        </div>
+      </Телефон>
+    </div>
+  );
+}
+
+/* Покупка: касание «Купить», «Покупаем…» с секундами до 0,9 — «Куплено». */
+function СценаПокупки() {
+  const [реф, в] = useВКадре();
+  const мс = useЧасы(в, 5200);
+  const нажал = 500, длится = 900;
+  const т = мс - нажал;
+  const готово = мс >= 0 && т >= длится;
+  const видна = мс >= 0 && т >= 0 && мс < 4600;
+  return (
+    <div ref={реф}>
+      <Телефон src="/landing/buy.webp" наклон={8} наЭкране={<Касание x={0.27} y={0.335} мс={мс} когда={нажал} />}>
+        <Плашка видна={видна} ждём={!готово} заголовок={готово ? "Куплено" : "Покупаем…"} подпись="48 200 MINT · комиссия 0%"
+          время={сек(готово ? длится : Math.max(0, т))} style={{ left: -200, top: 130 }} />
+      </Телефон>
     </div>
   );
 }
 
 // Счёт от 0,8% к 0%: в ролике комиссия «тает» на глазах.
 function Комиссия() {
-  const [реф, видно] = useПоявление();
+  const [реф, видно] = useВКадре(0.9);
   const [доля, setДоля] = useState(0.8);
   useEffect(() => {
-    if (!видно) return;
-    let кадр; const старт = performance.now() + 500;
+    if (!видно) { setДоля(0.8); return; }
+    let кадр; const старт = performance.now() + 1100;
     const шаг = (т) => {
       const п = Math.min(1, Math.max(0, (т - старт) / 1200));
       setДоля(0.8 * (1 - (1 - Math.pow(1 - п, 3))));
@@ -306,25 +475,33 @@ function Комиссия() {
 }
 
 function КартаDEX() {
+  const [наклон, setНаклон] = useState({ x: 18, y: 0 });
+  const двигать = (e) => {
+    const р = e.currentTarget.getBoundingClientRect();
+    const dx = (e.clientX - р.left) / р.width - 0.5, dy = (e.clientY - р.top) / р.height - 0.5;
+    setНаклон({ x: 18 - dy * 22, y: dx * 26 });
+  };
   return (
-    <div style={{ perspective: 1200 }}>
-      <div style={{
-        width: 420, height: 264, borderRadius: 24, padding: 26, boxSizing: "border-box", position: "relative", overflow: "hidden",
-        background: "linear-gradient(135deg,#8E8E93 0%,#3A3A3E 38%,#D9D9DE 62%,#4A4A4F 100%)",
-        boxShadow: "0 50px 120px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.12) inset",
-        transform: "rotateX(18deg) rotateZ(-8deg)", animation: "прив-плыть 6s ease-in-out infinite",
-      }}>
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(115deg,transparent 30%,rgba(255,255,255,.35) 48%,transparent 62%)" }} />
-        <div style={{ display: "flex", justifyContent: "space-between", position: "relative" }}>
-          <Звезда size={34} цвет="#FFFFFF" />
-          <div style={{ textAlign: "right", color: "#fff" }}>
-            <div style={{ fontWeight: 800, fontSize: 15 }}>Mintly</div>
-            <div style={{ fontSize: 10, letterSpacing: ".18em", opacity: .8, marginTop: 4 }}>LIMITED · DEX</div>
+    <div style={{ perspective: 1200, padding: 40 }} onMouseMove={двигать} onMouseLeave={() => setНаклон({ x: 18, y: 0 })}>
+      <div style={{ animation: "прив-плыть 6s ease-in-out infinite" }}>
+        <div style={{
+          width: 420, height: 264, borderRadius: 24, padding: 26, boxSizing: "border-box", position: "relative", overflow: "hidden",
+          background: "linear-gradient(135deg,#8E8E93 0%,#3A3A3E 38%,#D9D9DE 62%,#4A4A4F 100%)",
+          boxShadow: "0 50px 120px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.12) inset",
+          transform: `rotateX(${наклон.x}deg) rotateY(${наклон.y}deg) rotateZ(-8deg)`, transition: "transform .25s ease-out",
+        }}>
+          <div style={{ position: "absolute", top: 0, bottom: 0, width: "60%", background: "linear-gradient(105deg,transparent 0%,rgba(255,255,255,.45) 50%,transparent 100%)", animation: "прив-блик 4.5s ease-in-out infinite" }} />
+          <div style={{ display: "flex", justifyContent: "space-between", position: "relative" }}>
+            <Звезда size={34} цвет="#FFFFFF" />
+            <div style={{ textAlign: "right", color: "#fff" }}>
+              <div style={{ fontWeight: 800, fontSize: 15 }}>Mintly</div>
+              <div style={{ fontSize: 10, letterSpacing: ".18em", opacity: .8, marginTop: 4 }}>LIMITED · DEX</div>
+            </div>
           </div>
-        </div>
-        <div style={{ position: "absolute", left: 26, bottom: 24, color: "#fff" }}>
-          <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em" }}>$MINT</div>
-          <div style={{ fontSize: 13, opacity: .8 }}>Mintly</div>
+          <div style={{ position: "absolute", left: 26, bottom: 24, color: "#fff" }}>
+            <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em" }}>$MINT</div>
+            <div style={{ fontSize: 13, opacity: .8 }}>Mintly</div>
+          </div>
         </div>
       </div>
     </div>
@@ -472,11 +649,11 @@ function Приветствие() {
 
       <Раздел id="запуск"
         текст={<><Строки верх="Запуск токена" низ="за секунды" /><p style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Логотип, название, тикер — и монета уже торгуется на кривой. Без кода и без биржи.</p></>}
-        картинка={<Телефон src="/landing/create-12.webp" наклон={-8}><Плашка заголовок="Токен запущен" подпись="$MINT · Gram" время="2,8 с" style={{ left: -150, bottom: 140 }} /></Телефон>} />
+        картинка={<СценаЗапуска />} />
 
       <Раздел id="сети" обратно
         текст={<><Строки верх="Gram и Solana" низ="в одном месте" /><p style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Новые, трендовые и почти вышедшие на биржу — живая лента запусков обеих сетей.</p></>}
-        картинка={<Телефон src="/landing/pad.webp" наклон={8} />} />
+        картинка={<СценаСетей />} />
 
       <Раздел id="комиссия"
         текст={<Строки верх="Комиссия" низ="0%" размер={80} />}
@@ -484,7 +661,7 @@ function Приветствие() {
 
       <Раздел id="покупка" обратно
         текст={<><Строки верх="Покупка" низ="за секунду" /><p style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Сумма, одно нажатие — и токены в кошельке. Свечи графика двигаются вместе со сделками.</p></>}
-        картинка={<Телефон src="/landing/buy.webp" наклон={8}><Плашка заголовок="Куплено" подпись="48 200 MINT · комиссия 0%" время="0,9 с" style={{ right: -140, top: 120 }} /></Телефон>} />
+        картинка={<СценаПокупки />} />
 
       <section style={{ minHeight: "92vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 70, padding: "80px 40px" }}>
         <Появись style={{ textAlign: "center" }}>
