@@ -6136,6 +6136,43 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     cancelInertia();
     inertiaRaf.current = requestAnimationFrame(step);
   }
+  /* Шкала цены справа — как в терминалах (Axiom, TradingView): тянешь
+     по ней вверх — свечи вытягиваются, вниз — сжимаются. С этого момента
+     шкала ручная и сама за свечами не ходит; двойное касание по ней
+     возвращает автоподстройку. */
+  const шкалаRef = useRef(null); // { y0, min, max }
+  const касаниеШкалы = useRef(0);
+  function начатьШкалу(clientX, clientY) {
+    const rect = wrapRef.current && wrapRef.current.getBoundingClientRect();
+    const layout = computeLayout();
+    if (!rect || !layout || !yViewRef.current) return false;
+    if (clientX - rect.left < layout.plotW) return false;
+    const сейчас = performance.now();
+    if (сейчас - касаниеШкалы.current < 320) {
+      касаниеШкалы.current = 0;
+      yUserRef.current = false;
+      haptic("light");
+      draw();
+      return true;
+    }
+    касаниеШкалы.current = сейчас;
+    шкалаRef.current = { y0: clientY, min: yViewRef.current.min, max: yViewRef.current.max };
+    return true;
+  }
+  function тянутьШкалу(clientY) {
+    const ш = шкалаRef.current;
+    if (!ш) return;
+    const dy = clientY - ш.y0;
+    if (Math.abs(dy) < 2 && !yUserRef.current) return;
+    // Вниз — шире (свечи сжимаются), вверх — уже (вытягиваются).
+    const множитель = Math.exp(dy * 0.006);
+    const середина = (ш.min + ш.max) / 2;
+    const пол = ((ш.max - ш.min) / 2) * множитель;
+    yUserRef.current = true;
+    yViewRef.current = { min: середина - пол, max: середина + пол };
+    draw();
+  }
+  function закончитьШкалу() { шкалаRef.current = null; }
   function indexAtX(clientX) {
     const layout = computeLayout();
     if (!layout) return null;
@@ -6161,6 +6198,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     }
     cancelInertia();
     const x = e.touches[0].clientX, y = e.touches[0].clientY;
+    if (начатьШкалу(x, y)) return;
     dragRef.current = { lastX: x, lastY: y, lastT: performance.now(), vx: 0, vy: 0, moved: false, startX: x, startY: y };
   }
   function onTouchMove(e) {
@@ -6189,6 +6227,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       draw();
       return;
     }
+    if (шкалаRef.current && e.touches.length === 1) { e.preventDefault(); тянутьШкалу(e.touches[0].clientY); return; }
     if (!dragRef.current || e.touches.length !== 1) return;
     const x = e.touches[0].clientX, y = e.touches[0].clientY;
     const totalDx = x - dragRef.current.startX, totalDy = y - dragRef.current.startY;
@@ -6211,6 +6250,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     }
   }
   function onTouchEnd(e) {
+    if (шкалаRef.current) { закончитьШкалу(); return; }
     if (pinchRef.current) { pinchRef.current = null; return; }
     if (dragRef.current) {
       if (dragRef.current.moved) {
@@ -6227,9 +6267,11 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
   // harmless extras for previewing outside the Telegram mobile client.
   function onMouseDown(e) {
     cancelInertia();
+    if (начатьШкалу(e.clientX, e.clientY)) return;
     dragRef.current = { lastX: e.clientX, lastY: e.clientY, lastT: performance.now(), vx: 0, vy: 0, moved: false, startX: e.clientX, startY: e.clientY };
   }
   function onMouseMove(e) {
+    if (шкалаRef.current && e.buttons === 1) { тянутьШкалу(e.clientY); return; }
     if (!dragRef.current || e.buttons !== 1) return;
     const totalDx = e.clientX - dragRef.current.startX, totalDy = e.clientY - dragRef.current.startY;
     if (!dragRef.current.moved && Math.hypot(totalDx, totalDy) > 4) { dragRef.current.moved = true; hoverIdxRef.current = null; onHover && onHover(null); }
@@ -6246,6 +6288,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     }
   }
   function onMouseUp() {
+    if (шкалаRef.current) { закончитьШкалу(); return; }
     if (dragRef.current) {
       if (dragRef.current.moved) startInertia(dragRef.current.vx);
       else reportHover(indexAtX(dragRef.current.startX));
