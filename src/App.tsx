@@ -403,7 +403,7 @@ const STR = {
     mail2faSent: "Письмо ушло на {mail}. Введи код из него — или просто перейди по ссылке внутри, мы заметим сами.",
     mail2faWaiting: "Ждём подтверждения…",
     mail2faDone: "Почта привязана",
-    mail2faBadCode: "Код не подошёл — проверь цифры или запроси письмо заново",
+    mail2faBadCode: "Код не подошёл или устарел — запроси письмо заново и введи код из последнего письма",
     mail2faAgain: "Другая почта",
     mail2faCurrent: "Почта для 2ФА: {mail}",
     mail2faOff: "Почта не привязана",
@@ -1124,7 +1124,7 @@ const STR = {
     mail2faSent: "The letter went to {mail}. Enter the code from it — or just follow the link inside, we'll notice.",
     mail2faWaiting: "Waiting for confirmation…",
     mail2faDone: "Email linked",
-    mail2faBadCode: "Wrong code — check the digits or ask for the letter again",
+    mail2faBadCode: "Wrong or expired code — ask for a new letter and enter the code from the latest one",
     mail2faAgain: "Another email",
     mail2faCurrent: "2FA email: {mail}",
     mail2faOff: "No email linked",
@@ -24542,9 +24542,34 @@ async function привязатьПочту(почта) {
 }
 
 async function подтвердитьПочту(почта, код) {
-  // Смена почты подтверждается своим видом кода — email_change.
-  const { error } = await supabase.auth.verifyOtp({ email: почта, token: код, type: "email_change" });
-  if (error) throw error;
+  /* Смена почты подтверждается своим видом кода — email_change. Но
+     какой адрес назвать вместе с кодом, зависит от настроек проекта:
+     Supabase сверяет код то с новым адресом, то с текущим (у нас он
+     технический, tg<id>@telegram.local), а при смене через одноразовый
+     вход — как обычный код входа. Пробуем по очереди: верный код
+     подойдёт к одному из вариантов, а неверный не подойдёт ни к какому. */
+  const { data: сейчас } = await supabase.auth.getUser();
+  const текущая = (сейчас && сейчас.user && сейчас.user.email) || "";
+  const варианты = [
+    { email: почта, type: "email_change" },
+    ...(текущая && текущая.toLowerCase() !== почта ? [{ email: текущая, type: "email_change" }] : []),
+    { email: почта, type: "email" },
+  ];
+  let последняя = null;
+  for (const в of варианты) {
+    const { error } = await supabase.auth.verifyOtp({ ...в, token: код });
+    if (!error) {
+      // Сессия после подтверждения обновляется не сразу — просим её
+      // перечитать, иначе почтаАккаунта() вернула бы прежний адрес.
+      try { await supabase.auth.refreshSession(); } catch { /* перечитается сама */ }
+      return;
+    }
+    последняя = error;
+    console.warn("[mintly] код почты не подошёл:", в.type, в.email === почта ? "новый адрес" : "текущий адрес", error.message);
+    // Слишком часто — дальше пробовать бессмысленно.
+    if (/rate|too many/i.test(error.message || "")) break;
+  }
+  throw последняя || new Error("invalid");
 }
 
 /* Привязана ли почта. Технический адрес Telegram (tg<id>@telegram.local)
@@ -25187,7 +25212,11 @@ function ЭкранПочты({ открыт, onClose, onГотово = () => {}
       await отметить(true);
       haptic("success");
     } catch (e) {
-      setБеда(t("mail2faBadCode"));
+      const т = String((e && e.message) || "");
+      // Supabase на неверный и на просроченный код отвечает одним и тем же
+      // «expired or is invalid» — поэтому и в тексте обе причины.
+      setБеда(/rate|too many/i.test(т) ? t("authMailTooOften")
+        : t("mail2faBadCode"));
       haptic("error");
     } finally {
       setИдёт(false);
