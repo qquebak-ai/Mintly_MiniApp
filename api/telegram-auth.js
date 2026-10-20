@@ -356,6 +356,39 @@ async function проверитьДоступность(req, res) {
    Только законченные аккаунты (с ником): брошенная на полпути
    регистрация — не аккаунт. С включённой защитой почтой пароля мало —
    сессию не отдаём, а шлём код на подтверждённый адрес. */
+/* Вход на сайте кнопкой «Войти через Telegram» (Login Widget).
+   Подпись у виджета своя: ключ — SHA-256 от токена бота, без
+   «WebAppData». Аккаунт тот же, что в мини-приложении: ищем профиль по
+   telegram_id и открываем его сессию. Нового аккаунта отсюда не
+   заводим — его создают в мини-приложении. */
+async function входВиджетом(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
+  if (!BOT_TOKEN || !SUPABASE_URL || !SERVICE_ROLE_KEY) return res.status(500).json({ error: "server_not_configured" });
+  if (rateLimited(`widget:${clientKey(req)}`)) return res.status(429).json({ error: "too_many_requests" });
+  let body;
+  try { body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {}); } catch { return res.status(400).json({ error: "bad_body" }); }
+  const hash = String(body.hash || "");
+  const поля = Object.keys(body).filter((к) => к !== "hash" && body[к] != null && body[к] !== "").sort();
+  const строка = поля.map((к) => `${к}=${body[к]}`).join("\n");
+  const ключ = crypto.createHash("sha256").update(BOT_TOKEN).digest();
+  const своя = crypto.createHmac("sha256", ключ).update(строка).digest("hex");
+  const а = Buffer.from(своя), б = Buffer.from(hash);
+  if (!hash || а.length !== б.length || !crypto.timingSafeEqual(а, б)) return res.status(401).json({ error: "bad_signature" });
+  const возраст = Math.floor(Date.now() / 1000) - Number(body.auth_date || 0);
+  if (!(Number(body.auth_date) > 0) || возраст > 24 * 3600) return res.status(401).json({ error: "stale" });
+  const id = Number(body.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: "bad_user" });
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data: профиль } = await admin.from("profiles").select("id").eq("telegram_id", id).maybeSingle();
+  if (!профиль) return res.status(404).json({ error: "no_account" });
+  const { data: кто } = await admin.auth.admin.getUserById(профиль.id);
+  const почта = кто && кто.user && кто.user.email;
+  if (!почта) return res.status(404).json({ error: "no_account" });
+  const { data: ссылка, error } = await admin.auth.admin.generateLink({ type: "magiclink", email: почта });
+  if (error || !ссылка || !ссылка.properties || !ссылка.properties.hashed_token) return res.status(500).json({ error: "link_failed" });
+  return res.status(200).json({ token_hash: ссылка.properties.hashed_token });
+}
+
 async function входПаролем(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return res.status(500).json({ error: "server_not_configured" });
@@ -416,6 +449,7 @@ export default async function handler(req, res) {
   if (действие === "profile") return завестиПрофиль(req, res);
   if (действие === "available") return проверитьДоступность(req, res);
   if (действие === "password") return входПаролем(req, res);
+  if (действие === "widget") return входВиджетом(req, res);
 
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");

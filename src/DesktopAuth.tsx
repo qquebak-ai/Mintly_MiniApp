@@ -53,7 +53,7 @@ export async function профильЕсть() {
   return !!p;
 }
 
-async function войтиФантомом() {
+export async function войтиФантомом() {
   const провайдер = window.phantom && window.phantom.solana;
   if (!провайдер || !провайдер.isPhantom) {
     throw new Error("Phantom не найден — установите расширение");
