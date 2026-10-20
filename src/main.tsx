@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
 import TonLaunchApp from "./App";
 import Desktop from "./Desktop";
+import PC from "./PC";
 import { разобратьВозвратOAuth } from "./oauthВозврат";
 import "./index.css";
 
@@ -154,7 +155,11 @@ function десктопнаяВитрина() {
   return window.innerWidth >= 1100 && !("ontouchstart" in window && window.innerWidth < 1400);
 }
 
-const Корень = десктопнаяВитрина() ? Desktop : TonLaunchApp;
+/* На мониторе — то же приложение, разложенное под широкий экран (см.
+   PC.tsx). Старая витрина осталась по адресу /pro. */
+const пк = десктопнаяВитрина();
+if (пк) { window.__ПК = true; document.documentElement.classList.add("пк"); }
+const Корень = window.location.pathname.replace(/\/+$/, "") === "/pro" ? Desktop : пк ? PC : TonLaunchApp;
 
 function нарисовать() {
   try {

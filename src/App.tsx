@@ -8246,6 +8246,63 @@ function ЗнакСетиНав({ сеть: с, size, style }) {
 );
 }
 
+const ШИРИНА_ПАНЕЛИ_ПК = 248;
+/* Меню слева — на компьютере вместо капсулы внизу: на мониторе её
+   центр пришёлся бы на середину широкого экрана, далеко от всего. */
+function БоковаяПанельПК({ view, tab, profile, accountCreated, сеть, onСеть, onTab, onНастройки, onМеню }) {
+  const пункты = [
+    { id: "home", подпись: t("navHome"), Значок: ЗначокДом },
+    { id: "mempad", подпись: t("navMempad"), Значок: ЗначокОбмен },
+    { id: "create", подпись: t("navCreate"), Значок: ЗначокРакета },
+    { id: "wallet", подпись: t("navWallet"), Значок: ЗначокСтолбики },
+    { id: "profile", подпись: t("navProfileItem"), Значок: User },
+  ];
+  const сети = [["ton", "Gram"], ["sol", "Solana"], ...Object.entries(СЕТИ_EVM).map(([к, с]) => [к, с.имя])];
+  const кнопка = (активна, onClick, содержимое, ключ) => (
+    <button
+      key={ключ}
+      onClick={() => { haptic("light"); onClick(); }}
+      className="fx-tap flex items-center w-full"
+      style={{
+        gap: 14, padding: "12px 14px", borderRadius: 14, border: "none", textAlign: "left",
+        background: активна ? T.surfaceHi : "transparent", color: активна ? T.ice : T.muted,
+        fontFamily: displayFont, fontSize: 15.5, fontWeight: 700, transition: `background ${EASE}, color ${EASE}`,
+      }}
+    >{содержимое}</button>
+  );
+  return (
+    <aside style={{
+      position: "absolute", left: 0, top: 0, bottom: 0, width: ШИРИНА_ПАНЕЛИ_ПК, zIndex: 6,
+      display: "flex", flexDirection: "column", gap: 6, padding: "22px 14px",
+      borderRight: `1px solid ${T.line}`, background: T.bg,
+    }}>
+      <div className="flex items-center" style={{ gap: 10, padding: "4px 10px 18px" }}>
+        <ЗнакЗвезда size={28} />
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>Mintly</span>
+      </div>
+      {пункты.map((п) => {
+        const активна = п.id === "create" ? view === "create" : tab === п.id && view !== "create";
+        return кнопка(активна, () => onTab(п.id), (<><п.Значок size={20} color={активна ? T.ice : "#9B9FA9"} /> {п.подпись}</>), п.id);
+      })}
+      <div style={{ height: 1, background: T.line, margin: "12px 6px" }} />
+      <span style={{ padding: "0 14px 4px", fontFamily: bodyFont, color: T.faint, fontSize: 12, letterSpacing: "0.04em", textTransform: "uppercase" }}>Сеть</span>
+      {сети.map(([к, имя]) => кнопка(сеть === к, () => onСеть(к), (<><ЗнакСетиНав сеть={к} size={20} /> {имя}</>), к))}
+      <div style={{ flex: 1 }} />
+      {кнопка(false, onНастройки, (<><Settings size={20} color="#9B9FA9" /> {t("settings")}</>), "настройки")}
+      <button
+        onClick={() => { haptic("light"); onМеню(); }}
+        className="fx-tap flex items-center w-full"
+        style={{ gap: 12, padding: "10px 12px", borderRadius: 14, border: "none", background: T.surface, textAlign: "left", marginTop: 6 }}
+      >
+        <ЛицоЧеловека ник={profile && profile.nickname} src={profile && profile.avatarUrl} size={34} />
+        <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
+          {accountCreated && profile && profile.nickname ? `@${profile.nickname}` : t("accountNotCreated")}
+        </span>
+      </button>
+    </aside>
+  );
+}
+
 function ПометкаТест({ сеть, size = 10 }) {
   if (!пробнаяСеть(сеть)) return null;
   return (
@@ -9913,6 +9970,11 @@ function человечнаяОшибка(e, запас = "Что-то пошл�
   if (/[а-яё]/i.test(т) && т.length <= 120) return т;
   return запас;
 }
+
+/* Открыто ли на компьютере (см. PC.tsx и main.tsx). Флаг ставится до
+   отрисовки, но после загрузки этого модуля — поэтому функция, а не
+   константа. */
+function этоПК() { return typeof window !== "undefined" && !!window.__ПК; }
 
 function useНазадТелеграм(активно, действие) {
   const реф = useRef(действие);
@@ -14902,6 +14964,8 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
            сразу понятно, что это лист, который смахивают вниз. */
         position: "fixed", top: insetTop, left: 0, right: 0, bottom: 0, zIndex: 400, background: T.bg,
         display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto",
+        // На мониторе — окно посреди экрана, а не столбик во всю высоту.
+        ...(этоПК() ? { top: "6vh", bottom: "6vh", maxWidth: 620, borderRadius: 22, boxShadow: "0 30px 80px rgba(0,0,0,0.6)", border: `1px solid ${T.line}` } : null),
         // Снизу — запас под системную полосу.
         paddingBottom: insetBottom,
         overflow: "hidden",
@@ -18321,7 +18385,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           вверх-вниз: браузеру запрещён нативный скролл с этого элемента.
           Надёжнее одного preventDefault, который на iOS успевает
           опоздать к уже начавшемуся скроллу. */}
-      <div ref={кореньКарты} style={{ position: "relative", margin: "0 16px", isolation: "isolate", perspective: 900, touchAction: "none" }}>
+      <div ref={кореньКарты} style={{ position: "relative", margin: "0 16px", isolation: "isolate", perspective: 900, touchAction: "none", ...(этоПК() ? { maxWidth: 440 } : null) }}>
       {/* Наклон от прокрутки: карта откидывается назад, пока уезжает
           вверх, и чуть качается от скорости — тогда видно её толщину.
           Трансформ пишется напрямую в стиль из requestAnimationFrame,
@@ -31376,7 +31440,7 @@ function mapTokenRow(row) {
       data-platform={device.platform}
       data-telegram={device.inTelegram ? "1" : "0"}
       style={{
-        background: T.bg, height, minHeight: height, width: "100%", maxWidth: 480,
+        background: T.bg, height: этоПК() ? "100vh" : height, minHeight: этоПК() ? "100vh" : height, width: "100%", maxWidth: этоПК() ? "none" : 480,
         margin: "0 auto", fontFamily: bodyFont, position: "relative", overflow: "hidden",
         visibility: доступЗакрыт ? "hidden" : "visible",
       }}
@@ -31513,7 +31577,16 @@ function mapTokenRow(row) {
         onViewToken={viewLaunchedToken}
       />
 
-      <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column" }}>
+      {этоПК() && (
+        <БоковаяПанельПК
+          view={view} tab={tab} profile={profile} accountCreated={accountCreated}
+          сеть={сетьМемпада} onСеть={setСетьМемпада}
+          onTab={(id) => { if (id === "create") openCreate(); else goTab(id); }}
+          onНастройки={() => setНастройкиОткрыты(true)}
+          onМеню={() => setМенюОткрыто(true)}
+        />
+      )}
+      <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column", marginLeft: этоПК() ? ШИРИНА_ПАНЕЛИ_ПК : 0 }}>
         {/* Мягкие края прокрутки.
             Содержимое обрывалось ровно по границе экрана — строка или
             карточка резались пополам, и это читалось как поломка. Две
@@ -31555,6 +31628,8 @@ function mapTokenRow(row) {
             край, теряла по шестнадцать точек с каждой стороны. Поля
             держат сами экраны — каждый в своей обёртке ниже. */}
         <div className="no-scrollbar подложка" style={{ flex: 1, overflowY: "auto",
+          // На мониторе — крупнее и по центру широкой колонки.
+          ...(этоПК() ? { zoom: 1.12, width: "100%" } : null),
           /* Только по вертикали. Любой элемент, выходящий за поля — ореол
              карты, тень, широкая строка, — иначе даёт вбок несколько
              точек хода, и всё приложение ездит под пальцем. */
@@ -31574,7 +31649,7 @@ function mapTokenRow(row) {
           {/* Поля страниц. Кошелёк из этой обёртки исключён: его нижняя
               страница обязана упираться в край экрана, а свои отступы
               она держит сама. */}
-          <div className="px-4">
+          <div className="px-4" style={этоПК() ? { maxWidth: 1100, margin: "0 auto", paddingLeft: 32, paddingRight: 32 } : undefined}>
           <KeepAlive show={view === "home"}>
             <HomeView
               onOpenX={() => setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "x"))}
@@ -31604,6 +31679,7 @@ function mapTokenRow(row) {
             <MempadView myTokensLoading={!communityLoaded} myTokens={communityTokens} onOpen={openToken} onLaunch={openCreate} solДоступен={solЗапуск} currentUserId={userId} сеть={сетьМемпада} />
           </KeepAlive>
           </div>
+          <div style={этоПК() ? { maxWidth: 1100, margin: "0 auto", padding: "0 16px" } : undefined}>
           <KeepAlive show={view === "wallet"}>
             {/* Ключ по хозяину: со сменой аккаунта раздел пересоздаётся
                 начисто. Без него в нём оставались адреса и остатки
@@ -31635,6 +31711,7 @@ function mapTokenRow(row) {
               onСтрелкаФразы={setНазадФразы}
             />
           </KeepAlive>
+          </div>
           <div className="px-4">
           {/* Магазина больше нет — раздел убран целиком. */}
 
@@ -31656,7 +31733,7 @@ function mapTokenRow(row) {
             />
             </div>
           )}
-          {view === "token" && <div className={уходСтраницы ? "fx-view-out" : undefined}><TokenDetail t={token} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} unlocked={accountCreated} connected={connected} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} /></div>}
+          {view === "token" && <div className={уходСтраницы ? "fx-view-out" : undefined} style={этоПК() ? { maxWidth: 1100, margin: "0 auto", padding: "0 16px" } : undefined}><TokenDetail t={token} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} unlocked={accountCreated} connected={connected} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} /></div>}
           {view === "create" && (
             <div className={уходСтраницы ? "fx-view-out" : undefined}>
             <CreateView
@@ -31747,7 +31824,7 @@ function mapTokenRow(row) {
             Размытия подложки нет намеренно: панель висит над прокруткой,
             и браузер пересчитывал бы его на каждом кадре списка. Плотная
             заливка выглядит так же и ничего не стоит. */}
-        {(() => {
+        {!этоПК() && (() => {
           // Свёртка — только пока стоишь в самом мемпаде: поверх запуска
           // или в другом разделе панель всегда полная.
           const свёрнута = навСвёрнута && tab === "mempad" && view !== "create";
