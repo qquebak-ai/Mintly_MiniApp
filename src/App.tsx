@@ -9989,6 +9989,11 @@ function человечнаяОшибка(e, запас = "Что-то пошл�
    отрисовки, но после загрузки этого модуля — поэтому функция, а не
    константа. */
 function этоПК() { return typeof window !== "undefined" && !!window.__ПК; }
+/* Колонка страницы на мониторе. Ширина задана явно: в столбце флекса
+   поля «auto» по бокам иначе сжимали бы её до ширины содержимого. */
+function колонкаПК(открыта) {
+  return { width: "100%", maxWidth: 1100, marginLeft: "auto", marginRight: "auto", boxSizing: "border-box", flexShrink: 0, ...(открыта ? { marginTop: "auto", marginBottom: "auto" } : null) };
+}
 
 function useНазадТелеграм(активно, действие) {
   const реф = useRef(действие);
@@ -31660,7 +31665,11 @@ function mapTokenRow(row) {
             держат сами экраны — каждый в своей обёртке ниже. */}
         <div className="no-scrollbar подложка" style={{ flex: 1, overflowY: "auto",
           // На мониторе — крупнее и по центру широкой колонки.
-          ...(этоПК() ? { zoom: 1.12, width: "100%" } : null),
+          /* На мониторе — крупнее и по центру экрана. Масштаб растёт с
+             шириной окна: на 1920 точках прежние 1,12 выглядели телефоном
+             посреди пустоты. Колонка по вертикали — чтобы короткая
+             страница стояла посередине, а не прилипала к верху. */
+          ...(этоПК() ? { zoom: Math.min(1.5, Math.max(1.12, window.innerWidth / 1440)), width: "100%", display: "flex", flexDirection: "column" } : null),
           /* Только по вертикали. Любой элемент, выходящий за поля — ореол
              карты, тень, широкая строка, — иначе даёт вбок несколько
              точек хода, и всё приложение ездит под пальцем. */
@@ -31676,11 +31685,17 @@ function mapTokenRow(row) {
           // прокрутка упиралась в старый низ страницы — то, что ушло под
           // клавиатуру снизу, было уже не долистать. Не бесконечно, а
           // ровно на столько, сколько клавиатура реально забрала.
-          paddingBottom: 96 + insetBottom + (клавиатура ? клавиатураВысота : 0) }}>
+          // На мониторе капсулы снизу нет — запас под неё сдвигал бы
+          // страницу из центра вверх.
+          paddingBottom: этоПК() ? 32 : 96 + insetBottom + (клавиатура ? клавиатураВысота : 0) }}>
           {/* Поля страниц. Кошелёк из этой обёртки исключён: его нижняя
               страница обязана упираться в край экрана, а свои отступы
               она держит сама. */}
-          <div className="px-4" style={этоПК() ? { maxWidth: 1100, margin: "0 auto", paddingLeft: 32, paddingRight: 32 } : undefined}>
+          {/* Авто-поля сверху и снизу только у колонки открытого раздела:
+              у пустых соседей они тоже делили бы свободное место, и
+              страница съезжала бы из центра. Длинная страница их просто
+              не замечает и листается с самого верха. */}
+          <div className="px-4" style={этоПК() ? { ...колонкаПК(view === "home" || view === "mempad"), paddingLeft: 32, paddingRight: 32 } : undefined}>
           <KeepAlive show={view === "home"}>
             <HomeView
               onOpenX={() => setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "x"))}
@@ -31710,7 +31725,7 @@ function mapTokenRow(row) {
             <MempadView myTokensLoading={!communityLoaded} myTokens={communityTokens} onOpen={openToken} onLaunch={openCreate} solДоступен={solЗапуск} currentUserId={userId} сеть={сетьМемпада} />
           </KeepAlive>
           </div>
-          <div style={этоПК() ? { maxWidth: 1100, margin: "0 auto", padding: "0 16px" } : undefined}>
+          <div style={этоПК() ? { ...колонкаПК(view === "wallet"), padding: "0 16px" } : undefined}>
           <KeepAlive show={view === "wallet"}>
             {/* Ключ по хозяину: со сменой аккаунта раздел пересоздаётся
                 начисто. Без него в нём оставались адреса и остатки
@@ -31743,7 +31758,7 @@ function mapTokenRow(row) {
             />
           </KeepAlive>
           </div>
-          <div className="px-4">
+          <div className="px-4" style={этоПК() ? колонкаПК(["achievements", "user", "token", "create"].includes(view)) : undefined}>
           {/* Магазина больше нет — раздел убран целиком. */}
 
           {view === "achievements" && (

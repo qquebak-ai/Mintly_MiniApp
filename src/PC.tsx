@@ -20,7 +20,12 @@ import { апи } from "./апи";
 
 const БОТ = import.meta.env.VITE_TG_BOT || "MintlyAppbot";
 // Те же цвета и шрифты, что у приложения (App.tsx, тема T).
-const Ц = { фон: "#000000", поверхность: "#141416", выше: "#1C1C1F", линия: "rgba(255,255,255,0.08)", лёд: "#F2F2F0", тусклый: "#8E8E93", вниз: "#FF4D5E" };
+// Светлая тема выбирается в настройках приложения; вход должен совпадать
+// с ней, иначе после входа экран вспыхивает из чёрного в белый.
+const СВЕТЛАЯ = (() => { try { return localStorage.getItem("mintly_theme") === "White"; } catch { return false; } })();
+const Ц = СВЕТЛАЯ
+  ? { фон: "#FFFFFF", поверхность: "#F5F5F5", выше: "#EEEEEE", линия: "rgba(0,0,0,0.08)", лёд: "#000000", тусклый: "#6E6E73", вниз: "#E11D2A", наЛьду: "#FFFFFF" }
+  : { фон: "#000000", поверхность: "#141416", выше: "#1C1C1F", линия: "rgba(255,255,255,0.08)", лёд: "#F2F2F0", тусклый: "#8E8E93", вниз: "#FF4D5E", наЛьду: "#0B0B0F" };
 const ШРИФТ = "'MintlyUI', 'Jost', system-ui, sans-serif";
 
 function Кнопка({ children, onClick, disabled = false, главная = false }) {
@@ -30,7 +35,7 @@ function Кнопка({ children, onClick, disabled = false, главная = fa
       disabled={disabled}
       style={{
         width: "100%", height: 52, borderRadius: 14, border: "none", cursor: disabled ? "default" : "pointer",
-        background: главная ? Ц.лёд : Ц.выше, color: главная ? "#0B0B0F" : Ц.лёд,
+        background: главная ? Ц.лёд : Ц.выше, color: главная ? Ц.наЛьду : Ц.лёд,
         fontFamily: ШРИФТ, fontSize: 16, fontWeight: 800, opacity: disabled ? 0.5 : 1,
         display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
       }}
@@ -182,7 +187,7 @@ export default function PC() {
     const { data: подписка } = supabase.auth.onAuthStateChange(() => { проверить(); });
     return () => { жив = false; подписка && подписка.subscription && подписка.subscription.unsubscribe(); };
   }, []);
-  if (вошёл === null) return <div style={{ position: "fixed", inset: 0, background: "#000" }} />;
+  if (вошёл === null) return <div style={{ position: "fixed", inset: 0, background: Ц.фон }} />;
   if (!вошёл) return <ВходПК />;
   return <TonLaunchApp />;
 }
