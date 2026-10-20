@@ -172,7 +172,7 @@ const STR = {
     appWalletFailed: "Не получилось",
     appWalletPayout: "Адрес вывода",
     appWalletBind: "Привязать свой адрес",
-    appWalletBindHint: "Вывод — только на свой адрес. Подтверди его подписью в Phantom, и никто не уведёт монеты, даже получив доступ к аккаунту.",
+    appWalletBindHint: "Вывод — только на свой адрес. Подтверди его подписью в Phantom — тогда тот, кто получит доступ к аккаунту, не сможет вывести монеты к себе.",
     appWalletBinding: "Открываю кошелёк…",
     appWalletBound: "Адрес привязан",
     appWalletPending: "Адрес заработает через сутки",
@@ -552,7 +552,7 @@ const STR = {
     gradClosedTitle: "Токен закрыта",
     gradClosedBody: "Собрано {target} GRAM. Токен переезжает на биржу — торговля скоро откроется снова.",
     gradListedTitle: "Свободный рынок",
-    gradListedBody: "Токен на бирже: цена идёт по пулу, ликвидность заперта, продать можно в любой момент.",
+    gradListedBody: "Токен на бирже: цена идёт по пулу, ликвидность закреплена в контракте.",
     tabChart: "График", tabInfo: "Инфо", tabTx: "Транзакции", chartModePrice: "Цена", chartModeMcap: "Капитализация",
     tabHolders: "Держатели", tabFeed: "Лента", tabAbout: "О токене", tabStats: "Статистика", statMcap: "Капитализация", statLiq: "Ликвидность", statVol24: "Объём за сутки", statTrades24: "Сделок за сутки", statAge: "Возраст", statCurve: "Собрано", statDex: "Биржа",
     positionTitle: "Ваша позиция", positionValue: "Стоимость", positionAmount: "Количество",
@@ -738,6 +738,8 @@ const STR = {
     archFeeBody: "Комиссии площадки нет. Платится только комиссия сети. Запуск бесплатный — нужна лишь первая покупка.",
     archKeysTitle: "Ключи и подпись",
     archKeysBody: "Ключ кошелька хранится зашифрованным и подписывает отдельная служба. Вывод — только на подтверждённый адрес, с суточным лимитом.",
+    archRiskTitle: "Риски",
+    archRiskBody: "Мемкоины — очень рискованный актив: цена может упасть до нуля. Mintly не даёт инвестиционных советов и не отвечает за цену токенов. Вкладывай только то, что готов потерять.",
     archDataTitle: "Данные рынка",
     archDataBody: "Цены и сделки собирает наш сервер и отдаёт готовыми. Подделки под известные монеты отсеиваются.",
     accountLabel: "Аккаунт",
@@ -1458,6 +1460,8 @@ const STR = {
     archFeeBody: "There is no platform fee — zero percent on buys and on sells alike. The rate is baked into the curve at creation and never changes retroactively, so tokens launched earlier under a different rate keep their own. You only pay the network fee, which goes to validators, not to us. Launching is free: just your first buy and that same network fee.",
     archKeysTitle: "Keys and signing",
     archKeysBody: "The in-app wallet key is stored encrypted (AES-256-GCM, bound to its owner) and signed by a separate service outside the main server — the web app never sees it. Every transaction is parsed instruction by instruction before signing: foreign programs and transfers around the curve are rejected. Withdrawals go only to an address you proved by signing with your own wallet; changing that address takes effect after 24 hours, and daily withdrawals are capped.",
+    archRiskTitle: "Risks",
+    archRiskBody: "Memecoins are extremely risky: the price can drop to zero. Mintly gives no investment advice and is not responsible for token prices. Only put in what you can afford to lose.",
     archDataTitle: "Market data",
     archDataBody: "Prices, candles and trades are collected by our own crawler once a minute and cached — the app reads what is ready instead of polling the market source from every phone. Impostors of well-known coins and tokens with no name or symbol are filtered out before they reach the list.",
     accountLabel: "Account",
@@ -15557,7 +15561,8 @@ function ЭкранВывода({
     } catch (e) {
       const текст = String((e && e.message) || "");
       // Сервер отвечает короткими метками — переводим их в человеческие.
-      if (текст.includes("payout_locked")) showToast(t("withdrawLocked"));
+      if (текст.includes("need_2fa")) showToast("Подтверди вывод кодом из почты — открой вывод заново");
+      else if (текст.includes("payout_locked")) showToast(t("withdrawLocked"));
       else if (текст.includes("bad_address") || текст.includes("same_address")) showToast(t("withdrawBadAddress"));
       else if (текст.includes("daily_limit")) showToast(t("withdrawDailyLimit"));
       else if (текст.includes("bad_amount")) showToast(t("withdrawNotEnough"));
@@ -21846,6 +21851,13 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
               : `${t("sellFor")} ${amount.toLocaleString("ru-RU")} ${token.ticker}`)
             : (isBuy && tonPriceUsd <= 0 ? t("rateLoading") : !isBuy && holdingTokens <= 0 ? t("nothingToSell") : t("enterAmount"))}
         </button>
+        {/* Предупреждение о риске — у самой кнопки покупки: это место,
+            где решение и принимается. */}
+        {isBuy && (
+          <div style={{ marginTop: 10, textAlign: "center", fontFamily: bodyFont, color: T.faint, fontSize: 11.5, lineHeight: 1.4 }}>
+            {lang === "EN" ? "Memecoins are risky — you can lose what you put in." : "Мемкоины — рискованный актив: можно потерять вложенное."}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -24264,6 +24276,7 @@ function SettingsPanel({
             ["archFeeTitle", "archFeeBody"],
             ["archKeysTitle", "archKeysBody"],
             ["archDataTitle", "archDataBody"],
+            ["archRiskTitle", "archRiskBody"],
           ].map(([заголовок, текст], i) => (
             <div
               key={заголовок}

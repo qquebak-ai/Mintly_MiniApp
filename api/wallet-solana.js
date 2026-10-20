@@ -44,6 +44,7 @@ import { createClient } from "@supabase/supabase-js";
 import { проверитьТранзакцию } from "./_txguard.js";
 import { собратьЗапуск, собратьСделку, собратьЗакрытие, состояние as состояниеКривой } from "./solana-launch.js";
 import { котировка, сделка as свопJupiter, SOL_MINT } from "./solana.js";
+import { нуженВторойКлюч } from "./_second.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1014,6 +1015,8 @@ export default async function handler(req, res) {
     }
 
     if (действие === "payout-set") {
+      const отказ = await нуженВторойКлюч(req, db, user);
+      if (отказ) return res.status(403).json({ error: отказ });
       const адрес = String(тело.address || "").trim();
       const подпись = String(тело.signature || "").trim();
       if (!адресОк(адрес) || !подпись) return res.status(400).json({ error: "bad_request" });
@@ -1250,6 +1253,8 @@ export default async function handler(req, res) {
     }
 
     if (действие === "withdraw") {
+      const отказ2 = await нуженВторойКлюч(req, db, user);
+      if (отказ2) return res.status(403).json({ error: отказ2 });
       /* Куда выводим. Привязанный адрес — тот, владение которым доказано
          подписью: если он есть, деньги уходят только на него, и присланный
          в запросе адрес должен с ним совпадать — иначе привязка не значила

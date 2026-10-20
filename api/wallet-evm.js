@@ -25,6 +25,7 @@
 
 import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import { нуженВторойКлюч } from "./_second.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -171,7 +172,7 @@ async function хозяин(req, db) {
   return data.user;
 }
 
-const ПОЛЯ = "user_id, chain, address, secret_enc, key_id";
+const ПОЛЯ = "user_id, chain, address, secret_enc, key_id, payout_address";
 
 /* Строка кошелька: одна на все три сети, chain = "evm". Ключ выводится
    из общей фразы один раз и дальше хранится зашифрованным — как у TON. */
@@ -454,9 +455,15 @@ export default async function handler(req, res) {
        оставляем ровно столько, сколько сеть просит за простой перевод;
        «всё» — это остаток за вычетом этого газа. */
     if (действие === "withdraw") {
+      const отказ = await нуженВторойКлюч(req, db, user);
+      if (отказ) return res.status(403).json({ error: отказ });
       const { getAddress, parseUnits, formatUnits } = await ethersLib();
       let кому;
       try { кому = getAddress(String(тело.address || "").trim()); } catch { return res.status(400).json({ error: "bad_address" }); }
+      // Привязанный адрес вывода главнее названного — как в TON и Solana.
+      if (строка.payout_address && кому.toLowerCase() !== String(строка.payout_address).toLowerCase()) {
+        return res.status(400).json({ error: "payout_locked", payout: строка.payout_address });
+      }
       if (кому.toLowerCase() === String(строка.address).toLowerCase()) return res.status(400).json({ error: "same_address" });
       if (кому === "0x0000000000000000000000000000000000000000") return res.status(400).json({ error: "bad_address" });
       const п = await провайдер(сеть);

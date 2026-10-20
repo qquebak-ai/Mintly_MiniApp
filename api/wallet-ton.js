@@ -28,6 +28,8 @@ import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+import { нуженВторойКлюч } from "./_second.js";
+
 const TESTNET = process.env.TON_TESTNET === "1";
 const TONAPI = TESTNET ? "https://testnet.tonapi.io" : "https://tonapi.io";
 const TONAPI_KEY = process.env.TONAPI_KEY || "";
@@ -116,7 +118,20 @@ async function хозяин(req, db) {
   return data.user;
 }
 
-const ПОЛЯ = "user_id, chain, address, secret_enc, key_id, payout_address";
+const ПОЛЯ = "user_id, chain, address, secret_enc, key_id, payout_address, payout_pending, payout_pending_at";
+
+/* Смена адреса вывода ждёт сутки — как в Solana. Тот, кто завладел
+   сессией, мог бы сразу подменить адрес и вывести всё; за сутки
+   владелец видит уведомление в боте и успевает отменить. */
+const ЗАДЕРЖКА_ПРИВЯЗКИ = 24 * 60 * 60 * 1000;
+async function освежитьПривязку(db, строка) {
+  if (!строка.payout_pending || !строка.payout_pending_at) return строка;
+  if (Date.now() - new Date(строка.payout_pending_at).getTime() < ЗАДЕРЖКА_ПРИВЯЗКИ) return строка;
+  await db.from("app_wallets")
+    .update({ payout_address: строка.payout_pending, payout_pending: null, payout_pending_at: null })
+    .eq("user_id", строка.user_id).eq("chain", "ton");
+  return { ...строка, payout_address: строка.payout_pending, payout_pending: null, payout_pending_at: null };
+}
 
 /* Кошелёк человека в TON. Мнемоника рождается здесь, шифруется и больше
    нигде в открытом виде не появляется. */
@@ -377,7 +392,7 @@ export default async function handler(req, res) {
   try {
     const user = await хозяин(req, db);
     if (!user) return res.status(401).json({ error: "unauthorized" });
-    const строка = await кошелёк(db, user, набор);
+    const строка = await освежитьПривязку(db, await кошелёк(db, user, набор));
 
     if (действие === "state") {
       res.setHeader("Cache-Control", "no-store");
@@ -389,6 +404,8 @@ export default async function handler(req, res) {
         // Без предела поле пустое: интерфейс тогда ничем сумму не режет.
         dailyLeft: ЕСТЬ_ПРЕДЕЛ ? Math.max(0, ЛИМИТ_В_СУТКИ - выведено) : null,
         payout: строка.payout_address || null,
+        pending: строка.payout_pending || null,
+        pendingAt: строка.payout_pending_at || null,
         network: TESTNET ? "testnet" : "mainnet",
       });
     }
@@ -604,15 +621,29 @@ export default async function handler(req, res) {
 
     /* Вывод — только на адрес, который человек подтвердил заранее. */
     if (действие === "payout-set") {
+      const отказ = await нуженВторойКлюч(req, db, user);
+      if (отказ) return res.status(403).json({ error: отказ });
       const адрес = String(тело.address || "").trim();
       const { Address } = await библиотеки();
       try { Address.parse(адрес); } catch { return res.status(400).json({ error: "bad_address" }); }
-      await db.from("app_wallets").update({ payout_address: адрес })
+      if (адрес === строка.address) return res.status(400).json({ error: "same_address" });
+      // Сразу — только первый адрес на почти пустом кошельке: увести там
+      // нечего. Иначе смена ждёт сутки.
+      const есть = await баланс(строка.address);
+      const сразу = !строка.payout_address && есть < 0.05;
+      await db.from("app_wallets").update(сразу
+        ? { payout_address: адрес, payout_pending: null, payout_pending_at: null }
+        : { payout_pending: адрес, payout_pending_at: new Date().toISOString() })
         .eq("user_id", user.id).eq("chain", "ton");
-      return res.status(200).json({ ok: true });
+      await сообщить(db, user.id, сразу
+        ? `Адрес вывода привязан: <code>${адрес}</code>`
+        : `Запрошена смена адреса вывода на <code>${адрес}</code>. Она вступит в силу через сутки. Если это не вы — смените пароль и напишите в поддержку.`);
+      return res.status(200).json({ ok: true, payout: сразу ? адрес : null, pending: сразу ? null : адрес });
     }
 
     if (действие === "withdraw") {
+      const отказ2 = await нуженВторойКлюч(req, db, user);
+      if (отказ2) return res.status(403).json({ error: отказ2 });
       /* Куда выводим — как в Solana: привязанный адрес главнее, а пока
          его нет, адрес можно назвать прямо в запросе. Иначе деньги с
          внутреннего кошелька просто некуда забрать. */

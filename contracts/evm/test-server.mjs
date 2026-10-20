@@ -33,7 +33,7 @@ process.env.SUPABASE_URL = "https://db.test";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "x";
 
 // --- база в памяти: ровно те вызовы, что делает обработчик ------------
-const таблицы = { app_wallets: [], app_seeds: [], wallet_ops: [] };
+const таблицы = { app_wallets: [], app_seeds: [], wallet_ops: [], profiles: [] };
 const ЧЕЛОВЕК = { id: "u1" };
 function запрос(имя) {
   const фильтры = [];
@@ -182,6 +182,14 @@ await проверка("вывод: плохой адрес и свой адре
   assert.equal(r.код, 200, JSON.stringify(r.ответ));
   const осталось = Number(ethers.formatEther(await п.getBalance(адрес)));
   assert.ok(осталось < 0.001, `осталось ${осталось}`);
+});
+
+await проверка("с почтой для 2ФА вывод без свежего подтверждения отбивается", async () => {
+  таблицы.profiles.push({ id: "u1", mail_2fa: true });
+  const r = await вызвать("withdraw", { method: "POST", body: { chain: "bsc", address: "0x8ba1f109551bD432803012645Ac136ddd64DBA72", amount: 0.0001, requestKey: "w9" } });
+  assert.equal(r.код, 403);
+  assert.equal(r.ответ.error, "need_2fa");
+  таблицы.profiles.length = 0;
 });
 
 console.log(`\n${пройдено} проверок сервера пройдено`);
