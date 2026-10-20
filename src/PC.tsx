@@ -707,14 +707,18 @@ function Выезд({ откуда = "left", children, style = {} }) {
 }
 
 // Стрелка вниз: падает, ударяется о невидимый пол и отскакивает.
-function СтрелкаВниз({ onClick }) {
+// Видна только в самом начале: стоит сдвинуть страницу — гаснет, вернул
+// наверх — проявляется снова.
+function СтрелкаВниз({ onClick, видна = true }) {
   return (
-    <button onClick={onClick} aria-label="Дальше" className="прив-стрелка" style={{ position: "absolute", bottom: 34, left: "50%", marginLeft: -22, width: 44, height: 56, background: "none", border: "none", cursor: "pointer", animation: "прив-вход 1s 1.4s both" }}>
+    <div style={{ position: "absolute", bottom: 34, left: "50%", marginLeft: -22, transition: "opacity .35s ease, transform .35s ease", opacity: видна ? 1 : 0, transform: видна ? "none" : "translateY(10px)", pointerEvents: видна ? "auto" : "none" }}>
+    <button onClick={onClick} aria-label="Дальше" className="прив-стрелка" style={{ width: 44, height: 56, background: "none", border: "none", cursor: "pointer", animation: "прив-вход 1s 1.4s both" }}>
       <span style={{ display: "block", animation: "прив-удар 1.6s cubic-bezier(.45,0,.55,1) infinite", transformOrigin: "50% 100%" }}>
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={Ц.тусклый} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block", margin: "0 auto" }}><path d="M6 9.5l6 6 6-6" /></svg>
       </span>
       <span style={{ display: "block", width: 18, height: 2, borderRadius: 2, margin: "6px auto 0", background: Ц.линия }} />
     </button>
+    </div>
   );
 }
 
@@ -777,7 +781,7 @@ function Приветствие() {
             <button onClick={() => setОкно(true)} style={кнопкаГлавная}>Войти</button>
           </div>
         </div>
-        <СтрелкаВниз onClick={() => document.getElementById("запуск")?.scrollIntoView({ behavior: "smooth" })} />
+        <СтрелкаВниз видна={!прокручено} onClick={() => document.getElementById("запуск")?.scrollIntoView({ behavior: "smooth" })} />
       </section>
 
       <Раздел id="запуск"
