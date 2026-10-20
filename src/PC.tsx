@@ -551,43 +551,98 @@ function useГотовоПриветствие() {
   return готово;
 }
 
-/* Луч света за знаком в начале — как первый кадр ролика.
-   Раньше это был div с blur(70px), который двигался: браузер заново
-   размывал полосу шириной в полтора экрана каждый кадр, на мониторе это
-   и давало рывки, а сам переход шёл ступенями. Теперь полоса рисуется
-   один раз на холсте — размытие, плавный спад и шум в пикселях против
-   ступеней, — а движется уже готовая картинка, только сдвигом. */
-function ЛучПриветствия() {
+/* Фон — «шёлк» из ролика Mintly один в один: три размытые ленты
+   (серый край, светлая середина, белое ядро) по диагонали экрана, те же
+   пути и градиенты, что в demo/built/built.js.
+ *
+ * В ролике ленты двигаются по времени, здесь — по прокрутке: каждой доле
+ * страницы соответствует своё положение, поворот, масштаб и яркость, а
+ * сверху лежит лёгкое «дыхание», как в ролике.
+ *
+ * Размытие SVG пересчитывалось бы на каждом кадре прокрутки, поэтому
+ * шёлк рисуется один раз в холст (вместе с шумом против ступеней на
+ * плавных переходах), а двигается уже готовая картинка — только
+ * трансформацией, которую видеокарта делает бесплатно. */
+const КАДР_Ш = 1920, КАДР_В = 1080, ЗАПАС = 420;
+const ШЁЛК_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="${КАДР_Ш + 2 * ЗАПАС}" height="${КАДР_В + 2 * ЗАПАС}" viewBox="${-ЗАПАС} ${-ЗАПАС} ${КАДР_Ш + 2 * ЗАПАС} ${КАДР_В + 2 * ЗАПАС}">
+  <defs>
+    <linearGradient id="sg1" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#222222"/><stop offset=".4" stop-color="#666666"/><stop offset=".62" stop-color="#ACACAC"/><stop offset=".8" stop-color="#575757"/><stop offset="1" stop-color="#3E3E3E"/></linearGradient>
+    <linearGradient id="sg2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#9F9F9F" stop-opacity="0"/><stop offset=".5" stop-color="#CECECE"/><stop offset="1" stop-color="#9F9F9F" stop-opacity="0"/></linearGradient>
+    <filter id="sb" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="38"/></filter>
+    <filter id="sb2" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="20"/></filter>
+  </defs>
+  <path filter="url(#sb)" fill="url(#sg1)" d="M-300 1350C250 1050 520 760 860 560S1450 120 2200 -260L2300 160C1650 430 1350 760 1000 920S380 1300 -200 1600Z"/>
+  <path filter="url(#sb)" fill="url(#sg1)" opacity=".75" d="M300 1400C620 1100 760 860 1060 700S1600 420 2250 360L2250 760C1700 760 1420 880 1180 1040S760 1400 520 1500Z"/>
+  <path filter="url(#sb2)" fill="url(#sg2)" opacity=".9" d="M120 1250C520 980 700 760 940 620S1450 300 1950 40L1990 110C1500 380 1180 640 980 760S560 1100 220 1330Z"/>
+  <path filter="url(#sb2)" fill="url(#sg2)" opacity=".7" d="M560 1300C800 1080 960 900 1180 800S1660 600 2050 560L2050 620C1680 660 1400 760 1220 880S900 1150 660 1360Z"/>
+</svg>`;
+
+/* Положение шёлка по прокрутке: [доля страницы, яркость, сдвиг x, сдвиг y,
+   масштаб, поворот]. Те же точки, что сцены ролика: полное свечение в
+   начале, дальше лента уходит к краю за каждым разделом по очереди. */
+const ШЁЛК_КЛЮЧИ = [
+  // За разделами яркость ниже, как в «тёмных» сценах ролика: серый
+  // текст на полном свечении не читался.
+  [0, 1, 0, 0, 1, 0], [0.1, 0.42, -620, 300, 1.15, 4], [0.27, 0.38, 680, -160, 1.05, -3],
+  [0.45, 0.36, 940, -340, 1.1, 2], [0.62, 0.4, -820, 0, 1.1, -4], [0.8, 0.36, -560, 260, 1.15, 3], [1, 0.5, 0, 160, 1.02, 0],
+];
+const плавно = (x) => x * x * (3 - 2 * x);
+function поКлючам(т, К) {
+  if (т <= К[0][0]) return К[0].slice(1);
+  for (let i = 1; i < К.length; i++) {
+    if (т <= К[i][0]) { const а = К[i - 1], б = К[i], к = плавно((т - а[0]) / (б[0] - а[0])); return а.slice(1).map((v, j) => v + (б[j + 1] - v) * к); }
+  }
+  return К[К.length - 1].slice(1);
+}
+
+function ФонШёлк() {
   const холст = useRef(null);
   useEffect(() => {
     const к = холст.current;
     if (!к) return;
-    const ш = 1800, в = 900;
-    к.width = ш; к.height = в;
-    const г = к.getContext("2d");
-    const цвет = СВЕТЛАЯ ? "0,0,0" : "255,255,255";
-    const сила = СВЕТЛАЯ ? 0.1 : 0.22;
-    г.filter = "blur(90px)";
-    const гр = г.createLinearGradient(0, 0, ш, 0);
-    for (let i = 0; i <= 20; i++) { const t = i / 20; гр.addColorStop(t, `rgba(${цвет},${сила * Math.pow(Math.sin(Math.PI * t), 1.6)})`); }
-    г.fillStyle = гр;
-    г.beginPath(); г.ellipse(ш / 2, в / 2, ш * 0.42, в * 0.2, 0, 0, Math.PI * 2); г.fill();
-    г.filter = "none";
-    const д = г.getImageData(0, 0, ш, в), п = д.data;
-    for (let i = 0; i < п.length; i += 4) {
-      if (!п[i + 3]) continue;
-      const н = (Math.random() + Math.random() - 1) * 6;
-      п[i] = Math.max(0, Math.min(255, п[i] + н)); п[i + 1] = Math.max(0, Math.min(255, п[i + 1] + н)); п[i + 2] = Math.max(0, Math.min(255, п[i + 2] + н));
-    }
-    г.putImageData(д, 0, 0);
+    let жив = true, кадр = 0;
+    const и = new Image();
+    и.onload = () => {
+      if (!жив) return;
+      к.width = и.width; к.height = и.height;
+      const г = к.getContext("2d");
+      г.drawImage(и, 0, 0);
+      const д = г.getImageData(0, 0, к.width, к.height), п = д.data;
+      for (let i = 0; i < п.length; i += 4) {
+        if (!п[i + 3]) continue;
+        const н = (Math.random() + Math.random() - 1) * 5;
+        п[i] = Math.max(0, Math.min(255, п[i] + н)); п[i + 1] = Math.max(0, Math.min(255, п[i + 1] + н)); п[i + 2] = Math.max(0, Math.min(255, п[i + 2] + н));
+      }
+      г.putImageData(д, 0, 0);
+      к.style.visibility = "visible";
+    };
+    и.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(ШЁЛК_SVG);
+    const начало = performance.now();
+    const шаг = () => {
+      // Кадр ролика 1920×1080 вписывается в окно «с обрезкой», как фон.
+      const вш = window.innerWidth, вв = window.innerHeight;
+      const м = Math.max(вш / КАДР_Ш, вв / КАДР_В);
+      const ох = (вш - КАДР_Ш * м) / 2, оу = (вв - КАДР_В * м) / 2;
+      const всего = Math.max(1, document.documentElement.scrollHeight - вв);
+      const [я, dx, dy, sc, поворот] = поКлючам(Math.min(1, window.scrollY / всего), ШЁЛК_КЛЮЧИ);
+      const t = (performance.now() - начало) / 1000;
+      // «Дыхание» из ролика — медленное покачивание поверх положения.
+      const а = Math.sin(t * 0.5) * 3 + поворот, bx = Math.sin(t * 0.35) * 40 + dx, by = Math.cos(t * 0.42) * 26 + dy;
+      к.style.width = `${(КАДР_Ш + 2 * ЗАПАС) * м}px`;
+      к.style.height = `${(КАДР_В + 2 * ЗАПАС) * м}px`;
+      к.style.left = `${ох - ЗАПАС * м}px`;
+      к.style.top = `${оу - ЗАПАС * м}px`;
+      к.style.transformOrigin = `${(ЗАПАС + КАДР_Ш / 2) * м}px ${(ЗАПАС + КАДР_В / 2) * м}px`;
+      к.style.transform = `translate3d(${bx * м}px, ${by * м}px, 0) rotate(${а}deg) scale(${sc * (1 + 0.03 * Math.sin(t * 0.8))})`;
+      к.style.opacity = String(СВЕТЛАЯ ? я * 0.35 : я);
+      кадр = requestAnimationFrame(шаг);
+    };
+    кадр = requestAnimationFrame(шаг);
+    return () => { жив = false; cancelAnimationFrame(кадр); };
   }, []);
-  // Низ начала уходит в чёрный плавно: иначе край раздела резал луч линией.
   return (
-    <div aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", WebkitMaskImage: "linear-gradient(to bottom, #000 55%, transparent 100%)", maskImage: "linear-gradient(to bottom, #000 55%, transparent 100%)" }}>
-      <canvas ref={холст} style={{
-        position: "absolute", width: "130vw", height: "65vw", left: "-15vw", top: "50%", marginTop: "-32.5vw",
-        animation: "прив-свет 16s ease-in-out infinite", willChange: "transform",
-      }} />
+    <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: -1, overflow: "hidden", pointerEvents: "none" }}>
+      <canvas ref={холст} style={{ position: "absolute", visibility: "hidden", willChange: "transform, opacity", ...(СВЕТЛАЯ ? { filter: "invert(1)" } : null) }} />
     </div>
   );
 }
@@ -657,6 +712,7 @@ function Приветствие() {
   return (
     <div style={{ background: Ц.фон, color: Ц.лёд, fontFamily: ШРИФТ, minHeight: "100vh", overflowX: "hidden", isolation: "isolate", position: "relative", "--прив-над": СВЕТЛАЯ ? "rgba(0,0,0,.05)" : "rgba(255,255,255,.06)" }}>
       <style>{СТИЛЬ_ПРИВЕТСТВИЯ}</style>
+      <ФонШёлк />
 
       <header style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 20, height: 84, display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -679,7 +735,6 @@ function Приветствие() {
 
       {/* Начало — как первый кадр ролика: знак и имя, за ними медленный свет. */}
       <section style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-        <ЛучПриветствия />
         <div style={{ position: "relative", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
             <div style={{ animation: "прив-звезда 1.1s cubic-bezier(.2,.8,.2,1) both" }}><Звезда size={92} /></div>
@@ -724,15 +779,11 @@ function Приветствие() {
         <Появись style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <Строки верх="Один аккаунт" низ="на телефоне и ПК" размер={80} />
           <p style={{ color: Ц.тусклый, fontSize: 19, marginTop: 22 }}>Токены, кошелёк и история — те же, что в приложении.</p>
-          <div style={{ display: "flex", gap: 12, marginTop: 34 }}>
-            <button onClick={() => setОкно(true)} style={кнопкаГлавная}>Войти</button>
-          </div>
         </Появись>
       </section>
 
-      <footer style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "60px 0 70px", borderTop: `1px solid ${Ц.линия}` }}>
-        <Звезда size={30} />
-        <div style={{ fontSize: 17, fontWeight: 800 }}>Сделано в <span style={{ color: Ц.тусклый }}>Mintly.</span></div>
+      <footer style={{ display: "flex", justifyContent: "center", padding: "40px 0 90px" }}>
+        <button onClick={() => setОкно(true)} style={{ ...кнопкаГлавная, height: 60, padding: "0 56px", fontSize: 19, borderRadius: 18 }}>Начать</button>
       </footer>
 
       {окно && (
