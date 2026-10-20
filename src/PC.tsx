@@ -493,20 +493,39 @@ function Комиссия() {
 }
 
 function КартаDEX() {
+  /* Карту можно взять курсором и повернуть: до 40° вбок и 28° по
+     вертикали. Отпустил — плавно встаёт на место. Без захвата она
+     чуть наклоняется за мышью, как раньше. */
   const [наклон, setНаклон] = useState({ x: 0, y: 0 });
+  const [держу, setДержу] = useState(false);
+  const старт = useRef(null);
   const двигать = (e) => {
+    if (старт.current) {
+      const с = старт.current;
+      setНаклон({ x: Math.max(-28, Math.min(28, с.x - (e.clientY - с.my) * 0.25)), y: Math.max(-40, Math.min(40, с.y + (e.clientX - с.mx) * 0.3)) });
+      return;
+    }
     const р = e.currentTarget.getBoundingClientRect();
     const dx = (e.clientX - р.left) / р.width - 0.5, dy = (e.clientY - р.top) / р.height - 0.5;
     setНаклон({ x: -dy * 14, y: dx * 18 });
   };
+  const взять = (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    старт.current = { mx: e.clientX, my: e.clientY, x: наклон.x, y: наклон.y };
+    setДержу(true);
+  };
+  const отпустить = () => { старт.current = null; setДержу(false); setНаклон({ x: 0, y: 0 }); };
   return (
-    <div style={{ perspective: 1200, padding: 40 }} onMouseMove={двигать} onMouseLeave={() => setНаклон({ x: 0, y: 0 })}>
+    <div style={{ perspective: 1200, padding: 40, cursor: держу ? "grabbing" : "grab", touchAction: "none" }}
+      onPointerMove={двигать} onPointerDown={взять} onPointerUp={отпустить} onPointerCancel={отпустить}
+      onPointerLeave={() => { if (!старт.current) setНаклон({ x: 0, y: 0 }); }}>
       <div style={{ animation: "прив-плыть 6s ease-in-out infinite" }}>
         <div style={{
           width: 420, height: 264, borderRadius: 24, padding: 26, boxSizing: "border-box", position: "relative", overflow: "hidden",
           background: "linear-gradient(135deg,#8E8E93 0%,#3A3A3E 38%,#D9D9DE 62%,#4A4A4F 100%)",
           boxShadow: "0 50px 120px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.12) inset",
-          transform: `rotateX(${наклон.x}deg) rotateY(${наклон.y}deg)`, transition: "transform .25s ease-out",
+          transform: `rotateX(${наклон.x}deg) rotateY(${наклон.y}deg)`,
+          transition: держу ? "transform .06s linear" : "transform .7s cubic-bezier(.2,1.4,.4,1)",
         }}>
           <div style={{ position: "absolute", top: 0, bottom: 0, width: "60%", background: "linear-gradient(105deg,transparent 0%,rgba(255,255,255,.45) 50%,transparent 100%)", animation: "прив-блик 4.5s ease-in-out infinite" }} />
           <div style={{ display: "flex", justifyContent: "space-between", position: "relative" }}>
