@@ -5122,6 +5122,26 @@ async function рынокКривойСразу(token) {
 const СДЕЛКИ_КЕШ_МС = 3 * 60 * 1000;
 const сделкиКеш = new Map(); // tokenId -> { ряд, ts }
 
+/* Прогрев карточки — по касанию строки, ещё до отпускания пальца.
+   Между касанием и открытием проходит десятая доля секунды, а там ещё
+   и анимация перехода: к моменту, когда карточка спросит состояние
+   кривой и историю, ответы уже лежат в кеше. */
+const прогретые = new Map(); // id -> ts
+function прогретьТокен(tok) {
+  if (!tok || tok.демо || tok.id == null) return;
+  const было = прогретые.get(tok.id);
+  if (было && Date.now() - было < 15000) return;
+  прогретые.set(tok.id, Date.now());
+  try {
+    if (tok.chain === "solana" && (tok.tokenAddress || tok.address)) {
+      import("./solLaunch").then(({ состояниеКривойSol }) => состояниеКривойSol(tok.tokenAddress || tok.address)).catch(() => {});
+    } else if (tok.curveAddress && !tok.poolAddress) {
+      fetchCurveState(tok.curveAddress, TON_TESTNET_NETWORK, TON_PRIORITY.chart).catch(() => {});
+    }
+    сделкиИзКеша(tok.id).catch(() => {});
+  } catch { /* прогрев — не обязательная часть */ }
+}
+
 async function сделкиИзКеша(tokenId) {
   if (!tokenId) return null;
   const было = сделкиКеш.get(tokenId);
@@ -5268,11 +5288,15 @@ async function fetchCurveOHLCV(curveAddress, timeframe, testnet, rate = tonUsd()
   // это приезжало настоящее состояние. Нет состояния — нет графика;
   // вместо него рисуется ровная линия по известной цене, а попытка
   // повторяется.
-  const state = await fetchCurveState(curveAddress, testnet, TON_PRIORITY.chart);
+  // Состояние и история из базы — разом, а не друг за другом: это два
+  // разных источника, и ждать первый ради второго незачем.
+  const [state, изБазы] = await Promise.all([
+    fetchCurveState(curveAddress, testnet, TON_PRIORITY.chart),
+    сделкиИзКеша(tokenId).catch(() => null),
+  ]);
   if (!state) return null;
-  // Сперва история из базы: она посчитана сервером и приезжает разом.
-  // Нет её — читаем цепочку, как раньше.
-  const trades = (await сделкиИзКеша(tokenId))
+  // Нет истории в базе — читаем цепочку, как раньше.
+  const trades = изБазы
     || (await fetchCurveTrades(curveAddress, testnet, curveParamsOf(state).feeBps, TON_PRIORITY.chart));
   if (trades == null) return null;
   return buildCurveCandles(trades, timeframe, state, CHART_TOTAL, rate, запущен);
@@ -8285,6 +8309,7 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
   if (!картинкаГотова) return null;
   return (
     <button
+      onPointerDown={() => прогретьТокен(tok)}
       onClick={() => onOpen(tok)}
       className="fx-tap fx-card w-full text-left"
       // Лента, как в промо-ролике: строка прямо на чёрном, под ней тонкая
@@ -19651,7 +19676,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       // последней известной цене вместо истории — это и есть тот самый
       // «липовый график», который потом сам собой сменяется настоящим.
       // Лучше подержать загрузку на пару секунд дольше.
-      for (const [pause, allowFlat] of [[0, false], [2000, false], [4500, true]]) {
+      // Паузы короткие: открытая карточка ждёт именно этого ответа.
+      for (const [pause, allowFlat] of [[0, false], [500, false], [1500, true]]) {
         if (pause) await new Promise((r) => setTimeout(r, pause));
         if (cancelled || reqTf !== tfRef.current) return;
         const got = await attempt(allowFlat);

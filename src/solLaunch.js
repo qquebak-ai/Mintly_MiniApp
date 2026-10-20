@@ -150,10 +150,15 @@ export async function сделкаНаКривойSol({ mint, продажа = f
 }
 
 /* Состояние кривой: цена, собранная сумма и путь до листинга. */
+/* Полторы секунды держим ответ и общий запрос в полёте: карточку
+   прогревают касанием строки, и открытая следом карточка забирает тот
+   же ответ, а не спрашивает заново. Дольше нельзя — цена живая. */
+const кешСостояния = new Map(); // mint -> { ts, обещание }
 export async function состояниеКривойSol(mint) {
-  try {
-    return await запрос(`/api/solana-launch?action=state&mint=${encodeURIComponent(mint)}`);
-  } catch {
-    return null;
-  }
+  const было = кешСостояния.get(mint);
+  if (было && Date.now() - было.ts < 1500) return было.обещание;
+  const обещание = запрос(`/api/solana-launch?action=state&mint=${encodeURIComponent(mint)}`).catch(() => null);
+  кешСостояния.set(mint, { ts: Date.now(), обещание });
+  if (кешСостояния.size > 200) кешСостояния.delete(кешСостояния.keys().next().value);
+  return обещание;
 }
