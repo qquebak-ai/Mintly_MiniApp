@@ -1,0 +1,14 @@
+import { p, b, плохо } from "./libsol.mjs";
+const OUT = "/tmp/claude-0/-home-user-Facet-MiniApp/fac25f77-d2c0-52a4-9022-6fae6c8df13b/scratchpad";
+await p.mouse.click(164, 754);
+await p.waitForTimeout(2500);
+await p.screenshot({ path: `${OUT}/padsol.png` });
+await p.getByText("$WIF", { exact: true }).nth(1).click();
+await p.waitForTimeout(4000);
+await p.evaluate(() => { const x = [...document.querySelectorAll("button")].find((e) => e.textContent.trim() === "Купить"); x && x.click(); });
+await p.waitForTimeout(2500);
+await p.getByText("0.5 SOL", { exact: true }).first().click();
+await p.waitForTimeout(1500);
+await p.screenshot({ path: `${OUT}/buysol.png` });
+console.log((await p.evaluate(() => document.body.innerText)).replace(/\n+/g, " | ").slice(0, 600), плохо.slice(0, 3));
+await b.close();

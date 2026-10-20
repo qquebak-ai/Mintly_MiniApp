@@ -381,37 +381,45 @@ function СценаЗапуска() {
   const готово = мс >= 0 && т >= длится;
   return (
     <div ref={реф}>
-      <Телефон src="/landing/create-12.webp" наЭкране={<Касание x={0.5} y={0.641} мс={мс} когда={нажал} />}>
-        <Плашка видна={идёт || готово} ждём={!готово} заголовок={готово ? "Токен запущен" : "Запускаем…"} подпись="$MINT · Gram"
+      <Телефон src="/landing/create-sol.webp" наЭкране={<Касание x={0.5} y={0.642} мс={мс} когда={нажал} />}>
+        <Плашка видна={идёт || готово} ждём={!готово} заголовок={готово ? "Токен запущен" : "Запускаем…"} подпись="$WIF · Solana"
           время={сек(готово ? длится : Math.max(0, т))} style={{ left: -170, bottom: 150 }} />
       </Телефон>
     </div>
   );
 }
 
-/* Сети: рядом с телефоном — все сети приложения столбиком. Выбор сам
-   идёт по кругу, и под ним всплывает свежий запуск в выбранной сети. */
+/* Сети: рядом с телефоном — все сети приложения столбиком. На экране
+   мемпад Solana, поэтому выбрана она, и всплывают её же мемкоины — те,
+   что в ленте на экране. */
 const СЕТИ_ПРИВЕТСТВИЯ = [
-  { имя: "Gram", лого: "/coins/gram.png", токен: "$LILY", цвет: "linear-gradient(135deg,#2AABEE,#1B6FB0)", рост: "+12,6%" },
-  { имя: "Solana", лого: "/coins/sol.png", токен: "$PEPE", цвет: "linear-gradient(135deg,#14F195,#9945FF)", рост: "+18,4%" },
-  { имя: "BNB Chain", лого: "/coins/bnb.svg", токен: "$BOO", цвет: "linear-gradient(135deg,#F3BA2F,#B8860B)", рост: "+9,1%" },
-  { имя: "Base", лого: "/coins/base.svg", токен: "$PUP", цвет: "linear-gradient(135deg,#0052FF,#0A2D8F)", рост: "+24,9%" },
-  { имя: "Ethereum", лого: "/coins/eth.svg", токен: "$WICK", цвет: "linear-gradient(135deg,#8C8CF7,#454A75)", рост: "+71,4%" },
+  { имя: "Gram", лого: "/coins/gram.png" },
+  { имя: "Solana", лого: "/coins/sol.png" },
+  { имя: "BNB Chain", лого: "/coins/bnb.svg" },
+  { имя: "Base", лого: "/coins/base.svg" },
+  { имя: "Ethereum", лого: "/coins/eth.svg" },
 ];
-const ШАГ_СЕТИ = 2200;
+const ЗАПУСКИ_SOL = [
+  { т: "$BONK", лого: "/landing/tok/bonk.webp", рост: "+18,2%" },
+  { т: "$POPCAT", лого: "/landing/tok/popcat.webp", рост: "+27,5%" },
+  { т: "$BOME", лого: "/landing/tok/bome.webp", рост: "+63,9%" },
+  { т: "$MEW", лого: "/landing/tok/mew.webp", рост: "−4,6%" },
+  { т: "$WIF", лого: "/landing/tok/wif.webp", рост: "+41,7%" },
+];
+const ШАГ_СЕТИ = 2400;
 function СценаСетей() {
   const [реф, в] = useВКадре();
-  const мс = useЧасы(в, ШАГ_СЕТИ * СЕТИ_ПРИВЕТСТВИЯ.length);
+  const мс = useЧасы(в, ШАГ_СЕТИ * ЗАПУСКИ_SOL.length);
   const номер = мс < 0 ? 0 : Math.floor(мс / ШАГ_СЕТИ);
   const фаза = мс < 0 ? -1 : мс % ШАГ_СЕТИ;
-  const с = СЕТИ_ПРИВЕТСТВИЯ[номер];
+  const з = ЗАПУСКИ_SOL[номер];
   const видна = фаза > 450 && фаза < ШАГ_СЕТИ - 250;
   return (
     <div ref={реф}>
-      <Телефон src="/landing/pad.webp">
+      <Телефон src="/landing/pad-sol.webp">
         <div style={{ position: "absolute", left: -250, top: 70, width: 210, padding: 6, borderRadius: 18, background: Ц.поверхность, border: `1px solid ${Ц.линия}`, boxShadow: "0 18px 50px rgba(0,0,0,.35)", display: "flex", flexDirection: "column", gap: 2 }}>
-          {СЕТИ_ПРИВЕТСТВИЯ.map((н, i) => {
-            const вкл = мс >= 0 && i === номер;
+          {СЕТИ_ПРИВЕТСТВИЯ.map((н) => {
+            const вкл = н.имя === "Solana";
             return (
               <div key={н.имя} className={"прив-ряд" + (вкл ? " вкл" : "")} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 13, fontSize: 14.5, fontWeight: 700, cursor: "default", background: вкл ? Ц.лёд : "transparent", color: вкл ? Ц.наЛьду : Ц.тусклый }}>
                 <img src={н.лого} alt="" width={22} height={22} style={{ borderRadius: 999, display: "block" }} />{н.имя}
@@ -424,12 +432,12 @@ function СценаСетей() {
           background: Ц.поверхность, border: `1px solid ${Ц.линия}`, boxShadow: "0 18px 50px rgba(0,0,0,.35)",
           transition: "opacity .35s, transform .45s cubic-bezier(.2,.8,.2,1)", opacity: видна ? 1 : 0, transform: видна ? "none" : "translate3d(0,12px,0)",
         }}>
-          <div style={{ width: 36, height: 36, borderRadius: 999, background: с.цвет, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, color: "#fff", flexShrink: 0 }}>{с.токен[1]}</div>
+          <img src={з.лого} alt="" width={36} height={36} style={{ borderRadius: 999, display: "block", flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: Ц.лёд, fontSize: 14.5, fontWeight: 800 }}>Новый запуск {с.токен}</div>
-            <div className="прив-т" style={{ color: Ц.тусклый, fontSize: 12.5, marginTop: 2 }}>{с.имя} · 1 с назад</div>
+            <div style={{ color: Ц.лёд, fontSize: 14.5, fontWeight: 800 }}>Покупка {з.т}</div>
+            <div className="прив-т" style={{ color: Ц.тусклый, fontSize: 12.5, marginTop: 2 }}>Solana · только что</div>
           </div>
-          <div style={{ color: "#2EE87A", fontSize: 13.5, fontWeight: 800 }}>{с.рост}</div>
+          <div style={{ color: з.рост.startsWith("−") ? Ц.вниз : "#2EE87A", fontSize: 13.5, fontWeight: 800 }}>{з.рост}</div>
         </div>
       </Телефон>
     </div>
@@ -446,8 +454,8 @@ function СценаПокупки() {
   const видна = мс >= 0 && т >= 0 && мс < 4600;
   return (
     <div ref={реф}>
-      <Телефон src="/landing/buy.webp" наЭкране={<Касание x={0.27} y={0.335} мс={мс} когда={нажал} />}>
-        <Плашка видна={видна} ждём={!готово} заголовок={готово ? "Куплено" : "Покупаем…"} подпись="48 200 MINT · комиссия 0%"
+      <Телефон src="/landing/buy-sol.webp" наЭкране={<Касание x={0.5} y={0.874} мс={мс} когда={нажал} />}>
+        <Плашка видна={видна} ждём={!готово} заголовок={готово ? "Куплено" : "Покупаем…"} подпись="3 151 118 WIF · комиссия 0%"
           время={сек(готово ? длится : Math.max(0, т))} style={{ left: -200, top: 130 }} />
       </Телефон>
     </div>
@@ -560,7 +568,7 @@ function Раздел({ id, текст, картинка, обратно = false
    С font-display: swap текст сначала рисовался запасным шрифтом и на
    глазах перескакивал, а телефоны догружались уже на прокрутке. Заставка
    из index.html держится, пока это не готово (не дольше 2,5 с). */
-const КАРТИНКИ_ПРИВЕТСТВИЯ = ["/landing/create-12.webp", "/landing/pad.webp", "/landing/buy.webp", "/logo-star.png", "/coins/gram.png", "/coins/sol.png", "/coins/bnb.svg", "/coins/base.svg", "/coins/eth.svg"];
+const КАРТИНКИ_ПРИВЕТСТВИЯ = ["/landing/create-sol.webp", "/landing/pad-sol.webp", "/landing/buy-sol.webp", "/landing/tok/bonk.webp", "/landing/tok/popcat.webp", "/landing/tok/mew.webp", "/landing/tok/bome.webp", "/landing/tok/wif.webp", "/logo-star.png", "/coins/gram.png", "/coins/sol.png", "/coins/bnb.svg", "/coins/base.svg", "/coins/eth.svg"];
 function useГотовоПриветствие() {
   const [готово, setГотово] = useState(false);
   useEffect(() => {
