@@ -9989,6 +9989,8 @@ function человечнаяОшибка(e, запас = "Что-то пошл�
    отрисовки, но после загрузки этого модуля — поэтому функция, а не
    константа. */
 function этоПК() { return typeof window !== "undefined" && !!window.__ПК; }
+// Масштаб приложения на мониторе: растёт с шириной окна (см. прокрутку в App).
+function масштабПК() { return Math.min(1.5, Math.max(1.12, window.innerWidth / 1440)); }
 /* Колонка страницы на мониторе. Ширина задана явно: в столбце флекса
    поля «auto» по бокам иначе сжимали бы её до ширины содержимого. */
 function колонкаПК(открыта) {
@@ -14771,11 +14773,142 @@ function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} })
   );
 }
 
+/* Главная на мониторе — три колонки, как Pulse у Axiom.
+ *
+ * Крупные плитки главной сделаны под палец; на мониторе они выглядели
+ * телефоном, растянутым на всю ширину. Здесь сразу рынок: новые запуски,
+ * те, кому осталось немного до биржи, и уже вышедшие. Каждая колонка
+ * листается сама — так все три видны разом, как на терминалах. */
+const КОЛОНКИ_ПУЛЬСА = [
+  { id: "new", заголовок: "Новые", подпись: "Только что запущены" },
+  { id: "soon", заголовок: "Скоро на бирже", подпись: "Кривая почти собрана" },
+  { id: "dex", заголовок: "На бирже", подпись: "Вышли на DEX" },
+];
+
+const СтрокаПульса = React.memo(function СтрокаПульса({ t: tok, onOpen }) {
+  const xHandle = useXАвтора(tok.ownerId);
+  const рост = (tok.change || 0) >= 0;
+  const возраст = (fmtAge(tok.createdAt) || "").replace(/M$/, "м").replace(/H$/, "ч").replace(/D$/, "д");
+  const доля = долевКривой(tok);
+  const [над, setНад] = useState(false);
+  return (
+    <button
+      onPointerDown={() => прогретьТокен(tok)}
+      onClick={() => onOpen(tok)}
+      onMouseEnter={() => setНад(true)}
+      onMouseLeave={() => setНад(false)}
+      className="w-full text-left"
+      style={{
+        display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+        background: над ? T.surfaceHi : "transparent", borderBottom: `1px solid ${T.line}`,
+        transition: "background 120ms ease", cursor: "pointer",
+      }}
+    >
+      {доля != null ? (
+        <КольцоДоБиржи size={52} доля={доля} готово={доля >= 1}>
+          <TokenAvatar size={52} tone={рост ? "up" : "down"} src={tok.logoUrl} />
+        </КольцоДоБиржи>
+      ) : (
+        <TokenAvatar size={52} tone={рост ? "up" : "down"} src={tok.logoUrl} />
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="flex items-center" style={{ gap: 6, minWidth: 0 }}>
+          <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800 }}>${tok.ticker}</span>
+          <span className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{tok.name || ""}</span>
+          <ПометкаТест сеть={tok.network} />
+          {tok.демо && <ПометкаДемо />}
+        </div>
+        <div className="flex items-center" style={{ gap: 8, marginTop: 4, fontFamily: bodyFont, fontSize: 12.5, color: T.faint, minWidth: 0 }}>
+          {возраст && <span style={{ color: T.up, fontWeight: 700 }}>{возраст}</span>}
+          {xHandle && <СсылкаXАвтора handle={xHandle} size={12} />}
+          {tok.holders != null && <span>{tok.holders} держ.</span>}
+          {tok.tx24h > 0 && <span>{tok.tx24h} сделок</span>}
+        </div>
+        {доля != null && !tok.graduated && (
+          <div style={{ marginTop: 7, height: 3, borderRadius: 2, background: T.line, overflow: "hidden" }}>
+            <div style={{ width: `${Math.round(доля * 100)}%`, height: "100%", background: доля >= 0.8 ? T.up : T.muted, transition: "width 300ms ease" }} />
+          </div>
+        )}
+      </div>
+      <div style={{ textAlign: "right", flexShrink: 0 }}>
+        <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 11, fontWeight: 600 }}>MC</div>
+        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800 }}><ТекстСЧислами text={fmtUSD(tok.mcapNum)} /></div>
+        <div style={{ fontFamily: bodyFont, color: рост ? T.up : T.down, fontSize: 12, fontWeight: 700, marginTop: 2 }}>
+          {рост ? "+" : ""}<ТекстСЧислами text={(tok.change || 0).toFixed(1)} />%
+        </div>
+      </div>
+    </button>
+  );
+});
+
+function ПульсПК({ curveTokens = [], onOpenToken, onGoCreate, сеть = "ton", грузится = false }) {
+  const свои = useMemo(() => {
+    const нужная = сеть === "sol" ? "solana" : сеть;
+    return (curveTokens || []).map(localTokenToFeedShape)
+      .filter((tok) => (tok.chain || "ton") === нужная)
+      .filter((tok) => запускСостоялся(tok));
+  }, [curveTokens, сеть]);
+  const колонки = useMemo(() => {
+    const поВремени = (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    const кривые = свои.filter((tok) => !tok.graduated);
+    // «Скоро» — от половины кривой: ниже это ещё обычный новый запуск.
+    const скоро = кривые.filter((tok) => (долевКривой(tok) || 0) >= 0.5)
+      .sort((a, b) => (долевКривой(b) || 0) - (долевКривой(a) || 0));
+    const вСкоро = new Set(скоро.map((tok) => tok.id));
+    return {
+      new: кривые.filter((tok) => !вСкоро.has(tok.id)).sort(поВремени),
+      soon: скоро,
+      dex: свои.filter((tok) => tok.graduated).sort((a, b) => (b.mcapNum || 0) - (a.mcapNum || 0)),
+    };
+  }, [свои]);
+  // Высота колонок — по окну: страница не листается, листаются колонки.
+  // Окно меряется в точках до масштаба, поэтому делим на него.
+  const высота = Math.max(420, window.innerHeight / масштабПК() - 150);
+  return (
+    <div className="fx-view" style={{ paddingTop: 20, paddingBottom: 8 }}>
+      <div className="flex items-end justify-between" style={{ marginBottom: 18, gap: 16 }}>
+        <div>
+          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 30, fontWeight: 800, letterSpacing: "-0.02em" }}>Пульс</div>
+          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 4 }}>Все запуски Mintly в реальном времени</div>
+        </div>
+        <button onClick={onGoCreate} className="fx-tap" style={{
+          height: 42, padding: "0 20px", borderRadius: 12, border: "none", cursor: "pointer",
+          background: T.ice, color: T.bg, fontFamily: bodyFont, fontSize: 14, fontWeight: 800,
+        }}>Запустить токен</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14 }}>
+        {КОЛОНКИ_ПУЛЬСА.map((к) => {
+          const список = колонки[к.id];
+          return (
+            <div key={к.id} style={{ border: `1px solid ${T.line}`, borderRadius: 16, background: T.surface, overflow: "hidden", display: "flex", flexDirection: "column", height: высота }}>
+              <div className="flex items-center justify-between" style={{ padding: "14px 16px", borderBottom: `1px solid ${T.line}`, flexShrink: 0 }}>
+                <div>
+                  <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 800 }}>{к.заголовок}</div>
+                  <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 2 }}>{к.подпись}</div>
+                </div>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, fontWeight: 700, padding: "4px 10px", borderRadius: 999, border: `1px solid ${T.line}` }}>{список.length}</span>
+              </div>
+              <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                {грузится && !список.length
+                  ? <div className="flex items-center justify-center" style={{ height: 200 }}><ЗнакЗагрузки size={44} /></div>
+                  : список.length
+                    ? список.slice(0, 80).map((tok) => <СтрокаПульса key={tok.id} t={tok} onOpen={onOpenToken} />)
+                    : <div style={{ padding: "40px 16px", textAlign: "center", fontFamily: bodyFont, color: T.faint, fontSize: 13.5 }}>Пока пусто</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function HomeView({
   curveTokens = [], onOpenToken = () => {},
   onGoTab, onGoCreate, profile = null, accountCreated = false, userId = null,
-  onOpenMyProfile, профильГрузится = false, грузится = false, insetTop = 0, insetBottom = 0, onOpenMintie, окрасМ = "mint", onOpenX = null,
+  onOpenMyProfile, профильГрузится = false, грузится = false, insetTop = 0, insetBottom = 0, onOpenMintie, окрасМ = "mint", onOpenX = null, сеть = "ton",
 }) {
+  if (этоПК()) return <ПульсПК curveTokens={curveTokens} onOpenToken={onOpenToken} onGoCreate={onGoCreate} сеть={сеть} грузится={грузится} />;
   // Главная сведена к баннерам и курсу — сводка, лента, токен дня,
   // движение и топ убраны по просьбе. Заголовок и шапка (аватар, ник,
   // колокольчик) — на прежнем месте, вверху экрана.
@@ -31669,7 +31802,7 @@ function mapTokenRow(row) {
              шириной окна: на 1920 точках прежние 1,12 выглядели телефоном
              посреди пустоты. Колонка по вертикали — чтобы короткая
              страница стояла посередине, а не прилипала к верху. */
-          ...(этоПК() ? { zoom: Math.min(1.5, Math.max(1.12, window.innerWidth / 1440)), width: "100%", display: "flex", flexDirection: "column" } : null),
+          ...(этоПК() ? { zoom: масштабПК(), width: "100%", display: "flex", flexDirection: "column" } : null),
           /* Только по вертикали. Любой элемент, выходящий за поля — ореол
              карты, тень, широкая строка, — иначе даёт вбок несколько
              точек хода, и всё приложение ездит под пальцем. */
@@ -31695,7 +31828,7 @@ function mapTokenRow(row) {
               у пустых соседей они тоже делили бы свободное место, и
               страница съезжала бы из центра. Длинная страница их просто
               не замечает и листается с самого верха. */}
-          <div className="px-4" style={этоПК() ? { ...колонкаПК(view === "home" || view === "mempad"), paddingLeft: 32, paddingRight: 32 } : undefined}>
+          <div className="px-4" style={этоПК() ? { ...колонкаПК(view === "mempad"), ...(view === "home" ? { maxWidth: 1560 } : null), paddingLeft: 32, paddingRight: 32 } : undefined}>
           <KeepAlive show={view === "home"}>
             <HomeView
               onOpenX={() => setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "x"))}
@@ -31719,6 +31852,7 @@ function mapTokenRow(row) {
               insetTop={insetTop}
               insetBottom={insetBottom}
               достиженияГотовы={achievementsReady}
+              сеть={сетьМемпада}
             />
           </KeepAlive>
           <KeepAlive show={view === "mempad"}>
