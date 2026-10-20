@@ -12729,23 +12729,28 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
   function началоЖеста(e) {
     const т = e.touches && e.touches[0];
     if (!т) return;
-    жест.current = { x0: т.clientX, тянем: false };
+    жест.current = { x0: т.clientX, y0: т.clientY, тянем: false, т0: performance.now() };
   }
   function ходЖеста(e) {
     const ж = жест.current;
     const т = e.touches && e.touches[0];
     if (!ж || !т) return;
     const dx = т.clientX - ж.x0;
-    if (!ж.тянем && dx > -12) return;
+    const dy = т.clientY - ж.y0;
+    // Вертикальное движение — это прокрутка списка, не закрытие.
+    if (!ж.тянем && (dx > -10 || Math.abs(dy) > Math.abs(dx))) return;
     ж.тянем = true;
-    ж.путь = -dx;
-    setТяга(Math.min(96, Math.pow(Math.max(0, -dx), 0.86)));
+    ж.путь = Math.max(0, -dx);
+    // Меню идёт за пальцем один к одному — тогда видно, что его тянут.
+    setТяга(ж.путь);
   }
   function конецЖеста() {
     const ж = жест.current;
     жест.current = null;
     if (!ж || !ж.тянем) return;
-    if ((ж.путь || 0) > 110) { haptic("light"); закрыть(); return; }
+    const скорость = (ж.путь || 0) / Math.max(1, performance.now() - ж.т0);
+    // Далеко или коротким быстрым смахом — закрываем.
+    if ((ж.путь || 0) > 80 || (скорость > 0.45 && (ж.путь || 0) > 30)) { haptic("light"); закрыть(); return; }
     setТяга(0);
   }
 
@@ -12803,6 +12808,12 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
       />
       <div
         data-sheet="1"
+        // Смахнуть влево — закрыть: меню и выезжает слева, так что
+        // обратное движение читается само.
+        onTouchStart={началоЖеста}
+        onTouchMove={ходЖеста}
+        onTouchEnd={конецЖеста}
+        onTouchCancel={конецЖеста}
         className="no-scrollbar"
         style={{
           position: "fixed", top: 0, bottom: 0, left: 0, zIndex: 399,
