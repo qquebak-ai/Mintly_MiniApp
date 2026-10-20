@@ -590,6 +590,9 @@ function useГотовоПриветствие() {
  * плавных переходах), а двигается уже готовая картинка — только
  * трансформацией, которую видеокарта делает бесплатно. */
 const КАДР_Ш = 1920, КАДР_В = 1080, ЗАПАС = 420;
+// Шёлк отодвинут вглубь: в ролике он на весь кадр, на сайте за текстом
+// это слишком близко. Края лент гасит маска холста.
+const ДАЛЬ = 0.58;
 const ШЁЛК_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="${КАДР_Ш + 2 * ЗАПАС}" height="${КАДР_В + 2 * ЗАПАС}" viewBox="${-ЗАПАС} ${-ЗАПАС} ${КАДР_Ш + 2 * ЗАПАС} ${КАДР_В + 2 * ЗАПАС}">
   <defs>
     <linearGradient id="sg1" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#222222"/><stop offset=".4" stop-color="#666666"/><stop offset=".62" stop-color="#ACACAC"/><stop offset=".8" stop-color="#575757"/><stop offset="1" stop-color="#3E3E3E"/></linearGradient>
@@ -659,8 +662,8 @@ function ФонШёлк() {
       к.style.left = `${ох - ЗАПАС * м}px`;
       к.style.top = `${оу - ЗАПАС * м}px`;
       к.style.transformOrigin = `${(ЗАПАС + КАДР_Ш / 2) * м}px ${(ЗАПАС + КАДР_В / 2) * м}px`;
-      к.style.transform = `translate3d(${bx * м}px, ${by * м}px, 0) rotate(${а}deg) scale(${sc * (1 + 0.03 * Math.sin(t * 0.8))})`;
-      к.style.opacity = String(СВЕТЛАЯ ? я * 0.35 : я);
+      к.style.transform = `translate3d(${bx * м * ДАЛЬ}px, ${by * м * ДАЛЬ}px, 0) rotate(${а}deg) scale(${ДАЛЬ * sc * (1 + 0.03 * Math.sin(t * 0.8))})`;
+      к.style.opacity = String((СВЕТЛАЯ ? я * 0.35 : я) * 0.85);
       кадр = requestAnimationFrame(шаг);
     };
     кадр = requestAnimationFrame(шаг);
@@ -668,7 +671,8 @@ function ФонШёлк() {
   }, []);
   return (
     <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: -1, overflow: "hidden", pointerEvents: "none" }}>
-      <canvas ref={холст} style={{ position: "absolute", visibility: "hidden", willChange: "transform, opacity", ...(СВЕТЛАЯ ? { filter: "invert(1)" } : null) }} />
+      <canvas ref={холст} style={{ position: "absolute", visibility: "hidden", willChange: "transform, opacity",
+        WebkitMaskImage: "radial-gradient(closest-side, #000 62%, transparent 100%)", maskImage: "radial-gradient(closest-side, #000 62%, transparent 100%)", ...(СВЕТЛАЯ ? { filter: "invert(1)" } : null) }} />
     </div>
   );
 }

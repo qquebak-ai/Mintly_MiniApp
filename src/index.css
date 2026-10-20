@@ -96,6 +96,9 @@
    Поля ввода остаются выделяемыми, иначе адрес или код не скопировать. */
 html.пк, html.пк body { -webkit-user-select: none; user-select: none; }
 html.пк img { -webkit-user-drag: none; }
+/* Полосы прокрутки на сайте не видно — листается как обычно. */
+html.пк, html.пк * { scrollbar-width: none; }
+html.пк ::-webkit-scrollbar { display: none; width: 0; height: 0; }
 html.пк input, html.пк textarea, html.пк [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
 
 @tailwind base;
