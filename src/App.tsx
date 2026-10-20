@@ -11514,7 +11514,18 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
     const to = setTimeout(() => setЛентаГотова(true), 7000);
     return () => clearTimeout(to);
   }, [сеть]);
-  const разделГотов = useМинимумЗагрузки(!идётЗагрузка && лентаГотова);
+  /* Живые цифры своих кривых приходят отдельным опросом, чуть позже
+     списка: раздел ждёт и их, иначе на кадр вставали «$0». Страховка та
+     же — семь секунд. */
+  const ждутЦифр = (myTokens || []).some((tok) => tok && (tok.демо || tok.curveAddress) && !tok.graduated
+    && tok.chain === (сеть === "sol" ? "solana" : сеть) && !(tok.mcapNum > 0));
+  const [цифрыЖдать, setЦифрыЖдать] = useState(true);
+  useEffect(() => {
+    setЦифрыЖдать(true);
+    const to = setTimeout(() => setЦифрыЖдать(false), 7000);
+    return () => clearTimeout(to);
+  }, [сеть]);
+  const разделГотов = useМинимумЗагрузки(!идётЗагрузка && лентаГотова && !(ждутЦифр && цифрыЖдать));
 
   return (
     <div className="flex flex-col" style={{ gap: 20, paddingTop: 8, paddingBottom: 16 }}>
