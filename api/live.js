@@ -116,7 +116,10 @@ function статистикаДемо() {
   const граница = Math.floor((Date.now() - ДЕНЬ_МС) / 60000);
   let сделок = 0, объём = 0;
   for (const [м, к, о] of демоМинуты) if (м >= граница) { сделок += к; объём += о; }
-  return { holders: демо.держатели, tx24: сделок, vol24: объём, liquidity: демо.realSol };
+  // X «создателя» демо-токена — официальный X площадки, если он задан
+  // (MINTLY_X_HANDLE); нет — у демо X не показывается вовсе.
+  const x = String(process.env.MINTLY_X_HANDLE || "").replace(/^@/, "").trim();
+  return { holders: демо.держатели, tx24: сделок, vol24: объём, liquidity: демо.realSol, x: /^[A-Za-z0-9_]{1,15}$/.test(x) ? x : null };
 }
 function сделкаДемо(мс = Date.now()) {
   // Тянет к середине пути: собранное гуляет между 100 и 1400 монет, а

@@ -8461,7 +8461,8 @@ function СсылкаXАвтора({ handle, size = 12.5, style = {} }) {
 }
 
 const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
-  const xHandle = useXАвтора(tok.ownerId);
+  // У демо-токена автора нет — его X (официальный X площадки) приходит с сервера.
+  const xHandle = useXАвтора(tok.ownerId) || tok.xHandle || null;
   const картинкаГотова = useКартинкаГотова(tok.logoUrl ? превьюКартинки(tok.logoUrl, 48) : null);
   const рост = (tok.change || 0) >= 0;
   const возраст = (fmtAge(tok.createdAt) || "")
@@ -8758,6 +8759,7 @@ function localTokenToFeedShape(entry) {
     description: entry.description || null,
     bannerUrl: entry.bannerUrl || null,
     holders: entry.holders != null ? entry.holders : null,
+    xHandle: entry.xHandle || null,
     // Шкала до листинга: раньше эти числа сюда не доезжали, и полоса в
     // списке не рисовалась ни у одного своего токена.
     raisedTon: entry.raisedTon || 0,
@@ -11098,6 +11100,8 @@ function ФонКлеток({ клетка = 26 }) {
  * растягивать на треть экрана нечего. */
 function ВитринаСпотлайта({ token, всего = 1, активная = 0, onТочка, onOpen }) {
   const обложка = useОбложкаТокена(token);
+  const xHandle = useXАвтора(token.ownerId) || token.xHandle || null;
+  const строкаX = xHandle ? <span className="flex" style={{ marginTop: 4, minWidth: 0 }} onClick={(e) => e.stopPropagation()}><СсылкаXАвтора handle={xHandle} /></span> : null;
   const рост = token.change >= 0;
 
   const точки = всего > 1 ? (
@@ -11159,6 +11163,7 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
             <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 1 }}>
               <ТекстСЧислами text={fmtUSD(token.mcapNum)} /> · ${token.vol}
             </span>
+            {строкаX}
           </span>
           {точки}
         </span>
@@ -11172,8 +11177,16 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
       className="fx-tap w-full flex items-center text-left"
       style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface, border: "none", position: "relative", overflow: "hidden" }}
     >
-      {/* Фон витрины — сетка с вспыхивающими клетками. */}
-      <ФонКлеток />
+      {/* Фон витрины — логотип самого токена, крупно и размыто: карточка
+          окрашивается в его цвета. Клетки, вспыхивающие поверх, читались
+          случайными пятнами. */}
+      <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: 16 }}>
+        <img src={token.logoUrl || "/logo-star.png"} alt="" style={{
+          position: "absolute", left: "-10%", top: "50%", width: "120%", height: "auto", transform: "translateY(-50%)",
+          filter: "blur(34px) saturate(1.4)", opacity: token.logoUrl ? 0.55 : 0.22,
+        }} />
+        <span style={{ position: "absolute", inset: 0, background: `linear-gradient(90deg, ${hexA(T.surface, 0.55)} 0%, ${hexA(T.surface, 0.2)} 100%)` }} />
+      </span>
       <span style={{ position: "relative", zIndex: 1 }}>
         <TokenAvatar size={44} tone={рост ? "up" : "down"} src={token.logoUrl} />
       </span>
@@ -11182,6 +11195,7 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
         <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 3 }}>
           <ТекстСЧислами text={fmtUSD(token.mcapNum)} /> · ${token.vol}
         </span>
+        {строкаX}
       </span>
       {точки}
     </button>
@@ -30033,8 +30047,8 @@ function mapTokenRow(row) {
             if (tok.демо && j.demoCreated > 0 && tok.createdAt !== j.demoCreated) { тронуто = true; tok = { ...tok, createdAt: j.demoCreated }; }
             if (tok.демо && j.demoStats) {
               const ст = j.demoStats, курсД = курсTon;
-              const цифры = { tx24h: ст.tx24, holders: ст.holders, vol: fmtCompact(ст.vol24 * курсД), liq: fmtCompact(ст.liquidity * курсД), vol24hNum: ст.vol24 * курсД };
-              if (tok.tx24h !== цифры.tx24h || tok.holders !== цифры.holders || tok.vol !== цифры.vol) { тронуто = true; tok = { ...tok, ...цифры }; }
+              const цифры = { tx24h: ст.tx24, holders: ст.holders, vol: fmtCompact(ст.vol24 * курсД), liq: fmtCompact(ст.liquidity * курсД), vol24hNum: ст.vol24 * курсД, xHandle: ст.x || null };
+              if (tok.tx24h !== цифры.tx24h || tok.holders !== цифры.holders || tok.vol !== цифры.vol || tok.xHandle !== цифры.xHandle) { тронуто = true; tok = { ...tok, ...цифры }; }
             }
             if (!к || !(к.price > 0) || (tok.priceTon === к.price && tok.raisedTon === к.raised)) return tok;
             const курс = tok.chain === "solana" ? курсSol : курсTon;
