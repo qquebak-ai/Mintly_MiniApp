@@ -976,7 +976,9 @@ async function регистрацияНаСайте(req, res) {
   }
   const userId = создан.user.id;
   const профиль = {
-    id: userId, nickname, email: почта || null, bio: "", emoji: null,
+    // Почта в профиле обязательна (not null). У входа через X своей нет —
+    // кладём служебный адрес учётки, как у Telegram-аккаунтов (tg…@telegram.local).
+    id: userId, nickname, email: почта || адрес, bio: "", emoji: null,
     // Фото и описание из X не копируем — только привязка X.
     avatar_url: null,
   };
