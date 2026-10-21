@@ -5473,6 +5473,15 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
   // длины истории, то есть номера не значат ничего постоянного. Держим
   // якорь по времени и после обновления возвращаем окно на ту же дату.
   const anchorTimeRef = useRef(null);
+  /* Дробная часть сдвига: окно стоит не ровно на свече, а между ними, и
+     при возврате к якорю её надо вернуть. Раньше окно вставало на целую
+     свечу — каждое живое обновление (у демо-токена раз в 0,3 с) дёргало
+     график на долю свечи назад прямо под пальцем, и прокрутка влево
+     шла рывками. */
+  const anchorFracRef = useRef(0);
+  // Кадр, в котором нарисуется сдвиг: касания на экранах 120 Гц приходят
+  // чаще кадров, и рисовать на каждое — лишняя работа и рывки.
+  const кадрСдвига = useRef(null);
   /* Сколько времени показываем — в секундах, а не в свечах.
      Источник отдаёт свечи только там, где были сделки, и ряд то
      уплотняется, то редеет. Полсотни свечей в одном ответе — это час, в
@@ -6058,7 +6067,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         const d = Math.abs(candles[i].time - anchorTimeRef.current);
         if (d < bestD) { bestD = d; best = i; }
       }
-      v.start = Math.max(0, Math.min(best, Math.max(0, n - 1)));
+      v.start = Math.max(0, Math.min(best, Math.max(0, n - 1))) + anchorFracRef.current;
       clampView(true);
     }
     // Окно цены подгоняется заново. Оно задавалось один раз при первой
@@ -6083,6 +6092,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
   useEffect(() => () => {
     if (кадрШкалы.current) cancelAnimationFrame(кадрШкалы.current);
     if (кадрЖивой.current) cancelAnimationFrame(кадрЖивой.current);
+    if (кадрСдвига.current) cancelAnimationFrame(кадрСдвига.current);
   }, []);
 
   /* Перерисовки по таймеру больше нет: она нужна была только тикающему
@@ -6115,10 +6125,14 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     const v = viewRef.current;
     const правый = v.start + v.count;
     pinnedRef.current = правый >= n - 0.75 && правый <= n + хвостСправа(v.count) + 0.75;
-    const left = candles[Math.max(0, Math.min(n - 1, Math.floor(v.start)))];
+    const левыйНомер = Math.max(0, Math.min(n - 1, Math.floor(v.start)));
+    const left = candles[левыйНомер];
     anchorTimeRef.current = left && Number.isFinite(left.time) ? left.time : null;
+    anchorFracRef.current = v.start - левыйНомер;
     запомнитьРазмахОкна();
-    draw();
+    if (!кадрСдвига.current) {
+      кадрСдвига.current = requestAnimationFrame(() => { кадрСдвига.current = null; draw(); });
+    }
   }
   /* Вертикальный сдвиг убран нарочно.
    *
