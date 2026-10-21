@@ -13061,7 +13061,8 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
     // Аккаунт X — здесь, рядом с профилем: это часть того, кто ты, а не
     // настройка приложения.
     { key: "x", icon: ЗнакX, label: t("xTitle") },
-    { key: "referral", icon: Gift, label: t("referral") },
+    // Приглашения идут через бота в Telegram — на сайте им не место.
+    ...(этоПК() ? [] : [{ key: "referral", icon: Gift, label: t("referral") }]),
     /* Кошелька и секретной фразы в меню больше нет: кошелёк — своя
        вкладка внизу, а фраза открывается с оборота карты в нём. Два входа
        в одно и то же только путали. */
@@ -24705,6 +24706,11 @@ function SettingsPanel({
     case "security":
       body = (
         <div className="mt-2">
+          {/* PIN-код — замок телефона в Telegram. На сайте его нет: вход
+              туда и так по почте или X, а код при каждом открытии
+              вкладки только мешал. Почта для 2FA — запасной ключ к
+              Telegram-аккаунту, на сайте почта и есть сам вход. */}
+          {!этоПК() && <>
           <SettingsRow label={t("pinRow")} sub={t("pinRowSub")}>
             <ToggleSwitch on={appSettings.pinEnabled} onChange={onTogglePin} />
           </SettingsRow>
@@ -24715,9 +24721,10 @@ function SettingsPanel({
           >
             <Lock size={14} color={T.muted} /> {t("changePinCta")}
           </button>
+          </>}
           {/* Почта — второй ключ. Аккаунт держится на Telegram, и это
               хорошо ровно до дня, когда телеграм пропадает. */}
-          {accountCreated && (
+          {accountCreated && !этоПК() && (
             <button
               onClick={открытьПочту}
               className="fx-tap w-full flex items-center gap-2 rounded-[20px] px-3.5 py-3 mt-3"
@@ -30368,6 +30375,7 @@ function mapTokenRow(row) {
   const [pinLocked, setPinLocked] = useState(false);
 
   useEffect(() => {
+    if (этоПК()) return;
     try {
       const storedEnabled = window.localStorage.getItem("mintly_pin_enabled") === "1";
       const storedPin = window.localStorage.getItem("mintly_pin");
