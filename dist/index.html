@@ -120,11 +120,11 @@
         сообщить("promise", (r && (r.stack || r.message)) || String(r || "отказ без причины"));
       });
     </script>
-    <script type="module" crossorigin src="/assets/index-LYxvYLK5.js"></script>
+    <script type="module" crossorigin src="/assets/index-p48kLyEn.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/react-DS-kCp2g.js">
     <link rel="modulepreload" crossorigin href="/assets/supabase-QBHRJHLH.js">
     <link rel="modulepreload" crossorigin href="/assets/icons-CEWlNXj0.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-Dvxq1SVA.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-SFwoyq7X.css">
   </head>
   <body>
     <!-- Чёрное поле поверх всего, пока приложение не решило, что
@@ -202,6 +202,22 @@
          остальными шрифтами к этому моменту ещё не приехала. */
       @font-face { font-family: 'ШрифтШирмы'; font-weight: 100 900; font-display: block;
                    src: url('/fonts/jost-latin.woff2') format('woff2'); }
+      /* Сайт в загрузке: вместо чёрного поля — размытые очертания
+         страницы (шапка, боковая панель, карточки), а приехавшая
+         страница держится размытой, пока всё не загрузится. */
+      #заготовка-пк { display: none; }
+      html.пк-грузится #заготовка-пк { display: block; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+                                       filter: blur(16px); animation: заготовкаПК 1.8s ease-in-out infinite; }
+      #заготовка-пк i { position: absolute; background: rgba(150,150,160,0.16); border-radius: 22px; }
+      #заготовка-пк .з-шапка { left: 0; right: 0; top: 0; height: 42px; border-radius: 0; }
+      #заготовка-пк .з-бок { left: 0; top: 0; bottom: 0; width: 248px; border-radius: 0; }
+      #заготовка-пк .з-1 { left: 300px; right: 56px; top: 90px; height: 120px; }
+      #заготовка-пк .з-2 { left: 300px; width: calc((100% - 404px) / 3); top: 240px; bottom: 40px; }
+      #заготовка-пк .з-3 { left: calc(326px + (100% - 404px) / 3); width: calc((100% - 404px) / 3); top: 240px; bottom: 40px; }
+      #заготовка-пк .з-4 { right: 56px; width: calc((100% - 404px) / 3); top: 240px; bottom: 40px; }
+      @keyframes заготовкаПК { 0%, 100% { opacity: 0.6 } 50% { opacity: 1 } }
+      html.пк #root { position: relative; z-index: 1; transition: filter 600ms ease; }
+      html.пк-грузится #root { filter: blur(16px); }
       #ширма .слово { position: absolute; left: 0; right: 0; top: calc(46% + 150px); text-align: center;
                       font-family: 'ШрифтШирмы', 'Jost', -apple-system, 'Segoe UI', sans-serif; font-size: min(40px, 10.5vw); font-weight: 500;
                       text-transform: uppercase; letter-spacing: 0.36em; padding-left: 0.36em; color: #E4E2DC; }
@@ -312,6 +328,37 @@
       } catch (e) { /* хранилище закрыто */ }
       (function () {
         var поле = document.getElementById("ширма");
+        /* Сайт на мониторе: чёрной заставки со знаком нет. Сразу видны
+           размытые очертания страницы, а когда она приедет — сама
+           страница, размытая, пока всё не догрузится. Признак «сайт» —
+           тот же, что в main.tsx. */
+        var пк = (function () {
+          var путь = location.pathname.replace(/\/+$/, "");
+          if (путь === "/app") return false;
+          if (путь === "/pro") return true;
+          var tg = window.Telegram && window.Telegram.WebApp;
+          if (tg && tg.initData) return false;
+          return innerWidth >= 1100 && !("ontouchstart" in window && innerWidth < 1400);
+        })();
+        if (пк) {
+          window.__безЗаставки = true;
+          window.__ширмаСтарт = Date.now();
+          if (поле) поле.parentNode.removeChild(поле);
+          var корень = document.documentElement;
+          корень.classList.add("пк-грузится");
+          var снято = false;
+          window.__снятьБлюрПК = function () {
+            if (снято) return; снято = true;
+            // Два кадра: новая страница успевает нарисоваться под размытием.
+            requestAnimationFrame(function () { requestAnimationFrame(function () {
+              корень.classList.remove("пк-грузится");
+              setTimeout(function () { var з = document.getElementById("заготовка-пк"); if (з) з.parentNode.removeChild(з); }, 700);
+            }); });
+          };
+          // Что бы ни случилось — не дольше десяти секунд.
+          setTimeout(window.__снятьБлюрПК, 10000);
+          return;
+        }
         var естьАккаунт = false;
         try { естьАккаунт = localStorage.getItem("mintly_has_account") === "1"; } catch (e) { /* хранилище закрыто */ }
         if (!естьАккаунт && поле) {
@@ -338,6 +385,7 @@
         document.addEventListener("visibilitychange", ждатьКадр);
       })();
     </script>
+    <div id="заготовка-пк" aria-hidden="true"><i class="з-шапка"></i><i class="з-бок"></i><i class="з-1"></i><i class="з-2"></i><i class="з-3"></i><i class="з-4"></i></div>
     <div id="root"></div>
     <script>
       // Приложение поднялось — метку перечитывания снимаем, иначе

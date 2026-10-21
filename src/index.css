@@ -104,3 +104,10 @@ html.пк input, html.пк textarea, html.пк [contenteditable="true"] { -webki
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Загрузка на сайте — размытые очертания вместо знака. Размытие не
+   уходит, пока на месте заглушки не появится настоящее содержимое;
+   мягкое дыхание говорит, что работа идёт. */
+.размытие-пк { filter: blur(7px); animation: размытиеПК 1.8s ease-in-out infinite; pointer-events: none; }
+@keyframes размытиеПК { 0%, 100% { opacity: 0.55 } 50% { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .размытие-пк { animation: none; opacity: 0.8 } }

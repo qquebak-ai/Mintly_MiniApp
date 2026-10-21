@@ -531,7 +531,7 @@ function useГотовоПриветствие() {
     Promise.race([Promise.all([...шрифты, ...картинки]).catch(() => {}), стоп]).then(() => { if (жив) setГотово(true); });
     return () => { жив = false; };
   }, []);
-  useEffect(() => { if (!готово) return; const ш = document.getElementById("ширма"); if (ш) ш.remove(); }, [готово]);
+  useEffect(() => { if (!готово) return; const ш = document.getElementById("ширма"); if (ш) ш.remove(); if (window.__снятьБлюрПК) window.__снятьБлюрПК(); }, [готово]);
   return готово;
 }
 

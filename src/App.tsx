@@ -10417,6 +10417,7 @@ function ПлашкаЧисла({ width = 90, height = 22, radius = 8, style = n
    выглядит собой, а не заставкой: человек видит раскладку и понимает,
    что именно грузится, а не смотрит на крутящийся значок. */
 function PageLoader({ minHeight = 260 }) {
+  if (этоПК()) return <РазмытаяЗаглушка высота={minHeight || 260} />;
   const блоки = [
     { высота: 12, ширина: "42%", радиус: 6 },
     { высота: 12, ширина: "68%", радиус: 6 },
@@ -11651,7 +11652,7 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
             </svg>
           ) : (
             <div className="flex items-center justify-center" style={{ height: 200 }}>
-              {свечи === null ? <ЗнакЗагрузки size={80} /> : <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 13 }}>{t("chartNoData")}</span>}
+              {свечи === null ? <ЗнакЗагрузки size={80} всегда /> : <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 13 }}>{t("chartNoData")}</span>}
             </div>
           )}
         </div>
@@ -14574,6 +14575,7 @@ const КЛЮЧ_ПРОФИЛЯ = "mintly_profile_cache";
 
 function снятьШирму({ уйти = false } = {}) {
   if (typeof document === "undefined") return;
+  if (window.__снятьБлюрПК) window.__снятьБлюрПК();
   const поле = document.getElementById("ширма");
   if (!поле || поле.__снимаем) return;
   поле.__снимаем = true;
@@ -14642,6 +14644,68 @@ function снятьШирму({ уйти = false } = {}) {
   доУхода();
 }
 
+/* Загрузка на сайте — размытые очертания: строки «кружок и две полоски»,
+   сколько поместится в высоту места. Резкими они не становятся никогда:
+   держатся, пока не придут данные, и уступают место настоящему
+   содержимому. */
+function РазмытаяЗаглушка({ высота = 120 }) {
+  if (высота < 60) {
+    return (
+      <div aria-busy className="размытие-пк" style={{ width: "100%", height: высота, display: "flex", alignItems: "center" }}>
+        <div style={{ width: "60%", height: Math.max(10, высота * 0.5), borderRadius: 999, background: T.surfaceHi }} />
+      </div>
+    );
+  }
+  const строк = Math.max(1, Math.floor(высота / 58));
+  return (
+    <div aria-busy className="размытие-пк" style={{ width: "100%", height: высота, display: "flex", flexDirection: "column", justifyContent: "center", gap: 14, overflow: "hidden" }}>
+      {Array.from({ length: строк }, (_, и) => (
+        <div key={и} style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 999, background: T.surfaceHi, flex: "none" }} />
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ width: `${46 + ((и * 17) % 30)}%`, height: 13, borderRadius: 999, background: T.surfaceHi }} />
+            <div style={{ width: `${28 + ((и * 23) % 26)}%`, height: 10, borderRadius: 999, background: T.surface }} />
+          </div>
+          <div style={{ width: 64, height: 16, borderRadius: 999, background: T.surfaceHi, flex: "none" }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+/* Весь сайт, пока проверяется вход: размытые панель слева, лента
+   сверху и три колонки — те же очертания, что встают первыми из
+   index.html, так что подмена не видна. */
+function РазмытыйСайт() {
+  const плашка = (стиль) => <div style={{ position: "absolute", background: "rgba(150,150,160,0.16)", borderRadius: 22, ...стиль }} />;
+  return (
+    <div aria-busy className="размытие-пк" style={{ position: "absolute", inset: 0, filter: "blur(16px)" }}>
+      {плашка({ left: 0, right: 0, top: 0, height: 42, borderRadius: 0 })}
+      {плашка({ left: 0, top: 0, bottom: 0, width: 248, borderRadius: 0 })}
+      {плашка({ left: 300, right: 56, top: 90, height: 120 })}
+      {плашка({ left: 300, width: "calc((100% - 404px) / 3)", top: 240, bottom: 40 })}
+      {плашка({ left: "calc(326px + (100% - 404px) / 3)", width: "calc((100% - 404px) / 3)", top: 240, bottom: 40 })}
+      {плашка({ right: 56, width: "calc((100% - 404px) / 3)", top: 240, bottom: 40 })}
+    </div>
+  );
+}
+/* Целая страница в загрузке на сайте: шапка и пара карточек. */
+function РазмытаяСтраница() {
+  return (
+    <div aria-busy className="размытие-пк" style={{ display: "flex", flexDirection: "column", gap: 18, padding: "18px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 56, height: 56, borderRadius: 999, background: T.surfaceHi }} />
+        <div style={{ width: 220, height: 22, borderRadius: 999, background: T.surfaceHi }} />
+      </div>
+      <div style={{ height: 260, borderRadius: 22, background: T.surface }} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+        <div style={{ height: 150, borderRadius: 22, background: T.surface }} />
+        <div style={{ height: 150, borderRadius: 22, background: T.surface }} />
+      </div>
+      <РазмытаяЗаглушка высота={240} />
+    </div>
+  );
+}
+
 function ПлашкаБлока({ h, radius = 20 }) {
   return <ЗагрузкаБлока высота={h} />;
 }
@@ -14650,6 +14714,7 @@ function ПлашкаБлока({ h, radius = 20 }) {
    мерцающих заглушек больше нет нигде: пока данные едут, на их месте
    один знак, размером по высоте места. */
 function ЗагрузкаБлока({ высота = 120, size = null }) {
+  if (этоПК()) return <РазмытаяЗаглушка высота={высота} />;
   const знак = size || Math.max(28, Math.min(96, Math.round(высота * 0.5)));
   return (
     <div aria-busy className="flex items-center justify-center" style={{ width: "100%", height: высота }}>
@@ -20936,7 +21001,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               эффект с chartReload), и человек видит одну загрузку до конца. */}
           {!chartReady ? (
             <div className="flex items-center justify-center" style={{ height: 360 }}>
-              <ЗнакЗагрузки size={128} вид="контур" />
+              <ЗнакЗагрузки size={128} вид="контур" всегда />
             </div>
           ) : (
             <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} onОкно={chartMode === "price" ? setОкноГрафика : null} фиксШкалы={фиксШкалы} />
@@ -22726,7 +22791,7 @@ function TokenLaunchOverlay({ open, form, category, logoUrl, buyAmount, stepInde
                   <div className="flex flex-col items-center" style={{ width: 26, flexShrink: 0 }}>
                     <div style={{ width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: state === "done" ? hexA(T.up, 0.16) : "transparent", border: state === "pending" ? `1.5px solid ${T.lineHi}` : "none", transition: `background ${EASE}` }}>
                       {state === "done" ? <Check size={15} color={T.up} strokeWidth={3} />
-                        : state === "active" ? <ЗнакЗагрузки size={22} />
+                        : state === "active" ? <ЗнакЗагрузки size={22} всегда />
                         : null}
                     </div>
                     {!последний && (
@@ -25382,7 +25447,7 @@ function ИндикаторПроверки({ ждём = false, свободно
     : свободно ? <Check size={size} strokeWidth={3} />
     // Пока база думает — тот же знак-загрузчик, что и в остальном
     // приложении: контур бежит линией и заливается.
-    : <ЗнакЗагрузки size={size + 3} вид="контур" />;
+    : <ЗнакЗагрузки size={size + 3} вид="контур" всегда />;
   if (!жмётся) return <span aria-hidden style={общий}>{начинка}</span>;
   return (
     <button
@@ -25484,7 +25549,15 @@ function ЗнакЗвезда({ size = 64 }) {
 /* Загрузчик — сам знак приложения, двумя способами по очереди в разных
    местах, чтобы ожидание не выглядело одним и тем же колёсиком везде.
    Остановлен — знак просто стоит: ждать больше нечего. */
-function ЗнакЗагрузки({ size = 40, вид = "контур", остановлен = false, цвет = "#E4E2DC" }) {
+function ЗнакЗагрузки({ size = 40, вид = "контур", остановлен = false, цвет = "#E4E2DC", всегда = false }) {
+  /* На сайте знаков загрузки нет: на месте того, что грузится, стоят
+     размытые очертания будущего содержимого. Знак остался только там,
+     где он сам — ответ на действие (проверка, отправка, запуск) и у
+     графика. */
+  if (этоПК() && !всегда) {
+    if (size < 40) return <span aria-busy className="размытие-пк" style={{ display: "inline-block", width: Math.round(size * 2.2), height: Math.max(10, Math.round(size * 0.6)), borderRadius: 999, background: T.surfaceHi, verticalAlign: "middle" }} />;
+    return <div style={{ width: "100%", alignSelf: "stretch" }}><РазмытаяЗаглушка высота={Math.round(size * 1.5)} /></div>;
+  }
   if (вид === "раскрытие") {
     return (
       <svg width={size} height={size} viewBox={ВИД_ЗВЕЗДЫ} aria-hidden style={{ display: "block", overflow: "visible", flex: "none" }}>
@@ -25547,6 +25620,8 @@ function useМинимумЗагрузки(готово) {
 function ЭкранЗагрузкиЗнака() {
   const видна = React.useContext(ВкладкаВидна);
   if (!видна) return null;
+  // На сайте — без чёрного экрана: размытая страница прямо на месте.
+  if (этоПК()) return <РазмытаяСтраница />;
   // Порталом в документ: внутри вкладки, которая въезжает transform'ом,
   // «fixed» отсчитывался от неё, и знак сначала стоял выше, а после
   // анимации прыгал на место.
@@ -25697,15 +25772,17 @@ function ЗагрузкаВхода() {
     const id = setTimeout(() => setДолго(true), 6000);
     return () => clearTimeout(id);
   }, []);
+  const пк = этоПК();
   return (
     <div
       aria-hidden={!долго}
       style={{
         position: "absolute", inset: 0, zIndex: 200, visibility: "visible",
-        background: ОНБ.фон, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22,
+        // На сайте вместо чёрного поля — размытие всего, что под ним.
+        background: пк ? T.bg : ОНБ.фон, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22,
       }}
     >
-      <ЗнакЗагрузки size={88} вид="раскрытие" />
+      {пк ? <РазмытыйСайт /> : <ЗнакЗагрузки size={88} вид="раскрытие" />}
       {долго && (
         <button
           onClick={() => window.location.reload()}
@@ -27703,7 +27780,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   {/* Запускаем, только когда база ответила «свободно»: до
                       ответа создание само себя остановило бы. */}
                   {никГоден && <ОдинРаз действие={создать} />}
-                  <ЗнакЗагрузки size={88} />
+                  <ЗнакЗагрузки size={88} всегда />
                   <span style={{ fontFamily: bodyFont, color: ОНБ.приглушённый, fontSize: 14 }}>Создаём @{ник} из X…</span>
                 </div>
               ) : внутриTelegram && !входБезНика && xЗаготовка && (
