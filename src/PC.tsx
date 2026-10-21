@@ -13,8 +13,7 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
-import { профильЕсть, войтиФантомом } from "./DesktopAuth";
-import { запомнитьСтраницу } from "./oauthВозврат";
+import { профильЕсть } from "./DesktopAuth";
 import TonLaunchApp from "./App";
 import { апи } from "./апи";
 
@@ -27,152 +26,6 @@ const Ц = СВЕТЛАЯ
   ? { фон: "#FFFFFF", поверхность: "#F5F5F5", выше: "#EEEEEE", линия: "rgba(0,0,0,0.08)", лёд: "#000000", тусклый: "#6E6E73", вниз: "#E11D2A", наЛьду: "#FFFFFF" }
   : { фон: "#000000", поверхность: "#141416", выше: "#1C1C1F", линия: "rgba(255,255,255,0.08)", лёд: "#F2F2F0", тусклый: "#8E8E93", вниз: "#FF4D5E", наЛьду: "#0B0B0F" };
 const ШРИФТ = "'MintlyUI', 'Jost', system-ui, sans-serif";
-
-function Кнопка({ children, onClick, disabled = false, главная = false }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        width: "100%", height: 52, borderRadius: 14, border: "none", cursor: disabled ? "default" : "pointer",
-        background: главная ? Ц.лёд : Ц.выше, color: главная ? Ц.наЛьду : Ц.лёд,
-        fontFamily: ШРИФТ, fontSize: 16, fontWeight: 800, opacity: disabled ? 0.5 : 1,
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ВходПК({ вОкне = false }) {
-  const [способ, setСпособ] = useState(null); // null | "почта"
-  const [почта, setПочта] = useState("");
-  const [код, setКод] = useState("");
-  const [шаг, setШаг] = useState("адрес"); // адрес | код
-  const [идёт, setИдёт] = useState(false);
-  const [беда, setБеда] = useState("");
-  const виджет = useRef(null);
-  // Заставку из index.html убирает само приложение; до него при входе
-  // дело не доходит, поэтому снимаем её здесь.
-  useEffect(() => { const ш = document.getElementById("ширма"); if (ш) ш.remove(); }, []);
-
-  /* Кнопка Telegram. Виджет рисует её сам в своём окне и отдаёт данные
-     в onTelegramAuth — сервер сверяет подпись и открывает сессию того же
-     аккаунта, что в мини-приложении. */
-  useEffect(() => {
-    window.onTelegramAuth = async (данные) => {
-      setБеда("");
-      setИдёт(true);
-      try {
-        const r = await fetch(апи("/api/telegram-auth?action=widget"), {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(данные),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) {
-          throw new Error(j.error === "no_account" ? "Аккаунта ещё нет — создай его в Telegram, потом войди здесь" : "Не получилось войти через Telegram. Попробуй ещё раз");
-        }
-        const { error } = await supabase.auth.verifyOtp({ token_hash: j.token_hash, type: "magiclink" });
-        if (error) throw new Error("Не получилось войти. Попробуй ещё раз");
-      } catch (e) {
-        setБеда(String((e && e.message) || e));
-      } finally {
-        setИдёт(false);
-      }
-    };
-    const место = виджет.current;
-    if (место && !место.firstChild) {
-      const с = document.createElement("script");
-      с.async = true;
-      с.src = "https://telegram.org/js/telegram-widget.js?22";
-      с.setAttribute("data-telegram-login", БОТ);
-      с.setAttribute("data-size", "large");
-      с.setAttribute("data-radius", "14");
-      с.setAttribute("data-onauth", "onTelegramAuth(user)");
-      с.setAttribute("data-request-access", "write");
-      место.appendChild(с);
-    }
-    return () => { delete window.onTelegramAuth; };
-  }, []);
-
-  async function прислатьКод() {
-    setБеда("");
-    setИдёт(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({ email: почта.trim().toLowerCase(), options: { shouldCreateUser: false } });
-      if (error) throw error;
-      setШаг("код");
-    } catch (e) {
-      const т = String((e && e.message) || "");
-      setБеда(/signups not allowed|not found|user/i.test(т) ? "Такой почты нет ни у одного аккаунта. Привяжи её в приложении: Настройки → Безопасность → Почта для 2ФА"
-        : /rate|seconds/i.test(т) ? "Слишком часто. Подожди минуту и попробуй снова" : "Письмо не ушло. Попробуй ещё раз");
-    } finally {
-      setИдёт(false);
-    }
-  }
-  async function войтиКодом() {
-    setБеда("");
-    setИдёт(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({ email: почта.trim().toLowerCase(), token: код.trim(), type: "email" });
-      if (error) throw error;
-    } catch {
-      setБеда("Код не подошёл или устарел. Запроси новый");
-    } finally {
-      setИдёт(false);
-    }
-  }
-  async function google() {
-    setБеда("");
-    запомнитьСтраницу();
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname } });
-    if (error) setБеда("Не получилось открыть вход Google");
-  }
-  async function фантом() {
-    setБеда("");
-    setИдёт(true);
-    try { await войтиФантомом(); } catch (e) { setБеда(String((e && e.message) || "Не получилось войти через Phantom")); } finally { setИдёт(false); }
-  }
-
-  const поле = {
-    width: "100%", height: 52, padding: "0 16px", borderRadius: 14, boxSizing: "border-box", outline: "none",
-    background: Ц.выше, border: `1px solid ${Ц.линия}`, color: Ц.лёд, fontFamily: ШРИФТ, fontSize: 16,
-  };
-  return (
-    <div style={вОкне ? { fontFamily: ШРИФТ } : { minHeight: "100vh", background: Ц.фон, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: ШРИФТ }}>
-      <div style={{ width: "100%", maxWidth: 420, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ textAlign: "center", marginBottom: 10 }}>
-          <div style={{ fontSize: 40, fontWeight: 900, color: Ц.лёд, letterSpacing: "-0.03em" }}>Mintly</div>
-          <div style={{ fontSize: 15, color: Ц.тусклый, marginTop: 6 }}>Войди в тот же аккаунт, что в Telegram</div>
-        </div>
-        <div ref={виджет} style={{ display: "flex", justifyContent: "center", minHeight: 48 }} />
-        {способ !== "почта" ? (
-          <Кнопка onClick={() => setСпособ("почта")} disabled={идёт}>Войти кодом с почты</Кнопка>
-        ) : шаг === "адрес" ? (
-          <>
-            <input id="pc-mail" value={почта} onChange={(e) => setПочта(e.target.value)} placeholder="Почта из приложения" type="email" style={поле} />
-            <Кнопка главная onClick={прислатьКод} disabled={идёт || !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(почта.trim())}>{идёт ? "Отправляем…" : "Прислать код"}</Кнопка>
-          </>
-        ) : (
-          <>
-            <div style={{ color: Ц.тусклый, fontSize: 14, textAlign: "center" }}>Код отправлен на {почта.trim()}</div>
-            <input id="pc-code" value={код} onChange={(e) => setКод(e.target.value.replace(/\D/g, "").slice(0, 8))} placeholder="Код из письма" inputMode="numeric" style={{ ...поле, textAlign: "center", letterSpacing: "0.3em", fontSize: 20 }} />
-            <Кнопка главная onClick={войтиКодом} disabled={идёт || код.length < 6}>{идёт ? "Проверяем…" : "Войти"}</Кнопка>
-          </>
-        )}
-        <div style={{ display: "flex", gap: 10 }}>
-          <Кнопка onClick={google} disabled={идёт}>Google</Кнопка>
-          <Кнопка onClick={фантом} disabled={идёт}>Phantom</Кнопка>
-        </div>
-        {беда && <div style={{ color: Ц.вниз, fontSize: 14, textAlign: "center", lineHeight: 1.45 }}>{беда}</div>}
-        <div style={{ color: Ц.тусклый, fontSize: 13.5, textAlign: "center", marginTop: 6 }}>
-          Аккаунт создаётся в приложении Mintly
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 /* Приветствие — первое, что видит гость на мониторе.
  *
@@ -190,6 +43,8 @@ const СТИЛЬ_ПРИВЕТСТВИЯ = `
 @keyframes прив-крутись { to { transform: rotate(360deg) } }
 @keyframes прив-галка { from { transform: scale(.3); opacity: 0 } to { transform: none; opacity: 1 } }
 @keyframes прив-удар { 0% { transform: translateY(0) scale(1,1) } 45% { transform: translateY(14px) scale(1,1) } 52% { transform: translateY(16px) scale(1.18,.72) } 62% { transform: translateY(10px) scale(.94,1.08) } 100% { transform: translateY(0) scale(1,1) } }
+@keyframes прив-строка { from { opacity: 0; transform: translate3d(0,-18px,0) } to { opacity: 1; transform: none } }
+@keyframes прив-пульс { 0%,100% { opacity: 1; transform: scale(1) } 50% { opacity: .45; transform: scale(.8) } }
 @keyframes прив-блик { 0% { left: -70% } 55%,100% { left: 130% } }
 .прив-появись { opacity: 0; transform: translate3d(0, 40px, 0); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1) }
 .прив-появись.слева { transform: translate3d(-160px, 0, 0); transition-duration: 1.2s }
@@ -533,7 +388,10 @@ function КартаDEX() {
       onPointerLeave={() => { if (!старт.current) setНаклон({ x: 0, y: 0 }); }}>
       {/* Перспектива — у прямого родителя карты: на деде она не
           действовала, и поворот выглядел плоским сжатием. */}
-      <div style={{ animation: "прив-плыть 6s ease-in-out infinite", perspective: 1100 }}>
+      {/* Без плавания: слой с текстом, который сдвигается на доли
+          пикселя каждый кадр, браузер рисовал неровно — буквы и знак
+          выглядели сжатыми. */}
+      <div style={{ perspective: 1100 }}>
         <div style={{
           width: 420, height: 264, position: "relative", transformStyle: "preserve-3d",
           transform: `rotateX(${наклон.x}deg) rotateY(${наклон.y}deg)`,
@@ -553,22 +411,106 @@ function КартаDEX() {
             position: "absolute", inset: 0, borderRadius: 24, padding: 26, boxSizing: "border-box", overflow: "hidden",
             background: "linear-gradient(135deg,#8E8E93 0%,#3A3A3E 38%,#D9D9DE 62%,#4A4A4F 100%)",
             boxShadow: "0 0 0 1px rgba(255,255,255,.18) inset, 0 1px 0 rgba(255,255,255,.35) inset",
-            transform: "translateZ(0.5px)",
+            backfaceVisibility: "hidden", WebkitFontSmoothing: "antialiased",
           }}>
             <div style={{ position: "absolute", top: 0, bottom: 0, width: "60%", background: "linear-gradient(105deg,transparent 0%,rgba(255,255,255,.45) 50%,transparent 100%)", animation: "прив-блик 4.5s ease-in-out infinite" }} />
             <div style={{ display: "flex", justifyContent: "space-between", position: "relative" }}>
-              <Звезда size={34} цвет="#FFFFFF" />
+              <div style={{ flexShrink: 0 }}><Звезда size={34} цвет="#FFFFFF" /></div>
               <div style={{ textAlign: "right", color: "#fff" }}>
                 <div style={{ fontWeight: 800, fontSize: 15 }}>Mintly</div>
                 <div style={{ fontSize: 10, letterSpacing: ".18em", opacity: .8, marginTop: 4 }}>LIMITED · DEX</div>
               </div>
             </div>
             <div style={{ position: "absolute", left: 26, bottom: 24, color: "#fff" }}>
-              <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em" }}>$MINT</div>
+              <div style={{ fontSize: 34, fontWeight: 800 }}>$MINT</div>
               <div style={{ fontSize: 13, opacity: .8 }}>Mintly</div>
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* Лента сделок — живая, видна без входа.
+ *
+ * Сделки площадки отдаёт /api/trades-feed (тикер, сумма, время — без
+ * людей). Пока их мало, ленту добирают сделки демо-токена из /api/live:
+ * их каждые 0,3 с разыгрывает сервер, и они помечены «демо», чтобы не
+ * выдавать их за настоящие. Новая строка въезжает сверху. */
+const ВИДНО_СДЕЛОК = 8;
+const МОНЕТА_СЕТИ = { solana: "SOL", ton: "GRAM", bsc: "BNB", base: "ETH", eth: "ETH" };
+function числоРу(n, знаков = 2) {
+  return Number(n || 0).toLocaleString("ru-RU", { maximumFractionDigits: знаков, minimumFractionDigits: 0 });
+}
+function давно(мс) {
+  const с = Math.max(0, Math.round((Date.now() - мс) / 1000));
+  return с < 3 ? "сейчас" : с < 60 ? `${с} с` : с < 3600 ? `${Math.floor(с / 60)} мин` : `${Math.floor(с / 3600)} ч`;
+}
+function ЛентаСделок() {
+  const [настоящие, setНастоящие] = useState([]);
+  const [демо, setДемо] = useState([]);
+  const [, тик] = useState(0);
+  const [реф, в] = useВКадре(0.2);
+  useEffect(() => {
+    if (!в) return undefined;
+    let жив = true;
+    const площадка = async () => {
+      try {
+        const j = await fetch(апи("/api/trades-feed?limit=12")).then((r) => r.json());
+        if (жив && j && Array.isArray(j.rows)) setНастоящие(j.rows.filter((r) => r.ticker && r.amount > 0).map((r) => ({
+          id: `р${r.id}`, сторона: r.kind, тикер: r.ticker, лого: r.logoUrl, сумма: r.amount, монета: МОНЕТА_СЕТИ[r.chain] || "GRAM",
+          usd: r.usd, at: new Date(r.at).getTime(),
+        })));
+      } catch { /* лента подождёт следующего круга */ }
+    };
+    const живые = async () => {
+      try {
+        const j = await fetch(апи("/api/live?demo=1")).then((r) => r.json());
+        const список = j && j.trades ? Object.values(j.trades)[0] : null;
+        if (жив && Array.isArray(список)) setДемо(список.slice(0, ВИДНО_СДЕЛОК).map((r) => ({
+          id: `д${r.id}`, сторона: r.side, тикер: "DEMO", лого: null, сумма: r.coin, монета: "GRAM", usd: 0, at: r.at, демо: true,
+        })));
+      } catch { /* лента подождёт следующего круга */ }
+    };
+    площадка(); живые();
+    const и1 = setInterval(площадка, 4000), и2 = setInterval(живые, 900), и3 = setInterval(() => тик((x) => x + 1), 1000);
+    return () => { жив = false; clearInterval(и1); clearInterval(и2); clearInterval(и3); };
+  }, [в]);
+  // Настоящие сделки — всегда сверху: демо, идущее каждые 0,3 с, иначе
+  // вытесняло бы их из ленты за секунду.
+  const строки = [...[...настоящие].sort((a, b) => b.at - a.at), ...демо].slice(0, ВИДНО_СДЕЛОК);
+  return (
+    <div ref={реф} className="прив-виджет" style={{ width: 460, borderRadius: 24, background: Ц.поверхность, border: `1px solid ${Ц.линия}`, boxShadow: "0 30px 90px rgba(0,0,0,.45)", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: `1px solid ${Ц.линия}` }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: Ц.лёд }}>Сделки Mintly</div>
+        <div className="прив-т" style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: Ц.тусклый, fontWeight: 600 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 999, background: "#2EE87A", animation: "прив-пульс 1.6s ease-in-out infinite" }} />в эфире
+        </div>
+      </div>
+      <div style={{ height: ВИДНО_СДЕЛОК * 62, overflow: "hidden" }}>
+        {строки.map((с) => {
+          const покупка = с.сторона !== "sell";
+          return (
+            <div key={с.id} style={{ height: 62, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 13, padding: "0 22px", borderBottom: `1px solid ${Ц.линия}`, animation: "прив-строка .45s cubic-bezier(.2,.8,.2,1) both" }}>
+              {с.лого
+                ? <img src={с.лого} alt="" width={36} height={36} style={{ borderRadius: 999, objectFit: "cover", flexShrink: 0 }} />
+                : <div style={{ width: 36, height: 36, borderRadius: 999, background: Ц.выше, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: Ц.лёд, flexShrink: 0 }}>{с.тикер[0]}</div>}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: Ц.лёд }}>${с.тикер}</span>
+                  {с.демо && <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".08em", color: Ц.тусклый, border: `1px solid ${Ц.линия}`, borderRadius: 6, padding: "1px 5px" }}>ДЕМО</span>}
+                </div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: покупка ? "#2EE87A" : Ц.вниз, marginTop: 2 }}>{покупка ? "Покупка" : "Продажа"}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 14.5, fontWeight: 800, color: Ц.лёд, fontVariantNumeric: "tabular-nums" }}>{числоРу(с.сумма)} {с.монета}</div>
+                <div className="прив-т" style={{ fontSize: 12, color: Ц.тусклый, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{с.usd > 0 ? `$${числоРу(с.usd)} · ` : ""}{давно(с.at)}</div>
+              </div>
+            </div>
+          );
+        })}
+        {!строки.length && <div className="прив-т" style={{ padding: "40px 22px", textAlign: "center", color: Ц.тусклый, fontSize: 14 }}>Ждём первую сделку…</div>}
       </div>
     </div>
   );
@@ -754,24 +696,19 @@ function СтрелкаВниз({ onClick, видна = true }) {
   );
 }
 
-function Приветствие() {
+/* Разделы шапки — те же, что в приложении. Открыть любой можно только
+   с аккаунтом: приложение само встречает гостя своим окном регистрации и
+   входа, а после него открывает тот раздел, на который нажали. */
+function Приветствие({ onРаздел }) {
   const готово = useГотовоПриветствие();
-  const [окно, setОкно] = useState(false);
+  const setОкно = () => onРаздел("home");
   const [прокручено, setПрокручено] = useState(false);
   useEffect(() => {
     const н = () => setПрокручено(window.scrollY > 20);
     window.addEventListener("scroll", н, { passive: true });
     return () => window.removeEventListener("scroll", н);
   }, []);
-  useEffect(() => {
-    if (!окно) return;
-    const к = (e) => { if (e.key === "Escape") setОкно(false); };
-    window.addEventListener("keydown", к);
-    return () => window.removeEventListener("keydown", к);
-  }, [окно]);
-  const кМемпаду = () => document.getElementById("сети")?.scrollIntoView({ behavior: "smooth" });
-  // Остальные разделы — личные: без входа в них нечего показать.
-  const МЕНЮ = [["Мемпад", кМемпаду], ["Создать", () => setОкно(true)], ["Кошелёк", () => setОкно(true)], ["Профиль", () => setОкно(true)]];
+  const МЕНЮ = [["Мемпад", "mempad"], ["Создать", "create"], ["Кошелёк", "wallet"], ["Профиль", "profile"]].map(([имя, р]) => [имя, () => onРаздел(р)]);
   const кнопкаГлавная = { height: 48, padding: "0 26px", borderRadius: 14, border: "none", cursor: "pointer", background: Ц.лёд, color: Ц.наЛьду, fontFamily: ШРИФТ, fontSize: 16, fontWeight: 800 };
 
   if (!готово) return null;
@@ -824,11 +761,15 @@ function Приветствие() {
         текст={<><Строки верх="Все сети" низ="в одном месте" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Gram, Solana, BNB Chain, Base и Ethereum — живая лента запусков всех сетей.</p></>}
         картинка={<СценаСетей />} />
 
-      <Раздел id="комиссия"
+      <Раздел id="сделки"
+        текст={<><Строки верх="Сделки" низ="прямо сейчас" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Каждая покупка и продажа на площадке — в ленте в тот же миг.</p></>}
+        картинка={<ЛентаСделок />} />
+
+      <Раздел id="комиссия" обратно
         текст={<Строки верх="Комиссия" низ="0%" размер={80} />}
         картинка={<Комиссия />} />
 
-      <Раздел id="покупка" обратно
+      <Раздел id="покупка"
         текст={<><Строки верх="Покупка" низ="за секунду" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Сумма, одно нажатие — и токены в кошельке. Свечи графика двигаются вместе со сделками.</p></>}
         картинка={<СценаПокупки />} />
 
@@ -849,27 +790,36 @@ function Приветствие() {
         </Появись>
       </section>
 
-      {окно && (
-        <div onClick={() => setОкно(false)} style={{
-          position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center",
-          background: СВЕТЛАЯ ? "rgba(255,255,255,.55)" : "rgba(0,0,0,.6)", backdropFilter: "blur(18px)", animation: "прив-фон .25s ease both",
-        }}>
-          <div onClick={(e) => e.stopPropagation()} style={{
-            width: 480, maxWidth: "calc(100vw - 32px)", padding: "36px 30px 28px", boxSizing: "border-box", borderRadius: 26, position: "relative",
-            background: Ц.поверхность, border: `1px solid ${Ц.линия}`, boxShadow: "0 40px 120px rgba(0,0,0,.5)", animation: "прив-окно .35s cubic-bezier(.2,.8,.2,1) both",
-          }}>
-            <button onClick={() => setОкно(false)} aria-label="Закрыть" style={{ position: "absolute", top: 14, right: 14, width: 34, height: 34, borderRadius: 999, border: "none", background: Ц.выше, color: Ц.тусклый, cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
-            <ВходПК вОкне />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
+/* Возврат с X. Сервер кладёт в адрес либо одноразовый вход в аккаунт,
+   к которому X уже привязан (x_token), либо заготовку регистрации (x) —
+   её подхватывает окно регистрации приложения. Адрес сразу чистим:
+   ссылка с входом не должна остаться в истории. */
+function разобратьВозвратX() {
+  const п = new URLSearchParams(window.location.search);
+  const итог = { токен: п.get("x_token"), заготовка: п.get("x"), беда: п.get("x_error") };
+  if (итог.токен || итог.заготовка || итог.беда) {
+    ["x_token", "x", "x_error"].forEach((к) => п.delete(к));
+    const хвост = п.toString();
+    window.history.replaceState(null, "", window.location.pathname + (хвост ? `?${хвост}` : "") + window.location.hash);
+  }
+  if (итог.заготовка) { try { sessionStorage.setItem("mintly_x_web", итог.заготовка); } catch (e) { /* приватный режим */ } }
+  return итог;
+}
+const ВОЗВРАТ_X = typeof window !== "undefined" ? разобратьВозвратX() : {};
+
 export default function PC() {
   // null — ещё проверяем; false — нужен вход; true — можно в приложение.
   const [вошёл, setВошёл] = useState(null);
+  // Раздел, который гость открыл из шапки, — с ним показывается приложение.
+  const [раздел, setРаздел] = useState(ВОЗВРАТ_X.заготовка || ВОЗВРАТ_X.беда ? "home" : null);
+  useEffect(() => {
+    if (!ВОЗВРАТ_X.токен) return;
+    supabase.auth.verifyOtp({ token_hash: ВОЗВРАТ_X.токен, type: "magiclink" }).catch(() => {});
+  }, []);
   useEffect(() => {
     let жив = true;
     const проверить = async () => {
@@ -882,6 +832,10 @@ export default function PC() {
     return () => { жив = false; подписка && подписка.subscription && подписка.subscription.unsubscribe(); };
   }, []);
   if (вошёл === null) return <div style={{ position: "fixed", inset: 0, background: Ц.фон }} />;
-  if (!вошёл) return <Приветствие />;
-  return <TonLaunchApp />;
+  if (!вошёл && !раздел) return <Приветствие onРаздел={(р) => { window.__ПК_РАЗДЕЛ = р; setРаздел(р); }} />;
+  return (
+    <>
+      <TonLaunchApp />
+    </>
+  );
 }

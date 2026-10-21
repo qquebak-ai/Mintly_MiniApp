@@ -24873,6 +24873,27 @@ async function signInWithTelegram(nickname, email) {
   if (error) throw error;
 }
 
+/* Регистрация на сайте: аккаунт заводит сервер (telegram-auth,
+   web-signup) и отвечает одноразовым входом — тем же token_hash, что
+   у входа через Telegram. */
+async function зарегистрироватьсяНаСайте(nickname, email, password, xСоль) {
+  const res = await fetch(апи("/api/telegram-auth?action=web-signup"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nickname, ...(xСоль ? { x: xСоль } : { email, password }) }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(json.error === "x_taken" ? "email_taken" : (json.error || `auth_failed_${res.status}`));
+    err.detail = json.detail || "";
+    throw err;
+  }
+  markSignedOut(false);
+  markSeenSession();
+  const { error } = await supabase.auth.verifyOtp({ token_hash: json.token_hash, type: "magiclink" });
+  if (error) throw error;
+}
+
 // Есть ли у вошедшего профиль. Нет — значит аккаунт ещё не заведён, и
 // человека ждёт экран с ником. Строка без ника — тоже «нет»: её заводит
 // сама база в момент появления пользователя, ещё до того как человек
@@ -25011,14 +25032,15 @@ async function черновикПочты() {
    после нажатия кнопки. */
 async function проверитьДоступность(поля) {
   const initData = telegramInitData();
-  if (!initData) return {};
+  // На сайте Telegram нет — сервер проверяет и без него (web: true).
+  if (!initData && !этоПК()) return {};
   const обрыв = new AbortController();
   const таймер = setTimeout(() => обрыв.abort(), 6000);
   try {
     const res = await fetch(апи("/api/telegram-auth?action=available"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ initData, check: поля }),
+      body: JSON.stringify(initData ? { initData, check: поля } : { web: true, check: поля }),
       signal: обрыв.signal,
     });
     if (!res.ok) return {};
@@ -26328,6 +26350,13 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     setXИдёт(true);
     haptic("light");
     try {
+      if (!telegramInitData() && этоПК()) {
+        const r = await fetch(апи("/api/twitter?action=web-start"));
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.url) throw new Error(j.error || `http ${r.status}`);
+        window.location.href = j.url;
+        return;
+      }
       const r = await fetch(апи("/api/twitter?action=signup-start"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ initData: telegramInitData() }),
@@ -26368,6 +26397,31 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     document.addEventListener("visibilitychange", вернулся);
     return () => document.removeEventListener("visibilitychange", вернулся);
   }, [xЖдёмВозврата]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!open || isEdit || telegramInitData() || !этоПК()) return undefined;
+    let id = "";
+    try { id = sessionStorage.getItem("mintly_x_web") || ""; } catch (e) { /* приватный режим */ }
+    if (!id) return undefined;
+    let живо = true;
+    (async () => {
+      try {
+        const r = await fetch(апи(`/api/twitter?action=web-data&id=${encodeURIComponent(id)}`));
+        const j = await r.json().catch(() => ({}));
+        if (!живо) return;
+        try { sessionStorage.removeItem("mintly_x_web"); } catch (e) { /* приватный режим */ }
+        if (!j || !j.handle) { setXБеда("Вход через X устарел — нажми «Создать через X» ещё раз"); return; }
+        setXЗаготовка({ ...j, сайт: id });
+        setTgNick(String(j.handle).replace(/[^A-Za-z0-9_.]/g, "").slice(0, 20));
+        setTgNickTouched(true);
+        const фото = j.profile && j.profile.avatar;
+        if (фото && !/default_profile/.test(фото)) setAvatarUrl(фото);
+        haptic("success");
+        // Окно на открытии само ставит шаг «почта» — переходим после него.
+        setTimeout(() => { if (живо) сменитьШагВхода("ник"); }, 250);
+      } catch (e) { /* сеть не ответила — человек пройдёт обычные шаги */ }
+    })();
+    return () => { живо = false; };
+  }, [open, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
   // Смена ника в режиме правки профиля.
   const [nickEditing, setNickEditing] = useState(false);
   const [newNick, setNewNick] = useState("");
@@ -26472,7 +26526,12 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
      всё остальное на экране только отвлекало бы. Режим редактирования
      профиля остаётся прежней формой (ник, описание, аватарка). */
   if (!isEdit) {
-    const внутриTelegram = !!telegramInitData();
+    /* На сайте для компьютера Telegram нет, но регистрация та же: шаги,
+       поля и анимации одни, создаёт аккаунт сервер (web-signup). Поэтому
+       сайт для окна — тоже «можно создавать»; ждать ответа Telegram о
+       заведённом аккаунте там не от кого. */
+    const настоящийTelegram = !!telegramInitData();
+    const внутриTelegram = настоящийTelegram || этоПК();
     const ник = tgNick.trim();
     /* Четыре состояния имени: не по правилам / проверяем / занято /
        свободно. Зелёное — только на «свободно», то есть после ответа
@@ -26486,7 +26545,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
     const никГоден = никФормат && !никПроверяется && !никНеСвободен;
     // Из X пришёл свободный ник — аккаунт создаётся сам, без поля и кнопки.
     const автоX = внутриTelegram && шагВхода === "ник" && !!xЗаготовка && !xЗаготовка.taken && никФормат && !никНеСвободен && !tgError;
-    const ждём = внутриTelegram && естьАккаунт == null;
+    const ждём = настоящийTelegram && естьАккаунт == null;
     const почтаЧистая = почтаВвод.trim().toLowerCase();
     const почтаПохожа = ПОЧТА_RE.test(почтаЧистая);
     // Кнопка загорается на любом похожем адресе, а про службу говорим
@@ -26559,7 +26618,8 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           setTgBusy(false);
           return;
         }
-        await signInWithTelegram(входБезНика ? "" : ник, входБезНика ? "" : почтаЧистая);
+        if (настоящийTelegram) await signInWithTelegram(входБезНика ? "" : ник, входБезНика ? "" : почтаЧистая);
+        else await зарегистрироватьсяНаСайте(ник, почтаЧистая, парольВвод, xЗаготовка && xЗаготовка.сайт);
         // Вошедшему второй ключ предлагать незачем — он уже выбирал.
         if (входБезНика) {
           /* Вход прошёл, но профиль мог не появиться или остаться без
@@ -26584,7 +26644,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         /* Пароль ставим сразу после создания: до него нет сессии. Им
            потом входят по почте. Сбой связи — пробуем ещё раз: без пароля
            войти можно только через Telegram. */
-        if (парольВвод) {
+        if (парольВвод && настоящийTelegram) {
           for (let попытка = 0; попытка < 3; попытка++) {
             const { error: пErr } = await supabase.auth.updateUser({ password: парольВвод });
             if (!пErr) break;
@@ -26609,7 +26669,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         /* Почта с первого шага привязывается к аккаунту здесь же, но
            письмо не уходит: код человек запросит сам, плашкой на главной.
            Так «аккаунт готов» не зависит от чужого почтового сервера. */
-        if (почтаЧистая) {
+        if (почтаЧистая && настоящийTelegram) {
           try { await запомнитьПочту(почтаЧистая); setПочтаБеда(""); }
           catch (e) { setПочтаБеда(человечнаяОшибка(e)); }
           /* Тот же адрес кладём в профиль: следующий, кто наберёт его на
@@ -26622,7 +26682,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         }
         /* Создавали через X — привязываем X к новому аккаунту; фото и
            описание из X сервер ставит сам, если своих не выбрали. */
-        if (xЗаготовка) {
+        if (xЗаготовка && настоящийTelegram) {
           try {
             const { data } = await supabase.auth.getSession();
             const токен = data && data.session && data.session.access_token;
@@ -27127,7 +27187,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                     background: "transparent", color: ОНБ.текст, fontFamily: displayFont, fontSize: 15.5, fontWeight: 700,
                   }}
                 >
-                  <ЗнакX size={16} color={ОНБ.текст} /> {xИдёт ? "Открываем X…" : "Создать через X"}
+                  <ЗнакX size={16} color={ОНБ.текст} /> {xИдёт ? "Открываем X…" : (!telegramInitData() && этоПК() ? "Войти или создать через X" : "Создать через X")}
                 </button>
               )}
               {xБеда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{xБеда}</span>}
@@ -31092,6 +31152,15 @@ function mapTokenRow(row) {
   // убран, поэтому tab не трогаем — подсветка остаётся на том разделе,
   // откуда пришли, и «назад» возвращает туда же.
   function openCreate() { setView("create"); }
+  /* Сайт: гость нажал раздел в шапке приветствия — открываем его сразу,
+     окно регистрации встанет поверх и после себя оставит этот раздел. */
+  useEffect(() => {
+    if (!этоПК()) return;
+    const р = window.__ПК_РАЗДЕЛ;
+    window.__ПК_РАЗДЕЛ = null;
+    if (р === "create") openCreate();
+    else if (р && р !== "home") goTab(р);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Черновик из чата. Бот кладёт его в базу и приводит человека сюда
      ссылкой t.me/<бот>/<приложение>?startapp=draft_<id>. Открываем

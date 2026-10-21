@@ -110,6 +110,37 @@ function разобратьStateЗаписи(state) {
   return { tg: String(tg), verifier: подписьState(`v.${соль}`) };
 }
 
+/* Вход и регистрация через X на сайте. Telegram там нет, поэтому кто
+   начал вход, проверяется только подписью state (как у «su.»): в ней
+   срок и случайная соль, из соли же выводится PKCE-verifier. По
+   возвращении из X сервер сам решает: X уже привязан к аккаунту —
+   выдаёт вход в него; нет — кладёт заготовку под соль, и сайт открывает
+   регистрацию с ником, фото и описанием из X. */
+const САЙТ = String(process.env.SITE_URL || "https://www.mintly.company").replace(/\/+$/, "");
+function состояниеСайта() {
+  const срок = Date.now() + ЖИЗНЬ_STATE_МС;
+  const соль = crypto.randomBytes(12).toString("base64url");
+  const тело = `${срок}.${соль}`;
+  return { state: `wb.${тело}.${подписьState(тело)}`, verifier: подписьState(`w.${соль}`) };
+}
+function разобратьStateСайта(state) {
+  const ч = String(state || "").split(".");
+  if (ч.length !== 4 || ч[0] !== "wb") return null;
+  const [, срок, соль, подпись] = ч;
+  const ждём = подписьState(`${срок}.${соль}`);
+  if (подпись.length !== ждём.length || !crypto.timingSafeEqual(Buffer.from(подпись), Buffer.from(ждём))) return null;
+  if (Date.now() > Number(срок)) return { устарел: true };
+  return { соль, verifier: подписьState(`w.${соль}`) };
+}
+/* Заготовка X для регистрации на сайте — её забирает telegram-auth
+   (действие web-signup), когда человек выбрал ник. */
+export function заготовкаСайта(соль, забрать = false) {
+  const з = ЗАГОТОВКИ_X.get(`web:${соль}`);
+  if (!з || Date.now() - з.ts > ЖИЗНЬ_ЗАГОТОВКИ_МС) return null;
+  if (забрать) ЗАГОТОВКИ_X.delete(`web:${соль}`);
+  return з;
+}
+
 async function telegramИз(тело) {
   const { verifyInitData } = await import("./telegram-auth.js");
   const итог = verifyInitData(String((тело && тело.initData) || ""));
@@ -125,6 +156,14 @@ async function колбэкX(req, res, db) {
      регистрацию и решал, что всё сломалось. Мини-приложение же осталось
      открытым в Telegram и само переспросит X, когда в него вернутся. */
   const запись = String(state || "").startsWith("su.");
+  const сайт = String(state || "").startsWith("wb.");
+  // С сайта — не страница «вернитесь в Telegram», а сразу обратно на сайт.
+  const наСайт = (параметры) => {
+    res.statusCode = 302;
+    res.setHeader("Location", `${САЙТ}/?${new URLSearchParams(параметры)}`);
+    res.setHeader("Cache-Control", "no-store");
+    res.end();
+  };
   const назад = (статус, причина = "") => {
     const удача = статус === "ok";
     if (!удача) console.warn("[twitter] вход X не прошёл:", причина);
@@ -151,11 +190,16 @@ ${удача || !подробно ? "" : `<p style="font-size:12px;color:#5E5D59
 <script>setTimeout(function(){location.href="tg://resolve?domain=${бот}"},600)</script>
 </body></html>`);
   };
+  if (сайт && (xОтказ || !code)) return наСайт({ x_error: xОтказ ? "denied" : "no_code" });
   if (xОтказ) return назад("error", `X отказал: ${xОтказ}`);
   if (!code || !state) return назад("error", "X не вернул код входа");
   try {
     let строка = null;
-    if (запись) {
+    if (сайт) {
+      const р = разобратьStateСайта(state);
+      if (!р || р.устарел) return наСайт({ x_error: "state" });
+      строка = { code_verifier: р.verifier, сайт: р.соль };
+    } else if (запись) {
       const р = разобратьStateЗаписи(state);
       if (!р) return назад("error", "запрос входа не сходится — нажмите «Через X» ещё раз");
       if (р.устарел) return назад("error", "запрос входа устарел");
@@ -200,6 +244,22 @@ ${удача || !подробно ? "" : `<p style="font-size:12px;color:#5E5D59
     const handle = профиль && профиль.data && профиль.data.username;
     if (!профильОтвет.ok || !имяОк(handle)) {
       return назад("error", `профиль X: ${профильОтвет.status} ${(профиль && (профиль.title || профиль.detail)) || ""}`);
+    }
+
+    if (строка.сайт) {
+      // X уже привязан к аккаунту — входим в него.
+      const { data: свой } = await db.from("profiles").select("id").ilike("x_handle", handle)
+        .not("nickname", "is", null).neq("nickname", "").limit(1);
+      if (свой && свой.length) {
+        const { data: кто } = await db.auth.admin.getUserById(свой[0].id);
+        const адрес = кто && кто.user && кто.user.email;
+        if (!адрес) return наСайт({ x_error: "user" });
+        const { data: ссылка, error: ошибка } = await db.auth.admin.generateLink({ type: "magiclink", email: адрес });
+        if (ошибка || !ссылка || !ссылка.properties) return наСайт({ x_error: "link" });
+        return наСайт({ x_token: ссылка.properties.hashed_token });
+      }
+      ЗАГОТОВКИ_X.set(`web:${строка.сайт}`, { handle, xid: профиль.data.id, профиль: await профильX(handle), ts: Date.now() });
+      return наСайт({ x: строка.сайт });
     }
 
     // Аккаунта ещё нет — откладываем X до его создания.
@@ -353,6 +413,27 @@ export default async function handler(req, res) {
     if (!data || !data.length) return res.status(404).json({ error: "not_linked" });
     res.setHeader("Cache-Control", "public, max-age=300");
     return res.status(200).json({ handle: data[0].x_handle, profile: await профильX(data[0].x_handle) });
+  }
+
+  // Вход через X с сайта: без Telegram, только подписанный state.
+  if (действие === "web-start") {
+    res.setHeader("Cache-Control", "no-store");
+    if (!X_CLIENT_ID || !СЕКРЕТ_STATE) return res.status(503).json({ error: "x_oauth_disabled" });
+    const { state, verifier } = состояниеСайта();
+    const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
+    const параметры = new URLSearchParams({
+      response_type: "code", client_id: X_CLIENT_ID, redirect_uri: X_REDIRECT_URI,
+      scope: "users.read tweet.read", state, code_challenge: challenge, code_challenge_method: "S256",
+    });
+    return res.status(200).json({ url: `https://twitter.com/i/oauth2/authorize?${параметры}` });
+  }
+  if (действие === "web-data") {
+    res.setHeader("Cache-Control", "no-store");
+    const соль = String((req.query && req.query.id) || "");
+    const з = /^[A-Za-z0-9_-]{8,40}$/.test(соль) ? заготовкаСайта(соль) : null;
+    if (!з) return res.status(200).json({ handle: null });
+    const { data: занят } = await db.from("profiles").select("id").ilike("nickname", з.handle).limit(1);
+    return res.status(200).json({ handle: з.handle, profile: з.профиль, taken: !!(занят && занят.length) });
   }
 
   // Вход через X до создания аккаунта: кто это — по подписи Telegram.

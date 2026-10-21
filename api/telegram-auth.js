@@ -289,17 +289,20 @@ const экранировать = (строка) => строка.replace(/[%_\\]/
 
 async function проверитьДоступность(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
-  if (!BOT_TOKEN || !SUPABASE_URL || !SERVICE_ROLE_KEY) return res.status(500).json({ error: "server_not_configured" });
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return res.status(500).json({ error: "server_not_configured" });
   let body;
   try {
     body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
   } catch (err) {
     return fail(res, 400, "bad_body", err && err.message);
   }
-  if (typeof body.initData !== "string" || body.initData.length > MAX_INIT_DATA_LEN) {
+  /* С сайта Telegram нет — там регистрация та же, и проверка «занято ли»
+     нужна та же; держим её только счётчиком по сети. */
+  const сСайта = body.web === true && !body.initData;
+  if (!сСайта && (typeof body.initData !== "string" || body.initData.length > MAX_INIT_DATA_LEN)) {
     return fail(res, 400, "bad_init_data", "missing or oversized initData");
   }
-  const checked = verifyInitData(body.initData);
+  const checked = сСайта ? { user: { id: `web:${clientKey(req)}` } } : verifyInitData(body.initData);
   if (!checked.user) return fail(res, 401, "invalid_init_data", checked.reason);
   if (checkLimited(`chk:${checked.user.id}`) || checkLimited(`chkip:${clientKey(req)}`)) {
     res.setHeader("Retry-After", "30");
@@ -450,6 +453,7 @@ export default async function handler(req, res) {
   if (действие === "available") return проверитьДоступность(req, res);
   if (действие === "password") return входПаролем(req, res);
   if (действие === "widget") return входВиджетом(req, res);
+  if (действие === "web-signup") return регистрацияНаСайте(req, res);
 
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -920,4 +924,84 @@ async function завестиПрофиль(req, res) {
     return fail(res, 500, "profile_failed", insertErr.message);
   }
   return res.status(200).json({ created: true, nickname });
+}
+
+/* Регистрация на сайте — те же шаги, что в приложении (почта, пароль,
+ * ник или X вместо почты), только без Telegram: аккаунт заводит сервер,
+ * а в ответ уходит одноразовый вход (token_hash), как у остальных дверей.
+ *
+ * Почта, как и в приложении, письмом здесь не подтверждается — это
+ * второй ключ, код на неё человек запросит сам. С X вместо почты адрес
+ * учётки служебный (x<id>@x.mintly.local): по нему потом не войти,
+ * входят снова через X. */
+async function регистрацияНаСайте(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return res.status(500).json({ error: "server_not_configured" });
+  if (rateLimited(`websu:${clientKey(req)}`)) { res.setHeader("Retry-After", "300"); return res.status(429).json({ error: "too_many_requests" }); }
+  let body;
+  try { body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {}); }
+  catch (err) { return fail(res, 400, "bad_body", err && err.message); }
+
+  const nickname = wantedNickname(body);
+  if (!nickname) return res.status(400).json({ error: "nickname_required" });
+  const почта = String(body.email || "").trim().toLowerCase();
+  const пароль = String(body.password || "");
+  const xСоль = String(body.x || "");
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+
+  let x = null;
+  if (xСоль) {
+    const { заготовкаСайта } = await import("./twitter.js");
+    x = /^[A-Za-z0-9_-]{8,40}$/.test(xСоль) ? заготовкаСайта(xСоль) : null;
+    if (!x) return res.status(410).json({ error: "x_expired" });
+  } else {
+    if (почта.length > 254 || !/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(почта)) return res.status(400).json({ error: "bad_email" });
+    if (пароль.length < 6 || пароль.length > 128) return res.status(400).json({ error: "bad_password" });
+  }
+  if ((await nicknameTaken(admin, nickname)) === true) return res.status(409).json({ error: "nickname_taken" });
+  if (почта) {
+    const { data: занята } = await admin.from("profiles").select("id").ilike("email", экранировать(почта))
+      .not("nickname", "is", null).neq("nickname", "").limit(1);
+    if (занята && занята.length) return res.status(409).json({ error: "email_taken" });
+  }
+
+  const адрес = x ? `x${x.xid}@x.mintly.local` : почта;
+  const { data: создан, error: создатьErr } = await admin.auth.admin.createUser({
+    email: адрес, email_confirm: true, ...(x ? {} : { password: пароль }),
+    user_metadata: { nickname, source: "web" },
+  });
+  if (создатьErr || !создан || !создан.user) {
+    if (/registered|exists|duplicate/i.test((создатьErr && создатьErr.message) || "")) return res.status(409).json({ error: x ? "x_taken" : "email_taken" });
+    return fail(res, 500, "create_user_failed", создатьErr && создатьErr.message);
+  }
+  const userId = создан.user.id;
+  const профиль = {
+    id: userId, nickname, email: почта || null, bio: "", emoji: null,
+    avatar_url: (x && x.профиль && x.профиль.avatar && !/default_profile/.test(x.профиль.avatar)) ? x.профиль.avatar : null,
+  };
+  if (x) {
+    профиль.x_handle = x.handle;
+    профиль.x_verified_at = new Date().toISOString();
+    if (x.профиль && x.профиль.description) профиль.bio = String(x.профиль.description).slice(0, 200);
+    // Один X — один профиль: у прежнего владельца привязку снимаем.
+    await admin.from("profiles").update({ x_handle: null, x_verified_at: null }).ilike("x_handle", x.handle).neq("id", userId);
+  }
+  let { error: профErr } = await admin.from("profiles").upsert(профиль, { onConflict: "id" });
+  /* База сама заводит пустую строку под нового пользователя, а ник в ней
+     запирает триггер lock_nickname — как и выше, убираем заготовку и
+     кладём профиль заново. */
+  if (профErr && /immutable/i.test(профErr.message || "")) {
+    await admin.from("profiles").delete().eq("id", userId).or("nickname.is.null,nickname.eq.");
+    ({ error: профErr } = await admin.from("profiles").insert(профиль));
+  }
+  if (профErr) {
+    try { await admin.auth.admin.deleteUser(userId); } catch (e) { /* останется пустая учётка без профиля */ }
+    if (/duplicate|unique/i.test(профErr.message || "")) return res.status(409).json({ error: /email/i.test(профErr.message) ? "email_taken" : "nickname_taken" });
+    return fail(res, 500, "profile_failed", профErr.message);
+  }
+  if (x) { const { заготовкаСайта } = await import("./twitter.js"); заготовкаСайта(xСоль, true); }
+
+  const { data: ссылка, error: ссылкаErr } = await admin.auth.admin.generateLink({ type: "magiclink", email: адрес });
+  if (ссылкаErr || !ссылка || !ссылка.properties) return fail(res, 500, "link_failed", ссылкаErr && ссылкаErr.message);
+  return res.status(200).json({ token_hash: ссылка.properties.hashed_token });
 }
