@@ -109,13 +109,16 @@ function drawSilk(t) {
 
 // ===================== 1. ЗНАК И СЛОВО → ПЛАШКА → ЧИПЫ =====================
 const s1 = $(`<div class="scene"></div>`); root.appendChild(s1);
-const logo1 = $(`<div class="abs" style="left:0;top:0;width:150px;height:150px;filter:drop-shadow(0 0 18px rgba(228,228,228,.8))">${star(150, "#F4F6FF")}</div>`); s1.appendChild(logo1);
+// Знак и слово — крупно и дольше: это первое, что видит зритель, и
+// раньше логотип мелькал на долю секунды мелким.
+const ЛОГО = 240;
+const logo1 = $(`<div class="abs" style="left:0;top:0;width:${ЛОГО}px;height:${ЛОГО}px;filter:drop-shadow(0 0 24px rgba(228,228,228,.8))">${star(ЛОГО, "#F4F6FF")}</div>`); s1.appendChild(logo1);
 const WORD = "Mintly";
-const word1 = $(`<div class="abs" style="left:0;top:0;font:800 118px/1.1 'Nunito';letter-spacing:-.02em;white-space:nowrap;filter:drop-shadow(0 0 18px rgba(188,188,188,.55))">${[...WORD].map((c) => `<span class="ch grad">${c}</span>`).join("")}</div>`); s1.appendChild(word1);
+const word1 = $(`<div class="abs" style="left:0;top:0;font:800 190px/1.1 'Nunito';letter-spacing:-.02em;white-space:nowrap;filter:drop-shadow(0 0 18px rgba(188,188,188,.55))">${[...WORD].map((c) => `<span class="ch grad">${c}</span>`).join("")}</div>`); s1.appendChild(word1);
 const pill = $(`<div class="abs" style="left:0;top:0;height:96px;border-radius:30px;background:#fff;box-shadow:0 0 40px rgba(238,238,238,.95),0 0 110px rgba(167,167,167,.6)"></div>`); s1.appendChild(pill);
-// Панель разделов — та же капсула, что внизу приложения: пять круглых
-// кнопок, выбранная залита белым.
-const CHIPS = ["home", "swap", "rocket", "bag", "bars"];
+// Панель разделов — та же капсула, что внизу приложения: четыре круглых
+// кнопки (главная, мемпад, запуск, кошелёк), выбранная залита белым.
+const CHIPS = ["home", "swap", "rocket", "bars"];
 const КН = 132, ЗАЗОР_КН = 18, ПОЛЕ_КН = 20;
 const row = $(`<div class="abs" style="left:0;top:0;width:${W}px;height:${КН}px"></div>`); s1.appendChild(row);
 const capsule = $(`<div class="abs" style="left:0;top:${-ПОЛЕ_КН}px;height:${КН + ПОЛЕ_КН * 2}px;border-radius:999px;background:rgba(0,0,0,.22);backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);box-shadow:0 10px 30px rgba(0,0,0,.32)"></div>`); row.appendChild(capsule);
@@ -140,40 +143,40 @@ function drawS1(t) {
   const ух = E.io(prog(t, 2.45, 2.8));
   s1.style.opacity = 1 - ух; s1.style.filter = ух > 0.01 ? `blur(${(ух * 10).toFixed(1)}px)` : "none";
   // знак: проявляется в центре вращением, затем уходит влево к слову
-  const kIn = E.out(prog(t, 0.08, 0.4)), kL = E.io(prog(t, 0.38, 0.66)), kOut = prog(t, 1.12, 1.3);
-  const lx = lerp(W / 2, 700, kL) - 75, ly = H / 2 - 75;
+  const kIn = E.out(prog(t, 0.08, 0.4)), kL = E.io(prog(t, 0.38, 0.66)), kOut = prog(t, 1.27, 1.42);
+  const lx = lerp(W / 2, 640, kL) - ЛОГО / 2, ly = H / 2 - ЛОГО / 2;
   S(logo1, { o: kIn * (1 - kOut), x: lx, y: ly, s: lerp(0.35, 1, kIn) * (1 - 0.2 * kOut), r: lerp(-120, 0, kIn), b: (1 - kIn) * 14 + kOut * 10 });
   // слово по буквам: из размытия, со сдвигом вправо
-  const wx = 810, wy = H / 2 - 58;
+  const wx = 790, wy = H / 2 - 104;
   S(word1, { o: 1, x: wx, y: wy, b: 0 });
   [...word1.children].forEach((ch, i) => {
     const a = 0.56 + i * 0.05, k = E.out(prog(t, a, a + 0.28));
-    S(ch, { o: k * (1 - prog(t, 1.16, 1.26)), x: (1 - k) * 46, b: (1 - k) * 12 + prog(t, 1.12, 1.26) * 8 });
+    S(ch, { o: k * (1 - prog(t, 1.31, 1.41)), x: (1 - k) * 60, b: (1 - k) * 12 + prog(t, 1.27, 1.41) * 8 });
   });
   // плашка: вырастает на месте слова, растягивается и рассыпается на чипы
-  const kP = E.out(prog(t, 1.12, 1.27)), kSt = E.io(prog(t, 1.27, 1.42)), kPo = prog(t, 1.36, 1.46);
+  const kP = E.out(prog(t, 1.27, 1.39)), kSt = E.io(prog(t, 1.39, 1.5)), kPo = prog(t, 1.46, 1.54);
   const pw = lerp(lerp(60, 380, kP), 1440, kSt), ph = lerp(110, 96, kSt);
   pill.style.width = pw + "px"; pill.style.height = ph + "px";
-  S(pill, { o: (t >= 1.12 ? kP : 0) * (1 - kPo), x: lerp(wx + 170, W / 2, kSt) - pw / 2, y: H / 2 - ph / 2, b: kSt * 6 });
+  S(pill, { o: (t >= 1.27 ? kP : 0) * (1 - kPo), x: lerp(wx + 280, W / 2, kSt) - pw / 2, y: H / 2 - ph / 2, b: kSt * 6 });
   // чипы: из середины разъезжаются с отдачей и горизонтальным смазом
   row.style.transform = `translate3d(0,${H / 2 - КН / 2}px,0)`;
-  const kC = prog(t, 1.36, 1.8);
+  const kC = prog(t, 1.46, 1.84);
   // капсула растёт из плашки до ширины всех кнопок
-  const kCap = E.back(kC), full = chipX[4] + КН - chipX[0] + ПОЛЕ_КН * 2;
+  const kCap = E.back(kC), full = chipX[chips.length - 1] + КН - chipX[0] + ПОЛЕ_КН * 2;
   const cw = lerp(Math.min(full, 380), full, kCap);
   capsule.style.width = cw + "px";
-  S(capsule, { o: E.out(prog(t, 1.34, 1.46)), x: W / 2 - cw / 2 });
+  S(capsule, { o: E.out(prog(t, 1.44, 1.54)), x: W / 2 - cw / 2 });
   chips.forEach((c, i) => {
     const kk = E.back(kC), from = W / 2 - chipW[i] / 2;
     const x = lerp(from, chipX[i], kk);
-    const o = E.out(prog(t, 1.36, 1.5));
+    const o = E.out(prog(t, 1.46, 1.58));
     let s = 1, glow = 0;
     if (i === ЦЕЛЬ) {
       const press = prog(t, 2.14, 2.22) - prog(t, 2.24, 2.36);
       s = 1 - 0.07 * clamp(press);
       glow = E.out(prog(t, 2.16, 2.32));
     }
-    S(c, { o, x, s, b: (1 - E.out(prog(t, 1.36, 1.62))) * 9 });
+    S(c, { o, x, s, b: (1 - E.out(prog(t, 1.46, 1.68))) * 9 });
     // выбранная кнопка — белый круг: сначала «Главная», после нажатия «Запуск»
     const актив = i === ЦЕЛЬ ? glow : (i === 0 ? 1 - E.out(prog(t, 2.16, 2.32)) : 0);
     c.style.background = `rgba(255,255,255,${актив.toFixed(3)})`;
