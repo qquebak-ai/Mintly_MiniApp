@@ -4,7 +4,7 @@
 # добивают кадры, упавшие по памяти/таймауту, затем сборка.
 cd "$(dirname "$0")"
 for pass in 1 2 3 4 5 6; do
-  seq 0 30 1649 | xargs -P 2 -I{} sh -c '
+  seq 0 30 1649 | xargs -P 4 -I{} sh -c '
     need=0; e=$(({}+30)); [ $e -gt 1650 ] && e=1650
     f={}; while [ $f -lt $e ]; do [ -f frames/f$(printf %04d $f).jpg ] || need=1; f=$((f+1)); done
     [ $need -eq 1 ] && node render.mjs frames {},$e || true'

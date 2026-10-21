@@ -199,10 +199,9 @@ const подпись = (y, txt) => `<div class="abs" style="left:16px;top:${y}px
 const form = $(`<div class="abs" style="left:0;top:0;width:393px;height:540px;transform-origin:0 0">
   <div class="fbg abs" style="inset:-14px -0px;border-radius:40px;background:#0B0D12;box-shadow:0 0 0 1px rgba(255,255,255,.06),0 40px 100px rgba(0,0,0,.6)"></div>
   <div class="fui abs" style="inset:0">
-    <div class="abs" style="left:16px;top:14px;width:168px;height:38px;border-radius:999px;background:#14171F">
-      <div class="abs" style="left:3px;top:3px;width:81px;height:32px;border-radius:999px;background:rgba(255,255,255,.92)"></div>
-      <div class="abs" style="left:3px;top:0;width:81px;height:38px;display:flex;align-items:center;justify-content:center;font:800 13.5px/1 'Nunito';color:#0B0B0F">GRAM</div>
-      <div class="abs" style="left:84px;top:0;width:81px;height:38px;display:flex;align-items:center;justify-content:center;font:600 13.5px/1 'Onest';color:#63625F">SOL</div>
+    <div class="abs" style="left:16px;top:14px;height:40px;padding:0 14px 0 10px;border-radius:999px;background:#14171F;border:1px solid #22262F;display:flex;align-items:center;gap:8px">
+      <img src="assets/app/gram.png" style="width:20px;height:20px"/><span style="font:800 15px/1 'Nunito';color:#F2F0EB">Gram</span>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#97958F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
     </div>
     ${подпись(80, "Логотип")}
     <div class="abs" style="left:16px;top:102px;width:76px;height:76px;border-radius:50%;border:1.5px dashed #30343E;overflow:hidden">
@@ -427,7 +426,7 @@ const С_ОТ = ДЛИ.map((_, i) => ДЛИ.slice(0, i).reduce((a, b) => a + b, 
 // окна покупки больше нет — после последнего слайда сразу знак
 const ВСЕ_СЛАЙДЫ = [
   slide("Запуск токена<br>*за *секунды"),
-  slide("Gram и Solana<br>*в *одном *месте"),
+  slide("Все сети<br>*в *одном *месте"),
   slide("Комиссия *0%"),
   slide("Покупка<br>*за *секунду"),
   slide("Прямо<br>*в *Telegram"),
@@ -589,6 +588,18 @@ const сПолем = (y, ph, cls, h = 52) => `<div class="abs" style="left:20px;
   <span class="ph" style="color:#63625F">${ph}</span><span class="${cls}" style="color:#F2F0EB;white-space:pre"></span></div>`;
 // перенос строки — пустая буква во всю ширину поля: следующая уходит вниз
 const буквы = (el, txt) => { el.innerHTML = [...txt].map((c) => c === "\n" ? `<span class="ch" style="width:100%;height:0"></span>` : `<span class="ch">${c}</span>`).join(""); return [...el.children]; };
+/* Выбор сети — как теперь в приложении: тёмная пилюля со значком сети,
+   названием и стрелкой вниз; по нажатию раскрывается список всех пяти
+   сетей. Прежний переключатель GRAM/SOL остался в прошлом. */
+const СЕТИ_РОЛИКА = [["gram.png", "Gram"], ["sol.png", "Solana"], ["bnb.svg", "BNB Chain"], ["base.svg", "Base"], ["eth.svg", "Ethereum"]];
+const выборСети = (h, имя = "Gram", значок = "gram.png") => `<div class="выбор abs" style="left:0;top:0;height:${h}px;padding:0 ${h * 0.36}px 0 ${h * 0.24}px;border-radius:999px;background:#14171F;border:1px solid #22262F;display:flex;align-items:center;gap:${h * 0.2}px;white-space:nowrap">
+  <span class="выбор-зн" style="display:flex;width:${h * 0.5}px;height:${h * 0.5}px"><img src="assets/app/${значок}" style="width:100%;height:100%;border-radius:50%"/></span>
+  <span class="выбор-имя" style="font:800 ${h * 0.38}px/1 'Nunito';color:#F2F0EB">${имя}</span>
+  <svg width="${h * 0.32}" height="${h * 0.32}" viewBox="0 0 24 24" fill="none" stroke="#97958F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+</div>`;
+const списокСетей = (ш, выбрана = 0) => `<div class="сети abs" style="width:${ш}px;padding:${ш * 0.03}px;border-radius:${ш * 0.07}px;background:#101216;border:1px solid #22262F;box-shadow:0 30px 80px rgba(0,0,0,.6)">
+  ${СЕТИ_РОЛИКА.map(([зн, имя], i) => `<div class="сеть сеть-${i}" style="display:flex;align-items:center;gap:${ш * 0.05}px;padding:${ш * 0.045}px ${ш * 0.05}px;border-radius:${ш * 0.045}px;background:${i === выбрана ? "#1A1D24" : "transparent"};font:600 ${ш * 0.06}px/1 'Onest';color:#F2F0EB"><img src="assets/app/${зн}" style="width:${ш * 0.075}px;height:${ш * 0.075}px;border-radius:50%"/><span style="flex:1">${имя}</span><span class="галка" style="opacity:${i === выбрана ? 1 : 0}">✓</span></div>`).join("")}
+</div>`;
 const переключательСети = (w, h) => `<div class="abs" style="left:0;top:0;width:${w}px;height:${h}px;border-radius:999px;background:#14171F">
   <div class="бег abs" style="left:${h * 0.08}px;top:${h * 0.08}px;width:${w / 2 - h * 0.08}px;height:${h * 0.84}px;border-radius:999px;background:rgba(255,255,255,.92)"></div>
   <div class="сг abs" style="left:0;top:0;width:${w / 2}px;height:${h}px;display:flex;align-items:center;justify-content:center;gap:${h * 0.14}px;font:800 ${h * 0.36}px/1 'Nunito'"><img src="assets/app/gram.png" style="width:${h * 0.42}px;height:${h * 0.42}px"/>GRAM</div>
@@ -599,8 +610,8 @@ const переключательСети = (w, h) => `<div class="abs" style="le
 // запуск идёт по-настоящему 2,8 с, плашка ждёт вместе с ним
 const ЗАПУСК_С = 2.8, ЗАПУСК_ОТ = 1.6;
 const тф1 = телефон(0, `
-  <div class="abs" style="left:20px;top:70px;font:800 28px/1 'Nunito';color:#fff">Создать токен</div>
-  <div class="abs" style="left:20px;top:118px;width:180px;height:42px">${переключательСети(180, 42)}</div>
+  <div class="abs" style="left:20px;top:70px;font:800 30px/1 'Nunito';color:#fff">Запуск</div>
+  <div class="abs" style="left:20px;top:118px;height:42px">${выборСети(42)}</div>
   ${сПодписью(186, "Логотип")}
   <div class="abs" style="left:20px;top:210px;width:84px;height:84px;border-radius:50%;border:1.5px dashed #30343E;overflow:hidden"><img class="лого" src="assets/coins/mintly.png" style="width:100%;height:100%;opacity:0"/></div>
   <div class="abs" style="left:116px;top:210px;width:257px;height:84px;border-radius:18px;border:1.5px dashed #30343E;display:flex;align-items:center;justify-content:center;font:400 13px/1 'Onest';color:#97958F">Баннер (необязательно)</div>
@@ -611,9 +622,8 @@ const тф1 = телефон(0, `
     <div class="пол abs" style="left:0;top:0;bottom:0;width:0;background:#CECECE"></div>
     <div class="кнт abs" style="inset:0;display:flex;align-items:center;justify-content:center;font:800 18px/1 'Nunito';color:#2A2C31">Запустить токен</div>
   </div>`);
-тф1.querySelector(".сг").style.color = "#0B0B0F"; тф1.querySelector(".сс").style.color = "#63625F";
 const тф1Имя = буквы(тф1.querySelector(".имя"), "Mintly"), тф1Тик = буквы(тф1.querySelector(".тикер"), "MINT");
-const тф1Опис = буквы(тф1.querySelector(".опис"), "Мемкоины на Gram и Solana\nпрямо в Telegram");
+const тф1Опис = буквы(тф1.querySelector(".опис"), "Мемкоины на всех сетях\nпрямо в Telegram");
 const тф1Пх = [...тф1.querySelectorAll(".ph")];
 const тф1Кн = тф1.querySelector(".кн"), тф1Пол = тф1.querySelector(".пол"), тф1Кнт = тф1.querySelector(".кнт"), тф1Лого = тф1.querySelector(".лого");
 const пл1 = плашка(0, 800, 820, ["Запускаем…", "Токен запущен"], "$MINT · Gram");
@@ -644,12 +654,15 @@ const МП_W = 700;
 const МП_X = 1040, МП_Y = 190;
 const мемпад = виджет(1, МП_X, МП_Y, МП_W, `
   <div style="padding:32px 30px 34px">
-    <div class="abs" style="left:30px;top:32px;width:340px;height:76px">${переключательСети(340, 76)}</div>
-    <div style="display:flex;gap:26px;padding:104px 4px 24px;font:600 22px/1 'Onest';color:#63625F;white-space:nowrap">
-      <span style="color:#F2F0EB">Новые</span><span>Трендовые</span><span>Скоро на бирже</span><span>По обороту</span></div>
+    <div class="abs" style="left:30px;top:32px;height:72px">${выборСети(72)}</div>
+    <div style="display:flex;gap:12px;padding:104px 0 24px;font:600 22px/1 'Onest';color:#F2F0EB;white-space:nowrap">
+      <span style="padding:13px 24px;border-radius:999px;background:#F2F0EB;color:#0B0B0F;font-weight:700">Новые</span><span style="padding:13px 24px;border-radius:999px;border:1px solid #2A2E37">Трендовые</span><span style="padding:13px 24px;border-radius:999px;border:1px solid #2A2E37">Скоро на бирже</span></div>
     <div class="мпряды" style="position:relative;height:320px;overflow:hidden"></div>
   </div>`);
-const бег = мемпад.querySelector(".бег"), сг = мемпад.querySelector(".сг"), сс = мемпад.querySelector(".сс");
+const мпВыбор = мемпад.querySelector(".выбор"), мпИмя = мемпад.querySelector(".выбор-имя"), мпЗнак = мемпад.querySelector(".выбор-зн img");
+// раскрытый список сетей — под пилюлей, поверх строк
+const мпСписок = $(списокСетей(420)); мемпад.firstElementChild.appendChild(мпСписок);
+S(мпСписок, { o: 0 }); мпСписок.style.left = "30px"; мпСписок.style.top = "116px"; мпСписок.style.zIndex = 5; мпСписок.style.transformOrigin = "0 0";
 const мпРяды = мемпад.querySelector(".мпряды");
 // [аватар, имя, цена, знаков после точки, изменение за сутки]
 const ряд = ([lg, имя, цена, зн, изм], j) => {
@@ -679,13 +692,21 @@ const мпПалец = палец(1);
 function слайдСети(p) {
   const q = p / ДЛ;
   появление(мемпад, p, "падение", ВИД_K);
-  // палец дважды жмёт переключатель: на SOL и обратно на GRAM
-  const k = E.io(prog(q, 0.26, 0.4)) - E.io(prog(q, 0.62, 0.76));
-  const цx = МП_X + (30 + lerp(255, 85, smooth(prog(q, 0.42, 0.56)))) * ВИД_K, цy = МП_Y + 50 * ВИД_K;
-  const kc = E.out(prog(q, 0.12, 0.24)), pr = clamp(prog(q, 0.24, 0.27) - prog(q, 0.29, 0.33)) + clamp(prog(q, 0.58, 0.61) - prog(q, 0.63, 0.67));
-  S(мпПалец, { o: smooth(prog(q, 0.12, 0.17)) * (1 - smooth(prog(q, 0.8, 0.88))), x: lerp(цx + 220, цx, kc) - 14, y: lerp(цy + 380, цy, kc), s: 1 - 0.12 * pr });
-  бег.style.transform = `translateX(${(164 * k).toFixed(1)}px)`;
-  сг.style.color = k < 0.5 ? "#0B0B0F" : "#63625F"; сс.style.color = k >= 0.5 ? "#0B0B0F" : "#63625F";
+  // палец жмёт выбор сети, раскрывается список всех пяти сетей, палец
+  // выбирает Solana — список закрывается, и лента меняется на её токены
+  const откр = smooth(prog(q, 0.27, 0.34)) * (1 - smooth(prog(q, 0.56, 0.62)));
+  const k = smooth(prog(q, 0.55, 0.64));
+  const кПилюле = [МП_X + 110 * ВИД_K, МП_Y + 68 * ВИД_K], кСолане = [МП_X + 150 * ВИД_K, МП_Y + (116 + 12 + 25 + 62) * ВИД_K];
+  const путь = smooth(prog(q, 0.36, 0.48));
+  const цx = lerp(кПилюле[0], кСолане[0], путь), цy = lerp(кПилюле[1], кСолане[1], путь);
+  const kc = E.out(prog(q, 0.12, 0.24)), pr = clamp(prog(q, 0.24, 0.27) - prog(q, 0.29, 0.33)) + clamp(prog(q, 0.5, 0.53) - prog(q, 0.55, 0.59));
+  S(мпПалец, { o: smooth(prog(q, 0.12, 0.17)) * (1 - smooth(prog(q, 0.72, 0.82))), x: lerp(цx + 220, цx, kc) - 14, y: lerp(цy + 380, цy, kc), s: 1 - 0.12 * pr });
+  мпВыбор.style.transform = `scale(${(1 - 0.05 * clamp(prog(q, 0.24, 0.27) - prog(q, 0.29, 0.33))).toFixed(3)})`;
+  S(мпСписок, { o: откр, y: (1 - откр) * -16, s: 0.96 + 0.04 * откр });
+  мпСписок.querySelector(".сеть-1").style.background = q > 0.5 ? "#1A1D24" : "transparent";
+  мпСписок.querySelector(".сеть-0").style.background = q > 0.5 ? "transparent" : "#1A1D24";
+  мпСписок.querySelector(".сеть-0 .галка").style.opacity = q > 0.53 ? 0 : 1; мпСписок.querySelector(".сеть-1 .галка").style.opacity = q > 0.53 ? 1 : 0;
+  мпИмя.textContent = k > 0.5 ? "Solana" : "Gram"; мпЗнак.src = `assets/app/${k > 0.5 ? "sol.png" : "gram.png"}`;
   const вход = smooth(prog(q, 0.08, 0.22));
   рядыСети(МП_ТОН, вход * (1 - k), k > 0.5 ? -1 : 1, p);
   рядыСети(МП_СОЛ, k, k > 0.5 ? 1 : -1, p);
@@ -778,8 +799,8 @@ const тф5 = телефон(4, `
   <div class="abs" style="left:20px;top:20px;font:700 17px/1 'Onest';color:#F2F0EB">9:41</div>
   <div class="abs" style="left:18px;top:62px;font:400 34px/1 'Onest';color:#AEAEAE">‹</div>
   <div class="abs" style="left:56px;top:58px;width:48px;height:48px;border-radius:50%;background:#0F0F13;display:flex;align-items:center;justify-content:center">${star(30, "#E4E2DC")}</div>
-  <div class="abs" style="left:116px;top:62px"><div style="font:700 19px/1.1 'Onest';color:#fff">Mintly</div><div style="font:400 15px/1.5 'Onest';color:#929292">мемкоины на Gram и Solana</div></div>
-  <div class="сооб abs" style="left:14px;top:168px;width:300px;border-radius:20px 20px 20px 6px;background:#262626;padding:16px 18px;font:400 18px/1.4 'Onest';color:#F2F0EB">Запускай и покупай мемкоины прямо здесь — Gram и Solana в одном приложении.<div style="text-align:right;font-size:13px;color:#7E7E7E;margin-top:4px">9:41</div></div>
+  <div class="abs" style="left:116px;top:62px"><div style="font:700 19px/1.1 'Onest';color:#fff">Mintly</div><div style="font:400 15px/1.5 'Onest';color:#929292">мемкоины на всех сетях</div></div>
+  <div class="сооб abs" style="left:14px;top:168px;width:300px;border-radius:20px 20px 20px 6px;background:#262626;padding:16px 18px;font:400 18px/1.4 'Onest';color:#F2F0EB">Запускай и покупай мемкоины прямо здесь — Gram, Solana, BNB, Base и Ethereum в одном приложении.<div style="text-align:right;font-size:13px;color:#7E7E7E;margin-top:4px">9:41</div></div>
   <div class="ткн abs" style="left:14px;top:330px;width:300px;height:52px;border-radius:14px;background:#525252;display:flex;align-items:center;justify-content:center;font:600 18px/1 'Onest';color:#fff">Открыть Mintly</div>
   <div class="abs" style="left:0;right:0;bottom:0;height:92px;background:#212121;display:flex;align-items:flex-start;gap:12px;padding:14px 14px 0">
     <div style="height:44px;padding:0 16px;border-radius:12px;background:#525252;display:flex;align-items:center;font:600 16px/1 'Onest';color:#fff">Открыть</div>
