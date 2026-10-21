@@ -795,6 +795,7 @@ function разобратьВозвратX() {
 }
 const ВОЗВРАТ_X = typeof window !== "undefined" ? разобратьВозвратX() : {};
 
+const этоПКСайт = () => typeof window !== "undefined" && !!window.__снятьБлюрПК;
 export default function PC() {
   // null — ещё проверяем; false — нужен вход; true — можно в приложение.
   const [вошёл, setВошёл] = useState(null);
@@ -809,13 +810,16 @@ export default function PC() {
     const проверить = async () => {
       const { data } = await supabase.auth.getSession();
       const есть = !!(data && data.session) && (await профильЕсть());
+      window.__ПК_ПРОФИЛЬ_ЕСТЬ = есть;
       if (жив) setВошёл(есть);
     };
     проверить();
     const { data: подписка } = supabase.auth.onAuthStateChange(() => { проверить(); });
     return () => { жив = false; подписка && подписка.subscription && подписка.subscription.unsubscribe(); };
   }, []);
-  if (вошёл === null) return <div style={{ position: "fixed", inset: 0, background: Ц.фон }} />;
+  // Пока проверяем вход — ничего своего: под пустым корнем видны
+  // размытые очертания страницы из index.html, а не чёрное поле.
+  if (вошёл === null) return этоПКСайт() ? null : <div style={{ position: "fixed", inset: 0, background: Ц.фон }} />;
   if (!вошёл && !раздел) return <Приветствие onРаздел={(р) => { window.__ПК_РАЗДЕЛ = р; setРаздел(р); }} />;
   return (
     <>

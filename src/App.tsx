@@ -25766,10 +25766,12 @@ function ОнбКнопка({ onClick, disabled = false, занята = false, �
 /* Пока аккаунт проверяется (или связь пропала): колёсико, а через шесть
    секунд — кнопка «Повторить». Без неё человек, у которого не ответил
    сервер, остался бы смотреть на колёсико без конца. */
-function ЗагрузкаВхода() {
+function ЗагрузкаВхода({ onВойти = null }) {
   const [долго, setДолго] = useState(false);
   useEffect(() => {
-    const id = setTimeout(() => setДолго(true), 6000);
+    // На сайте размытая страница без единой подписи читалась как пустой
+    // серый экран — объяснение и кнопки появляются раньше.
+    const id = setTimeout(() => setДолго(true), этоПК() ? 3000 : 6000);
     return () => clearTimeout(id);
   }, []);
   const пк = этоПК();
@@ -25783,7 +25785,17 @@ function ЗагрузкаВхода() {
       }}
     >
       {пк ? <РазмытыйСайт /> : <ЗнакЗагрузки size={88} вид="раскрытие" />}
-      {долго && (
+      {пк && долго && (
+        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 18, padding: "34px 40px", borderRadius: 26, background: hexA(T.surface, 0.9), border: `1px solid ${T.line}` }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800 }}>Аккаунт не открылся</span>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 15, textAlign: "center", maxWidth: 340, lineHeight: 1.45 }}>Сервер не ответил вовремя. Обнови страницу или войди заново.</span>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button onClick={() => window.location.reload()} className="fx-tap" style={{ height: 46, padding: "0 26px", borderRadius: 999, border: "none", background: T.ice, color: T.bg, fontFamily: bodyFont, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>Обновить</button>
+            {onВойти && <button onClick={onВойти} className="fx-tap" style={{ height: 46, padding: "0 26px", borderRadius: 999, border: `1px solid ${T.line}`, background: "transparent", color: T.ice, fontFamily: bodyFont, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>Войти</button>}
+          </div>
+        </div>
+      )}
+      {!пк && долго && (
         <button
           onClick={() => window.location.reload()}
           className="fx-tap"
@@ -29310,6 +29322,8 @@ const FEE_PERCENT = 0; // комиссии площадки нет
       // в приложение, а не держим на «Повторить»: профиль доедет при
       // следующем обновлении сессии.
       try { if (localStorage.getItem("mintly_has_account") === "1") setAccountCreated(true); } catch (e) { /* приватный режим */ }
+      // На сайте профиль уже нашла проверка перед входом (PC.tsx).
+      if (window.__ПК_ПРОФИЛЬ_ЕСТЬ) setAccountCreated(true);
       return;
     }
     // Строка без ника — заготовка базы, а не аккаунт (см. профильЕсть).
@@ -32096,7 +32110,7 @@ function mapTokenRow(row) {
       {/* Окна входа ещё нет (проверяем аккаунт или связь пропала), а
           приложение закрыто: вместо пустого экрана — колёсико. Потомок
           с visibility: visible остаётся видимым внутри скрытого корня. */}
-      {доступЗакрыт && !profileModalOpen && <ЗагрузкаВхода />}
+      {доступЗакрыт && !profileModalOpen && <ЗагрузкаВхода onВойти={openLoginProfile} />}
       {/* Запуск токена показывает ракету — и только её. Обводки
           «Динамического острова» и контура экрана, которые она
           поджигала, убраны: на разных телефонах они ложились по-разному,
