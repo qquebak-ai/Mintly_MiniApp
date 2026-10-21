@@ -3533,14 +3533,11 @@ function fillCandleGaps(candles, stepSec, limit = CHART_TOTAL, nowSec = Math.flo
     prevClose = real.get(t).close;
   }
 
-  // Долгие простои не рисуем целиком. У мемкоина, по которому торговали
-  // утром и вечером, минутный график превращался в стену из сотен
-  // одинаковых плоских свечей: сделки сжимались в два пятнышка по краям,
-  // а между ними — ровная черта во весь экран. Пропуск обозначаем
-  // несколькими пустыми свечами и перескакиваем к следующей сделке;
-  // подписи времени берутся из самих свечей, поэтому разрыв виден по
-  // ним, а не выдаётся за непрерывную торговлю.
-  const ПУСТЫХ_ПОДРЯД = 4;
+  // Пустых свечей не рисуем вовсе: свеча есть только там, где была хоть
+  // одна сделка, как на терминалах. Пропуск перескакиваем к следующей
+  // сделке; подписи времени берутся из самих свечей, поэтому разрыв виден
+  // по ним, а не выдаётся за ровную торговлю.
+  const ПУСТЫХ_ПОДРЯД = 0;
   const out = [];
   let t = start;
   while (t <= end) {
@@ -4768,7 +4765,6 @@ async function loadCurveTrades(curveAddress, testnet, feeBps, priority = TON_PRI
 /* Сколько свечей без единой сделки показываем подряд, прежде чем
    выбросить остальные. Две: одной пауза не читается, а десяток — это
    уже пустой экран вместо графика. */
-const ПУСТЫХ_СВЕЧЕЙ_ПОДРЯД = 2;
 
 function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL, rate = tonUsd(), запущен = 0) {
   const params = curveParamsOf(state);
@@ -4834,100 +4830,53 @@ function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL,
     ? curvePriceFromReserve(state.realTon, params) * rate
     : (points.length ? points[points.length - 1].price : startPrice);
 
-  const firstTime = points.length ? points[0].time : now;
   const nowBucket = bucketOf(now);
-  // Обычно окно кончается сейчас. Но если в него не попала ни одна
-  // сделка, а история есть, окно сдвигается к последним сделкам: пустая
-  // прямая на месте живого графика читается как поломка, хотя цена и
-  // правда стоит — просто торги были раньше. Ничего не выдумываем,
-  // время под осью подписано, и видно, что показан прошлый участок.
-  let lastBucket = nowBucket;
-  if (points.length) {
-    const lastTrade = points[points.length - 1].time;
-    if (lastTrade < nowBucket - step * (limit - 1)) {
-      const tail = Math.max(2, Math.round(limit * 0.15));
-      lastBucket = Math.min(nowBucket, bucketOf(lastTrade) + step * tail);
-    }
-  }
-  // Окно — последние limit интервалов, но не раньше начала торгов.
-  // Без нижней границы на мелком таймфрейме пришлось бы перебирать
-  // десятки тысяч пустых интервалов, а на экране была бы прямая линия
-  // из времён, когда токена ещё не существовало.
-  let bucket = Math.max(
-    bucketOf(firstTime) - step * Math.min(limit - 1, 12),
-    lastBucket - step * (limit - 1),
-  );
-  // До запуска токена не существовало, и рисовать там цену нельзя: те
-  // двенадцать свечей запаса слева выглядели как ровная торговля,
-  // которой не было. Начало графика — та свеча, в которой токен вышел.
-  //
-  // Время запуска приходит из базы, а строка пишется уже после сделки —
-  // на полминуты позже. По нему одному граница вставала правее первой
-  // покупки, и самая большая свеча, та самая стартовая, срезалась. Берём
-  // что раньше: запись о токене или его первая сделка.
-  if (запущен > 0) {
-    const начало = points.length ? Math.min(запущен, points[0].time) : запущен;
-    bucket = Math.max(bucket, bucketOf(начало));
-  }
+  /* Свеча — только там, где была сделка. Пустых свечей нет вовсе: минута
+     без сделок не рисуется, и свеча «ждёт» следующую сделку, как на
+     терминалах. Открытие каждой — закрытие предыдущей, поэтому разрыв во
+     времени не рвёт цену, а подписи под осью показывают, сколько прошло.
+     Первая свеча открывается ценой до первой сделки: так стартовая
+     покупка видна целиком, а не начинается с уже выросшей цены. */
   const candles = [];
   const volume = [];
   let price = startPrice;
   let i = 0;
-  // Сделки левее окна на экран не попадают, но цену двигают: прокручиваем
-  // их, чтобы первая видимая свеча открылась по реальной цене.
-  while (i < points.length && points[i].time < bucket) {
-    price = points[i].price;
-    i++;
-  }
-  while (bucket <= lastBucket) {
+  while (i < points.length) {
+    const bucket = bucketOf(points[i].time);
     const open = price;
     let high = open, low = open, close = open, vol = 0;
-    while (i < points.length && points[i].time < bucket + step) {
+    while (i < points.length && bucketOf(points[i].time) === bucket) {
       close = points[i].price;
       high = Math.max(high, close);
       low = Math.min(low, close);
       vol += points[i].volume;
       i++;
     }
-    // Цену из контракта дописываем только в свечу, которая идёт прямо
-    // сейчас. Если окно сдвинуто в прошлое, сегодняшняя цена в старой
-    // свече была бы подделкой истории.
-    if (bucket === lastBucket && lastBucket === nowBucket) {
-      close = lastPrice;
-      high = Math.max(high, close);
-      low = Math.min(low, close);
-    }
     candles.push({ time: bucket, open, high, low, close });
     volume.push({ time: bucket, value: vol, color: close >= open ? hexA(СВЕЧА_РОСТ, 0.32) : hexA(СВЕЧА_ПАДЕНИЕ, 0.32) });
     price = close;
-    bucket += step;
+  }
+  /* Цена из контракта — истина на сейчас. Если она ушла от последней
+     сделки ряда, значит, прошла сделка, которой история ещё не знает:
+     она и есть новая свеча, в текущем интервале. Совпадает — ничего не
+     добавляем: пустой свечи «на сейчас» больше нет. */
+  if (state?.realTon != null && lastPrice > 0) {
+    const пред = candles.length ? candles[candles.length - 1] : null;
+    const отход = пред ? Math.abs(lastPrice - пред.close) / пред.close : 1;
+    if (отход > 1e-6) {
+      if (пред && пред.time === nowBucket) {
+        пред.close = lastPrice;
+        пред.high = Math.max(пред.high, lastPrice);
+        пред.low = Math.min(пред.low, lastPrice);
+      } else {
+        const open = пред ? пред.close : startPrice;
+        candles.push({ time: nowBucket, open, high: Math.max(open, lastPrice), low: Math.min(open, lastPrice), close: lastPrice });
+        volume.push({ time: nowBucket, value: 0, color: lastPrice >= open ? hexA(СВЕЧА_РОСТ, 0.32) : hexA(СВЕЧА_ПАДЕНИЕ, 0.32) });
+      }
+    }
   }
   if (!candles.length) return null;
-
-  /* Пустые промежутки сжимаем. У токена на кривой сделки редкие, а шаг
-     графика минутный: между двумя покупками набегают сотни свечей, в
-     которых не происходило ничего, и весь экран занимает прямая линия,
-     а сами сделки жмутся в одну точку у края. Из каждой такой череды
-     оставляем две свечи — паузу видно, — а остальные выбрасываем.
-     Последнюю оставляем всегда: это текущая цена. */
-  const сжатые = [];
-  const сжатыйОбъём = [];
-  let пустыхПодряд = 0;
-  for (let k = 0; k < candles.length; k++) {
-    const c = candles[k];
-    const v = volume[k];
-    const пусто = !(v.value > 0) && c.open === c.close && c.high === c.low;
-    if (пусто && k !== candles.length - 1) {
-      пустыхПодряд += 1;
-      if (пустыхПодряд > ПУСТЫХ_СВЕЧЕЙ_ПОДРЯД) continue;
-    } else {
-      пустыхПодряд = 0;
-    }
-    сжатые.push(c);
-    сжатыйОбъём.push(v);
-  }
-
-  return { candles: сжатые.slice(-limit), volume: сжатыйОбъём.slice(-limit) };
+  return { candles: candles.slice(-limit), volume: volume.slice(-limit) };
 }
 
 // Рыночные показатели токена на кривой — все из цепочки, ничего
@@ -5033,22 +4982,13 @@ async function fetchCurveSparkCloses(curveAddress, n = 24) {
 // приехала: у токена на кривой цена всё равно между сделками не
 // меняется, так что прямая линия — это правда, а случайный график —
 // нет.
-function flatCandles(price, timeframe, limit = CHART_TOTAL, запущен = 0) {
+function flatCandles(price, timeframe) {
   if (!(price > 0)) return null;
   const step = TF_SECONDS[timeframe] || 3600;
   const last = Math.floor(Date.now() / 1000 / step) * step;
-  const candles = [];
-  const volume = [];
-  // Прямая линия честна ровно там, где токен уже существовал: левее
-  // запуска рисовать нечего.
-  const первая = запущен > 0 ? Math.floor(запущен / step) * step : -Infinity;
-  for (let i = limit - 1; i >= 0; i--) {
-    const time = last - i * step;
-    if (time < первая) continue;
-    candles.push({ time, open: price, high: price, low: price, close: price });
-    volume.push({ time, value: 0, color: hexA(T.up, 0.32) });
-  }
-  return { candles, volume };
+  // Одна свеча по известной цене, а не ряд пустых: пустых свечей на
+  // графике нет, а сделки, когда история приедет, встанут рядом с ней.
+  return { candles: [{ time: last, open: price, high: price, low: price, close: price }], volume: [{ time: last, value: 0, color: hexA(T.up, 0.32) }] };
 }
 
 /* Рынок токена прямо из его кривой, без кеша и без ленты.
@@ -5197,7 +5137,7 @@ const СДЕЛКИ_SOL_МС = 5 * 60 * 1000;
 const сделкиSolКеш = new Map(); // tokenId -> { ряд, ts }
 // Сделка, которую состояние уже видит, а история ещё нет. Время у неё
 // запоминается один раз — иначе свеча переезжала бы при каждом опросе.
-const хвостыSol = new Map(); // tokenId -> { time, дельта }
+const хвостыSol = new Map(); // tokenId -> { история, длина, очередь: [{ time, дельта }] }
 
 async function сделкиSolИзКеша(tokenId) {
   if (!tokenId) return null;
@@ -5269,33 +5209,61 @@ async function свечиКривойSol(mint, tokenId, timeframe, курсSolUs
     };
   });
 
-  /* Хвост: сделка, которой ещё нет в истории.
+  /* Хвосты: сделки, которых ещё нет в истории.
    *
    * Историю собирает сервер раз в двадцать секунд, а состояние кривой
-   * читается сразу. Между этими двумя моментами последняя сделка есть в
-   * состоянии, но её нет в ряду — и график дорисовывал движение в
-   * текущую свечу, а когда история догоняла, переносил его в ту свечу,
-   * где сделка случилась на самом деле. Со стороны это и был прыжок.
+   * читается сразу. Разница между ними — сделки, прошедшие после
+   * последнего обхода. Раньше она вся становилась одной точкой на момент,
+   * когда её заметили, и с каждой новой сделкой точка переезжала вперёд:
+   * стартовая покупка в 3 SOL сливалась со следующей в 0.5 в одну свечу, а
+   * свеча запуска оставалась пустой — на графике 0.5 «давали» больше роста,
+   * чем 3.
    *
-   * Теперь недостающая сделка сразу становится точкой ряда, и время у
-   * неё фиксируется в момент, когда её заметили: дальше оно не меняется,
-   * поэтому и свеча остаётся на месте. Догнала история — хвост исчезает
-   * сам, разница-то обнулилась. */
+   * Теперь каждая замеченная разница — своя точка со своим временем и
+   * своей суммой: новая сделка добавляет только то, на что изменилось
+   * собранное. Когда история догоняет, хвосты, которые она покрыла,
+   * уходят с начала очереди. */
   const realSol = собраноСейчас;
-  const разница = realSol - собрано;
-  if (Math.abs(разница) > 1) {
-    const было = хвостыSol.get(tokenId);
-    const тотЖе = было && Math.abs(было.дельта - разница) <= 1;
-    const время = тотЖе ? было.time : Math.floor(Date.now() / 1000);
-    хвостыSol.set(tokenId, { time: время, дельта: разница });
+  let хв = хвостыSol.get(tokenId);
+  if (!хв) хв = { история: собрано, очередь: [], аренда: null };
+  else if (хв.история !== собрано) {
+    // История сдвинулась: снимаем с начала очереди то, что она покрыла.
+    let остаток = собрано - хв.история;
+    const очередь = хв.очередь.slice();
+    while (очередь.length && Math.sign(очередь[0].дельта) === Math.sign(остаток) && Math.abs(очередь[0].дельта) <= Math.abs(остаток) + 1) {
+      остаток -= очередь[0].дельта;
+      очередь.shift();
+    }
+    хв = { история: собрано, очередь, аренда: хв.аренда };
+  }
+  const вОчереди = хв.очередь.reduce((с, х) => с + х.дельта, 0);
+  /* Расхождение в аренду счёта — не сделка. История считает деньги по
+     балансу счёта кривой, а в нём с момента создания лежит ещё и плата за
+     хранение (около 0.012 SOL), которой нет в собранном. Без поправки
+     после каждой сделки рисовалась фальшивая продажа на эту сумму, а
+     стартовая покупка выходила чуть больше настоящей. Сумму запоминаем
+     один раз — дальше любая разница уже честная сделка. */
+  const сырая = realSol - собрано - вОчереди;
+  if (хв.аренда == null && !хв.очередь.length && ряд.length && сырая < 0 && -сырая <= 3e7 && (сделки[0].дельта || 0) > -сырая) хв.аренда = -сырая;
+  const аренда = хв.аренда || 0;
+  if (аренда) {
+    for (const т of ряд) т.realTon = BigInt(Math.max(0, Number(т.realTon) - аренда));
+    ряд[0].ton = BigInt(Math.max(0, Number(ряд[0].ton) - аренда));
+  }
+  const собраноЧисто = собрано - аренда;
+  const недостаёт = realSol - собраноЧисто - вОчереди;
+  if (Math.abs(недостаёт) > 1) хв.очередь.push({ time: Math.floor(Date.now() / 1000), дельта: недостаёт });
+  if (хв.очередь.length && Math.abs(realSol - собраноЧисто) <= 1) хв.очередь = [];
+  хвостыSol.set(tokenId, хв);
+  let накоплено = собраноЧисто;
+  for (const х of хв.очередь) {
+    накоплено += х.дельта;
     ряд.push({
-      time: время,
-      ton: BigInt(Math.abs(разница)),
-      realTon: BigInt(realSol),
-      kind: разница < 0 ? "sell" : "buy",
+      time: Math.max(х.time, ряд.length ? ряд[ряд.length - 1].time : 0),
+      ton: BigInt(Math.abs(Math.round(х.дельта))),
+      realTon: BigInt(Math.max(0, Math.round(накоплено))),
+      kind: х.дельта < 0 ? "sell" : "buy",
     });
-  } else {
-    хвостыSol.delete(tokenId);
   }
 
   return buildCurveCandles(ряд, timeframe, состояние, limit, курсSolUsd, запущен);
@@ -20434,7 +20402,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       // либо пришли, либо нет: во втором случае показываем «нет
       // данных», а не случайное движение.
       let flat = false;
-      if (!result && allowFlat && curveChart) { result = flatCandles(token.price, tf, CHART_TOTAL, запущенВ); src = "curve"; flat = true; }
+      if (!result && allowFlat && curveChart) { result = flatCandles(token.price, tf); src = "curve"; flat = true; }
       if (cancelled || reqTf !== tfRef.current) return false;
       // Источник запоминается: обновлять график надо из того же места.
       // Иначе свечи биржи и точки tonapi сменяли друг друга — сетка
@@ -20571,14 +20539,24 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             цена = весть.price * курс;
           }
           if (!(цена > 0)) return;
+          /* Сделка видна сразу, своей свечой. Последняя свеча — та, где
+             была последняя сделка, и она может быть давней: пустых свечей
+             на графике нет. Новая сделка в новом интервале открывает новую
+             свечу ценой закрытия прежней; в том же интервале — двигает
+             текущую. Цена не изменилась — сделки не было, и рисовать нечего. */
           setChartData((prev) => {
             if (!prev || !prev.candles || !prev.candles.length) return prev;
             const свечи = prev.candles.slice();
-            const последняя = { ...свечи[свечи.length - 1] };
-            последняя.close = цена;
-            последняя.high = Math.max(последняя.high, цена);
-            последняя.low = Math.min(последняя.low, цена);
-            свечи[свечи.length - 1] = последняя;
+            const было = свечи[свечи.length - 1];
+            if (Math.abs(цена - было.close) <= было.close * 1e-6) return prev;
+            const шагTf = TF_SECONDS[prev.tf || tf] || 60;
+            const сейчасСвеча = Math.floor(Date.now() / 1000 / шагTf) * шагTf;
+            if (было.time < сейчасСвеча) {
+              свечи.push({ time: сейчасСвеча, open: было.close, high: Math.max(было.close, цена), low: Math.min(было.close, цена), close: цена });
+              const объём = (prev.volume || []).concat([{ time: сейчасСвеча, value: 0, color: hexA(цена >= было.close ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ, 0.32) }]);
+              return { ...prev, candles: свечи, volume: объём };
+            }
+            свечи[свечи.length - 1] = { ...было, close: цена, high: Math.max(было.high, цена), low: Math.min(было.low, цена) };
             return { ...prev, candles: свечи };
           });
           if (Date.now() - последнийРяд > 1500) {
@@ -20640,7 +20618,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     if (chartData && chartData.candles && chartData.candles.length) return chartData;
     const цена = (своя && своя.priceUsd > 0) ? своя.priceUsd : 0;
     if (!(цена > 0)) return null;
-    const ряд = flatCandles(цена, tf, CHART_TOTAL, запущенВ);
+    const ряд = flatCandles(цена, tf);
     return ряд ? { ...ряд, tf, isLive: false } : null;
   }, [chartData, своя, tf, запущенВ]);
   const scaledCandles = useMemo(() => {
