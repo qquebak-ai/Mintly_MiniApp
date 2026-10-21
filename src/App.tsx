@@ -18087,7 +18087,11 @@ function МастерФразы({
   return (
     <div className="flex flex-col" style={{
       padding: "8px 16px 0", gap: 16,
-      minHeight: `calc(100vh - ${contentTopPad(insetTop) + 96 + insetBottom}px)`,
+      // На сайте страница увеличена zoom'ом, и 100vh в её точках выше
+      // экрана: кнопка «Создать кошелёк», прижатая к низу, уезжала за
+      // край, и создать кошелёк было нечем. Там кнопка идёт сразу под
+      // текстом, колонкой посередине.
+      ...(этоПК() ? { maxWidth: 520, margin: "0 auto", width: "100%" } : { minHeight: `calc(100vh - ${contentTopPad(insetTop) + 96 + insetBottom}px)` }),
     }}>
       {шаг === "начало" ? (
         <>
@@ -18101,7 +18105,7 @@ function МастерФразы({
             </span>
             {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5 }}>{беда}</span>}
           </div>
-          <div style={{ marginTop: "auto" }}>
+          <div style={{ marginTop: этоПК() ? 18 : "auto" }}>
             <Кнопка надпись={идёт ? t("walletMakeWait") : t("walletMakeCta")} onClick={создатьСразу} активна={!идёт} мгновенно />
           </div>
         </>
@@ -31612,7 +31616,16 @@ function mapTokenRow(row) {
   // Создание — отдельная страница, а не вкладка: пункт из нижнего меню
   // убран, поэтому tab не трогаем — подсветка остаётся на том разделе,
   // откуда пришли, и «назад» возвращает туда же.
-  function openCreate() { setView("create"); }
+  /* На сайте платить нечем, пока не заведён кошелёк: внешних кошельков
+     там нет, а купить или запустить токен без денег — тупик посреди
+     формы. Ведём сразу в кошелёк, к кнопке «Создать кошелёк». */
+  function нуженКошелёкНаСайте() {
+    if (!этоПК() || !фразаКошелька || фразаКошелька.начато) return false;
+    showToast("Сначала создай кошелёк");
+    goTab("wallet");
+    return true;
+  }
+  function openCreate() { if (нуженКошелёкНаСайте()) return; setView("create"); }
   /* Сайт: гость нажал раздел в шапке приветствия — открываем его сразу,
      окно регистрации встанет поверх и после себя оставит этот раздел. */
   useEffect(() => {
@@ -31746,6 +31759,40 @@ function mapTokenRow(row) {
     };
   }, [backAction, стекНазад]);
 
+  /* Сайт: стрелка «назад» браузера. В Telegram назад ведёт его кнопка в
+     шапке, а на сайте человек жмёт стрелку браузера — и раньше она
+     уводила прочь с сайта. Теперь каждый открытый уровень (страница
+     токена, окно, лист) кладёт запись в историю браузера, и стрелка
+     закрывает ровно его. Закрыли уровень своей кнопкой — лишние записи
+     снимаем сами, чтобы стрелка не «застревала» на пустых шагах. */
+  const историяПК = useRef({ положено: 0, пропустить: 0 });
+  useEffect(() => {
+    if (!этоПК()) return;
+    const и = историяПК.current;
+    const уровней = СТЕК_НАЗАД.length + (backAction ? 1 : 0);
+    if (уровней > и.положено) {
+      for (let k = и.положено; k < уровней; k++) window.history.pushState({ mintly: k + 1 }, "");
+      и.положено = уровней;
+    } else if (уровней < и.положено) {
+      const лишних = и.положено - уровней;
+      и.положено = уровней;
+      и.пропустить += 1;
+      window.history.go(-лишних);
+    }
+  }, [backAction, стекНазад]);
+  useEffect(() => {
+    if (!этоПК()) return undefined;
+    const н = () => {
+      const и = историяПК.current;
+      if (и.пропустить > 0) { и.пропустить -= 1; return; }
+      и.положено = Math.max(0, и.положено - 1);
+      const действие = назадДляПК.current && назадДляПК.current();
+      if (действие) действие();
+    };
+    window.addEventListener("popstate", н);
+    return () => window.removeEventListener("popstate", н);
+  }, []);
+
   /* Сайт: на мониторе нет кнопки «Назад» Telegram, поэтому любое
      открытое окно (настройки, листы, карточки) закрывается нажатием на
      пустое место вокруг него. Пустое место — всё, что вне окна, или его
@@ -31878,8 +31925,8 @@ function mapTokenRow(row) {
     // кошельком приложения, он заводится вместе с аккаунтом.
     return true;
   }
-  function handleBuy() { if (token && token.демо) { showToast("Это демо-токен — его нельзя купить"); return; } if (requireUnlockRoot()) setTradeModal({ mode: "buy" }); }
-  function handleSell() { if (token && token.демо) { showToast("Это демо-токен — его нельзя продать"); return; } if (requireUnlockRoot()) setTradeModal({ mode: "sell" }); }
+  function handleBuy() { if (token && token.демо) { showToast("Это демо-токен — его нельзя купить"); return; } if (нуженКошелёкНаСайте()) return; if (requireUnlockRoot()) setTradeModal({ mode: "buy" }); }
+  function handleSell() { if (token && token.демо) { showToast("Это демо-токен — его нельзя продать"); return; } if (нуженКошелёкНаСайте()) return; if (requireUnlockRoot()) setTradeModal({ mode: "sell" }); }
   // Своя запись о сделке. Цепочка знает о переводе, но не знает, кто
   // его сделал из приложения и по какому курсу — а без этого не
   // посчитать ни портфель, ни прибыль. Пишем после того, как кошелёк
