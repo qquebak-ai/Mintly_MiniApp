@@ -24367,7 +24367,7 @@ function ЗнакX({ size = 24, color = "currentColor", style }) {
 /* Профиль X целиком: баннер, аватар, имя, юзернейм, описание и цифры —
    как карточка аккаунта в самом X. Данные открытые, их отдаёт сервер
    вместе с состоянием подключения. */
-function ПрофильX({ открыт, onClose, handle, профиль }) {
+function ПрофильX({ открыт, onClose, handle, профиль, своя = false }) {
   const [видно, уходит] = useClosing(открыт ? true : null, 220);
   useНазадТелеграм(!!открыт, onClose);
   // Свайп вниз не сворачивает и само мини-приложение, пока карточка открыта.
@@ -24423,20 +24423,41 @@ function ПрофильX({ открыт, onClose, handle, профиль }) {
           <span><b style={{ color: T.ice }}>{число(п.followers)}</b> <span style={{ color: T.muted }}>читателей</span></span>
           <span><b style={{ color: T.ice }}>{число(п.tweets)}</b> <span style={{ color: T.muted }}>постов</span></span>
         </div>
+        {/* Свой X открывается из профиля этой карточкой, мимо настроек, —
+            поэтому анкета на галочку живёт и здесь, иначе её не найти. */}
+        {своя && <div style={{ marginTop: 22 }}><ЗаявкаНаГалочку запросX={запросКX} handle={handle} /></div>}
       </div>
     </div>
   );
   return typeof document !== "undefined" ? createPortal(лист, document.body) : лист;
 }
 
+async function запросКX(действие, тело) {
+  const { data } = await supabase.auth.getSession();
+  const токен = data && data.session && data.session.access_token;
+  if (!токен) throw new Error("нет входа");
+  const res = await fetch(апи(`/api/twitter?action=${действие}`), {
+    method: тело ? "POST" : "GET",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${токен}` },
+    body: тело ? JSON.stringify(тело) : undefined,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || `http ${res.status}`);
+  return json;
+}
+
 /* Галочка «проверенное лицо» — по желанию. Человек сам заполняет
-   заявку: настоящее имя и ссылку, по которой видно, что X — его (сайт,
-   LinkedIn, пост, интервью). Заявку смотрят админы в боте; решение
-   приходит сюда же и сообщением от бота. */
+   анкету: ник, сколько у него читателей, чем занимается, и ссылку, по
+   которой видно, что X — его (сайт, пост, интервью). Число читателей
+   пишет сам — админ сверит его с X. Заявку смотрят админы в боте;
+   решение приходит сюда же и сообщением от бота. */
+const ЗАНЯТИЯ_X = ["Трейдер", "Блогер", "Разработчик", "Проект или команда", "Медиа", "Другое"];
 function ЗаявкаНаГалочку({ запросX, handle }) {
   const [сост, setСост] = useState(null); // { person, request }
   const [открыта, setОткрыта] = useState(false);
   const [имя, setИмя] = useState("");
+  const [читатели, setЧитатели] = useState("");
+  const [занятие, setЗанятие] = useState("");
   const [ссылкаП, setСсылкаП] = useState("");
   const [заметка, setЗаметка] = useState("");
   const [идёт, setИдёт] = useState(false);
@@ -24466,16 +24487,18 @@ function ЗаявкаНаГалочку({ запросX, handle }) {
   }
   async function отправить() {
     setБеда("");
-    if (имя.trim().length < 3) { setБеда("Напиши имя и фамилию"); return; }
+    if (имя.trim().length < 2) { setБеда("Напиши ник"); return; }
+    if (!читатели) { setБеда("Укажи, сколько у тебя читателей"); return; }
+    if (!занятие) { setБеда("Выбери вид деятельности"); return; }
     if (!/^https?:\/\/\S+\.\S+/i.test(ссылкаП.trim())) { setБеда("Нужна ссылка, начиная с https://"); return; }
     setИдёт(true);
     try {
-      await запросX("verify-request", { fullName: имя.trim(), proof: ссылкаП.trim(), note: заметка.trim() });
+      await запросX("verify-request", { nick: имя.trim(), audience: Number(читатели), activity: занятие, proof: ссылкаП.trim(), note: заметка.trim() });
       haptic("success");
       setСост({ ...сост, request: { status: "pending" } });
     } catch (e) {
       const к = String((e && e.message) || "");
-      setБеда(к === "pending" ? "Заявка уже на проверке" : к === "already_verified" ? "Галочка уже выдана" : "Не получилось отправить — попробуй ещё раз");
+      setБеда(к === "pending" ? "Заявка уже на проверке" : к === "already_verified" ? "Галочка уже выдана" : к === "bad_audience" ? "Проверь число читателей" : к === "bad_activity" ? "Выбери вид деятельности" : "Не получилось отправить — попробуй ещё раз");
       haptic("error");
     } finally {
       setИдёт(false);
@@ -24495,7 +24518,21 @@ function ЗаявкаНаГалочку({ запросX, handle }) {
       </button>
       {открыта && (
         <div className="fx-view flex flex-col" style={{ gap: 10, marginTop: 4 }}>
-          <input id="xv-name" value={имя} onChange={(e) => setИмя(e.target.value.slice(0, 80))} placeholder="Имя и фамилия" style={поле} />
+          <input id="xv-name" value={имя} onChange={(e) => setИмя(e.target.value.slice(0, 80))} placeholder="Ник" autoCapitalize="off" style={поле} />
+          {/* Пробелы-разделители — чтобы 125000 читалось как 125 000. */}
+          <input id="xv-audience" value={читатели ? Number(читатели).toLocaleString("ru-RU") : ""} onChange={(e) => setЧитатели(e.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 10))} placeholder="Сколько читателей у постов" inputMode="numeric" style={поле} />
+          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2 }}>Вид деятельности</div>
+          <div className="flex flex-wrap" style={{ gap: 8 }}>
+            {ЗАНЯТИЯ_X.map((з) => {
+              const выбран = занятие === з;
+              return (
+                <button key={з} type="button" onClick={() => { haptic("light"); setЗанятие(з); }} className="fx-tap" aria-pressed={выбран}
+                  style={{ padding: "9px 14px", borderRadius: 999, border: `1px solid ${выбран ? T.ice : T.line}`, background: выбран ? T.ice : T.surface, color: выбран ? T.bg : T.ice, fontFamily: bodyFont, fontSize: 14, fontWeight: 600 }}>
+                  {з}
+                </button>
+              );
+            })}
+          </div>
           <input id="xv-proof" value={ссылкаП} onChange={(e) => setСсылкаП(e.target.value.slice(0, 300))} placeholder="Ссылка-подтверждение: сайт, LinkedIn, пост" inputMode="url" autoCapitalize="off" style={поле} />
           <textarea id="xv-note" value={заметка} onChange={(e) => setЗаметка(e.target.value.slice(0, 500))} placeholder="Комментарий — необязательно" rows={3} style={{ ...поле, resize: "none" }} />
           {беда && <div style={{ fontFamily: bodyFont, color: T.down, fontSize: 13 }}>{беда}</div>}
@@ -24519,19 +24556,7 @@ function ПодключениеX({ showToast }) {
   const [проверяю, setПроверяю] = useState(false);
   const [беда, setБеда] = useState("");
 
-  async function запросX(действие, тело) {
-    const { data } = await supabase.auth.getSession();
-    const токен = data && data.session && data.session.access_token;
-    if (!токен) throw new Error("нет входа");
-    const res = await fetch(апи(`/api/twitter?action=${действие}`), {
-      method: тело ? "POST" : "GET",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${токен}` },
-      body: тело ? JSON.stringify(тело) : undefined,
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || `http ${res.status}`);
-    return json;
-  }
+  const запросX = запросКX;
 
   useEffect(() => {
     let жив = true;
@@ -28578,7 +28603,7 @@ function ProfileView({
                 </button>
               ))}
               {xСостояние && xСостояние.handle && (
-                <ПрофильX открыт={xПрофильОткрыт} onClose={() => setXПрофильОткрыт(false)} handle={xСостояние.handle} профиль={xСостояние.profile} />
+                <ПрофильX открыт={xПрофильОткрыт} onClose={() => setXПрофильОткрыт(false)} handle={xСостояние.handle} профиль={xСостояние.profile} своя />
               )}
             </>
           ) : (

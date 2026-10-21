@@ -298,6 +298,10 @@ ${удача || !подробно ? "" : `<p style="font-size:12px;color:#5E5D59
 
 // Сколько живёт код. Полчаса — с запасом на «напишу пост попозже», но не
 // настолько долго, чтобы код успел куда-то утечь и пригодиться.
+// Вид деятельности в заявке на галочку — тот же список, что в анкете
+// (src/App.tsx): своё слово сюда не пройдёт, админу проще сравнивать.
+const ЗАНЯТИЯ_X = ["Трейдер", "Блогер", "Разработчик", "Проект или команда", "Медиа", "Другое"];
+
 const ЖИЗНЬ_КОДА_МС = 30 * 60 * 1000;
 
 const БУКВЫ = "abcdefghijkmnpqrstuvwxyz23456789";
@@ -524,19 +528,32 @@ export default async function handler(req, res) {
   if (действие === "verify-request") {
     if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
     const тело = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-    const имя = String(тело.fullName || "").trim().slice(0, 80);
+    // Ник — то имя, под которым человека знают читатели; паспортное имя
+    // для галочки не нужно и хранить его незачем.
+    const имя = String(тело.nick || тело.fullName || "").trim().slice(0, 80);
     const подтверждение = String(тело.proof || "").trim().slice(0, 300);
     const заметка = String(тело.note || "").trim().slice(0, 500);
-    if (имя.length < 3) return res.status(400).json({ error: "bad_name" });
+    const читатели = Math.floor(Number(String(тело.audience ?? "").replace(/\D/g, "")));
+    const занятие = ЗАНЯТИЯ_X.includes(тело.activity) ? тело.activity : "";
+    if (имя.length < 2) return res.status(400).json({ error: "bad_name" });
+    if (!Number.isFinite(читатели) || читатели < 0 || читатели > 1e10 || String(тело.audience ?? "").trim() === "") return res.status(400).json({ error: "bad_audience" });
+    if (!занятие) return res.status(400).json({ error: "bad_activity" });
     if (!/^https?:\/\/\S+\.\S+/i.test(подтверждение)) return res.status(400).json({ error: "bad_proof" });
     const { data: моя } = await db.from("profiles").select("x_handle, x_person_verified").eq("id", user.id).maybeSingle();
     if (!моя || !моя.x_handle) return res.status(400).json({ error: "no_x" });
     if (моя.x_person_verified) return res.status(409).json({ error: "already_verified" });
     const { data: ждёт } = await db.from("x_verification_requests").select("id").eq("user_id", user.id).eq("status", "pending").limit(1);
     if (ждёт && ждёт.length) return res.status(409).json({ error: "pending" });
-    const { data: заявка, error } = await db.from("x_verification_requests")
-      .insert({ user_id: user.id, handle: моя.x_handle, full_name: имя, proof_url: подтверждение, note: заметка || null, status: "pending" })
-      .select("*").single();
+    const строка = { user_id: user.id, handle: моя.x_handle, full_name: имя, proof_url: подтверждение, note: заметка || null, status: "pending" };
+    let { data: заявка, error } = await db.from("x_verification_requests")
+      .insert({ ...строка, audience: читатели, activity: занятие }).select("*").single();
+    // Колонок audience/activity может ещё не быть (SQL не запускали) —
+    // тогда заявка всё равно доходит, а цифры едут в комментарии.
+    if (error && /audience|activity/.test(error.message || "")) {
+      ({ data: заявка, error } = await db.from("x_verification_requests")
+        .insert({ ...строка, note: [`Читателей: ${читатели}`, `Деятельность: ${занятие}`, заметка].filter(Boolean).join("\n") })
+        .select("*").single());
+    }
     if (error) return res.status(500).json({ error: "db", detail: error.message });
     const { разослатьЗаявку } = await import("./_xverify.js");
     await разослатьЗаявку(заявка);

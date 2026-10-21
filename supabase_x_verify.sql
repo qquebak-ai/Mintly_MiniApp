@@ -15,6 +15,9 @@ create table if not exists public.x_verification_requests (
   decided_at timestamptz,
   decided_by text
 );
+-- Анкета: сколько читателей и чем человек занимается.
+alter table public.x_verification_requests add column if not exists audience bigint;
+alter table public.x_verification_requests add column if not exists activity text;
 create index if not exists x_verification_requests_user on public.x_verification_requests(user_id, created_at desc);
 -- Пишет и читает только сервер (service_role): из браузера таблица закрыта.
 alter table public.x_verification_requests enable row level security;
