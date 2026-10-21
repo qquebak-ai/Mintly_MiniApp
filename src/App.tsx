@@ -5552,8 +5552,13 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     // растяжение холста на процент — как раз столько, чтобы подписи
     // поплыли.
     if (el) {
+      // Ширина в точках раскладки. На сайте над графиком стоит zoom, и
+      // getBoundingClientRect может вернуть уже увеличенную ширину —
+      // делим её обратно, сверяясь с offsetWidth.
       const w = el.getBoundingClientRect().width;
-      if (w > 0) widthRef.current = w;
+      const раскладка = el.offsetWidth;
+      const поправка = раскладка > 0 && w / раскладка > 1.01 ? w / раскладка : 1;
+      if (w > 0) widthRef.current = w / поправка;
     }
     return widthRef.current || widthPx;
   }
@@ -5758,7 +5763,10 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     // отсчёта. Постоянная переаллокация — это и лишняя работа, и повод
     // для системы отдать буфер поменьше: тогда шкала с подписями
     // становится мыльной.
-    const dpr = typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1;
+    /* На сайте вся страница увеличена zoom'ом (масштабПК): холст,
+       посчитанный под обычную плотность, браузер растягивал — свечи и
+       подписи выходили мыльными. Буфер берём с запасом на этот масштаб. */
+    const dpr = typeof window !== "undefined" ? (window.devicePixelRatio || 1) * (этоПК() ? масштабПК() : 1) : 1;
     // Ширину спрашиваем у самого элемента прямо сейчас, а не берём из
     // состояния: наблюдатель за размером срабатывает не в тот же кадр, и
     // при устаревшем числе холст рисуется в одном размере, а
