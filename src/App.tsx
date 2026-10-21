@@ -27177,6 +27177,10 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
           haptic("light");
           return;
         }
+        // Вход руками снимает отметку «вышел сам»: иначе при следующем
+        // обновлении страницы приложение само закрывало эту сессию.
+        markSignedOut(false);
+        markSeenSession();
         const { error } = await supabase.auth.setSession({ access_token: о.access_token, refresh_token: о.refresh_token });
         if (error) throw error;
         haptic("success");
@@ -29936,7 +29940,10 @@ function mapTokenRow(row) {
       // Сессия пережила выход — так бывает, когда выход не доехал до
       // сервера или память телефона вернула прошлое значение. Раз человек
       // выходил и с тех пор не входил, доводим выход до конца здесь.
-      if (session && isSignedOutByHand()) {
+      // На сайте молчаливого входа нет — сессия там бывает только от входа
+      // руками, и закрывать её по старой отметке нельзя: иначе вход
+      // слетал при каждом обновлении страницы.
+      if (session && !этоПК() && isSignedOutByHand()) {
         try { await supabase.auth.signOut(); } catch (e) { /* уже не важно */ }
         session = null;
       }
@@ -30032,7 +30039,7 @@ function mapTokenRow(row) {
       // События приходят и после выхода: подписка сообщает о сессии,
       // которую успела прочитать из памяти телефона, и профиль
       // загружался поверх только что закрытого аккаунта.
-      if (session && isSignedOutByHand()) return;
+      if (session && !этоПК() && isSignedOutByHand()) return;
       loadProfileForUser(session?.user || null);
     });
     loadCommunityTokens();

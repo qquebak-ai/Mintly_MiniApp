@@ -819,6 +819,9 @@ export default function PC() {
   const [раздел, setРаздел] = useState(ВОЗВРАТ_X.заготовка || ВОЗВРАТ_X.беда ? "home" : null);
   useEffect(() => {
     if (!ВОЗВРАТ_X.токен) return;
+    // Вход через X — тоже вход руками: отметка «вышел сам» иначе
+    // закрывала бы сессию при первом же обновлении страницы.
+    try { localStorage.removeItem("mintly_signed_out"); } catch (e) { /* приватный режим */ }
     supabase.auth.verifyOtp({ token_hash: ВОЗВРАТ_X.токен, type: "magiclink" }).catch(() => {});
   }, []);
   useEffect(() => {
