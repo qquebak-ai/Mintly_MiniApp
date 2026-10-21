@@ -175,14 +175,16 @@
       /* Знак-звезда приближается из глубины: издалека, маленький и размытый, —
          к своему размеру. Место и размер те же, что у знака в окне входа
          (46% высоты, 150 точек): окно подхватывает его без скачка. */
-      #ширма .знак { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%);
-                     will-change: transform, opacity, filter; }
+      /* Без will-change: с ним браузер рисовал знак один раз, в начальном
+         масштабе 0.3, и дальше растягивал готовую картинку — звезда
+         выходила мыльной. Без подсказки он перерисовывает вектор. */
+      #ширма .знак { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); }
       #ширма:not(.идёт):not(.уходит) .знак { opacity: 0; }
       #ширма.идёт .знак { animation: ширмаИзДали 900ms cubic-bezier(0.16, 1, 0.3, 1) 60ms both; }
       #ширма.уходит .знак { animation: ширмаЗнакУход 420ms cubic-bezier(0.4, 0, 1, 1) both; }
-      @keyframes ширмаИзДали { from { opacity: 0; transform: translate(-50%, -50%) scale(0.3); filter: blur(6px); }
-                               60% { opacity: 1; filter: blur(0); }
-                               to { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: none; } }
+      @keyframes ширмаИзДали { from { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+                               60% { opacity: 1; }
+                               to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
       @keyframes ширмаЗнакУход { to { opacity: 0; transform: translate(-50%, -50%) scale(1.12); filter: blur(6px); } }
       @keyframes ширмаВсплыв { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes ширмаВправо { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(16px); } }
@@ -195,7 +197,7 @@
          остальными шрифтами к этому моменту ещё не приехала. */
       @font-face { font-family: 'ШрифтШирмы'; font-weight: 100 900; font-display: block;
                    src: url('/fonts/jost-latin.woff2') format('woff2'); }
-      #ширма .слово { position: absolute; left: 0; right: 0; top: calc(46% + 104px); text-align: center;
+      #ширма .слово { position: absolute; left: 0; right: 0; top: calc(46% + 162px); text-align: center;
                       font-family: 'ШрифтШирмы', 'Jost', -apple-system, 'Segoe UI', sans-serif; font-size: 27px; font-weight: 500;
                       text-transform: uppercase; letter-spacing: 0.36em; padding-left: 0.36em; color: #E4E2DC; }
       #ширма .слово b { display: inline-block; font-weight: inherit; will-change: opacity, transform; }
