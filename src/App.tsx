@@ -31525,6 +31525,44 @@ function mapTokenRow(row) {
     };
   }, [backAction, стекНазад]);
 
+  /* Сайт: на мониторе нет кнопки «Назад» Telegram, поэтому любое
+     открытое окно (настройки, листы, карточки) закрывается нажатием на
+     пустое место вокруг него. Пустое место — всё, что вне окна, или его
+     подложка во весь экран. Нажатие при этом гасится: под затемнением
+     лежит страница, и кликнуть по ней сквозь окно было бы неожиданно. */
+  const назадДляПК = useRef(null);
+  назадДляПК.current = () => {
+    const верх = СТЕК_НАЗАД.length ? СТЕК_НАЗАД[СТЕК_НАЗАД.length - 1] : null;
+    return верх || backAction;
+  };
+  useEffect(() => {
+    if (!этоПК()) return undefined;
+    const вовсюЭкран = (эл) => {
+      const р = эл.getBoundingClientRect();
+      return р.width >= window.innerWidth * 0.9 && р.height >= window.innerHeight * 0.9;
+    };
+    let гасимКлик = false;
+    const нажатие = (e) => {
+      if (e.button !== 0) return;
+      const окна = document.querySelectorAll('[data-sheet="1"]');
+      if (!окна.length) return;
+      const цель = e.target instanceof Element ? e.target : null;
+      if (!цель) return;
+      const внутри = цель.closest('[data-sheet="1"]');
+      if (внутри && !вовсюЭкран(цель)) return;
+      const действие = назадДляПК.current();
+      if (!действие) return;
+      e.preventDefault();
+      e.stopPropagation();
+      гасимКлик = true;
+      действие();
+    };
+    const клик = (e) => { if (гасимКлик) { гасимКлик = false; e.preventDefault(); e.stopPropagation(); } };
+    document.addEventListener("pointerdown", нажатие, true);
+    document.addEventListener("click", клик, true);
+    return () => { document.removeEventListener("pointerdown", нажатие, true); document.removeEventListener("click", клик, true); };
+  }, []);
+
   function handleHeaderWalletClick() { goTab("profile"); }
 
   function openCreateProfile() { setProfileModalMode("create"); setProfileModalOpen(true); }
