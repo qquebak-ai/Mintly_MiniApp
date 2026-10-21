@@ -35,6 +35,9 @@ fi
 echo "== код =="
 sudo -u "$USR" git -C "$DIR" fetch --quiet origin main
 sudo -u "$USR" git -C "$DIR" reset --hard --quiet origin/main
+# Посторонние файлы в assets — остатки ручной сборки на сервере — не
+# нужны никому: прежние файлы для открытых вкладок берутся из www.
+sudo -u "$USR" git -C "$DIR" clean -fdq -- dist/assets
 sudo -u "$USR" git -C "$DIR" log -1 --oneline
 
 echo "== зависимости =="
@@ -79,11 +82,7 @@ sudo -u "$USR" cp -r "$DIR/dist/." "$NEW/"
 
 # Всё, на что ссылаются страница и сам код (куски, которые грузятся
 # позже), должно лежать на месте. Чего-то нет — не подменяем.
-MISSING=0
-for REF in $(grep -ohE 'assets/[A-Za-z0-9_.-]+\.(js|css)' "$NEW/index.html" "$NEW"/assets/*.js | sort -u); do
-  if [ ! -f "$NEW/$REF" ]; then echo "нет файла $REF"; MISSING=1; fi
-done
-[ "$MISSING" = 0 ] || { echo "сборка неполная — оставляю прежний сайт"; exit 1; }
+sudo -u "$USR" node "$DIR/server/check-site.mjs" "$NEW" || { echo "сборка неполная — оставляю прежний сайт"; exit 1; }
 
 # Прежние файлы сборки оставляем рядом с новыми: у открытых вкладок
 # index.html старый и просит именно их. Время у них старое (-p), у новых
