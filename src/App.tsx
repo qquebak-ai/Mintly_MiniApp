@@ -5766,7 +5766,16 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     /* На сайте вся страница увеличена zoom'ом (масштабПК): холст,
        посчитанный под обычную плотность, браузер растягивал — свечи и
        подписи выходили мыльными. Буфер берём с запасом на этот масштаб. */
-    const dpr = typeof window !== "undefined" ? (window.devicePixelRatio || 1) * (этоПК() ? масштабПК() : 1) : 1;
+    // currentCSSZoom — настоящий итоговый масштаб над холстом (страница
+    // может быть увеличена не одним zoom'ом); где его нет — свой расчёт.
+    const зумСтраницы = canvas.currentCSSZoom || (этоПК() ? масштабПК() : 1);
+    const dpr = typeof window !== "undefined" ? (window.devicePixelRatio || 1) * зумСтраницы : 1;
+    /* Тонкие линии — ровно в целые точки экрана. При дробной плотности
+       (зум сайта 1,33) линия в «одну точку» ложилась на полторы и
+       размазывалась в серую полосу: сетка, пунктир цены и ось выходили
+       мыльными. */
+    const линия = Math.max(1, Math.round(dpr)) / dpr;
+    const ровно = (v) => (Math.round(v * dpr) + (Math.max(1, Math.round(dpr)) % 2 ? 0.5 : 0)) / dpr;
     // Ширину спрашиваем у самого элемента прямо сейчас, а не берём из
     // состояния: наблюдатель за размером срабатывает не в тот же кадр, и
     // при устаревшем числе холст рисуется в одном размере, а
@@ -5801,7 +5810,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     // Фоновая сетка внутри карточки —
     // только статичная и приглушённая, чтобы не спорить со свечами
     ctx.strokeStyle = hexA(T.ice, 0.05);
-    ctx.lineWidth = 1;
+    ctx.lineWidth = линия;
     const gridTargetLines = Math.max(4, Math.round(drawHeight / 44));
     const gridRawStep = range / gridTargetLines;
     const gridMag = Math.pow(10, Math.floor(Math.log10(gridRawStep || 1)));
@@ -5813,8 +5822,8 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         const y = yFor(price);
         if (y < padTop - 4 || y > height - padBottom + 4) continue;
         ctx.beginPath();
-        ctx.moveTo(0, y + 0.5);
-        ctx.lineTo(plotW, y + 0.5);
+        ctx.moveTo(0, ровно(y));
+        ctx.lineTo(plotW, ровно(y));
         ctx.stroke();
       }
     }
@@ -5822,8 +5831,8 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     for (let c = 0; c <= gridColCount; c++) {
       const x = (plotW / gridColCount) * c;
       ctx.beginPath();
-      ctx.moveTo(x + 0.5, padTop);
-      ctx.lineTo(x + 0.5, height - padBottom);
+      ctx.moveTo(ровно(x), padTop);
+      ctx.lineTo(ровно(x), height - padBottom);
       ctx.stroke();
     }
 
@@ -5886,11 +5895,11 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       const y = yFor(lastCandle.close);
       // Dashed guide line at the live price, spanning only the candle area.
       ctx.strokeStyle = lastColor;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = линия;
       ctx.setLineDash([4, 3]);
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(plotW, y);
+      ctx.moveTo(0, ровно(y));
+      ctx.lineTo(plotW, ровно(y));
       ctx.stroke();
       ctx.setLineDash([]);
 
@@ -5909,10 +5918,10 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     ctx.fillStyle = T.bg;
     ctx.fillRect(plotW, 0, gutter, height);
     ctx.strokeStyle = hexA(T.ice, 0.08);
-    ctx.lineWidth = 1;
+    ctx.lineWidth = линия;
     ctx.beginPath();
-    ctx.moveTo(plotW + 0.5, padTop);
-    ctx.lineTo(plotW + 0.5, height - padBottom);
+    ctx.moveTo(ровно(plotW), padTop);
+    ctx.lineTo(ровно(plotW), height - padBottom);
     ctx.stroke();
     const targetLines = Math.max(4, Math.round(drawHeight / 44));
     const rawStep = range / targetLines;
@@ -6114,9 +6123,17 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
      отсчёту. График двигают данные — новая цена из потока и новые
      свечи, — и каждая из них рисует кадр сама. */
 
+  /* Во сколько раз график увеличен на экране (zoom сайта). Координаты
+     мыши — в точках экрана, а раскладка свечей — в своих; без деления
+     точка приближения уезжала от курсора, и график дёргался. */
+  function зумЭкрана() {
+    const el = wrapRef.current;
+    const w = el ? el.getBoundingClientRect().width : 0;
+    return el && el.offsetWidth > 0 && w / el.offsetWidth > 1.01 ? w / el.offsetWidth : 1;
+  }
   function xFromEvent(clientX) {
     const rect = wrapRef.current?.getBoundingClientRect();
-    return rect ? clientX - rect.left : 0;
+    return rect ? (clientX - rect.left) / зумЭкрана() : 0;
   }
   function dist(touches) {
     return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
@@ -6192,7 +6209,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     const rect = wrapRef.current && wrapRef.current.getBoundingClientRect();
     const layout = computeLayout();
     if (!rect || !layout || !yViewRef.current) return false;
-    if (clientX - rect.left < layout.plotW) return false;
+    if ((clientX - rect.left) / зумЭкрана() < layout.plotW) return false;
     const сейчас = performance.now();
     if (сейчас - касаниеШкалы.current < 320) {
       касаниеШкалы.current = 0;
@@ -6322,8 +6339,9 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     const totalDx = e.clientX - dragRef.current.startX, totalDy = e.clientY - dragRef.current.startY;
     if (!dragRef.current.moved && Math.hypot(totalDx, totalDy) > 4) { dragRef.current.moved = true; hoverIdxRef.current = null; onHover && onHover(null); }
     if (dragRef.current.moved) {
-      const dx = e.clientX - dragRef.current.lastX;
-      const dy = e.clientY - dragRef.current.lastY;
+      const з = зумЭкрана();
+      const dx = (e.clientX - dragRef.current.lastX) / з;
+      const dy = (e.clientY - dragRef.current.lastY) / з;
       const now = performance.now();
       const dt = Math.max(1, now - dragRef.current.lastT);
       dragRef.current.vx = dx / dt;
@@ -6347,7 +6365,11 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     if (!layout) return;
     const mx = xFromEvent(e.clientX);
     const anchorIdx = viewRef.current.start + mx / layout.slot;
-    const factor = e.deltaY > 0 ? 1.1 : 0.9;
+    /* Шаг — по величине прокрутки, а не фиксированные 10% на событие:
+       тачпад и плавное колесо шлют десятки мелких событий, и график
+       прыгал рывками. Строки (deltaMode 1) переводим в точки. */
+    const шаг = (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1) * e.deltaY;
+    const factor = Math.exp(Math.max(-120, Math.min(120, шаг)) * 0.0012);
     let newCount = Math.max(CHART_MIN_VISIBLE, Math.min(CHART_MAX_VISIBLE, nВид, viewRef.current.count * factor));
     const newSlot = chartWidth() / newCount;
     viewRef.current = { start: anchorIdx - mx / newSlot, count: newCount };
@@ -6355,6 +6377,18 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     запомнитьРазмахОкна();
     draw();
   }
+  /* Колесо — своим обработчиком, не через onWheel: у React он пассивный,
+     preventDefault там не действует, и вместе с приближением графика
+     листалась вся страница — отсюда дёрганье. */
+  const колесоRef = useRef(onWheel);
+  колесоRef.current = onWheel;
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return undefined;
+    const f = (e) => колесоRef.current(e);
+    el.addEventListener("wheel", f, { passive: false });
+    return () => el.removeEventListener("wheel", f);
+  }, [n > 0]);
 
   /* Ручку шкалы убрали вместе с вертикальным сдвигом: шкала цены
      считается по видимым свечам и вручную не задаётся. Тянуть её было
@@ -6364,7 +6398,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
   return (
     <div ref={wrapRef} data-chart="1" style={{ width: "100%", height, position: "relative", touchAction: "none" }}
       onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}
-      onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp} onWheel={onWheel}>
+      onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
       <canvas ref={canvasRef} style={{ display: "block", width: "100%", height }} />
     </div>
   );
@@ -32242,7 +32276,7 @@ function mapTokenRow(row) {
             />
           </KeepAlive>
           </div>
-          <div className="px-4" style={этоПК() ? колонкаПК(["achievements", "user", "token", "create"].includes(view)) : undefined}>
+          <div className="px-4" style={этоПК() ? { ...колонкаПК(["achievements", "user", "token", "create"].includes(view)), ...(view === "token" ? { maxWidth: "none", paddingLeft: 20, paddingRight: 20 } : null) } : undefined}>
           {/* Магазина больше нет — раздел убран целиком. */}
 
           {view === "achievements" && (
@@ -32263,7 +32297,7 @@ function mapTokenRow(row) {
             />
             </div>
           )}
-          {view === "token" && <div className={уходСтраницы ? "fx-view-out" : undefined} style={этоПК() ? { maxWidth: 1100, margin: "0 auto", padding: "0 16px" } : undefined}><TokenDetail t={token} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} unlocked={accountCreated} connected={connected} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} /></div>}
+          {view === "token" && <div className={уходСтраницы ? "fx-view-out" : undefined} style={undefined}><TokenDetail t={token} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} unlocked={accountCreated} connected={connected} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} /></div>}
           {view === "create" && (
             <div className={уходСтраницы ? "fx-view-out" : undefined}>
             <CreateView
