@@ -5839,6 +5839,12 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     // Candles — high-contrast bodies + wicks, sized to fill the available
     // width so they stay readable at any zoom level. Plotted only within
     // plotW, so nothing ever draws underneath the price-axis gutter.
+    // Свечи — только внутри поля графика: утянутые рукой вниз, они
+    // иначе залезали на подписи времени под ним.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, plotW, height - padBottom + 6);
+    ctx.clip();
     for (let i = startI; i < endI; i++) {
       const сырая = candles[i];
       // Последняя свеча рисуется по живому значению: телом она тянется
@@ -5883,6 +5889,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       ctx.fill();
       ctx.lineCap = "butt";
     }
+    ctx.restore();
 
     const lastCandle = Number.isFinite(candles[n - 1]?.close)
       ? (ж.cur != null ? { ...candles[n - 1], close: ж.cur, high: ж.hi, low: ж.lo } : candles[n - 1])
@@ -6181,7 +6188,17 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
      стоит, пока её не тронет человек, и тянуть её пальцем вверх-вниз
      можно куда угодно. В обычном режиме шкала садится по свечам сама. */
   function panY(dyScreen) {
-    if (!фиксRef.current || !yViewRef.current) return;
+    if (!yViewRef.current) return;
+    /* С открытым замком график тоже тянется вверх-вниз: берёшься за
+       любую точку и ведёшь куда угодно. Автоподгонка шкалы при этом
+       отключается — иначе она тут же вернула бы свечи на место. Двойной
+       тап по шкале цены возвращает её. Дрожь руки в пару точек при
+       горизонтальной прокрутке подгонку не ломает. */
+    if (!фиксRef.current && !yUserRef.current) {
+      const д = dragRef.current;
+      if (!д || Math.abs(д.lastY - д.startY) < 6) return;
+      yUserRef.current = true;
+    }
     const layout = computeLayout();
     if (!layout) return;
     const цена = (dyScreen * layout.range) / layout.drawHeight;
@@ -8356,9 +8373,9 @@ function БоковаяПанельПК({ view, tab, profile, accountCreated, с
       display: "flex", flexDirection: "column", gap: 6, padding: "22px 14px",
       borderRight: `1px solid ${T.line}`, background: T.bg,
     }}>
-      <div className="flex items-center" style={{ gap: 10, padding: "4px 10px 18px" }}>
-        <ЗнакЗвезда size={28} />
-        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 21, fontWeight: 800, letterSpacing: "-0.02em" }}>Mintly</span>
+      <div className="flex items-center" style={{ gap: 12, padding: "2px 8px 20px" }}>
+        <ЗнакЗвезда size={44} />
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1 }}>Mintly</span>
       </div>
       {пункты.map((п) => {
         const активна = п.id === "create" ? view === "create" : tab === п.id && view !== "create";
