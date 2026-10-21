@@ -16,10 +16,23 @@ import { fileURLToPath } from "node:url";
 
 const корень = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+/* Сайт цел, если на месте не только страница, но и всё, что она просит.
+   Однажды выкладка оборвалась посередине: index.html был новый, а файлов
+   кода к нему не было, — сайт стоял пустым, а проверка отвечала «ok»,
+   потому что смотрела только на страницу. */
+function сайтЦел() {
+  const www = path.join(корень, "www");
+  const каталог = fs.existsSync(path.join(www, "index.html")) ? www : path.join(корень, "dist");
+  let страница;
+  try { страница = fs.readFileSync(path.join(каталог, "index.html"), "utf8"); } catch { return false; }
+  const нужны = страница.match(/assets\/[A-Za-z0-9_.-]+\.(js|css)/g) || [];
+  return нужны.every((ф) => fs.existsSync(path.join(каталог, ф)));
+}
+
 const адресОк = (s) => typeof s === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s.trim());
 
 export default async function handler(req, res) {
-  const сайт = fs.existsSync(path.join(корень, "dist", "index.html"));
+  const сайт = сайтЦел();
 
   const запуск = адресОк(process.env.SOLANA_CURVE_PROGRAM || "")
     && адресОк(process.env.SOLANA_FEE_ACCOUNT || "");

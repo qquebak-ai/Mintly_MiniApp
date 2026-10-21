@@ -130,13 +130,20 @@ function тело(req) {
 /* Раздача самого сайта.
  *
  * Пока сайт жил на чужой площадке, серверу хватало API. Теперь он отдаёт
- * и собранные страницы из dist: одно место, куда идёт выкладка, и
- * никакого ожидания чужой очереди сборки.
+ * и собранные страницы: одно место, куда идёт выкладка, и никакого
+ * ожидания чужой очереди сборки.
+ *
+ * Откуда — из www: туда выкладка (server/deploy.sh) кладёт сайт целиком
+ * и проверенным, одним переименованием. Пока www нет (выкладка новой
+ * схемой ещё не проходила), отдаём dist, как раньше.
  *
  * Всё, что не файл, отдаётся как index.html: адреса вроде /pro и /app
  * разбирает само приложение в браузере, и без этого обновление страницы
  * на них давало бы 404. */
-const САЙТ = path.join(корень, "dist");
+function каталогСайта() {
+  const www = path.join(корень, "www");
+  return fs.existsSync(path.join(www, "index.html")) ? www : path.join(корень, "dist");
+}
 
 const ТИПЫ = {
   ".html": "text/html; charset=utf-8",
@@ -153,21 +160,71 @@ const ТИПЫ = {
   ".txt": "text/plain; charset=utf-8",
   ".webmanifest": "application/manifest+json",
 };
+// То, что выкладка сжимает заранее (server/compress.mjs).
+const СЖИМАЕМЫЕ = /\.(js|mjs|css|html|svg|json|txt|webmanifest|xml|ico|map)$/i;
 
-function отдатьФайл(res, файл, кеш) {
-  const тип = ТИПЫ[path.extname(файл).toLowerCase()] || "application/octet-stream";
+/* Файлы в памяти. Раньше каждый запрос читал файл с диска заново — на
+   главный файл кода это почти два мегабайта на каждое открытие. Запись
+   сверяется с размером и временем файла, так что после выкладки в
+   ответ идёт уже новый. */
+const ПАМЯТЬ = new Map();
+function прочитать(файл) {
+  let ст;
+  try { ст = fs.statSync(файл); } catch { return null; }
+  if (!ст.isFile()) return null;
+  const метка = `${ст.size.toString(36)}-${Math.floor(ст.mtimeMs).toString(36)}`;
+  const было = ПАМЯТЬ.get(файл);
+  if (было && было.метка === метка) return было;
   let байты;
-  try { байты = fs.readFileSync(файл); } catch { return false; }
+  try { байты = fs.readFileSync(файл); } catch { return null; }
+  const запись = { метка, байты };
+  if (ПАМЯТЬ.size > 3000) ПАМЯТЬ.clear();
+  if (ст.size < 8 * 1024 * 1024) ПАМЯТЬ.set(файл, запись);
+  return запись;
+}
+
+function отдатьФайл(req, res, файл, кеш) {
+  const исходный = прочитать(файл);
+  if (!исходный) return false;
+  const тип = ТИПЫ[path.extname(файл).toLowerCase()] || "application/octet-stream";
+  /* Готовая сжатая копия, если браузер её понимает: brotli на треть
+     меньше gzip, а считать ничего не нужно. Nginx уже сжатый ответ не
+     трогает — второй раз его не сожмёт. */
+  let запись = исходный, сжатие = null;
+  if (СЖИМАЕМЫЕ.test(файл)) {
+    const умеет = String(req.headers["accept-encoding"] || "");
+    const br = /\bbr\b/.test(умеет) ? прочитать(файл + ".br") : null;
+    const gz = !br && /\bgzip\b/.test(умеет) ? прочитать(файл + ".gz") : null;
+    if (br) { запись = br; сжатие = "br"; } else if (gz) { запись = gz; сжатие = "gzip"; }
+    const vary = res.getHeader("Vary");
+    res.setHeader("Vary", vary ? `${vary}, Accept-Encoding` : "Accept-Encoding");
+  }
+  // Метка версии: повторное открытие получает «не изменилось» без тела.
+  const etag = `"${исходный.метка}${сжатие ? `-${сжатие}` : ""}"`;
   res.setHeader("Content-Type", тип);
   res.setHeader("Cache-Control", кеш);
-  res.status(200).end(байты);
+  res.setHeader("ETag", etag);
+  if (сжатие) res.setHeader("Content-Encoding", сжатие);
+  if (req.headers["if-none-match"] === etag) {
+    res.statusCode = 304;
+    res.end();
+    return true;
+  }
+  res.setHeader("Content-Length", запись.байты.length);
+  res.statusCode = 200;
+  res.end(req.method === "HEAD" ? undefined : запись.байты);
   return true;
 }
 
-function отдатьСайт(res, путь) {
+function отдатьСайт(req, res, путь) {
+  const САЙТ = каталогСайта();
   if (!fs.existsSync(САЙТ)) return false;
-  /* Путь из запроса нормализуем и держим внутри dist: «..» в адресе не
-     должно выводить за пределы каталога сайта.
+  // Страница всегда перепроверяется: по ней браузер узнаёт, что вышла
+  // новая сборка. «no-cache» — не «не хранить», а «спроси, не
+  // изменилась ли»: неизменившаяся приходит ответом без тела.
+  const СТРАНИЦА = "no-cache";
+  /* Путь из запроса нормализуем и держим внутри каталога сайта: «..» в
+     адресе не должно выводить за его пределы.
 
      Сравниваем не по началу строки, а по границе каталога: «начинается
      с /srv/app/dist» верно и для соседней папки /srv/app/dist-old, и
@@ -178,15 +235,18 @@ function отдатьСайт(res, путь) {
   try {
     внутри = path.normalize(path.join(САЙТ, decodeURIComponent(путь)));
   } catch {
-    return отдатьФайл(res, path.join(САЙТ, "index.html"), "no-cache, no-store, must-revalidate");
+    return отдатьФайл(req, res, path.join(САЙТ, "index.html"), СТРАНИЦА);
   }
   const своё = внутри === САЙТ || внутри.startsWith(САЙТ + path.sep);
   if (своё && fs.existsSync(внутри) && fs.statSync(внутри).isFile()) {
     // Файлы с отпечатком в имени (assets/index-XXXX.js) не меняются
-    // никогда — их можно держать в кеше браузера год. Всё остальное
-    // перепроверяем.
-    const навсегда = /\/assets\//.test(путь) || /\.(woff2|png|jpg|jpeg|webp|svg|ico)$/.test(путь);
-    return отдатьФайл(res, внутри, навсегда ? "public, max-age=31536000, immutable" : "no-cache");
+    // никогда — их можно держать в кеше браузера год. Картинки и шрифты
+    // без отпечатка — неделю: их иногда перерисовывают под тем же
+    // именем. Всё остальное перепроверяем.
+    const кеш = /\/assets\//.test(путь) ? "public, max-age=31536000, immutable"
+      : /\.(woff2|png|jpg|jpeg|webp|svg|ico)$/.test(путь) ? "public, max-age=604800, stale-while-revalidate=86400"
+      : внутри.endsWith("index.html") ? СТРАНИЦА : "no-cache";
+    return отдатьФайл(req, res, внутри, кеш);
   }
   /* Файла нет. Если просили ресурс сборки — отвечаем «нет», а не
      страницей приложения: браузер, получив HTML вместо кода, ругается
@@ -194,12 +254,12 @@ function отдатьСайт(res, путь) {
      страница ловит сама и перечитывает себя заново (см. index.html).
 
      Всё остальное — адрес внутри приложения, его разбирает сам сайт. */
-  if (/\.(js|mjs|css|json|map|woff2?|png|jpe?g|webp|svg|ico)$/i.test(путь)) {
+  if (/\.(js|mjs|css|json|map|woff2?|png|jpe?g|webp|svg|ico|br|gz)$/i.test(путь)) {
     res.setHeader("Cache-Control", "no-store");
     res.status(404).end("not found");
     return true;
   }
-  return отдатьФайл(res, path.join(САЙТ, "index.html"), "no-cache, no-store, must-revalidate");
+  return отдатьФайл(req, res, path.join(САЙТ, "index.html"), СТРАНИЦА);
 }
 
 const сервер = http.createServer(async (req, res) => {
@@ -256,7 +316,7 @@ const сервер = http.createServer(async (req, res) => {
     // Не наш обработчик — пробуем отдать сайт. API живёт под /api, всё
     // остальное принадлежит страницам.
     if (req.method === "GET" || req.method === "HEAD") {
-      if (!адрес.pathname.startsWith("/api/") && отдатьСайт(res, адрес.pathname)) return;
+      if (!адрес.pathname.startsWith("/api/") && отдатьСайт(req, res, адрес.pathname)) return;
     }
     res.status(404).json({ error: "not_found" });
     return;

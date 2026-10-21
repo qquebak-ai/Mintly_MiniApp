@@ -51,3 +51,8 @@ demo/built/node_modules
 demo/built/fullrender.log
 demo/built/assets/track.wav
 .state/
+
+# Сайт, разложенный выкладкой (server/deploy.sh)
+www/
+www.new/
+www.old/
