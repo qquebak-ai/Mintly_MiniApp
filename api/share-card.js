@@ -22,6 +22,11 @@ function admin() {
   return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 }
 
+function подписьHTML(текст) {
+  const html = текст.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return html.replace(/^Ca: (\S+)$/m, "Ca: <code>$1</code>");
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
   const db = admin();
@@ -63,7 +68,10 @@ export default async function handler(req, res) {
         id: `share-${Date.now()}`,
         photo_url: адрес,
         thumbnail_url: адрес,
-        caption: подпись || undefined,
+        // Адрес в строке «Ca:» — моноширинным: в Telegram он копируется
+        // одним нажатием.
+        caption: подпись ? подписьHTML(подпись) : undefined,
+        parse_mode: подпись ? "HTML" : undefined,
         reply_markup: { inline_keyboard: [[{ text: "📈 Открыть токен", url: ссылка }]] },
       },
       allow_user_chats: true,

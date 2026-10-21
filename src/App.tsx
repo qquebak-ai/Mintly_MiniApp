@@ -21507,8 +21507,10 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
     return c.toDataURL("image/jpeg", 0.86);
   }
   async function sendTelegram(tg) {
-    // Подпись — только тикер: ссылка уже стоит в кнопке под картинкой.
-    const подпись = `$${String(token.ticker || "").toUpperCase()} в Mintly`;
+    // Подпись: тикер, а второй строкой — адрес контракта (CA): по нему
+    // токен находят и покупают в любом кошельке. Ссылка — в кнопке.
+    const адресТокена = token.tokenAddress || token.address || "";
+    const подпись = `$${String(token.ticker || "").toUpperCase()} в Mintly${адресТокена ? `\nCa: ${адресТокена}` : ""}`;
     try {
       const canvas = canvasRef.current;
       if (tg.shareMessage && canvas) {
@@ -21525,7 +21527,7 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
         }
       }
     } catch (e) { /* ниже — запасной путь */ }
-    tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(`$${String(token.ticker || "").toUpperCase()} в Mintly`)}`);
+    tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(подпись)}`);
   }
 
   async function send() {
