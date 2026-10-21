@@ -14959,10 +14959,59 @@ function открытьТелеграм(ссылка) {
   else if (typeof window !== "undefined") window.open(ссылка, "_blank");
 }
 
+/* Подключение уведомлений: бот открывается со ссылкой-ключом этого
+   аккаунта (см. api/trading-bot.js, action=link) и сам привязывается к
+   нему — в том числе у тех, кто вошёл по почте или через X и Telegram
+   аккаунту не знаком. Окно на сайте открываем сразу, до ответа сервера:
+   открытое после ожидания браузер принял бы за всплывающую рекламу. */
+async function токенСессии() {
+  try { const { data } = await supabase.auth.getSession(); return (data && data.session && data.session.access_token) || null; } catch { return null; }
+}
+async function подключитьУведомления() {
+  const wa = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+  const вTelegram = !!(wa && wa.initData);
+  const окно = !вTelegram && typeof window !== "undefined" ? window.open("", "_blank") : null;
+  let ссылка = БОТ_MINTLY;
+  const т = await токенСессии();
+  if (т) {
+    try {
+      const r = await fetch(апи("/api/trading-bot?action=link"), { headers: { Authorization: `Bearer ${т}` } });
+      const j = await r.json().catch(() => null);
+      if (j && j.url) ссылка = j.url;
+    } catch { /* без ключа — просто бот, он подскажет, что делать */ }
+  }
+  if (окно) { окно.location.href = ссылка; return; }
+  открытьТелеграм(ссылка);
+}
+/* Подключён ли бот уведомлений у этого аккаунта. Пока человек ходит в
+   Telegram и обратно, спрашиваем снова при возвращении на страницу. */
+function useУведомленияПодключены() {
+  const [подключены, setПодключены] = useState(null);
+  useEffect(() => {
+    let жив = true;
+    const спросить = async () => {
+      const т = await токенСессии();
+      if (!т) return;
+      try {
+        const r = await fetch(апи("/api/trading-bot?action=status"), { headers: { Authorization: `Bearer ${т}` } });
+        const j = await r.json().catch(() => null);
+        if (жив && j && typeof j.connected === "boolean") setПодключены(j.connected && !j.muted);
+      } catch { /* не узнали — оставляем как было */ }
+    };
+    спросить();
+    const видно = () => { if (document.visibilityState === "visible") спросить(); };
+    document.addEventListener("visibilitychange", видно);
+    window.addEventListener("focus", видно);
+    return () => { жив = false; document.removeEventListener("visibilitychange", видно); window.removeEventListener("focus", видно); };
+  }, []);
+  return подключены;
+}
+
 /* Баннеры главной: две широкие двери наружу (канал и уведомления в
    боте) и две плитки внутрь — к запуску и в мемпад. Появляются по
    одной, с небольшим сдвигом: экран собирается, а не выпрыгивает. */
 function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} }) {
+  const уведомления = useУведомленияПодключены();
   const широкий = (ключ, i, { заголовок, текст, кнопка, Значок, цвет, onClick, скоро = false }) => (
     <button
       key={ключ}
@@ -15007,7 +15056,9 @@ function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} })
   return (
     <section className="flex flex-col" style={{ gap: 12 }}>
       {широкий("канал", 0, { заголовок: "Канал Mintly", текст: "Новости и громкие запуски", кнопка: "Открыть", Значок: Send, цвет: "#2AABEE", onClick: () => открытьТелеграм(КАНАЛ_MINTLY), скоро: !КАНАЛ_MINTLY })}
-      {широкий("бот", 1, { заголовок: "Уведомления", текст: "Покупки ваших токенов — в боте", кнопка: "Включить", Значок: Bell, цвет: "#F5C04E", onClick: () => открытьТелеграм(БОТ_MINTLY) })}
+      {широкий("бот", 1, уведомления
+        ? { заголовок: "Уведомления подключены", текст: "Покупки ваших токенов приходят в бот", кнопка: "Настроить", Значок: Bell, цвет: "#F5C04E", onClick: () => открытьТелеграм(БОТ_MINTLY.replace("?start=app", "")) }
+        : { заголовок: "Уведомления", текст: "Покупки ваших токенов — в боте", кнопка: "Подключить", Значок: Bell, цвет: "#F5C04E", onClick: подключитьУведомления })}
       <div className="flex" style={{ gap: 12 }}>
         {плитка("запуск", 2, { заголовок: "Запустить", текст: "Свой мемкоин за минуту", Значок: Rocket, onClick: onGoCreate })}
         {плитка("мемпад", 3, { заголовок: "Мемпад", текст: "Все свежие токены", Значок: ЗначокОбмен, onClick: () => onGoTab("mempad") })}
@@ -15159,6 +15210,20 @@ const СтрокаПульса = React.memo(function СтрокаПульса({ 
   );
 });
 
+/* Уведомления в Telegram — с сайта тоже: кнопка рядом с запуском. */
+function КнопкаУведомленийПК() {
+  const подключены = useУведомленияПодключены();
+  return (
+    <button onClick={подключены ? () => window.open(БОТ_MINTLY.replace("?start=app", ""), "_blank") : подключитьУведомления} className="fx-tap flex items-center" style={{
+      gap: 8, height: 42, padding: "0 16px", borderRadius: 12, cursor: "pointer",
+      background: "transparent", border: `1px solid ${T.line}`, color: T.ice, fontFamily: bodyFont, fontSize: 14, fontWeight: 700,
+    }}>
+      <Bell size={16} color={подключены ? T.up : T.ice} />
+      {подключены ? "Уведомления подключены" : "Уведомления в Telegram"}
+    </button>
+  );
+}
+
 function ПульсПК({ curveTokens = [], onOpenToken, onGoCreate, сеть = "ton", грузится = false }) {
   const свои = useMemo(() => {
     const нужная = сеть === "sol" ? "solana" : сеть;
@@ -15192,10 +15257,13 @@ function ПульсПК({ curveTokens = [], onOpenToken, onGoCreate, сеть = 
           <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 30, fontWeight: 800, letterSpacing: "-0.02em" }}>Пульс</div>
           <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 4 }}>Все запуски Mintly в реальном времени</div>
         </div>
-        <button onClick={onGoCreate} className="fx-tap" style={{
-          height: 42, padding: "0 20px", borderRadius: 12, border: "none", cursor: "pointer",
-          background: T.ice, color: T.bg, fontFamily: bodyFont, fontSize: 14, fontWeight: 800,
-        }}>Запустить токен</button>
+        <div className="flex items-center" style={{ gap: 10 }}>
+          <КнопкаУведомленийПК />
+          <button onClick={onGoCreate} className="fx-tap" style={{
+            height: 42, padding: "0 20px", borderRadius: 12, border: "none", cursor: "pointer",
+            background: T.ice, color: T.bg, fontFamily: bodyFont, fontSize: 14, fontWeight: 800,
+          }}>Запустить токен</button>
+        </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14 }}>
         {КОЛОНКИ_ПУЛЬСА.map((к) => {

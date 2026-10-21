@@ -156,3 +156,32 @@ export function проверитьПодпись(initData, срокСек = 24 *
   if (!когда || Date.now() / 1000 - когда > срокСек) return null;
   try { return JSON.parse(п.get("user") || "null"); } catch { return null; }
 }
+
+/* Ключ привязки: ссылка https://t.me/<бот>?start=<ключ> из приложения или
+   с сайта. Telegram передаёт его боту в /start, и бот по нему узнаёт, к
+   какому аккаунту Mintly пришёл человек, — так подключаются и те, кто
+   входил по почте или через X и не заходил через Telegram. В ключе id
+   аккаунта, срок и подпись токеном бота: подделать чужой нельзя, а
+   отдельная таблица под одноразовые коды не нужна. Длина — до 64
+   знаков, как требует Telegram. */
+function подписьКлюча(тело) {
+  return crypto.createHmac("sha256", `mintly-link:${ТОКЕН_ТОРГОВОГО}`).update(тело).digest("hex").slice(0, 16);
+}
+export function ключПривязки(userId, срокСек = 30 * 60) {
+  const id = String(userId).replace(/-/g, "").toLowerCase();
+  const до = Math.floor(Date.now() / 1000 + срокСек).toString(36);
+  const тело = `${id}${до}`;
+  return `l${тело}${подписьКлюча(тело)}`;
+}
+export function разобратьКлюч(ключ) {
+  const м = /^l([0-9a-f]{32})([0-9a-z]{5,8})([0-9a-f]{16})$/.exec(String(ключ || ""));
+  if (!м) return null;
+  const [, id, до, подпись] = м;
+  const нужная = подписьКлюча(`${id}${до}`);
+  if (!crypto.timingSafeEqual(Buffer.from(нужная), Buffer.from(подпись))) return null;
+  if (parseInt(до, 36) < Date.now() / 1000) return { просрочен: true };
+  return { userId: `${id.slice(0, 8)}-${id.slice(8, 12)}-${id.slice(12, 16)}-${id.slice(16, 20)}-${id.slice(20)}` };
+}
+
+// Сбросить минутную память: после привязки человек должен находиться сразу.
+export function забыть(telegramId) { память.delete(String(telegramId)); }
