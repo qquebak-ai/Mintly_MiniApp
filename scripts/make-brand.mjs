@@ -41,7 +41,7 @@ const кадры = [
       <div style="height:42px"></div>
       <div style="display:flex;gap:14px">
         <span class="чип" style="font-size:21px;padding:13px 26px">Свой токен за пару секунд</span>
-        <span class="чип" style="font-size:21px;padding:13px 26px">Торговля с почти нулевой комиссией</span>
+        <span class="чип" style="font-size:21px;padding:13px 26px">Торговля с нулевой комиссией</span>
       </div>
     </div>` },
   { имя: "start-og", ш: 1200, в: 630, тело: `
@@ -81,7 +81,9 @@ const кадры = [
 ];
 
 const б = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
-for (const к of кадры) {
+// Можно перерисовать только нужные: node scripts/make-brand.mjs start
+const только = process.argv.slice(2);
+for (const к of кадры.filter((к) => !только.length || только.includes(к.имя))) {
   const стр = await б.newPage({ viewport: { width: к.ш, height: к.в }, deviceScaleFactor: к.мн || 2 });
   await стр.setContent(`<!doctype html><html><head><meta charset="utf-8"><style>${стили}</style></head><body>${к.тело}</body></html>`);
   await стр.evaluate(() => document.fonts.ready);
