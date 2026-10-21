@@ -17301,10 +17301,11 @@ const ГРАДИЕНТ_КАРТЫ =
  * иначе карта и её ореол расходятся. */
 const WALLET_SKINS = [
   {
-    // Минимализм: почти чёрная карта с едва заметным светом сверху —
-    // на ней только баланс, ник и маленький знак.
+    // Металл — как лимитированная карта DEX на сайте: тёмный графит в
+    // углу с балансом, светлая полоса стали посередине. Почти чёрная
+    // карта на чёрном экране сливалась с фоном. Без движения.
     id: "none", label: { RU: "Mintly", EN: "Mintly" }, price: 0,
-    fill: "linear-gradient(160deg, #1A1B1F 0%, #0E0F12 55%, #0A0A0C 100%)", glow: "#000000", минимал: true,
+    fill: "linear-gradient(135deg, #2B2B2F 0%, #4A4A4F 30%, #9C9CA2 52%, #5C5C61 70%, #2E2E32 100%)", glow: "#000000", минимал: true, металл: true, size: "100% 100%",
   },
   {
     id: "midnight", label: { RU: "Полночь", EN: "Midnight" }, price: 140,
@@ -18741,7 +18742,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
         }} />}
         {/* Тонкая светлая кромка — край минимальной карты на чёрном фоне. */}
-        {видКарты.минимал && <span aria-hidden style={{ position: "absolute", inset: 0, borderRadius: 24, boxShadow: `inset 0 0 0 1px ${hexA("#FFFFFF", 0.07)}`, pointerEvents: "none" }} />}
+        {видКарты.минимал && <span aria-hidden style={{ position: "absolute", inset: 0, borderRadius: 24, boxShadow: видКарты.металл ? `inset 0 0 0 1px ${hexA("#FFFFFF", 0.22)}, inset 0 1px 0 ${hexA("#FFFFFF", 0.35)}` : `inset 0 0 0 1px ${hexA("#FFFFFF", 0.07)}`, pointerEvents: "none" }} />}
         {/* Отблеск наклона: полоса света едет по карте вслед за углом и
             гаснет, когда карта встаёт ровно. */}
         <span aria-hidden style={{
@@ -18782,10 +18783,22 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         }}>
           Mintly
         </span>}
+        {/* У металла знак — крупно, уходит за правый край, как тиснение. */}
+        {видКарты.металл && (
+          <svg aria-hidden width={230} height={230} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", right: -62, top: "50%", marginTop: -115, pointerEvents: "none" }}>
+            <defs>
+              <linearGradient id="тиснение" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.26" />
+                <stop offset="1" stopColor="#FFFFFF" stopOpacity="0.06" />
+              </linearGradient>
+            </defs>
+            <path d={ПУТЬ_ЗВЕЗДЫ} fill="url(#тиснение)" stroke={hexA("#FFFFFF", 0.28)} strokeWidth="0.6" />
+          </svg>
+        )}
         {/* Знак приложения — в углу, где у карт стоит логотип банка. */}
-        <svg aria-hidden width={видКарты.минимал ? 34 : 40} height={видКарты.минимал ? 34 : 40} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: видКарты.минимал ? 14 : 12, right: видКарты.минимал ? 16 : 14, pointerEvents: "none" }}>
+        {!видКарты.металл && <svg aria-hidden width={видКарты.минимал ? 34 : 40} height={видКарты.минимал ? 34 : 40} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: видКарты.минимал ? 14 : 12, right: видКарты.минимал ? 16 : 14, pointerEvents: "none" }}>
           <path d={ПУТЬ_ЗВЕЗДЫ} fill={hexA("#FFFFFF", видКарты.минимал ? 0.8 : 0.9)} />
-        </svg>
+        </svg>}
         {/* Имя держателя, как на дебетовой карте: ник заглавными, с
             разрядкой, внизу карты. Чипа с монетами там больше нет —
             монеты видны в активах ниже. */}
