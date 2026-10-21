@@ -20337,7 +20337,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
      У своих токенов и у всего, что живёт в TON, число считает tonapi по
      жетонным кошелькам. У токена Solana он молчит — там берём число из
      справочника биржи, которое приезжает вместе с описанием. */
-  const держателейВсего = holdersCount != null ? holdersCount : (info && info.holders) || null;
+  const [демоСтата, setДемоСтата] = useState(null);
+  /* Цифры демо-токена — с сервера, где его сделки и считаются: в копии
+     строки, с которой открыта страница, их нет вовсе (стояли $0 и «—»). */
+  const курсДемо = tonPriceUsd > 0 ? tonPriceUsd : tonUsd();
+  const цифрыДемо = token.демо && демоСтата ? {
+    liq: fmtCompact(демоСтата.liquidity * курсДемо), vol: fmtCompact(демоСтата.vol24 * курсДемо), tx24h: демоСтата.tx24,
+  } : null;
+  const держателейВсего = token.демо && демоСтата ? демоСтата.holders
+    : holdersCount != null ? holdersCount : (info && info.holders) || null;
   useEffect(() => {
     let cancelled = false;
     setInfo(null);
@@ -20383,6 +20391,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         /* Демо: свечи из истории цен, что копит сервер, — по одной на
            шаг выбранного интервала, без пустых свечей впереди. */
         if (token.демо && j && j.demoCreated > 0) демоСоздан = j.demoCreated;
+        if (token.демо && j && j.demoStats) setДемоСтата(j.demoStats);
         if (token.демо && !историяЕсть && j && Array.isArray(j.history)) {
           историяЕсть = true;
           const курсИ = tonPriceUsd > 0 ? tonPriceUsd : tonUsd();
@@ -20931,11 +20940,12 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       <КарточкаСтрок
         заголовок={`${tr("aboutToken")} $${token.ticker}`}
         строки={[
-          [t("marketCapLabel"), fmtUSD(token.mcapNum > 0 ? token.mcapNum : капОкна)],
-          [tr("statVolume24h"), `$${token.vol}`],
-          [tr("statLiquidity"), `$${token.liq}`],
+          // Капитализация — та же живая, что в шапке: копия строки отстаёт.
+          [t("marketCapLabel"), fmtUSD(капОкна)],
+          [tr("statVolume24h"), `$${(цифрыДемо || token).vol}`],
+          [tr("statLiquidity"), `$${(цифрыДемо || token).liq}`],
           token.chain === "solana"
-            ? [tr("statTx24h"), (token.tx24h || 0).toLocaleString("ru-RU")]
+            ? [tr("statTx24h"), ((цифрыДемо || token).tx24h || 0).toLocaleString("ru-RU")]
             : [tr("statHolders"), держателейВсего == null ? "—" : держателейВсего.toLocaleString("ru-RU")],
           [tr("statAge"), fmtAge(создано(token)) || "—"],
         ]}
@@ -20968,10 +20978,10 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       {tab === "stats" && (
         <div className="fx-swap flex flex-col" style={{ gap: 0 }}>
           {[
-            [tr("statMcap"), fmtUSD(token.mcapNum > 0 ? token.mcapNum : капОкна)],
-            [tr("statLiq"), `$${token.liq ?? "—"}`],
-            [tr("statVol24"), `$${token.vol ?? "—"}`],
-            [tr("statTrades24"), (token.tx24h || 0).toLocaleString("ru-RU")],
+            [tr("statMcap"), fmtUSD(капОкна)],
+            [tr("statLiq"), `$${(цифрыДемо || token).liq ?? "—"}`],
+            [tr("statVol24"), `$${(цифрыДемо || token).vol ?? "—"}`],
+            [tr("statTrades24"), ((цифрыДемо || token).tx24h || 0).toLocaleString("ru-RU")],
             [tr("statHolders"), держателейВсего == null ? "—" : держателейВсего.toLocaleString("ru-RU")],
             [tr("statAge"), fmtAge(создано(token)) || "—"],
             ...(token.graduationTon > 0
@@ -30028,6 +30038,11 @@ function mapTokenRow(row) {
             // запуска, а своё «минуту назад» телефон ставил при каждом открытии.
             if (j.demoCreated > 0) демоСоздан = j.demoCreated;
             if (tok.демо && j.demoCreated > 0 && tok.createdAt !== j.demoCreated) { тронуто = true; tok = { ...tok, createdAt: j.demoCreated }; }
+            if (tok.демо && j.demoStats) {
+              const ст = j.demoStats, курсД = курсTon;
+              const цифры = { tx24h: ст.tx24, holders: ст.holders, vol: fmtCompact(ст.vol24 * курсД), liq: fmtCompact(ст.liquidity * курсД), vol24hNum: ст.vol24 * курсД };
+              if (tok.tx24h !== цифры.tx24h || tok.holders !== цифры.holders || tok.vol !== цифры.vol) { тронуто = true; tok = { ...tok, ...цифры }; }
+            }
             if (!к || !(к.price > 0) || (tok.priceTon === к.price && tok.raisedTon === к.raised)) return tok;
             const курс = tok.chain === "solana" ? курсSol : курсTon;
             тронуто = true;
