@@ -8240,6 +8240,11 @@ function SpotlightAura({ src, ticker }) {
    0,3 с разыгрывает сервер (api/live.js), в сети его нет: купить или
    продать его нельзя, он только показывает, как быстро живут цифры. */
 const ДЕМО_MINT = "MintDemo1111111111111111111111111111111111";
+/* Когда демо-токен появился — по словам сервера (/api/live, demoCreated).
+   Страница токена держит свою копию строки, поэтому возраст демо-токена
+   берётся отсюда, а не из копии. */
+let демоСоздан = 0;
+const создано = (tok) => (tok && tok.демо && демоСоздан ? демоСоздан : tok && tok.createdAt);
 function создатьДемоТокен() {
   return {
     id: "demo-speed", демо: true, name: "Demo Speed", ticker: "DEMO", emoji: "⚡",
@@ -8247,7 +8252,7 @@ function создатьДемоТокен() {
     address: null, tokenAddress: null, poolAddress: null, dexPoolAddress: null, curveAddress: null,
     logoUrl: null, description: "Тестовый токен: сделки каждые 0,3 секунды, чтобы видеть скорость обновления.",
     network: "mainnet", chain: "ton", механики: { fair_start: false, buyback: false, live_chart: false },
-    замок: "none", ownerId: null, createdAt: Date.now() - 60 * 1000, graduationTon: 85, raisedTon: 0,
+    замок: "none", ownerId: null, createdAt: демоСоздан || Date.now() - 60 * 1000, graduationTon: 85, raisedTon: 0,
   };
 }
 function ПометкаДемо({ size = 10 }) {
@@ -20377,6 +20382,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         const j = r.ok ? await r.json() : null;
         /* Демо: свечи из истории цен, что копит сервер, — по одной на
            шаг выбранного интервала, без пустых свечей впереди. */
+        if (token.демо && j && j.demoCreated > 0) демоСоздан = j.demoCreated;
         if (token.демо && !историяЕсть && j && Array.isArray(j.history)) {
           историяЕсть = true;
           const курсИ = tonPriceUsd > 0 ? tonPriceUsd : tonUsd();
@@ -20719,7 +20725,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             </button>
           ) : <span />}
           <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12 }}>
-            {fmtAge(token.createdAt) || ""}{token.dexName ? ` · ${token.dexName}` : ""}
+            {fmtAge(создано(token)) || ""}{token.dexName ? ` · ${token.dexName}` : ""}
           </span>
         </div>
 
@@ -20931,7 +20937,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           token.chain === "solana"
             ? [tr("statTx24h"), (token.tx24h || 0).toLocaleString("ru-RU")]
             : [tr("statHolders"), держателейВсего == null ? "—" : держателейВсего.toLocaleString("ru-RU")],
-          [tr("statAge"), fmtAge(token.createdAt) || "—"],
+          [tr("statAge"), fmtAge(создано(token)) || "—"],
         ]}
       />
 
@@ -20967,7 +20973,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             [tr("statVol24"), `$${token.vol ?? "—"}`],
             [tr("statTrades24"), (token.tx24h || 0).toLocaleString("ru-RU")],
             [tr("statHolders"), держателейВсего == null ? "—" : держателейВсего.toLocaleString("ru-RU")],
-            [tr("statAge"), fmtAge(token.createdAt) || "—"],
+            [tr("statAge"), fmtAge(создано(token)) || "—"],
             ...(token.graduationTon > 0
               ? [[tr("statCurve"), `${Math.round(Math.min(1, (Number(token.raisedTon) || 0) / token.graduationTon) * 100)}%`]]
               : []),
@@ -21377,7 +21383,7 @@ async function drawTokenShareCard(canvas, { token, curve, link, holders }) {
   const rows = [
     [t("statHolders"), holders == null ? "—" : String(holders)],
     [t("statVolume24h"), token.vol ? `$${token.vol}` : "—"],
-    [t("tokenAgeLabel"), fmtAge(token.createdAt) || "—"],
+    [t("tokenAgeLabel"), fmtAge(создано(token)) || "—"],
   ];
   let ry = barDrawn ? 900 : 812;
   rows.forEach(([label, value]) => {
@@ -30018,6 +30024,10 @@ function mapTokenRow(row) {
           let тронуто = false;
           const следующий = prev.map((tok) => {
             const к = j.curves[tok.демо ? ДЕМО_MINT : tok.chain === "solana" ? tok.address : tok.curveAddress];
+            // Возраст демо-токена — с сервера: там он живёт с первого
+            // запуска, а своё «минуту назад» телефон ставил при каждом открытии.
+            if (j.demoCreated > 0) демоСоздан = j.demoCreated;
+            if (tok.демо && j.demoCreated > 0 && tok.createdAt !== j.demoCreated) { тронуто = true; tok = { ...tok, createdAt: j.demoCreated }; }
             if (!к || !(к.price > 0) || (tok.priceTon === к.price && tok.raisedTon === к.raised)) return tok;
             const курс = tok.chain === "solana" ? курсSol : курсTon;
             тронуто = true;
