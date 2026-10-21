@@ -45,6 +45,8 @@ const СТИЛЬ_ПРИВЕТСТВИЯ = `
 @keyframes прив-удар { 0% { transform: translateY(0) scale(1,1) } 45% { transform: translateY(14px) scale(1,1) } 52% { transform: translateY(16px) scale(1.18,.72) } 62% { transform: translateY(10px) scale(.94,1.08) } 100% { transform: translateY(0) scale(1,1) } }
 @keyframes прив-строка { from { opacity: 0; transform: translate3d(0,-18px,0) } to { opacity: 1; transform: none } }
 @keyframes прив-пульс { 0%,100% { opacity: 1; transform: scale(1) } 50% { opacity: .45; transform: scale(.8) } }
+@keyframes прив-лента { from { transform: translate3d(0,0,0) } to { transform: translate3d(-50%,0,0) } }
+.прив-лента:hover > div { animation-play-state: paused }
 @keyframes прив-блик { 0% { left: -70% } 55%,100% { left: 130% } }
 .прив-появись { opacity: 0; transform: translate3d(0, 40px, 0); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1) }
 .прив-появись.слева { transform: translate3d(-160px, 0, 0); transition-duration: 1.2s }
@@ -432,85 +434,61 @@ function КартаDEX() {
   );
 }
 
-/* Лента сделок — живая, видна без входа.
- *
- * Сделки площадки отдаёт /api/trades-feed (тикер, сумма, время — без
- * людей). Пока их мало, ленту добирают сделки демо-токена из /api/live:
- * их каждые 0,3 с разыгрывает сервер, и они помечены «демо», чтобы не
- * выдавать их за настоящие. Новая строка въезжает сверху. */
-const ВИДНО_СДЕЛОК = 8;
-const МОНЕТА_СЕТИ = { solana: "SOL", ton: "GRAM", bsc: "BNB", base: "ETH", eth: "ETH" };
-function числоРу(n, знаков = 2) {
-  return Number(n || 0).toLocaleString("ru-RU", { maximumFractionDigits: знаков, minimumFractionDigits: 0 });
-}
-function давно(мс) {
-  const с = Math.max(0, Math.round((Date.now() - мс) / 1000));
-  return с < 3 ? "сейчас" : с < 60 ? `${с} с` : с < 3600 ? `${Math.floor(с / 60)} мин` : `${Math.floor(с / 3600)} ч`;
-}
-function ЛентаСделок() {
-  const [настоящие, setНастоящие] = useState([]);
-  const [демо, setДемо] = useState([]);
-  const [, тик] = useState(0);
-  const [реф, в] = useВКадре(0.2);
+/* Бегущая строка под шапкой — настоящие токены площадки: логотип,
+   тикер, капитализация и изменение за сутки. Берутся из той же таблицы,
+   что лента приложения (tokens + curve_cache), курс монет — с сервера.
+   Нет ни одного токена с ценой — строки нет вовсе. */
+function БегущаяСтрока({ сверху }) {
+  const [токены, setТокены] = useState([]);
   useEffect(() => {
-    if (!в) return undefined;
     let жив = true;
-    const площадка = async () => {
+    const загрузить = async () => {
       try {
-        const j = await fetch(апи("/api/trades-feed?limit=12")).then((r) => r.json());
-        if (жив && j && Array.isArray(j.rows)) setНастоящие(j.rows.filter((r) => r.ticker && r.amount > 0).map((r) => ({
-          id: `р${r.id}`, сторона: r.kind, тикер: r.ticker, лого: r.logoUrl, сумма: r.amount, монета: МОНЕТА_СЕТИ[r.chain] || "GRAM",
-          usd: r.usd, at: new Date(r.at).getTime(),
-        })));
-      } catch { /* лента подождёт следующего круга */ }
+        const [{ data }, курсы] = await Promise.all([
+          supabase.from("tokens")
+            .select("id, ticker, name, logo_url, chain, created_at, curve_cache(price_ton, change24, supply, logo_url)")
+            .order("created_at", { ascending: false }).limit(40),
+          fetch(апи("/api/market-rates")).then((r) => r.json()).catch(() => null),
+        ]);
+        const курсSol = (курсы && курсы.sol && курсы.sol.price) || 0;
+        const курсTon = (курсы && курсы.gram && курсы.gram.price) || 0;
+        const строки = (data || []).map((т) => {
+          const к = Array.isArray(т.curve_cache) ? т.curve_cache[0] : т.curve_cache;
+          const курс = т.chain === "solana" ? курсSol : курсTon;
+          const кап = к && к.price_ton > 0 && курс > 0 ? к.price_ton * курс * (Number(к.supply) || 1e9) : 0;
+          return { id: т.id, тикер: т.ticker, лого: т.logo_url || (к && к.logo_url) || null, кап, рост: Number(к && к.change24) || 0 };
+        }).filter((т) => т.тикер && т.кап > 0);
+        if (жив) setТокены(строки);
+      } catch { /* строки не будет — приветствие и без неё целое */ }
     };
-    const живые = async () => {
-      try {
-        const j = await fetch(апи("/api/live?demo=1")).then((r) => r.json());
-        const список = j && j.trades ? Object.values(j.trades)[0] : null;
-        if (жив && Array.isArray(список)) setДемо(список.slice(0, ВИДНО_СДЕЛОК).map((r) => ({
-          id: `д${r.id}`, сторона: r.side, тикер: "DEMO", лого: null, сумма: r.coin, монета: "GRAM", usd: 0, at: r.at, демо: true,
-        })));
-      } catch { /* лента подождёт следующего круга */ }
-    };
-    площадка(); живые();
-    const и1 = setInterval(площадка, 4000), и2 = setInterval(живые, 900), и3 = setInterval(() => тик((x) => x + 1), 1000);
-    return () => { жив = false; clearInterval(и1); clearInterval(и2); clearInterval(и3); };
-  }, [в]);
-  // Настоящие сделки — всегда сверху: демо, идущее каждые 0,3 с, иначе
-  // вытесняло бы их из ленты за секунду.
-  const строки = [...[...настоящие].sort((a, b) => b.at - a.at), ...демо].slice(0, ВИДНО_СДЕЛОК);
+    загрузить();
+    const и = setInterval(загрузить, 30000);
+    return () => { жив = false; clearInterval(и); };
+  }, []);
+  if (!токены.length) return null;
+  // Повторяем ряд, пока он не станет шире экрана, и ещё раз целиком —
+  // сдвиг на половину ленты незаметно замыкает её в кольцо.
+  const раз = Math.max(1, Math.ceil(16 / токены.length));
+  const ряд = Array.from({ length: раз }, () => токены).flat();
+  const кап = (n) => n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(1)}K` : `$${n.toFixed(0)}`;
+  const элемент = (т, i) => (
+    <span key={`${т.id}-${i}`} style={{ display: "inline-flex", alignItems: "center", gap: 9, padding: "0 26px", whiteSpace: "nowrap" }}>
+      {т.лого
+        ? <img src={т.лого} alt="" width={22} height={22} style={{ borderRadius: 999, objectFit: "cover" }} />
+        : <span style={{ width: 22, height: 22, borderRadius: 999, background: Ц.выше, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>{т.тикер[0]}</span>}
+      <span style={{ fontWeight: 800, color: Ц.лёд, fontSize: 14 }}>${т.тикер}</span>
+      <span style={{ color: Ц.тусклый, fontSize: 13.5, fontVariantNumeric: "tabular-nums" }}>{кап(т.кап)}</span>
+      <span style={{ color: т.рост >= 0 ? "#2EE87A" : Ц.вниз, fontSize: 13.5, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{т.рост >= 0 ? "+" : ""}{т.рост.toFixed(1)}%</span>
+    </span>
+  );
   return (
-    <div ref={реф} className="прив-виджет" style={{ width: 460, borderRadius: 24, background: Ц.поверхность, border: `1px solid ${Ц.линия}`, boxShadow: "0 30px 90px rgba(0,0,0,.45)", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: `1px solid ${Ц.линия}` }}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: Ц.лёд }}>Сделки Mintly</div>
-        <div className="прив-т" style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: Ц.тусклый, fontWeight: 600 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 999, background: "#2EE87A", animation: "прив-пульс 1.6s ease-in-out infinite" }} />в эфире
-        </div>
-      </div>
-      <div style={{ height: ВИДНО_СДЕЛОК * 62, overflow: "hidden" }}>
-        {строки.map((с) => {
-          const покупка = с.сторона !== "sell";
-          return (
-            <div key={с.id} style={{ height: 62, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 13, padding: "0 22px", borderBottom: `1px solid ${Ц.линия}`, animation: "прив-строка .45s cubic-bezier(.2,.8,.2,1) both" }}>
-              {с.лого
-                ? <img src={с.лого} alt="" width={36} height={36} style={{ borderRadius: 999, objectFit: "cover", flexShrink: 0 }} />
-                : <div style={{ width: 36, height: 36, borderRadius: 999, background: Ц.выше, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: Ц.лёд, flexShrink: 0 }}>{с.тикер[0]}</div>}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 15, fontWeight: 800, color: Ц.лёд }}>${с.тикер}</span>
-                  {с.демо && <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".08em", color: Ц.тусклый, border: `1px solid ${Ц.линия}`, borderRadius: 6, padding: "1px 5px" }}>ДЕМО</span>}
-                </div>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: покупка ? "#2EE87A" : Ц.вниз, marginTop: 2 }}>{покупка ? "Покупка" : "Продажа"}</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 14.5, fontWeight: 800, color: Ц.лёд, fontVariantNumeric: "tabular-nums" }}>{числоРу(с.сумма)} {с.монета}</div>
-                <div className="прив-т" style={{ fontSize: 12, color: Ц.тусклый, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{с.usd > 0 ? `$${числоРу(с.usd)} · ` : ""}{давно(с.at)}</div>
-              </div>
-            </div>
-          );
-        })}
-        {!строки.length && <div className="прив-т" style={{ padding: "40px 22px", textAlign: "center", color: Ц.тусклый, fontSize: 14 }}>Ждём первую сделку…</div>}
+    <div className="прив-лента" style={{
+      position: "fixed", top: сверху, left: 0, right: 0, zIndex: 19, height: 42, overflow: "hidden",
+      display: "flex", alignItems: "center", borderBottom: `1px solid ${Ц.линия}`, background: Ц.фон,
+      WebkitMaskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)", maskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)",
+    }}>
+      <div style={{ display: "flex", width: "max-content", animation: `прив-лента ${Math.max(30, ряд.length * 3.2)}s linear infinite` }}>
+        {ряд.map(элемент)}{ряд.map((т, i) => элемент(т, i + ряд.length))}
       </div>
     </div>
   );
@@ -735,6 +713,7 @@ function Приветствие({ onРаздел }) {
         </nav>
         <button onClick={() => setОкно(true)} style={{ ...кнопкаГлавная, height: 42, padding: "0 22px", fontSize: 15 }}>Войти</button>
       </header>
+      <БегущаяСтрока сверху={84} />
 
       {/* Начало — как первый кадр ролика: знак и имя, за ними медленный свет. */}
       <section style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
@@ -761,15 +740,11 @@ function Приветствие({ onРаздел }) {
         текст={<><Строки верх="Все сети" низ="в одном месте" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Gram, Solana, BNB Chain, Base и Ethereum — живая лента запусков всех сетей.</p></>}
         картинка={<СценаСетей />} />
 
-      <Раздел id="сделки"
-        текст={<><Строки верх="Сделки" низ="прямо сейчас" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Каждая покупка и продажа на площадке — в ленте в тот же миг.</p></>}
-        картинка={<ЛентаСделок />} />
-
-      <Раздел id="комиссия" обратно
+      <Раздел id="комиссия"
         текст={<Строки верх="Комиссия" низ="0%" размер={80} />}
         картинка={<Комиссия />} />
 
-      <Раздел id="покупка"
+      <Раздел id="покупка" обратно
         текст={<><Строки верх="Покупка" низ="за секунду" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Сумма, одно нажатие — и токены в кошельке. Свечи графика двигаются вместе со сделками.</p></>}
         картинка={<СценаПокупки />} />
 
