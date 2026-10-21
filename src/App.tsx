@@ -11249,33 +11249,35 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
     );
   }
 
+  /* Витрина — крупно: лицо токена посередине, под ним тикер, цифры и X.
+     Строка в ширину терялась среди ленты и не читалась главным местом. */
   return (
     <button
       onClick={() => onOpen(token)}
-      className="fx-tap w-full flex items-center text-left"
-      style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface, border: "none", position: "relative", overflow: "hidden" }}
+      className="fx-tap w-full flex flex-col items-center text-center"
+      style={{ gap: 0, padding: "26px 18px 18px", borderRadius: 24, background: T.surface, border: "none", position: "relative", overflow: "hidden" }}
     >
-      {/* Фон витрины — логотип самого токена, крупно и размыто: карточка
-          окрашивается в его цвета. Клетки, вспыхивающие поверх, читались
-          случайными пятнами. */}
-      <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: 16 }}>
+      <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: 24 }}>
         <img src={token.logoUrl || "/logo-star.png"} alt="" style={{
-          position: "absolute", left: "-10%", top: "50%", width: "120%", height: "auto", transform: "translateY(-50%)",
-          filter: "blur(34px) saturate(1.4)", opacity: token.logoUrl ? 0.55 : 0.22,
+          position: "absolute", left: "50%", top: "38%", width: "130%", height: "auto", transform: "translate(-50%, -50%)",
+          filter: "blur(40px) saturate(1.4)", opacity: token.logoUrl ? 0.5 : 0.2,
         }} />
-        <span style={{ position: "absolute", inset: 0, background: `linear-gradient(90deg, ${hexA(T.surface, 0.55)} 0%, ${hexA(T.surface, 0.2)} 100%)` }} />
+        <span style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${hexA(T.surface, 0.1)} 0%, ${hexA(T.surface, 0.55)} 75%, ${hexA(T.surface, 0.8)} 100%)` }} />
       </span>
       <span style={{ position: "relative", zIndex: 1 }}>
-        <TokenAvatar size={44} tone={рост ? "up" : "down"} src={token.logoUrl} />
+        <TokenAvatar size={96} tone={рост ? "up" : "down"} src={token.logoUrl} />
       </span>
-      <span className="flex-1 min-w-0" style={{ position: "relative", zIndex: 1, display: "block" }}>
-        <span className="flex items-center" style={{ gap: 8 }}>{подписи}</span>
-        <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 3 }}>
-          <ТекстСЧислами text={fmtUSD(token.mcapNum)} /> · ${token.vol}
+      <span className="flex items-center justify-center" style={{ position: "relative", zIndex: 1, gap: 8, marginTop: 14 }}>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800 }}>${token.ticker}</span>
+        <span style={{ fontFamily: monoFont, color: рост ? T.up : T.down, fontSize: 15, fontWeight: 700 }}>
+          {рост ? "+" : ""}<ТекстСЧислами text={(token.change || 0).toFixed(1)} />%
         </span>
-        {строкаX}
       </span>
-      {точки}
+      <span style={{ position: "relative", zIndex: 1, display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 4 }}>
+        <ТекстСЧислами text={fmtUSD(token.mcapNum)} /> · ${token.vol}
+      </span>
+      {строкаX && <span className="flex justify-center" style={{ position: "relative", zIndex: 1, marginTop: 6 }}>{строкаX}</span>}
+      {точки && <span className="flex justify-center" style={{ position: "relative", zIndex: 1, marginTop: 14 }}>{точки}</span>}
     </button>
   );
 }
@@ -14845,23 +14847,25 @@ function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} })
       key={ключ}
       onClick={скоро ? undefined : () => { haptic("light"); onClick(); }}
       className="fx-tap fx-card w-full flex items-center text-left"
+      // Тот же вид, что у плиток ниже и у остального приложения: ровная
+      // поверхность, белый значок, белая кнопка. Цветные заливки
+      // (голубая, жёлтая) выбивались из чёрно-белого интерфейса.
       style={{
-        gap: 14, padding: "16px 16px", borderRadius: 22, border: "none",
-        background: `linear-gradient(120deg, ${hexA(цвет, 0.22)} 0%, ${hexA(цвет, 0.06)} 60%, ${T.surface} 100%)`,
-        boxShadow: `inset 0 0 0 1px ${hexA(цвет, 0.18)}`,
-        animationDelay: `${i * 60}ms`, opacity: скоро ? 0.75 : 1,
+        gap: 14, padding: "16px 16px", borderRadius: 22, border: "none", background: T.surface,
+        animationDelay: `${i * 60}ms`,
       }}
     >
-      <span className="flex items-center justify-center flex-shrink-0" style={{ width: 46, height: 46, borderRadius: 14, background: hexA(цвет, 0.18) }}>
-        <Значок size={22} color={цвет} />
+      <span className="flex items-center justify-center flex-shrink-0" style={{ width: 46, height: 46, borderRadius: 999, background: T.surfaceHi }}>
+        <Значок size={21} color={T.ice} />
       </span>
       <span className="flex flex-col" style={{ flex: 1, minWidth: 0, gap: 3 }}>
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 800 }}>{заголовок}</span>
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.35 }}>{текст}</span>
       </span>
       <span style={{
-        flexShrink: 0, padding: "7px 12px", borderRadius: 999, fontFamily: displayFont, fontSize: 12.5, fontWeight: 800,
-        background: скоро ? T.surfaceHi : цвет, color: скоро ? T.muted : "#0B0B0F",
+        flexShrink: 0, padding: "8px 14px", borderRadius: 999, fontFamily: displayFont, fontSize: 12.5, fontWeight: 800,
+        background: скоро ? "transparent" : T.ice, color: скоро ? T.faint : T.bg,
+        boxShadow: скоро ? `inset 0 0 0 1px ${T.lineHi}` : "none",
       }}>{скоро ? "Скоро" : кнопка}</span>
     </button>
   );
