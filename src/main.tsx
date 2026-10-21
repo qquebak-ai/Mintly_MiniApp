@@ -2,7 +2,6 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
 import TonLaunchApp from "./App";
-import Desktop from "./Desktop";
 import PC from "./PC";
 import { разобратьВозвратOAuth } from "./oauthВозврат";
 import "./index.css";
@@ -159,7 +158,14 @@ function десктопнаяВитрина() {
    PC.tsx). Старая витрина осталась по адресу /pro. */
 const пк = десктопнаяВитрина();
 if (пк) { window.__ПК = true; document.documentElement.classList.add("пк"); }
-const Корень = window.location.pathname.replace(/\/+$/, "") === "/pro" ? Desktop : пк ? PC : TonLaunchApp;
+/* Старая витрина /pro — отдельным куском, по требованию. Вместе с ней
+   в общий файл попадала вся библиотека Solana для её торговли — четверть
+   мегабайта кода, которую качал каждый, кто открывал сайт или
+   приложение, хотя /pro почти никто не открывает. */
+const Desktop = React.lazy(() => import("./Desktop"));
+const Корень = window.location.pathname.replace(/\/+$/, "") === "/pro"
+  ? () => <React.Suspense fallback={null}><Desktop /></React.Suspense>
+  : пк ? PC : TonLaunchApp;
 
 function нарисовать() {
   try {

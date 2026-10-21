@@ -13,7 +13,6 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
-import { профильЕсть } from "./DesktopAuth";
 import TonLaunchApp from "./App";
 import { апи } from "./апи";
 
@@ -514,10 +513,12 @@ function Раздел({ id, текст, картинка, обратно = false
   );
 }
 
-/* Всё, что приветствие показывает, — заранее: шрифты и экраны телефонов.
-   С font-display: swap текст сначала рисовался запасным шрифтом и на
-   глазах перескакивал, а телефоны догружались уже на прокрутке. Заставка
-   из index.html держится, пока это не готово (не дольше 2,5 с). */
+/* Приветствие не ждёт картинок: раньше страница стояла пустой до 2,5 с,
+   пока не догрузятся экраны телефонов, хотя на первом экране их нет
+   вовсе. Ждём только шрифт, и то не дольше трети секунды (он заранее
+   подгружается из index.html, так что обычно уже на месте), — иначе
+   заголовок на глазах перескакивал бы с запасного шрифта. Картинки
+   разделов грузятся следом, фоном: к прокрутке они уже готовы. */
 const КАРТИНКИ_ПРИВЕТСТВИЯ = ["/landing/create-sol.webp", "/landing/pad-sol.webp", "/landing/buy-sol.webp", "/landing/tok/bonk.webp", "/landing/tok/popcat.webp", "/landing/tok/mew.webp", "/landing/tok/bome.webp", "/landing/tok/wif.webp", "/logo-star.png", "/coins/gram.png", "/coins/sol.png", "/coins/bnb.svg", "/coins/base.svg", "/coins/eth.svg"];
 function useГотовоПриветствие() {
   const [готово, setГотово] = useState(false);
@@ -526,12 +527,12 @@ function useГотовоПриветствие() {
     const шрифты = document.fonts ? ["400", "600", "800"].flatMap((в) => [
       document.fonts.load(`${в} 20px MintlyUI`, "Мintly"), document.fonts.load(`${в} 20px MintlyUI`, "Ая"),
     ]) : [];
-    const картинки = КАРТИНКИ_ПРИВЕТСТВИЯ.map((src) => { const и = new Image(); и.src = src; return и.decode ? и.decode().catch(() => {}) : Promise.resolve(); });
-    const стоп = new Promise((r) => setTimeout(r, 2500));
-    Promise.race([Promise.all([...шрифты, ...картинки]).catch(() => {}), стоп]).then(() => { if (жив) setГотово(true); });
+    КАРТИНКИ_ПРИВЕТСТВИЯ.forEach((src) => { const и = new Image(); и.decoding = "async"; и.src = src; });
+    const стоп = new Promise((r) => setTimeout(r, 300));
+    Promise.race([Promise.all(шрифты).catch(() => {}), стоп]).then(() => { if (жив) setГотово(true); });
     return () => { жив = false; };
   }, []);
-  useEffect(() => { if (!готово) return; const ш = document.getElementById("ширма"); if (ш) ш.remove(); if (window.__снятьБлюрПК) window.__снятьБлюрПК(); }, [готово]);
+  useEffect(() => { if (!готово) return; const ш = document.getElementById("ширма"); if (ш) ш.remove(); }, [готово]);
   return готово;
 }
 
@@ -795,10 +796,25 @@ function разобратьВозвратX() {
 }
 const ВОЗВРАТ_X = typeof window !== "undefined" ? разобратьВозвратX() : {};
 
-const этоПКСайт = () => typeof window !== "undefined" && !!window.__снятьБлюрПК;
+/* Вошёл ли человек — сперва по памяти браузера, без сети. Раньше сайт
+   ничего не показывал, пока база не подтвердит сессию и профиль: два
+   сетевых круга пустого экрана на каждом открытии. Теперь страница
+   рисуется сразу по сохранённой сессии, а проверка идёт следом. */
+function сессияВПамяти() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const к = localStorage.key(i);
+      if (к && /^sb-.+-auth-token$/.test(к) && localStorage.getItem(к)) return true;
+    }
+  } catch (e) { /* хранилище закрыто */ }
+  return false;
+}
+
 export default function PC() {
   // null — ещё проверяем; false — нужен вход; true — можно в приложение.
-  const [вошёл, setВошёл] = useState(null);
+  // Возврат из X со ссылкой входа — единственный случай, когда ждём:
+  // сессия появится только после обмена ссылки, и приветствие мигнуло бы.
+  const [вошёл, setВошёл] = useState(() => (ВОЗВРАТ_X.токен ? null : сессияВПамяти()));
   // Раздел, который гость открыл из шапки, — с ним показывается приложение.
   const [раздел, setРаздел] = useState(ВОЗВРАТ_X.заготовка || ВОЗВРАТ_X.беда ? "home" : null);
   useEffect(() => {
@@ -809,17 +825,20 @@ export default function PC() {
     let жив = true;
     const проверить = async () => {
       const { data } = await supabase.auth.getSession();
-      const есть = !!(data && data.session) && (await профильЕсть());
-      window.__ПК_ПРОФИЛЬ_ЕСТЬ = есть;
-      if (жив) setВошёл(есть);
+      const сессия = data && data.session;
+      if (!сессия) { window.__ПК_ПРОФИЛЬ_ЕСТЬ = false; if (жив) setВошёл(false); return; }
+      const { data: строка, error } = await supabase.from("profiles").select("id").eq("id", сессия.user.id).maybeSingle();
+      // Сбой связи — это «не узнали», а не «нет»: уже открытый сайт из-за
+      // него не закрываем.
+      if (error) { if (жив) setВошёл((было) => (было === null ? true : было)); return; }
+      window.__ПК_ПРОФИЛЬ_ЕСТЬ = !!строка;
+      if (жив) setВошёл(!!строка);
     };
     проверить();
     const { data: подписка } = supabase.auth.onAuthStateChange(() => { проверить(); });
     return () => { жив = false; подписка && подписка.subscription && подписка.subscription.unsubscribe(); };
   }, []);
-  // Пока проверяем вход — ничего своего: под пустым корнем видны
-  // размытые очертания страницы из index.html, а не чёрное поле.
-  if (вошёл === null) return этоПКСайт() ? null : <div style={{ position: "fixed", inset: 0, background: Ц.фон }} />;
+  if (вошёл === null) return null;
   if (!вошёл && !раздел) return <Приветствие onРаздел={(р) => { window.__ПК_РАЗДЕЛ = р; setРаздел(р); }} />;
   return (
     <>

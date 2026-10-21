@@ -8346,7 +8346,7 @@ function ЗнакСетиНав({ сеть: с, size, style }) {
 const ШИРИНА_ПАНЕЛИ_ПК = 248;
 /* Меню слева — на компьютере вместо капсулы внизу: на мониторе её
    центр пришёлся бы на середину широкого экрана, далеко от всего. */
-function БоковаяПанельПК({ view, tab, profile, accountCreated, сеть, onСеть, onTab, onНастройки, onМеню }) {
+function БоковаяПанельПК({ view, tab, profile, accountCreated, сеть, onСеть, onTab, onНастройки, onМеню, профильГрузится = false }) {
   const пункты = [
     { id: "home", подпись: t("navHome"), Значок: ЗначокДом },
     { id: "mempad", подпись: t("navMempad"), Значок: ЗначокОбмен },
@@ -8386,15 +8386,27 @@ function БоковаяПанельПК({ view, tab, profile, accountCreated, с
       {сети.map(([к, имя]) => кнопка(сеть === к, () => onСеть(к), (<><ЗнакСетиНав сеть={к} size={20} /> {имя}</>), к))}
       <div style={{ flex: 1 }} />
       {кнопка(false, onНастройки, (<><Settings size={20} color="#9B9FA9" /> {t("settings")}</>), "настройки")}
+      {/* Пока профиль едет, плашка стоит размытой: раньше на её месте
+          на долю секунды мелькало «Аккаунт не создан» у того, у кого он
+          есть. */}
       <button
         onClick={() => { haptic("light"); onМеню(); }}
-        className="fx-tap flex items-center w-full"
+        className={профильГрузится ? "fx-tap flex items-center w-full виджет виджет-грузится" : "fx-tap flex items-center w-full виджет"}
         style={{ gap: 12, padding: "10px 12px", borderRadius: 14, border: "none", background: T.surface, textAlign: "left", marginTop: 6 }}
       >
-        <ЛицоЧеловека ник={profile && profile.nickname} src={profile && profile.avatarUrl} size={34} />
-        <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
-          {accountCreated && profile && profile.nickname ? `@${profile.nickname}` : t("accountNotCreated")}
-        </span>
+        {профильГрузится ? (
+          <>
+            <div style={{ width: 34, height: 34, borderRadius: 999, background: T.surfaceHi, flex: "none" }} />
+            <div style={{ width: 96, height: 12, borderRadius: 6, background: T.surfaceHi }} />
+          </>
+        ) : (
+          <>
+            <ЛицоЧеловека ник={profile && profile.nickname} src={profile && profile.avatarUrl} size={34} />
+            <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
+              {accountCreated && profile && profile.nickname ? `@${profile.nickname}` : t("accountNotCreated")}
+            </span>
+          </>
+        )}
       </button>
     </aside>
   );
@@ -14575,7 +14587,6 @@ const КЛЮЧ_ПРОФИЛЯ = "mintly_profile_cache";
 
 function снятьШирму({ уйти = false } = {}) {
   if (typeof document === "undefined") return;
-  if (window.__снятьБлюрПК) window.__снятьБлюрПК();
   const поле = document.getElementById("ширма");
   if (!поле || поле.__снимаем) return;
   поле.__снимаем = true;
@@ -14669,22 +14680,6 @@ function РазмытаяЗаглушка({ высота = 120 }) {
           <div style={{ width: 64, height: 16, borderRadius: 999, background: T.surfaceHi, flex: "none" }} />
         </div>
       ))}
-    </div>
-  );
-}
-/* Весь сайт, пока проверяется вход: размытые панель слева, лента
-   сверху и три колонки — те же очертания, что встают первыми из
-   index.html, так что подмена не видна. */
-function РазмытыйСайт() {
-  const плашка = (стиль) => <div style={{ position: "absolute", background: "rgba(150,150,160,0.16)", borderRadius: 22, ...стиль }} />;
-  return (
-    <div aria-busy className="размытие-пк" style={{ position: "absolute", inset: 0, filter: "blur(16px)" }}>
-      {плашка({ left: 0, right: 0, top: 0, height: 42, borderRadius: 0 })}
-      {плашка({ left: 0, top: 0, bottom: 0, width: 248, borderRadius: 0 })}
-      {плашка({ left: 300, right: 56, top: 90, height: 120 })}
-      {плашка({ left: 300, width: "calc((100% - 404px) / 3)", top: 240, bottom: 40 })}
-      {плашка({ left: "calc(326px + (100% - 404px) / 3)", width: "calc((100% - 404px) / 3)", top: 240, bottom: 40 })}
-      {плашка({ right: 56, width: "calc((100% - 404px) / 3)", top: 240, bottom: 40 })}
     </div>
   );
 }
@@ -15011,10 +15006,27 @@ function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} })
 /* Бегущая строка токенов вверху сайта — над любым разделом. Токены те
    же, что в мемпаде (с живыми цифрами); нажатие открывает токен,
    наведение останавливает ленту. */
-function БегущаяСтрокаПК({ tokens = [], onOpen }) {
+function БегущаяСтрокаПК({ tokens = [], onOpen, грузится = false }) {
   const ряд0 = useMemo(() => (tokens || []).map(localTokenToFeedShape)
     .filter((tok) => tok.ticker && tok.mcapNum > 0 && запускСостоялся(tok)), [tokens]);
-  if (!ряд0.length) return null;
+  /* Пока ленты нет, полоса стоит на своём месте размытой: раньше её не
+     было вовсе, а потом она появлялась и сдвигала всю страницу вниз. */
+  if (!ряд0.length) {
+    if (!грузится) return null;
+    return (
+      <div aria-busy style={{ position: "relative", zIndex: 6, background: T.bg, flexShrink: 0, height: 42, overflow: "hidden", display: "flex", alignItems: "center", borderBottom: `1px solid ${T.line}` }}>
+        <div className="виджет виджет-грузится" style={{ display: "flex", alignItems: "center", gap: 48, padding: "0 24px" }}>
+          {Array.from({ length: 12 }, (_, и) => (
+            <div key={и} style={{ display: "flex", alignItems: "center", gap: 9, flex: "none" }}>
+              <div style={{ width: 22, height: 22, borderRadius: 999, background: T.surfaceHi }} />
+              <div style={{ width: 46 + (и * 7) % 20, height: 11, borderRadius: 6, background: T.surfaceHi }} />
+              <div style={{ width: 40, height: 10, borderRadius: 5, background: hexA(T.ice, 0.08) }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
   const раз = Math.max(1, Math.ceil(14 / ряд0.length));
   const ряд = Array.from({ length: раз }, () => ряд0).flat();
   const элемент = (tok, i) => {
@@ -15038,6 +15050,29 @@ function БегущаяСтрокаПК({ tokens = [], onOpen }) {
       <style>{`@keyframes лентаПК { from { transform: translate3d(0,0,0) } to { transform: translate3d(-50%,0,0) } } .лента-пк:hover > div { animation-play-state: paused }`}</style>
       <div style={{ display: "flex", width: "max-content", animation: `лентаПК ${Math.max(28, ряд.length * 3)}s linear infinite` }}>
         {ряд.map(элемент)}{ряд.map((tok, i) => элемент(tok, i + ряд.length))}
+      </div>
+    </div>
+  );
+}
+
+/* Заготовка строки Пульса — те же места, что у настоящей: кольцо с
+   логотипом, тикер, цифры, полоска кривой, капитализация. Сама она не
+   размыта: размыта вся колонка целиком (класс виджет-грузится), и
+   второе размытие поверх первого превратило бы строки в кашу. */
+function СтрокаПульсаЗаготовка({ и = 0, колонка = "new" }) {
+  const ш = (база, шаг) => `${база + ((и * шаг) % 22)}%`;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderBottom: `1px solid ${T.line}` }}>
+      <div style={{ width: 52, height: 52, borderRadius: 999, background: T.surfaceHi, flex: "none" }} />
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 7 }}>
+        <div style={{ width: ш(38, 13), height: 13, borderRadius: 6, background: T.surfaceHi }} />
+        <div style={{ width: ш(52, 17), height: 10, borderRadius: 5, background: hexA(T.ice, 0.08) }} />
+        {колонка !== "dex" && <div style={{ width: "100%", height: 3, borderRadius: 2, background: T.line }} />}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flex: "none" }}>
+        <div style={{ width: 22, height: 8, borderRadius: 4, background: hexA(T.ice, 0.08) }} />
+        <div style={{ width: 58, height: 13, borderRadius: 6, background: T.surfaceHi }} />
+        <div style={{ width: 40, height: 10, borderRadius: 5, background: hexA(T.up, 0.25) }} />
       </div>
     </div>
   );
@@ -15134,6 +15169,9 @@ function ПульсПК({ curveTokens = [], onOpenToken, onGoCreate, сеть = 
   // Высота колонок — по окну: страница не листается, листаются колонки.
   // Окно меряется в точках до масштаба, поэтому делим на него.
   const высота = Math.max(420, window.innerHeight / масштабПК() - 150);
+  // Ленты ещё нет — каждая колонка стоит целиком размытой, с заготовками
+  // строк внутри, и проясняется, когда приходят данные.
+  const ждём = грузится && !свои.length;
   return (
     <div className="fx-view" style={{ paddingTop: 20, paddingBottom: 8 }}>
       <div className="flex items-end justify-between" style={{ marginBottom: 18, gap: 16 }}>
@@ -15150,17 +15188,17 @@ function ПульсПК({ curveTokens = [], onOpenToken, onGoCreate, сеть = 
         {КОЛОНКИ_ПУЛЬСА.map((к) => {
           const список = колонки[к.id];
           return (
-            <div key={к.id} style={{ border: `1px solid ${T.line}`, borderRadius: 16, background: T.surface, overflow: "hidden", display: "flex", flexDirection: "column", height: высота }}>
+            <div key={к.id} className={ждём ? "виджет виджет-грузится" : "виджет"} aria-busy={ждём || undefined} style={{ border: `1px solid ${T.line}`, borderRadius: 16, background: T.surface, overflow: "hidden", display: "flex", flexDirection: "column", height: высота }}>
               <div className="flex items-center justify-between" style={{ padding: "14px 16px", borderBottom: `1px solid ${T.line}`, flexShrink: 0 }}>
                 <div>
                   <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 800 }}>{к.заголовок}</div>
                   <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 2 }}>{к.подпись}</div>
                 </div>
-                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, fontWeight: 700, padding: "4px 10px", borderRadius: 999, border: `1px solid ${T.line}` }}>{список.length}</span>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, fontWeight: 700, padding: "4px 10px", borderRadius: 999, border: `1px solid ${T.line}` }}>{ждём ? "·" : список.length}</span>
               </div>
-              <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-                {грузится && !список.length
-                  ? <div className="flex items-center justify-center" style={{ height: 200 }}><ЗнакЗагрузки size={88} /></div>
+              <div className="no-scrollbar" style={{ flex: 1, overflowY: ждём ? "hidden" : "auto", minHeight: 0 }}>
+                {ждём
+                  ? Array.from({ length: 9 }, (_, и) => <СтрокаПульсаЗаготовка key={и} и={и} колонка={к.id} />)
                   : список.length
                     ? список.slice(0, 80).map((tok) => <СтрокаПульса key={tok.id} t={tok} onOpen={onOpenToken} />)
                     : <div style={{ padding: "40px 16px", textAlign: "center", fontFamily: bodyFont, color: T.faint, fontSize: 13.5 }}>Пока пусто</div>}
@@ -25766,27 +25804,22 @@ function ОнбКнопка({ onClick, disabled = false, занята = false, �
 /* Пока аккаунт проверяется (или связь пропала): колёсико, а через шесть
    секунд — кнопка «Повторить». Без неё человек, у которого не ответил
    сервер, остался бы смотреть на колёсико без конца. */
-function ЗагрузкаВхода({ onВойти = null }) {
+function ЗагрузкаВхода({ onВойти = null, проверено = false }) {
   const [долго, setДолго] = useState(false);
-  useEffect(() => {
-    // На сайте размытая страница без единой подписи читалась как пустой
-    // серый экран — объяснение и кнопки появляются раньше.
-    const id = setTimeout(() => setДолго(true), этоПК() ? 3000 : 6000);
-    return () => clearTimeout(id);
-  }, []);
   const пк = этоПК();
-  return (
-    <div
-      aria-hidden={!долго}
-      style={{
-        position: "absolute", inset: 0, zIndex: 200, visibility: "visible",
-        // На сайте вместо чёрного поля — размытие всего, что под ним.
-        background: пк ? T.bg : ОНБ.фон, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22,
-      }}
-    >
-      {пк ? <РазмытыйСайт /> : <ЗнакЗагрузки size={88} вид="раскрытие" />}
-      {пк && долго && (
-        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 18, padding: "34px 40px", borderRadius: 26, background: hexA(T.surface, 0.9), border: `1px solid ${T.line}` }}>
+  useEffect(() => {
+    // На сайте страница под этим слоем уже стоит (см. visibility ниже):
+    // ждать нечего, а карточка — только если вход правда не решился.
+    // Проверка закончилась без аккаунта — три секунды; ещё идёт — даём
+    // ей двенадцать, медленная связь не повод пугать человека.
+    const id = setTimeout(() => setДолго(true), пк ? (проверено ? 3000 : 12000) : 6000);
+    return () => clearTimeout(id);
+  }, [пк, проверено]);
+  if (пк) {
+    if (!долго) return null;
+    return (
+      <div style={{ position: "absolute", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: hexA(T.bg, 0.6) }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18, padding: "34px 40px", borderRadius: 26, background: T.surface, border: `1px solid ${T.line}` }}>
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800 }}>Аккаунт не открылся</span>
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 15, textAlign: "center", maxWidth: 340, lineHeight: 1.45 }}>Сервер не ответил вовремя. Обнови страницу или войди заново.</span>
           <div style={{ display: "flex", gap: 12 }}>
@@ -25794,8 +25827,19 @@ function ЗагрузкаВхода({ onВойти = null }) {
             {onВойти && <button onClick={onВойти} className="fx-tap" style={{ height: 46, padding: "0 26px", borderRadius: 999, border: `1px solid ${T.line}`, background: "transparent", color: T.ice, fontFamily: bodyFont, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>Войти</button>}
           </div>
         </div>
-      )}
-      {!пк && долго && (
+      </div>
+    );
+  }
+  return (
+    <div
+      aria-hidden={!долго}
+      style={{
+        position: "absolute", inset: 0, zIndex: 200, visibility: "visible",
+        background: ОНБ.фон, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22,
+      }}
+    >
+      <ЗнакЗагрузки size={88} вид="раскрытие" />
+      {долго && (
         <button
           onClick={() => window.location.reload()}
           className="fx-tap"
@@ -32102,7 +32146,9 @@ function mapTokenRow(row) {
       style={{
         background: T.bg, height: этоПК() ? "100vh" : height, minHeight: этоПК() ? "100vh" : height, width: "100%", maxWidth: этоПК() ? "none" : 480,
         margin: "0 auto", fontFamily: bodyFont, position: "relative", overflow: "hidden",
-        visibility: доступЗакрыт ? "hidden" : "visible",
+        // На сайте страница не прячется, пока решается вход: каркас и
+        // размытые виджеты видны сразу, а не через сетевой круг.
+        visibility: доступЗакрыт && !этоПК() ? "hidden" : "visible",
       }}
     >
       <GlobalStyle />
@@ -32110,7 +32156,7 @@ function mapTokenRow(row) {
       {/* Окна входа ещё нет (проверяем аккаунт или связь пропала), а
           приложение закрыто: вместо пустого экрана — колёсико. Потомок
           с visibility: visible остаётся видимым внутри скрытого корня. */}
-      {доступЗакрыт && !profileModalOpen && <ЗагрузкаВхода onВойти={openLoginProfile} />}
+      {доступЗакрыт && !profileModalOpen && <ЗагрузкаВхода onВойти={openLoginProfile} проверено={authChecked} />}
       {/* Запуск токена показывает ракету — и только её. Обводки
           «Динамического острова» и контура экрана, которые она
           поджигала, убраны: на разных телефонах они ложились по-разному,
@@ -32244,10 +32290,11 @@ function mapTokenRow(row) {
           onTab={(id) => { if (id === "create") openCreate(); else goTab(id); }}
           onНастройки={() => setНастройкиОткрыты(true)}
           onМеню={() => setМенюОткрыто(true)}
+          профильГрузится={!authChecked && !accountCreated}
         />
       )}
       <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column", marginLeft: этоПК() ? ШИРИНА_ПАНЕЛИ_ПК : 0 }}>
-        {этоПК() && <БегущаяСтрокаПК tokens={communityTokens} onOpen={openToken} />}
+        {этоПК() && <БегущаяСтрокаПК tokens={communityTokens} onOpen={openToken} грузится={!communityLoaded || tokensLoading} />}
         {/* Мягкие края прокрутки.
             Содержимое обрывалось ровно по границе экрана — строка или
             карточка резались пополам, и это читалось как поломка. Две
