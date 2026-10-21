@@ -18783,8 +18783,8 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
           Mintly
         </span>}
         {/* Знак приложения — в углу, где у карт стоит логотип банка. */}
-        <svg aria-hidden width={видКарты.минимал ? 20 : 30} height={видКарты.минимал ? 20 : 30} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: видКарты.минимал ? 18 : 14, right: видКарты.минимал ? 20 : 16, pointerEvents: "none" }}>
-          <path d={ПУТЬ_ЗВЕЗДЫ} fill={hexA("#FFFFFF", видКарты.минимал ? 0.7 : 0.9)} />
+        <svg aria-hidden width={видКарты.минимал ? 34 : 40} height={видКарты.минимал ? 34 : 40} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: видКарты.минимал ? 14 : 12, right: видКарты.минимал ? 16 : 14, pointerEvents: "none" }}>
+          <path d={ПУТЬ_ЗВЕЗДЫ} fill={hexA("#FFFFFF", видКарты.минимал ? 0.8 : 0.9)} />
         </svg>
         {/* Имя держателя, как на дебетовой карте: ник заглавными, с
             разрядкой, внизу карты. Чипа с монетами там больше нет —
