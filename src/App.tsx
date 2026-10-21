@@ -134,6 +134,17 @@ function hexA(hex, alpha) {
    hardcoded white glows; ink(alpha) is the same idea for structural
    (grid line / vignette) effects that used to assume a dark backdrop. */
 let T = { ...DARK_THEME };
+/* Цвет шапки Telegram. В полноэкранном режиме шапки как полосы нет —
+   от её цвета Telegram красит плашки «Назад» и «⌄ ···», а текст в них
+   берёт из своей темы. В светлой теме приложения при тёмной теме
+   Telegram плашки выходили белыми с белым текстом — пустыми. Поэтому в
+   полноэкранном режиме светлой темы шапка тёмная: плашки тёмные, текст
+   на них виден, а по белой странице они читаются как кнопки. */
+function цветШапкиTelegram(светлая) {
+  const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+  if (!светлая) return "#000000";
+  return tg && tg.isFullscreen ? "#1C1C1E" : "#FFFFFF";
+}
 function applyTheme(mode) {
   mode = mode === "White" ? "White" : "Dark";
   // Цвет страницы под приложением — тот же, что у темы: иначе при
@@ -144,7 +155,7 @@ function applyTheme(mode) {
     try {
       const tg = window.Telegram && window.Telegram.WebApp;
       const цвет = mode === "White" ? "#FFFFFF" : "#000000";
-      if (tg && tg.setHeaderColor) tg.setHeaderColor(цвет);
+      if (tg && tg.setHeaderColor) tg.setHeaderColor(цветШапкиTelegram(mode === "White"));
       if (tg && tg.setBackgroundColor) tg.setBackgroundColor(цвет);
       if (tg && tg.setBottomBarColor) tg.setBottomBarColor(цвет);
     } catch { /* старый клиент */ }
@@ -28359,7 +28370,7 @@ function useTelegramViewport() {
         tg.ready();
         tg.expand();
         if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
-        if (tg.setHeaderColor) { try { tg.setHeaderColor(T.bg); } catch (e) {} }
+        if (tg.setHeaderColor) { try { tg.setHeaderColor(цветШапкиTelegram(T.bg === "#FFFFFF")); } catch (e) {} }
         if (tg.setBackgroundColor) { try { tg.setBackgroundColor(T.bg); } catch (e) {} }
         // Нижняя полоса Telegram тоже чёрная — иначе под приложением светлела кайма.
         if (tg.setBottomBarColor) { try { tg.setBottomBarColor(T.bg); } catch (e) {} }
@@ -28427,7 +28438,12 @@ function useTelegramViewport() {
       // Переход на целую страницу приходит отдельным событием: отступы
       // при нём меняются, а viewportChanged может и не сработать.
       tg.onEvent && tg.onEvent("fullscreenChanged", update);
+      // Вошли в полноэкранный режим или вышли — плашкам Telegram нужен
+      // свой цвет шапки (см. цветШапкиTelegram).
+      const перекраситьШапку = () => { try { tg.setHeaderColor && tg.setHeaderColor(цветШапкиTelegram(T.bg === "#FFFFFF")); } catch (e) { /* старый клиент */ } };
+      tg.onEvent && tg.onEvent("fullscreenChanged", перекраситьШапку);
       return () => {
+        tg.offEvent && tg.offEvent("fullscreenChanged", перекраситьШапку);
         tg.offEvent && tg.offEvent("viewportChanged", update);
         document.removeEventListener("visibilitychange", приВозврате);
         window.removeEventListener("focus", приВозврате);
