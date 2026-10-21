@@ -6772,9 +6772,7 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
           className="flex items-center gap-2 rounded-[16px] px-3 py-2 overflow-hidden"
           style={{ background: hexA(T.up, 0.05), border: `1px solid ${hexA(T.up, 0.14)}` }}
         >
-          <div className="fx-skeleton" style={{ width: 20, height: 20, borderRadius: "50%" }} />
-          <div className="fx-skeleton" style={{ width: "38%", height: 10, borderRadius: 4 }} />
-          <div className="fx-skeleton" style={{ width: "22%", height: 10, borderRadius: 4 }} />
+          <ЗагрузкаБлока высота={22} size={22} />
         </div>
       );
     }
@@ -8774,16 +8772,8 @@ function Конфетти({ количество = 26 }) {
 }
 
 function MempadRowSkeleton({ index }) {
-  return (
-    <div className="w-full flex items-center gap-3 py-3" style={{ animationDelay: `${index * 55}ms` }}>
-      <div className="fx-skeleton" style={{ width: 54, height: 54, borderRadius: "50%" }} />
-      <div className="flex-1 flex flex-col gap-2">
-        <div className="fx-skeleton" style={{ width: "35%", height: 12, borderRadius: 4 }} />
-        <div className="fx-skeleton" style={{ width: "50%", height: 9, borderRadius: 4 }} />
-      </div>
-      <div className="fx-skeleton" style={{ width: 44, height: 22, borderRadius: 6 }} />
-    </div>
-  );
+  // Вместо ряда серых строк — один знак: первая «строка» и есть загрузка.
+  return index === 0 ? <ЗагрузкаБлока высота={220} /> : null;
 }
 
 // Приводит токен, запущенный в приложении, к тому же виду, в котором
@@ -8895,7 +8885,7 @@ function TokenCreatorCard({ ownerId, currentUserId, onNeedAuth, showToast, onOpe
   if (loading && !creator) {
     return (
       <div className="rounded-[22px] p-4 flex items-center justify-center" style={{ background: T.surface, border: "none" }}>
-        <ЗнакЗагрузки size={34} вид="контур" />
+        <ЗнакЗагрузки size={68} вид="контур" />
       </div>
     );
   }
@@ -9589,7 +9579,7 @@ function TrustPanel({ token, testnet = false, holders = null }) {
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{tr("trustUnknown")}</span>
         </div>
       ) : held === undefined ? (
-        <div className="fx-skeleton" style={{ width: "60%", height: 10, borderRadius: 4, marginTop: 8 }} />
+        <div style={{ marginTop: 6 }}><ЗнакЗагрузки size={20} /></div>
       ) : (
         <div className="flex items-center gap-1.5" style={{ marginTop: 6 }}>
           {sold ? <ShieldAlert size={13} color={T.down} /> : <ShieldCheck size={13} color={T.up} />}
@@ -10352,9 +10342,10 @@ function ПлашкаЧисла({ width = 90, height = 22, radius = 8, style = n
   return (
     <span
       aria-hidden
-      className="fx-skeleton"
-      style={{ display: "inline-block", width, height, borderRadius: radius, verticalAlign: "middle", ...(style || {}) }}
-    />
+      style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-start", width, height, verticalAlign: "middle", ...(style || {}) }}
+    >
+      <ЗнакЗагрузки size={Math.max(16, Math.min(40, height * 1.2))} />
+    </span>
   );
 }
 
@@ -10370,14 +10361,8 @@ function PageLoader({ minHeight = 260 }) {
     { высота: 140, ширина: "100%", радиус: 22 },
   ];
   return (
-    <div className="fx-view flex flex-col" style={{ minHeight, gap: 12, paddingTop: 4 }}>
-      {блоки.map((б, i) => (
-        <div
-          key={i}
-          className="fx-skeleton"
-          style={{ height: б.высота, width: б.ширина, borderRadius: б.радиус, animationDelay: `${i * 90}ms` }}
-        />
-      ))}
+    <div className="fx-view flex items-center justify-center" style={{ minHeight: minHeight || блоки.reduce((с, б) => с + б.высота + 12, 0), paddingTop: 4 }}>
+      <ЗнакЗагрузки size={120} />
     </div>
   );
 }
@@ -10429,7 +10414,7 @@ function BootSplash({ steps, done, уходит = false, insetTop = 0 }) {
         {/* Знак замирает по тому же признаку, по которому уходит сама
             заставка: и когда данные пришли, и когда мы устали их ждать —
             вид один и тот же. */}
-        <ЗнакЗагрузки size={96} вид="раскрытие" остановлен={done} />
+        <ЗнакЗагрузки size={160} вид="раскрытие" остановлен={done} />
         <div style={{ width: 132, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
           <div style={{
             width: `${Math.round(progress * 100)}%`, height: "100%", borderRadius: 999,
@@ -11603,7 +11588,7 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
             </svg>
           ) : (
             <div className="flex items-center justify-center" style={{ height: 200 }}>
-              {свечи === null ? <ЗнакЗагрузки size={40} /> : <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 13 }}>{t("chartNoData")}</span>}
+              {свечи === null ? <ЗнакЗагрузки size={80} /> : <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 13 }}>{t("chartNoData")}</span>}
             </div>
           )}
         </div>
@@ -11922,7 +11907,7 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
             листает, а рисовать и анимировать их браузер обязан — на
             переключении вкладки это заметная задержка. */}
         {идётЗагрузка
-          ? <div className="flex items-center justify-center" style={{ height: 260 }}><ЗнакЗагрузки size={56} /></div>
+          ? <div className="flex items-center justify-center" style={{ height: 260 }}><ЗнакЗагрузки size={112} /></div>
           : list.slice(0, 60).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)}
         {/* Пустой фильтр — просто пусто: ни знака, ни надписи. */}
       </div>
@@ -12442,7 +12427,7 @@ function ВТренде({ tokens = [], onOpen, onAll }) {
       </div>
       {список.length
         ? список.map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)
-        : <div className="flex items-center justify-center" style={{ height: 200 }}><ЗнакЗагрузки size={48} /></div>}
+        : <div className="flex items-center justify-center" style={{ height: 200 }}><ЗнакЗагрузки size={96} /></div>}
     </section>
   );
 }
@@ -13138,7 +13123,6 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
       style={{ gap: 11, background: "transparent", border: "none", padding: 0, alignSelf: "flex-start" }}
     >
       <span
-        className={грузится ? "fx-skeleton" : undefined}
         style={{
           width: 58, height: 58, borderRadius: "50%", flexShrink: 0,
           border: ОБОД_ЛИЦА, overflow: "hidden",
@@ -13149,6 +13133,7 @@ function ШапкаГлавной({ profile, accountCreated, onOpenMyProfile, г
           display: "flex", alignItems: "center", justifyContent: "center",
         }}
       >
+        {грузится && <ЗнакЗагрузки size={30} />}
         {!грузится && !аватар && (accountCreated && profile && profile.nickname
           ? <БукваАватара ник={profile.nickname} size={58} />
           : <User size={22} color={T.muted} />)}
@@ -13472,19 +13457,7 @@ function МояАктивность({ userId, тик = 0 }) {
     return (
       <section>
         <SectionTitle>{t("activityTitle")}</SectionTitle>
-        <div className="fx-грузится flex flex-col" aria-hidden style={{ gap: 8 }}>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex items-center"
-              style={{ gap: 10, padding: "11px 13px", borderRadius: 18, background: T.surface, border: `1px solid ${T.line}` }}
-            >
-              <span className="fx-skeleton" style={{ width: 15, height: 15, borderRadius: 5, flexShrink: 0 }} />
-              <span className="fx-skeleton flex-1" style={{ height: 11, borderRadius: 5, maxWidth: `${46 + i * 9}%` }} />
-              <span className="fx-skeleton" style={{ width: 52, height: 11, borderRadius: 5, flexShrink: 0 }} />
-            </div>
-          ))}
-        </div>
+        <ЗагрузкаБлока высота={160} />
       </section>
     );
   }
@@ -14607,7 +14580,19 @@ function снятьШирму({ уйти = false } = {}) {
 }
 
 function ПлашкаБлока({ h, radius = 20 }) {
-  return <div aria-hidden className="fx-skeleton" style={{ width: "100%", height: h, borderRadius: radius }} />;
+  return <ЗагрузкаБлока высота={h} />;
+}
+
+/* Загрузка на месте блока — знак Mintly с заполнением снизу. Серых
+   мерцающих заглушек больше нет нигде: пока данные едут, на их месте
+   один знак, размером по высоте места. */
+function ЗагрузкаБлока({ высота = 120, size = null }) {
+  const знак = size || Math.max(28, Math.min(96, Math.round(высота * 0.5)));
+  return (
+    <div aria-busy className="flex items-center justify-center" style={{ width: "100%", height: высота }}>
+      <ЗнакЗагрузки size={знак} />
+    </div>
+  );
 }
 
 /* Живые знаки в заглушках.
@@ -15012,7 +14997,7 @@ function ПульсПК({ curveTokens = [], onOpenToken, onGoCreate, сеть = 
               </div>
               <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
                 {грузится && !список.length
-                  ? <div className="flex items-center justify-center" style={{ height: 200 }}><ЗнакЗагрузки size={44} /></div>
+                  ? <div className="flex items-center justify-center" style={{ height: 200 }}><ЗнакЗагрузки size={88} /></div>
                   : список.length
                     ? список.slice(0, 80).map((tok) => <СтрокаПульса key={tok.id} t={tok} onOpen={onOpenToken} />)
                     : <div style={{ padding: "40px 16px", textAlign: "center", fontFamily: bodyFont, color: T.faint, fontSize: 13.5 }}>Пока пусто</div>}
@@ -17197,18 +17182,7 @@ function ИсторияКошелька({ userId, тик = 0, безЗаголо
             {t("walletHistory")}
           </div>
         )}
-        <div className="fx-грузится flex flex-col" aria-hidden style={{ gap: 2 }}>
-          {Array.from({ length: Math.min(предел, 7) }).map((_, i) => (
-            <div key={i} className="flex items-center" style={{ gap: 12, padding: "13px 2px" }}>
-              <span className="fx-skeleton" style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0 }} />
-              <span className="flex-1 flex flex-col" style={{ gap: 6 }}>
-                <span className="fx-skeleton" style={{ width: `${52 + (i % 3) * 12}%`, height: 11, borderRadius: 5 }} />
-                <span className="fx-skeleton" style={{ width: `${28 + (i % 4) * 7}%`, height: 9, borderRadius: 5 }} />
-              </span>
-              <span className="fx-skeleton" style={{ width: 58, height: 12, borderRadius: 5, flexShrink: 0 }} />
-            </div>
-          ))}
-        </div>
+        <ЗагрузкаБлока высота={Math.min(предел, 7) * 46} />
       </section>
     );
   }
@@ -19122,18 +19096,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         {!holdingsReady ? (
           /* Не полоска посреди пустоты, а размытые строки: место под
              список занято сразу, и приход данных не двигает страницу. */
-          <div className="fx-грузится flex flex-col" aria-hidden style={{ gap: 2 }}>
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center" style={{ gap: 12, padding: "12px 2px" }}>
-                <span className="fx-skeleton" style={{ width: 34, height: 34, borderRadius: "50%", flexShrink: 0 }} />
-                <span className="flex-1 flex flex-col" style={{ gap: 6 }}>
-                  <span className="fx-skeleton" style={{ width: `${40 + i * 12}%`, height: 11, borderRadius: 5 }} />
-                  <span className="fx-skeleton" style={{ width: `${24 + i * 8}%`, height: 9, borderRadius: 5 }} />
-                </span>
-                <span className="fx-skeleton" style={{ width: 56, height: 12, borderRadius: 5, flexShrink: 0 }} />
-              </div>
-            ))}
-          </div>
+          <ЗагрузкаБлока высота={180} />
         ) : !holdings.length ? (
           <div style={{ padding: "4px 2px 8px" }}>
             <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.45 }}>
@@ -19371,7 +19334,7 @@ function TokenComments({ tokenId, currentUserId, onNeedAuth, onOpenProfile, show
       )}
 
       {items === null ? (
-        <div className="flex items-center justify-center" style={{ height: 70 }}><ЗнакЗагрузки size={30} вид="раскрытие" /></div>
+        <div className="flex items-center justify-center" style={{ height: 70 }}><ЗнакЗагрузки size={60} вид="раскрытие" /></div>
       ) : items.length === 0 ? (
         <div className="rounded-[20px] p-4 text-center" style={{ background: T.surface, border: `1px dashed ${T.line}` }}>
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{t("commentsEmpty")}</span>
@@ -20875,7 +20838,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               эффект с chartReload), и человек видит одну загрузку до конца. */}
           {!chartReady ? (
             <div className="flex items-center justify-center" style={{ height: 360 }}>
-              <ЗнакЗагрузки size={64} вид="контур" />
+              <ЗнакЗагрузки size={128} вид="контур" />
             </div>
           ) : (
             <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} onОкно={chartMode === "price" ? setОкноГрафика : null} фиксШкалы={фиксШкалы} />
@@ -20951,10 +20914,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           })()}
         </div>
         {позиция == null ? (
-          <div className="flex flex-col gap-2">
-            <div className="fx-skeleton" style={{ width: 120, height: 22, borderRadius: 6 }} />
-            <div className="fx-skeleton" style={{ width: 90, height: 12, borderRadius: 4 }} />
-          </div>
+          <ЗагрузкаБлока высота={64} />
         ) : позиция > 0 ? (
           <div className="flex items-end justify-between gap-3">
             <div>
@@ -21115,9 +21075,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 13 }}>{tr("statHolders")}</span>
           </div>
           {топДержателей == null ? (
-            <div className="flex flex-col" style={{ gap: 10 }}>
-              {[0, 1, 2].map((i) => <div key={i} className="fx-skeleton" style={{ width: "100%", height: 14, borderRadius: 4 }} />)}
-            </div>
+            <ЗагрузкаБлока высота={110} />
           ) : топДержателей.length === 0 ? (
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{tr("holdersEmpty")}</span>
           ) : (
@@ -21186,7 +21144,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           {!token.poolAddress && !token.curveAddress && !token.демо ? (
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{tr("txUnavailable")}</span>
           ) : tradesLoading && !сделкиНаЭкране ? (
-            <div className="flex items-center justify-center" style={{ height: 100 }}><ЗнакЗагрузки size={40} вид="раскрытие" /></div>
+            <div className="flex items-center justify-center" style={{ height: 100 }}><ЗнакЗагрузки size={80} вид="раскрытие" /></div>
           ) : !сделкиНаЭкране ? (
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{tr("txLoadFailed")}</span>
           ) : сделкиНаЭкране.length === 0 ? (
@@ -21225,10 +21183,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               покупки, а не после. */}
           <ОбещанияТокена механики={token.механики} замок={token.замок} tokenId={token.id} />
           {infoLoading && !info ? (
-            <div className="flex flex-col gap-2">
-              <div className="fx-skeleton" style={{ width: "100%", height: 12, borderRadius: 4 }} />
-              <div className="fx-skeleton" style={{ width: "80%", height: 12, borderRadius: 4 }} />
-            </div>
+            <ЗагрузкаБлока высота={80} />
           ) : (info?.description || info?.telegram || info?.twitter || info?.website) ? (
             <div className="flex flex-col" style={{ gap: 10 }}>
               {info.description && (
@@ -24328,7 +24283,7 @@ function ПодключениеX({ showToast }) {
   }
 
   if (грузится) {
-    return <div className="fx-skeleton mt-2" style={{ height: 96, borderRadius: 18 }} />;
+    return <ЗагрузкаБлока высота={110} />;
   }
 
   if (состояние && состояние.handle) {
@@ -25499,7 +25454,7 @@ function ЭкранЗагрузкиЗнака() {
   // анимации прыгал на место.
   const экран = (
     <div aria-busy style={{ position: "fixed", inset: 0, zIndex: 90, background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <ЗнакЗагрузки size={76} />
+      <ЗнакЗагрузки size={152} />
     </div>
   );
   return typeof document !== "undefined" ? createPortal(экран, document.body) : экран;
@@ -25652,7 +25607,7 @@ function ЗагрузкаВхода() {
         background: ОНБ.фон, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22,
       }}
     >
-      <ЗнакЗагрузки size={44} вид="раскрытие" />
+      <ЗнакЗагрузки size={88} вид="раскрытие" />
       {долго && (
         <button
           onClick={() => window.location.reload()}
@@ -27650,7 +27605,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   {/* Запускаем, только когда база ответила «свободно»: до
                       ответа создание само себя остановило бы. */}
                   {никГоден && <ОдинРаз действие={создать} />}
-                  <ЗнакЗагрузки size={44} />
+                  <ЗнакЗагрузки size={88} />
                   <span style={{ fontFamily: bodyFont, color: ОНБ.приглушённый, fontSize: 14 }}>Создаём @{ник} из X…</span>
                 </div>
               ) : внутриTelegram && !входБезНика && xЗаготовка && (
@@ -31996,7 +31951,7 @@ function mapTokenRow(row) {
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           gap: 12, padding: "0 28px",
         }}>
-          <ЗнакЗагрузки size={44} вид="контур" />
+          <ЗнакЗагрузки size={88} вид="контур" />
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 700 }}>
             {ждётПокупкиТокен ? `${ждётПокупкиСумма} TON · ${ждётПокупкиТокен}` : t("openingWallet")}
           </span>
