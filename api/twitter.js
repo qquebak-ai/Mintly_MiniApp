@@ -69,6 +69,9 @@ async function профильX(handle) {
       tweets: Number(u.tweets) || 0,
       joined: u.joined || null,
       verified: !!(u.verification && u.verification.verified),
+      // Вид подписки X, как его рисует сам X: individual — синяя галочка,
+      // business — золотая, government — серая.
+      verifiedType: u.verification && u.verification.verified ? (u.verification.type || "individual") : null,
     };
     кешПрофилейX.set(ключ, { ts: Date.now(), профиль });
     return профиль;
@@ -139,6 +142,18 @@ export function заготовкаСайта(соль, забрать = false) {
   if (!з || Date.now() - з.ts > ЖИЗНЬ_ЗАГОТОВКИ_МС) return null;
   if (забрать) ЗАГОТОВКИ_X.delete(`web:${соль}`);
   return з;
+}
+
+/* Привязанные X-ники вместе с галочкой. Колонки x_person_verified может
+   ещё не быть (supabase_x_verify.sql не запускали) — тогда без неё. */
+async function привязанные(db, ники) {
+  if (!ники.length) return [];
+  const или = ники.map((н) => `x_handle.ilike.${н}`).join(",");
+  let { data, error } = await db.from("profiles").select("x_handle, x_person_verified").or(или).limit(80);
+  if (error) ({ data } = await db.from("profiles").select("x_handle").or(или).limit(80));
+  // «_» в ilike — любой знак: сверяем ник точно уже здесь.
+  const точно = new Set(ники.map((н) => н.toLowerCase()));
+  return (data || []).filter((с) => с.x_handle && точно.has(String(с.x_handle).toLowerCase()));
 }
 
 async function telegramИз(тело) {
@@ -409,10 +424,25 @@ export default async function handler(req, res) {
   if (действие === "profile") {
     const handle = String((req.query && req.query.handle) || "").replace(/^@/, "");
     if (!/^[A-Za-z0-9_]{1,15}$/.test(handle)) return res.status(400).json({ error: "bad_handle" });
-    const { data } = await db.from("profiles").select("x_handle").ilike("x_handle", handle).limit(1);
-    if (!data || !data.length) return res.status(404).json({ error: "not_linked" });
-    res.setHeader("Cache-Control", "public, max-age=300");
-    return res.status(200).json({ handle: data[0].x_handle, profile: await профильX(data[0].x_handle) });
+    const data = await привязанные(db, [handle]);
+    if (!data.length) return res.status(404).json({ error: "not_linked" });
+    res.setHeader("Cache-Control", "public, max-age=60");
+    return res.status(200).json({ handle: data[0].x_handle, person: !!data[0].x_person_verified, profile: await профильX(data[0].x_handle) });
+  }
+
+  /* Значки у X-ников разом — для ленты и витрины: подписка X (какая
+     галочка у него в самом X) и наша галочка проверенного лица. */
+  if (действие === "badges") {
+    const ники = [...new Set(String((req.query && req.query.handles) || "").split(",").map((н) => н.trim().replace(/^@/, ""))
+      .filter((н) => /^[A-Za-z0-9_]{1,15}$/.test(н)))].slice(0, 40);
+    const строки = await привязанные(db, ники);
+    const итог = {};
+    await Promise.all(строки.map(async (с) => {
+      const п = await профильX(с.x_handle);
+      итог[String(с.x_handle).toLowerCase()] = { x: (п && п.verifiedType) || null, person: !!с.x_person_verified };
+    }));
+    res.setHeader("Cache-Control", "public, max-age=60");
+    return res.status(200).json({ badges: итог });
   }
 
   // Вход через X с сайта: без Telegram, только подписанный state.
@@ -483,6 +513,34 @@ export default async function handler(req, res) {
     if (error) return res.status(500).json({ error: "db", detail: error.message });
     ЗАГОТОВКИ_X.delete(tg);
     return res.status(200).json({ ok: true, handle: з.handle });
+  }
+
+  // Галочка проверенного лица: состояние и заявка (по желанию).
+  if (действие === "verify-state") {
+    const { data: моя } = await db.from("profiles").select("x_handle, x_person_verified").eq("id", user.id).maybeSingle();
+    const { data: заявки } = await db.from("x_verification_requests").select("status, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1);
+    return res.status(200).json({ person: !!(моя && моя.x_person_verified), request: (заявки && заявки[0]) || null });
+  }
+  if (действие === "verify-request") {
+    if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
+    const тело = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    const имя = String(тело.fullName || "").trim().slice(0, 80);
+    const подтверждение = String(тело.proof || "").trim().slice(0, 300);
+    const заметка = String(тело.note || "").trim().slice(0, 500);
+    if (имя.length < 3) return res.status(400).json({ error: "bad_name" });
+    if (!/^https?:\/\/\S+\.\S+/i.test(подтверждение)) return res.status(400).json({ error: "bad_proof" });
+    const { data: моя } = await db.from("profiles").select("x_handle, x_person_verified").eq("id", user.id).maybeSingle();
+    if (!моя || !моя.x_handle) return res.status(400).json({ error: "no_x" });
+    if (моя.x_person_verified) return res.status(409).json({ error: "already_verified" });
+    const { data: ждёт } = await db.from("x_verification_requests").select("id").eq("user_id", user.id).eq("status", "pending").limit(1);
+    if (ждёт && ждёт.length) return res.status(409).json({ error: "pending" });
+    const { data: заявка, error } = await db.from("x_verification_requests")
+      .insert({ user_id: user.id, handle: моя.x_handle, full_name: имя, proof_url: подтверждение, note: заметка || null, status: "pending" })
+      .select("*").single();
+    if (error) return res.status(500).json({ error: "db", detail: error.message });
+    const { разослатьЗаявку } = await import("./_xverify.js");
+    await разослатьЗаявку(заявка);
+    return res.status(200).json({ ok: true });
   }
 
   try {

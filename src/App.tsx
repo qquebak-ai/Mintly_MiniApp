@@ -8442,6 +8442,82 @@ function ЧужойПрофильX() {
   }, []);
   return <ПрофильX открыт={!!handle} onClose={() => setHandle(null)} handle={handle} профиль={профиль} />;
 }
+/* Значки у X-ника.
+ *
+ * Первый — подписка X, ровно как её рисует сам X: синяя галочка у
+ * личной подписки, золотая у компаний, серая у госорганов. Второй — наша
+ * белая галочка «проверенное лицо»: её выдают админы по заявке. Значки
+ * спрашиваются пачкой (badges) и держатся в памяти, чтобы лента из
+ * сорока строк не делала сорок запросов. */
+const кешЗначковX = new Map(); // ник в нижнем регистре -> { x, person, ts }
+const ждутЗначков = new Map(); // ник -> [функции]
+let таймерЗначков = null;
+function значкиX(handle) {
+  const к = String(handle || "").toLowerCase();
+  if (!к) return Promise.resolve(null);
+  const было = кешЗначковX.get(к);
+  if (было && Date.now() - было.ts < 5 * 60 * 1000) return Promise.resolve(было);
+  return new Promise((готово) => {
+    if (!ждутЗначков.has(к)) ждутЗначков.set(к, []);
+    ждутЗначков.get(к).push(готово);
+    if (таймерЗначков) return;
+    таймерЗначков = setTimeout(async () => {
+      таймерЗначков = null;
+      const пачка = new Map(ждутЗначков);
+      ждутЗначков.clear();
+      let ответ = {};
+      try {
+        const r = await fetch(апи(`/api/twitter?action=badges&handles=${encodeURIComponent([...пачка.keys()].join(","))}`));
+        ответ = ((await r.json()) || {}).badges || {};
+      } catch { /* без сети — без значков */ }
+      for (const [ник, ждущие] of пачка) {
+        const з = { x: (ответ[ник] && ответ[ник].x) || null, person: !!(ответ[ник] && ответ[ник].person), ts: Date.now() };
+        кешЗначковX.set(ник, з);
+        ждущие.forEach((f) => f(з));
+      }
+    }, 40);
+  });
+}
+function useЗначкиX(handle) {
+  const [з, setЗ] = useState(() => (handle && кешЗначковX.get(String(handle).toLowerCase())) || null);
+  useEffect(() => {
+    let живо = true;
+    if (handle) значкиX(handle).then((р) => { if (живо) setЗ(р); });
+    return () => { живо = false; };
+  }, [handle]);
+  return з;
+}
+const ЦВЕТ_ГАЛОЧКИ_X = { individual: "#1D9BF0", business: "#E2B719", government: "#829AAB" };
+function ГалочкаX({ вид, size = 14 }) {
+  if (!вид) return null;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-label="Подписка X" style={{ flexShrink: 0, display: "block" }}>
+      <path fill={ЦВЕТ_ГАЛОЧКИ_X[вид] || ЦВЕТ_ГАЛОЧКИ_X.individual} d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81c-.66-1.31-1.91-2.19-3.34-2.19s-2.67.88-3.33 2.19c-1.4-.46-2.91-.2-3.92.81s-1.26 2.52-.8 3.91c-1.31.67-2.2 1.91-2.2 3.34s.89 2.67 2.2 3.34c-.46 1.39-.21 2.9.8 3.91s2.52 1.26 3.91.81c.67 1.31 1.91 2.19 3.34 2.19s2.68-.88 3.34-2.19c1.39.45 2.9.2 3.91-.81s1.27-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34zm-11.71 4.2L6.8 12.46l1.41-1.42 2.26 2.26 4.8-5.23 1.47 1.36-6.2 6.77z" />
+    </svg>
+  );
+}
+// Наша галочка «проверенное лицо» — белый круг с тёмной галочкой (в
+// светлой теме наоборот), чтобы её не путали с синей галочкой X.
+function ГалочкаЛица({ size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-label="Проверенное лицо" style={{ flexShrink: 0, display: "block" }}>
+      <circle cx="12" cy="12" r="11" fill={T.ice} />
+      <path d="M7.2 12.4l3.1 3.1 6.5-7" fill="none" stroke={T.bg} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function ЗначкиX({ handle, size = 14, значки = null }) {
+  const свои = useЗначкиX(значки ? null : handle);
+  const з = значки || свои;
+  if (!з || (!з.x && !з.person)) return null;
+  return (
+    <span className="inline-flex items-center" style={{ gap: 3, flexShrink: 0 }}>
+      <ГалочкаX вид={з.x} size={size} />
+      {з.person && <ГалочкаЛица size={size} />}
+    </span>
+  );
+}
+
 function СсылкаXАвтора({ handle, size = 12.5, style = {} }) {
   if (!handle) return null;
   // span, а не button: строка ленты сама кнопка, вложенная кнопка в ней
@@ -8456,6 +8532,7 @@ function СсылкаXАвтора({ handle, size = 12.5, style = {} }) {
     >
       <ЗнакX size={size - 1.5} color={T.ice} />
       <span className="truncate">@{handle}</span>
+      <ЗначкиX handle={handle} size={size + 1} />
     </span>
   );
 }
@@ -8855,6 +8932,7 @@ function TokenCreatorCard({ ownerId, currentUserId, onNeedAuth, showToast, onOpe
             >
               <ЗнакX size={12} color={T.electric} />
               <span className="truncate" style={{ fontFamily: bodyFont, color: T.electric, fontSize: 12.5 }}>@{creator.x_handle}</span>
+              <ЗначкиX handle={creator.x_handle} size={13} />
             </span>
           ) : null}
         </div>
@@ -24045,6 +24123,7 @@ function ПрофильX({ открыт, onClose, handle, профиль }) {
         </div>
         <div className="flex items-center" style={{ gap: 6, marginTop: 12 }}>
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800 }}>{п.name || handle}</span>
+          <ЗначкиX handle={handle} size={20} />
         </div>
         <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 15, marginTop: 2 }}>@{handle}</div>
         {п.description ? (
@@ -24064,6 +24143,85 @@ function ПрофильX({ открыт, onClose, handle, профиль }) {
     </div>
   );
   return typeof document !== "undefined" ? createPortal(лист, document.body) : лист;
+}
+
+/* Галочка «проверенное лицо» — по желанию. Человек сам заполняет
+   заявку: настоящее имя и ссылку, по которой видно, что X — его (сайт,
+   LinkedIn, пост, интервью). Заявку смотрят админы в боте; решение
+   приходит сюда же и сообщением от бота. */
+function ЗаявкаНаГалочку({ запросX, handle }) {
+  const [сост, setСост] = useState(null); // { person, request }
+  const [открыта, setОткрыта] = useState(false);
+  const [имя, setИмя] = useState("");
+  const [ссылкаП, setСсылкаП] = useState("");
+  const [заметка, setЗаметка] = useState("");
+  const [идёт, setИдёт] = useState(false);
+  const [беда, setБеда] = useState("");
+  useEffect(() => {
+    let жив = true;
+    запросX("verify-state").then((о) => { if (жив) setСост(о || {}); }).catch(() => { if (жив) setСост({}); });
+    return () => { жив = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!сост) return null;
+  const поле = { width: "100%", boxSizing: "border-box", padding: "13px 14px", borderRadius: 14, border: `1px solid ${T.line}`, background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 15, outline: "none" };
+  if (сост.person) {
+    return (
+      <div className="flex items-center" style={{ gap: 12, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
+        <ГалочкаЛица size={22} />
+        <div style={{ fontFamily: bodyFont, color: T.ice, fontSize: 14.5, lineHeight: 1.4 }}>Проверенное лицо — галочка видна рядом с @{handle} везде в Mintly</div>
+      </div>
+    );
+  }
+  if (сост.request && сост.request.status === "pending") {
+    return (
+      <div className="flex items-center" style={{ gap: 12, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
+        <ЗнакЗагрузки size={22} />
+        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.4 }}>Заявка на галочку проверенного лица на проверке — ответ придёт в боте</div>
+      </div>
+    );
+  }
+  async function отправить() {
+    setБеда("");
+    if (имя.trim().length < 3) { setБеда("Напиши имя и фамилию"); return; }
+    if (!/^https?:\/\/\S+\.\S+/i.test(ссылкаП.trim())) { setБеда("Нужна ссылка, начиная с https://"); return; }
+    setИдёт(true);
+    try {
+      await запросX("verify-request", { fullName: имя.trim(), proof: ссылкаП.trim(), note: заметка.trim() });
+      haptic("success");
+      setСост({ ...сост, request: { status: "pending" } });
+    } catch (e) {
+      const к = String((e && e.message) || "");
+      setБеда(к === "pending" ? "Заявка уже на проверке" : к === "already_verified" ? "Галочка уже выдана" : "Не получилось отправить — попробуй ещё раз");
+      haptic("error");
+    } finally {
+      setИдёт(false);
+    }
+  }
+  return (
+    <div className="flex flex-col" style={{ gap: 10, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
+      <button onClick={() => { haptic("light"); setОткрыта((о) => !о); }} className="fx-tap flex items-center text-left" style={{ gap: 12, background: "none", border: "none", padding: 0, width: "100%" }}>
+        <ГалочкаЛица size={22} />
+        <div className="flex-1 min-w-0">
+          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>Галочка проверенного лица</div>
+          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2 }}>
+            {сост.request && сост.request.status === "rejected" ? "Прошлую заявку отклонили — можно подать снова" : "По желанию: подтверди, что X — твой"}
+          </div>
+        </div>
+        <ChevronRight size={16} color={T.faint} style={{ transform: открыта ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+      </button>
+      {открыта && (
+        <div className="fx-view flex flex-col" style={{ gap: 10, marginTop: 4 }}>
+          <input id="xv-name" value={имя} onChange={(e) => setИмя(e.target.value.slice(0, 80))} placeholder="Имя и фамилия" style={поле} />
+          <input id="xv-proof" value={ссылкаП} onChange={(e) => setСсылкаП(e.target.value.slice(0, 300))} placeholder="Ссылка-подтверждение: сайт, LinkedIn, пост" inputMode="url" autoCapitalize="off" style={поле} />
+          <textarea id="xv-note" value={заметка} onChange={(e) => setЗаметка(e.target.value.slice(0, 500))} placeholder="Комментарий — необязательно" rows={3} style={{ ...поле, resize: "none" }} />
+          {беда && <div style={{ fontFamily: bodyFont, color: T.down, fontSize: 13 }}>{беда}</div>}
+          <button onClick={отправить} disabled={идёт} className="fx-tap" style={{ height: 50, borderRadius: 14, border: "none", background: T.ice, color: T.bg, fontFamily: displayFont, fontSize: 15, fontWeight: 800, opacity: идёт ? 0.6 : 1 }}>
+            {идёт ? "Отправляем…" : "Отправить заявку"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ПодключениеX({ showToast }) {
@@ -24168,13 +24326,14 @@ function ПодключениеX({ showToast }) {
             ? <img src={состояние.profile.avatar} alt="" width={36} height={36} style={{ borderRadius: "50%", flexShrink: 0 }} />
             : <ЗнакX size={18} color={T.ice} />}
           <div className="flex-1 min-w-0">
-            <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>@{состояние.handle}</div>
+            <div className="flex items-center" style={{ gap: 5, fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>@{состояние.handle}<ЗначкиX handle={состояние.handle} size={15} /></div>
             <div style={{ fontFamily: bodyFont, color: T.up, fontSize: 12.5 }}>{t("xConnected")}</div>
           </div>
           <CheckCircle2 size={18} color={T.up} />
           <ChevronRight size={16} color={T.faint} />
         </button>
         <ПрофильX открыт={профильОткрыт} onClose={() => setПрофильОткрыт(false)} handle={состояние.handle} профиль={состояние.profile} />
+        <ЗаявкаНаГалочку запросX={запросX} handle={состояние.handle} />
         <button
           onClick={отключить}
           className="fx-tap w-full rounded-[12px] min-h-[52px] py-3"
@@ -28080,7 +28239,7 @@ function ProfileView({
                   className="fx-tap flex items-center"
                   style={{ gap: 7, padding: "7px 12px", borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700 }}
                 >
-                  <ЗнакX size={13} color={T.ice} /> @{xСостояние.handle}
+                  <ЗнакX size={13} color={T.ice} /> @{xСостояние.handle} <ЗначкиX handle={xСостояние.handle} size={14} />
                 </button>
               ) : (
                 <button

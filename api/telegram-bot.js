@@ -726,6 +726,14 @@ async function сделкаSolana(cb, card, действие, число) {
 async function handleCallback(cb) {
   const данные = String(cb.data || "");
 
+  // Заявка на галочку проверенного лица: «Выдать» / «Отказать» у админа.
+  if (данные.startsWith("xv:")) {
+    if (данные === "xv:done") { await tg("answerCallbackQuery", { callback_query_id: cb.id }); return; }
+    const { кнопкаЗаявки } = await import("./_xverify.js");
+    await кнопкаЗаявки(cb);
+    return;
+  }
+
   // Кнопки главного меню: у них своих токенов нет, только действие.
   if (данные === "w:") {
     await handleWallet(cb.message ? cb.message.chat.id : cb.from.id, cb.from.id);
@@ -1931,6 +1939,12 @@ export default async function handler(req, res) {
       }
       if (имя === "top") {
         await handleTop(message);
+        return res.status(200).json({ ok: true });
+      }
+      // Галочка проверенного лица — выдать или снять по нику X (админы).
+      if (имя === "verify" || имя === "unverify") {
+        const { командаАдмина } = await import("./_xverify.js");
+        await командаАдмина(message, имя === "verify", хвост);
         return res.status(200).json({ ok: true });
       }
       if (имя === "help") {
