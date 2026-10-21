@@ -14659,17 +14659,20 @@ function снятьШирму({ уйти = false } = {}) {
    сколько поместится в высоту места. Резкими они не становятся никогда:
    держатся, пока не придут данные, и уступают место настоящему
    содержимому. */
-function РазмытаяЗаглушка({ высота = 120 }) {
+function РазмытаяЗаглушка({ высота = 120, внутри = false }) {
+  // Внутри уже размытого целого своё размытие не нужно: размытие поверх
+  // размытия превращает заготовку в серое пятно.
+  const класс = внутри ? undefined : "виджет-грузится";
   if (высота < 60) {
     return (
-      <div aria-busy className="размытие-пк" style={{ width: "100%", height: высота, display: "flex", alignItems: "center" }}>
+      <div aria-busy className={класс} style={{ width: "100%", height: высота, display: "flex", alignItems: "center" }}>
         <div style={{ width: "60%", height: Math.max(10, высота * 0.5), borderRadius: 999, background: T.surfaceHi }} />
       </div>
     );
   }
   const строк = Math.max(1, Math.floor(высота / 58));
   return (
-    <div aria-busy className="размытие-пк" style={{ width: "100%", height: высота, display: "flex", flexDirection: "column", justifyContent: "center", gap: 14, overflow: "hidden" }}>
+    <div aria-busy className={класс} style={{ width: "100%", height: высота, display: "flex", flexDirection: "column", justifyContent: "center", gap: 14, overflow: "hidden" }}>
       {Array.from({ length: строк }, (_, и) => (
         <div key={и} style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ width: 44, height: 44, borderRadius: 999, background: T.surfaceHi, flex: "none" }} />
@@ -14686,7 +14689,7 @@ function РазмытаяЗаглушка({ высота = 120 }) {
 /* Целая страница в загрузке на сайте: шапка и пара карточек. */
 function РазмытаяСтраница() {
   return (
-    <div aria-busy className="размытие-пк" style={{ display: "flex", flexDirection: "column", gap: 18, padding: "18px 0" }}>
+    <div aria-busy className="виджет-грузится" style={{ display: "flex", flexDirection: "column", gap: 18, padding: "18px 0" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{ width: 56, height: 56, borderRadius: 999, background: T.surfaceHi }} />
         <div style={{ width: 220, height: 22, borderRadius: 999, background: T.surfaceHi }} />
@@ -14696,7 +14699,7 @@ function РазмытаяСтраница() {
         <div style={{ height: 150, borderRadius: 22, background: T.surface }} />
         <div style={{ height: 150, borderRadius: 22, background: T.surface }} />
       </div>
-      <РазмытаяЗаглушка высота={240} />
+      <РазмытаяЗаглушка высота={240} внутри />
     </div>
   );
 }
@@ -25593,7 +25596,7 @@ function ЗнакЗагрузки({ size = 40, вид = "контур", оста
      где он сам — ответ на действие (проверка, отправка, запуск) и у
      графика. */
   if (этоПК() && !всегда) {
-    if (size < 40) return <span aria-busy className="размытие-пк" style={{ display: "inline-block", width: Math.round(size * 2.2), height: Math.max(10, Math.round(size * 0.6)), borderRadius: 999, background: T.surfaceHi, verticalAlign: "middle" }} />;
+    if (size < 40) return <span aria-busy className="виджет-грузится" style={{ display: "inline-block", width: Math.round(size * 2.2), height: Math.max(10, Math.round(size * 0.6)), borderRadius: 999, background: T.surfaceHi, verticalAlign: "middle" }} />;
     return <div style={{ width: "100%", alignSelf: "stretch" }}><РазмытаяЗаглушка высота={Math.round(size * 1.5)} /></div>;
   }
   if (вид === "раскрытие") {

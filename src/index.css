@@ -105,17 +105,13 @@ html.пк input, html.пк textarea, html.пк [contenteditable="true"] { -webki
 @tailwind components;
 @tailwind utilities;
 
-/* Загрузка на сайте — размытые очертания вместо знака. Размытие не
-   уходит, пока на месте заглушки не появится настоящее содержимое;
-   мягкое дыхание говорит, что работа идёт. */
-.размытие-пк { filter: blur(7px); animation: размытиеПК 1.8s ease-in-out infinite; pointer-events: none; }
-@keyframes размытиеПК { 0%, 100% { opacity: 0.55 } 50% { opacity: 1 } }
-@media (prefers-reduced-motion: reduce) { .размытие-пк { animation: none; opacity: 0.8 } }
-
-/* Виджет, у которого ещё нет данных, размыт целиком — рамка, заголовок
-   и заготовки строк внутри. Одно размытие на весь виджет: заготовки
+/* Загрузка на сайте — размытые виджеты вместо знака. Виджет, у
+   которого ещё нет данных, размыт целиком — рамка, заголовок и
+   заготовки строк внутри. Одно размытие на весь виджет: заготовки
    внутри сами не размыты, иначе вышло бы размытие поверх размытия.
-   Пришли данные — класс снимается, и виджет плавно проясняется. */
+   Мягкое дыхание говорит, что работа идёт; пришли данные — класс
+   снимается, и виджет плавно проясняется. */
+@keyframes размытиеПК { 0%, 100% { opacity: 0.55 } 50% { opacity: 1 } }
 .виджет { transition: filter 450ms ease, opacity 450ms ease; }
 .виджет-грузится { filter: blur(6px); animation: размытиеПК 1.8s ease-in-out infinite; pointer-events: none; user-select: none; }
 @media (prefers-reduced-motion: reduce) { .виджет-грузится { animation: none; opacity: 0.8 } }
