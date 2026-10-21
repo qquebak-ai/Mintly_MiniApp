@@ -14880,6 +14880,41 @@ function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} })
   );
 }
 
+/* Бегущая строка токенов вверху сайта — над любым разделом. Токены те
+   же, что в мемпаде (с живыми цифрами); нажатие открывает токен,
+   наведение останавливает ленту. */
+function БегущаяСтрокаПК({ tokens = [], onOpen }) {
+  const ряд0 = useMemo(() => (tokens || []).map(localTokenToFeedShape)
+    .filter((tok) => tok.ticker && tok.mcapNum > 0 && запускСостоялся(tok)), [tokens]);
+  if (!ряд0.length) return null;
+  const раз = Math.max(1, Math.ceil(14 / ряд0.length));
+  const ряд = Array.from({ length: раз }, () => ряд0).flat();
+  const элемент = (tok, i) => {
+    const рост = (tok.change || 0) >= 0;
+    return (
+      <button key={`${tok.id}-${i}`} onClick={() => onOpen(tok)} className="fx-tap" style={{ display: "inline-flex", alignItems: "center", gap: 9, padding: "0 24px", whiteSpace: "nowrap", background: "none", border: "none", cursor: "pointer" }}>
+        <TokenAvatar size={22} tone={рост ? "up" : "down"} src={tok.logoUrl} />
+        <span style={{ fontFamily: displayFont, fontWeight: 800, color: T.ice, fontSize: 13.5 }}>${tok.ticker}</span>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}><ТекстСЧислами text={fmtUSD(tok.mcapNum)} /></span>
+        <span style={{ fontFamily: bodyFont, color: рост ? T.up : T.down, fontSize: 13, fontWeight: 700 }}>{рост ? "+" : ""}<ТекстСЧислами text={(tok.change || 0).toFixed(1)} />%</span>
+      </button>
+    );
+  };
+  return (
+    <div className="лента-пк" style={{
+      // Выше мягкой кромки прокрутки: та лежит у верха колонки и мутила ленту.
+      position: "relative", zIndex: 6, background: T.bg,
+      flexShrink: 0, height: 42, overflow: "hidden", display: "flex", alignItems: "center", borderBottom: `1px solid ${T.line}`,
+      WebkitMaskImage: "linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent)", maskImage: "linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent)",
+    }}>
+      <style>{`@keyframes лентаПК { from { transform: translate3d(0,0,0) } to { transform: translate3d(-50%,0,0) } } .лента-пк:hover > div { animation-play-state: paused }`}</style>
+      <div style={{ display: "flex", width: "max-content", animation: `лентаПК ${Math.max(28, ряд.length * 3)}s linear infinite` }}>
+        {ряд.map(элемент)}{ряд.map((tok, i) => элемент(tok, i + ряд.length))}
+      </div>
+    </div>
+  );
+}
+
 /* Главная на мониторе — три колонки, как Pulse у Axiom.
  *
  * Крупные плитки главной сделаны под палец; на мониторе они выглядели
@@ -32058,6 +32093,7 @@ function mapTokenRow(row) {
         />
       )}
       <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column", marginLeft: этоПК() ? ШИРИНА_ПАНЕЛИ_ПК : 0 }}>
+        {этоПК() && <БегущаяСтрокаПК tokens={communityTokens} onOpen={openToken} />}
         {/* Мягкие края прокрутки.
             Содержимое обрывалось ровно по границе экрана — строка или
             карточка резались пополам, и это читалось как поломка. Две

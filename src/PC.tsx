@@ -458,6 +458,13 @@ function БегущаяСтрока({ сверху }) {
           const кап = к && к.price_ton > 0 && курс > 0 ? к.price_ton * курс * (Number(к.supply) || 1e9) : 0;
           return { id: т.id, тикер: т.ticker, лого: т.logo_url || (к && к.logo_url) || null, кап, рост: Number(к && к.change24) || 0 };
         }).filter((т) => т.тикер && т.кап > 0);
+        // Пока своих токенов с ценой нет — в строке демо-токен площадки
+        // с живой ценой с сервера, чтобы лента не пропадала.
+        if (!строки.length) {
+          const д = await fetch(апи("/api/live?demo=1")).then((r) => r.json()).catch(() => null);
+          const к = д && д.curves && Object.values(д.curves)[0];
+          if (к && к.price > 0 && курсTon > 0) строки.push({ id: "demo", тикер: "DEMO", лого: null, кап: к.price * курсTon * 1e9, рост: 0, демо: true });
+        }
         if (жив) setТокены(строки);
       } catch { /* строки не будет — приветствие и без неё целое */ }
     };
@@ -478,7 +485,9 @@ function БегущаяСтрока({ сверху }) {
         : <span style={{ width: 22, height: 22, borderRadius: 999, background: Ц.выше, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>{т.тикер[0]}</span>}
       <span style={{ fontWeight: 800, color: Ц.лёд, fontSize: 14 }}>${т.тикер}</span>
       <span style={{ color: Ц.тусклый, fontSize: 13.5, fontVariantNumeric: "tabular-nums" }}>{кап(т.кап)}</span>
-      <span style={{ color: т.рост >= 0 ? "#2EE87A" : Ц.вниз, fontSize: 13.5, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{т.рост >= 0 ? "+" : ""}{т.рост.toFixed(1)}%</span>
+      {т.демо
+        ? <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".08em", color: Ц.тусклый, border: `1px solid ${Ц.линия}`, borderRadius: 6, padding: "1px 5px" }}>ДЕМО</span>
+        : <span style={{ color: т.рост >= 0 ? "#2EE87A" : Ц.вниз, fontSize: 13.5, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{т.рост >= 0 ? "+" : ""}{т.рост.toFixed(1)}%</span>}
     </span>
   );
   return (
