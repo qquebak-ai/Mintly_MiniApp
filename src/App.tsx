@@ -134,16 +134,12 @@ function hexA(hex, alpha) {
    hardcoded white glows; ink(alpha) is the same idea for structural
    (grid line / vignette) effects that used to assume a dark backdrop. */
 let T = { ...DARK_THEME };
-/* Цвет шапки Telegram. В полноэкранном режиме шапки как полосы нет —
-   от её цвета Telegram красит плашки «Назад» и «⌄ ···», а текст в них
-   берёт из своей темы. В светлой теме приложения при тёмной теме
-   Telegram плашки выходили белыми с белым текстом — пустыми. Поэтому в
-   полноэкранном режиме светлой темы шапка тёмная: плашки тёмные, текст
-   на них виден, а по белой странице они читаются как кнопки. */
+/* Цвет шапки Telegram. От него Telegram выбирает цвет часов, заряда и
+   своих плашек «Назад» и «⌄ ···»: на белой шапке — тёмные, на тёмной —
+   светлые. Поэтому в светлой теме шапка белая всегда — с тёмной в
+   полноэкранном режиме часы и плашки становились белыми на белом. */
 function цветШапкиTelegram(светлая) {
-  const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
-  if (!светлая) return "#000000";
-  return tg && tg.isFullscreen ? "#1C1C1E" : "#FFFFFF";
+  return светлая ? "#FFFFFF" : "#000000";
 }
 function applyTheme(mode) {
   mode = mode === "White" ? "White" : "Dark";
