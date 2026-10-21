@@ -10027,7 +10027,8 @@ function СтраницаПрофиля({ открыт, уходит = false, in
       aria-hidden={открыт ? undefined : true}
       inert={открыт ? undefined : ""}
       style={{
-        position: "absolute", left: 0, right: 0, top: 0, bottom: 0,
+        // На мониторе сверху бежит лента токенов (42 точки) — под ней.
+        position: "absolute", left: 0, right: 0, top: этоПК() ? 42 : 0, bottom: 0,
         // Ниже панели разделов (её слой 5) и выше содержимого главной:
         // страница закрывает ленту, но не сам способ уйти с неё.
         zIndex: 3,
@@ -10045,9 +10046,12 @@ function СтраницаПрофиля({ открыт, уходит = false, in
           paddingTop: contentTopPad(insetTop),
           paddingBottom: 92,
           overscrollBehavior: "contain",
+          // На мониторе профиль крупнее остального сайта: он и так узкий
+          // столбец, и в обычном масштабе терялся посреди экрана.
+          ...(этоПК() ? { zoom: Math.min(2, масштабПК() * 1.45) } : null),
         }}
       >
-        {children}
+        {этоПК() ? <div style={{ maxWidth: 760, margin: "0 auto" }}>{children}</div> : children}
       </div>
     </div>
   );
@@ -10414,7 +10418,7 @@ function BootSplash({ steps, done, уходит = false, insetTop = 0 }) {
         {/* Знак замирает по тому же признаку, по которому уходит сама
             заставка: и когда данные пришли, и когда мы устали их ждать —
             вид один и тот же. */}
-        <ЗнакЗагрузки size={160} вид="раскрытие" остановлен={done} />
+        <ЗнакЗагрузки size={260} вид="раскрытие" остановлен={done} />
         <div style={{ width: 132, height: 3, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
           <div style={{
             width: `${Math.round(progress * 100)}%`, height: "100%", borderRadius: 999,
