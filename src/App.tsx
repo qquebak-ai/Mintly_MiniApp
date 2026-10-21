@@ -20407,6 +20407,13 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   // Множитель «цена → капитализация» приезжает отдельно от свечей: пока
   // его нет, показывать нечего, но и «нет данных» неправда.
   const chartPending = chartLoading || (!!графДанные && графДанные.tf === tf && !scaledCandles);
+  // Загрузка не удалась — пробуем снова сами, раз в две с половиной
+  // секунды, пока график не придёт: кнопки «Повторить» больше нет.
+  useEffect(() => {
+    if (chartReady || chartPending) return undefined;
+    const id = setTimeout(() => setChartReload((v) => v + 1), 2500);
+    return () => clearTimeout(id);
+  }, [chartReady, chartPending, chartReload]);
 
   // Кнопка «поделиться» открывает карточку картинкой: голая ссылка в
   // чате не показывает ни цифр, ни лого — превью мини-приложения
@@ -20863,21 +20870,12 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             рамка и скругление вокруг него мешали читать свечи у краёв, а
             места под сам график оставалось меньше. */}
         <div style={{ position: "relative", marginLeft: -16, marginRight: -16, background: T.bg }}>
-          {!chartReady && chartPending ? (
+          {/* Пока графика нет — только знак, заполняющийся снизу. Табличка
+              «не загрузилось · Повторить» убрана: повтор идёт сам (см.
+              эффект с chartReload), и человек видит одну загрузку до конца. */}
+          {!chartReady ? (
             <div className="flex items-center justify-center" style={{ height: 360 }}>
               <ЗнакЗагрузки size={64} вид="контур" />
-            </div>
-          ) : !chartReady ? (
-            <div className="flex flex-col items-center justify-center gap-3" style={{ height: 360, padding: "0 20px" }}>
-              <КотПланета size={86} />
-              <span style={{ fontFamily: monoFont, fontSize: 12, color: T.muted, textAlign: "center" }}>{tr("chartNoData")}</span>
-              <button
-                onClick={() => setChartReload((v) => v + 1)}
-                className="fx-tap rounded-full px-3.5 py-1.5"
-                style={{ background: T.surface, border: "none", fontFamily: bodyFont, fontSize: 13, color: T.ice }}
-              >
-                {tr("chartRetry")}
-              </button>
             </div>
           ) : (
             <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} onОкно={chartMode === "price" ? setОкноГрафика : null} фиксШкалы={фиксШкалы} />
