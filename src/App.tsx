@@ -18740,9 +18740,11 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
         }} />
         {ткань && <СлойКарбона fill={видКарты.fill} size={видКарты.size} />}
         {/* Волны от касаний — поверх заливки, но под текстом. */}
-        {!видКарты.минимал && <div key={ключПереливаКарты} aria-hidden style={{
+        {/* Блик бежит и по металлу: без него стальная карта выглядела
+            плоской картинкой. */}
+        {(!видКарты.минимал || видКарты.металл) && <div key={ключПереливаКарты} aria-hidden style={{
           position: "absolute", top: -70, left: -90, width: 260, height: 320,
-          background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", 0.13)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
+          background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", видКарты.металл ? 0.3 : 0.13)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
           transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
         }} />}
         {/* Тонкая светлая кромка — край минимальной карты на чёрном фоне. */}
