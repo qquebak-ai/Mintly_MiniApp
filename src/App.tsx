@@ -21980,7 +21980,13 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
 /* TradeModal — the buy/sell sheet: pick an amount (with quick %/preset
    chips), see the live conversion, pick slippage tolerance, and confirm.
    Shared between the Buy and Sell CTAs so switching tabs mid-flow works. */
+const СКОРОСТИ_СДЕЛКИ = [
+  { id: "normal", имя: "Обычно", плата: "~1–2 с" },
+  { id: "fast", имя: "Быстро", плата: "+0.0001 SOL" },
+  { id: "turbo", имя: "Молния", плата: "+0.001 SOL" },
+];
 function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, walletTonBalance = 0, tonPriceUsd = 0, heldAmount = null, curveState = null }) {
+  const [скорость, setСкорость] = useState(() => { try { const v = localStorage.getItem("mintly_trade_speed"); return ["normal", "fast", "turbo"].includes(v) ? v : "fast"; } catch { return "fast"; } });
   // Курс SOL нужен только окну сделки по токену Solana — там он один раз
   // пересчитывает введённую сумму в примерное количество токенов.
   const [solPriceUsd, setSolPriceUsd] = useState(0);
@@ -22425,6 +22431,23 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
             ))}
           </div>
         </div>
+
+        {/* Скорость — как у терминалов: доплата за место в ближайшем
+            блоке. «Быстро» и «Молния» идут через Jito и попадают в
+            следующий слот, около 0,4 с. Выбор запоминается. */}
+        {соло && (
+          <div style={{ marginTop: 14 }}>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>Скорость</span>
+            <div className="flex gap-1.5 mt-1.5">
+              {СКОРОСТИ_СДЕЛКИ.map((с) => (
+                <button key={с.id} onClick={() => { setСкорость(с.id); try { localStorage.setItem("mintly_trade_speed", с.id); } catch { /* приватный режим */ } }} className="fx-tap rounded-[16px] px-3 py-1.5 flex flex-col items-start" style={{ background: скорость === с.id ? T.ice : T.surfaceHi, color: скорость === с.id ? T.bg : T.muted, border: `1px solid ${скорость === с.id ? T.ice : T.line}`, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
+                  <span>{с.имя}</span>
+                  <span style={{ fontFamily: monoFont, fontSize: 10.5, fontWeight: 500, opacity: 0.75 }}>{с.плата}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-1.5" style={{ marginTop: 14, fontFamily: monoFont, fontSize: 12, color: T.muted }}>
           <div className="flex justify-between"><span>{t("rate")}</span><span style={{ color: T.ice }}><ТекстСЧислами text={fmtPrice(token.price)} /> / ${token.ticker}</span></div>

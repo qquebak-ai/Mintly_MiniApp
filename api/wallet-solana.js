@@ -42,7 +42,7 @@
 import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { проверитьТранзакцию } from "./_txguard.js";
-import { собратьЗапуск, собратьСделку, собратьЗакрытие, состояние as состояниеКривой } from "./solana-launch.js";
+import { собратьЗапуск, собратьСделку, собратьЗакрытие, состояние as состояниеКривой, ОСНОВНАЯ_СЕТЬ } from "./solana-launch.js";
 import { котировка, сделка as свопJupiter, SOL_MINT } from "./solana.js";
 import { нуженВторойКлюч } from "./_second.js";
 
@@ -251,6 +251,31 @@ async function кошелёк(db, user, набор) {
    то думает по десять секунд. Раньше любой такой сбой превращался в
    ноль на балансе, а зависший ответ держал человека без конца. Теперь:
    срок на попытку, и до трёх попыток на перегрузку и сетевой сбой. */
+/* Куда ещё отправлять готовую сделку, кроме своего узла. Блок-энджины
+   Jito принимают транзакцию с чаевыми и сразу передают её валидатору
+   Jito — без общей очереди; ближайший к серверу в Германии —
+   франкфуртский, рядом Амстердам. Дополнительные узлы можно задать в
+   SOLANA_SEND_URLS через запятую (например, Helius Sender). Ответы не
+   ждём: что дошло первым, то и попадёт в блок, а подпись одна — дважды
+   сделка не пройдёт. */
+const КУДА_ЕЩЁ = [
+  ...(ОСНОВНАЯ_СЕТЬ ? [
+    "https://frankfurt.mainnet.block-engine.jito.wtf/api/v1/transactions",
+    "https://amsterdam.mainnet.block-engine.jito.wtf/api/v1/transactions",
+    "https://mainnet.block-engine.jito.wtf/api/v1/transactions",
+  ] : []),
+  ...String(process.env.SOLANA_SEND_URLS || "").split(",").map((с) => с.trim()).filter(Boolean),
+];
+function разослать(подписанная) {
+  for (const адрес of КУДА_ЕЩЁ) {
+    fetch(адрес, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "sendTransaction", params: [подписанная, { encoding: "base64", skipPreflight: true, maxRetries: 0 }] }),
+    }).catch(() => {});
+  }
+}
+
 async function rpc(method, params) {
   let последняя;
   for (let попытка = 0; попытка < 3; попытка += 1) {
@@ -442,13 +467,14 @@ async function подписатьИОтправить({ db, user, строка, 
      ожидания на каждую сделку. Проверку мы уже сделали сами и строже:
      что подписывается, разобрано по инструкциям выше. Ретраи оставляем
      узлу: если блок занят, он повторит сам. */
+  разослать(подписанная);
   const подпись = await rpc("sendTransaction", [
     подписанная,
     { encoding: "base64", skipPreflight: true, preflightCommitment: "processed", maxRetries: 5 },
   ]);
   /* Повторная отправка той же транзакции, пока она не попала в блок.
      Узел пересылает её лидеру один раз, а пакеты в загруженной сети
-     теряются; наш повтор раз в полторы секунды — бесплатный способ
+     теряются; наш повтор раз в 0,6 с (полтора слота) — бесплатный способ
      попасть в ближайший блок, а не через один. Подпись та же, поэтому
      дважды сделка пройти не может. */
   // Транзакция ушла — можно показывать её итог, не дожидаясь блока.
@@ -457,7 +483,8 @@ async function подписатьИОтправить({ db, user, строка, 
   const повтор = setInterval(() => {
     if (готово) return;
     rpc("sendTransaction", [подписанная, { encoding: "base64", skipPreflight: true, maxRetries: 0 }]).catch(() => {});
-  }, 1500);
+    разослать(подписанная);
+  }, 600);
   let исход;
   try {
     исход = await дождаться(подпись);
@@ -1152,6 +1179,7 @@ export default async function handler(req, res) {
           продажа,
           amount: сумма,
           minOut: тело.minOut,
+          скорость: ["normal", "fast", "turbo"].includes(тело.speed) ? тело.speed : "normal",
         });
         const подпись = await подписатьИОтправить({
           db, user, строка, набор,

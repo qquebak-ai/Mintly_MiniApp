@@ -314,10 +314,35 @@ async function арендаМинта(connection) {
   return сумма;
 }
 
-function приоритет(tx, единиц = ЕДИНИЦ_НА_СДЕЛКУ) {
+function приоритет(tx, единиц = ЕДИНИЦ_НА_СДЕЛКУ, цена = ЦЕНА_ЕДИНИЦЫ) {
   if (!ComputeBudgetProgram) return;
   tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: единиц }));
-  if (ЦЕНА_ЕДИНИЦЫ > 0) tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: ЦЕНА_ЕДИНИЦЫ }));
+  if (цена > 0) tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: цена }));
+}
+
+/* Скорость сделки — как у терминалов (Axiom и подобных): человек сам
+   выбирает, сколько доплатить за место в ближайшем блоке. «Обычно» —
+   прежняя надбавка; «Быстро» и «Молния» поднимают её и добавляют чаевые
+   Jito: тогда сделку пропускает в блок валидатор Jito, минуя общую
+   очередь, и она попадает в следующий слот — около 0,4 с. Чаевые —
+   обычный перевод на один из счетов Jito, платит покупатель. */
+export const СКОРОСТИ = {
+  normal: { цена: ЦЕНА_ЕДИНИЦЫ, чаевые: 0 },
+  fast: { цена: 500000, чаевые: 0.0001 },
+  turbo: { цена: 2000000, чаевые: 0.001 },
+};
+const СЧЕТА_JITO = [
+  "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5", "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+  "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY", "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+  "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh", "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+  "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL", "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
+];
+// Jito есть только в основной сети: в тестовых чаевые некому принимать.
+export const ОСНОВНАЯ_СЕТЬ = !/devnet|testnet/.test(RPC);
+function чаевыеJito(tx, payer, sol) {
+  if (!ОСНОВНАЯ_СЕТЬ || !(sol > 0)) return;
+  const счёт = new PublicKey(СЧЕТА_JITO[Math.floor(Math.random() * СЧЕТА_JITO.length)]);
+  tx.add(SystemProgram.transfer({ fromPubkey: payer, toPubkey: счёт, lamports: Math.round(sol * LAMPORTS) }));
 }
 
 function вBase64(tx) {
@@ -509,7 +534,8 @@ function выплатаЗа(кривая, единиц) {
 }
 
 /* Покупка и продажа на уже заведённой кривой. */
-export async function собратьСделку({ wallet, mint, продажа, amount, minOut }) {
+export async function собратьСделку({ wallet, mint, продажа, amount, minOut, скорость = "normal" }) {
+  const темп = СКОРОСТИ[скорость] || СКОРОСТИ.normal;
   await библиотеки();
   const programId = программа();
   if (!programId) throw new Error("программа кривой не развёрнута");
@@ -548,7 +574,7 @@ export async function собратьСделку({ wallet, mint, продажа,
   }
 
   const tx = new Transaction();
-  приоритет(tx);
+  приоритет(tx, ЕДИНИЦ_НА_СДЕЛКУ, темп.цена);
   if (!продажа) {
     tx.add(createAssociatedTokenAccountIdempotentInstruction(payer, ata, payer, mintKey));
   }
@@ -568,6 +594,7 @@ export async function собратьСделку({ wallet, mint, продажа,
       : инструкцияПокупки(Math.round(Number(amount) * LAMPORTS), Math.round(Number(minOut || 0) * ЕДИНИЦА)),
   }));
 
+  чаевыеJito(tx, payer, темп.чаевые);
   tx.feePayer = payer;
   tx.recentBlockhash = await блок;
   return {

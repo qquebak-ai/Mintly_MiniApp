@@ -457,8 +457,10 @@ export default async function handler(req, res) {
       for (let i = 0; i < пакеты.length; i += 1) {
         if (i > 0) {
           const было = seqno;
-          for (let ждём = 0; ждём < 30; ждём += 1) {
-            await new Promise((r) => setTimeout(r, 2000));
+          // Блок в TON — доли секунды, а спрашивали раз в две секунды:
+          // покупка после запуска ждала лишнее. Теперь — чаще.
+          for (let ждём = 0; ждём < 85; ждём += 1) {
+            await new Promise((r) => setTimeout(r, 700));
             try { seqno = await открытый.getSeqno(); } catch { /* узел моргнул — спросим снова */ }
             if (seqno > было) break;
           }

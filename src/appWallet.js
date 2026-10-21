@@ -155,9 +155,14 @@ export async function запуститьВнутренним({ имя, тике�
   });
 }
 
-export async function сделкаВнутренним({ mint, продажа = false, amount, minOut = 0 }) {
+/* Скорость сделки — выбор человека в окне сделки (см. App.tsx): от неё
+   зависят приоритетная надбавка и чаевые Jito, которые соберёт сервер. */
+export function скоростьСделки() {
+  try { const v = localStorage.getItem("mintly_trade_speed"); return ["normal", "fast", "turbo"].includes(v) ? v : "fast"; } catch { return "fast"; }
+}
+export async function сделкаВнутренним({ mint, продажа = false, amount, minOut = 0, скорость = скоростьСделки() }) {
   const j = await запрос("/api/wallet-solana?action=trade", {
-    mint, sell: продажа, amount, minOut, requestKey: ключЗапроса(),
+    mint, sell: продажа, amount, minOut, speed: скорость, requestKey: ключЗапроса(),
   });
   // Без подписи сделки не было. Молчать об этом нельзя: приложение
   // запишет её в историю и уменьшит позицию, а в цепочке ничего не
