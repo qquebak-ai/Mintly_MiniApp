@@ -5518,6 +5518,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
   // Что сейчас в окне: цена справа и цена слева. По ним шапка считает
   // рост или падение именно того участка, который человек видит.
   const окноRef = useRef({ от: 0, до: 0, ts: 0 });
+  const окноТаймер = useRef(null);
   const dragRef = useRef(null);     // { lastX, lastY, lastT, vx, vy, moved, startX, startY }
   const pinchRef = useRef(null);    // { startDist, startCount, anchorIdx }
   const inertiaRaf = useRef(null);
@@ -6029,10 +6030,14 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       const слева = candles[Math.max(0, n - шаг)];
       if (слева && справа && Number.isFinite(слева.open) && Number.isFinite(справа.close)) {
         const было = окноRef.current;
-        const пора = Date.now() - было.ts > 90;
-        if (пора && (было.от !== слева.open || было.до !== справа.close)) {
+        if (было.от !== слева.open || было.до !== справа.close) {
+          /* Цифры над графиком — после того, как рука остановилась, а не
+             на каждом кадре: каждое обновление перерисовывало всю
+             страницу токена, и прокрутка колесом шла рывками. */
           окноRef.current = { от: слева.open, до: справа.close, ts: Date.now() };
-          onОкно({ от: слева.open, до: справа.close, слева: слева.time, справа: справа.time });
+          clearTimeout(окноТаймер.current);
+          const окно = { от: слева.open, до: справа.close, слева: слева.time, справа: справа.time };
+          окноТаймер.current = setTimeout(() => onОкно(окно), 160);
         }
       }
     }
@@ -6392,7 +6397,10 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     viewRef.current = { start: anchorIdx - mx / newSlot, count: newCount };
     clampView(true);
     запомнитьРазмахОкна();
-    draw();
+    // Колесо шлёт десятки событий в секунду — рисуем раз в кадр.
+    if (!кадрСдвига.current) {
+      кадрСдвига.current = requestAnimationFrame(() => { кадрСдвига.current = null; draw(); });
+    }
   }
   /* Колесо — своим обработчиком, не через onWheel: у React он пассивный,
      preventDefault там не действует, и вместе с приближением графика
@@ -19998,7 +20006,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
      на что смотрят в первую очередь. Капитализация остаётся рядом, но
      переключателем, а не единственным режимом: раньше шапка говорила о
      цене, а график — о капитализации, и числа не сходились. */
-  const [chartMode, setChartMode] = useState("price");
+  // На сайте шкала по умолчанию в капитализации — так её читают на
+  // терминалах; цена за один токен с шестью нулями ничего не говорит.
+  const [chartMode, setChartMode] = useState(() => (этоПК() ? "mcap" : "price"));
   const [tf, setTf] = useState(() => {
     try {
       if (typeof window !== "undefined") {
@@ -21041,11 +21051,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               «не загрузилось · Повторить» убрана: повтор идёт сам (см.
               эффект с chartReload), и человек видит одну загрузку до конца. */}
           {!chartReady ? (
-            <div className="flex items-center justify-center" style={{ height: 360 }}>
+            <div className="flex items-center justify-center" style={{ height: этоПК() ? 720 : 360 }}>
               <ЗнакЗагрузки size={128} вид="контур" всегда />
             </div>
           ) : (
-            <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} onОкно={chartMode === "price" ? setОкноГрафика : null} фиксШкалы={фиксШкалы} />
+            <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={этоПК() ? 720 : 360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} onОкно={chartMode === "price" ? setОкноГрафика : null} фиксШкалы={фиксШкалы} />
           )}
         </div>
 
