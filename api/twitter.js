@@ -477,8 +477,8 @@ export default async function handler(req, res) {
     if (!моя || String(моя.telegram_id) !== tg) return res.status(403).json({ error: "wrong_telegram" });
     await db.from("profiles").update({ x_handle: null, x_verified_at: null }).ilike("x_handle", з.handle).neq("id", user.id);
     const правка = { x_handle: з.handle, x_verified_at: new Date().toISOString(), x_code: null, x_code_at: null };
-    if (!моя.avatar_url && з.профиль && з.профиль.avatar) правка.avatar_url = з.профиль.avatar;
-    if (!моя.bio && з.профиль && з.профиль.description) правка.bio = String(з.профиль.description).slice(0, 200);
+    // Фото и описание из X в профиль не копируем: профиль человек
+    // оформляет сам, X — только привязка.
     const { error } = await db.from("profiles").update(правка).eq("id", user.id);
     if (error) return res.status(500).json({ error: "db", detail: error.message });
     ЗАГОТОВКИ_X.delete(tg);

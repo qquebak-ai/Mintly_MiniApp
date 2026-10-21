@@ -26376,7 +26376,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
   const isLogin = !isEdit && authTab === "login";
   const [tgNick, setTgNick] = useState("");
   const [tgNickTouched, setTgNickTouched] = useState(false);
-  /* Создание через X: ник, фото и описание приходят из X. Человек уходит
+  /* Создание через X: из X приходит только ник (и X привязывается). Человек уходит
      в браузер X и возвращается — заготовку тогда забираем с сервера и
      подставляем в анкету; занят ник — поле остаётся для своего. */
   const [xЗаготовка, setXЗаготовка] = useState(null); // { handle, profile, taken }
@@ -26426,9 +26426,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         setXЗаготовка(j);
         setTgNick(String(j.handle).replace(/[^A-Za-z0-9_.]/g, "").slice(0, 20));
         setTgNickTouched(true);
-        // Фото из X — если это не стандартная заглушка самого X.
-        const фото = j.profile && j.profile.avatar;
-        if (фото && !/default_profile/.test(фото)) setAvatarUrl(фото);
+        // Фото и описание из X не переносим — только ник как подсказку.
         haptic("success");
         сменитьШагВхода("ник");
       } catch { /* сеть не ответила — спросим на следующем возврате */ }
@@ -26452,8 +26450,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
         setXЗаготовка({ ...j, сайт: id });
         setTgNick(String(j.handle).replace(/[^A-Za-z0-9_.]/g, "").slice(0, 20));
         setTgNickTouched(true);
-        const фото = j.profile && j.profile.avatar;
-        if (фото && !/default_profile/.test(фото)) setAvatarUrl(фото);
+        // Фото и описание из X не переносим — только ник как подсказку.
         haptic("success");
         // Окно на открытии само ставит шаг «почта» — переходим после него.
         setTimeout(() => { if (живо) сменитьШагВхода("ник"); }, 250);
@@ -27214,7 +27211,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                 {t("onbContinue")}
               </ОнбКнопка>
 
-              {/* Быстрый путь: ник, фото и описание — из X. Почту можно
+              {/* Быстрый путь: ник — из X, X сразу привязан. Почту можно
                   добавить потом, с главной. */}
               {внутриTelegram && (
                 <button
@@ -27472,7 +27469,7 @@ function AuthModal({ open, onClose, onSubmit, initial, mode = "create", walletAd
                   <span style={{ fontFamily: bodyFont, color: xЗаготовка.taken ? T.down : ОНБ.приглушённый, fontSize: 13, lineHeight: 1.4 }}>
                     {xЗаготовка.taken
                       ? `@${xЗаготовка.handle} уже занят в Mintly — придумай другой ник`
-                      : `Из X: @${xЗаготовка.handle} — ник, фото и описание`}
+                      : `Из X: @${xЗаготовка.handle} — ник и привязка X`}
                   </span>
                 </div>
               )}

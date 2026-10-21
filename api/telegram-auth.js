@@ -977,12 +977,12 @@ async function регистрацияНаСайте(req, res) {
   const userId = создан.user.id;
   const профиль = {
     id: userId, nickname, email: почта || null, bio: "", emoji: null,
-    avatar_url: (x && x.профиль && x.профиль.avatar && !/default_profile/.test(x.профиль.avatar)) ? x.профиль.avatar : null,
+    // Фото и описание из X не копируем — только привязка X.
+    avatar_url: null,
   };
   if (x) {
     профиль.x_handle = x.handle;
     профиль.x_verified_at = new Date().toISOString();
-    if (x.профиль && x.профиль.description) профиль.bio = String(x.профиль.description).slice(0, 200);
     // Один X — один профиль: у прежнего владельца привязку снимаем.
     await admin.from("profiles").update({ x_handle: null, x_verified_at: null }).ilike("x_handle", x.handle).neq("id", userId);
   }
