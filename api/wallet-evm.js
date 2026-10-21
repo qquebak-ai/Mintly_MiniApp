@@ -293,6 +293,28 @@ async function виртуальныеЗапасы() {
   return итог;
 }
 
+/* Скорость сделки — доплата за место в ближайшем блоке, как в Solana.
+   Блок EVM берёт сначала тех, кто дал больше чаевых валидатору (EIP-1559),
+   а в BNB Chain — тех, у кого выше цена газа. «Обычно» — ровно то, что
+   советует сам узел; «Быстро» и «Молния» — вдвое и вчетверо больше
+   чаевых. Платит покупатель: доплата уходит в газ его же сделки. */
+const МНОЖИТЕЛЬ_СКОРОСТИ = { normal: 10n, fast: 20n, turbo: 40n };
+async function платаЗаСкорость(сеть, скорость) {
+  const м = МНОЖИТЕЛЬ_СКОРОСТИ[скорость] || МНОЖИТЕЛЬ_СКОРОСТИ.fast;
+  if (м === 10n) return {};
+  const г = await (await провайдер(сеть)).getFeeData();
+  if (г.maxFeePerGas) {
+    // Узлы L2 советуют чаевые около нуля — от нуля вдвое ничего не
+    // прибавить, поэтому берём хотя бы 0,01 gwei.
+    const база = г.maxPriorityFeePerGas && г.maxPriorityFeePerGas > 10_000_000n ? г.maxPriorityFeePerGas : 10_000_000n;
+    const чаевые = (база * м) / 10n;
+    return { maxPriorityFeePerGas: чаевые, maxFeePerGas: г.maxFeePerGas + чаевые };
+  }
+  // Цена газа без чаевых (BNB Chain): «Быстро» — в полтора раза выше,
+  // «Молния» — в два с половиной.
+  return г.gasPrice ? { gasPrice: (г.gasPrice * (10n + (м - 10n) / 2n)) / 10n } : {};
+}
+
 function сетьИз(значение) {
   const с = String(значение || "").trim();
   return Object.prototype.hasOwnProperty.call(СЕТИ, с) ? с : null;
@@ -385,6 +407,7 @@ export default async function handler(req, res) {
     // Проскальзывание: от 0,5% до 20%, по умолчанию 5% — мемкоин на
     // кривой двигается быстро.
     const проск = BigInt(Math.max(50, Math.min(2000, Number(тело.slippageBps) || 500)));
+    const скорость = String(тело.speed || "fast");
 
     if (действие === "launch") {
       const имя = String(тело.name || "").trim().slice(0, 64);
@@ -403,7 +426,7 @@ export default async function handler(req, res) {
       const к = new Contract(с.фабрика, ABI_КРИВОЙ, w);
       const плата = await к.launchFee();
       const value = плата + parseUnits(покупка.toFixed(18), 18);
-      const tx = await к.create(имя, тикер, метаданные, 0, { value });
+      const tx = await к.create(имя, тикер, метаданные, 0, { value, ...(await платаЗаСкорость(сеть, скорость)) });
       const r = await tx.wait(1, 120_000);
       if (!r || r.status !== 1) throw new Error("запуск не прошёл");
       let токен = null;
@@ -435,13 +458,13 @@ export default async function handler(req, res) {
       if (действие === "buy") {
         const value = parseUnits(сумма.toFixed(18), 18);
         const [ожидаем] = await к.quoteBuy(токен, value);
-        tx = await к.buy(токен, (ожидаем * (10000n - проск)) / 10000n, { value });
+        tx = await к.buy(токен, (ожидаем * (10000n - проск)) / 10000n, { value, ...(await платаЗаСкорость(сеть, скорость)) });
       } else {
         // Продают в токенах; «всё» приходит точной строкой raw, чтобы
         // округление не оставило пылинку на кошельке.
         const tokensIn = тело.raw && /^\d+$/.test(String(тело.raw)) ? BigInt(тело.raw) : parseUnits(сумма.toFixed(18), 18);
         const ожидаем = await к.quoteSell(токен, tokensIn);
-        tx = await к.sell(токен, tokensIn, (ожидаем * (10000n - проск)) / 10000n);
+        tx = await к.sell(токен, tokensIn, (ожидаем * (10000n - проск)) / 10000n, await платаЗаСкорость(сеть, скорость));
       }
       const r = await tx.wait(1, 120_000);
       if (!r || r.status !== 1) throw new Error("сделка не прошла");

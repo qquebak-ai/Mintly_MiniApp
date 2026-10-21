@@ -11731,6 +11731,7 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
                 ? (мои.монеты != null ? `На кошельке ${дробь(мои.монеты)} ${с.монета}` : "")
                 : (мои.токенов != null ? `На кошельке ${дробь(мои.токенов, 0)} $${токен.ticker}` : "")}
           </div>
+          <ВыборСкорости сеть={сеть} style={{ marginTop: 12 }} />
           <button
             onClick={сделка}
             disabled={идёт || !(числоСуммы > 0)}
@@ -21981,12 +21982,37 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
    chips), see the live conversion, pick slippage tolerance, and confirm.
    Shared between the Buy and Sell CTAs so switching tabs mid-flow works. */
 const СКОРОСТИ_СДЕЛКИ = [
-  { id: "normal", имя: "Обычно", плата: "~1–2 с" },
-  { id: "fast", имя: "Быстро", плата: "+0.0001 SOL" },
-  { id: "turbo", имя: "Молния", плата: "+0.001 SOL" },
+  { id: "normal", имя: "Обычно", плата: "~1–2 с", платаEVM: "газ сети" },
+  { id: "fast", имя: "Быстро", плата: "+0.0001 SOL", платаEVM: "чаевые ×2" },
+  { id: "turbo", имя: "Молния", плата: "+0.001 SOL", платаEVM: "чаевые ×4" },
 ];
+const читатьСкорость = () => { try { const v = localStorage.getItem("mintly_trade_speed"); return ["normal", "fast", "turbo"].includes(v) ? v : "fast"; } catch { return "fast"; } };
+
+/* Скорость — как у терминалов: доплата за место в ближайшем блоке.
+   В Solana «Быстро» и «Молния» идут через Jito и попадают в следующий
+   слот, около 0,4 с; в EVM это чаевые валидатору (в BNB Chain — цена
+   газа). В TON аукциона за место в блоке нет — там выбора и не
+   показываем. Выбор один на все сети и запоминается: сервер читает его
+   при каждой сделке и запуске (appWallet.js, скоростьСделки). */
+function ВыборСкорости({ сеть, style }) {
+  const [скорость, setСкорость] = useState(читатьСкорость);
+  if (!(сеть === "sol" || этоEVM(сеть))) return null;
+  const evm = этоEVM(сеть);
+  return (
+    <div style={style}>
+      <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>Скорость</span>
+      <div className="flex gap-1.5 mt-1.5">
+        {СКОРОСТИ_СДЕЛКИ.map((с) => (
+          <button key={с.id} type="button" aria-pressed={скорость === с.id} onClick={() => { haptic("light"); setСкорость(с.id); try { localStorage.setItem("mintly_trade_speed", с.id); } catch { /* приватный режим */ } }} className="fx-tap rounded-[16px] px-3 py-1.5 flex flex-col items-start" style={{ background: скорость === с.id ? T.ice : T.surfaceHi, color: скорость === с.id ? T.bg : T.muted, border: `1px solid ${скорость === с.id ? T.ice : T.line}`, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
+            <span>{с.имя}</span>
+            <span style={{ fontFamily: monoFont, fontSize: 10.5, fontWeight: 500, opacity: 0.75 }}>{evm ? с.платаEVM : с.плата}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, walletTonBalance = 0, tonPriceUsd = 0, heldAmount = null, curveState = null }) {
-  const [скорость, setСкорость] = useState(() => { try { const v = localStorage.getItem("mintly_trade_speed"); return ["normal", "fast", "turbo"].includes(v) ? v : "fast"; } catch { return "fast"; } });
   // Курс SOL нужен только окну сделки по токену Solana — там он один раз
   // пересчитывает введённую сумму в примерное количество токенов.
   const [solPriceUsd, setSolPriceUsd] = useState(0);
@@ -22432,22 +22458,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           </div>
         </div>
 
-        {/* Скорость — как у терминалов: доплата за место в ближайшем
-            блоке. «Быстро» и «Молния» идут через Jito и попадают в
-            следующий слот, около 0,4 с. Выбор запоминается. */}
-        {соло && (
-          <div style={{ marginTop: 14 }}>
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>Скорость</span>
-            <div className="flex gap-1.5 mt-1.5">
-              {СКОРОСТИ_СДЕЛКИ.map((с) => (
-                <button key={с.id} onClick={() => { setСкорость(с.id); try { localStorage.setItem("mintly_trade_speed", с.id); } catch { /* приватный режим */ } }} className="fx-tap rounded-[16px] px-3 py-1.5 flex flex-col items-start" style={{ background: скорость === с.id ? T.ice : T.surfaceHi, color: скорость === с.id ? T.bg : T.muted, border: `1px solid ${скорость === с.id ? T.ice : T.line}`, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
-                  <span>{с.имя}</span>
-                  <span style={{ fontFamily: monoFont, fontSize: 10.5, fontWeight: 500, opacity: 0.75 }}>{с.плата}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {соло && <ВыборСкорости сеть="sol" style={{ marginTop: 14 }} />}
 
         <div className="flex flex-col gap-1.5" style={{ marginTop: 14, fontFamily: monoFont, fontSize: 12, color: T.muted }}>
           <div className="flex justify-between"><span>{t("rate")}</span><span style={{ color: T.ice }}><ТекстСЧислами text={fmtPrice(token.price)} /> / ${token.ticker}</span></div>
@@ -23529,60 +23540,42 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           const число = (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: вEVM ? 3 : вSolana ? 2 : 1 });
           const плохо = touched && ((вEVM ? false : вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED)) && (курсЗапуска()) > 0
             && !(сейчас * (курсЗапуска()) >= MIN_LAUNCH_USD);
-          const применитьСумму = () => {
-            const v = Math.max(0, Math.min(верх, parseFloat(суммаЧерновик.replace(",", ".")) || 0));
-            setForm((f) => ({ ...f, buyAmount: v > 0 ? String(v) : "" }));
-            setСуммаВводится(false);
+          // Обычное поле вместо ползунка: сумму печатают точно, а не
+          // ловят пальцем. Больше верха кривой не пускаем — сделку сверх
+          // запаса контракт всё равно отвергнет.
+          const поправить = () => {
+            const v = parseFloat(String(form.buyAmount).replace(",", "."));
+            if (Number.isFinite(v) && v > верх) setForm((f) => ({ ...f, buyAmount: String(верх) }));
           };
           return (
             <>
-              {суммаВводится ? (
-                // Никакой рамки и подсветки: строка выглядит ровно так
-                // же, как в режиме просмотра, только число теперь можно
-                // стереть и напечатать своё. Число и единица — тем же
-                // кеглем и промежутком, что были у обычного текста,
-                // никакого лишнего зазора между ними.
-                <span className="flex items-baseline" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
-                  {t("launchAmountLabel")}:&nbsp;
-                  <ПолеСЖивымТекстом
-                    // Клавиатура числовая, а точку и запятую пускаем сами:
-                    // на части телефонов запятая — единственный десятичный
-                    // разделитель, который умеет показать раскладка.
-                    type="text" inputMode="decimal" autoFocus
-                    value={суммаЧерновик}
-                    onChange={(e) => setСуммаЧерновик(e.target.value.replace(/[^0-9.,]/g, ""))}
-                    onBlur={применитьСумму}
-                    onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-                    size={Math.max(1, суммаЧерновик.length || 1)}
-                    style={{
-                      width: "auto", maxWidth: 90, background: "transparent", border: "none", outline: "none",
-                      fontFamily: "inherit", color: T.ice, fontSize: "inherit", fontWeight: 700, padding: 0, margin: 0,
-                    }}
-                  />
-                  &nbsp;{единица}
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => { setСуммаЧерновик(сейчас > 0 ? String(сейчас) : ""); setСуммаВводится(true); }}
-                  className="fx-tap"
-                  style={{ background: "transparent", border: "none", padding: 0, fontFamily: bodyFont, color: плохо ? T.down : T.muted, fontSize: 13 }}
-                >
-                  {t("launchAmountLabel")}: <УмныйТекст text={число(сейчас)} /> {единица}
+              <label htmlFor="launch-buy" style={{ fontFamily: bodyFont, color: плохо ? T.down : T.muted, fontSize: 13 }}>{t("launchAmountLabel")}</label>
+              <div className="flex items-center" style={{ gap: 8, marginTop: 6, padding: "0 14px", height: 52, borderRadius: 14, background: T.surfaceHi, border: `1px solid ${плохо ? hexA(T.down, 0.5) : T.line}` }}>
+                <input
+                  id="launch-buy"
+                  // Клавиатура числовая, а точку и запятую пускаем сами:
+                  // на части телефонов запятая — единственный десятичный
+                  // разделитель, который умеет показать раскладка.
+                  type="text" inputMode="decimal" placeholder="0"
+                  value={form.buyAmount}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9.,]/g, "").replace(/([.,].*)[.,]/g, "$1").slice(0, 12);
+                    setForm((f) => ({ ...f, buyAmount: v }));
+                  }}
+                  onBlur={поправить}
+                  onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                  style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: T.ice, fontFamily: displayFont, fontSize: 18, fontWeight: 700, padding: 0 }}
+                />
+                <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 15, fontWeight: 700 }}>{единица}</span>
+                <button type="button" onClick={() => { haptic("light"); setForm((f) => ({ ...f, buyAmount: String(верх) })); }} className="fx-tap"
+                  style={{ padding: "6px 10px", borderRadius: 999, border: `1px solid ${T.line}`, background: "transparent", color: T.ice, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
+                  Макс
                 </button>
-              )}
-              <Ползунок
-                value={сейчас}
-                min={0}
-                max={верх}
-                step={шаг}
-                формат={число}
-                единица={единица}
-                кривизна={3}
-                радуга
-                ariaLabel={t("launchAmountLabel")}
-                onChange={(v) => setForm((f) => ({ ...f, buyAmount: v > 0 ? String(v) : "" }))}
-              />
+              </div>
+              <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 4 }}>
+                <ТекстСЧислами text={`0 — без покупки, до ${число(верх)} ${единица}`} />
+              </span>
+              <ВыборСкорости сеть={сетьЗапуска} style={{ marginTop: 14 }} />
             </>
           );
         })()}

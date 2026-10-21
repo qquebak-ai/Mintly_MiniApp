@@ -1119,6 +1119,7 @@ export default async function handler(req, res) {
           symbol: тикер,
           base: хост ? `https://${хост}` : "",
           buySol: взнос,
+          скорость: ["normal", "fast", "turbo"].includes(тело.speed) ? тело.speed : "normal",
         });
         // Взнос плюс аренда счетов токена и метаданных: дороже запуск не
         // бывает, а значит и уйти больше не может.
