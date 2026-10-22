@@ -11386,25 +11386,14 @@ function ФонСпотлайта({ вид }) {
         свет.addColorStop(0, "rgba(160,255,200,0.22)"); свет.addColorStop(1, "rgba(160,255,200,0)");
         п.fillStyle = свет; п.fillRect(0, 0, w, h);
       } else {
-        // Рост: тёмный терминал с сеткой и бледными свечами в глубине,
-        // зелёное зарево справа внизу — туда и уходит линия.
+        // Рост: тёмный терминал с сеткой и зелёным заревом справа внизу —
+        // туда и уходит линия. Свечей в глубине нет: они спорили с линией.
         const г = п.createLinearGradient(0, 0, 0, h);
         г.addColorStop(0, "#050A0D"); г.addColorStop(1, "#071510");
         п.fillStyle = г; п.fillRect(0, 0, w, h);
         п.strokeStyle = "rgba(140,200,180,0.07)"; п.lineWidth = 1;
         for (let x = 0; x <= w; x += 28) { п.beginPath(); п.moveTo(x + 0.5, 0); п.lineTo(x + 0.5, h); п.stroke(); }
         for (let y = 0; y <= h; y += 28) { п.beginPath(); п.moveTo(0, y + 0.5); п.lineTo(w, y + 0.5); п.stroke(); }
-        let цена = h * 0.8;
-        for (let x = 10; x < w; x += 14) {
-          const шаг = сз(-h * 0.05, h * 0.03);
-          const o = цена, c = Math.max(h * 0.15, Math.min(h * 0.92, цена + шаг));
-          const вверх = c < o;
-          п.strokeStyle = вверх ? "rgba(0,233,107,0.16)" : "rgba(255,77,94,0.13)";
-          п.fillStyle = п.strokeStyle;
-          п.beginPath(); п.moveTo(x, Math.min(o, c) - сз(2, 8)); п.lineTo(x, Math.max(o, c) + сз(2, 8)); п.stroke();
-          п.fillRect(x - 3, Math.min(o, c), 6, Math.max(2, Math.abs(c - o)));
-          цена = c;
-        }
         const з = п.createRadialGradient(w * 0.85, h, 0, w * 0.85, h, h * 1.1);
         з.addColorStop(0, "rgba(0,233,107,0.22)"); з.addColorStop(1, "rgba(0,233,107,0)");
         п.fillStyle = з; п.fillRect(0, 0, w, h);
