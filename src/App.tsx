@@ -18424,7 +18424,7 @@ function МастерФразы({
   );
 }
 
-function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none", фраза = null, setФраза = () => {}, запросФразы = 0, onСтрелкаФразы = () => {}, ник = "" }) {
+function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none", фраза = null, setФраза = () => {}, запросФразы = 0, onСтрелкаФразы = () => {}, ник = "" }) {
   // Вид карты берём из купленного в магазине; неизвестный id — обычная
   // карта Mintly, а не пустая заливка.
   const видКарты = WALLET_SKIN_BY_ID[скинКарты] || WALLET_SKIN_BY_ID.none;
@@ -19375,10 +19375,14 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
             {holdings.map(({ tok, amount }) => {
               const изм = Number(tok.change24 ?? tok.change ?? 0);
               return (
-                <div
+                // Строка ведёт на карточку токена: там и график, и кнопка
+                // продажи — ради этого в список и заходят.
+                <button
+                  type="button"
                   key={tok.id}
-                  className="flex items-center"
-                  style={{ gap: 12, padding: "12px 2px" }}
+                  onClick={() => { if (onOpenToken) { haptic("light"); onOpenToken(tok); } }}
+                  className="fx-tap flex items-center w-full text-left"
+                  style={{ gap: 12, padding: "12px 2px", background: "transparent", border: "none" }}
                 >
                   <TokenAvatar size={38} src={tok.logoUrl} />
                   <div className="min-w-0" style={{ flex: 1 }}>
@@ -19402,7 +19406,7 @@ function WalletView({ connected, walletAddress, tonBalance = 0, tonPriceUsd = 0,
                       ${String(tok.ticker || "").toUpperCase()}
                     </div>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -32717,6 +32721,7 @@ function mapTokenRow(row) {
                 чужой кошелёк, хотя в базе у него ничего нет. */}
             <WalletView
               key={userId || "гость"}
+              onOpenToken={openToken}
               ник={accountCreated && profile ? profile.nickname : ""}
               скинКарты="none"
               connected={connected}
