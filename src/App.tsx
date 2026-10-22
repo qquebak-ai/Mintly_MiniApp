@@ -8,7 +8,8 @@ import {
   Lock, LockOpen, Gift, LifeBuoy, Plus, ArrowDownLeft, Repeat,
   FileText, CheckCircle2, AlertTriangle, Info, RefreshCw, X,
   Eye, EyeOff, LogIn, ShoppingBag, Trash2, Crown, Bell, Check, Cpu, Settings,
-  Mail, CalendarDays, Pencil, Zap
+  Mail, CalendarDays, Pencil, Zap,
+  UserPlus, Users, MessageCircle, BadgeCheck, Link2,
 } from "lucide-react";
 import { useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { Address, beginCell, toNano } from "@ton/core";
@@ -10681,8 +10682,12 @@ const ShopItem = React.memo(function ShopItem({ item, kind, equipped, owned, pri
    раньше два действия жили на одной плитке и путались между собой. */
 function AchievementsView({ achievements = [], onGoShop, onBack }) {
   const done = achievements.filter((a) => a.done).length;
+  const впереди = achievements.filter((a) => !a.done);
+  const открыто = achievements.filter((a) => a.done);
+  const заработано = открыто.reduce((с, a) => с + (a.coins || 0), 0);
+  const всегоМонет = achievements.reduce((с, a) => с + (a.coins || 0), 0);
   return (
-    <div className="fx-view flex flex-col gap-4 pt-2">
+    <div className="fx-view flex flex-col pt-2" style={{ gap: 22 }}>
       {onBack && !hasTelegramBack() && (
         <button onClick={onBack} className="fx-tap flex items-center gap-1 self-start" style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.muted }}>
           <ChevronLeft size={16} /> {t("back")}
@@ -10693,70 +10698,70 @@ function AchievementsView({ achievements = [], onGoShop, onBack }) {
         <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, marginTop: 4 }}>{t("achievementsIntro")}</p>
       </div>
 
-      {/* Общий прогресс — без подложки: сама полоса и есть виджет, а
-          карточка вокруг двух строк только добавляла слой. */}
-      <div>
-        <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("achProgress")}</span>
-          <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{tf("achUnlockedOf", { done, total: achievements.length })}</span>
+      {/* Сводка: сколько открыто и сколько монет это уже принесло. Полоса
+          без подложки — она сама и есть виджет. */}
+      <div className="fx-card" style={{ animationDelay: "40ms" }}>
+        <div className="flex items-end justify-between" style={{ gap: 12 }}>
+          <div>
+            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("achProgress")}</div>
+            <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 46, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
+              {done}<span style={{ color: T.faint, fontSize: 28 }}> / {achievements.length}</span>
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{lang === "EN" ? "Earned" : "Получено"}</div>
+            <div className="flex items-center justify-end gap-1.5" style={{ marginTop: 6, fontFamily: monoFont, color: T.ice, fontSize: 18, fontWeight: 700 }}>
+              <CoinIcon size={16} /> {заработано}
+              <span style={{ color: T.faint, fontSize: 13, fontWeight: 500 }}>/ {всегоМонет}</span>
+            </div>
+          </div>
         </div>
-        <div style={{ height: 6, borderRadius: 3, background: T.surfaceHi, overflow: "hidden" }}>
+        <div style={{ height: 6, borderRadius: 3, background: T.surfaceHi, overflow: "hidden", marginTop: 14 }}>
           <div style={{ width: `${achievements.length ? (done / achievements.length) * 100 : 0}%`, height: "100%", background: PRISM, transition: `width ${EASE}` }} />
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
-        {achievements.map((a, i) => {
-          return (
-            <div
-              key={a.id}
-              className="fx-card rounded-[22px] p-3.5 flex items-center gap-3"
-              style={{
-                background: T.surface,
-                border: `1px solid ${a.done ? hexA(a.color, 0.45) : T.line}`,
-                animationDelay: `${i * 40}ms`,
-                position: "relative", overflow: "hidden",
-              }}
-            >
-              <div style={{
-                width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-                background: a.done ? hexA(a.color, 0.16) : T.surfaceHi,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <a.icon size={18} color={a.done ? a.color : T.muted} />
-              </div>
-
-              <div className="min-w-0" style={{ flex: 1 }}>
-                <div className="flex items-center gap-1.5">
-                  <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{a.label}</span>
-                  {a.done && <CheckCircle2 size={13} color={a.color} />}
+      {/* Сначала то, что ещё впереди: за ним сюда и приходят. Открытое —
+          ниже, отдельной группой, чтобы не смешивать «сделал» и «сделай». */}
+      {[[впереди, lang === "EN" ? "Ahead" : "Впереди"], [открыто, lang === "EN" ? "Unlocked" : "Открыто"]].map(([список, заголовок], гi) => список.length > 0 && (
+        <div key={заголовок} className="fx-card" style={{ animationDelay: `${100 + гi * 60}ms` }}>
+          <SectionTitle>{заголовок}</SectionTitle>
+          <ГруппаСтрок>
+            {список.map((a) => (
+              <div key={a.id} className="flex items-center" style={{ gap: 12, padding: "13px 16px" }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 12, flexShrink: 0,
+                  background: a.done ? hexA(a.color, 0.16) : T.surfaceHi,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <a.icon size={17} color={a.done ? a.color : T.muted} />
                 </div>
-                <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.35, marginTop: 2 }}>{a.hint}</div>
-                {!a.done && a.target > 1 && (
-                  <div className="flex items-center gap-2" style={{ marginTop: 6 }}>
-                    <div style={{ flex: 1, height: 4, borderRadius: 2, background: T.surfaceHi, overflow: "hidden" }}>
-                      <div style={{ width: `${Math.min(100, (a.value / a.target) * 100)}%`, height: "100%", background: hexA(a.color, 0.65) }} />
-                    </div>
-                    <span style={{ fontFamily: monoFont, fontSize: 11.5, color: T.muted }}>{achProgressText(a)}</span>
+                <div className="min-w-0" style={{ flex: 1 }}>
+                  <div className="flex items-center gap-1.5">
+                    <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{a.label}</span>
+                    {a.done && <CheckCircle2 size={13} color={a.color} />}
                   </div>
+                  <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.35, marginTop: 2 }}>{a.hint}</div>
+                  {!a.done && a.target > 1 && (
+                    <div className="flex items-center gap-2" style={{ marginTop: 7 }}>
+                      <div style={{ flex: 1, height: 4, borderRadius: 2, background: T.surfaceHi, overflow: "hidden" }}>
+                        <div style={{ width: `${Math.min(100, (a.value / a.target) * 100)}%`, height: "100%", background: T.ice, transition: `width ${EASE}` }} />
+                      </div>
+                      <span style={{ fontFamily: monoFont, fontSize: 11.5, color: T.muted, fontVariantNumeric: "tabular-nums" }}>{achProgressText(a)}</span>
+                    </div>
+                  )}
+                </div>
+                {/* Награда — монеты для магазина: что купить, решает человек. */}
+                {a.coins > 0 && (
+                  <span className="flex items-center gap-1 flex-shrink-0" style={{ fontFamily: monoFont, fontSize: 13, fontWeight: 700, color: a.done ? T.ice : T.muted }}>
+                    <CoinIcon size={12} dim={!a.done} /> +{a.coins}
+                  </span>
                 )}
               </div>
-
-              {/* Награда — монеты для магазина. Предмет за достижение
-                  больше не закреплён: что купить, человек решает сам. */}
-              {a.coins > 0 && (
-                <div className="flex items-center gap-1 flex-shrink-0 rounded-full px-2.5 py-1"
-                  style={{ background: a.done ? hexA(T.electric, 0.14) : T.surfaceHi, border: `1px solid ${a.done ? hexA(T.electric, 0.4) : T.line}` }}>
-                  <CoinIcon size={12} dim={!a.done} />
-                  <span style={{ fontFamily: monoFont, fontSize: 12.5, fontWeight: 700, color: a.done ? T.electric : T.muted }}>
-                    +{a.coins}
-                  </span>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            ))}
+          </ГруппаСтрок>
+        </div>
+      ))}
 
       {onGoShop && (
         <button
@@ -24737,11 +24742,11 @@ const SUPPORT_FAQ = [
 /* Одна строка вопроса: нажатие раскрывает ответ. */
 function FaqItem({ item, open, onToggle }) {
   return (
-    <div style={{ background: T.surfaceHi, border: "none", borderRadius: 18, overflow: "hidden" }}>
+    <div>
       <button
         onClick={onToggle}
         className="fx-tap w-full flex items-center gap-2"
-        style={{ background: "transparent", border: "none", padding: "12px 14px", textAlign: "left" }}
+        style={{ background: "transparent", border: "none", padding: "14px 16px", textAlign: "left" }}
       >
         <span style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.ice, flex: 1 }}>{pickLabel(item.q)}</span>
         <ChevronDown
@@ -24752,7 +24757,7 @@ function FaqItem({ item, open, onToggle }) {
       {open && (
         <div style={{
           fontFamily: bodyFont, fontSize: 13.5, lineHeight: 1.5, color: T.muted,
-          padding: "0 14px 13px", animation: "fadeInUp 240ms ease-out both",
+          padding: "0 16px 14px", animation: "fadeInUp 240ms ease-out both",
         }}>
           {pickLabel(item.a)}
         </div>
@@ -24858,11 +24863,26 @@ function SupportChat({ accountCreated, showToast, onRead }) {
 
   if (mode === "faq") {
     return (
-      <div className="fx-swap flex flex-col">
-        <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5, textAlign: "center" }}>
-          {t("supportFaqLead")}
-        </p>
-        <div className="flex flex-col gap-2" style={{ marginTop: 14 }}>
+      <div className="fx-swap flex flex-col" style={{ gap: 22 }}>
+        <button
+          onClick={() => setMode("chat")}
+          className="fx-tap fx-card w-full flex items-center text-left"
+          style={{ animationDelay: "40ms", gap: 12, padding: "14px 16px", borderRadius: 22, background: T.surface, border: "none" }}
+        >
+          <span style={{ width: 40, height: 40, borderRadius: 13, flexShrink: 0, background: T.surfaceHi, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <MessageCircle size={18} color={T.ice} />
+          </span>
+          <span className="min-w-0" style={{ flex: 1 }}>
+            <span style={{ display: "block", fontFamily: displayFont, fontSize: 15, fontWeight: 700, color: T.ice }}>{lang === "EN" ? "Chat with support" : "Чат с поддержкой"}</span>
+            <span style={{ display: "block", fontFamily: bodyFont, fontSize: 12.5, color: T.muted, marginTop: 2 }}>
+              {messages.length ? (lang === "EN" ? `${messages.length} messages in the thread` : `Сообщений в переписке: ${messages.length}`) : (lang === "EN" ? "Answers come here and in the bot" : "Ответ придёт сюда и в бота")}
+            </span>
+          </span>
+          <ChevronRight size={16} color={T.faint} />
+        </button>
+        <div className="fx-card" style={{ animationDelay: "100ms" }}>
+          <SectionTitle>{lang === "EN" ? "Common questions" : "Частые вопросы"}</SectionTitle>
+          <ГруппаСтрок>
           {SUPPORT_FAQ.map((item) => (
             <FaqItem
               key={item.id}
@@ -24873,21 +24893,15 @@ function SupportChat({ accountCreated, showToast, onRead }) {
               onToggle={() => setOpenQuestion(openQuestion === item.id ? null : item.id)}
             />
           ))}
+          </ГруппаСтрок>
         </div>
-        <button
-          onClick={() => setMode("chat")}
-          className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3"
-          style={{ marginTop: 14, ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
-        >
-          <Send size={14} /> {t("supportOther")}
-        </button>
       </div>
     );
   }
 
   return (
     <div className="fx-swap flex flex-col">
-      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5, textAlign: "center", marginTop: 8 }}>
+      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5 }}>
         {t("supportDesc")}
       </p>
 
@@ -24934,7 +24948,7 @@ function SupportChat({ accountCreated, showToast, onRead }) {
           человек хочет не прокручивая. */}
       <div style={{
         position: "sticky", bottom: 0, marginTop: 12, paddingTop: 10, paddingBottom: 2,
-        background: T.surface,
+        background: T.bg,
       }}>
         <div className="flex items-end gap-2">
           <ПолеСЖивымТекстом как="textarea"
@@ -24945,7 +24959,7 @@ function SupportChat({ accountCreated, showToast, onRead }) {
             style={{
               flex: 1, minWidth: 0, resize: "none",
               fontFamily: bodyFont, fontSize: 16, lineHeight: 1.4, color: T.ice,
-              background: T.bg, border: "none", borderRadius: 18,
+              background: T.surface, border: "none", borderRadius: 18,
               padding: "10px 13px", outline: "none",
             }}
           />
@@ -25008,22 +25022,25 @@ function ReferralShare({ showToast }) {
   const оборот = Number(state.volume) || 0;
 
   return (
-    <div className="mt-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surfaceHi, border: "none" }}>
-      <div className="flex items-center justify-between">
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("refVolume")}</span>
-        <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 15, fontWeight: 700 }}><ТекстСЧислами text={fmtTon(оборот)} /> TON</span>
+    <div className="fx-card" style={{ animationDelay: "120ms" }}>
+      <SectionTitle>{lang === "EN" ? "Share of friends' trading" : "Доля с оборота друзей"}</SectionTitle>
+      <div style={{ background: T.surface, borderRadius: 22, padding: "14px 16px" }}>
+        <div className="flex items-center justify-between">
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("refVolume")}</span>
+          <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 15, fontWeight: 700 }}><ТекстСЧислами text={fmtTon(оборот)} /> TON</span>
+        </div>
+        <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 6 }}>
+          {t("refShareNote")}
+        </p>
+        <button
+          onClick={claim}
+          disabled={busy}
+          className={`fx-tap w-full flex items-center justify-center gap-1.5 rounded-[16px] py-3 mt-3${busy ? " fx-busy" : ""}`}
+          style={{ background: T.surfaceHi, border: "none", fontFamily: displayFont, fontWeight: 700, fontSize: 14, color: T.ice }}
+        >
+          <CoinIcon size={14} /> {t("refPayoutCta")}
+        </button>
       </div>
-      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.45, marginTop: 6 }}>
-        {t("refShareNote")}
-      </p>
-      <button
-        onClick={claim}
-        disabled={busy}
-        className={`fx-tap w-full flex items-center justify-center gap-1.5 rounded-[16px] py-2.5 mt-2${busy ? " fx-busy" : ""}`}
-        style={{ background: T.surface, border: `1px solid ${hexA(T.electric, 0.4)}`, fontFamily: displayFont, fontWeight: 700, fontSize: 13.5, color: T.electric }}
-      >
-        <CoinIcon size={14} /> {t("refPayoutCta")}
-      </button>
     </div>
   );
 }
@@ -25162,7 +25179,7 @@ function ЗаявкаНаГалочку({ запросX, handle }) {
   const поле = { width: "100%", boxSizing: "border-box", padding: "13px 14px", borderRadius: 14, border: `1px solid ${T.line}`, background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 15, outline: "none" };
   if (сост.person) {
     return (
-      <div className="flex items-center" style={{ gap: 12, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
+      <div className="flex items-center" style={{ gap: 12, padding: "14px 16px", borderRadius: 22, background: T.surface }}>
         <ГалочкаЛица size={22} />
         <div style={{ fontFamily: bodyFont, color: T.ice, fontSize: 14.5, lineHeight: 1.4 }}>Проверенное лицо — галочка видна рядом с @{handle} везде в Mintly</div>
       </div>
@@ -25170,7 +25187,7 @@ function ЗаявкаНаГалочку({ запросX, handle }) {
   }
   if (сост.request && сост.request.status === "pending") {
     return (
-      <div className="flex items-center" style={{ gap: 12, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
+      <div className="flex items-center" style={{ gap: 12, padding: "14px 16px", borderRadius: 22, background: T.surface }}>
         <ЗнакЗагрузки size={22} />
         <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.4 }}>Заявка на галочку проверенного лица на проверке — ответ придёт в боте</div>
       </div>
@@ -25196,7 +25213,7 @@ function ЗаявкаНаГалочку({ запросX, handle }) {
     }
   }
   return (
-    <div className="flex flex-col" style={{ gap: 10, padding: 14, borderRadius: 18, background: T.surfaceHi }}>
+    <div className="flex flex-col" style={{ gap: 10, padding: "14px 16px", borderRadius: 22, background: T.surface }}>
       <button onClick={() => { haptic("light"); setОткрыта((о) => !о); }} className="fx-tap flex items-center text-left" style={{ gap: 12, background: "none", border: "none", padding: 0, width: "100%" }}>
         <ГалочкаЛица size={22} />
         <div className="flex-1 min-w-0">
@@ -25315,33 +25332,56 @@ function ПодключениеX({ showToast }) {
   }
 
   if (состояние && состояние.handle) {
+    const п = состояние.profile || {};
+    const число = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(".0", "")}M` : n >= 1e4 ? `${(n / 1e3).toFixed(1).replace(".0", "")}K` : (n || 0).toLocaleString("ru-RU"));
+    const ru = lang !== "EN";
     return (
-      <div className="flex flex-col mt-2" style={{ gap: 12 }}>
+      <>
+        {/* Шапка как профиль в самом X: баннер, аватар, имя и цифры. Нажатие
+            открывает карточку целиком. */}
         <button
           onClick={() => { haptic("light"); setПрофильОткрыт(true); }}
-          className="fx-tap flex items-center text-left"
-          style={{ gap: 12, padding: 14, borderRadius: 18, background: T.surfaceHi, border: "none", width: "100%" }}
+          className="fx-tap fx-card w-full text-left"
+          style={{ animationDelay: "40ms", padding: 0, borderRadius: 22, overflow: "hidden", background: T.surface, border: "none" }}
         >
-          {состояние.profile && состояние.profile.avatar
-            ? <img src={состояние.profile.avatar} alt="" width={36} height={36} style={{ borderRadius: "50%", flexShrink: 0 }} />
-            : <ЗнакX size={18} color={T.ice} />}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center" style={{ gap: 5, fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>@{состояние.handle}<ЗначкиX handle={состояние.handle} size={15} /></div>
-            <div style={{ fontFamily: bodyFont, color: T.up, fontSize: 12.5 }}>{t("xConnected")}</div>
+          <div style={{ height: 92, background: п.banner ? `center/cover no-repeat url(${п.banner})` : T.surfaceHi }} />
+          <div style={{ padding: "0 16px 16px" }}>
+            <div className="flex items-end justify-between" style={{ marginTop: -30 }}>
+              <span style={{ width: 64, height: 64, borderRadius: "50%", border: `4px solid ${T.surface}`, background: T.surfaceHi, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {п.avatar ? <img src={п.avatar} alt="" width={64} height={64} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ЗнакX size={22} color={T.muted} />}
+              </span>
+              <span className="flex items-center" style={{ gap: 5, fontFamily: bodyFont, fontSize: 12.5, color: T.up, paddingBottom: 6 }}>
+                <CheckCircle2 size={14} color={T.up} /> {t("xConnected")}
+              </span>
+            </div>
+            <div className="flex items-center" style={{ gap: 5, marginTop: 10 }}>
+              <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800 }}>{п.name || состояние.handle}</span>
+              <ЗначкиX handle={состояние.handle} size={16} />
+            </div>
+            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 1 }}>@{состояние.handle}</div>
+            {(п.followers != null || п.following != null) && (
+              <div className="flex" style={{ gap: 16, marginTop: 10, fontFamily: bodyFont, fontSize: 13.5 }}>
+                <span><b style={{ color: T.ice, fontVariantNumeric: "tabular-nums" }}>{число(п.followers)}</b> <span style={{ color: T.muted }}>{ru ? "читателей" : "followers"}</span></span>
+                <span><b style={{ color: T.ice, fontVariantNumeric: "tabular-nums" }}>{число(п.following)}</b> <span style={{ color: T.muted }}>{ru ? "в читаемых" : "following"}</span></span>
+              </div>
+            )}
           </div>
-          <CheckCircle2 size={18} color={T.up} />
-          <ChevronRight size={16} color={T.faint} />
         </button>
         <ПрофильX открыт={профильОткрыт} onClose={() => setПрофильОткрыт(false)} handle={состояние.handle} профиль={состояние.profile} />
-        <ЗаявкаНаГалочку запросX={запросX} handle={состояние.handle} />
+
+        <div className="fx-card" style={{ animationDelay: "100ms" }}>
+          <SectionTitle>{ru ? "Галочка" : "Badge"}</SectionTitle>
+          <ЗаявкаНаГалочку запросX={запросX} handle={состояние.handle} />
+        </div>
+
         <button
           onClick={отключить}
-          className="fx-tap w-full rounded-[12px] min-h-[52px] py-3"
-          style={{ background: "transparent", border: `1px solid ${hexA(T.down, 0.35)}`, fontFamily: bodyFont, fontSize: 14.5, color: T.down }}
+          className="fx-tap w-full"
+          style={{ padding: "14px 0", background: "transparent", border: "none", fontFamily: bodyFont, fontSize: 14.5, color: T.down }}
         >
           {t("xUnlink")}
         </button>
-      </div>
+      </>
     );
   }
 
@@ -25351,13 +25391,18 @@ function ПодключениеX({ showToast }) {
   const текстКнопки = ждёмВозврата || проверяю ? t("xWaiting") : t("xConnectCta");
 
   return (
-    <div className="flex flex-col mt-2" style={{ gap: 14 }}>
-      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>{t("xHint")}</p>
+    <div className="flex flex-col" style={{ gap: 14 }}>
+      <ГруппаСтрок style={{ animation: "fadeInUp 480ms cubic-bezier(0.16,1,0.3,1) 60ms backwards" }}>
+        <СтрокаГруппы иконка={ImageIcon} label={lang === "EN" ? "Avatar and name from X" : "Аватар и ник из X"} sub={lang === "EN" ? "Pulled in automatically and kept fresh" : "Подтягиваются сами и обновляются"} />
+        <СтрокаГруппы иконка={ЗнакX} label={lang === "EN" ? "X badge next to your name" : "Значок X рядом с ником"} sub={lang === "EN" ? "On your tokens, trades and profile" : "На твоих токенах, сделках и в профиле"} />
+        <СтрокаГруппы иконка={BadgeCheck} label={lang === "EN" ? "Verified person badge" : "Галочка проверенного лица"} sub={lang === "EN" ? "Optional, after a short form" : "По желанию, после короткой анкеты"} />
+      </ГруппаСтрок>
+      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5 }}>{t("xHint")}</p>
 
       <button
         onClick={подключить}
         disabled={занята}
-        className={`fx-tap w-full rounded-[12px] min-h-[52px] py-3 flex items-center justify-center${занята ? " fx-busy" : ""}`}
+        className={`fx-tap w-full rounded-[20px] min-h-[52px] py-3 flex items-center justify-center${занята ? " fx-busy" : ""}`}
         style={{
           gap: 8, ...ВОЛНА(ЦВЕТ_КНОПКИ), border: "none",
           fontFamily: displayFont, fontWeight: 700, fontSize: 15, color: PRISM_TEXT,
@@ -25385,6 +25430,42 @@ function ПодключениеX({ showToast }) {
 /* Разделы, которые длиннее экрана: у них панель держит высоту, а не
    растёт под содержимое. */
 const ДЛИННЫЕ_РАЗДЕЛЫ = new Set(["support", "architecture", "privacy", "referral", "x", "notify"]);
+/* Эти разделы — страницы, а не листы: в них листают, заполняют анкету и
+   переписываются, и большая карточка поверх приложения только съедала
+   место по краям. Выглядят как «Достижения» — заголовок слева и списки. */
+const ПОЛНОЭКРАННЫЕ = new Set(["referral", "x", "support"]);
+
+/* Группа строк одной плашкой с тонкими разделителями — как списки на
+   главной и в кошельке, вместо отдельной пилюли на каждую строку. */
+function ГруппаСтрок({ children, style }) {
+  const строки = React.Children.toArray(children).filter(Boolean);
+  return (
+    <div style={{ background: T.surface, borderRadius: 22, overflow: "hidden", ...style }}>
+      {строки.map((с, i) => (
+        <div key={i} style={{ borderTop: i ? `1px solid ${T.line}` : "none" }}>{с}</div>
+      ))}
+    </div>
+  );
+}
+
+function СтрокаГруппы({ иконка: Иконка, label, sub, value, onClick, цвет }) {
+  const Тег = onClick ? "button" : "div";
+  return (
+    <Тег onClick={onClick} className={onClick ? "fx-tap w-full text-left" : undefined}
+      style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", background: "transparent", border: "none", width: "100%" }}>
+      {Иконка && (
+        <span style={{ width: 34, height: 34, borderRadius: 11, flexShrink: 0, background: T.surfaceHi, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Иконка size={16} color={цвет || T.ice} />
+        </span>
+      )}
+      <span className="min-w-0" style={{ flex: 1 }}>
+        <span style={{ display: "block", fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>{label}</span>
+        {sub && <span style={{ display: "block", fontFamily: bodyFont, fontSize: 12.5, color: T.muted, lineHeight: 1.4, marginTop: 2 }}>{sub}</span>}
+      </span>
+      {value}
+    </Тег>
+  );
+}
 
 function SettingsPanel({
   item: itemProp, onClose, appSettings, onUpdateSetting,
@@ -25673,47 +25754,64 @@ function SettingsPanel({
         </div>
       );
       break;
-    case "referral":
+    case "referral": {
+      const заработано = coinsFromInvites(inviteCount);
+      const ru = lang !== "EN";
+      /* Шаги — настоящая последовательность: ссылка, аккаунт друга,
+         доля с его сделок. Поэтому и пронумерованы. */
+      const шаги = ru
+        ? ["Отправь ссылку другу", `Друг заводит аккаунт по ней — тебе ${REFERRAL_COINS} монет`, "С его сделок дальше капает доля монетами"]
+        : ["Send your link to a friend", `They sign up through it — you get ${REFERRAL_COINS} coins`, "A share of their trading keeps dripping in coins"];
       body = (
         <>
-          <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, textAlign: "center" }}>
-            {t("referralDesc")}
-          </p>
-          {/* Цена приглашения стоит первой строкой: ради неё сюда и
-              заходят, а счёт приглашённых без неё — просто число. */}
-          <div className="flex items-center justify-between mt-3 rounded-[20px] px-3.5 py-3" style={{ background: T.surfaceHi, border: `1px solid ${hexA(T.electric, 0.35)}` }}>
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("refPerFriend")}</span>
-            <span className="flex items-center gap-1.5" style={{ fontFamily: displayFont, color: T.electric, fontSize: 17.5, fontWeight: 700 }}>
-              <CoinIcon size={16} /> {REFERRAL_COINS}
-            </span>
+          {/* Главная цифра — сколько уже принесли друзья: ради неё сюда и
+              заходят. Остальное — строками ниже. */}
+          <div className="fx-card" style={{ animationDelay: "40ms" }}>
+            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("refEarned")}</div>
+            <div className="flex items-center" style={{ gap: 10, marginTop: 4 }}>
+              <CoinIcon size={30} />
+              <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 46, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{заработано}</span>
+            </div>
           </div>
-          <div className="flex items-center justify-between mt-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surfaceHi, border: "none" }}>
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("refInvited")}</span>
-            <span style={{ fontFamily: displayFont, color: T.turquoise, fontSize: 17.5, fontWeight: 700 }}>{inviteCount}</span>
-          </div>
-          <div className="flex items-center justify-between mt-2 rounded-[20px] px-3.5 py-3" style={{ background: T.surfaceHi, border: "none" }}>
-            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("refEarned")}</span>
-            <span className="flex items-center gap-1.5" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17.5, fontWeight: 700 }}>
-              <CoinIcon size={16} /> {coinsFromInvites(inviteCount)}
-            </span>
-          </div>
-          {/* Доля с комиссий друзей. Стоит после счёта приглашённых:
-              сперва человек видит, сколько привёл, потом — что с этого
-              капает дальше. */}
+
+          <ГруппаСтрок style={{ animation: "fadeInUp 480ms cubic-bezier(0.16,1,0.3,1) 80ms backwards" }}>
+            <СтрокаГруппы иконка={Gift} label={t("refPerFriend")}
+              value={<span className="flex items-center gap-1.5" style={{ fontFamily: monoFont, color: T.ice, fontSize: 15, fontWeight: 700 }}><CoinIcon size={14} /> {REFERRAL_COINS}</span>} />
+            <СтрокаГруппы иконка={Users} label={t("refInvited")}
+              value={<span style={{ fontFamily: monoFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>{inviteCount}</span>} />
+          </ГруппаСтрок>
+
           <ReferralShare showToast={showToast} />
 
-          <div className="flex items-center gap-2 mt-2 rounded-[20px] px-3 py-2.5" style={{ background: T.surfaceHi, border: "none" }}>
-            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 12.5, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{refLink || "—"}</span>
-            <button onClick={copyReferral} className="fx-tap" disabled={!refLink}><Copy size={14} color={T.muted} /></button>
+          <div className="fx-card" style={{ animationDelay: "160ms" }}>
+            <SectionTitle>{ru ? "Как это работает" : "How it works"}</SectionTitle>
+            <ГруппаСтрок>
+              {шаги.map((ш, i) => (
+                <div key={i} className="flex items-center" style={{ gap: 12, padding: "13px 16px" }}>
+                  <span style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, background: T.surfaceHi, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: monoFont, fontSize: 12.5, fontWeight: 700, color: T.ice }}>{i + 1}</span>
+                  <span style={{ fontFamily: bodyFont, fontSize: 14, color: T.ice, lineHeight: 1.4 }}>{ш}</span>
+                </div>
+              ))}
+            </ГруппаСтрок>
           </div>
-          {refLink && (
-            <button onClick={shareReferral} className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3 mt-3" style={{ ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
-              <Send size={14} /> {t("refShare")}
+
+          <div className="fx-card" style={{ animationDelay: "200ms" }}>
+            <SectionTitle>{ru ? "Твоя ссылка" : "Your link"}</SectionTitle>
+            <button onClick={copyReferral} disabled={!refLink} className="fx-tap w-full flex items-center text-left" style={{ gap: 12, padding: "13px 16px", borderRadius: 22, background: T.surface, border: "none" }}>
+              <Link2 size={16} color={T.muted} style={{ flexShrink: 0 }} />
+              <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 13, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{refLink ? refLink.replace(/^https:\/\//, "") : "—"}</span>
+              <Copy size={15} color={T.muted} style={{ flexShrink: 0 }} />
             </button>
-          )}
+            {refLink && (
+              <button onClick={shareReferral} className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3.5" style={{ marginTop: 10, ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}>
+                <Send size={14} /> {t("refShare")}
+              </button>
+            )}
+          </div>
         </>
       );
       break;
+    }
     case "support":
       body = <SupportChat accountCreated={accountCreated} showToast={showToast} onRead={onSupportRead} />;
       break;
@@ -25749,6 +25847,36 @@ function SettingsPanel({
       break;
     default:
       body = null;
+  }
+
+  if (ПОЛНОЭКРАННЫЕ.has(item.key)) {
+    const подводка = item.key === "referral" ? t("referralDesc")
+      : item.key === "support" ? t("supportFaqLead")
+        : lang === "EN" ? "Your X name, avatar and badge show up across Mintly." : "Ник, аватар и значок из X видны везде в Mintly.";
+    return createPortal(
+      <div
+        data-sheet="1"
+        className={`no-scrollbar ${уходит || closing ? "fx-sheet-out" : "fx-sheet-in"}`}
+        style={{
+          position: "fixed", inset: 0, zIndex: 460, background: T.bg, overflowY: "auto", overscrollBehavior: "contain",
+          padding: `calc(${insetTop}px + 10px) 16px calc(${insetBottom}px + 40px)`,
+        }}
+      >
+        <div className="flex flex-col" style={{ gap: 22, maxWidth: 520, margin: "0 auto" }}>
+          {!hasTelegramBack() && (
+            <button onClick={закрытьПанель} className="fx-tap flex items-center gap-1 self-start" style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.muted, background: "none", border: "none" }}>
+              <ChevronLeft size={16} /> {t("back")}
+            </button>
+          )}
+          <div className="fx-card">
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.1, textWrap: "balance" }}>{t(item.tKey)}</span>
+            <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, marginTop: 6 }}>{подводка}</p>
+          </div>
+          {body}
+        </div>
+      </div>,
+      document.body,
+    );
   }
 
   /* Порталом и поверх всего: пункт открывают с листа настроек, а тот
