@@ -23552,7 +23552,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   const курсЗапуска = () => (вEVM ? курсМонетыEVM(сетьЗапуска, КЕШ_КУРСОВ_EVM) : вSolana ? solUsd() : tonUsd());
   // Виртуальный запас фабрики — тот же, что в contracts/evm/deploy.mjs.
   const ВИРТ_EVM = вEVM
-    ? (Number(сетиEVMЗапуска[сетьЗапуска] && сетиEVMЗапуска[сетьЗапуска].virtual) || (сетиEVMЗапуска.тестовые ? (сетьЗапуска === "bsc" ? 0.01365 : 0.004095) : (сетьЗапуска === "bsc" ? 1.365 : 0.4095)))
+    ? (Number(сетиEVMЗапуска[сетьЗапуска] && сетиEVMЗапуска[сетьЗапуска].virtual) || (сетьЗапуска === "bsc" ? 1.365 : 0.4095))
     : 0;
   const ВИРТ_ТОКЕНОВ_EVM = 1_073_000_000;
   const ПРОДАЖА_EVM = 800_000_000;

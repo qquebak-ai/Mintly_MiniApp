@@ -703,14 +703,7 @@ var LiquidityPool = class _LiquidityPool {
 };
 
 // src/curveConfig.js
-var \u0422\u0415\u0421\u0422\u041E\u0412\u0410\u042F_\u0421\u0415\u0422\u042C = (() => {
-  try {
-    return String(import.meta.env.VITE_TON_TESTNET ?? "0") === "1";
-  } catch {
-    return typeof process !== "undefined" && !!process.env && process.env.TON_TESTNET === "1";
-  }
-})();
-var \u041C\u0410\u0421\u0428\u0422\u0410\u0411_\u041A\u0420\u0418\u0412\u041E\u0419 = \u0422\u0415\u0421\u0422\u041E\u0412\u0410\u042F_\u0421\u0415\u0422\u042C ? 0.01 : 1;
+var \u041C\u0410\u0421\u0428\u0422\u0410\u0411_\u041A\u0420\u0418\u0412\u041E\u0419 = 1;
 var CURVE_PARAMS = {
   virtualTon: toNano((529.38 * \u041C\u0410\u0421\u0428\u0422\u0410\u0411_\u041A\u0420\u0418\u0412\u041E\u0419).toFixed(4)),
   virtualTokens: toNano("1073000000"),

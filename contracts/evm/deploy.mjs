@@ -60,19 +60,19 @@ const ТЕСТОВЫЕ = {
     chainId: 97, rpc: "https://bsc-testnet-rpc.publicnode.com",
     weth: "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",       // WBNB testnet
     dexFactory: "0x6725F303b657a9451d8BA641348b6761A6CC7a17", // PancakeSwap V2 testnet
-    virtualNative: "0.01365", env: "EVM_CURVE_BSC",
+    virtualNative: "1.365", env: "EVM_CURVE_BSC",
   },
   base: {
     chainId: 84532, rpc: "https://sepolia.base.org",
     weth: "0x4200000000000000000000000000000000000006",
     dexFactory: "0x7Ae58f10f7849cA6F5fB71b7f45CB416c9204b1e", // Uniswap V2, Base Sepolia
-    virtualNative: "0.004095", env: "EVM_CURVE_BASE",
+    virtualNative: "0.4095", env: "EVM_CURVE_BASE",
   },
   eth: {
     chainId: 11155111, rpc: "https://ethereum-sepolia-rpc.publicnode.com",
     weth: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
     dexFactory: "0xF62c03E08ada871A0bEb309762E260a7a6a880E6", // Uniswap V2, Sepolia
-    virtualNative: "0.004095", env: "EVM_CURVE_ETH",
+    virtualNative: "0.4095", env: "EVM_CURVE_ETH",
   },
 };
 
