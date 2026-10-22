@@ -5974,11 +5974,11 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     const свечаСделки = (t) => { let lo = 0, hi = n - 1, i = -1; while (lo <= hi) { const mid = (lo + hi) >> 1; if (candles[mid] && candles[mid].time <= t) { i = mid; lo = mid + 1; } else hi = mid - 1; } return i; };
     if (метки && метки.length && n) {
       for (const м of метки) {
-        if (!м.стрелка || !Number.isFinite(м.цена)) continue;
+        if (!м.стрелка) continue;
         const i = свечаСделки(м.time);
         const c = i === n - 1 && ж.cur != null ? { ...candles[i], high: ж.hi, low: ж.lo } : candles[i];
         if (!c || !Number.isFinite(c.high) || !Number.isFinite(c.low)) continue;
-        const y = yFor(Math.min(c.high, Math.max(c.low, м.цена)));
+        const y = yFor(Number.isFinite(м.цена) ? Math.min(c.high, Math.max(c.low, м.цена)) : c.close);
         const верх = м.side === "buy" ? y - 3 : y - 21;
         верхСтрелки.set(i, Math.min(верхСтрелки.has(i) ? верхСтрелки.get(i) : Infinity, верх));
       }
@@ -6021,7 +6021,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     стрелкиRef.current = [];
     if (метки && метки.length && n) {
       for (const м of метки) {
-        if (!м.стрелка || !Number.isFinite(м.цена)) continue;
+        if (!м.стрелка) continue;
         let lo = 0, hi = n - 1, i = -1;
         while (lo <= hi) { const mid = (lo + hi) >> 1; if (candles[mid] && candles[mid].time <= м.time) { i = mid; lo = mid + 1; } else hi = mid - 1; }
         if (i < startI || i >= endI || !candles[i]) continue;
@@ -6034,7 +6034,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         if (x < -10 || x > plotW + 10) continue;
         const c = i === n - 1 && ж.cur != null ? { ...candles[i], high: ж.hi, low: ж.lo } : candles[i];
         if (!Number.isFinite(c.high) || !Number.isFinite(c.low)) continue;
-        const цена = Math.min(c.high, Math.max(c.low, м.цена));
+        const цена = Number.isFinite(м.цена) ? Math.min(c.high, Math.max(c.low, м.цена)) : (i === n - 1 && ж.cur != null ? ж.cur : c.close);
         const y = yFor(цена);
         const н = покупка ? 1 : -1; // покупка: хвост ниже острия
         ctx.beginPath();
@@ -20821,14 +20821,21 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
          самая ранняя покупка создателя токена. */
       const яСоздатель = !!(currentUserId && token.ownerId === currentUserId);
       const покупкиПоВремени = свои.filter((с) => с.side === "buy").sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-      const стартовая = яСоздатель ? покупкиПоВремени[0] : null;
+      /* Самая ранняя покупка создателя — стартовая, если она случилась в
+         первые минуты жизни токена. Без записи запуска иначе выпала бы
+         первая настоящая покупка. */
+      const создан = token.createdAt ? new Date(token.createdAt).getTime() : 0;
+      const перваяП = покупкиПоВремени[0];
+      const стартовая = яСоздатель && перваяП && (!создан || new Date(перваяП.created_at).getTime() - создан < 3 * 60000) ? перваяП : null;
       const монета = token.chain === "solana" ? "SOL" : этоEVM(token.chain) ? (token.chain === "bsc" ? "BNB" : "ETH") : ТИКЕР_TON;
       const стрелка = (с) => {
         const сумма = Number(с.ton_amount) || 0, штук = Number(с.token_amount) || 0, курс = Number(с.ton_price_usd) || 0;
         const ценаUsd = штук > 0 && курс > 0 ? (сумма * курс) / штук : NaN;
         const д = new Date(с.created_at);
         return {
-          стрелка: с !== стартовая && Number.isFinite(ценаUsd),
+          // Старые записи без количества токенов тоже получают стрелку —
+          // она встаёт на цену закрытия своей свечи.
+          стрелка: с !== стартовая,
           ценаUsd,
           когда: д.toLocaleTimeString(lang === "EN" ? "en-US" : "ru-RU", { hour: "2-digit", minute: "2-digit" }),
           сумма: `${fmtCoin(сумма)} ${монета}${курс > 0 ? ` · ${fmtUSD(сумма * курс)}` : ""}`,
@@ -20850,7 +20857,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       clearInterval(id);
       if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", послеСделки);
     };
-  }, [currentUserId, token.tokenAddress, token.address, token.демо, token.ownerId, token.chain]);
+  }, [currentUserId, token.tokenAddress, token.address, token.демо, token.ownerId, token.chain, token.createdAt]);
 
   /* Сколько стоит позиция. Не «количество × цена», а сколько монет
      вернёт продажа прямо сейчас: кривая по ходу сделки опускается, и
@@ -21228,7 +21235,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   // Цена сделки в единицах графика: в режиме капитализации свечи
   // умножены на выпуск — стрелки умножаем так же.
   const меткиГрафика = useMemo(() => (меткиСделок || []).map((м) => (
-    м.стрелка ? { ...м, цена: chartMode === "price" ? м.ценаUsd : (supplyEst ? м.ценаUsd * supplyEst : NaN) } : м
+    м.стрелка ? { ...м, цена: !Number.isFinite(м.ценаUsd) ? NaN : chartMode === "price" ? м.ценаUsd : (supplyEst ? м.ценаUsd * supplyEst : NaN) } : м
   )), [меткиСделок, chartMode, supplyEst]);
   // Множитель «цена → капитализация» приезжает отдельно от свечей: пока
   // его нет, показывать нечего, но и «нет данных» неправда.
@@ -33298,9 +33305,12 @@ function mapTokenRow(row) {
            не знает ни комиссии, ни подрезки под остаток, и продажа
            купленного за 10 SOL значилась в истории ровно десяткой, хотя
            вернулось 9,9. */
-        const проданоТокенов = mode === "sell"
-          ? (Number(итог && итог.tokens) > 0 ? Number(итог.tokens) : rawAmount)
-          : (Number(rawEstimate) || 0);
+        /* Сколько токенов — по ответу кривой и для покупки: в 1 клик оценки
+           из окна нет вовсе, и покупка писалась с нулём токенов — без цены
+           сделки её стрелку на графике было не поставить. */
+        const проданоТокенов = Number(итог && итог.tokens) > 0
+          ? Number(итог.tokens)
+          : (mode === "sell" ? rawAmount : (Number(rawEstimate) || 0));
         const монет = mode === "buy"
           ? rawAmount
           : (Number(итог && итог.solOut) > 0 ? Number(итог.solOut) : (Number(rawEstimate) || 0));
