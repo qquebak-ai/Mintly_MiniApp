@@ -5531,6 +5531,9 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
      уйти тени. Держим в ref, а не в состоянии: это кадры, а не данные,
      и перерисовка идёт через canvas. */
   const живаяСвеча = useRef({ time: null, cur: null, hi: null, lo: null });
+  // Где нарисованы стрелки своих сделок и какая из них открыта нажатием.
+  const стрелкиRef = useRef([]);
+  const [открытаяСтрелка, setОткрытаяСтрелка] = useState(null);
   const кадрЖивой = useRef(null);
   // Трогали ли масштаб пальцами. Пока нет — окно держит свою длину даже
   // на короткой истории; после щипка длину выбирает человек.
@@ -5966,6 +5969,20 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     /* Кружки сделок над свечами: B/S — свои сделки с этого кошелька, D —
        сделки создателя токена, их видят все. Свеча ищется по времени
        сделки; несколько сделок в одной свече встают столбиком. */
+    /* Верх стрелок по свечам: кружки встают над ними, а не поверх. */
+    const верхСтрелки = new Map();
+    const свечаСделки = (t) => { let lo = 0, hi = n - 1, i = -1; while (lo <= hi) { const mid = (lo + hi) >> 1; if (candles[mid] && candles[mid].time <= t) { i = mid; lo = mid + 1; } else hi = mid - 1; } return i; };
+    if (метки && метки.length && n) {
+      for (const м of метки) {
+        if (!м.стрелка || !Number.isFinite(м.цена)) continue;
+        const i = свечаСделки(м.time);
+        const c = i === n - 1 && ж.cur != null ? { ...candles[i], high: ж.hi, low: ж.lo } : candles[i];
+        if (!c || !Number.isFinite(c.high) || !Number.isFinite(c.low)) continue;
+        const y = yFor(Math.min(c.high, Math.max(c.low, м.цена)));
+        const верх = м.side === "buy" ? y - 3 : y - 21;
+        верхСтрелки.set(i, Math.min(верхСтрелки.has(i) ? верхСтрелки.get(i) : Infinity, верх));
+      }
+    }
     if (метки && метки.length && n) {
       const стопка = new Map();
       const r = Math.max(6, Math.min(9, bodyW * 0.55));
@@ -5984,7 +6001,8 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         const k = стопка.get(i) || 0;
         стопка.set(i, k + 1);
         if (k >= 3) continue;
-        const y = Math.max(r + 2, yFor(c.high) - r - 6 - k * (r * 2 + 3));
+        const надСвечой = Math.min(yFor(c.high) - r - 6, верхСтрелки.has(i) ? верхСтрелки.get(i) - r - 2 : Infinity);
+        const y = Math.max(r + 2, надСвечой - k * (r * 2 + 3));
         const покупка = м.side === "buy";
         const цвет = покупка ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
         ctx.beginPath();
@@ -5994,6 +6012,50 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         if (м.dev) { ctx.lineWidth = 2; ctx.strokeStyle = цвет; ctx.stroke(); }
         ctx.fillStyle = м.dev ? "#1A1200" : (покупка ? "#06210F" : "#FFFFFF");
         ctx.fillText(м.dev ? "D" : (покупка ? "B" : "S"), x, y + 0.5);
+      }
+    }
+    /* Стрелки своих сделок: остриё стоит ровно на цене сделки — вверх
+       покупка, вниз продажа. Цена прижимается к телу и теням своей свечи:
+       свеча сводит минуту целиком, и цена сделки с комиссией могла бы
+       вылезти за неё на волосок. Места стрелок запоминаем для нажатия. */
+    стрелкиRef.current = [];
+    if (метки && метки.length && n) {
+      for (const м of метки) {
+        if (!м.стрелка || !Number.isFinite(м.цена)) continue;
+        let lo = 0, hi = n - 1, i = -1;
+        while (lo <= hi) { const mid = (lo + hi) >> 1; if (candles[mid] && candles[mid].time <= м.time) { i = mid; lo = mid + 1; } else hi = mid - 1; }
+        if (i < startI || i >= endI || !candles[i]) continue;
+        const покупка = м.side === "buy";
+        const голова = 7, ширина = 6, хвост = 11;
+        /* Прямо на свече: сбоку стрелка наезжала на соседние свечи. Чтобы
+           её было видно и на теле того же цвета, она белая с цветной
+           каймой и тёмной обводкой снаружи. */
+        const x = xFor(i);
+        if (x < -10 || x > plotW + 10) continue;
+        const c = i === n - 1 && ж.cur != null ? { ...candles[i], high: ж.hi, low: ж.lo } : candles[i];
+        if (!Number.isFinite(c.high) || !Number.isFinite(c.low)) continue;
+        const цена = Math.min(c.high, Math.max(c.low, м.цена));
+        const y = yFor(цена);
+        const н = покупка ? 1 : -1; // покупка: хвост ниже острия
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + ширина, y + н * голова);
+        ctx.lineTo(x + 2.2, y + н * голова);
+        ctx.lineTo(x + 2.2, y + н * (голова + хвост));
+        ctx.lineTo(x - 2.2, y + н * (голова + хвост));
+        ctx.lineTo(x - 2.2, y + н * голова);
+        ctx.lineTo(x - ширина, y + н * голова);
+        ctx.closePath();
+        ctx.lineJoin = "round";
+        ctx.lineWidth = 4.5;
+        ctx.strokeStyle = T.bg;
+        ctx.stroke();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = покупка ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
+        ctx.stroke();
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fill();
+        стрелкиRef.current.push({ x, y: y + н * (голова + хвост) / 2, м });
       }
     }
     ctx.restore();
@@ -6377,6 +6439,23 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     onHover && onHover(idx == null ? null : candles[idx]);
   }
 
+  /* Нажатие по стрелке открывает подпись сделки; мимо — закрывает. */
+  function нажатьСтрелку(cx, cy) {
+    const эл = wrapRef.current;
+    if (!эл) return false;
+    const к = эл.getBoundingClientRect();
+    const з = зумЭкрана();
+    const x = (cx - к.left) / з, y = (cy - к.top) / з;
+    let лучшая = null, близко = 18;
+    for (const с of стрелкиRef.current) {
+      const д = Math.hypot(с.x - x, с.y - y);
+      if (д < близко) { близко = д; лучшая = с; }
+    }
+    setОткрытаяСтрелка(лучшая ? { x: лучшая.x, y: лучшая.y, м: лучшая.м } : null);
+    if (лучшая) { haptic("light"); return true; }
+    return false;
+  }
+
   function onTouchStart(e) {
     if (e.touches.length === 2) {
       cancelInertia();
@@ -6426,6 +6505,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       dragRef.current.moved = true;
       hoverIdxRef.current = null; // a real pan cancels any tap crosshair
       onHover && onHover(null);
+      setОткрытаяСтрелка(null);
     }
     if (dragRef.current.moved) {
       e.preventDefault();
@@ -6446,7 +6526,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     if (dragRef.current) {
       if (dragRef.current.moved) {
         startInertia(dragRef.current.vx);
-      } else {
+      } else if (!нажатьСтрелку(dragRef.current.startX, dragRef.current.startY)) {
         // No meaningful movement -> treat as a tap: show the crosshair.
         reportHover(indexAtX(dragRef.current.startX));
       }
@@ -6483,7 +6563,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     if (шкалаRef.current) { закончитьШкалу(); return; }
     if (dragRef.current) {
       if (dragRef.current.moved) startInertia(dragRef.current.vx);
-      else reportHover(indexAtX(dragRef.current.startX));
+      else if (!нажатьСтрелку(dragRef.current.startX, dragRef.current.startY)) reportHover(indexAtX(dragRef.current.startX));
       dragRef.current = null;
     }
   }
@@ -6531,6 +6611,27 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}
       onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
       <canvas ref={canvasRef} style={{ display: "block", width: "100%", height }} />
+      {открытаяСтрелка && (() => {
+        const { x, y, м } = открытаяСтрелка;
+        const покупка = м.side === "buy";
+        const ширинаЭл = (wrapRef.current && wrapRef.current.clientWidth) || 360;
+        const слева = Math.max(6, Math.min(ширинаЭл - 186, x - 90));
+        const выше = покупка ? y > 70 : y > height - 80;
+        return (
+          <div style={{
+            position: "absolute", left: слева, top: выше ? y - 64 : y + 18, width: 180, pointerEvents: "none",
+            padding: "8px 11px", borderRadius: 12, background: "rgba(22,22,26,0.92)",
+            border: "0.5px solid rgba(255,255,255,0.16)", boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+            animation: "fadeInUp 200ms ease-out both",
+          }}>
+            <div style={{ fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700, color: покупка ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ }}>
+              {покупка ? (lang === "EN" ? "Your buy" : "Твоя покупка") : (lang === "EN" ? "Your sell" : "Твоя продажа")} · {м.когда}
+            </div>
+            <div style={{ fontFamily: monoFont, fontSize: 12.5, color: "#F5F5F7", marginTop: 3 }}>{м.сумма}</div>
+            {м.поЦене && <div style={{ fontFamily: monoFont, fontSize: 11.5, color: "rgba(245,245,247,0.6)", marginTop: 1 }}>{м.поЦене}</div>}
+          </div>
+        );
+      })()}
     </div>
   );
 })
@@ -20701,7 +20802,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     const читать = async () => {
       const [свои, дев] = await Promise.all([
         currentUserId
-          ? supabase.from("trades").select("side, created_at").eq("user_id", currentUserId).eq("token_address", адрес)
+          ? supabase.from("trades").select("side, created_at, ton_amount, token_amount, ton_price_usd").eq("user_id", currentUserId).eq("token_address", адрес)
             .order("created_at", { ascending: false }).limit(100).then((r) => r.data || []).catch(() => [])
           : Promise.resolve([]),
         fetch(апи(`/api/dev-trades?token=${encodeURIComponent(адрес)}`)).then((r) => r.json()).catch(() => null),
@@ -20710,8 +20811,27 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       const вСек = (iso) => Math.floor(new Date(iso).getTime() / 1000);
       // Создатель — ты сам? Тогда твои кружки уже стоят как B/S.
       const девЭтоЯ = !!(дев && дев.owner && дев.owner === currentUserId);
+      /* Стрелки — только своим сделкам и без стартовой покупки: её делает
+         сам запуск, и стрелка на первой свече ничего не сообщает. Стартовая —
+         самая ранняя покупка создателя токена. */
+      const яСоздатель = !!(currentUserId && token.ownerId === currentUserId);
+      const покупкиПоВремени = свои.filter((с) => с.side === "buy").sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      const стартовая = яСоздатель ? покупкиПоВремени[0] : null;
+      const монета = token.chain === "solana" ? "SOL" : этоEVM(token.chain) ? (token.chain === "bsc" ? "BNB" : "ETH") : ТИКЕР_TON;
+      const стрелка = (с) => {
+        const сумма = Number(с.ton_amount) || 0, штук = Number(с.token_amount) || 0, курс = Number(с.ton_price_usd) || 0;
+        const ценаUsd = штук > 0 && курс > 0 ? (сумма * курс) / штук : NaN;
+        const д = new Date(с.created_at);
+        return {
+          стрелка: с !== стартовая && Number.isFinite(ценаUsd),
+          ценаUsd,
+          когда: д.toLocaleTimeString(lang === "EN" ? "en-US" : "ru-RU", { hour: "2-digit", minute: "2-digit" }),
+          сумма: `${fmtCoin(сумма)} ${монета}${курс > 0 ? ` · ${fmtUSD(сумма * курс)}` : ""}`,
+          поЦене: Number.isFinite(ценаUsd) ? `${fmtCompact(штук)} ${token.ticker || ""} по ${fmtPrice(ценаUsd)}` : "",
+        };
+      };
       const метки = [
-        ...свои.map((с) => ({ time: вСек(с.created_at), side: с.side, dev: false })),
+        ...свои.map((с) => ({ time: вСек(с.created_at), side: с.side, dev: false, ...стрелка(с) })),
         ...(девЭтоЯ ? [] : ((дев && дев.trades) || []).map((с) => ({ time: вСек(с.at), side: с.side, dev: true }))),
       ].filter((м) => Number.isFinite(м.time)).sort((a, b) => a.time - b.time);
       setМеткиСделок(метки);
@@ -20725,7 +20845,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       clearInterval(id);
       if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", послеСделки);
     };
-  }, [currentUserId, token.tokenAddress, token.address, token.демо]);
+  }, [currentUserId, token.tokenAddress, token.address, token.демо, token.ownerId, token.chain]);
 
   /* Сколько стоит позиция. Не «количество × цена», а сколько монет
      вернёт продажа прямо сейчас: кривая по ходу сделки опускается, и
@@ -21100,6 +21220,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   // Пока их нет — крутится загрузка; «нет данных» пишем лишь тогда, когда
   // запрос отработал и не принёс ничего.
   const chartReady = !!(графДанные && графДанные.tf === tf && scaledCandles && scaledCandles.length);
+  // Цена сделки в единицах графика: в режиме капитализации свечи
+  // умножены на выпуск — стрелки умножаем так же.
+  const меткиГрафика = useMemo(() => (меткиСделок || []).map((м) => (
+    м.стрелка ? { ...м, цена: chartMode === "price" ? м.ценаUsd : (supplyEst ? м.ценаUsd * supplyEst : NaN) } : м
+  )), [меткиСделок, chartMode, supplyEst]);
   // Множитель «цена → капитализация» приезжает отдельно от свечей: пока
   // его нет, показывать нечего, но и «нет данных» неправда.
   const chartPending = chartLoading || (!!графДанные && графДанные.tf === tf && !scaledCandles);
@@ -21646,7 +21771,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
               <ЗнакЗагрузки size={128} вид="контур" всегда />
             </div>
           ) : (
-            <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={этоПК() ? 720 : 360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} onОкно={chartMode === "price" ? setОкноГрафика : null} фиксШкалы={фиксШкалы} метки={меткиСделок} />
+            <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={этоПК() ? 720 : 360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} onОкно={chartMode === "price" ? setОкноГрафика : null} фиксШкалы={фиксШкалы} метки={меткиГрафика} />
           )}
         </div>
 
