@@ -20632,6 +20632,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   const [листВыхода, setЛистВыхода] = useState(false);
   // Последний честный итог позиции — его держим, пока история догоняет кошелёк.
   const прошлыйИтог = useRef(0);
+  const [свояСделкаВ, setСвояСделкаВ] = useState(0);
   useEffect(() => { прошлыйИтог.current = 0; }, [token.id]);
   const [быстрые] = useБыстрые();
   useEffect(() => {
@@ -20653,11 +20654,16 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     };
     const читать = () => поСети().catch(() => null)
       .then((и) => и || вложеноВТокен(currentUserId, адрес))
-      .then((и) => { if (!брошено && и) setВложено(и); });
+      .then((и) => { if (!брошено && и) setВложено({ ...и, at: Date.now() }); });
     читать();
     // Сеть отдаёт свежую сделку в истории не сразу — перечитываем
     // несколько раз, пока она не попадёт в расчёт.
-    const своя = () => { for (const мс of [1500, 4000, 8000, 15000]) setTimeout(читать, мс); };
+    const своя = (e) => {
+      if (e && e.detail && e.detail.tokenId && e.detail.tokenId !== token.id) return;
+      // Своя сделка: итог замирает, пока история не догонит её (см. ниже).
+      setСвояСделкаВ(Date.now());
+      for (const мс of [1500, 4000, 8000, 15000, 22000]) setTimeout(читать, мс);
+    };
     if (typeof window !== "undefined") window.addEventListener("mintly:сделка", своя);
     return () => {
       брошено = true;
@@ -21702,7 +21708,14 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
               || Math.abs(вложено.токенов - позиция) <= Math.max(1, позиция * 0.005);
             let итог = вложеноUSD > 0 ? стоимостьПозиции - вложеноUSD : 0;
             if (Math.abs(итог) < Math.max(0.01, вложеноUSD * 0.005)) итог = 0;
-            if (!сходится) итог = прошлыйИтог.current;
+            /* После своей сделки кривая и кошелёк меняются в разное время:
+               цена уже сдвинулась, а остаток и история ещё старые, — и на
+               миг выходил случайный плюс или минус. Итог стоит, пока не
+               придёт история, прочитанная после сделки и сходящаяся с
+               кошельком (но не дольше 25 секунд). */
+            const ждёмИсторию = свояСделкаВ > 0 && Date.now() - свояСделкаВ < 25000
+              && !(вложено && вложено.at > свояСделкаВ + 1000 && сходится);
+            if (!сходится || ждёмИсторию) итог = прошлыйИтог.current;
             else прошлыйИтог.current = итог;
             const плюс = итог >= 0;
             return (
