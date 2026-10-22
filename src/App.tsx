@@ -11394,7 +11394,7 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
           <span className="flex-1 min-w-0" style={{ display: "block" }}>
             <span className="flex items-center" style={{ gap: 8 }}>{подписи}</span>
             <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 1 }}>
-              <ТекстСЧислами text={fmtUSD(token.mcapNum)} /> · ${token.vol}
+              <ТекстСЧислами text={fmtUSD(token.mcapNum)} />
             </span>
             {строкаX}
           </span>
@@ -11429,8 +11429,10 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
           {рост ? "+" : ""}<ТекстСЧислами text={(token.change || 0).toFixed(1)} />%
         </span>
       </span>
-      <span style={{ position: "relative", zIndex: 1, display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 4 }}>
-        <ТекстСЧислами text={fmtUSD(token.mcapNum)} /> · ${token.vol}
+      {/* Под тикером — одна капитализация, крупно: оборот рядом с ней
+          читался как вторая цена и только путал. */}
+      <span style={{ position: "relative", zIndex: 1, display: "block", fontFamily: displayFont, color: T.ice, fontSize: 20, fontWeight: 800, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
+        <ТекстСЧислами text={fmtUSD(token.mcapNum)} />
       </span>
       {строкаX && <span className="flex justify-center" style={{ position: "relative", zIndex: 1, marginTop: 6 }}>{строкаX}</span>}
       {точки && <span className="flex justify-center" style={{ position: "relative", zIndex: 1, marginTop: 14 }}>{точки}</span>}
