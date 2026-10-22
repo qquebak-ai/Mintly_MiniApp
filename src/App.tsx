@@ -8,7 +8,7 @@ import {
   Lock, LockOpen, Gift, LifeBuoy, Plus, ArrowDownLeft, Repeat,
   FileText, CheckCircle2, AlertTriangle, Info, RefreshCw, X,
   Eye, EyeOff, LogIn, ShoppingBag, Trash2, Crown, Bell, Check, Cpu, Settings,
-  Mail, CalendarDays, Pencil
+  Mail, CalendarDays, Pencil, Zap
 } from "lucide-react";
 import { useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { Address, beginCell, toNano } from "@ton/core";
@@ -281,6 +281,7 @@ const STR = {
     shopLockedBody: "Вид карты баланса меняется здесь, а монеты приходят за достижения. Войди, чтобы всё это стало твоим.",
     cosmeticApplied: "Применено", cosmeticRemoved: "Снято",
     settingsSaved: "Настройки сохранены",
+    quickTradeTitle: "Быстрая покупка",
     langTitle: "Язык", themeTitle: "Оформление", themeWhite: "Светлая",
     notifyTitle: "Уведомления",
     notifyDesc: "Бот пишет о том, что происходит с твоими токенами. Что именно присылать — выбираешь здесь.",
@@ -1007,6 +1008,7 @@ const STR = {
     shopLockedBody: "Your balance card gets its look here, and coins come from achievements. Sign in to make them yours.",
     cosmeticApplied: "Applied", cosmeticRemoved: "Removed",
     settingsSaved: "Settings saved",
+    quickTradeTitle: "Quick buy",
     langTitle: "Language", themeTitle: "Appearance", themeWhite: "White",
     notifyTitle: "Notifications",
     notifyDesc: "The bot tells you what happens to your tokens. Pick what it should send.",
@@ -5373,6 +5375,80 @@ const ВЫСОТА_ПОЛОСЫ = 64;
 const СУММЫ_ПОКУПКИ_SOL = [0.01, 0.1, 0.5];
 const СУММЫ_ПОКУПКИ_GRAM = [1, 5, 25];
 
+/* Быстрая сделка: три свои суммы на покупку (в монете сети) и три доли
+   на продажу. Человек правит их карандашом прямо в окне сделки, а в
+   настройках включает «покупку в 1 клик» — тогда окно показывает только
+   эти три кнопки, и нажатие сразу отправляет сделку. Живёт на телефоне:
+   это привычка руки, а не данные аккаунта. */
+const БЫСТРЫЕ_КЛЮЧ = "mintly_quick_trade";
+const БЫСТРЫЕ_ПО_УМОЛЧАНИЮ = { oneClick: false, buy: { SOL: [0.1, 0.5, 1], TON: СУММЫ_ПОКУПКИ_GRAM }, sell: [25, 50, 100] };
+function тройка(v, запас, макс = Infinity) {
+  return Array.isArray(v) && v.length === 3 && v.every((x) => Number(x) > 0 && Number(x) <= макс) ? v.map(Number) : запас;
+}
+function быстрыеНастройки() {
+  let о = {};
+  try { о = JSON.parse(localStorage.getItem(БЫСТРЫЕ_КЛЮЧ) || "{}") || {}; } catch { /* приватный режим */ }
+  const д = БЫСТРЫЕ_ПО_УМОЛЧАНИЮ;
+  return {
+    oneClick: !!о.oneClick,
+    buy: { SOL: тройка(о.buy && о.buy.SOL, д.buy.SOL), TON: тройка(о.buy && о.buy.TON, д.buy.TON) },
+    sell: тройка(о.sell, д.sell, 100),
+  };
+}
+function useБыстрые() {
+  const [н, setН] = useState(быстрыеНастройки);
+  useEffect(() => {
+    const свежие = () => setН(быстрыеНастройки());
+    window.addEventListener("mintly:быстрые", свежие);
+    return () => window.removeEventListener("mintly:быстрые", свежие);
+  }, []);
+  const сохранить = useCallback((правка) => {
+    const следующие = { ...быстрыеНастройки(), ...правка };
+    try { localStorage.setItem(БЫСТРЫЕ_КЛЮЧ, JSON.stringify(следующие)); } catch { /* приватный режим */ }
+    setН(следующие);
+    // Окно сделки и настройки открыты разом — обе стороны видят правку.
+    window.dispatchEvent(new Event("mintly:быстрые"));
+  }, []);
+  return [н, сохранить];
+}
+
+/* Три быстрые суммы с карандашом. Карандаш превращает кнопки в поля —
+   «Готово» сохраняет. Подпись под суммой — итог: сколько придёт. */
+function БыстрыеСуммы({ значения, подпись, итог, onВыбор, onСохранить, крупно = false, цвет = null, макс = Infinity }) {
+  const [правка, setПравка] = useState(null);
+  if (правка) {
+    const годно = правка.every((x) => Number(String(x).replace(",", ".")) > 0 && Number(String(x).replace(",", ".")) <= макс);
+    return (
+      <div className="flex items-center gap-1.5" style={{ marginTop: 8 }}>
+        {правка.map((v, i) => (
+          <input key={i} id={`quick-edit-${i}`} value={v} inputMode="decimal" autoFocus={i === 0}
+            onChange={(e) => { const к = правка.slice(); к[i] = e.target.value.replace(/[^0-9.,]/g, "").slice(0, 10); setПравка(к); }}
+            style={{ flex: 1, minWidth: 0, height: крупно ? 56 : 34, borderRadius: 16, border: `1px solid ${T.lineHi}`, background: T.bg, color: T.ice, textAlign: "center", fontFamily: monoFont, fontSize: 14, outline: "none" }} />
+        ))}
+        <button type="button" disabled={!годно} onClick={() => { haptic("light"); onСохранить(правка.map((x) => Number(String(x).replace(",", ".")))); setПравка(null); }} className="fx-tap"
+          style={{ height: крупно ? 56 : 34, padding: "0 12px", borderRadius: 16, border: "none", background: годно ? T.ice : T.surfaceHi, color: годно ? T.bg : T.muted, fontFamily: bodyFont, fontSize: 13, fontWeight: 700 }}>
+          Готово
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-stretch gap-1.5" style={{ marginTop: 8 }}>
+      {значения.map((v) => (
+        <button key={v} type="button" onClick={() => onВыбор(v)} className="fx-tap flex-1 flex flex-col items-center justify-center rounded-[16px]"
+          style={{ minWidth: 0, overflow: "hidden", minHeight: крупно ? 64 : 34, padding: крупно ? "8px 4px" : "6px 4px", background: цвет ? hexA(цвет, 0.14) : T.surfaceHi, border: цвет ? `1px solid ${hexA(цвет, 0.4)}` : "none", fontFamily: monoFont, fontSize: крупно ? 15 : 12.5, fontWeight: крупно ? 700 : 500, color: цвет || T.ice }}>
+          <span>{подпись(v)}</span>
+          {итог && итог(v) ? <span style={{ fontSize: 10.5, fontWeight: 500, color: T.muted, marginTop: 2, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><УмныйТекст text={итог(v)} /></span> : null}
+        </button>
+      ))}
+      <button type="button" aria-label="Изменить суммы" onClick={() => { haptic("light"); setПравка(значения.map(String)); }} className="fx-tap flex items-center justify-center rounded-[16px]"
+        style={{ width: крупно ? 44 : 38, flexShrink: 0, background: T.surfaceHi, border: "none", color: T.muted }}>
+        <Pencil size={15} />
+      </button>
+    </div>
+  );
+}
+
 const CHART_MIN_VISIBLE = 20;
 const CHART_MAX_VISIBLE = 150;
 const CHART_DEFAULT_VISIBLE = 60;
@@ -7929,6 +8005,7 @@ const SETTINGS_ITEMS = [
   { key: "x", icon: ЗнакX, tKey: "xTitle" },
   { key: "security", icon: Lock, tKey: "security" },
   { key: "notify", icon: Bell, tKey: "notifyTitle" },
+  { key: "quick", icon: Zap, tKey: "quickTradeTitle" },
   { key: "language", icon: Globe2, tKey: "langTitle" },
   { key: "theme", icon: Sparkles, tKey: "themeTitle" },
   { key: "referral", icon: Gift, tKey: "referral" },
@@ -21890,6 +21967,7 @@ const СКОРОСТИ_СДЕЛКИ = [
   { id: "fast", имя: "Быстро", плата: "+0.0001 SOL", платаEVM: "чаевые ×2" },
   { id: "turbo", имя: "Молния", плата: "+0.001 SOL", платаEVM: "чаевые ×4" },
 ];
+const ДОПЛАТА_СКОРОСТИ_SOL = { normal: 0, fast: 0.0001, turbo: 0.001 };
 const читатьСкорость = () => { try { const v = localStorage.getItem("mintly_trade_speed"); return ["normal", "fast", "turbo"].includes(v) ? v : "fast"; } catch { return "fast"; } };
 
 /* Скорость — как у терминалов: доплата за место в ближайшем блоке.
@@ -21898,7 +21976,7 @@ const читатьСкорость = () => { try { const v = localStorage.getIte
    газа). В TON аукциона за место в блоке нет — там выбора и не
    показываем. Выбор один на все сети и запоминается: сервер читает его
    при каждой сделке и запуске (appWallet.js, скоростьСделки). */
-function ВыборСкорости({ сеть, style }) {
+function ВыборСкорости({ сеть, style, onChange = null }) {
   const [скорость, setСкорость] = useState(читатьСкорость);
   if (!(сеть === "sol" || этоEVM(сеть))) return null;
   const evm = этоEVM(сеть);
@@ -21907,7 +21985,7 @@ function ВыборСкорости({ сеть, style }) {
       <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>Скорость</span>
       <div className="flex gap-1.5 mt-1.5">
         {СКОРОСТИ_СДЕЛКИ.map((с) => (
-          <button key={с.id} type="button" aria-pressed={скорость === с.id} onClick={() => { haptic("light"); setСкорость(с.id); try { localStorage.setItem("mintly_trade_speed", с.id); } catch { /* приватный режим */ } }} className="fx-tap rounded-[16px] px-3 py-1.5 flex flex-col items-start" style={{ background: скорость === с.id ? T.ice : T.surfaceHi, color: скорость === с.id ? T.bg : T.muted, border: `1px solid ${скорость === с.id ? T.ice : T.line}`, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
+          <button key={с.id} type="button" aria-pressed={скорость === с.id} onClick={() => { haptic("light"); setСкорость(с.id); if (onChange) onChange(с.id); try { localStorage.setItem("mintly_trade_speed", с.id); } catch { /* приватный режим */ } }} className="fx-tap rounded-[16px] px-3 py-1.5 flex flex-col items-start" style={{ background: скорость === с.id ? T.ice : T.surfaceHi, color: скорость === с.id ? T.bg : T.muted, border: `1px solid ${скорость === с.id ? T.ice : T.line}`, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
             <span>{с.имя}</span>
             <span style={{ fontFamily: monoFont, fontSize: 10.5, fontWeight: 500, opacity: 0.75 }}>{evm ? с.платаEVM : с.плата}</span>
           </button>
@@ -21941,6 +22019,8 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // готовая покупка ровно на то, что человек ввёл в форме создания.
   const [amountStr, setAmountStr] = useState(tradeModal?.prefill ? String(tradeModal.prefill) : "");
   const [slippage, setSlippage] = useState(1);
+  const [скорость, setСкорость] = useState(читатьСкорость);
+  const [быстрые, сохранитьБыстрые] = useБыстрые();
   /* Одно нажатие — одна сделка. Второго подтверждения нет: окно
      закрывается в тот же миг, и нажать ещё раз уже некуда. */
   const отправлено = useRef(false);
@@ -22110,6 +22190,10 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // использования — ниже на него смотрят и предел суммы, и подписи.
   const соло = token.chain === "solana";
   const монета = соло ? "SOL" : ТИКЕР_TON;
+  const ключМонеты = соло ? "SOL" : "TON";
+  const сохранитьТройку = (тройка) => (isBuy
+    ? сохранитьБыстрые({ buy: { ...быстрые.buy, [ключМонеты]: тройка } })
+    : сохранитьБыстрые({ sell: тройка }));
 
   // Покупка теперь считается в TON, а не в долларах: пользователь вводит
   // сумму в TON, и она напрямую ограничена доступным балансом кошелька.
@@ -22134,57 +22218,63 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // У токенов на кривой сумма считается её же формулой — той самой, что
   // применит контракт. По цене из ленты считать нельзя: она обновляется
   // редко, а для свежего токена её просто нет.
-  let estimate;
-  if (curveState) {
-    // Комиссию берём из самой кривой: у токенов, запущенных до её
-    // введения, она нулевая и такой останется навсегда.
-    const feeBps = curveParamsOf(curveState).feeBps;
-    if (isBuy) {
-      const tonIn = toNano(amount.toFixed(9));
-      const netTon = tonIn - tonIn * feeBps / 10000n;
-      estimate = Number(tokensOutFor(curveState, netTon) / 1000000000n);
+  // Оценка — функцией: та же формула нужна и для суммы в поле, и для
+  // каждой из быстрых сумм, которые показывают свой итог прямо на кнопке.
+  function оценкаНа(amount) {
+    let estimate;
+    if (curveState) {
+      // Комиссию берём из самой кривой: у токенов, запущенных до её
+      // введения, она нулевая и такой останется навсегда.
+      const feeBps = curveParamsOf(curveState).feeBps;
+      if (isBuy) {
+        const tonIn = toNano(amount.toFixed(9));
+        const netTon = tonIn - tonIn * feeBps / 10000n;
+        estimate = Number(tokensOutFor(curveState, netTon) / 1000000000n);
+      } else {
+        const gross = tonOutFor(curveState, toNano(amount.toFixed(9)));
+        const net = gross - gross * feeBps / 10000n;
+        // В самой монете: продал за GRAM — получил GRAM, и в окне стоит
+        // то же число, что придёт на кошелёк.
+        estimate = Number(net) / 1e9;
+      }
+    } else if (соло && кривscolana && кривscolana.virtualSol > 0) {
+      /* По самой кривой — той же формулой, что применит программа.
+         Резервы виртуальные, поэтому цена зависит только от собранного:
+         произведение резервов постоянно, и сколько уйдёт штук, считается
+         точно, без курса монеты и без цены из ленты. */
+      const st = кривscolana;
+      const комиссия = (st.feeBps || 0) / 10000;
+      const резервSol = st.virtualSol + st.realSol;
+      const резервШтук = st.virtualTokens - st.tokensSold;
+      if (isBuy) {
+        const вошло = amount * 1e9 * (1 - комиссия);
+        const стало = (резервSol * резервШтук) / (резервSol + вошло);
+        estimate = Math.max(0, (резервШтук - стало) / 1e6);
+      } else {
+        const отдал = amount * 1e6;
+        const стало = (резервSol * резервШтук) / (резервШтук + отдал);
+        estimate = Math.max(0, ((резервSol - стало) * (1 - комиссия)) / 1e9);
+      }
+    } else if (соло) {
+      /* Считаем в самой монете, а не через доллары: у токена на кривой
+         цена и так хранится в SOL за штуку. Прежний путь шёл через курс
+         SOL с чужого сайта — не ответил он, и в поле стоял ноль, будто
+         покупка ничего не даёт. */
+      const курсSol = solPriceUsd > 0 ? solPriceUsd : (solUsd() || 0);
+      const ценаSol = Number(token.priceTon) > 0
+        ? Number(token.priceTon)
+        : (priceUsd > 0 && курсSol > 0 ? priceUsd / курсSol : 0);
+      estimate = isBuy
+        ? (ценаSol > 0 ? amount / ценаSol : 0)
+        : amount * ценаSol;
     } else {
-      const gross = tonOutFor(curveState, toNano(amount.toFixed(9)));
-      const net = gross - gross * feeBps / 10000n;
-      // В самой монете: продал за GRAM — получил GRAM, и в окне стоит
-      // то же число, что придёт на кошелёк.
-      estimate = Number(net) / 1e9;
+      estimate = isBuy
+        ? (priceUsd > 0 ? (amount * tonPriceUsd) / priceUsd : 0)
+        : (tonPriceUsd > 0 ? (amount * priceUsd) / tonPriceUsd : 0);
     }
-  } else if (соло && кривscolana && кривscolana.virtualSol > 0) {
-    /* По самой кривой — той же формулой, что применит программа.
-       Резервы виртуальные, поэтому цена зависит только от собранного:
-       произведение резервов постоянно, и сколько уйдёт штук, считается
-       точно, без курса монеты и без цены из ленты. */
-    const st = кривscolana;
-    const комиссия = (st.feeBps || 0) / 10000;
-    const резервSol = st.virtualSol + st.realSol;
-    const резервШтук = st.virtualTokens - st.tokensSold;
-    if (isBuy) {
-      const вошло = amount * 1e9 * (1 - комиссия);
-      const стало = (резервSol * резервШтук) / (резервSol + вошло);
-      estimate = Math.max(0, (резервШтук - стало) / 1e6);
-    } else {
-      const отдал = amount * 1e6;
-      const стало = (резервSol * резервШтук) / (резервШтук + отдал);
-      estimate = Math.max(0, ((резервSol - стало) * (1 - комиссия)) / 1e9);
-    }
-  } else if (соло) {
-    /* Считаем в самой монете, а не через доллары: у токена на кривой
-       цена и так хранится в SOL за штуку. Прежний путь шёл через курс
-       SOL с чужого сайта — не ответил он, и в поле стоял ноль, будто
-       покупка ничего не даёт. */
-    const курсSol = solPriceUsd > 0 ? solPriceUsd : (solUsd() || 0);
-    const ценаSol = Number(token.priceTon) > 0
-      ? Number(token.priceTon)
-      : (priceUsd > 0 && курсSol > 0 ? priceUsd / курсSol : 0);
-    estimate = isBuy
-      ? (ценаSol > 0 ? amount / ценаSol : 0)
-      : amount * ценаSol;
-  } else {
-    estimate = isBuy
-      ? (priceUsd > 0 ? (amount * tonPriceUsd) / priceUsd : 0)
-      : (tonPriceUsd > 0 ? (amount * priceUsd) / tonPriceUsd : 0);
+    return estimate;
   }
+  const estimate = оценкаНа(amount);
   const feeUsd = NETWORK_FEE_TON * tonPriceUsd;
   // В Solana точную сумму покажет сам кошелёк, поэтому курс TON здесь
   // ни при чём и ждать его незачем.
@@ -22208,9 +22298,25 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
     setAmountStr(String(Number(v.toFixed(знаков))));
   }
 
+  /* Покупка в 1 клик: сумма берётся с кнопки, и сделка уходит сразу —
+     тем же путём, что и обычная, только без поля и второй кнопки. */
+  function сделкаСразу(сумма) {
+    const a = Math.floor((Number(сумма) || 0) * 1e6) / 1e6;
+    const можно = a > 0 && a <= maxAmount * 1.0000001 && (соло || (isBuy ? tonPriceUsd > 0 : balanceKnown));
+    if (!можно) { haptic("error"); return; }
+    if (отправлено.current) return;
+    отправлено.current = true;
+    haptic("medium");
+    отправить(a, оценкаНа(a));
+  }
+
   function handleConfirm() {
     if (!canConfirm || отправлено.current) return;
     отправлено.current = true;
+    отправить(amount, estimate);
+  }
+
+  function отправить(amount, estimate) {
     const payAmount = isBuy ? `${amount.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}` : `${amount.toLocaleString("ru-RU")}`;
     /* Оценка бывает нулевой — например, курс монеты ещё не приехал. В
        сообщении «куплено ≈ 0» нет смысла: лучше промолчать о количестве,
@@ -22234,6 +22340,12 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
         className={`fx-modal-card${уходит || тяга > 0 ? " fx-no-anim" : ""}`}
         data-sheet="1"
         onClick={(e) => e.stopPropagation()}
+        // Жест закрытия был написан, но к окну не подключён — полоска
+        // сверху обещала свайп, а окно не двигалось.
+        onTouchStart={началоЖестаС}
+        onTouchMove={ходЖестаС}
+        onTouchEnd={конецЖестаС}
+        onTouchCancel={конецЖестаС}
         style={sheetCard(20, {
           transform: уходит ? "translateY(110%)" : `translateY(${тяга}px)`,
           transition: жест.current ? "none" : `transform ${УХОД_ЛИСТА}ms cubic-bezier(0.22, 0.85, 0.25, 1)`,
@@ -22280,9 +22392,51 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           })}
         </div>
 
+        {/* Покупка в 1 клик: только три свои суммы (на продаже — доли).
+            Нажатие — и сделка ушла. Под суммой — сколько придёт. */}
+        {быстрые.oneClick ? (
+          <>
+        <div className="flex items-center justify-between" style={{ marginTop: 16 }}>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{isBuy ? "Купить в 1 клик" : "Продать в 1 клик"}</span>
+          {/* «Доступно» — это и есть «МАКС»: нажатие ставит весь остаток. */}
+          <span role="button" onClick={() => { haptic("light"); setPct(1); }} className="fx-tap" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, cursor: "pointer" }}>
+            {t("available")}: {соло
+              // Пока баланс кошелька приложения не приехал, предела нет.
+              ? (solБаланс == null
+                ? <РазмытаяСумма образец={isBuy ? "0,0000 SOL" : `0 000 ${token.ticker}`} />
+                : isBuy
+                  ? `${(solДоступно || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} SOL`
+                  : `${solБаланс.token.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${token.ticker}`)
+              : isBuy
+                ? `${spendableTon.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${ТИКЕР_TON}`
+                : balanceKnown
+                  ? `${holdingTokens.toLocaleString("ru-RU")} ${token.ticker}`
+                  : <РазмытаяСумма образец={`0 000 ${token.ticker}`} />}
+          </span>
+        </div>
+            <БыстрыеСуммы
+              крупно
+              цвет={isBuy ? T.up : T.down}
+              значения={isBuy ? быстрые.buy[ключМонеты] : быстрые.sell}
+              подпись={(v) => (isBuy ? `${v} ${монета}` : `${v}%`)}
+              итог={(v) => {
+                const a = isBuy ? v : (Number.isFinite(maxAmount) ? maxAmount * v / 100 : 0);
+                const о = a > 0 ? оценкаНа(a) : 0;
+                if (!(о > 0)) return "";
+                // Коротко — «10.4M», иначе восемь цифр не влезают под кнопку.
+                return isBuy ? `≈ ${fmtCompact(о)} ${token.ticker}` : `≈ ${о.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`;
+              }}
+              макс={isBuy ? Infinity : 100}
+              onВыбор={(v) => сделкаСразу(isBuy ? v : (Number.isFinite(maxAmount) ? maxAmount * v / 100 : 0))}
+              onСохранить={сохранитьТройку}
+            />
+          </>
+        ) : (
+          <>
         <div className="flex items-center justify-between" style={{ marginTop: 16 }}>
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{isBuy ? t("youPay") : t("youSell")}</span>
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>
+          {/* «Доступно» — это и есть «МАКС»: нажатие ставит весь остаток. */}
+          <span role="button" onClick={() => { haptic("light"); setPct(1); }} className="fx-tap" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, cursor: "pointer" }}>
             {t("available")}: {соло
               // Пока баланс кошелька приложения не приехал, предела нет.
               ? (solБаланс == null
@@ -22314,24 +22468,13 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
             у сетей разные: GRAM стоит куда дешевле SOL, и те же 0.01
             там были бы пылью. При продаже доли остаются: продают часть
             того, что держат. */}
-        <div className="grid grid-cols-4 gap-1.5" style={{ marginTop: 8 }}>
-          {isBuy
-            ? [...(соло ? СУММЫ_ПОКУПКИ_SOL : СУММЫ_ПОКУПКИ_GRAM), null].map((сумма, i) => (
-              <button
-                key={сумма == null ? "max" : сумма}
-                onClick={() => (сумма == null ? setPct(1) : setAmountStr(String(сумма)))}
-                className="fx-tap rounded-[16px] py-1.5"
-                style={{ background: T.surfaceHi, border: "none", fontFamily: monoFont, fontSize: 12.5, color: T.ice }}
-              >
-                {сумма == null ? t("maxLabel") : `${сумма} ${монета}`}
-              </button>
-            ))
-            : [0.25, 0.5, 0.75, 1].map(pct => (
-              <button key={pct} onClick={() => setPct(pct)} className="fx-tap rounded-[16px] py-1.5" style={{ background: T.surfaceHi, border: "none", fontFamily: monoFont, fontSize: 12.5, color: T.ice }}>
-                {pct === 1 ? t("maxLabel") : `${pct * 100}%`}
-              </button>
-            ))}
-        </div>
+        <БыстрыеСуммы
+          значения={isBuy ? быстрые.buy[ключМонеты] : быстрые.sell}
+          подпись={(v) => (isBuy ? `${v} ${монета}` : `${v}%`)}
+          макс={isBuy ? Infinity : 100}
+          onВыбор={(v) => (isBuy ? setAmountStr(String(v)) : setPct(v / 100))}
+          onСохранить={сохранитьТройку}
+        />
 
         <div className="rounded-[20px] p-3.5 mt-3.5" style={{ background: T.bg, border: "none" }}>
           <div className="flex items-center justify-between">
@@ -22362,7 +22505,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           </div>
         </div>
 
-        {соло && <ВыборСкорости сеть="sol" style={{ marginTop: 14 }} />}
+        {соло && <ВыборСкорости сеть="sol" style={{ marginTop: 14 }} onChange={setСкорость} />}
 
         <div className="flex flex-col gap-1.5" style={{ marginTop: 14, fontFamily: monoFont, fontSize: 12, color: T.muted }}>
           <div className="flex justify-between"><span>{t("rate")}</span><span style={{ color: T.ice }}><ТекстСЧислами text={fmtPrice(token.price)} /> / ${token.ticker}</span></div>
@@ -22375,6 +22518,20 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
               : `${NETWORK_FEE_TON} TON ($${feeUsd.toFixed(2)})`} />
           </span></div>
           <div className="flex justify-between"><span>{t("minReceive")}</span><span style={{ color: T.ice }}><ТекстСЧислами text={amount > 0 ? (isBuy ? `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 0 })} ${token.ticker}` : `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`) : "—"} /></span></div>
+          {/* Итог — сколько всего уйдёт с кошелька: сумма, комиссия сети и
+              доплата за скорость. Без этой строки «Молния» выглядела
+              бесплатной, а с кошелька списывалось больше, чем в поле. */}
+          {amount > 0 && (
+            <div className="flex justify-between" style={{ color: T.ice, fontWeight: 700, fontSize: 13, marginTop: 2 }}>
+              <span>{isBuy ? "Итого спишется" : "Итого придёт"}</span>
+              <span><ТекстСЧислами text={(() => {
+                const fee = соло ? 0.003 + (ДОПЛАТА_СКОРОСТИ_SOL[скорость] || 0) : NETWORK_FEE_TON;
+                const сумма = isBuy ? amount + fee : Math.max(0, estimate - fee);
+                const курс = соло ? solPriceUsd : tonPriceUsd;
+                return `${isBuy ? "" : "≈ "}${сумма.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}${курс > 0 ? ` ($${(сумма * курс).toFixed(2)})` : ""}`;
+              })()} /></span>
+            </div>
+          )}
         </div>
 
         <button onClick={handleConfirm} disabled={!canConfirm} className="fx-tap w-full rounded-[12px] min-h-[52px] py-3 mt-5" style={{
@@ -22405,6 +22562,8 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           <div style={{ marginTop: 10, textAlign: "center", fontFamily: bodyFont, color: T.faint, fontSize: 11.5, lineHeight: 1.4 }}>
             {lang === "EN" ? "Memecoins are risky — you can lose what you put in." : "Мемкоины — рискованный актив: можно потерять вложенное."}
           </div>
+        )}
+          </>
         )}
       </div>
     </div>
@@ -23832,6 +23991,31 @@ const ГРУППЫ_НАСТРОЕК = [
 ];
 
 /* Small reusable on/off switch used inside settings rows. */
+/* Настройка быстрой сделки: выключатель «в 1 клик» и три суммы на
+   покупку в каждой монете, три доли на продажу. Те же кнопки с
+   карандашом, что и в окне сделки: правка здесь видна и там. */
+function НастройкаБыстрых() {
+  const [н, сохранить] = useБыстрые();
+  const строка = { fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 16 };
+  return (
+    <div className="mt-2">
+      <div className="flex items-center justify-between rounded-[20px] py-3 px-3.5" style={{ background: T.surfaceHi, gap: 12 }}>
+        <span className="flex flex-col" style={{ minWidth: 0 }}>
+          <span style={{ fontFamily: bodyFont, color: T.ice, fontSize: 14.5 }}>Покупка в 1 клик</span>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2, lineHeight: 1.4 }}>Окно сделки покажет только три суммы — нажатие сразу покупает или продаёт</span>
+        </span>
+        <ToggleSwitch on={н.oneClick} onChange={(v) => { haptic("light"); сохранить({ oneClick: v }); }} />
+      </div>
+      <div style={строка}>Покупка, SOL</div>
+      <БыстрыеСуммы значения={н.buy.SOL} подпись={(v) => `${v} SOL`} onВыбор={() => {}} onСохранить={(т) => сохранить({ buy: { ...н.buy, SOL: т } })} />
+      <div style={строка}>Покупка, {ТИКЕР_TON}</div>
+      <БыстрыеСуммы значения={н.buy.TON} подпись={(v) => `${v} ${ТИКЕР_TON}`} onВыбор={() => {}} onСохранить={(т) => сохранить({ buy: { ...н.buy, TON: т } })} />
+      <div style={строка}>Продажа, доля позиции</div>
+      <БыстрыеСуммы значения={н.sell} подпись={(v) => `${v}%`} макс={100} onВыбор={() => {}} onСохранить={(т) => сохранить({ sell: т })} />
+    </div>
+  );
+}
+
 function ToggleSwitch({ on, onChange }) {
   return (
     <button
@@ -24867,6 +25051,9 @@ function SettingsPanel({
           <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.5, marginTop: 2 }}>{t("langFullNote")}</p>
         </div>
       );
+      break;
+    case "quick":
+      body = <НастройкаБыстрых />;
       break;
     case "theme":
       body = (
