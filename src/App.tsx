@@ -9637,18 +9637,30 @@ function ЛистДоЛистинга({ данные: данныеProp, onClose 
     ...(д.проданоДоля != null ? [["Продано с кривой", `${(д.проданоДоля * 100).toFixed(1)}%`, "из 800 млн к продаже"]] : []),
   ];
   const лист = (
-    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ ...SHEET_BACK, position: "fixed", zIndex: 70 }} onClick={onClose}>
+    /* Отдельная страница во весь экран: закрывается только «Назад» —
+       кнопкой Telegram или своей, если Telegram её не показывает. */
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 70, background: T.bg, overflowY: "auto", WebkitOverflowScrolling: "touch",
+      opacity: closing ? 0 : 1, transition: "opacity 200ms ease",
+    }}>
       <style>{`
         @keyframes листСтрока { from { opacity: 0; transform: translateY(14px) scale(0.98); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
-        @keyframes листБлик { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -${ДЛИНА.toFixed(1)}; } }
+        @keyframes листВход { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
         @keyframes листИскра { 0% { opacity: 0; transform: translate(0, 0) scale(0.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.2); } }
         @keyframes листДыхание { 0%, 100% { opacity: 0.35; transform: scale(0.96); } 50% { opacity: 0.7; transform: scale(1.04); } }
         @media (prefers-reduced-motion: reduce) { .лист-анимация * { animation: none !important; transition: none !important; } }
       `}</style>
-      <div className="fx-modal-card лист-анимация" data-sheet="1" onClick={(e) => e.stopPropagation()} style={sheetCard(20, { position: "relative", overflow: "hidden" })}>
-        <div className="flex justify-center" style={{ marginBottom: 6 }}>
-          <span aria-hidden style={{ width: 40, height: 4, borderRadius: 999, background: hexA("#FFFFFF", 0.22) }} />
-        </div>
+      <div className="лист-анимация" style={{
+        maxWidth: 520, margin: "0 auto", position: "relative",
+        padding: "calc(var(--tg-inset-top, 0px) + 18px) 20px calc(var(--tg-inset-bottom, 0px) + 28px)",
+        animation: "листВход 380ms cubic-bezier(0.22, 1, 0.36, 1) both",
+      }}>
+        {!hasTelegramBack() && (
+          <button onClick={onClose} className="fx-tap flex items-center justify-center" aria-label="Назад"
+            style={{ width: 36, height: 36, borderRadius: 999, background: T.surface, border: "none", color: T.ice, marginBottom: 8 }}>
+            <ChevronLeft size={18} />
+          </button>
+        )}
         <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800, textAlign: "center" }}>{tr("gradTitle")}</div>
         <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, textAlign: "center", marginTop: 2 }}>${д.тикер} · {д.биржа}</div>
 
@@ -9669,13 +9681,6 @@ function ЛистДоЛистинга({ данные: данныеProp, onClose 
               strokeDashoffset={налито ? ДЛИНА * (1 - доля) : ДЛИНА}
               style={{ transition: "stroke-dashoffset 1.3s cubic-bezier(0.22, 1, 0.36, 1)", filter: `drop-shadow(0 0 8px ${hexA(T.electric, 0.6)})` }}
             />
-            {доля > 0.02 && (
-              <circle
-                cx={R + ТОЛЩ} cy={R + ТОЛЩ} r={R} fill="none" stroke="#FFFFFF" strokeOpacity={0.55} strokeWidth={ТОЛЩ * 0.45} strokeLinecap="round"
-                strokeDasharray={`${Math.min(ДЛИНА * доля, ДЛИНА * 0.08)} ${ДЛИНА}`}
-                style={{ animation: `листБлик ${Math.max(1.6, 3.2 * доля)}s linear infinite`, opacity: налито ? 1 : 0, transition: "opacity .6s ease 1.1s" }}
-              />
-            )}
           </svg>
           {/* Искры разлетаются от конца налитой дуги. */}
           {налито && доля > 0 && Array.from({ length: 8 }).map((_, i) => {
