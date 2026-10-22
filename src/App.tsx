@@ -29027,13 +29027,21 @@ function useTelegramViewport() {
         if (tg.setBottomBarColor) { try { tg.setBottomBarColor(T.bg); } catch (e) {} }
       } catch (e) { /* older client, some methods may be missing */ }
 
-      const update = () => {
+      const update = (событие) => {
+        /* Пока Telegram анимирует шапку или шторку, он шлёт высоту на
+           каждом кадре — с флагом isStateStable = false. Раньше мы
+           перестраивали окно по каждому такому кадру, и всё, что прижато
+           к низу, — окна сделки, листы, разделы — уезжало на десяток точек
+           и возвращалось: на открытии любого окна экран «скакал». Ждём
+           устойчивого состояния. */
+        if (событие && событие.isStateStable === false) return;
         /* Свёрнутое мини-приложение Telegram сообщает высоту свёрнутой
            шторки, а после возвращения «устойчивая» высота так и остаётся
            той, маленькой: экран обрезался посередине. Берём большее из
            двух чисел Telegram и не опускаемся ниже окна браузера, пока
            страница на экране. */
-        let h = Math.max(tg.viewportStableHeight || 0, tg.viewportHeight || 0) || window.innerHeight;
+        // viewportHeight — это высота посреди анимации; берём устойчивую.
+        let h = tg.viewportStableHeight || tg.viewportHeight || window.innerHeight;
         if (document.visibilityState === "visible" && window.innerHeight > h) h = window.innerHeight;
         /* Пока открыта клавиатура, окно не ужимаем. Telegram сообщает
            новую высоту уже после того, как клавиатура выехала: вся
@@ -29079,7 +29087,11 @@ function useTelegramViewport() {
       };
       document.addEventListener("visibilitychange", приВозврате);
       window.addEventListener("focus", приВозврате);
-      window.addEventListener("resize", update);
+      // Размер окна браузера тоже дёргается кадрами, пока Telegram ведёт
+      // свою анимацию: перечитываем, когда он успокоился.
+      let таймерРазмера = 0;
+      const послеРазмера = () => { clearTimeout(таймерРазмера); таймерРазмера = setTimeout(update, 180); };
+      window.addEventListener("resize", послеРазмера);
       // Клавиатуру убрали — высота должна вернуться к настоящей: событие
       // окна к этому времени могло уже пройти.
       const послеКлавиатуры = () => setTimeout(() => { if (!сКлавиатурой(document.activeElement)) update(); }, 350);
@@ -29098,7 +29110,8 @@ function useTelegramViewport() {
         tg.offEvent && tg.offEvent("viewportChanged", update);
         document.removeEventListener("visibilitychange", приВозврате);
         window.removeEventListener("focus", приВозврате);
-        window.removeEventListener("resize", update);
+        window.removeEventListener("resize", послеРазмера);
+        clearTimeout(таймерРазмера);
         таймерыВозврата.forEach(clearTimeout);
         document.removeEventListener("focusout", послеКлавиатуры);
         tg.offEvent && tg.offEvent("safeAreaChanged", update);
