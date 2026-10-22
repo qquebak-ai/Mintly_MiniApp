@@ -19454,7 +19454,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
           const плюс = центы >= 0;
           return (
             <div style={{ position: "relative", marginTop: 4, fontFamily: bodyFont, fontSize: 14, fontWeight: 700, color: центы === 0 ? hexA("#FFFFFF", 0.55) : плюс ? T.up : T.down, fontVariantNumeric: "tabular-nums", ...туман }}>
-              <УмныйТекст text={`${плюс ? "+" : "−"}$${Math.abs(центы).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${плюс ? "+" : "−"}${Math.abs(заДеньПроцент).toFixed(2)}%) за сегодня`} />
+              <УмныйТекст text={`PNL ${плюс ? "+" : "−"}$${Math.abs(центы).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${плюс ? "+" : "−"}${Math.abs(заДеньПроцент).toFixed(2)}%)`} />
             </div>
           );
         })()}
@@ -29837,13 +29837,9 @@ const FEE_PERCENT = 0; // комиссии площадки нет
   /* Праздник на успешной покупке — по дизайн-плану частицы отмечают
      удачные действия. Слой общий: покупка случается на разных экранах, а
      конфетти должно лететь поверх всего. */
-  const [праздник, setПраздник] = useState(0);
-  const отпраздновать = useCallback(() => {
-    setПраздник((н) => н + 1);
-    // Частицы живут около двух секунд; дальше слой убираем, чтобы он не
-    // висел в разметке до конца сессии.
-    setTimeout(() => setПраздник(0), 2200);
-  }, []);
+  const [праздник] = useState(0);
+  // Конфетти после покупки и продажи убрано по просьбе: сделка — не повод
+  // для праздника. Слой оставлен под другие события.
   // Последнее показанное — чтобы одно и то же сообщение не всплывало
   // дважды подряд.
   const последнийToast = useRef({ текст: "", когда: 0 });
@@ -32809,7 +32805,6 @@ function mapTokenRow(row) {
         /* Об удачной сделке молчим: результат виден сразу — позиция,
            график и история меняются на глазах, а всплывающая карточка
            поверх всего этого только мешала. Говорим только об отказе. */
-        if (mode === "buy") отпраздновать();
         setBalanceRefreshTick((n) => n + 1);
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 2500);
       } catch (e) {
@@ -32846,7 +32841,6 @@ function mapTokenRow(row) {
         recordTrade("buy", totalTon, rawEstimate);
         сообщитьОСделке(token.id);
         setTradeModal(null);
-        отпраздновать();
         // Баланс на цепочке обновится не мгновенно — даём блокчейну
         // пару секунд на подтверждение, потом перезапрашиваем его.
         setBalanceRefreshTick((n) => n + 1);
