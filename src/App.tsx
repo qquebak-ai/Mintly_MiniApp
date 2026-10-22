@@ -23631,12 +23631,18 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           const число = (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: вEVM ? 3 : вSolana ? 2 : 1 });
           const плохо = touched && ((вEVM ? false : вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED)) && (курсЗапуска()) > 0
             && !(сейчас * (курсЗапуска()) >= MIN_LAUNCH_USD);
+          /* Сколько на самом деле можно отдать на покупку: остаток кошелька
+             за вычетом запаса на комиссию, но не больше, чем примет кривая.
+             Это число и на кнопке «Макс», и в подсказке: «до 35 SOL» при
+             пяти на кошельке обещало то, чего не купить. Вниз до шага —
+             вверх запуску не хватит на газ. */
+          const можноКупить = Number((Math.floor(Math.min(верх, остатокСети != null ? Math.max(0, остатокСети - ЗАПАС_ЗАПУСКА) : верх) / шаг + 1e-9) * шаг).toFixed(вEVM ? 3 : 2));
           // Обычное поле вместо ползунка: сумму печатают точно, а не
           // ловят пальцем. Больше верха кривой не пускаем — сделку сверх
           // запаса контракт всё равно отвергнет.
           const поправить = () => {
             const v = parseFloat(String(form.buyAmount).replace(",", "."));
-            if (Number.isFinite(v) && v > верх) setForm((f) => ({ ...f, buyAmount: String(верх) }));
+            if (Number.isFinite(v) && v > можноКупить) setForm((f) => ({ ...f, buyAmount: можноКупить > 0 ? String(можноКупить) : "" }));
           };
           return (
             <>
@@ -23663,16 +23669,14 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
                   // «Макс» — всё, что есть на кошельке, за вычетом запаса на
                   // комиссию сети, но не больше, чем примет кривая. Округляем
                   // вниз до шага: вверх — и запуску не хватит на газ.
-                  const есть = остатокСети != null ? Math.max(0, остатокСети - ЗАПАС_ЗАПУСКА) : верх;
-                  const v = Math.floor(Math.min(верх, есть) / шаг + 1e-9) * шаг;
-                  setForm((f) => ({ ...f, buyAmount: v > 0 ? String(Number(v.toFixed(вEVM ? 3 : 2))) : "" }));
+                  setForm((f) => ({ ...f, buyAmount: можноКупить > 0 ? String(можноКупить) : "" }));
                 }} className="fx-tap"
                   style={{ padding: "6px 10px", borderRadius: 999, border: `1px solid ${T.line}`, background: "transparent", color: T.ice, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
-                  Макс
+                  Макс {число(можноКупить)}
                 </button>
               </div>
               <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 4 }}>
-                <ТекстСЧислами text={`0 — без покупки, до ${число(верх)} ${единица}`} />
+                <ТекстСЧислами text={`0 — без покупки, до ${число(можноКупить)} ${единица}`} />
               </span>
             </>
           );
