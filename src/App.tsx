@@ -5968,21 +5968,9 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     }
     /* Кружки сделок над свечами: B/S — свои сделки с этого кошелька, D —
        сделки создателя токена, их видят все. Свеча ищется по времени
-       сделки; несколько сделок в одной свече встают столбиком. */
-    /* Верх стрелок по свечам: кружки встают над ними, а не поверх. */
-    const верхСтрелки = new Map();
-    const свечаСделки = (t) => { let lo = 0, hi = n - 1, i = -1; while (lo <= hi) { const mid = (lo + hi) >> 1; if (candles[mid] && candles[mid].time <= t) { i = mid; lo = mid + 1; } else hi = mid - 1; } return i; };
-    if (метки && метки.length && n) {
-      for (const м of метки) {
-        if (!м.стрелка) continue;
-        const i = свечаСделки(м.time);
-        const c = i === n - 1 && ж.cur != null ? { ...candles[i], high: ж.hi, low: ж.lo } : candles[i];
-        if (!c || !Number.isFinite(c.high) || !Number.isFinite(c.low)) continue;
-        const y = yFor(Number.isFinite(м.цена) ? Math.min(c.high, Math.max(c.low, м.цена)) : c.close);
-        const верх = м.side === "buy" ? y - 2 : y - 12;
-        верхСтрелки.set(i, Math.min(верхСтрелки.has(i) ? верхСтрелки.get(i) : Infinity, верх));
-      }
-    }
+       сделки; несколько сделок в одной свече встают столбиком. Места
+       кружков запоминаем: нажатие по кружку открывает подпись сделки. */
+    стрелкиRef.current = [];
     if (метки && метки.length && n) {
       const стопка = new Map();
       const r = Math.max(6, Math.min(9, bodyW * 0.55));
@@ -6001,8 +5989,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         const k = стопка.get(i) || 0;
         стопка.set(i, k + 1);
         if (k >= 3) continue;
-        const надСвечой = Math.min(yFor(c.high) - r - 6, верхСтрелки.has(i) ? верхСтрелки.get(i) - r - 2 : Infinity);
-        const y = Math.max(r + 2, надСвечой - k * (r * 2 + 3));
+        const y = Math.max(r + 2, yFor(c.high) - r - 6 - k * (r * 2 + 3));
         const покупка = м.side === "buy";
         const цвет = покупка ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
         ctx.beginPath();
@@ -6012,49 +5999,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         if (м.dev) { ctx.lineWidth = 2; ctx.strokeStyle = цвет; ctx.stroke(); }
         ctx.fillStyle = м.dev ? "#1A1200" : (покупка ? "#06210F" : "#FFFFFF");
         ctx.fillText(м.dev ? "D" : (покупка ? "B" : "S"), x, y + 0.5);
-      }
-    }
-    /* Стрелки своих сделок: остриё стоит ровно на цене сделки — вверх
-       покупка, вниз продажа. Цена прижимается к телу и теням своей свечи:
-       свеча сводит минуту целиком, и цена сделки с комиссией могла бы
-       вылезти за неё на волосок. Места стрелок запоминаем для нажатия. */
-    стрелкиRef.current = [];
-    if (метки && метки.length && n) {
-      for (const м of метки) {
-        if (!м.стрелка) continue;
-        let lo = 0, hi = n - 1, i = -1;
-        while (lo <= hi) { const mid = (lo + hi) >> 1; if (candles[mid] && candles[mid].time <= м.time) { i = mid; lo = mid + 1; } else hi = mid - 1; }
-        if (i < startI || i >= endI || !candles[i]) continue;
-        const покупка = м.side === "buy";
-        const голова = 4, ширина = 3.5, хвост = 6, стебель = 1.2;
-        /* Прямо на свече: сбоку стрелка наезжала на соседние свечи. Чтобы
-           её было видно и на теле того же цвета, она белая с цветной
-           каймой и тёмной обводкой снаружи. */
-        const x = xFor(i);
-        if (x < -10 || x > plotW + 10) continue;
-        const c = i === n - 1 && ж.cur != null ? { ...candles[i], high: ж.hi, low: ж.lo } : candles[i];
-        if (!Number.isFinite(c.high) || !Number.isFinite(c.low)) continue;
-        const цена = Number.isFinite(м.цена) ? Math.min(c.high, Math.max(c.low, м.цена)) : (i === n - 1 && ж.cur != null ? ж.cur : c.close);
-        const y = yFor(цена);
-        const н = покупка ? 1 : -1; // покупка: хвост ниже острия
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + ширина, y + н * голова);
-        ctx.lineTo(x + стебель, y + н * голова);
-        ctx.lineTo(x + стебель, y + н * (голова + хвост));
-        ctx.lineTo(x - стебель, y + н * (голова + хвост));
-        ctx.lineTo(x - стебель, y + н * голова);
-        ctx.lineTo(x - ширина, y + н * голова);
-        ctx.closePath();
-        // Один цвет — зелёная покупка, красная продажа; тонкая тёмная
-        // обводка только отделяет её от свечи того же цвета.
-        ctx.lineJoin = "round";
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = T.bg;
-        ctx.stroke();
-        ctx.fillStyle = покупка ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
-        ctx.fill();
-        стрелкиRef.current.push({ x, y: y + н * (голова + хвост) / 2, м });
+        стрелкиRef.current.push({ x, y, м });
       }
     }
     ctx.restore();
@@ -6615,7 +6560,8 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         const покупка = м.side === "buy";
         const ширинаЭл = (wrapRef.current && wrapRef.current.clientWidth) || 360;
         const слева = Math.max(6, Math.min(ширинаЭл - 186, x - 90));
-        const выше = покупка ? y > 70 : y > height - 80;
+        // Под кружком, если сверху тесно; иначе над ним.
+        const выше = y > 80;
         return (
           <div style={{
             position: "absolute", left: слева, top: выше ? y - 64 : y + 18, width: 180, pointerEvents: "none",
@@ -6624,9 +6570,11 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
             animation: "fadeInUp 200ms ease-out both",
           }}>
             <div style={{ fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700, color: покупка ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ }}>
-              {покупка ? (lang === "EN" ? "Your buy" : "Твоя покупка") : (lang === "EN" ? "Your sell" : "Твоя продажа")} · {м.когда}
+              {м.dev
+                ? (покупка ? (lang === "EN" ? "Creator bought" : "Покупка создателя") : (lang === "EN" ? "Creator sold" : "Продажа создателя"))
+                : (покупка ? (lang === "EN" ? "Your buy" : "Твоя покупка") : (lang === "EN" ? "Your sell" : "Твоя продажа"))}{м.когда ? ` · ${м.когда}` : ""}
             </div>
-            <div style={{ fontFamily: monoFont, fontSize: 12.5, color: "#F5F5F7", marginTop: 3 }}>{м.сумма}</div>
+            {м.сумма && <div style={{ fontFamily: monoFont, fontSize: 12.5, color: "#F5F5F7", marginTop: 3 }}>{м.сумма}</div>}
             {м.поЦене && <div style={{ fontFamily: monoFont, fontSize: 11.5, color: "rgba(245,245,247,0.6)", marginTop: 1 }}>{м.поЦене}</div>}
           </div>
         );
@@ -20864,7 +20812,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       };
       const метки = [
         ...свои.map((с) => ({ time: вСек(с.created_at), side: с.side, dev: false, ...стрелка(с) })),
-        ...(девЭтоЯ ? [] : ((дев && дев.trades) || []).map((с) => ({ time: вСек(с.at), side: с.side, dev: true }))),
+        ...(девЭтоЯ ? [] : ((дев && дев.trades) || []).map((с) => ({
+          time: вСек(с.at), side: с.side, dev: true,
+          когда: new Date(с.at).toLocaleTimeString(lang === "EN" ? "en-US" : "ru-RU", { hour: "2-digit", minute: "2-digit" }),
+          сумма: Number(с.coin || с.amount) > 0 ? `${fmtCoin(Number(с.coin || с.amount))} ${token.chain === "solana" ? "SOL" : ТИКЕР_TON}` : "",
+        }))),
       ].filter((м) => Number.isFinite(м.time)).sort((a, b) => a.time - b.time);
       /* Мгновенные стрелки (поставленные в миг нажатия) держим, пока их
          запись не появилась в базе, — иначе стрелка мигала: была, пропала
