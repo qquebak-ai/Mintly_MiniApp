@@ -15,6 +15,7 @@ import { Address, beginCell, toNano } from "@ton/core";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { supabase } from "./supabaseClient";
 import { апи, запрос } from "./апи";
+import { ДЕМО_ТОКЕНЫ, логоДемо } from "../api/_demoTokens.js";
 import {
   CURVE_PARAMS,
   CURVE_TOTAL_SUPPLY,
@@ -5377,6 +5378,8 @@ const СВЕЧА_ПАДЕНИЕ = "#FF3B47";
 
 // Высота полосы, которая всегда висит у верхней кромки экрана токена.
 const ВЫСОТА_ПОЛОСЫ = 64;
+// Высота баннера токена под шапкой клиента — примерно 3:1 на ширине телефона.
+const ВЫСОТА_БАННЕРА = 132;
 /* Готовые суммы покупки. У сетей они разные не по прихоти: SOL стоит
    около двух сотен долларов, GRAM — единицы, и одинаковые числа значили
    бы совсем разные деньги. */
@@ -6800,25 +6803,26 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
      как у блоков сети: строка появляется вместе с каждой сделкой. */
   const демоСети = useMemo(() => {
     const нужная = этоEVM(сеть) ? сеть : сеть === "sol" ? "solana" : "ton";
-    return (curveTokens || []).find((tok) => tok && tok.демо && (tok.chain || "ton") === нужная) || null;
+    // Демо в сети несколько — лента берёт сделки всех сразу.
+    const все = (curveTokens || []).filter((tok) => tok && tok.демо && (tok.chain || "ton") === нужная);
+    return все.length ? все : null;
   }, [curveTokens, сеть]);
-  const ключДемоСети = демоСети ? `${демоСети.id}:${ключДемо(демоСети)}` : "";
+  const ключДемоСети = демоСети ? демоСети.map((tok) => `${tok.id}:${ключДемо(tok)}`).join(",") : "";
   useEffect(() => {
     if (!демоСети) return undefined;
     let живо = true;
     const виденные = new Set();
-    const сеть_ = ключДемо(демоСети);
-    const mint = mintДемо(демоСети);
+    const сеть_ = демоСети.map(ключДемо).join(",");
     const читать = async () => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       try {
         const r = await живойЗапрос(`/api/live?demo=${сеть_}`);
         const j = r.ok ? await r.json() : null;
         if (!живо || !j || !j.trades) return;
-        const курс = курсСетиДемо(демоСети, tonUsd());
-        const новые = (j.trades[mint] || [])
-          .filter((с) => !виденные.has(с.id))
-          .map((с) => { виденные.add(с.id); return { id: `demo:${с.id}`, kind: с.side, at: new Date(с.at).toISOString(), from: null, volCoin: Number(с.coin) || 0, volUsd: (Number(с.coin) || 0) * курс, token: демоСети }; });
+        const курс = курсСетиДемо(демоСети[0], tonUsd());
+        const новые = демоСети.flatMap((tok) => (j.trades[mintДемо(tok)] || [])
+          .filter((с) => !виденные.has(`${tok.id}:${с.id}`))
+          .map((с) => { виденные.add(`${tok.id}:${с.id}`); return { id: `demo:${tok.id}:${с.id}`, kind: с.side, at: new Date(с.at).toISOString(), from: null, volCoin: Number(с.coin) || 0, volUsd: (Number(с.coin) || 0) * курс, token: tok }; }));
         setLoaded(true);
         if (!новые.length) return;
         const очередь = [...новые, ...collectedRef.current]
@@ -8419,26 +8423,25 @@ function SpotlightAura({ src, ticker }) {
 /* Пометка «тест» у токена из пробной сети. Монеты там ничего не стоят, а
    выглядит такой токен точно так же, как настоящий, — без подписи это
    ловушка для того, кто пришёл покупать. */
-/* Демо-токены — по одному в каждой сети, с пометкой «демо». Сделки по
+/* Демо-токены — по пять в каждой сети (api/_demoTokens.js). Сделки по
    ним разыгрывает сервер (api/live.js) в темпе блоков своей сети в
    mainnet: Solana 0,4 с, BNB Chain 0,75 с, Base 2 с, TON около 2,5 с,
    Ethereum 12 с. В сети их нет: купить или продать нельзя, они только
    показывают, с какой скоростью будут жить цифры на боевой сети. */
-const ДЕМО_СЕТИ = {
-  ton: { mint: "MintDemo1111111111111111111111111111111111", chain: "ton", id: "demo-speed", имя: "Demo Speed", блок: "≈2,5 с" },
-  sol: { mint: "MintDemoSo1ana111111111111111111111111111111", chain: "solana", id: "demo-sol", имя: "Demo Solana", блок: "0,4 с" },
-  bsc: { mint: "MintDemoBsc11111111111111111111111111111111", chain: "bsc", id: "demo-bsc", имя: "Demo BNB", блок: "0,75 с" },
-  base: { mint: "MintDemoBase1111111111111111111111111111111", chain: "base", id: "demo-base", имя: "Demo Base", блок: "2 с" },
-  eth: { mint: "MintDemoEth11111111111111111111111111111111", chain: "eth", id: "demo-eth", имя: "Demo Ethereum", блок: "12 с" },
-};
+// Ключ ДЕМО_СЕТИ — ключ токена (ton, ton2, sol…), сеть — в chain.
+const ЦЕПЬ_ДЕМО = { ton: "ton", sol: "solana", bsc: "bsc", base: "base", eth: "eth" };
+const ДЕМО_СЕТИ = Object.fromEntries(ДЕМО_ТОКЕНЫ.map((т) => [т.ключ, {
+  mint: т.mint, chain: ЦЕПЬ_ДЕМО[т.сеть], id: т.id, имя: т.имя, тикер: т.тикер, лого: логоДемо(т.ключ),
+}]));
 const ДЕМО_MINT = ДЕМО_СЕТИ.ton.mint;
 const ключДемо = (tok) => (tok && tok.демо ? (tok.демоСеть || "ton") : null);
 const mintДемо = (tok) => ДЕМО_СЕТИ[ключДемо(tok)] ? ДЕМО_СЕТИ[ключДемо(tok)].mint : ДЕМО_MINT;
 /* Курс монеты сети в долларах — для демо любой сети. */
 function курсСетиДемо(tok, курсTon) {
   const к = ключДемо(tok);
-  if (к === "sol") return solUsd();
-  if (к && к !== "ton") {
+  const цепь = ДЕМО_СЕТИ[к] ? ДЕМО_СЕТИ[к].chain : "ton";
+  if (цепь === "solana") return solUsd();
+  if (цепь !== "ton") {
     // Курсы EVM грузит хук кошелька и мемпада EVM; демо в общей ленте
     // живёт и без них — просим курс сами, один раз.
     if (!КЕШ_КУРСОВ_EVM.ts) {
@@ -8459,24 +8462,15 @@ const демоСозданы = {};
 const создано = (tok) => (tok && tok.демо && демоСозданы[ключДемо(tok)] ? демоСозданы[ключДемо(tok)] : tok && tok.createdAt);
 function создатьДемоТокены() {
   return Object.entries(ДЕМО_СЕТИ).map(([к, с]) => ({
-    id: с.id, демо: true, демоСеть: к, name: с.имя, ticker: "DEMO", emoji: "⚡",
+    id: с.id, демо: true, демоСеть: к, name: с.имя, ticker: с.тикер, emoji: "⚡",
     verified: false, mcapNum: 0, liq: "0", vol: "0", change: 0, tx24h: 0,
     address: null, tokenAddress: null, poolAddress: null, dexPoolAddress: null, curveAddress: null,
-    logoUrl: null, description: `Демо-токен: сделка на каждый блок сети — раз в ${с.блок}, как в mainnet. Так видно, с какой скоростью живут цифры.`,
+    logoUrl: с.лого, bannerUrl: с.лого.replace(/\.png$/, "-banner.jpg"),
+    description: "Демо-токен Mintly: сделки разыгрываются в темпе блоков сети в mainnet, купить его нельзя.",
     network: "mainnet", chain: с.chain, механики: { fair_start: false, buyback: false, live_chart: false },
     замок: "none", ownerId: null, createdAt: демоСозданы[к] || Date.now() - 60 * 1000, graduationTon: 85, raisedTon: 0,
   }));
 }
-function ПометкаДемо({ size = 10 }) {
-  return (
-    <span style={{
-      fontFamily: monoFont, fontSize: size, lineHeight: 1.6, letterSpacing: 0.4,
-      color: "#7FB5FF", border: "1px solid #7FB5FF55",
-      borderRadius: 6, padding: "0 5px", flexShrink: 0, textTransform: "uppercase",
-    }}>демо</span>
-  );
-}
-
 const ЛОГО_СЕТИ = { ton: "/coins/gram.png", sol: "/coins/sol.png" };
 // У картинки Соланы знак занимает половину кадра внутри чёрного
 // круга, а у Грама — всю ширину без фона. Поэтому Солана здесь
@@ -8802,7 +8796,7 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
           <div className="flex items-center" style={{ gap: 6 }}>
             <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800 }}>${tok.ticker}</span>
             <ПометкаТест сеть={tok.network} />
-            {tok.демо && <ПометкаДемо />}
+            
           </div>
           <div className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 3 }}>
             {tok.name || "—"}
@@ -11393,7 +11387,7 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
           <TokenAvatar size={34} tone={рост ? "up" : "down"} src={token.logoUrl} />
           <span className="flex-1 min-w-0" style={{ display: "block" }}>
             <span className="flex items-center" style={{ gap: 8 }}>{подписи}</span>
-            <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 1 }}>
+            <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800, marginTop: 1, fontVariantNumeric: "tabular-nums" }}>
               <ТекстСЧислами text={fmtUSD(token.mcapNum)} />
             </span>
             {строкаX}
@@ -15307,7 +15301,7 @@ const СтрокаПульса = React.memo(function СтрокаПульса({ 
           <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800 }}>${tok.ticker}</span>
           <span className="truncate" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{tok.name || ""}</span>
           <ПометкаТест сеть={tok.network} />
-          {tok.демо && <ПометкаДемо />}
+          
         </div>
         <div className="flex items-center" style={{ gap: 8, marginTop: 4, fontFamily: bodyFont, fontSize: 12.5, color: T.faint, minWidth: 0 }}>
           {возраст && <span style={{ color: T.up, fontWeight: 700 }}>{возраст}</span>}
@@ -20388,6 +20382,10 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
    * Возврат чуть раньше, чем вход: без этого запаса на самой черте
    * подпись мигала бы туда-сюда от дрожания пальца. */
   const [шапкаВидна, setШапкаВидна] = useState(false);
+  // Баннер из запуска стоит фоном шапки, пока страница у самого верха;
+  // стоит её прокрутить — полоса снова заливается цветом страницы.
+  const обложкаТокена = useОбложкаТокена(token);
+  const [уВерха, setУВерха] = useState(true);
   const рядАватарки = useRef(null);
   /* Узел приходит не сразу: пока цифры и график в пути, на месте
      страницы стоят плашки, и мерить нечего. Поэтому ref со звонком —
@@ -20419,6 +20417,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       const своё = r.top - верх + прокручено;
       const черта = Math.max(0, своё + r.height / 2 - ВЫСОТА_ПОЛОСЫ);
       setШапкаВидна((было) => (прокручено > черта + (было ? -14 : 4) ? true : false));
+      setУВерха(прокручено < 6);
     };
     const наПрокрутку = () => { if (!кадр) кадр = requestAnimationFrame(считать); };
     считать();
@@ -21193,6 +21192,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
                  цвета страницы уводит проезжающую строку в фон —
                  сплошной до середины аватарки, дальше растворяется. */
               background: `linear-gradient(180deg, ${T.bg} 0%, ${T.bg} calc(100% - 26px), ${hexA(T.bg, 0)} 100%)`,
+              opacity: обложкаТокена && уВерха ? 0 : 1,
+              transition: "opacity .2s ease",
               pointerEvents: "none",
             }}
           />
@@ -21262,6 +21263,18 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         onClose={() => setShareOpen(false)}
         showToast={showToast}
       />
+      {/* Баннер — во всю ширину от самой кромки экрана, под полосой с
+          аватаркой, и уезжает вместе со страницей. Низ растворяется в
+          цвете страницы, чтобы имя под ним не стояло на обрыве картинки. */}
+      {обложкаТокена && (
+        <div aria-hidden style={{
+          position: "absolute", top: -отступСверху, left: -16, right: -16, height: отступСверху + ВЫСОТА_БАННЕРА,
+          background: `center / cover no-repeat url(${обложкаТокена})`,
+          WebkitMaskImage: "linear-gradient(180deg, #000 0%, #000 55%, transparent 100%)",
+          maskImage: "linear-gradient(180deg, #000 0%, #000 55%, transparent 100%)",
+          zIndex: 0, pointerEvents: "none",
+        }} />
+      )}
       <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: 18 }}>
 
       {/* Аватарка и кнопки живут в полосе наверху, поэтому здесь их
@@ -21270,7 +21283,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           точки, то есть кончается за десять точек до низа полосы, — на
           столько распорка и короче: прежде под кругом оставалась пустая
           полоса в полсотни точек, и имя висело в воздухе. */}
-      <div ref={ставитьЯкорь} aria-hidden style={{ height: ВЫСОТА_ПОЛОСЫ - 20 }} />
+      <div ref={ставитьЯкорь} aria-hidden style={{ height: обложкаТокена ? ВЫСОТА_БАННЕРА - 26 : ВЫСОТА_ПОЛОСЫ - 20 }} />
 
       <div className="flex flex-col" style={{ gap: 8 }}>
         {/* Имя крупно, тикер — справа от него мелким: имя читают, тикером
