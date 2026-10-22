@@ -462,6 +462,41 @@ export default async function handler(req, res) {
       return res.status(200).json({ tokens: итог });
     }
 
+    /* Сколько вложено в токен — по самим транзакциям кошелька, а не по
+       записям приложения: те могли не записаться (сеть моргнула, сделка
+       прошла мимо окна), и прибыль считалась от неполной суммы. Каждая
+       транзакция с этим токеном: на сколько изменился SOL кошелька и
+       сколько токена пришло или ушло. Купил — SOL ушёл, продал — пришёл.
+       Комиссии сети входят во вложенное: это тоже деньги, отданные за
+       позицию. */
+    if (действие === "position-cost") {
+      const кошелёк = String(req.query.wallet || "");
+      const mint = String(req.query.mint || "");
+      if (!адресОк(кошелёк) || !адресОк(mint)) return res.status(400).json({ error: "bad_request" });
+      const { PublicKey } = await import("@solana/web3.js");
+      const { getAssociatedTokenAddressSync } = await import("@solana/spl-token");
+      const счёт = getAssociatedTokenAddressSync(new PublicKey(mint), new PublicKey(кошелёк)).toBase58();
+      const подписи = (await rpc("getSignaturesForAddress", [счёт, { limit: 200 }]).catch(() => null)) || [];
+      let ушлоSol = 0, пришлоSol = 0, купленоТок = 0, проданоТок = 0, сделок = 0;
+      for (let i = 0; i < подписи.length; i += 25) {
+        const пачка = подписи.slice(i, i + 25).filter((п) => !п.err);
+        const txs = await Promise.all(пачка.map((п) => rpc("getTransaction", [п.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" }]).catch(() => null)));
+        for (const tx of txs) {
+          if (!tx || !tx.meta || tx.meta.err) continue;
+          const ключи = (tx.transaction.message.accountKeys || []).map((к) => (typeof к === "string" ? к : к.pubkey));
+          const я = ключи.indexOf(кошелёк);
+          if (я < 0) continue;
+          const дельтаSol = ((tx.meta.postBalances[я] || 0) - (tx.meta.preBalances[я] || 0)) / 1e9;
+          const ток = (список) => (список || []).filter((б) => б.mint === mint && б.owner === кошелёк).reduce((с, б) => с + (Number(б.uiTokenAmount && б.uiTokenAmount.uiAmount) || 0), 0);
+          const дельтаТок = ток(tx.meta.postTokenBalances) - ток(tx.meta.preTokenBalances);
+          if (дельтаТок > 0) { купленоТок += дельтаТок; ушлоSol += Math.max(0, -дельтаSol); сделок += 1; }
+          else if (дельтаТок < 0) { проданоТок += -дельтаТок; пришлоSol += Math.max(0, дельтаSol); сделок += 1; }
+        }
+      }
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).json({ spentSol: ушлоSol, receivedSol: пришлоSol, bought: купленоТок, sold: проданоТок, trades: сделок, net: ушлоSol - пришлоSol });
+    }
+
     if (действие === "balances") {
       const b = await балансы({ wallet: req.query.wallet, mint: req.query.mint });
       if (!b) return res.status(400).json({ error: "bad_request" });

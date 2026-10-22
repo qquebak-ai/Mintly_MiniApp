@@ -20627,7 +20627,21 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     setВложено(null);
     const адрес = token.tokenAddress || token.address;
     if (!currentUserId || !адрес) return;
-    const читать = () => вложеноВТокен(currentUserId, адрес).then((и) => { if (!брошено && и) setВложено(и); });
+    /* В Solana вложенное — по транзакциям самого кошелька в сети:
+       записи приложения о сделках могли не дойти, и прибыль считалась бы
+       от неполной суммы (купил несколько раз — а в плюсе). Сеть не
+       ответила — тогда по записям, как в остальных сетях. */
+    const поСети = async () => {
+      if (token.chain !== "solana") return null;
+      const { состояниеВнутреннего } = await import("./appWallet");
+      const св = await состояниеВнутреннего();
+      if (!св || !св.address) return null;
+      const r = await fetch(апи(`/api/solana?action=position-cost&wallet=${св.address}&mint=${encodeURIComponent(адрес)}`)).then((x) => x.json());
+      return r && Number.isFinite(r.net) && r.trades > 0 ? { вложено: r.net, сделок: r.trades } : null;
+    };
+    const читать = () => поСети().catch(() => null)
+      .then((и) => и || вложеноВТокен(currentUserId, адрес))
+      .then((и) => { if (!брошено && и) setВложено(и); });
     читать();
     const своя = () => setTimeout(читать, 1500);
     if (typeof window !== "undefined") window.addEventListener("mintly:сделка", своя);
