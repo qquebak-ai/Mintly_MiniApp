@@ -20693,6 +20693,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
      оценённая по нему, давала плюс на собственных покупках. */
   const [резервыСети, setРезервыСети] = useState(null);
   useEffect(() => { setСвоя(null); setРезервыСети(null); }, [token.id]);
+  // Последние резервы кривой — для мгновенного расчёта своей сделки.
+  const резервыДляСделкиRef = useRef(null);
   useEffect(() => {
     /* Читаем всегда, пока карточка открыта, а не только пока лента
        молчит: цена в ленте обновляется обходом раз в минуту, и после
@@ -20864,7 +20866,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
         ...свои.map((с) => ({ time: вСек(с.created_at), side: с.side, dev: false, ...стрелка(с) })),
         ...(девЭтоЯ ? [] : ((дев && дев.trades) || []).map((с) => ({ time: вСек(с.at), side: с.side, dev: true }))),
       ].filter((м) => Number.isFinite(м.time)).sort((a, b) => a.time - b.time);
-      setМеткиСделок(метки);
+      /* Мгновенные стрелки (поставленные в миг нажатия) держим, пока их
+         запись не появилась в базе, — иначе стрелка мигала: была, пропала
+         до записи сделки, появилась снова. */
+      setМеткиСделок((было) => {
+        const сейчас = Date.now() / 1000;
+        const мгновенные = (было || []).filter((м) => м.мгновенная && сейчас - м.time < 60
+          && !метки.some((н) => !н.dev && н.side === м.side && Math.abs(н.time - м.time) < 45));
+        return мгновенные.length ? [...метки, ...мгновенные].sort((a, b) => a.time - b.time) : метки;
+      });
     };
     читать();
     const id = setInterval(читать, 15000);
@@ -21252,6 +21262,58 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   const chartReady = !!(графДанные && графДанные.tf === tf && scaledCandles && scaledCandles.length);
   // Цена сделки в единицах графика: в режиме капитализации свечи
   // умножены на выпуск — стрелки умножаем так же.
+  резервыДляСделкиRef.current = резервыСети || (своя && своя.резервы) || null;
+  /* Своя сделка на графике — в миг нажатия. Новое состояние кривой
+     считаем сами по тем же резервам (x·y = k), двигаем живую свечу и
+     ставим стрелку. Метка времени — сейчас, поэтому поток с более
+     поздним ms потом спокойно подтвердит или поправит цену. */
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const старт = (e) => {
+      const d = e && e.detail;
+      if (!d || d.tokenId !== token.id || !(d.сумма > 0)) return;
+      const р = резервыДляСделкиRef.current;
+      if (!р || !(р.vМонеты > 0) || !(р.vТокены > 0)) return;
+      const курс = token.chain === "solana" ? (курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd()) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
+      if (!(курс > 0)) return;
+      const x = р.vМонеты + (р.собрано || 0), y = р.vТокены - (р.продано || 0);
+      if (!(x > 0) || !(y > 0)) return;
+      const k = x * y;
+      const покупка = d.mode === "buy";
+      const новыйX = покупка ? x + d.сумма : k / (y + d.сумма);
+      const новыйY = k / новыйX;
+      const монет = Math.abs(новыйX - x), токенов = Math.abs(y - новыйY);
+      if (!(монет > 0) || !(токенов > 0)) return;
+      const цена = (новыйX / новыйY) * курс;
+      const сейчасМс = Date.now();
+      setChartData((prev) => {
+        if (!prev || !prev.candles || !prev.candles.length) return prev;
+        const свечи = prev.candles.slice();
+        const было = свечи[свечи.length - 1];
+        const шагTf = TF_SECONDS[prev.tf || tf] || 60;
+        const сейчасСвеча = Math.floor(сейчасМс / 1000 / шагTf) * шагTf;
+        живаяЦенаRef.current = { time: Math.max(было.time, сейчасСвеча), close: цена, at: сейчасМс, ms: сейчасМс };
+        if (было.time < сейчасСвеча) {
+          свечи.push({ time: сейчасСвеча, open: было.close, high: Math.max(было.close, цена), low: Math.min(было.close, цена), close: цена });
+          return { ...prev, candles: свечи, volume: (prev.volume || []).concat([{ time: сейчасСвеча, value: 0, color: hexA(цена >= было.close ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ, 0.32) }]) };
+        }
+        свечи[свечи.length - 1] = { ...было, close: цена, high: Math.max(было.high, цена), low: Math.min(было.low, цена) };
+        return { ...prev, candles: свечи };
+      });
+      const монета = token.chain === "solana" ? "SOL" : ТИКЕР_TON;
+      const ценаМонеты = монет / токенов;
+      setМеткиСделок((было) => [...(было || []), {
+        time: Math.floor(сейчасМс / 1000), side: покупка ? "buy" : "sell", dev: false, стрелка: true, мгновенная: true,
+        ценаМонеты, ценаUsd: ценаМонеты * курс,
+        когда: new Date(сейчасМс).toLocaleTimeString(lang === "EN" ? "en-US" : "ru-RU", { hour: "2-digit", minute: "2-digit" }),
+        сумма: `${fmtCoin(монет)} ${монета} · ${fmtUSD(монет * курс)}`,
+        поЦене: `${fmtCompact(токенов)} ${token.ticker || ""} по ${fmtPrice(ценаМонеты * курс)}`,
+      }]);
+    };
+    window.addEventListener("mintly:сделка-старт", старт);
+    return () => window.removeEventListener("mintly:сделка-старт", старт);
+  }, [token.id, token.chain, token.ticker, tf, курсSolДляГрафика, tonPriceUsd]);
+
   const курсСтрелок = token.chain === "solana" ? (курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd()) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
   const меткиГрафика = useMemo(() => (меткиСделок || []).map((м) => {
     if (!м.стрелка) return м;
@@ -33316,6 +33378,13 @@ function mapTokenRow(row) {
   }
 
   async function провестиСделку(mode, payAmount, receiveAmount, unit, rawAmount, rawEstimate) {
+    /* График не ждёт сети: в миг нажатия страница токена сама считает
+       итог по кривой и рисует свечу и стрелку. Ответ сервера и поток
+       потом лишь подтверждают то же число. */
+    if (token && !token.демо && typeof window !== "undefined") {
+      try { window.dispatchEvent(new CustomEvent("mintly:сделка-старт", { detail: { tokenId: token.id, mode, сумма: Number(rawAmount) || 0 } })); }
+      catch { /* старый движок — дождёмся потока */ }
+    }
     // Токен из ленты Solana торгуется в своей сети и своим кошельком:
     // ни кривой, ни TonConnect тут нет.
     if (token && token.chain === "solana") {
