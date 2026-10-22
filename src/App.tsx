@@ -10772,6 +10772,8 @@ function ShopView({ cosmetics, owned, coins, onBuy, onOpenLook, onEquip, achieve
 /* Все сети приложения в одном порядке: две свои первыми, за ними EVM.
    Один список на мемпад, запуск и получение — чтобы сеть везде
    называлась и выглядела одинаково. */
+// Монета карточки кошелька → сеть в экранах «Получить» и «Отправить».
+const СЕТЬ_МОНЕТЫ = { sol: "sol", ton: "ton", gram: "ton", bnb: "bsc", eth: "eth", base: "base" };
 const ВСЕ_СЕТИ = [
   { ключ: "ton", имя: "Gram", лого: "/coins/gram.png" },
   { ключ: "sol", имя: "Solana", лого: "/coins/sol.png" },
@@ -15593,12 +15595,14 @@ function черезПоле(текст) {
  * адрес кошелька — не то, что стоит отправлять чужому серверу ради
  * картинки.
  */
-function ЭкранПолучить({ открыт, onClose, адрес = "", адреса = null, сеть = "Solana", showToast = () => {}, insetTop = 0, insetBottom = 0 }) {
+function ЭкранПолучить({ открыт, onClose, адрес = "", адреса = null, сеть = "Solana", сетьСразу = "sol", showToast = () => {}, insetTop = 0, insetBottom = 0 }) {
   /* Какую сеть пополняем. Адрес у каждой свой, и перевод, ушедший не в ту
      сеть, не возвращается — поэтому выбор стоит здесь, рядом с кодом, а
      не где-то в настройках экрана. */
-  const [сетьПрихода, setСетьПрихода] = useState("sol");
-  useEffect(() => { if (открыт) setСетьПрихода("sol"); }, [открыт]);
+  // Открыли с карточки монеты — сразу её сеть: нажал «Получить» у ETH, а
+  // перед глазами был адрес Solana, и перевод ушёл бы не туда.
+  const [сетьПрихода, setСетьПрихода] = useState(сетьСразу);
+  useEffect(() => { if (открыт) setСетьПрихода(сетьСразу); }, [открыт]); // eslint-disable-line react-hooks/exhaustive-deps
   // У трёх сетей EVM адрес один и тот же — но сеть выбирать всё равно
   // нужно: монета, отправленная в BNB Chain, на Ethereum не появится.
   const адресСети = адреса
@@ -18471,6 +18475,8 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
   useEffect(() => { if (фраза && фраза.готово) setФразаОткрыта(false); }, [фраза]);
   const [обменОткрыт, setОбменОткрыт] = useState(false);
   const [получитьОткрыт, setПолучитьОткрыт] = useState(false);
+  // Сеть, с которой открыли «Получить» или «Отправить» из карточки монеты.
+  const [сетьДействия, setСетьДействия] = useState(null);
   const [выводОткрыт, setВыводОткрыт] = useState(false);
   // История — своя страница, а не хвост кошелька: список длинный, и в
   // столбце под токенами его всё равно никто не дочитывал.
@@ -19234,8 +19240,8 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
           От карты его отделяет заметный отступ: иначе кнопки читались
           как её нижний край, а это отдельная вещь. */}
       <div className="flex items-start" style={{ gap: 10, marginTop: 26, padding: "0 16px" }}>
-        <ДействиеКошелька icon={ArrowUpRight} label={t("walletActBuy")} onClick={() => setВыводОткрыт(true)} />
-        <ДействиеКошелька icon={ArrowDownLeft} label={t("walletActReceive")} onClick={() => setПолучитьОткрыт(true)} />
+        <ДействиеКошелька icon={ArrowUpRight} label={t("walletActBuy")} onClick={() => { setСетьДействия(null); setВыводОткрыт(true); }} />
+        <ДействиеКошелька icon={ArrowDownLeft} label={t("walletActReceive")} onClick={() => { setСетьДействия(null); setПолучитьОткрыт(true); }} />
         <ДействиеКошелька icon={Repeat} label={t("walletActSwap")} onClick={() => setОбменОткрыт(true)} />
         <ДействиеКошелька
           icon={Clock}
@@ -19254,8 +19260,8 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
           : монетаОткрыта === "base" ? Number((остатокEVM("base") || {}).native) || 0
           : тонНаКошельке}
         onClose={() => setМонетаОткрыта(null)}
-        onSend={() => setВыводОткрыт(true)}
-        onReceive={() => setПолучитьОткрыт(true)}
+        onSend={() => { setСетьДействия(СЕТЬ_МОНЕТЫ[монетаОткрыта] || null); setВыводОткрыт(true); }}
+        onReceive={() => { setСетьДействия(СЕТЬ_МОНЕТЫ[монетаОткрыта] || null); setПолучитьОткрыт(true); }}
         onSwap={() => setОбменОткрыт(true)}
       />
 
@@ -19441,6 +19447,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
           evm: внутрEVM && внутрEVM.address ? внутрEVM.address : "",
         }}
         сеть={вTON ? ТИКЕР_TON : "Solana"}
+        сетьСразу={сетьДействия || "sol"}
         showToast={showToast}
         insetTop={insetTop}
         insetBottom={insetBottom}
@@ -19449,7 +19456,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
       <ЭкранВывода
         открыт={выводОткрыт}
         onClose={() => setВыводОткрыт(false)}
-        сеть={вTON ? "ton" : "sol"}
+        сеть={сетьДействия || (вTON ? "ton" : "sol")}
         свой={адресВнутри}
         userId={userId}
         остатки={{
