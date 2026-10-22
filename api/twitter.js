@@ -61,9 +61,15 @@ async function профильX(handle) {
   const было = кешПрофилейX.get(ключ);
   if (было && Date.now() - было.ts < 10 * 60 * 1000) return было.профиль;
   try {
-    const r = await fetch(`https://api.fxtwitter.com/${encodeURIComponent(handle)}`, { signal: AbortSignal.timeout(6000) });
-    const j = r.ok ? await r.json() : null;
-    const u = j && j.user;
+    /* У fxtwitter новый путь /2/profile — старый /:ник для многих ников
+       отвечает 404. Спрашиваем новый, старый — запасным. */
+    const спросить = async (адрес) => {
+      const r = await fetch(адрес, { signal: AbortSignal.timeout(6000) });
+      const j = r.ok ? await r.json().catch(() => null) : null;
+      return j && j.user ? j.user : null;
+    };
+    const u = await спросить(`https://api.fxtwitter.com/2/profile/${encodeURIComponent(handle)}`)
+      || await спросить(`https://api.fxtwitter.com/${encodeURIComponent(handle)}`);
     /* fxtwitter перестал отдавать профили (404 на любой ник), и аватар
        X не подтягивался нигде. Аватар тогда берём у unavatar.io — он
        отдаёт картинку профиля X по нику; числа без источника — нули. */
@@ -78,7 +84,7 @@ async function профильX(handle) {
       website: (u.website && u.website.url) || null,
       followers: Number(u.followers) || 0,
       following: Number(u.following) || 0,
-      tweets: Number(u.tweets) || 0,
+      tweets: Number(u.statuses != null ? u.statuses : u.tweets) || 0,
       joined: u.joined || null,
       verified: !!(u.verification && u.verification.verified),
       // Вид подписки X, как его рисует сам X: individual — синяя галочка,
