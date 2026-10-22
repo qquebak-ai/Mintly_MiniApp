@@ -441,6 +441,27 @@ export default async function handler(req, res) {
       return res.status(200).json(h);
     }
 
+    /* Все токены кошелька одним заходом: {mint: количество}. Список «твои
+       токены» раньше спрашивал остаток по каждому токену отдельно — по
+       секунде на штуку, и свежий токен появлялся с большой задержкой. */
+    if (действие === "wallet-tokens") {
+      const кошелёк = String(req.query.wallet || "");
+      if (!адресОк(кошелёк)) return res.status(400).json({ error: "bad_request" });
+      const итог = {};
+      await Promise.all([TOKEN_СТАРЫЙ, TOKEN_2022].map(async (programId) => {
+        try {
+          const r = await rpc("getTokenAccountsByOwner", [кошелёк, { programId }, { encoding: "jsonParsed" }]);
+          for (const счёт of (r && r.value) || []) {
+            const инфо = счёт?.account?.data?.parsed?.info;
+            const сколько = Number(инфо?.tokenAmount?.uiAmount) || 0;
+            if (инфо && инфо.mint && сколько > 0) итог[инфо.mint] = (итог[инфо.mint] || 0) + сколько;
+          }
+        } catch { /* программа не ответила — у второй своё */ }
+      }));
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).json({ tokens: итог });
+    }
+
     if (действие === "balances") {
       const b = await балансы({ wallet: req.query.wallet, mint: req.query.mint });
       if (!b) return res.status(400).json({ error: "bad_request" });

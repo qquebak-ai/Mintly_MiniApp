@@ -30442,6 +30442,17 @@ function mapTokenRow(row) {
      от каждой правки обход остатков начинался заново — до конца он не
      доходил ни разу, и свежий токен в «Твоих токенах» не появлялся. */
   const ключТокенов = communityTokens.map((tok) => `${tok.id}:${tok.address || ""}`).join(",");
+  /* Прошлый список — сразу, пока сеть отвечает: открыл кошелёк и видишь
+     свои токены, а не пустое место на секунду-другую. */
+  useEffect(() => {
+    if (holdingsReady || !communityTokens.length) return;
+    try {
+      const было = JSON.parse(localStorage.getItem(`mintly_holdings_${userId || "гость"}`) || "[]");
+      const поId = new Map(communityTokens.map((tok) => [tok.id, tok]));
+      const список = было.map(([id, amount]) => ({ tok: поId.get(id), amount })).filter((h) => h.tok);
+      if (список.length) { setWalletHoldings(список); setHoldingsReady(true); }
+    } catch { /* нет памяти — подождём сеть */ }
+  }, [ключТокенов, userId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!communityTokens.length) {
       setWalletHoldings([]);
@@ -30475,15 +30486,18 @@ function mapTokenRow(row) {
       // считанные запросы в секунду, а список может быть длинным.
       const list = communityTokens.filter((tok) => tok.address).slice(0, 14);
       const found = [];
-      // Разом, а не по очереди: по одному список из десятка токенов
-      // собирался секундами.
+      // Solana — одним запросом все токены кошелька, а не по запросу на
+      // каждый: по секунде на штуку свежий токен появлялся с задержкой.
+      const всеSol = солАдрес && list.some((tok) => tok.chain === "solana")
+        ? await fetch(апи(`/api/solana?action=wallet-tokens&wallet=${encodeURIComponent(солАдрес)}`)).then((r) => r.json()).then((j) => (j && j.tokens) || null).catch(() => null)
+        : null;
+      if (cancelled) return;
+      // Разом, а не по очереди: по одному список собирался секундами.
       await Promise.all(list.map(async (tok) => {
         try {
           if (tok.chain === "solana") {
-            if (!солАдрес) return;
-            const п = new URLSearchParams({ wallet: солАдрес, mint: tok.address });
-            const b = await fetch(апи(`/api/solana?action=balances&${п}`)).then((r) => r.json()).catch(() => null);
-            const сколько = b && !b.error ? Number(b.token) || 0 : 0;
+            if (!солАдрес || !всеSol) return;
+            const сколько = Number(всеSol[tok.address]) || 0;
             if (сколько >= ПЫЛЬ_ТОКЕНОВ) found.push({ tok, amount: сколько });
             return;
           }
@@ -30495,7 +30509,12 @@ function mapTokenRow(row) {
       if (cancelled) return;
       // Порядок — как в ленте, а не как ответила сеть.
       found.sort((a, b) => list.indexOf(a.tok) - list.indexOf(b.tok));
-      if (!cancelled) { setWalletHoldings(found); setHoldingsReady(true); }
+      if (!cancelled) {
+        setWalletHoldings(found); setHoldingsReady(true);
+        // Запоминаем: следующее открытие показывает список сразу, а
+        // сеть его только уточняет.
+        try { localStorage.setItem(`mintly_holdings_${userId || "гость"}`, JSON.stringify(found.map((h) => [h.tok.id, h.amount]))); } catch { /* приватный режим */ }
+      }
     })();
     return () => { cancelled = true; };
   }, [connected, walletAddress, ключТокенов, balanceRefreshTick, holdingsTick]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -30507,7 +30526,7 @@ function mapTokenRow(row) {
   useEffect(() => { if (view === "wallet") setHoldingsTick((n) => n + 1); }, [view]);
   useEffect(() => {
     const таймеры = [];
-    const послеСделки = () => { for (const мс of [6000, 15000]) таймеры.push(setTimeout(() => setHoldingsTick((n) => n + 1), мс)); };
+    const послеСделки = () => { for (const мс of [1500, 6000, 15000]) таймеры.push(setTimeout(() => setHoldingsTick((n) => n + 1), мс)); };
     window.addEventListener("mintly:сделка", послеСделки);
     return () => { window.removeEventListener("mintly:сделка", послеСделки); таймеры.forEach(clearTimeout); };
   }, []);
