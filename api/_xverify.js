@@ -56,10 +56,19 @@ export async function разослатьЗаявку(заявка) {
      читает команда, и кнопки «Выдать» / «Отказать» жмут админы прямо в
      этом чате. Чата поддержки нет — как раньше, каждому админу лично. */
   const { SUPPORT_CHAT_ID } = await import("./_support.js");
-  const куда = SUPPORT_CHAT_ID ? [SUPPORT_CHAT_ID] : [...админы()].map(Number);
-  await Promise.all(куда.map((id) => телеграм("sendMessage", {
+  const послать = (id) => телеграм("sendMessage", {
     chat_id: id, text: текст, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: кнопки,
-  })));
+  });
+  /* Сначала — в чат поддержки. Не дошло (бота нет в чате, чат не задан,
+     Telegram отказал) — админам лично, и причина отказа уходит в журнал
+     службы: раньше заявка молча пропадала. */
+  const вЧат = SUPPORT_CHAT_ID ? await послать(SUPPORT_CHAT_ID) : null;
+  if (вЧат && вЧат.ok) return true;
+  if (SUPPORT_CHAT_ID) console.warn("[галочка] в чат поддержки не ушло:", вЧат && вЧат.description);
+  const лично = await Promise.all([...админы()].map((id) => послать(Number(id))));
+  const дошло = лично.some((о) => о && о.ok);
+  if (!дошло) console.warn("[галочка] заявка никому не ушла:", !BOT_TOKEN ? "нет TELEGRAM_BOT_TOKEN" : !админы().size ? "нет ADMIN_TG_IDS" : лично.map((о) => о && о.description).join("; "));
+  return дошло;
 }
 
 /* Выдать или снять по нику X. Возвращает, сколько профилей затронуто. */
