@@ -24767,7 +24767,7 @@ function НастройкаБыстрых() {
         <ToggleSwitch on={н.oneClick} onChange={(v) => { haptic("light"); сохранить({ oneClick: v }); }} />
       </div>
 
-      <div className="fx-card" style={{ animationDelay: "100ms", opacity: н.oneClick ? 1 : 0.55, transition: `opacity ${EASE}` }}>
+      <div className="fx-card" style={{ animationDelay: "100ms" }}>
         <SectionTitle>{ru ? "Суммы покупки" : "Buy amounts"}</SectionTitle>
         <div className="flex flex-col" style={{ gap: 14, padding: "14px 16px", borderRadius: 22, background: T.surface }}>
           {монеты.map(([ключ, тикер, сеть]) => (
@@ -24779,7 +24779,7 @@ function НастройкаБыстрых() {
         </div>
       </div>
 
-      <div className="fx-card" style={{ animationDelay: "160ms", opacity: н.oneClick ? 1 : 0.55, transition: `opacity ${EASE}` }}>
+      <div className="fx-card" style={{ animationDelay: "160ms" }}>
         <SectionTitle>{ru ? "Доли продажи" : "Sell shares"}</SectionTitle>
         <div style={{ padding: "14px 16px", borderRadius: 22, background: T.surface }}>
           <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginBottom: 6 }}>{ru ? "Процент от позиции" : "Percent of position"}</div>
