@@ -20204,7 +20204,7 @@ function КарточкаСтрок({ заголовок, строки }) {
   );
 }
 
-function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = true, connected = true, themeKey, currentUserId = null, onNeedAuth, onOpenProfile, tonPriceUsd = 0, walletAddress = null, onManage = null }) {
+function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = true, connected = true, themeKey, currentUserId = null, onNeedAuth, onOpenProfile, tonPriceUsd = 0, walletAddress = null, onManage = null, изменение24 = null }) {
   // График вынесен из вкладок наверх, поэтому здесь остались только
   // разделы под ним: держатели, лента, о токене.
   // Экран открывается на статистике: цифры рынка важнее ленты чужих
@@ -20459,12 +20459,13 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const капОкна = своя_кривая
     ? живаяЦена * выпускТокена
     : (token.mcapNum > 0 ? token.mcapNum : ценаТокена * выпускТокена);
-  const дельтаОкна = (окноГрафика
-    ? окноГрафика.до - окноГрафика.от
-    : (ценаТокена * (token.change || 0)) / 100) * выпускТокена;
-  const процентОкна = окноГрафика
-    ? (окноГрафика.от > 0 ? ((окноГрафика.до - окноГрафика.от) / окноГрафика.от) * 100 : 0)
-    : (token.change || 0);
+  /* Процент под ценой — за сутки, тот же, что в ленте: раньше здесь
+     стояло движение за видимый участок графика, и у одного токена в
+     ленте было +1,2 %, а в карточке +86 %. Живое число приходит из
+     общей ленты (изменение24); пока его нет — то, с чем карточку открыли. */
+  const сутки = Number.isFinite(изменение24) ? изменение24 : (Number(token.change) || 0);
+  const дельтаОкна = капОкна * сутки / (100 + сутки);
+  const процентОкна = сутки;
   const ростОкна = процентОкна >= 0;
 
   /* Вложенное в этот токен — по своим же сделкам. По нему считается
@@ -30876,6 +30877,12 @@ function mapTokenRow(row) {
   // loadMyTokens/loadProfileForUser above), scoped per-account instead of
   // per-browser. Starts empty and is populated once the session resolves.
   const [myTokens, setMyTokens] = useState([]);
+  // Живой процент за сутки у открытого токена — тот же, что в ленте.
+  const изменениеОткрытого = useMemo(() => {
+    if (!token) return null;
+    const ж = communityTokens.find((x) => x.id === token.id) || myTokens.find((x) => x.id === token.id);
+    return ж && Number.isFinite(Number(ж.change)) ? Number(ж.change) : null;
+  }, [token, communityTokens, myTokens]);
 
   /* Живые цифры ленты — опросом каждые 0,3 секунды.
    *
@@ -30918,8 +30925,8 @@ function mapTokenRow(row) {
             if (д && д.created > 0 && tok.createdAt !== д.created) { тронуто = true; tok = { ...tok, createdAt: д.created }; }
             if (д && д.stats) {
               const ст = д.stats, курсД = курсСетиДемо(tok, курсTon);
-              const цифры = { tx24h: ст.tx24, holders: ст.holders, vol: fmtCompact(ст.vol24 * курсД), liq: fmtCompact(ст.liquidity * курсД), vol24hNum: ст.vol24 * курсД, xHandle: ст.x || null };
-              if (tok.tx24h !== цифры.tx24h || tok.holders !== цифры.holders || tok.vol !== цифры.vol || tok.xHandle !== цифры.xHandle) { тронуто = true; tok = { ...tok, ...цифры }; }
+              const цифры = { tx24h: ст.tx24, holders: ст.holders, vol: fmtCompact(ст.vol24 * курсД), liq: fmtCompact(ст.liquidity * курсД), vol24hNum: ст.vol24 * курсД, xHandle: ст.x || null, ...(ст.change24 != null ? { change: ст.change24 } : null) };
+              if (tok.tx24h !== цифры.tx24h || tok.holders !== цифры.holders || tok.vol !== цифры.vol || tok.xHandle !== цифры.xHandle || tok.change !== цифры.change) { тронуто = true; tok = { ...tok, ...цифры }; }
             }
             if (!к || !(к.price > 0) || (tok.priceTon === к.price && tok.raisedTon === к.raised)) return tok;
             const курс = tok.демо ? курсСетиДемо(tok, курсTon) : tok.chain === "solana" ? курсSol : курсTon;
@@ -30932,7 +30939,8 @@ function mapTokenRow(row) {
             return {
               ...tok,
               цена24,
-              change: (к.price / цена24 - 1) * 100,
+              // У демо процент за сутки считает сервер по своей истории.
+              change: tok.демо && д && д.stats && д.stats.change24 != null ? д.stats.change24 : (к.price / цена24 - 1) * 100,
               priceTon: к.price,
               price: курс > 0 ? к.price * курс : tok.price,
               mcapNum: курс > 0 ? к.price * курс * 1_000_000_000 : tok.mcapNum,
@@ -33010,7 +33018,7 @@ function mapTokenRow(row) {
             />
             </div>
           )}
-          {view === "token" && <div className={уходСтраницы ? "fx-view-out" : undefined} style={undefined}><TokenDetail t={token} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} unlocked={accountCreated} connected={connected} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} /></div>}
+          {view === "token" && <div className={уходСтраницы ? "fx-view-out" : undefined} style={undefined}><TokenDetail t={token} изменение24={изменениеОткрытого} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} unlocked={accountCreated} connected={connected} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} /></div>}
           {view === "create" && (
             <div className={уходСтраницы ? "fx-view-out" : undefined}>
             <CreateView
