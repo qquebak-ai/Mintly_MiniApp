@@ -569,7 +569,7 @@ const STR = {
     trustOfSupply: "% выпуска",
     gradTitle: "До листинга на бирже",
     gradLeft: "осталось {left} GRAM",
-    gradDone: "Токен закрыта — токен уходит на биржу",
+    gradDone: "Кривая закрыта — токен уходит на биржу",
     gradNote: "Когда соберётся {target} GRAM, токен выйдет на биржу: собранное и остаток выпуска уйдут в пул.",
     gradClosedTitle: "Токен закрыта",
     gradClosedBody: "Собрано {target} GRAM. Токен переезжает на биржу — торговля скоро откроется снова.",
@@ -7204,7 +7204,8 @@ function КольцоДоБиржи({ size, доля, готово = false, chil
             />
           </mask>
         </defs>
-        <circle cx={внешний / 2} cy={внешний / 2} r={r} fill="none" stroke={T.line} strokeWidth={толщина} />
+        {/* Серой дорожки под дугой нет: вокруг аватарки она читалась
+            рамкой. Видно только пройденное. */}
         <circle
           cx={внешний / 2} cy={внешний / 2} r={r} fill="none" stroke={цвет}
           strokeWidth={толщина} strokeLinecap="round" strokeDasharray={`${дуга} ${длина}`}
@@ -7256,14 +7257,14 @@ function TokenAvatar({ size = 52, tone = "neutral", src }) {
     }, 1000);
     return () => clearTimeout(id);
   }, [src, пришла, исходная]);
-  const ringColor = T.lineHi;
   const естьКартинка = !!src && !broken;
   return (
     <div
       className="fx-avatar"
       style={{
+        // Без обода: серая рамка вокруг логотипа выглядела чужой рамкой
+        // поверх картинки токена.
         width: size, height: size, position: "relative", flexShrink: 0, borderRadius: "50%",
-        border: `1.5px solid ${ringColor}`,
         background: T.surfaceHi,
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: size * 0.44, overflow: "hidden",
@@ -9601,7 +9602,130 @@ function TrustPanel({ token, testnet = false, holders = null }) {
    Оба числа берутся у самой кривой: цель зашита в контракт при запуске,
    и у токенов, созданных до смены настроек, она своя. Считать по
    настройкам приложения нельзя — покажем чужую цель. */
-function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false, монета = ТИКЕР_TON }) {
+/* Подробности пути до биржи — по нажатию на шкалу «До листинга».
+ *
+ * Кольцо наливается от нуля до собранного, цифры набегают, строки
+ * проявляются одна за другой, а по налитой дуге идёт блик. Всё — на
+ * живых цифрах страницы: сделка, пришедшая при открытом окне, сразу
+ * двигает и кольцо, и строки. */
+function ЛистДоЛистинга({ данные: данныеProp, onClose }) {
+  useНазадТелеграм(!!данныеProp, onClose);
+  const [д, closing] = useClosing(данныеProp);
+  // Кольцо наливается после первого кадра: иначе переход не с чего начать.
+  const [налито, setНалито] = useState(false);
+  useEffect(() => {
+    if (!данныеProp) { setНалито(false); return undefined; }
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setНалито(true)));
+    return () => cancelAnimationFrame(id);
+  }, [!!данныеProp]);
+  const доля = д && д.цель > 0 ? Math.max(0, Math.min(1, д.собрано / д.цель)) : 0;
+  const процент = useCountUp(доля * 100, 1100, !!д && налито);
+  const собраноСчёт = useCountUp(д ? д.собрано : 0, 1100, !!д && налито);
+  if (!д) return null;
+  const R = 74, ТОЛЩ = 12, ДЛИНА = 2 * Math.PI * R;
+  const осталось = Math.max(0, д.цель - д.собрано);
+  const usd = (v) => (д.курс > 0 ? fmtUSD(v * д.курс) : "—");
+  const строки = [
+    ["Собрано", `${fmtTon(д.собрано)} ${д.монета}`, usd(д.собрано)],
+    ["Порог выхода", `${fmtTon(д.цель)} ${д.монета}`, usd(д.цель)],
+    ["Осталось", `${fmtTon(осталось)} ${д.монета}`, usd(осталось)],
+    ["Капитализация сейчас", fmtUSD(д.капСейчас), null],
+    ...(д.капНаВыходе > 0 ? [["Капитализация на выходе", fmtUSD(д.капНаВыходе), д.капСейчас > 0 ? `×${(д.капНаВыходе / д.капСейчас).toFixed(1)} от текущей` : null]] : []),
+    ...(д.проданоДоля != null ? [["Продано с кривой", `${(д.проданоДоля * 100).toFixed(1)}%`, "из 800 млн к продаже"]] : []),
+  ];
+  const лист = (
+    <div className={`fx-modal-back${closing ? " fx-out" : ""}`} style={{ ...SHEET_BACK, position: "fixed", zIndex: 70 }} onClick={onClose}>
+      <style>{`
+        @keyframes листСтрока { from { opacity: 0; transform: translateY(14px) scale(0.98); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+        @keyframes листБлик { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -${ДЛИНА.toFixed(1)}; } }
+        @keyframes листИскра { 0% { opacity: 0; transform: translate(0, 0) scale(0.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.2); } }
+        @keyframes листДыхание { 0%, 100% { opacity: 0.35; transform: scale(0.96); } 50% { opacity: 0.7; transform: scale(1.04); } }
+        @media (prefers-reduced-motion: reduce) { .лист-анимация * { animation: none !important; transition: none !important; } }
+      `}</style>
+      <div className="fx-modal-card лист-анимация" data-sheet="1" onClick={(e) => e.stopPropagation()} style={sheetCard(20, { position: "relative", overflow: "hidden" })}>
+        <div className="flex justify-center" style={{ marginBottom: 6 }}>
+          <span aria-hidden style={{ width: 40, height: 4, borderRadius: 999, background: hexA("#FFFFFF", 0.22) }} />
+        </div>
+        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800, textAlign: "center" }}>{tr("gradTitle")}</div>
+        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, textAlign: "center", marginTop: 2 }}>${д.тикер} · {д.биржа}</div>
+
+        <div style={{ position: "relative", width: 2 * (R + ТОЛЩ), height: 2 * (R + ТОЛЩ), margin: "18px auto 10px" }}>
+          {/* Свечение под кольцом дышит — так видно, что цифры живые. */}
+          <span aria-hidden style={{ position: "absolute", inset: 18, borderRadius: "50%", background: `radial-gradient(circle, ${hexA(T.electric, 0.35)} 0%, transparent 70%)`, animation: "листДыхание 3.2s ease-in-out infinite" }} />
+          <svg width={2 * (R + ТОЛЩ)} height={2 * (R + ТОЛЩ)} style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)", overflow: "visible" }} aria-hidden>
+            <defs>
+              <linearGradient id="листДуга" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor={T.electric} />
+                <stop offset="1" stopColor={T.up} />
+              </linearGradient>
+            </defs>
+            <circle cx={R + ТОЛЩ} cy={R + ТОЛЩ} r={R} fill="none" stroke={hexA("#FFFFFF", 0.06)} strokeWidth={ТОЛЩ} />
+            <circle
+              cx={R + ТОЛЩ} cy={R + ТОЛЩ} r={R} fill="none" stroke="url(#листДуга)" strokeWidth={ТОЛЩ} strokeLinecap="round"
+              strokeDasharray={`${ДЛИНА} ${ДЛИНА}`}
+              strokeDashoffset={налито ? ДЛИНА * (1 - доля) : ДЛИНА}
+              style={{ transition: "stroke-dashoffset 1.3s cubic-bezier(0.22, 1, 0.36, 1)", filter: `drop-shadow(0 0 8px ${hexA(T.electric, 0.6)})` }}
+            />
+            {доля > 0.02 && (
+              <circle
+                cx={R + ТОЛЩ} cy={R + ТОЛЩ} r={R} fill="none" stroke="#FFFFFF" strokeOpacity={0.55} strokeWidth={ТОЛЩ * 0.45} strokeLinecap="round"
+                strokeDasharray={`${Math.min(ДЛИНА * доля, ДЛИНА * 0.08)} ${ДЛИНА}`}
+                style={{ animation: `листБлик ${Math.max(1.6, 3.2 * доля)}s linear infinite`, opacity: налито ? 1 : 0, transition: "opacity .6s ease 1.1s" }}
+              />
+            )}
+          </svg>
+          {/* Искры разлетаются от конца налитой дуги. */}
+          {налито && доля > 0 && Array.from({ length: 8 }).map((_, i) => {
+            const угол = 2 * Math.PI * доля - Math.PI / 2;
+            const x = R + ТОЛЩ + Math.cos(угол) * R, y = R + ТОЛЩ + Math.sin(угол) * R;
+            const разлёт = (i / 8) * Math.PI * 2;
+            return (
+              <span key={i} aria-hidden style={{
+                position: "absolute", left: x - 2.5, top: y - 2.5, width: 5, height: 5, borderRadius: "50%", background: T.up,
+                boxShadow: `0 0 8px ${T.up}`, "--dx": `${Math.cos(разлёт) * 26}px`, "--dy": `${Math.sin(разлёт) * 26}px`,
+                animation: `листИскра 1.6s ease-out ${1.2 + i * 0.12}s infinite`, opacity: 0,
+              }} />
+            );
+          })}
+          <div className="flex flex-col items-center justify-center" style={{ position: "absolute", inset: 0 }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
+              {процент.toFixed(процент < 10 ? 1 : 0)}%
+            </span>
+            <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
+              {fmtTon(собраноСчёт)} / {fmtTon(д.цель)} {д.монета}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col" style={{ gap: 0, marginTop: 6 }}>
+          {строки.map(([имя, значение, под], i) => (
+            <div key={имя} className="flex items-center justify-between" style={{
+              gap: 12, padding: "11px 2px", borderTop: i ? `1px solid ${hexA("#FFFFFF", 0.06)}` : "none",
+              animation: `листСтрока 520ms cubic-bezier(0.22, 1, 0.36, 1) ${0.25 + i * 0.07}s backwards`,
+            }}>
+              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{имя}</span>
+              <span className="flex flex-col items-end" style={{ minWidth: 0 }}>
+                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}><ТекстСЧислами text={значение} /></span>
+                {под && <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 11.5 }}><ТекстСЧислами text={под} /></span>}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          marginTop: 12, padding: "12px 14px", borderRadius: 16, background: hexA(T.up, 0.08),
+          fontFamily: bodyFont, color: T.paper, fontSize: 13, lineHeight: 1.5,
+          animation: `листСтрока 520ms cubic-bezier(0.22, 1, 0.36, 1) ${0.25 + строки.length * 0.07}s backwards`,
+        }}>
+          Когда соберётся {fmtTon(д.цель)} {д.монета}, кривая закроется сама: собранное и остаток токенов уйдут в пул {д.биржа}, а LP-токены сгорят — ликвидность заперта навсегда, забрать её не сможет никто, включая площадку.
+        </div>
+      </div>
+    </div>
+  );
+  return typeof document !== "undefined" ? createPortal(лист, document.body) : лист;
+}
+
+function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false, монета = ТИКЕР_TON, onOpen = null }) {
   if (!(targetTon > 0)) return null;
   const pct = Math.max(0, Math.min(100, (raisedTon / targetTon) * 100));
   const left = Math.max(0, targetTon - raisedTon);
@@ -9617,9 +9741,16 @@ function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false, моне
     );
   }
   return (
-    <div className="rounded-[22px] p-3.5" style={{ background: T.surface, border: "none" }}>
+    <div
+      className={`rounded-[22px] p-3.5${onOpen ? " fx-tap" : ""}`}
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onClick={onOpen ? () => { haptic("light"); onOpen(); } : undefined}
+      onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } } : undefined}
+      style={{ background: T.surface, border: "none", cursor: onOpen ? "pointer" : undefined }}
+    >
       <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{tr("gradTitle")}</span>
+        <span className="flex items-center" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, gap: 4 }}>{tr("gradTitle")}{onOpen && <ChevronRight size={14} color={T.faint} />}</span>
         <span style={{ fontFamily: monoFont, color: done ? T.up : T.ice, fontSize: 13, fontWeight: 700 }}>
           <ТекстСЧислами text={done ? tr("gradDone") : `${pct.toFixed(0)}%`} />
         </span>
@@ -20021,196 +20152,6 @@ function useТопДержателей(token, открыто) {
   return список;
 }
 
-/* Чат токена.
- *
- * Кто в нём говорит, решает создатель: «всем» или «только держателям».
- * Проверку владения делает сервер (api/token-chat.js) — баланс лежит в
- * цепочке, и ответ браузера «я держатель» ничего не стоит; отсюда и все
- * запросы идут туда, а не прямо в базу.
- *
- * Обновление опросом раз в пять секунд. Живое подключение здесь лишнее:
- * карточка открыта недолго, а сообщений в минуту — единицы.
- */
-function ЧатТокена({ tokenId, свой = false, currentUserId, onNeedAuth, showToast }) {
-  const [состояние, setСостояние] = useState(null);
-  const [сообщения, setСообщения] = useState([]);
-  const [черновик, setЧерновик] = useState("");
-  const [шлём, setШлём] = useState(false);
-  const лента = useRef(null);
-
-  const загрузить = useCallback(async () => {
-    if (!tokenId) return;
-    try {
-      const { данные } = await запросЧата(`/api/token-chat?action=list&token=${tokenId}`);
-      if (!данные) return;
-      setСостояние({ mode: данные.mode, canWrite: данные.canWrite, canRead: данные.canRead });
-      setСообщения(данные.messages || []);
-    } catch { /* сеть моргнула — покажем, что было */ }
-  }, [tokenId]);
-
-  useEffect(() => {
-    let жив = true;
-    const шаг = () => { if (жив) загрузить(); };
-    шаг();
-    const id = setInterval(шаг, 5000);
-    return () => { жив = false; clearInterval(id); };
-  }, [загрузить, currentUserId]);
-
-  // Новое сообщение — вниз, к последнему: так чат и читают.
-  useEffect(() => {
-    const эл = лента.current;
-    if (эл) эл.scrollTop = эл.scrollHeight;
-  }, [сообщения.length]);
-
-  async function отправить() {
-    const текст = черновик.trim();
-    if (!текст || шлём) return;
-    if (!currentUserId) { onNeedAuth && onNeedAuth(); return; }
-    setШлём(true);
-    try {
-      const { данные, ошибка } = await запросЧата("/api/token-chat?action=send", { token: tokenId, body: текст });
-      if (!данные) throw new Error(ошибка || "не отправилось");
-      setЧерновик("");
-      await загрузить();
-    } catch (e) {
-      showToast && showToast(человечнаяОшибка(e));
-    } finally {
-      setШлём(false);
-    }
-  }
-
-  async function сменитьРежим(режим) {
-    try {
-      const { данные } = await запросЧата("/api/token-chat?action=mode", { token: tokenId, mode: режим });
-      if (данные) { setСостояние((с) => ({ ...(с || {}), mode: данные.mode, canWrite: true })); загрузить(); }
-    } catch { showToast && showToast(t("chatModeFailed")); }
-  }
-
-  if (!состояние) return null;
-  const толькоДержателям = состояние.mode === "holders";
-
-  return (
-    <section style={{ borderRadius: 16, background: T.surface, padding: 14 }}>
-      <div className="flex items-center justify-between" style={{ gap: 10, marginBottom: 10 }}>
-        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
-          {t("chatTitle")}
-        </span>
-        {свой ? (
-          /* Переключатель видит только создатель: это его решение, кому
-             открыт разговор под его токеном. */
-          <span className="flex items-center" style={{ gap: 2, padding: 3, borderRadius: 999, background: T.bg }}>
-            {[["all", t("chatModeAll")], ["holders", t("chatModeHolders")]].map(([ключ, подпись]) => (
-              <button
-                key={ключ}
-                onClick={() => сменитьРежим(ключ)}
-                className="fx-tap"
-                style={{
-                  padding: "5px 10px", borderRadius: 999, border: "none",
-                  background: состояние.mode === ключ ? T.surfaceHi : "transparent",
-                  color: состояние.mode === ключ ? T.ice : T.muted,
-                  fontFamily: displayFont, fontSize: 12, fontWeight: 700,
-                }}
-              >
-                {подпись}
-              </button>
-            ))}
-          </span>
-        ) : (
-          толькоДержателям && (
-            <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 11.5 }}>{t("chatOnlyHolders")}</span>
-          )
-        )}
-      </div>
-
-      {!состояние.canRead ? (
-        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
-          {t("chatLockedBody")}
-        </div>
-      ) : (
-        <>
-          <div
-            ref={лента}
-            className="no-scrollbar flex flex-col"
-            style={{ gap: 8, maxHeight: 240, overflowY: "auto", paddingRight: 2 }}
-          >
-            {sсообщенийНет(сообщения) ? (
-              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{t("chatEmpty")}</span>
-            ) : сообщения.map((м) => (
-              <div key={м.id} className="flex" style={{ gap: 8, flexDirection: м.mine ? "row-reverse" : "row" }}>
-                <span className="flex items-center justify-center" style={{
-                  width: 26, height: 26, borderRadius: "50%", flexShrink: 0, border: ОБОД_ЛИЦА,
-                  background: м.avatarUrl ? `center/cover no-repeat url(${м.avatarUrl})` : T.surfaceHi,
-                }}>
-                  {!м.avatarUrl && <БукваАватара ник={м.nickname} size={26} />}
-                </span>
-                <div style={{
-                  maxWidth: "78%", padding: "8px 11px", borderRadius: 14,
-                  background: м.mine ? hexA("#F2F0EB", 0.28) : T.surfaceHi,
-                }}>
-                  <div style={{ fontFamily: displayFont, color: T.faint, fontSize: 11, marginBottom: 2 }}>
-                    {м.nickname ? `@${м.nickname}` : t("chatSomeone")} · {fmtSince(м.createdAt)}
-                  </div>
-                  <div style={{ fontFamily: bodyFont, color: T.ice, fontSize: 13.5, lineHeight: 1.4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                    {м.body}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center" style={{ gap: 8, marginTop: 10 }}>
-            <ПолеСЖивымТекстом
-              value={черновик}
-              onChange={(e) => setЧерновик(e.target.value.slice(0, 400))}
-              onKeyDown={(e) => { if (e.key === "Enter") отправить(); }}
-              placeholder={состояние.canWrite ? t("chatPlaceholder") : t("chatOnlyHoldersWrite")}
-              disabled={!состояние.canWrite}
-              style={{
-                flex: 1, minWidth: 0, padding: "10px 12px", borderRadius: 14,
-                background: T.bg, border: "none", outline: "none",
-                fontFamily: bodyFont, fontSize: 16, color: T.ice,
-                opacity: состояние.canWrite ? 1 : 0.6,
-              }}
-            />
-            <button
-              onClick={отправить}
-              disabled={!состояние.canWrite || !черновик.trim() || шлём}
-              className={`fx-tap flex items-center justify-center${шлём ? " fx-busy" : ""}`}
-              style={{
-                width: 40, height: 40, borderRadius: "50%", flexShrink: 0, border: "none",
-                ...(состояние.canWrite && черновик.trim() ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
-                opacity: состояние.canWrite ? 1 : 0.6,
-              }}
-            >
-              <Send size={15} color={состояние.canWrite && черновик.trim() ? PRISM_TEXT : T.muted} />
-            </button>
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-
-const sсообщенийНет = (ряд) => !ряд || !ряд.length;
-
-/* Запрос к чату: подпись сессии в заголовке, разбор ответа — здесь же,
-   чтобы наверху остались только слова. */
-async function запросЧата(путь, тело) {
-  const { data } = await supabase.auth.getSession();
-  const токен = data && data.session ? data.session.access_token : null;
-  const res = await fetch(апи(путь), {
-    method: тело ? "POST" : "GET",
-    headers: {
-      ...(токен ? { Authorization: `Bearer ${токен}` } : {}),
-      ...(тело ? { "Content-Type": "application/json" } : {}),
-    },
-    body: тело ? JSON.stringify(тело) : undefined,
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) return { данные: null, ошибка: (json && (json.error || json.detail)) || `ошибка ${res.status}` };
-  return { данные: json, ошибка: null };
-}
-
 /* Что создатель обещал при запуске.
  *
  * Показывается на вкладке «о токене» списком: включённые механики
@@ -20578,6 +20519,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
      строка над позицией: прибыль от собственной цены входа, а не
      суточное движение цены. */
   const [вложено, setВложено] = useState(null);
+  const [листВыхода, setЛистВыхода] = useState(false);
   useEffect(() => {
     let брошено = false;
     setВложено(null);
@@ -21360,6 +21302,28 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       </div>
 
       <TrendFX up={up} seedKey={token.seed} />
+      <ЛистДоЛистинга
+        данные={листВыхода ? (() => {
+          const цель = Number((своя && своя.цель) || token.graduationTon || (curve && Number(curve.graduationTon) / 1e9)) || 0;
+          const курс = token.демо ? курсСетиДемо(token, tonPriceUsd) : token.chain === "solana" ? solUsd() : этоEVM(token.chain) ? курсМонетыEVM(token.chain, КЕШ_КУРСОВ_EVM) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
+          const р = своя && своя.резервы;
+          // Капитализация в миг выхода — по той же формуле кривой, что и
+          // цена: запас вырос на весь порог.
+          let капНаВыходе = 0;
+          if (р && р.vМонеты > 0 && р.vТокены > 0 && цель > 0 && курс > 0) {
+            const x = р.vМонеты + цель;
+            const y = (р.vМонеты * р.vТокены) / x;
+            капНаВыходе = (x / y) * выпускТокена * курс;
+          }
+          return {
+            тикер: token.ticker, собрано: собраноЖиво, цель, курс, капСейчас: капОкна, капНаВыходе,
+            монета: token.chain === "solana" ? "SOL" : этоEVM(token.chain) ? СЕТИ_EVM[token.chain].монета : ТИКЕР_TON,
+            биржа: token.chain === "solana" ? "Raydium" : token.chain === "bsc" ? "PancakeSwap" : этоEVM(token.chain) ? "Uniswap" : "STON.fi",
+            проданоДоля: р && р.продано >= 0 ? Math.min(1, р.продано / 800_000_000) : null,
+          };
+        })() : null}
+        onClose={() => setЛистВыхода(false)}
+      />
       <TokenShareSheet
         token={shareOpen ? {
           ...token, logoUrl: логотип,
@@ -21599,18 +21563,6 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         )}
       </div>
 
-      {/* Чат тех, кто в токене. Стоит сразу под позицией: разговор о
-          монете и есть то, ради чего в карточку возвращаются. */}
-      {token.id && (
-        <ЧатТокена
-          tokenId={token.id}
-          свой={!!onManage}
-          currentUserId={currentUserId}
-          onNeedAuth={onNeedAuth}
-          showToast={showToast}
-        />
-      )}
-
       {/* Путь до биржи и её итог: у токенов на своей кривой это главное
           число после цены, у остальных блока просто нет. */}
       {curve && curve.graduated ? (
@@ -21627,7 +21579,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             </p>
           </div>
         </div>
-      ) : !token.демо && Number((своя && своя.цель) || token.graduationTon || (curve && Number(curve.graduationTon) / 1e9)) > 0 ? (
+      ) : Number((своя && своя.цель) || token.graduationTon || (curve && Number(curve.graduationTon) / 1e9)) > 0 ? (
         /* Путь до биржи — как «Bonding curve» у Axiom, во всех сетях и
            на живых цифрах: собранное приходит каждые 0,3 с. Раньше шкала
            была только у TON и стояла на месте до перезахода. */
@@ -21635,6 +21587,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
           raisedTon={собраноЖиво}
           targetTon={Number((своя && своя.цель) || token.graduationTon || Number(curve.graduationTon) / 1e9)}
           монета={token.chain === "solana" ? "SOL" : этоEVM(token.chain) ? СЕТИ_EVM[token.chain].монета : ТИКЕР_TON}
+          onOpen={() => setЛистВыхода(true)}
         />
       ) : null}
 
