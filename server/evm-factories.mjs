@@ -42,14 +42,18 @@ const БОЕВЫЕ = env.EVM_MAINNET === "1";
 
 // Те же адреса, что в contracts/evm/deploy.mjs: обёрнутая монета и
 // фабрика пулов биржи, куда токен выходит после кривой.
+// Виртуальный запас задаёт порог выхода на биржу: кривая той же формы,
+// что у pump.fun, и сбор к выходу — вирт × 800 / 273 ≈ 2,93 × вирт. Пороги
+// в монете сети равны по деньгам 85 SOL у pump.fun: 12 BNB, 3,6 ETH; в
+// тестовых сетях в сто раз меньше, чтобы выход проверялся монетами с крана.
 const СЕТИ = БОЕВЫЕ ? {
-  bsc: { chainId: 56, rpc: env.EVM_RPC_BSC || "https://bsc-dataseed.bnbchain.org", weth: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", dex: "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73", вирт: "6", монета: "BNB" },
-  base: { chainId: 8453, rpc: env.EVM_RPC_BASE || "https://mainnet.base.org", weth: "0x4200000000000000000000000000000000000006", dex: "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6", вирт: "1.5", монета: "ETH" },
-  eth: { chainId: 1, rpc: env.EVM_RPC_ETH || "https://ethereum-rpc.publicnode.com", weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", dex: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f", вирт: "1.5", монета: "ETH" },
+  bsc: { chainId: 56, rpc: env.EVM_RPC_BSC || "https://bsc-dataseed.bnbchain.org", weth: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", dex: "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73", вирт: "4.1", монета: "BNB" },
+  base: { chainId: 8453, rpc: env.EVM_RPC_BASE || "https://mainnet.base.org", weth: "0x4200000000000000000000000000000000000006", dex: "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6", вирт: "1.23", монета: "ETH" },
+  eth: { chainId: 1, rpc: env.EVM_RPC_ETH || "https://ethereum-rpc.publicnode.com", weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", dex: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f", вирт: "1.23", монета: "ETH" },
 } : {
-  bsc: { chainId: 97, rpc: env.EVM_RPC_BSC || "https://bsc-testnet-rpc.publicnode.com", weth: "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd", dex: "0x6725F303b657a9451d8BA641348b6761A6CC7a17", вирт: "0.06", монета: "tBNB", кран: "https://www.bnbchain.org/en/testnet-faucet" },
-  base: { chainId: 84532, rpc: env.EVM_RPC_BASE || "https://sepolia.base.org", weth: "0x4200000000000000000000000000000000000006", dex: "0x7Ae58f10f7849cA6F5fB71b7f45CB416c9204b1e", вирт: "0.015", монета: "ETH (Base Sepolia)", кран: "https://portal.cdp.coinbase.com/products/faucet" },
-  eth: { chainId: 11155111, rpc: env.EVM_RPC_ETH || "https://ethereum-sepolia-rpc.publicnode.com", weth: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14", dex: "0xF62c03E08ada871A0bEb309762E260a7a6a880E6", вирт: "0.015", монета: "SepoliaETH", кран: "https://cloud.google.com/application/web3/faucet/ethereum/sepolia" },
+  bsc: { chainId: 97, rpc: env.EVM_RPC_BSC || "https://bsc-testnet-rpc.publicnode.com", weth: "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd", dex: "0x6725F303b657a9451d8BA641348b6761A6CC7a17", вирт: "0.041", монета: "tBNB", кран: "https://www.bnbchain.org/en/testnet-faucet" },
+  base: { chainId: 84532, rpc: env.EVM_RPC_BASE || "https://sepolia.base.org", weth: "0x4200000000000000000000000000000000000006", dex: "0x7Ae58f10f7849cA6F5fB71b7f45CB416c9204b1e", вирт: "0.0123", монета: "ETH (Base Sepolia)", кран: "https://portal.cdp.coinbase.com/products/faucet" },
+  eth: { chainId: 11155111, rpc: env.EVM_RPC_ETH || "https://ethereum-sepolia-rpc.publicnode.com", weth: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14", dex: "0xF62c03E08ada871A0bEb309762E260a7a6a880E6", вирт: "0.0123", монета: "SepoliaETH", кран: "https://cloud.google.com/application/web3/faucet/ethereum/sepolia" },
 };
 const выбраны = (process.argv[2] ? process.argv[2].split(",") : Object.keys(СЕТИ)).filter((к) => СЕТИ[к]);
 

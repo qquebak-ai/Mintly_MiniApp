@@ -754,7 +754,7 @@ const STR = {
     archCurveTitle: "Токен",
     archCurveBody: "Рынок токена — это контракт. Цена считается по формуле от выкупленного объёма, поэтому торговать можно с первой секунды.",
     archSupplyTitle: "Эмиссия и листинг",
-    archSupplyBody: "Выпуск — миллиард токенов. Когда порог собран (1500 TON или 35 SOL), торговля здесь закрывается, а собранное и остаток выпуска уходят в пул на бирже.",
+    archSupplyBody: "Выпуск — миллиард токенов, кривая как у pump.fun: на ней продаётся 793 млн, и к этому моменту собирается порог — 85 SOL, 6600 GRAM, 12 BNB или 3,6 ETH. Тогда торговля здесь закрывается, а собранное и остальные 207 млн токенов сами уходят в пул на бирже — по той же цене, без скачка.",
     archFeeTitle: "Комиссия",
     archFeeBody: "Комиссии площадки нет. Платится только комиссия сети. Запуск бесплатный — нужна лишь первая покупка.",
     archKeysTitle: "Ключи и подпись",
@@ -1477,7 +1477,7 @@ const STR = {
     archCurveTitle: "Bonding curve",
     archCurveBody: "A token's market is a contract, not an order book — the contract itself is the counterparty. Price comes from a formula over how much has been bought, so trading works from the first second without waiting for anyone to seed liquidity. On TON it is a Tact contract, on Solana a Rust program; the math is the same.",
     archSupplyTitle: "Supply and listing",
-    archSupplyBody: "Supply is fixed at one billion, minted in full and handed to the curve in full. On TON it sells 900 million and holds the rest until listing, with a 1500 TON threshold. On Solana 860 million are sold, 140 million wait for the pair, threshold 35 SOL: the market cap lands around 25 thousand dollars and stays there in the pool right after the move — no jump in price. Once the threshold is met the curve closes, and the collected coin plus the remaining supply move into a pool on a DEX.",
+    archSupplyBody: "Supply is one billion, on a pump.fun-shaped curve: 793 million are sold on it, and by then the threshold is collected — 85 SOL, 6600 GRAM, 12 BNB or 3.6 ETH. The curve then closes, and the collected coin plus the remaining 207 million tokens move into a DEX pool on their own — at the same price, no jump.",
     archFeeTitle: "Fees",
     archFeeBody: "There is no platform fee — zero percent on buys and on sells alike. The rate is baked into the curve at creation and never changes retroactively, so tokens launched earlier under a different rate keep their own. You only pay the network fee, which goes to validators, not to us. Launching is free: just your first buy and that same network fee.",
     archKeysTitle: "Keys and signing",
@@ -23256,7 +23256,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
   const курсЗапуска = () => (вEVM ? курсМонетыEVM(сетьЗапуска, КЕШ_КУРСОВ_EVM) : вSolana ? solUsd() : tonUsd());
   // Виртуальный запас фабрики — тот же, что в contracts/evm/deploy.mjs.
   const ВИРТ_EVM = вEVM
-    ? (Number(сетиEVMЗапуска[сетьЗапуска] && сетиEVMЗапуска[сетьЗапуска].virtual) || (сетиEVMЗапуска.тестовые ? (сетьЗапуска === "bsc" ? 0.06 : 0.015) : (сетьЗапуска === "bsc" ? 6 : 1.5)))
+    ? (Number(сетиEVMЗапуска[сетьЗапуска] && сетиEVMЗапуска[сетьЗапуска].virtual) || (сетиEVMЗапуска.тестовые ? (сетьЗапуска === "bsc" ? 0.041 : 0.0123) : (сетьЗапуска === "bsc" ? 4.1 : 1.23)))
     : 0;
   const ВИРТ_ТОКЕНОВ_EVM = 1_073_000_000;
   const ПРОДАЖА_EVM = 800_000_000;
@@ -23674,7 +23674,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
           const единица = единицаЗапуска;
           const шаг = вEVM ? 0.001 : вSolana ? 0.01 : 0.1;
           /* Верх шкалы — та же логика, что у самой кривой: покупка, которая
-             берёт порог листинга (1500 GRAM в TON, 35 SOL в Solana). На
+             берёт порог листинга (6600 GRAM в TON, 85 SOL в Solana). На
              нём кривая закрывается и уходит в пул, а капитализация выходит
              ровно той, что задумана под листинг. Если порог стоит у самого
              потолка продажи (так в Solana), упираемся в 99,9 % запаса:
@@ -23710,7 +23710,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             && !(сейчас * (курсЗапуска()) >= MIN_LAUNCH_USD);
           /* Сколько на самом деле можно отдать на покупку: остаток кошелька
              за вычетом запаса на комиссию, но не больше, чем примет кривая.
-             Это число и на кнопке «Макс», и в подсказке: «до 35 SOL» при
+             Это число и на кнопке «Макс», и в подсказке: «до 85 SOL» при
              пяти на кошельке обещало то, чего не купить. Вниз до шага —
              вверх запуску не хватит на газ. */
           const можноКупить = Number((Math.floor(Math.min(верх, остатокСети != null ? Math.max(0, остатокСети - ЗАПАС_ЗАПУСКА) : верх) / шаг + 1e-9) * шаг).toFixed(вEVM ? 3 : 2));
@@ -24210,8 +24210,8 @@ const SUPPORT_FAQ = [
     id: "dex",
     q: { RU: "Когда токен попадёт на биржу?", EN: "When does a token reach an exchange?" },
     a: {
-      RU: "Когда в токене наберётся 1500 TON. После этого торговля внутри приложения заканчивается: собранные TON и оставшийся выпуск уходят на биржу и становятся парой для торговли. На экране токена видно, сколько пути пройдено.",
-      EN: "Once the curve collects 1500 TON. Trading inside the app then ends: the collected TON and the remaining supply move to a DEX and become a trading pair. The token screen shows how far along it is.",
+      RU: "Когда кривая соберёт порог — как у pump.fun: 85 SOL, 6600 GRAM, 12 BNB или 3,6 ETH. После этого торговля внутри приложения заканчивается: собранное и оставшийся выпуск сами уходят на биржу и становятся парой для торговли. На экране токена полоска показывает, сколько пути пройдено.",
+      EN: "Once the curve collects its threshold — pump.fun style: 85 SOL, 6600 GRAM, 12 BNB or 3.6 ETH. Trading inside the app then ends: the collected coin and the remaining supply move to a DEX on their own and become a trading pair. A bar on the token screen shows how far along it is.",
     },
   },
   {
