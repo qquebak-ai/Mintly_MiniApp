@@ -979,11 +979,12 @@ async function регистрацияНаСайте(req, res) {
     // Почта в профиле обязательна (not null). У входа через X своей нет —
     // кладём служебный адрес учётки, как у Telegram-аккаунтов (tg…@telegram.local).
     id: userId, nickname, email: почта || адрес, bio: "", emoji: null,
-    // Фото и описание из X не копируем — только привязка X.
     avatar_url: null,
   };
   if (x) {
     профиль.x_handle = x.handle;
+    // Аватар из X — по нику, через unavatar.io (fxtwitter профили не отдаёт).
+    профиль.avatar_url = `https://unavatar.io/x/${encodeURIComponent(x.handle)}`;
     профиль.x_verified_at = new Date().toISOString();
     // Один X — один профиль: у прежнего владельца привязку снимаем.
     await admin.from("profiles").update({ x_handle: null, x_verified_at: null }).ilike("x_handle", x.handle).neq("id", userId);

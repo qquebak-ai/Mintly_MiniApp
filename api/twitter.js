@@ -49,6 +49,13 @@ const ЖИЗНЬ_STATE_МС = 30 * 60 * 1000;
    лимита бесплатного X API (на нём users/me даётся считанные разы в
    сутки). Десять минут держим в памяти: профиль меняется редко. */
 const кешПрофилейX = new Map();
+const аватарX = (handle) => `https://unavatar.io/x/${encodeURIComponent(handle)}`;
+
+/* Привязали X — аватар профиля берём из X, если своего человек не ставил. */
+async function аватарИзX(db, userId, handle) {
+  await db.from("profiles").update({ avatar_url: аватарX(handle) }).eq("id", userId).is("avatar_url", null);
+}
+
 async function профильX(handle) {
   const ключ = String(handle).toLowerCase();
   const было = кешПрофилейX.get(ключ);
@@ -57,7 +64,10 @@ async function профильX(handle) {
     const r = await fetch(`https://api.fxtwitter.com/${encodeURIComponent(handle)}`, { signal: AbortSignal.timeout(6000) });
     const j = r.ok ? await r.json() : null;
     const u = j && j.user;
-    if (!u) return было ? было.профиль : null;
+    /* fxtwitter перестал отдавать профили (404 на любой ник), и аватар
+       X не подтягивался нигде. Аватар тогда берём у unavatar.io — он
+       отдаёт картинку профиля X по нику; числа без источника — нули. */
+    if (!u) return было ? было.профиль : { name: handle, avatar: аватарX(handle), banner: null, description: "", location: "", website: null, followers: 0, following: 0, tweets: 0, joined: null, verified: false, verifiedType: null };
     const профиль = {
       name: u.name || handle,
       // Аватар в полном размере: «_normal» — это 48 точек.
@@ -315,6 +325,7 @@ ${удача || !подробно ? "" : `<p style="font-size:12px;color:#5E5D59
       x_handle: handle, x_verified_at: new Date().toISOString(), x_code: null, x_code_at: null,
     }).eq("id", строка.user_id);
     if (error) return назад("error", `база: ${error.message}`);
+    await аватарИзX(db, строка.user_id, handle).catch(() => {});
     return назад("ok");
   } catch (e) {
     return назад("error", `сбой: ${(e && e.message) || e}`);
@@ -540,6 +551,7 @@ export default async function handler(req, res) {
     // оформляет сам, X — только привязка.
     const { error } = await db.from("profiles").update(правка).eq("id", user.id);
     if (error) return res.status(500).json({ error: "db", detail: error.message });
+    await аватарИзX(db, user.id, з.handle).catch(() => {});
     ЗАГОТОВКИ_X.delete(tg);
     return res.status(200).json({ ok: true, handle: з.handle });
   }
@@ -603,6 +615,8 @@ export default async function handler(req, res) {
     if (действие === "state") {
       const { data } = await db.from("profiles").select("x_handle, x_verified_at").eq("id", user.id).maybeSingle();
       const handle = (data && data.x_handle) || null;
+      // Привязанным раньше — аватар из X тоже, если своего нет.
+      if (handle) await аватарИзX(db, user.id, handle).catch(() => {});
       return res.status(200).json({
         handle,
         verifiedAt: (data && data.x_verified_at) || null,
