@@ -5979,7 +5979,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         const c = i === n - 1 && ж.cur != null ? { ...candles[i], high: ж.hi, low: ж.lo } : candles[i];
         if (!c || !Number.isFinite(c.high) || !Number.isFinite(c.low)) continue;
         const y = yFor(Number.isFinite(м.цена) ? Math.min(c.high, Math.max(c.low, м.цена)) : c.close);
-        const верх = м.side === "buy" ? y - 3 : y - 21;
+        const верх = м.side === "buy" ? y - 2 : y - 12;
         верхСтрелки.set(i, Math.min(верхСтрелки.has(i) ? верхСтрелки.get(i) : Infinity, верх));
       }
     }
@@ -6026,7 +6026,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         while (lo <= hi) { const mid = (lo + hi) >> 1; if (candles[mid] && candles[mid].time <= м.time) { i = mid; lo = mid + 1; } else hi = mid - 1; }
         if (i < startI || i >= endI || !candles[i]) continue;
         const покупка = м.side === "buy";
-        const голова = 7, ширина = 6, хвост = 11;
+        const голова = 4, ширина = 3.5, хвост = 6, стебель = 1.2;
         /* Прямо на свече: сбоку стрелка наезжала на соседние свечи. Чтобы
            её было видно и на теле того же цвета, она белая с цветной
            каймой и тёмной обводкой снаружи. */
@@ -6040,20 +6040,19 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         ctx.beginPath();
         ctx.moveTo(x, y);
         ctx.lineTo(x + ширина, y + н * голова);
-        ctx.lineTo(x + 2.2, y + н * голова);
-        ctx.lineTo(x + 2.2, y + н * (голова + хвост));
-        ctx.lineTo(x - 2.2, y + н * (голова + хвост));
-        ctx.lineTo(x - 2.2, y + н * голова);
+        ctx.lineTo(x + стебель, y + н * голова);
+        ctx.lineTo(x + стебель, y + н * (голова + хвост));
+        ctx.lineTo(x - стебель, y + н * (голова + хвост));
+        ctx.lineTo(x - стебель, y + н * голова);
         ctx.lineTo(x - ширина, y + н * голова);
         ctx.closePath();
+        // Один цвет — зелёная покупка, красная продажа; тонкая тёмная
+        // обводка только отделяет её от свечи того же цвета.
         ctx.lineJoin = "round";
-        ctx.lineWidth = 4.5;
+        ctx.lineWidth = 2;
         ctx.strokeStyle = T.bg;
         ctx.stroke();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = покупка ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
-        ctx.stroke();
-        ctx.fillStyle = "#FFFFFF";
+        ctx.fillStyle = покупка ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
         ctx.fill();
         стрелкиRef.current.push({ x, y: y + н * (голова + хвост) / 2, м });
       }
@@ -20762,6 +20761,10 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   // Последний честный итог позиции — его держим, пока история догоняет кошелёк.
   const прошлыйИтог = useRef(0);
   const [свояСделкаВ, setСвояСделкаВ] = useState(0);
+  // Остаток на кошельке в миг своей сделки: пока он не изменился, сделка
+  // ещё не дошла до кошелька, и итог считать рано.
+  const позицияПриСделке = useRef(null);
+  const позицияRef = useRef(null);
   useEffect(() => { прошлыйИтог.current = 0; }, [token.id]);
   const [быстрые] = useБыстрые();
   useEffect(() => {
@@ -20791,6 +20794,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       if (e && e.detail && e.detail.tokenId && e.detail.tokenId !== token.id) return;
       // Своя сделка: итог замирает, пока история не догонит её (см. ниже).
       setСвояСделкаВ(Date.now());
+      позицияПриСделке.current = позицияRef.current;
       for (const мс of [1500, 4000, 8000, 15000, 22000]) setTimeout(читать, мс);
     };
     if (typeof window !== "undefined") window.addEventListener("mintly:сделка", своя);
@@ -20836,12 +20840,16 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       const стрелка = (с) => {
         const сумма = Number(с.ton_amount) || 0, штук = Number(с.token_amount) || 0, курс = Number(с.ton_price_usd) || 0;
         const ценаUsd = штук > 0 && курс > 0 ? (сумма * курс) / штук : NaN;
+        // Цена в монете сети: график переводит её в доллары своим курсом,
+        // и остриё встаёт ровно туда же, где нарисована свеча.
+        const ценаМонеты = штук > 0 && сумма > 0 ? сумма / штук : NaN;
         const д = new Date(с.created_at);
         return {
           // Старые записи без количества токенов тоже получают стрелку —
           // она встаёт на цену закрытия своей свечи.
           стрелка: с !== стартовая,
           ценаUsd,
+          ценаМонеты,
           когда: д.toLocaleTimeString(lang === "EN" ? "en-US" : "ru-RU", { hour: "2-digit", minute: "2-digit" }),
           сумма: `${fmtCoin(сумма)} ${монета}${курс > 0 ? ` · ${fmtUSD(сумма * курс)}` : ""}`,
           поЦене: Number.isFinite(ценаUsd) ? `${fmtCompact(штук)} ${token.ticker || ""} по ${fmtPrice(ценаUsd)}` : "",
@@ -21239,9 +21247,12 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   const chartReady = !!(графДанные && графДанные.tf === tf && scaledCandles && scaledCandles.length);
   // Цена сделки в единицах графика: в режиме капитализации свечи
   // умножены на выпуск — стрелки умножаем так же.
-  const меткиГрафика = useMemo(() => (меткиСделок || []).map((м) => (
-    м.стрелка ? { ...м, цена: !Number.isFinite(м.ценаUsd) ? NaN : chartMode === "price" ? м.ценаUsd : (supplyEst ? м.ценаUsd * supplyEst : NaN) } : м
-  )), [меткиСделок, chartMode, supplyEst]);
+  const курсСтрелок = token.chain === "solana" ? (курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd()) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
+  const меткиГрафика = useMemo(() => (меткиСделок || []).map((м) => {
+    if (!м.стрелка) return м;
+    const usd = Number.isFinite(м.ценаМонеты) && курсСтрелок > 0 && !этоEVM(token.chain) ? м.ценаМонеты * курсСтрелок : м.ценаUsd;
+    return { ...м, цена: !Number.isFinite(usd) ? NaN : chartMode === "price" ? usd : (supplyEst ? usd * supplyEst : NaN) };
+  }), [меткиСделок, chartMode, supplyEst, курсСтрелок, token.chain]);
   // Множитель «цена → капитализация» приезжает отдельно от свечей: пока
   // его нет, показывать нечего, но и «нет данных» неправда.
   const chartPending = chartLoading || (!!графДанные && графДанные.tf === tf && !scaledCandles);
@@ -21864,8 +21875,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
                выходил ложный плюс, который через секунду падал в ноль.
                Пока количество из истории не сходится с кошельком, держим
                прежнее значение. */
-            const сходится = !вложено || вложено.токенов == null
-              || Math.abs(вложено.токенов - позиция) <= Math.max(1, позиция * 0.005);
+            позицияRef.current = позиция;
+            /* Кривая не может держать у тебя больше, чем на ней продано:
+               остаток больше проданного — значит, кошелёк ещё старый, а
+               кривая уже после продажи (отсюда был минус на всю позицию). */
+            const резервыИтога = резервыСети || (своя && своя.резервы);
+            const кривойХватает = пулБиржи || !резервыИтога || !(резервыИтога.продано >= 0)
+              || позиция <= резервыИтога.продано * 1.005 + 1;
+            const сходится = кривойХватает && (!вложено || вложено.токенов == null
+              || Math.abs(вложено.токенов - позиция) <= Math.max(1, позиция * 0.005));
             let итог = вложеноUSD > 0 ? стоимостьПозиции - вложеноUSD : 0;
             if (Math.abs(итог) < Math.max(0.01, вложеноUSD * 0.005)) итог = 0;
             /* После своей сделки кривая и кошелёк меняются в разное время:
@@ -21873,8 +21891,10 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
                миг выходил случайный плюс или минус. Итог стоит, пока не
                придёт история, прочитанная после сделки и сходящаяся с
                кошельком (но не дольше 25 секунд). */
-            const ждёмИсторию = свояСделкаВ > 0 && Date.now() - свояСделкаВ < 25000
-              && !(вложено && вложено.at > свояСделкаВ + 1000 && сходится
+            const кошелёкОбновился = позицияПриСделке.current == null
+              || Math.abs(позиция - позицияПриСделке.current) > Math.max(1, позицияПриСделке.current * 0.001);
+            const ждёмИсторию = свояСделкаВ > 0 && Date.now() - свояСделкаВ < 40000
+              && !(кошелёкОбновился && вложено && вложено.at > свояСделкаВ + 1000 && сходится
                 && (!резервыСети || резервыСети.at > свояСделкаВ + 1500));
             if (!сходится || ждёмИсторию) итог = прошлыйИтог.current;
             else прошлыйИтог.current = итог;
