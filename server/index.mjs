@@ -447,6 +447,36 @@ if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.CURVES_LOOP !== "0") {
   console.log(`[кривые] цикл раз в ${Math.round(ШАГ_КРИВЫХ_МС / 1000)} с`);
 }
 
+/* Выход на биржу — тем же способом.
+ *
+ * Кривая Solana, набравшая порог, сама не закрывается: закрыть её зовёт
+ * api/wallet-solana (action=graduate), и на Vercel это делало
+ * расписание — при переезде звать стало некому. Здесь же сразу после
+ * закрытия сервер заводит пул на Raydium и сжигает LP-токены
+ * (api/solana-migrate.js), как pump.fun. */
+const ШАГ_ВЫХОДА_МС = Number(process.env.GRADUATE_INTERVAL_MS) || 30000;
+
+if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.GRADUATE_LOOP !== "0") {
+  const круг = async () => {
+    try {
+      const ф = await обработчик("/api/wallet-solana");
+      const ответ = дополнить({ statusCode: 200, headersSent: false, setHeader() {}, end() { this.headersSent = true; } });
+      await ф(
+        { method: "GET", url: "/api/wallet-solana?action=graduate", query: { action: "graduate" }, headers: { authorization: `Bearer ${process.env.CRON_SECRET || ""}` } },
+        ответ
+      );
+      const { вывестиНаБиржу } = await import("../api/solana-migrate.js");
+      await вывестиНаБиржу();
+    } catch (err) {
+      console.warn("[выход на DEX]", err && err.message);
+    } finally {
+      setTimeout(круг, ШАГ_ВЫХОДА_МС);
+    }
+  };
+  setTimeout(круг, 8000);
+  console.log(`[выход на DEX] цикл раз в ${Math.round(ШАГ_ВЫХОДА_МС / 1000)} с`);
+}
+
 /* Уведомления о покупках — тем же способом.
  *
  * Их тоже звал чужой планировщик, и там же ломался: секрет в настройках

@@ -17,6 +17,9 @@
  *                          задан, запуск в Solana выключен целиком.
  *   SOLANA_FEE_ACCOUNT   — кошелёк площадки: туда идёт комиссия сделок.
  *   SOLANA_LIQUIDITY     — куда уходит ликвидность после закрытия кривой.
+ *   SOLANA_LIQUIDITY_KEY — ключ этого кошелька (JSON-массив байтов). С ним
+ *                          сервер сам заводит пул на Raydium после закрытия
+ *                          (api/solana-migrate.js), и адрес берётся из ключа.
  *   SOLANA_RPC           — узел сети.
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY — для метаданных токена.
  */
@@ -55,7 +58,19 @@ const RPC = process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com";
 const СЕТЬ_SOL = /devnet/.test(RPC) ? "devnet" : /testnet/.test(RPC) ? "testnet" : "mainnet";
 const PROGRAM = (process.env.SOLANA_CURVE_PROGRAM || "").trim();
 const FEE_ACCOUNT = (process.env.SOLANA_FEE_ACCOUNT || "").trim();
-const LIQUIDITY = (process.env.SOLANA_LIQUIDITY || FEE_ACCOUNT || "").trim();
+const LIQUIDITY_ЗАДАН = (process.env.SOLANA_LIQUIDITY || FEE_ACCOUNT || "").trim();
+/* Ключ кошелька ликвидности — если он есть, кривые новых токенов отдают
+   ликвидность именно ему: только его сервер может подписать заведение
+   пула на бирже. Без ключа — прежний адрес, и пул заводят руками. */
+export function ключЛиквидности() {
+  const сырой = String(process.env.SOLANA_LIQUIDITY_KEY || "").trim();
+  if (!сырой || !Keypair) return null;
+  try { return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(сырой))); } catch { return null; }
+}
+const адресЛиквидности = () => {
+  const к = ключЛиквидности();
+  return к ? к.publicKey.toBase58() : LIQUIDITY_ЗАДАН;
+};
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -347,6 +362,7 @@ export async function собратьЗапуск({ wallet, name, symbol, base, b
   if (!programId) throw new Error("программа кривой не развёрнута");
   if (!адресОк(wallet)) throw new Error("плохой адрес кошелька");
   if (!FEE_ACCOUNT || !адресОк(FEE_ACCOUNT)) throw new Error("не задан кошелёк комиссии");
+  const LIQUIDITY = адресЛиквидности();
   if (!LIQUIDITY || !адресОк(LIQUIDITY)) throw new Error("не задан получатель ликвидности");
 
   const connection = new Connection(RPC, "confirmed");
@@ -448,7 +464,8 @@ export function поляКривой(d) {
   const версия = d.readUInt8(p); p += 1;
   p += 1; // bump
   const закрыта = d.readUInt8(p) === 1; p += 1;
-  p += 32 * 4; // mint, creator, fee_wallet, destination
+  p += 32 * 3; // mint, creator, fee_wallet
+  const destination = d.subarray(p, p + 32); p += 32;
   const virtualSol = Number(d.readBigUInt64LE(p)); p += 8;
   const virtualTokens = Number(d.readBigUInt64LE(p)); p += 8;
   const tokensForSale = Number(d.readBigUInt64LE(p)); p += 8;
@@ -456,7 +473,7 @@ export function поляКривой(d) {
   const feeBps = d.readUInt16LE(p); p += 2;
   const realSol = Number(d.readBigUInt64LE(p)); p += 8;
   const tokensSold = Number(d.readBigUInt64LE(p));
-  return { версия, закрыта, virtualSol, virtualTokens, tokensForSale, graduationSol, feeBps, realSol, tokensSold };
+  return { версия, закрыта, virtualSol, virtualTokens, tokensForSale, graduationSol, feeBps, realSol, tokensSold, destination: Buffer.from(destination) };
 }
 
 /* Сколько токенов кривая способна выкупить прямо сейчас.
@@ -619,7 +636,12 @@ export async function собратьЗакрытие({ payer, mint }) {
   const плательщик = new PublicKey(payer);
   const mintKey = new PublicKey(mint);
   const curve = кривуюДля(mintKey, programId);
-  const получатель = new PublicKey(LIQUIDITY || FEE_ACCOUNT);
+  /* Получатель — тот, что записан в самой кривой при запуске, а не
+     нынешняя настройка: у токенов, запущенных до смены кошелька
+     ликвидности, он прежний, и программа другой не примет. */
+  const счётКривой = await connection.getAccountInfo(curve);
+  const поля = счётКривой ? поляКривой(счётКривой.data) : null;
+  const получатель = поля && поля.destination ? new PublicKey(поля.destination) : new PublicKey(адресЛиквидности() || FEE_ACCOUNT);
   const ata = getAssociatedTokenAddressSync(mintKey, получатель);
 
   const tx = new Transaction();
@@ -682,6 +704,9 @@ export async function состояние(mint) {
     tokensSold,
     realSol,
     graduationSol,
+    // Куда кривая отдаст ликвидность — по нему видно, может ли сервер
+    // сам завести пул (api/solana-migrate.js).
+    destination: поля.destination ? new PublicKey(поля.destination).toBase58() : null,
   };
 }
 
