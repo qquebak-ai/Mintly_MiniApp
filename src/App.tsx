@@ -329,7 +329,7 @@ const STR = {
     withdrawDo: "Отправить",
     withdrawGoing: "Отправляем…",
     withdrawSent: "Отправлено {sum}",
-    withdrawTestnetHint: "Это тестовая сеть: в кошельке получателя переключи её, иначе перевода не видно",
+    withdrawTestnetHint: "В кошельке получателя переключи сеть на ту же, иначе перевода не видно",
     withdrawFailed: "Вывод не прошёл",
     withdrawNotEnough: "На кошельке столько нет",
     withdrawDailyLimit: "Упёрлись в суточный предел вывода — остаток ниже",
@@ -8571,16 +8571,9 @@ function БоковаяПанельПК({ view, tab, profile, accountCreated, с
   );
 }
 
-function ПометкаТест({ сеть, size = 10 }) {
-  if (!пробнаяСеть(сеть)) return null;
-  return (
-    <span style={{
-      fontFamily: monoFont, fontSize: size, lineHeight: 1.6, letterSpacing: 0.4,
-      color: "#F2C14E", border: "1px solid #F2C14E55",
-      borderRadius: 6, padding: "0 5px", flexShrink: 0, textTransform: "uppercase",
-    }}>тест</span>
-  );
-}
+// Пометку «тест» убрали: сеть и так видна по значку, а жёлтая плашка у
+// каждой строки выглядела как предупреждение об ошибке.
+function ПометкаТест() { return null; }
 
 /* Одна цифра в подвале карточки. Подпись мелкая и приглушённая: их
    четыре в ряд, и если каждую набрать наравне со значением, ряд читается
@@ -10884,6 +10877,18 @@ const ВСЕ_СЕТИ = [
 /* Выбор сети выпадающим списком — как кружок сети в мемпаде: одна
    кнопка с текущей сетью, по нажатию — список всех. Недоступные сети
    видны, но не выбираются: подпись справа говорит почему. */
+/* Сеть под заголовком мемпада: кружок сети в панели мал, и без подписи
+   не всегда ясно, чей рынок на экране. */
+function ПодписьСетиМемпада({ сеть }) {
+  const с = ВСЕ_СЕТИ.find((x) => x.ключ === сеть) || ВСЕ_СЕТИ[0];
+  return (
+    <div className="flex items-center" style={{ gap: 10, marginTop: -8 }}>
+      <img src={с.лого} alt="" width={22} height={22} style={{ borderRadius: "50%" }} />
+      <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600 }}>{с.имя}</span>
+    </div>
+  );
+}
+
 function ВыборСети({ value, onChange, недоступны = {}, сети = ВСЕ_СЕТИ, style }) {
   const [открыт, setОткрыт] = useState(false);
   const текущая = сети.find((с) => с.ключ === value) || сети[0];
@@ -11524,10 +11529,7 @@ function МемпадEVM({ сеть, onOpen, myTokens = [] }) {
   return (
     <div className="flex flex-col" style={{ gap: 20, paddingTop: 8, paddingBottom: 16 }}>
       <ЗаголовокРаздела>Мемпад</ЗаголовокРаздела>
-      <div className="flex items-center" style={{ gap: 10, marginTop: -8 }}>
-        <img src={с.лого} alt="" width={22} height={22} style={{ borderRadius: "50%" }} />
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600 }}>{с.имя}</span>
-      </div>
+      <ПодписьСетиМемпада сеть={сеть} />
       <RecentBuysTicker сеть={сеть} tokens={[]} curveTokens={свои} onOpen={onOpen} />
       {/* «В центре внимания» — как в TON и Solana: крупнейшие по
           капитализации, по кругу раз в восемь секунд. */}
@@ -12036,6 +12038,7 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
   return (
     <div className="flex flex-col" style={{ gap: 20, paddingTop: 8, paddingBottom: 16 }}>
       <ЗаголовокРаздела>Мемпад</ЗаголовокРаздела>
+      <ПодписьСетиМемпада сеть={сеть} />
       {/* Пока раздел не готов, его содержимое скрыто, но смонтировано:
           лента сама ходит за сделками, и без неё на экране ждать было бы
           нечего. На виду в это время — та же раскладка плашками: бегущая
@@ -15866,7 +15869,7 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", а
             приложение их не увидит, а вернуть их будет сложно. */}
         {тестоваяEVM && (
           <span style={{ fontFamily: bodyFont, color: T.warning, fontSize: 13, textAlign: "center", lineHeight: 1.4, maxWidth: 330 }}>
-            Тестовая сеть ({сетьПрихода === "bsc" ? "BNB testnet" : сетьПрихода === "base" ? "Base Sepolia" : "Sepolia"}): присылай только тестовые монеты с крана
+            Присылай монеты только с крана {сетьПрихода === "bsc" ? "BNB" : сетьПрихода === "base" ? "Base Sepolia" : "Sepolia"}
           </span>
         )}
       </div>
@@ -16312,18 +16315,6 @@ function ЭкранВывода({
         <div className="flex flex-col" style={{ flex: 1, minHeight: 0, padding: "0 18px", gap: 12 }}>
           <div className="flex items-center justify-between" style={{ gap: 8 }}>
             <ВыборСети value={сеть} onChange={(с) => { setСеть(с); setВвод(""); setВсё(false); }} />
-            {/* Какая это сеть — видно до отправки. Деньги в devnet
-                доходят исправно, но обычный кошелёк их не показывает,
-                пока в нём самом не переключить сеть, и перевод выглядит
-                пропавшим. */}
-            {тестовая && (
-              <span style={{
-                padding: "3px 9px", borderRadius: 999, background: hexA("#F0B429", 0.16),
-                color: "#F0B429", fontFamily: monoFont, fontSize: 11, fontWeight: 700,
-              }}>
-                {сеть === "sol" ? "devnet" : "testnet"}
-              </span>
-            )}
           </div>
           <div className="flex items-center" style={{ gap: 8 }}>
             <div style={{ flex: 1, position: "relative", display: "flex" }}>
@@ -18872,7 +18863,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
   }, [userId]);
   const курсыEVM = useКурсыEVM();
   const сетиEVMКошелька = useСетиEVM();
-  const пометкаТеста = сетиEVMКошелька && сетиEVMКошелька.тестовые ? " · тест" : "";
+  const тестовыеEVM = !!(сетиEVMКошелька && сетиEVMКошелька.тестовые);
   const остатокEVM = (сеть) => (внутрEVM && внутрEVM.chains && внутрEVM.chains[сеть]) || null;
   const вДолларахEVM = Object.keys(СЕТИ_EVM).reduce((сумма, к) => {
     const о = остатокEVM(к);
@@ -18919,6 +18910,37 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
   // Без счётчика: сумма сменяется умным текстом — общие цифры стоят,
   // новые проступают из размытия.
   const итог = адресВнутри ? всегоВДолларах : 0;
+  /* Изменение с начала дня — по ходу курса, а не по разнице сумм: иначе
+     пополнение кошелька выглядело бы прибылью. Цена в полночь берётся из
+     той же суточной кривой, что рисуют карточки монет. */
+  const [курсыДня, setКурсыДня] = useState({});
+  useEffect(() => {
+    let живо = true;
+    const обновить = async () => {
+      const полночь = new Date(); полночь.setHours(0, 0, 0, 0);
+      const итогКурсов = {};
+      for (const к of ["sol", "gram", "bnb", "eth"]) {
+        const д = await получитьКурсМонеты(к).catch(() => null);
+        if (!д || !(д.price > 0)) continue;
+        const pts = д.points || [];
+        const утро = (pts.find((p) => p.t >= полночь.getTime()) || pts[0] || { p: д.price }).p;
+        итогКурсов[к] = { сейчас: д.price, утро };
+      }
+      if (живо) setКурсыДня(итогКурсов);
+    };
+    обновить();
+    const id = setInterval(обновить, 5000);
+    return () => { живо = false; clearInterval(id); };
+  }, []);
+  const сдвигКурса = (к) => (курсыДня[к] ? курсыДня[к].сейчас - курсыДня[к].утро : 0);
+  const заДень = адресВнутри
+    ? солНаКошельке * сдвигКурса("sol") + тонНаКошельке * сдвигКурса("gram")
+      + Object.keys(СЕТИ_EVM).reduce((сумма, к) => {
+        const о = остатокEVM(к);
+        return сумма + (о ? (Number(о.native) || 0) * сдвигКурса(СЕТИ_EVM[к].монета === "BNB" ? "bnb" : "eth") : 0);
+      }, 0)
+    : 0;
+  const заДеньПроцент = итог - заДень > 0 ? (заДень / (итог - заДень)) * 100 : 0;
 
   /* Всё ли пришло. Ноль, показанный до ответа сети, человек читает как
      «деньги пропали», поэтому до полной загрузки — обоих остатков и
@@ -19225,6 +19247,16 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             );
           })()}
         </div>
+        {(() => {
+          // Округляем как на экране: доля цента не должна красить ноль.
+          const центы = Math.round(заДень * 100) / 100;
+          const плюс = центы >= 0;
+          return (
+            <div style={{ position: "relative", marginTop: 4, fontFamily: bodyFont, fontSize: 14, fontWeight: 700, color: центы === 0 ? hexA("#FFFFFF", 0.55) : плюс ? T.up : T.down, fontVariantNumeric: "tabular-nums", ...туман }}>
+              <УмныйТекст text={`${плюс ? "+" : "−"}$${Math.abs(центы).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${плюс ? "+" : "−"}${Math.abs(заДеньПроцент).toFixed(2)}%) за сегодня`} />
+            </div>
+          );
+        })()}
         {/* Мягкая кромка: рисунок сходит на нет у самого края, и карта
             не выглядит обрезанной по линейке.
             Раньше кромка размывала подложку (backdrop-filter). Пока по
@@ -19443,12 +19475,12 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             // Монеты сетей EVM — каждая своей строкой, даже с нулём: так
             // видно, куда ещё можно положить деньги.
             ...Object.entries(СЕТИ_EVM).map(([к, с]) => ({
-              ключ: к, тикер: `${с.монета} · ${с.имя}${пометкаТеста}`, имя: к === "bsc" ? "BNB" : "Ethereum",
+              ключ: к, тикер: `${с.монета} · ${с.имя}`, имя: к === "bsc" ? "BNB" : "Ethereum",
               лого: к === "base" ? "/coins/eth.svg" : с.лого, сеть: к === "base" ? с.лого : null,
               сколько: Number(остатокEVM(к) && остатокEVM(к).native) || 0, курс: курсМонетыEVM(к, курсыEVM),
             })),
             // В тестовых сетях настоящих стейблов нет — и строк под них тоже.
-            ...(пометкаТеста ? [] : Object.entries(СЕТИ_EVM)).flatMap(([к, с]) => ["USDT", "USDC"].map((т) => ({
+            ...(тестовыеEVM ? [] : Object.entries(СЕТИ_EVM)).flatMap(([к, с]) => ["USDT", "USDC"].map((т) => ({
               ключ: `${к}-${т}`, тикер: `${т} · ${с.имя}`, имя: т === "USDT" ? "Tether" : "USD Coin",
               лого: т === "USDT" ? "/coins/usdt.svg" : "/coins/usdc.png", сеть: с.лого,
               сколько: Number(остатокEVM(к) && остатокEVM(к).tokens && остатокEVM(к).tokens[т]) || 0, курс: 1,
@@ -23326,9 +23358,13 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
       return "ton";
     }
   });
-  useEffect(() => {
-    try { if (typeof window !== "undefined") window.localStorage.setItem("mintly.network", сетьЗапуска); } catch { /* приватный режим */ }
-  }, [сетьЗапуска]);
+  /* Запоминаем только выбор рукой. Сброс на TON, когда в сети запуска
+     ещё нет, раньше тоже писался в общий ключ — и мемпад при следующем
+     открытии терял выбранную человеком сеть. */
+  const выбратьСетьЗапуска = (с) => {
+    setСетьЗапуска(с);
+    try { if (typeof window !== "undefined") window.localStorage.setItem("mintly.network", с); } catch { /* приватный режим */ }
+  };
   /* Подписи следуют выбору человека, а не готовности сервера: раньше
      при выключенной программе Solana форма молча показывала TON — и в
      разделе SOL всё было подписано тонами. Теперь выбор виден, а про
@@ -23689,7 +23725,7 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
       {/* Сеть — тем же выпадающим списком, что и в мемпаде. */}
       <ВыборСети
         value={сетьЗапуска}
-        onChange={setСетьЗапуска}
+        onChange={выбратьСетьЗапуска}
         style={{ alignSelf: "flex-start" }}
         недоступны={{
           ...(solДоступен ? {} : { sol: "скоро" }),
@@ -33292,7 +33328,12 @@ function mapTokenRow(row) {
                       onClick={() => {
                         haptic("light");
                         setМенюСети(false);
+                        if (выбрана && view !== "mempad") { запомнитьТокен(null); goTab("mempad"); return; }
                         if (!выбрана) setСетьМемпада(ключ);
+                        // Меню сети видно и поверх карточки токена: выбор
+                        // другой сети там значит «покажи её рынок», а не
+                        // просто смену кружка над чужим токеном.
+                        if (view !== "mempad") { запомнитьТокен(null); goTab("mempad"); }
                       }}
                       className="fx-tap flex items-center"
                       style={{
