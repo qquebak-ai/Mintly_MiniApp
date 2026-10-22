@@ -20924,11 +20924,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       return { ...основа, candles: свечи };
     }
     if (основа) return основа;
+    /* Ровная линия по текущей цене — только когда история пришла пустой
+       (свежий токен без сделок). Пока она едет, на месте графика знак
+       загрузки: плоская линия вместо него выглядела сломанным графиком. */
+    if (chartLoading) return null;
     const цена = (своя && своя.priceUsd > 0) ? своя.priceUsd : 0;
     if (!(цена > 0)) return null;
     const ряд = flatCandles(цена, tf);
     return ряд ? { ...ряд, tf, isLive: false } : null;
-  }, [chartData, своя, tf, запущенВ, пулБиржи, точкиПула, курсПула]);
+  }, [chartData, своя, tf, запущенВ, пулБиржи, точкиПула, курсПула, chartLoading]);
   const scaledCandles = useMemo(() => {
     if (!графДанные?.candles) return null;
     // Без множителя рисовать нечего: раньше в этот момент график молча
