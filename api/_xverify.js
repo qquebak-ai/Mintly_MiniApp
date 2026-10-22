@@ -2,8 +2,8 @@
  *
  * Выдаёт её человек, а не робот: владелец X по желанию заполняет заявку
  * (ник, читатели, вид деятельности, ссылка-подтверждение, комментарий),
- * заявка уходит админам в бота
- * с кнопками «Выдать» и «Отказать». Админы — Telegram id из ADMIN_TG_IDS
+ * заявка уходит в чат поддержки бота (SUPPORT_CHAT_ID), а без него —
+ * админам лично, с кнопками «Выдать» и «Отказать». Админы — Telegram id из ADMIN_TG_IDS
  * через запятую. Выдать или снять можно и командой: /verify @ник,
  * /unverify @ник.
  *
@@ -52,8 +52,13 @@ export async function разослатьЗаявку(заявка) {
     { text: "✅ Выдать", callback_data: `xv:ok:${заявка.id}` },
     { text: "❌ Отказать", callback_data: `xv:no:${заявка.id}` },
   ]] };
-  await Promise.all([...админы()].map((id) => телеграм("sendMessage", {
-    chat_id: Number(id), text: текст, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: кнопки,
+  /* Заявки — туда же, куда вопросы в поддержку (SUPPORT_CHAT_ID): там их
+     читает команда, и кнопки «Выдать» / «Отказать» жмут админы прямо в
+     этом чате. Чата поддержки нет — как раньше, каждому админу лично. */
+  const { SUPPORT_CHAT_ID } = await import("./_support.js");
+  const куда = SUPPORT_CHAT_ID ? [SUPPORT_CHAT_ID] : [...админы()].map(Number);
+  await Promise.all(куда.map((id) => телеграм("sendMessage", {
+    chat_id: id, text: текст, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: кнопки,
   })));
 }
 
