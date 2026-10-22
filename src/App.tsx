@@ -8953,7 +8953,6 @@ function TokenCreatorCard({ ownerId, currentUserId, onNeedAuth, showToast, onOpe
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.04em" }}>{tr("creatorLabel")}</span>
           <div className="flex items-center gap-1 min-w-0">
             <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>{creator.nickname}</span>
-            <CreatorWreathBadge tier={Number(creator.creator_tier) || 0} size={16} />
             <ChevronRight size={14} color={T.muted} />
           </div>
           {/* Подтверждённый аккаунт в X — главный довод в пользу автора:
@@ -9076,12 +9075,6 @@ function PublicProfileView({ userId: ownerId, currentUserId, onBack, onOpenToken
         <div className="flex flex-col items-center gap-2" style={{ position: "relative", zIndex: 1, width: "100%" }}>
           <span style={{ position: "relative", fontFamily: displayFont, color: T.ice, fontSize: 20.5, fontWeight: 700, marginTop: 4 }}>
             {profile.nickname}
-            <span className="flex items-center" style={{
-              position: "absolute", left: "100%", top: "50%", transform: "translateY(-50%)",
-              marginLeft: 6, gap: 6,
-            }}>
-              <CreatorWreathBadge tier={creatorTier} size={19} />
-            </span>
           </span>
           <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, maxWidth: 260, lineHeight: 1.5 }}>
             {profile.bio || tr("bioEmptyPlaceholder")}
@@ -9206,234 +9199,6 @@ const PROFILE_CARDS = [
 const FRAME_BY_ID = Object.fromEntries(AVATAR_FRAMES.map(f => [f.id, f]));
 const CARD_BY_ID = Object.fromEntries(PROFILE_CARDS.map(c => [c.id, c]));
 
-/* Знак создателя — лавровый венок за капитализацию своего токена.
-
-   Ступени: 1 — контур ($1K), 2 — заливка ($10K), 3 — заливка со звездой
-   и свечением ($100K). Цифру внутрь не ставим: рядом с ником знак живёт
-   в 16–20px, и любой текст там превращается в кашу — уровень читается
-   по заливке и звезде.
-
-   Венок рисуется из двух веток по пять листиков. Листики расставлены по
-   дуге и к концу ветки мельчают — так растёт настоящий лавр, и без этого
-   венок выглядит штампованным. */
-const WREATH_LEAVES = 5;
-const WREATH_FROM = 34;   // угол первого листика от вертикали
-const WREATH_TO = 152;    // угол последнего — ветка почти смыкается внизу
-
-function wreathLeafPositions() {
-  const out = [];
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < WREATH_LEAVES; i++) {
-      const a = WREATH_FROM + ((WREATH_TO - WREATH_FROM) * i) / (WREATH_LEAVES - 1);
-      out.push({ side, deg: side * a, scale: 1 - i * 0.09, i });
-    }
-  }
-  return out;
-}
-const WREATH_POS = wreathLeafPositions();
-
-/* Ветер не дует по расписанию: у каждого листа своя длительность и своя
-   фаза. Задержка отрицательная — иначе первые секунды все листья стоят
-   ровно и трогаются разом, что и выглядит как рывок. */
-function wreathSwayTime(p) {
-  return `${(4.9 + p.i * 0.63 + (p.side > 0 ? 0.42 : 0)).toFixed(2)}s`;
-}
-function wreathSwayDelay(p) {
-  return `${-(p.i * 1.37 + (p.side > 0 ? 0.81 : 0)).toFixed(2)}s`;
-}
-
-// Дуга самой ветки — от первого листика к последнему.
-function wreathBranchPath(side) {
-  const cx = 30, cy = 32, r = 17;
-  const p = (deg) => {
-    const a = (deg * Math.PI) / 180;
-    return [cx + side * r * Math.sin(a), cy - r * Math.cos(a)];
-  };
-  const [x1, y1] = p(WREATH_FROM);
-  const [x2, y2] = p(WREATH_TO);
-  return `M${x1} ${y1} A ${r} ${r} 0 0 ${side > 0 ? 1 : 0} ${x2} ${y2}`;
-}
-
-function starPath(cx, cy, r) {
-  let d = "";
-  for (let i = 0; i < 5; i++) {
-    const ao = ((i * 72 - 90) * Math.PI) / 180;
-    const ai = ((i * 72 - 54) * Math.PI) / 180;
-    d += `${i ? "L" : "M"}${cx + r * Math.cos(ao)} ${cy + r * Math.sin(ao)} `;
-    d += `L${cx + r * 0.45 * Math.cos(ai)} ${cy + r * 0.45 * Math.sin(ai)} `;
-  }
-  return d + "Z";
-}
-
-const CreatorWreath = React.memo(function CreatorWreath({ tier = 0, size = 20, animate = true }) {
-  if (!tier) return null;
-  const filled = tier >= 2;
-  const fill = filled ? T.electric : "none";
-  const glow = tier >= 3 ? `drop-shadow(0 0 ${Math.max(3, size * 0.09)}px ${hexA(T.electric, 0.85)})` : "none";
-  return (
-    <svg
-      width={size} height={size} viewBox="0 0 60 60"
-      style={{ display: "block", overflow: "visible", filter: glow, flexShrink: 0 }}
-      aria-hidden="true"
-    >
-      {[-1, 1].map((side) => (
-        <path
-          key={side} d={wreathBranchPath(side)} fill="none"
-          stroke={T.electric} strokeWidth={1.6} strokeLinecap="round" opacity={0.85}
-        />
-      ))}
-      {WREATH_POS.map((p, idx) => (
-        // Качание висит на отдельной обёртке: css-свойство transform
-        // перебивает одноимённый атрибут целиком, и анимация прямо на
-        // этой группе сбила бы весь разворот листика по дуге.
-        <g key={idx} transform={`rotate(${p.deg} 30 32) translate(30 15) rotate(${p.side * -26})`}>
-          <g style={animate ? {
-            transformBox: "fill-box", transformOrigin: "50% 100%",
-            animation: `wreathSway ${wreathSwayTime(p)} ease-in-out ${wreathSwayDelay(p)} infinite`,
-          } : undefined}>
-            <g transform={`scale(${p.scale})`}>
-              <path
-                d="M0 0 C 4.2 -2.6 5 -7.4 0 -12 C -5 -7.4 -4.2 -2.6 0 0 Z"
-                fill={fill} stroke={filled ? "none" : T.electric} strokeWidth={1.5} strokeLinejoin="round"
-              />
-              <path d="M0 -0.6 L0 -11" stroke={filled ? T.bg : T.electric} strokeWidth={0.9} opacity={filled ? 0.45 : 0.9} />
-            </g>
-          </g>
-        </g>
-      ))}
-      {tier >= 3 && (
-        <path
-          d={starPath(30, 6.5, 6)} fill={T.electric}
-          style={animate ? {
-            transformBox: "fill-box", transformOrigin: "50% 50%",
-            animation: "wreathStar 4.5s ease-in-out infinite",
-          } : undefined}
-        />
-      )}
-    </svg>
-  );
-});
-
-/* Венок вокруг аватарки — из настоящих листьев с фона.
-
-   Рядом с ником знак живёт в 16–20px, там нужен простой силуэт, а вот
-   вокруг аватарки места хватает на клён, дуб и мяту со всеми прожилками.
-   Какой из трёх — выбирается в магазине, поэтому вид приходит снаружи. */
-const WREATH_LEAF_KINDS = [
-  // Порядок важен: номер в этом списке и есть то, что лежит в профиле.
-  { id: "mix", leaf: -1, label: { RU: "Все три", EN: "All three" } },
-  { id: "maple", leaf: 0, label: { RU: "Клён", EN: "Maple" } },
-  { id: "oak", leaf: 1, label: { RU: "Дуб", EN: "Oak" } },
-  { id: "mint", leaf: 2, label: { RU: "Мята", EN: "Mint" } },
-];
-const WREATH_LEAF_BY_ID = Object.fromEntries(WREATH_LEAF_KINDS.map((k) => [k.id, k]));
-
-// Расстановка та же, что у малого знака: пять листьев на ветку по дуге,
-// к верхнему разрыву мельчают. Размеры — в единицах картинки 200×200.
-const WREATH_BIG_R = 62;
-function wreathBigBranchPath(side) {
-  const cx = 100, cy = 100, r = WREATH_BIG_R;
-  const p = (deg) => {
-    const a = (deg * Math.PI) / 180;
-    return [cx + side * r * Math.sin(a), cy - r * Math.cos(a)];
-  };
-  const [x1, y1] = p(WREATH_FROM);
-  const [x2, y2] = p(WREATH_TO);
-  return `M${x1} ${y1} A ${r} ${r} 0 0 ${side > 0 ? 1 : 0} ${x2} ${y2}`;
-}
-
-const AvatarWreathArt = React.memo(function AvatarWreathArt({ tier = 0, kindId = "mix", size = 200, animate = true }) {
-  const glowId = React.useId();
-  if (!tier) return null;
-  // Вид листа берётся на каждый листик отдельно: в смешанном венке они
-  // чередуются клён — дуб — мята, причём по номеру места на ветке, так
-  // что левая и правая половины остаются зеркальными.
-  const pick = (WREATH_LEAF_BY_ID[kindId] || WREATH_LEAF_KINDS[0]).leaf;
-  const leafAt = (i) => LEAF_KINDS[pick < 0 ? i % LEAF_KINDS.length : pick];
-  const filled = tier >= 2;
-  const veinColor = filled ? T.bg : T.electric;
-
-  // Сам венок — без черенков: они торчали внутрь и ложились палками на
-  // аватарку. Лист крепится прямо к ветке, этого достаточно.
-  const renderBody = (moving) => (
-    <>
-      {[-1, 1].map((side) => (
-        <path
-          key={side} d={wreathBigBranchPath(side)} fill="none"
-          stroke={T.electric} strokeWidth={2.6} strokeLinecap="round" opacity={0.8}
-        />
-      ))}
-      {WREATH_POS.map((p, idx) => {
-        const kind = leafAt(p.i);
-        return (
-          <g key={idx} transform={`rotate(${p.deg} 100 100) translate(100 ${100 - WREATH_BIG_R})`}>
-            <g style={moving ? {
-              transformBox: "fill-box", transformOrigin: "50% 100%",
-              animation: `wreathSway ${wreathSwayTime(p)} ease-in-out ${wreathSwayDelay(p)} infinite`,
-              willChange: "transform",
-            } : undefined}>
-              <g transform={`rotate(${p.side * -14}) scale(${(1.12 * p.scale).toFixed(3)})`}>
-                <path d={kind.outline} fill={filled ? T.electric : "none"} stroke={T.electric} strokeWidth={filled ? 0.8 : 1.5} strokeLinejoin="round" />
-                {kind.veins.map((v, vi) => (
-                  <path key={vi} d={v} fill="none" stroke={veinColor} strokeWidth={0.8} opacity={filled ? 0.32 : 0.55} strokeLinecap="round" />
-                ))}
-              </g>
-            </g>
-          </g>
-        );
-      })}
-      {tier >= 3 && (
-        <path
-          d={starPath(100, 21, 19)} fill={T.electric}
-          style={moving ? {
-            transformBox: "fill-box", transformOrigin: "50% 50%",
-            animation: "wreathStar 4.5s ease-in-out infinite",
-          } : undefined}
-        />
-      )}
-    </>
-  );
-
-  return (
-    <svg
-      width={size} height={size} viewBox="0 0 200 200"
-      style={{ display: "block", overflow: "visible" }}
-      aria-hidden="true"
-    >
-      {/* Свечение — отдельным размытым слоем снизу, а не фильтром на всей
-          картинке: drop-shadow размывал и сами листья, и венок выглядел
-          мутным. Так гало есть, а края остаются острыми.
-
-          Слой свечения намеренно неподвижен. Пока он повторял анимацию,
-          браузер каждый кадр пересчитывал размытие и подгонял область
-          фильтра к целым пикселям — от этого вся конструкция чуть
-          подрагивала вверх-вниз. Неподвижное гало этого не делает, а на
-          глаз размытое пятно и не должно качаться вместе с листьями. */}
-      {tier >= 3 && (
-        <>
-          <defs>
-            <filter id={glowId} x="-40%" y="-40%" width="180%" height="180%">
-              <feGaussianBlur stdDeviation="4.5" />
-            </filter>
-          </defs>
-          <g filter={`url(#${glowId})`} opacity={0.7} aria-hidden="true">{renderBody(false)}</g>
-        </>
-      )}
-      {renderBody(animate)}
-    </svg>
-  );
-});
-
-/* Значки рядом с ником — венок создателя и подтверждение аккаунта.
-
-   Оба объясняют себя по нажатию, поэтому окно у них одно на двоих:
-   отличаются только картинкой и текстом. Значки висят и на чужих
-   профилях, где догадаться об их смысле неоткуда.
-
-   Окно уходит в портал: значок нередко лежит внутри кнопки перехода на
-   профиль и внутри блоков с обрезкой. */
-const WREATH_TIER_SUM = ["", "$1K", "$10K", "$100K"];
-
 /* BadgeSheet — карточка снизу: картинка вырастает, подпись проявляется
    вместе с ней. Не впритык к краям экрана, иначе читается как обрезанная
    полоса, а не как отдельное окно. */
@@ -9510,28 +9275,6 @@ function BadgeTap({ label, onOpen, children }) {
     >
       {children}
     </span>
-  );
-}
-
-function CreatorWreathBadge({ tier = 0, kindId = "mix", size = 19 }) {
-  const [open, setOpen] = useState(false);
-  if (!tier) return null;
-  const close = (e) => { if (e) { e.stopPropagation(); e.preventDefault(); } setOpen(false); };
-  return (
-    <>
-      <BadgeTap label={tr("wreathBadgeTitle")} onOpen={() => setOpen(true)}>
-        <CreatorWreath tier={tier} size={size} />
-      </BadgeTap>
-      {open && (
-        <BadgeSheet
-          onClose={close}
-          art={<AvatarWreathArt tier={tier} kindId={kindId} size={160} />}
-          title={tr("wreathBadgeTitle")}
-          subtitle={tr(`wreathTier${tier}`)}
-          text={trf("wreathBadgeBody", { sum: WREATH_TIER_SUM[tier] || "" })}
-        />
-      )}
-    </>
   );
 }
 
@@ -11202,6 +10945,186 @@ function ФонКлеток({ клетка = 26 }) {
   );
 }
 
+/* Живой фон витрины «в центре внимания» — три сюжета по кругу: огонь,
+ * падающие деньги и рост. Подборка листается раз в восемь секунд, и у
+ * каждого токена в ней свой фон: так смена токена видна сразу, а не
+ * только по тикеру.
+ *
+ * Холст, а не сотня элементов с CSS-анимацией: частиц много, они живут
+ * доли секунды, и пересоздавать под них узлы страницы — это лаги на
+ * телефоне. Кадры идут, только пока витрина на экране и вкладка открыта;
+ * при «уменьшить движение» рисуется один неподвижный кадр. */
+const ВИДЫ_ФОНА_СПОТЛАЙТА = ["огонь", "деньги", "рост"];
+function ФонСпотлайта({ вид }) {
+  const холстRef = useRef(null);
+  useEffect(() => {
+    const холст = холстRef.current;
+    if (!холст) return undefined;
+    const ctx = холст.getContext("2d");
+    if (!ctx) return undefined;
+    const тихо = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let w = 0, h = 0, dpr = 1;
+    const размер = () => {
+      const r = холст.getBoundingClientRect();
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      w = Math.max(1, r.width); h = Math.max(1, r.height);
+      холст.width = Math.round(w * dpr); холст.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    размер();
+    const сл = (a, b) => a + Math.random() * (b - a);
+    const частицы = [];
+
+    // Огонь: языки поднимаются от нижнего края, тускнеют и сжимаются.
+    // Цвет идёт от белёсо-жёлтого у основания к красному на кончике, а
+    // сложение «lighter» само даёт свечение там, где языки перекрываются.
+    function огонь(dt) {
+      for (let i = 0; i < Math.ceil(dt * 0.09); i++) {
+        частицы.push({ x: сл(0, w), y: h + сл(0, 12), r: сл(10, 26), vy: сл(40, 90), vx: сл(-8, 8), t: 0, life: сл(0.9, 1.7), фаза: сл(0, 6.3) });
+      }
+      ctx.clearRect(0, 0, w, h);
+      const низ = ctx.createLinearGradient(0, h, 0, h * 0.45);
+      низ.addColorStop(0, "rgba(255,90,20,0.30)");
+      низ.addColorStop(1, "rgba(255,90,20,0)");
+      ctx.fillStyle = низ; ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = частицы.length - 1; i >= 0; i--) {
+        const ч = частицы[i];
+        ч.t += dt / 1000;
+        const к = ч.t / ч.life;
+        if (к >= 1) { частицы.splice(i, 1); continue; }
+        ч.y -= ч.vy * dt / 1000;
+        ч.x += (ч.vx + Math.sin(ч.t * 6 + ч.фаза) * 14) * dt / 1000;
+        const r = ч.r * (1 - к * 0.75);
+        const g = ctx.createRadialGradient(ч.x, ч.y, 0, ч.x, ч.y, r);
+        const зел = Math.round(220 - к * 170);
+        g.addColorStop(0, `rgba(255,${зел},${Math.round(90 - к * 90)},${0.55 * (1 - к)})`);
+        g.addColorStop(1, "rgba(255,40,0,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(ч.x, ч.y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    // Деньги: купюры падают, покачиваясь и переворачиваясь, — переворот
+    // это сжатие по ширине, как у листа, который крутится в воздухе.
+    function купюра(ч) {
+      ctx.save();
+      ctx.translate(ч.x, ч.y);
+      ctx.rotate(ч.угол);
+      ctx.scale(Math.cos(ч.флип) || 0.05, 1);
+      ctx.globalAlpha = ч.a;
+      const bw = ч.s * 2.1, bh = ч.s;
+      ctx.fillStyle = "#1F8A4C";
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(-bw / 2, -bh / 2, bw, bh, 2); else ctx.rect(-bw / 2, -bh / 2, bw, bh);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(190,255,210,0.55)"; ctx.lineWidth = 1;
+      ctx.strokeRect(-bw / 2 + 2, -bh / 2 + 2, bw - 4, bh - 4);
+      ctx.fillStyle = "rgba(220,255,230,0.9)";
+      ctx.font = `700 ${Math.round(bh * 0.72)}px ${bodyFont}`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("$", 0, 1);
+      ctx.restore();
+    }
+    function деньги(dt) {
+      if (частицы.length < Math.round(w / 20) && Math.random() < dt * 0.02) {
+        частицы.push({ x: сл(0, w), y: -20, s: сл(9, 15), vy: сл(28, 60), угол: сл(-0.6, 0.6), vr: сл(-1.2, 1.2), флип: сл(0, 6.3), vf: сл(2, 5), фаза: сл(0, 6.3), t: 0, a: сл(0.3, 0.65) });
+      }
+      ctx.clearRect(0, 0, w, h);
+      for (let i = частицы.length - 1; i >= 0; i--) {
+        const ч = частицы[i];
+        ч.t += dt / 1000;
+        ч.y += ч.vy * dt / 1000;
+        ч.x += Math.sin(ч.t * 1.7 + ч.фаза) * 18 * dt / 1000;
+        ч.угол += ч.vr * dt / 1000;
+        ч.флип += ч.vf * dt / 1000;
+        if (ч.y > h + 30) { частицы.splice(i, 1); continue; }
+        купюра(ч);
+      }
+    }
+
+    // Рост: линия графика сама прорисовывается вверх слева направо, под
+    // ней заливка, на конце — светящаяся точка, а снизу поднимаются
+    // зелёные искры. Дошла до края — гаснет и рисуется новая.
+    let ряд = [], ход = 0;
+    const новыйРяд = () => {
+      ряд = []; let y = 0.95;
+      for (let i = 0; i <= 24; i++) { y -= сл(-0.02, 0.045); ряд.push(Math.max(0.42, Math.min(0.97, y))); }
+      ход = 0;
+    };
+    новыйРяд();
+    function рост(dt) {
+      ход += dt / 3200;
+      if (ход > 1.5) новыйРяд();
+      ctx.clearRect(0, 0, w, h);
+      const виден = Math.min(1, ход);
+      const гасн = ход > 1.15 ? Math.max(0, 1 - (ход - 1.15) / 0.35) : 1;
+      const n = ряд.length - 1;
+      const до = виден * n;
+      const точки = [];
+      for (let i = 0; i <= Math.floor(до); i++) точки.push([(i / n) * w, ряд[i] * h]);
+      const дробь = до - Math.floor(до);
+      if (Math.floor(до) < n) {
+        const a = ряд[Math.floor(до)], b = ряд[Math.floor(до) + 1];
+        точки.push([(до / n) * w, (a + (b - a) * дробь) * h]);
+      }
+      if (точки.length > 1) {
+        const з = ctx.createLinearGradient(0, 0, 0, h);
+        з.addColorStop(0, `rgba(0,233,107,${0.28 * гасн})`);
+        з.addColorStop(1, "rgba(0,233,107,0)");
+        ctx.beginPath(); ctx.moveTo(точки[0][0], h);
+        for (const [x, y] of точки) ctx.lineTo(x, y);
+        ctx.lineTo(точки[точки.length - 1][0], h); ctx.closePath();
+        ctx.fillStyle = з; ctx.fill();
+        ctx.beginPath(); ctx.moveTo(точки[0][0], точки[0][1]);
+        for (const [x, y] of точки) ctx.lineTo(x, y);
+        ctx.strokeStyle = `rgba(0,233,107,${0.85 * гасн})`; ctx.lineWidth = 2.4; ctx.lineJoin = "round";
+        ctx.shadowColor = "rgba(0,233,107,0.8)"; ctx.shadowBlur = 10; ctx.stroke(); ctx.shadowBlur = 0;
+        const [кx, кy] = точки[точки.length - 1];
+        ctx.fillStyle = `rgba(200,255,225,${гасн})`;
+        ctx.beginPath(); ctx.arc(кx, кy, 3.5, 0, Math.PI * 2); ctx.fill();
+      }
+      if (Math.random() < dt * 0.03) частицы.push({ x: сл(0, w), y: h + 4, vy: сл(25, 55), t: 0, life: сл(1.5, 3), r: сл(1, 2.4) });
+      for (let i = частицы.length - 1; i >= 0; i--) {
+        const ч = частицы[i];
+        ч.t += dt / 1000; ч.y -= ч.vy * dt / 1000;
+        const к = ч.t / ч.life;
+        if (к >= 1) { частицы.splice(i, 1); continue; }
+        ctx.fillStyle = `rgba(120,255,170,${0.7 * (1 - к)})`;
+        ctx.beginPath(); ctx.arc(ч.x, ч.y, ч.r, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    const кадр = вид === "огонь" ? огонь : вид === "деньги" ? деньги : рост;
+    if (тихо) {
+      // Один неподвижный кадр: сцену прогоняем вперёд, чтобы он не был пустым.
+      for (let i = 0; i < 90; i++) кадр(16);
+      return undefined;
+    }
+    let raf = 0, было = 0, видно = true;
+    const шаг = (ts) => {
+      const dt = было ? Math.min(50, ts - было) : 16;
+      было = ts;
+      кадр(dt);
+      raf = requestAnimationFrame(шаг);
+    };
+    const пуск = () => { if (!raf && видно && !document.hidden) { было = 0; raf = requestAnimationFrame(шаг); } };
+    const стоп = () => { if (raf) cancelAnimationFrame(raf); raf = 0; };
+    const io = typeof IntersectionObserver !== "undefined"
+      ? new IntersectionObserver(([e]) => { видно = e.isIntersecting; if (видно) пуск(); else стоп(); })
+      : null;
+    if (io) io.observe(холст);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(размер) : null;
+    if (ro) ro.observe(холст);
+    const вкладка = () => { if (document.hidden) стоп(); else пуск(); };
+    document.addEventListener("visibilitychange", вкладка);
+    пуск();
+    return () => { стоп(); if (io) io.disconnect(); if (ro) ro.disconnect(); document.removeEventListener("visibilitychange", вкладка); };
+  }, [вид]);
+  return <canvas ref={холстRef} aria-hidden style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", display: "block" }} />;
+}
+
 /* Витрина «в центре внимания».
  *
  * У токена с биржи есть своя шапка — та же, что рисуют на DexScreener,
@@ -11214,6 +11137,7 @@ function ФонКлеток({ клетка = 26 }) {
  * Без шапки всё по-прежнему: строка с аурой по цвету логотипа —
  * растягивать на треть экрана нечего. */
 function ВитринаСпотлайта({ token, всего = 1, активная = 0, onТочка, onOpen }) {
+  const вид = ВИДЫ_ФОНА_СПОТЛАЙТА[активная % ВИДЫ_ФОНА_СПОТЛАЙТА.length];
   const обложка = useОбложкаТокена(token);
   const xHandle = useXАвтора(token.ownerId) || token.xHandle || null;
   const строкаX = xHandle ? <span className="flex" style={{ marginTop: 4, minWidth: 0 }} onClick={(e) => e.stopPropagation()}><СсылкаXАвтора handle={xHandle} /></span> : null;
@@ -11262,6 +11186,7 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
           alt=""
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />
+        <ФонСпотлайта вид={вид} />
         {/* Подписи лежат на баннере, поэтому под ними — затемнение снизу
             вверх: по светлой картинке белый тикер не читается, а гасить
             её целиком незачем, её и показываем. */}
@@ -11300,6 +11225,7 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
           filter: "blur(40px) saturate(1.4)", opacity: token.logoUrl ? 0.5 : 0.2,
         }} />
         <span style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${hexA(T.surface, 0.1)} 0%, ${hexA(T.surface, 0.55)} 75%, ${hexA(T.surface, 0.8)} 100%)` }} />
+        <ФонСпотлайта вид={вид} />
       </span>
       <span style={{ position: "relative", zIndex: 1 }}>
         <TokenAvatar size={96} tone={рост ? "up" : "down"} src={token.logoUrl} />
@@ -28518,12 +28444,6 @@ function ProfileView({
               <div className="flex items-center justify-center mt-1">
                 <span style={{ position: "relative", fontFamily: displayFont, color: T.ice, fontSize: 20.5, fontWeight: 700 }}>
                   {profile.nickname}
-                  <span className="flex items-center" style={{
-                    position: "absolute", left: "100%", top: "50%", transform: "translateY(-50%)",
-                    marginLeft: 6, gap: 6,
-                  }}>
-                    <CreatorWreathBadge tier={creatorTier} size={19} />
-                  </span>
                 </span>
               </div>
               {/* Описание в две строки: длинное всё равно дочитывают на
