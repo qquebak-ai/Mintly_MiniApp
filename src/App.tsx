@@ -21364,13 +21364,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
               style={{ width: 32, height: 32, borderRadius: 999, background: T.surface, border: "none" }}>
               <Share2 size={14} color={T.paper} />
             </button>
-            {onManage && (
-              <button onClick={() => onManage(token)} className="fx-tap flex items-center justify-center"
-                aria-label={tr("manageBtn")}
-                style={{ width: 32, height: 32, borderRadius: 999, background: T.surface, border: "none" }}>
-                <Settings size={14} color={T.paper} />
-              </button>
-            )}
+            {/* Управления у запущенного токена нет: менять в нём нельзя ничего. */}
           </div>
         </div>
       </div>
@@ -21485,7 +21479,6 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
             изменить (только своему) и скопировать адрес. */}
         <div className="flex items-center" style={{ gap: 8 }}>
           <КнопкаДействия Значок={Share2} подпись={tr("actShare")} onClick={handleShare} />
-          {onManage && <КнопкаДействия Значок={Pencil} подпись={tr("actEdit")} onClick={() => onManage(token)} />}
           {token.tokenAddress && (
             <КнопкаДействия Значок={Copy} подпись={tr("actCopy")} onClick={() => copyContract({ тихо: true })} подсказка={tr("actCopied")} />
           )}
