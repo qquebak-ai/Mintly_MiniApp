@@ -603,7 +603,7 @@ const STR = {
     profileNotFound: "Профиль не найден",
     txLoadFailed: "Не удалось загрузить сделки — обновим через несколько секунд",
     aboutToken: "О токене",
-    securityTitle: "Безопасность", securityVerified: "Проверен", securityNetwork: "Сеть", securityCurve: "Свой токен площадки", yes: "Да", no: "Нет",
+    securityTitle: "Безопасность", securityVerified: "Проверен", securityNetwork: "Сеть", securityCurve: "Создан в Mintly", yes: "Да", no: "Нет",
     youPay: "Вы платите", youSell: "Вы продаёте", youReceive: "Вы получите",
     available: "Доступно",
     insufficientFunds: "Недостаточно средств для этой суммы",
@@ -5487,7 +5487,7 @@ const CHART_GUTTER = 76;
 /* Обёртка в memo намеренно: шапка пересчитывается на каждом кадре
    прокрутки, и без неё весь холст перерисовывался бы шестьдесят раз в
    секунду просто потому, что наверху сдвинулась подпись. */
-const TerminalChart = React.memo(function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt, onОкно = null, фиксШкалы = false }) {
+const TerminalChart = React.memo(function TerminalChart({ candles, height = 340, themeKey, onHover, tf, valueFmt, onОкно = null, фиксШкалы = false, метки = null }) {
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
   const [widthPx, setWidthPx] = useState(320);
@@ -5951,6 +5951,39 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       else ctx.rect(x - bodyW / 2, top, bodyW, h);
       ctx.fill();
       ctx.lineCap = "butt";
+    }
+    /* Кружки сделок над свечами: B/S — свои сделки с этого кошелька, D —
+       сделки создателя токена, их видят все. Свеча ищется по времени
+       сделки; несколько сделок в одной свече встают столбиком. */
+    if (метки && метки.length && n) {
+      const стопка = new Map();
+      const r = Math.max(6, Math.min(9, bodyW * 0.55));
+      ctx.font = `800 ${Math.round(r * 1.15)}px ${bodyFont}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const м of метки) {
+        // Последняя свеча, начавшаяся не позже сделки.
+        let lo = 0, hi = n - 1, i = -1;
+        while (lo <= hi) { const mid = (lo + hi) >> 1; if (candles[mid] && candles[mid].time <= м.time) { i = mid; lo = mid + 1; } else hi = mid - 1; }
+        if (i < startI || i >= endI || !candles[i]) continue;
+        const x = xFor(i);
+        if (x < -r || x > plotW + r) continue;
+        const c = i === n - 1 && ж.cur != null ? { ...candles[i], high: ж.hi } : candles[i];
+        if (!Number.isFinite(c.high)) continue;
+        const k = стопка.get(i) || 0;
+        стопка.set(i, k + 1);
+        if (k >= 3) continue;
+        const y = Math.max(r + 2, yFor(c.high) - r - 6 - k * (r * 2 + 3));
+        const покупка = м.side === "buy";
+        const цвет = покупка ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = м.dev ? "#F2C14E" : цвет;
+        ctx.fill();
+        if (м.dev) { ctx.lineWidth = 2; ctx.strokeStyle = цвет; ctx.stroke(); }
+        ctx.fillStyle = м.dev ? "#1A1200" : (покупка ? "#06210F" : "#FFFFFF");
+        ctx.fillText(м.dev ? "D" : (покупка ? "B" : "S"), x, y + 0.5);
+      }
     }
     ctx.restore();
 
@@ -11164,9 +11197,87 @@ function ФонСпотлайта({ вид }) {
       w = Math.max(1, r.width); h = Math.max(1, r.height);
       холст.width = Math.round(w * dpr); холст.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      нарисоватьПодложку();
     };
-    размер();
     const сл = (a, b) => a + Math.random() * (b - a);
+    /* Подложка — своя у каждой анимации и рисуется один раз на размер:
+       кадр только кладёт её готовой картинкой и рисует поверх частицы.
+       Случайность в ней своя, с постоянным зерном, чтобы подложка не
+       менялась при каждом повороте экрана. */
+    const подложка = document.createElement("canvas");
+    function нарисоватьПодложку() {
+      подложка.width = холст.width; подложка.height = холст.height;
+      const п = подложка.getContext("2d");
+      if (!п) return;
+      п.setTransform(dpr, 0, 0, dpr, 0, 0);
+      let зерно = 7;
+      const сз = (a, b) => { зерно = (зерно * 16807) % 2147483647; return a + ((зерно - 1) / 2147483646) * (b - a); };
+      if (вид === "огонь") {
+        // Угли: тёмный дымный верх, раскалённая полоса у низа, редкие
+        // светящиеся угольки и пелена дыма.
+        const г = п.createLinearGradient(0, 0, 0, h);
+        г.addColorStop(0, "#0B0706"); г.addColorStop(0.55, "#1A0B06"); г.addColorStop(0.85, "#3A1206"); г.addColorStop(1, "#5A1A05");
+        п.fillStyle = г; п.fillRect(0, 0, w, h);
+        for (let k = 0; k < 7; k++) {
+          const x = сз(0, w), y = сз(h * 0.1, h * 0.6), r = сз(w * 0.15, w * 0.35);
+          const д = п.createRadialGradient(x, y, 0, x, y, r);
+          д.addColorStop(0, "rgba(90,70,60,0.10)"); д.addColorStop(1, "rgba(90,70,60,0)");
+          п.fillStyle = д; п.beginPath(); п.arc(x, y, r, 0, Math.PI * 2); п.fill();
+        }
+        for (let k = 0; k < 26; k++) {
+          const x = сз(0, w), y = h - сз(2, h * 0.16), r = сз(6, 18);
+          const у = п.createRadialGradient(x, y, 0, x, y, r);
+          у.addColorStop(0, "rgba(255,170,60,0.55)"); у.addColorStop(0.5, "rgba(255,80,20,0.25)"); у.addColorStop(1, "rgba(255,60,10,0)");
+          п.fillStyle = у; п.beginPath(); п.arc(x, y, r, 0, Math.PI * 2); п.fill();
+        }
+      } else if (вид === "деньги") {
+        // Банкнота: глубокий зелёный, гильош тонкими волнами, рамка и
+        // мягкий свет сверху, как над столом в хранилище.
+        const г = п.createLinearGradient(0, 0, w, h);
+        г.addColorStop(0, "#04140B"); г.addColorStop(0.5, "#082818"); г.addColorStop(1, "#03100A");
+        п.fillStyle = г; п.fillRect(0, 0, w, h);
+        п.lineWidth = 0.6;
+        for (let k = 0; k < 18; k++) {
+          п.strokeStyle = `rgba(120,230,160,${0.05 + (k % 3) * 0.02})`;
+          п.beginPath();
+          for (let x = 0; x <= w; x += 4) {
+            const y = h * (0.15 + k * 0.045) + Math.sin(x / (18 + k) + k) * 6 + Math.sin(x / 7 + k * 2) * 1.5;
+            if (x === 0) п.moveTo(x, y); else п.lineTo(x, y);
+          }
+          п.stroke();
+        }
+        п.strokeStyle = "rgba(150,240,180,0.12)"; п.lineWidth = 1;
+        п.strokeRect(8, 8, w - 16, h - 16); п.strokeRect(12, 12, w - 24, h - 24);
+        const свет = п.createRadialGradient(w / 2, -h * 0.1, 0, w / 2, -h * 0.1, h * 0.9);
+        свет.addColorStop(0, "rgba(160,255,200,0.22)"); свет.addColorStop(1, "rgba(160,255,200,0)");
+        п.fillStyle = свет; п.fillRect(0, 0, w, h);
+      } else {
+        // Рост: тёмный терминал с сеткой и бледными свечами в глубине,
+        // зелёное зарево справа внизу — туда и уходит линия.
+        const г = п.createLinearGradient(0, 0, 0, h);
+        г.addColorStop(0, "#050A0D"); г.addColorStop(1, "#071510");
+        п.fillStyle = г; п.fillRect(0, 0, w, h);
+        п.strokeStyle = "rgba(140,200,180,0.07)"; п.lineWidth = 1;
+        for (let x = 0; x <= w; x += 28) { п.beginPath(); п.moveTo(x + 0.5, 0); п.lineTo(x + 0.5, h); п.stroke(); }
+        for (let y = 0; y <= h; y += 28) { п.beginPath(); п.moveTo(0, y + 0.5); п.lineTo(w, y + 0.5); п.stroke(); }
+        let цена = h * 0.8;
+        for (let x = 10; x < w; x += 14) {
+          const шаг = сз(-h * 0.05, h * 0.03);
+          const o = цена, c = Math.max(h * 0.15, Math.min(h * 0.92, цена + шаг));
+          const вверх = c < o;
+          п.strokeStyle = вверх ? "rgba(0,233,107,0.16)" : "rgba(255,77,94,0.13)";
+          п.fillStyle = п.strokeStyle;
+          п.beginPath(); п.moveTo(x, Math.min(o, c) - сз(2, 8)); п.lineTo(x, Math.max(o, c) + сз(2, 8)); п.stroke();
+          п.fillRect(x - 3, Math.min(o, c), 6, Math.max(2, Math.abs(c - o)));
+          цена = c;
+        }
+        const з = п.createRadialGradient(w * 0.85, h, 0, w * 0.85, h, h * 1.1);
+        з.addColorStop(0, "rgba(0,233,107,0.22)"); з.addColorStop(1, "rgba(0,233,107,0)");
+        п.fillStyle = з; п.fillRect(0, 0, w, h);
+      }
+    }
+    const основа = () => { ctx.clearRect(0, 0, w, h); ctx.drawImage(подложка, 0, 0, w, h); };
+    размер();
     const частицы = [];
 
     // Огонь: языки поднимаются от нижнего края, тускнеют и сжимаются.
@@ -11176,7 +11287,7 @@ function ФонСпотлайта({ вид }) {
       for (let i = 0; i < Math.ceil(dt * 0.09); i++) {
         частицы.push({ x: сл(0, w), y: h + сл(0, 12), r: сл(10, 26), vy: сл(40, 90), vx: сл(-8, 8), t: 0, life: сл(0.9, 1.7), фаза: сл(0, 6.3) });
       }
-      ctx.clearRect(0, 0, w, h);
+      основа();
       const низ = ctx.createLinearGradient(0, h, 0, h * 0.45);
       низ.addColorStop(0, "rgba(255,90,20,0.30)");
       низ.addColorStop(1, "rgba(255,90,20,0)");
@@ -11225,7 +11336,7 @@ function ФонСпотлайта({ вид }) {
       if (частицы.length < Math.round(w / 20) && Math.random() < dt * 0.02) {
         частицы.push({ x: сл(0, w), y: -20, s: сл(9, 15), vy: сл(28, 60), угол: сл(-0.6, 0.6), vr: сл(-1.2, 1.2), флип: сл(0, 6.3), vf: сл(2, 5), фаза: сл(0, 6.3), t: 0, a: сл(0.3, 0.65) });
       }
-      ctx.clearRect(0, 0, w, h);
+      основа();
       for (let i = частицы.length - 1; i >= 0; i--) {
         const ч = частицы[i];
         ч.t += dt / 1000;
@@ -11251,7 +11362,7 @@ function ФонСпотлайта({ вид }) {
     function рост(dt) {
       ход += dt / 3200;
       if (ход > 1.5) новыйРяд();
-      ctx.clearRect(0, 0, w, h);
+      основа();
       const виден = Math.min(1, ход);
       const гасн = ход > 1.15 ? Math.max(0, 1 - (ход - 1.15) / 0.35) : 1;
       const n = ряд.length - 1;
@@ -11332,7 +11443,6 @@ function ФонСпотлайта({ вид }) {
  * растягивать на треть экрана нечего. */
 function ВитринаСпотлайта({ token, всего = 1, активная = 0, onТочка, onOpen }) {
   const вид = ВИДЫ_ФОНА_СПОТЛАЙТА[активная % ВИДЫ_ФОНА_СПОТЛАЙТА.length];
-  const обложка = useОбложкаТокена(token);
   const xHandle = useXАвтора(token.ownerId) || token.xHandle || null;
   const строкаX = xHandle ? <span className="flex" style={{ marginTop: 4, minWidth: 0 }} onClick={(e) => e.stopPropagation()}><СсылкаXАвтора handle={xHandle} /></span> : null;
   const рост = token.change >= 0;
@@ -11362,63 +11472,17 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
     </>
   );
 
-  if (обложка) {
-    return (
-      <button
-        onClick={() => onOpen(token)}
-        className="fx-tap w-full text-left"
-        style={{
-          display: "block", width: "100%", padding: 0, border: "none", background: T.surface,
-          borderRadius: 16, overflow: "hidden", position: "relative",
-          // То же соотношение, что у самой шапки: при заполнении по ширине
-          // ничего не обрезается ни сверху, ни снизу.
-          aspectRatio: "3 / 1",
-        }}
-      >
-        <img
-          src={обложка}
-          alt=""
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-        />
-        <ФонСпотлайта вид={вид} />
-        {/* Подписи лежат на баннере, поэтому под ними — затемнение снизу
-            вверх: по светлой картинке белый тикер не читается, а гасить
-            её целиком незачем, её и показываем. */}
-        <span
-          className="flex items-center"
-          style={{
-            position: "absolute", left: 0, right: 0, bottom: 0, gap: 10, padding: "30px 12px 11px",
-            background: `linear-gradient(180deg, ${hexA(T.bg, 0)} 0%, ${hexA(T.bg, 0.72)} 52%, ${hexA(T.bg, 0.95)} 100%)`,
-          }}
-        >
-          <TokenAvatar size={34} tone={рост ? "up" : "down"} src={token.logoUrl} />
-          <span className="flex-1 min-w-0" style={{ display: "block" }}>
-            <span className="flex items-center" style={{ gap: 8 }}>{подписи}</span>
-            <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800, marginTop: 1, fontVariantNumeric: "tabular-nums" }}>
-              <ТекстСЧислами text={fmtUSD(token.mcapNum)} />
-            </span>
-            {строкаX}
-          </span>
-          {точки}
-        </span>
-      </button>
-    );
-  }
-
   /* Витрина — крупно: лицо токена посередине, под ним тикер, цифры и X.
      Строка в ширину терялась среди ленты и не читалась главным местом. */
   return (
     <button
       onClick={() => onOpen(token)}
       className="fx-tap w-full flex flex-col items-center text-center"
-      style={{ gap: 0, padding: "26px 18px 18px", borderRadius: 24, background: T.surface, border: "none", position: "relative", overflow: "hidden" }}
+      style={{ gap: 0, padding: "26px 18px 18px", borderRadius: 24, background: "#050505", border: "none", position: "relative", overflow: "hidden" }}
     >
+      {/* Фон — только сама анимация со своей подложкой: размытый
+          логотип и баннер под ней спорили с огнём и деньгами. */}
       <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: 24 }}>
-        <img src={token.logoUrl || "/logo-star.png"} alt="" style={{
-          position: "absolute", left: "50%", top: "38%", width: "130%", height: "auto", transform: "translate(-50%, -50%)",
-          filter: "blur(40px) saturate(1.4)", opacity: token.logoUrl ? 0.5 : 0.2,
-        }} />
-        <span style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${hexA(T.surface, 0.1)} 0%, ${hexA(T.surface, 0.55)} 75%, ${hexA(T.surface, 0.8)} 100%)` }} />
         <ФонСпотлайта вид={вид} />
       </span>
       <span style={{ position: "relative", zIndex: 1 }}>
@@ -20527,6 +20591,44 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
     };
   }, [currentUserId, token.tokenAddress, token.address]);
 
+  /* Кружки сделок на графике: свои — со своего кошелька (B/S), чужие
+     видны только у создателя (D). Свои читаются прямо из базы — политика
+     отдаёт человеку его строки, — а сделки создателя сводит сервер. */
+  const [меткиСделок, setМеткиСделок] = useState(null);
+  useEffect(() => {
+    let брошено = false;
+    setМеткиСделок(null);
+    const адрес = token.tokenAddress || token.address;
+    if (!адрес || token.демо) return undefined;
+    const читать = async () => {
+      const [свои, дев] = await Promise.all([
+        currentUserId
+          ? supabase.from("trades").select("side, created_at").eq("user_id", currentUserId).eq("token_address", адрес)
+            .order("created_at", { ascending: false }).limit(100).then((r) => r.data || []).catch(() => [])
+          : Promise.resolve([]),
+        fetch(апи(`/api/dev-trades?token=${encodeURIComponent(адрес)}`)).then((r) => r.json()).catch(() => null),
+      ]);
+      if (брошено) return;
+      const вСек = (iso) => Math.floor(new Date(iso).getTime() / 1000);
+      // Создатель — ты сам? Тогда твои кружки уже стоят как B/S.
+      const девЭтоЯ = !!(дев && дев.owner && дев.owner === currentUserId);
+      const метки = [
+        ...свои.map((с) => ({ time: вСек(с.created_at), side: с.side, dev: false })),
+        ...(девЭтоЯ ? [] : ((дев && дев.trades) || []).map((с) => ({ time: вСек(с.at), side: с.side, dev: true }))),
+      ].filter((м) => Number.isFinite(м.time)).sort((a, b) => a.time - b.time);
+      setМеткиСделок(метки);
+    };
+    читать();
+    const id = setInterval(читать, 15000);
+    const послеСделки = () => setTimeout(читать, 1500);
+    if (typeof window !== "undefined") window.addEventListener("mintly:сделка", послеСделки);
+    return () => {
+      брошено = true;
+      clearInterval(id);
+      if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", послеСделки);
+    };
+  }, [currentUserId, token.tokenAddress, token.address, token.демо]);
+
   /* Сколько стоит позиция. Не «количество × цена», а сколько монет
      вернёт продажа прямо сейчас: кривая по ходу сделки опускается, и
      оценка по последней цене завышала позицию — у человека, который сам
@@ -21365,7 +21467,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
               <ЗнакЗагрузки size={128} вид="контур" всегда />
             </div>
           ) : (
-            <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={этоПК() ? 720 : 360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} onОкно={chartMode === "price" ? setОкноГрафика : null} фиксШкалы={фиксШкалы} />
+            <TerminalChart key={`${token.id}-${tf}-${chartMode}`} candles={scaledCandles} height={этоПК() ? 720 : 360} themeKey={themeKey} onHover={setHovered} tf={tf} valueFmt={chartMode === "price" ? fmtPrice : fmtUSD} onОкно={chartMode === "price" ? setОкноГрафика : null} фиксШкалы={фиксШкалы} метки={меткиСделок} />
           )}
         </div>
 
@@ -21427,11 +21529,18 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             if (!(позиция != null && позиция > 0)) return null;
             const курсМонеты = token.chain === "solana" ? solUsd() : tonUsd();
             const вложеноUSD = вложено && курсМонеты > 0 ? вложено.вложено * курсМонеты : 0;
-            if (!(вложеноUSD > 0)) return null;
-            const итог = стоимостьПозиции - вложеноUSD;
+            /* Пока своих сделок не дочитали — ноль, а не пустое место:
+               строка не должна появляться рывком. Если весь проданный
+               кривой выпуск лежит у тебя, рынка кроме тебя нет, и
+               «прибыль» — это лишь комиссии сети, а не чья-то сделка:
+               тоже ноль. Плюс или минус появляется только от чужих сделок. */
+            const р = своя && своя.резервы;
+            const одинНаКривой = р && р.продано > 0 && Math.abs(р.продано - позиция) / р.продано < 0.001;
+            let итог = вложеноUSD > 0 && !одинНаКривой ? стоимостьПозиции - вложеноUSD : 0;
+            if (Math.abs(итог) < Math.max(0.01, вложеноUSD * 0.005)) итог = 0;
             const плюс = итог >= 0;
             return (
-              <span style={{ fontFamily: monoFont, fontSize: 12.5, color: плюс ? T.up : T.down }}>
+              <span style={{ fontFamily: monoFont, fontSize: 12.5, color: итог === 0 ? T.faint : плюс ? T.up : T.down }}>
                 {плюс ? "+" : "−"}<ТекстСЧислами text={fmtUSD(Math.abs(итог))} />
               </span>
             );
@@ -21548,7 +21657,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         заголовок={tr("securityTitle")}
         строки={[
           [tr("securityNetwork"), token.chain === "solana" ? "Solana" : "TON"],
-          [tr("securityCurve"), token.curveAddress ? tr("yes") : tr("no")],
+          // У Solana и EVM адреса кривой в карточке нет — свой токен узнаём
+          // по создателю из базы.
+          [tr("securityCurve"), (token.curveAddress || token.ownerId || token.демо) ? tr("yes") : tr("no")],
         ]}
       />
 
@@ -22047,7 +22158,13 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
   useНазадТелеграм(!!tokenProp, onClose);
   // Пока шторка уезжает, токена в пропсах уже нет — держим последний,
   // иначе на кадрах закрытия рисовать нечего и всё падает.
-  const [token, closing] = useClosing(tokenProp);
+  /* Картинка — снимок на момент открытия. Страница отдаёт сюда живые
+     цифры, и каждая сделка пересобирала картинку: окно мерцало и
+     дёргалось вслед за ценой. */
+  const снимок = useRef(null);
+  if (!tokenProp) снимок.current = null;
+  else if (!снимок.current || снимок.current.id !== tokenProp.id) снимок.current = tokenProp;
+  const [token, closing] = useClosing(снимок.current);
   const canvasRef = useRef(null);
   const blobRef = useRef(null);
   const [ready, setReady] = useState(false);
@@ -22063,7 +22180,6 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
   // самими числами.
   const curveRef = useRef(curve);
   curveRef.current = curve;
-  const raisedKey = curve ? `${curve.realTon}/${curve.graduationTon}/${curve.graduated}` : "";
 
   useEffect(() => {
     if (!token) return;
@@ -22082,7 +22198,7 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
       }
     })();
     return () => { cancelled = true; };
-  }, [token, raisedKey, holders, link, showToast]);
+  }, [token, holders, link, showToast]);
 
   if (!token) return null;
 
