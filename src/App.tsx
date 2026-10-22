@@ -30437,6 +30437,11 @@ function mapTokenRow(row) {
   const [walletHoldings, setWalletHoldings] = useState([]);
   const [holdingsReady, setHoldingsReady] = useState(false);
   const [holdingsTick, setHoldingsTick] = useState(0);
+  /* Список перечитываем, только когда меняется сам набор токенов. Живые
+     цифры ленты обновляют communityTokens по нескольку раз в секунду, и
+     от каждой правки обход остатков начинался заново — до конца он не
+     доходил ни разу, и свежий токен в «Твоих токенах» не появлялся. */
+  const ключТокенов = communityTokens.map((tok) => `${tok.id}:${tok.address || ""}`).join(",");
   useEffect(() => {
     if (!communityTokens.length) {
       setWalletHoldings([]);
@@ -30470,26 +30475,30 @@ function mapTokenRow(row) {
       // считанные запросы в секунду, а список может быть длинным.
       const list = communityTokens.filter((tok) => tok.address).slice(0, 14);
       const found = [];
-      for (const tok of list) {
-        if (cancelled) return;
+      // Разом, а не по очереди: по одному список из десятка токенов
+      // собирался секундами.
+      await Promise.all(list.map(async (tok) => {
         try {
           if (tok.chain === "solana") {
-            if (!солАдрес) continue;
+            if (!солАдрес) return;
             const п = new URLSearchParams({ wallet: солАдрес, mint: tok.address });
             const b = await fetch(апи(`/api/solana?action=balances&${п}`)).then((r) => r.json()).catch(() => null);
             const сколько = b && !b.error ? Number(b.token) || 0 : 0;
             if (сколько >= ПЫЛЬ_ТОКЕНОВ) found.push({ tok, amount: сколько });
-            continue;
+            return;
           }
-          if (!тонАдрес) continue;
+          if (!тонАдрес) return;
           const info = await fetchJettonAccount(tok.address, тонАдрес, TON_TESTNET);
           if (info && info.balance >= ПЫЛЬ_ТОКЕНОВ) found.push({ tok, amount: info.balance });
         } catch (e) { /* один не ответил — остальные всё равно нужны */ }
-      }
+      }));
+      if (cancelled) return;
+      // Порядок — как в ленте, а не как ответила сеть.
+      found.sort((a, b) => list.indexOf(a.tok) - list.indexOf(b.tok));
       if (!cancelled) { setWalletHoldings(found); setHoldingsReady(true); }
     })();
     return () => { cancelled = true; };
-  }, [connected, walletAddress, communityTokens, balanceRefreshTick, holdingsTick]);
+  }, [connected, walletAddress, ключТокенов, balanceRefreshTick, holdingsTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Остатки перечитываем, когда открывают кошелёк, и ещё дважды после
      своей сделки: узел Solana видит продажу не сразу, и через две с
