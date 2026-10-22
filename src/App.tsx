@@ -8350,24 +8350,42 @@ function SpotlightAura({ src, ticker }) {
 /* Пометка «тест» у токена из пробной сети. Монеты там ничего не стоят, а
    выглядит такой токен точно так же, как настоящий, — без подписи это
    ловушка для того, кто пришёл покупать. */
-/* Демо-токен — для всех, с пометкой «демо». Сделки по нему каждые
-   0,3 с разыгрывает сервер (api/live.js), в сети его нет: купить или
-   продать его нельзя, он только показывает, как быстро живут цифры. */
-const ДЕМО_MINT = "MintDemo1111111111111111111111111111111111";
-/* Когда демо-токен появился — по словам сервера (/api/live, demoCreated).
-   Страница токена держит свою копию строки, поэтому возраст демо-токена
-   берётся отсюда, а не из копии. */
-let демоСоздан = 0;
-const создано = (tok) => (tok && tok.демо && демоСоздан ? демоСоздан : tok && tok.createdAt);
-function создатьДемоТокен() {
-  return {
-    id: "demo-speed", демо: true, name: "Demo Speed", ticker: "DEMO", emoji: "⚡",
+/* Демо-токены — по одному в каждой сети, с пометкой «демо». Сделки по
+   ним разыгрывает сервер (api/live.js) в темпе блоков своей сети в
+   mainnet: Solana 0,4 с, BNB Chain 0,75 с, Base 2 с, TON около 2,5 с,
+   Ethereum 12 с. В сети их нет: купить или продать нельзя, они только
+   показывают, с какой скоростью будут жить цифры на боевой сети. */
+const ДЕМО_СЕТИ = {
+  ton: { mint: "MintDemo1111111111111111111111111111111111", chain: "ton", id: "demo-speed", имя: "Demo Speed", блок: "≈2,5 с" },
+  sol: { mint: "MintDemoSo1ana111111111111111111111111111111", chain: "solana", id: "demo-sol", имя: "Demo Solana", блок: "0,4 с" },
+  bsc: { mint: "MintDemoBsc11111111111111111111111111111111", chain: "bsc", id: "demo-bsc", имя: "Demo BNB", блок: "0,75 с" },
+  base: { mint: "MintDemoBase1111111111111111111111111111111", chain: "base", id: "demo-base", имя: "Demo Base", блок: "2 с" },
+  eth: { mint: "MintDemoEth11111111111111111111111111111111", chain: "eth", id: "demo-eth", имя: "Demo Ethereum", блок: "12 с" },
+};
+const ДЕМО_MINT = ДЕМО_СЕТИ.ton.mint;
+const ключДемо = (tok) => (tok && tok.демо ? (tok.демоСеть || "ton") : null);
+const mintДемо = (tok) => ДЕМО_СЕТИ[ключДемо(tok)] ? ДЕМО_СЕТИ[ключДемо(tok)].mint : ДЕМО_MINT;
+/* Курс монеты сети в долларах — для демо любой сети. */
+function курсСетиДемо(tok, курсTon) {
+  const к = ключДемо(tok);
+  if (к === "sol") return solUsd();
+  if (к && к !== "ton") return курсМонетыEVM(ДЕМО_СЕТИ[к].chain, КЕШ_КУРСОВ_EVM);
+  return курсTon > 0 ? курсTon : tonUsd();
+}
+/* Когда демо-токены появились — по словам сервера (/api/live, demos).
+   Страница токена держит свою копию строки, поэтому возраст берётся
+   отсюда, а не из копии. */
+const демоСозданы = {};
+const создано = (tok) => (tok && tok.демо && демоСозданы[ключДемо(tok)] ? демоСозданы[ключДемо(tok)] : tok && tok.createdAt);
+function создатьДемоТокены() {
+  return Object.entries(ДЕМО_СЕТИ).map(([к, с]) => ({
+    id: с.id, демо: true, демоСеть: к, name: с.имя, ticker: "DEMO", emoji: "⚡",
     verified: false, mcapNum: 0, liq: "0", vol: "0", change: 0, tx24h: 0,
     address: null, tokenAddress: null, poolAddress: null, dexPoolAddress: null, curveAddress: null,
-    logoUrl: null, description: "Тестовый токен: сделки каждые 0,3 секунды, чтобы видеть скорость обновления.",
-    network: "mainnet", chain: "ton", механики: { fair_start: false, buyback: false, live_chart: false },
-    замок: "none", ownerId: null, createdAt: демоСоздан || Date.now() - 60 * 1000, graduationTon: 85, raisedTon: 0,
-  };
+    logoUrl: null, description: `Демо-токен: сделка на каждый блок сети — раз в ${с.блок}, как в mainnet. Так видно, с какой скоростью живут цифры.`,
+    network: "mainnet", chain: с.chain, механики: { fair_start: false, buyback: false, live_chart: false },
+    замок: "none", ownerId: null, createdAt: демоСозданы[к] || Date.now() - 60 * 1000, graduationTon: 85, raisedTon: 0,
+  }));
 }
 function ПометкаДемо({ size = 10 }) {
   return (
@@ -20716,10 +20734,23 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const [демоСтата, setДемоСтата] = useState(null);
   /* Цифры демо-токена — с сервера, где его сделки и считаются: в копии
      строки, с которой открыта страница, их нет вовсе (стояли $0 и «—»). */
-  const курсДемо = tonPriceUsd > 0 ? tonPriceUsd : tonUsd();
+  const курсДемо = курсСетиДемо(token, tonPriceUsd);
   const цифрыДемо = token.демо && демоСтата ? {
     liq: fmtCompact(демоСтата.liquidity * курсДемо), vol: fmtCompact(демоСтата.vol24 * курсДемо), tx24h: демоСтата.tx24,
   } : null;
+  const [прирост, setПрирост] = useState({ объём: 0, сделок: 0 });
+  /* Живые цифры своего токена: ликвидность и «собрано» — из состояния
+     кривой, которое приходит каждые 0,3 с, объём и сделки — база обхода
+     плюс сделки, увиденные после открытия. Раньше вся статистика стояла
+     на копии строки с момента открытия карточки. */
+  const собраноЖиво = своя && своя.raised != null ? Number(своя.raised) : Number(token.raisedTon) || 0;
+  const курсЖивой = token.chain === "solana" ? solUsd() : этоEVM(token.chain) ? курсМонетыEVM(token.chain, КЕШ_КУРСОВ_EVM) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
+  const базаОбъёма = Number(token.vol24hNum) > 0 ? Number(token.vol24hNum) : (Number(token.vol24Ton) || 0) * курсЖивой;
+  const цифрыЖивые = цифрыДемо || (своя_кривая ? {
+    liq: курсЖивой > 0 && собраноЖиво > 0 ? fmtCompact(собраноЖиво * курсЖивой) : token.liq,
+    vol: прирост.объём > 0 ? fmtCompact(базаОбъёма + прирост.объём) : token.vol,
+    tx24h: (Number(token.tx24h) || 0) + прирост.сделок,
+  } : null);
   const держателейВсего = token.демо && демоСтата ? демоСтата.holders
     : holdersCount != null ? holdersCount : (info && info.holders) || null;
   useEffect(() => {
@@ -20748,11 +20779,19 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
      свежие сделки сверху ленты. Остальное (полный ряд свечей, кошельки
      в сделках) дочитывают обычные опросы ниже — уже не торопясь. */
   const [живыеСделки, setЖивыеСделки] = useState([]);
+  /* Сделки, пришедшие после открытия карточки: на них растут объём и
+     число сделок за сутки прямо на глазах. База — цифры обхода, с
+     которыми карточка открылась; первую пачку живых сделок он уже
+     учёл, поэтому её только запоминаем. */
   useEffect(() => {
     setЖивыеСделки([]);
+    setПрирост({ объём: 0, сделок: 0 });
+    const виденные = new Set();
+    let первая = true;
     const sol = token.chain === "solana" ? (token.tokenAddress || token.address) : null;
     const ton = !sol && !этоEVM(token.chain) && !token.poolAddress ? token.curveAddress : null;
-    const ключ = token.демо ? ДЕМО_MINT : sol || ton;
+    const ключ = token.демо ? mintДемо(token) : sol || ton;
+    const сетьДемо = ключДемо(token);
     if (!ключ) return undefined;
     let живо = true;
     let идёт = false;
@@ -20762,15 +20801,16 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
       if (идёт || document.visibilityState === "hidden") return;
       идёт = true;
       try {
-        const r = await живойЗапрос(token.демо ? `/api/live?demo=1${историяЕсть ? "" : "&history=1"}` : `/api/live?${sol ? "sol" : "ton"}=${encodeURIComponent(ключ)}`);
+        const r = await живойЗапрос(token.демо ? `/api/live?demo=${сетьДемо}${историяЕсть ? "" : `&history=${сетьДемо}`}` : `/api/live?${sol ? "sol" : "ton"}=${encodeURIComponent(ключ)}`);
         const j = r.ok ? await r.json() : null;
         /* Демо: свечи из истории цен, что копит сервер, — по одной на
            шаг выбранного интервала, без пустых свечей впереди. */
-        if (token.демо && j && j.demoCreated > 0) демоСоздан = j.demoCreated;
-        if (token.демо && j && j.demoStats) setДемоСтата(j.demoStats);
+        const д = token.демо && j && j.demos ? j.demos[сетьДемо] : null;
+        if (д && д.created > 0) демоСозданы[сетьДемо] = д.created;
+        if (д && д.stats) setДемоСтата(д.stats);
         if (token.демо && !историяЕсть && j && Array.isArray(j.history)) {
           историяЕсть = true;
-          const курсИ = tonPriceUsd > 0 ? tonPriceUsd : tonUsd();
+          const курсИ = курсСетиДемо(token, tonPriceUsd);
           const шагTf = TF_SECONDS[tf] || 60;
           const свечи = [];
           for (const [мс, ц] of j.history) {
@@ -20785,9 +20825,19 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         }
         const к = j && j.curves && j.curves[ключ];
         if (!живо || !к || !(к.price > 0)) return;
-        const курс = sol ? solUsd() : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
+        const курс = token.демо ? курсСетиДемо(token, tonPriceUsd) : sol ? solUsd() : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
         const курсГрафика = sol ? (курсSolДляГрафика > 0 ? курсSolДляГрафика : курс) : курс;
         const сделки = (j.trades && j.trades[ключ]) || [];
+        if (!token.демо) {
+          let объём = 0, сделок = 0;
+          for (const с of сделки) {
+            if (виденные.has(с.id)) continue;
+            виденные.add(с.id);
+            if (!первая) { объём += (Number(с.coin) || 0) * курс; сделок += 1; }
+          }
+          первая = false;
+          if (сделок) setПрирост((п) => ({ объём: п.объём + объём, сделок: п.сделок + сделок }));
+        }
         setЖивыеСделки((было) => (было.length === сделки.length && (!сделки.length || было[0].id === `live-${сделки[0].id}`)) ? было
           : сделки.map((с) => ({
             id: `live-${с.id}`, kind: с.side, volTon: с.coin, volUsd: с.coin * курс,
@@ -21306,10 +21356,10 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         строки={[
           // Капитализация — та же живая, что в шапке: копия строки отстаёт.
           [t("marketCapLabel"), fmtUSD(капОкна)],
-          [tr("statVolume24h"), `$${(цифрыДемо || token).vol}`],
-          [tr("statLiquidity"), `$${(цифрыДемо || token).liq}`],
+          [tr("statVolume24h"), `$${(цифрыЖивые || token).vol}`],
+          [tr("statLiquidity"), `$${(цифрыЖивые || token).liq}`],
           token.chain === "solana"
-            ? [tr("statTx24h"), ((цифрыДемо || token).tx24h || 0).toLocaleString("ru-RU")]
+            ? [tr("statTx24h"), ((цифрыЖивые || token).tx24h || 0).toLocaleString("ru-RU")]
             : [tr("statHolders"), держателейВсего == null ? "—" : держателейВсего.toLocaleString("ru-RU")],
           [tr("statAge"), fmtAge(создано(token)) || "—"],
         ]}
@@ -21343,13 +21393,13 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
         <div className="fx-swap flex flex-col" style={{ gap: 0 }}>
           {[
             [tr("statMcap"), fmtUSD(капОкна)],
-            [tr("statLiq"), `$${(цифрыДемо || token).liq ?? "—"}`],
-            [tr("statVol24"), `$${(цифрыДемо || token).vol ?? "—"}`],
-            [tr("statTrades24"), ((цифрыДемо || token).tx24h || 0).toLocaleString("ru-RU")],
+            [tr("statLiq"), `$${(цифрыЖивые || token).liq ?? "—"}`],
+            [tr("statVol24"), `$${(цифрыЖивые || token).vol ?? "—"}`],
+            [tr("statTrades24"), ((цифрыЖивые || token).tx24h || 0).toLocaleString("ru-RU")],
             [tr("statHolders"), держателейВсего == null ? "—" : держателейВсего.toLocaleString("ru-RU")],
             [tr("statAge"), fmtAge(создано(token)) || "—"],
             ...(token.graduationTon > 0
-              ? [[tr("statCurve"), `${Math.round(Math.min(1, (Number(token.raisedTon) || 0) / token.graduationTon) * 100)}%`]]
+              ? [[tr("statCurve"), `${Math.round(Math.min(1, собраноЖиво / ((своя && своя.цель) || token.graduationTon)) * 100)}%`]]
               : []),
             ...(token.dexName ? [[tr("statDex"), token.dexName]] : []),
           ].map(([подпись, значение], i) => (
@@ -30067,7 +30117,10 @@ function mapTokenRow(row) {
     });
     // Демо-токен держим первым и не пересоздаём: иначе каждое
     // перечитывание ленты сбрасывало бы его живые цифры.
-    setCommunityTokens((prev) => [prev.find((tok) => tok.демо) || создатьДемоТокен(), ...rows]);
+    setCommunityTokens((prev) => {
+      const прежние = prev.filter((tok) => tok.демо);
+      return [...(прежние.length === Object.keys(ДЕМО_СЕТИ).length ? прежние : создатьДемоТокены()), ...rows];
+    });
     setCommunityLoaded(true);
     дополнитьSolanaРынком(rows);
 
@@ -30716,11 +30769,11 @@ function mapTokenRow(row) {
       const ряд = списокДляЖивого.current;
       const sol = ряд.filter((tok) => tok.chain === "solana" && tok.address).map((tok) => tok.address);
       const ton = ряд.filter((tok) => tok.chain !== "solana" && !этоEVM(tok.chain) && tok.curveAddress).map((tok) => tok.curveAddress);
-      const демо = ряд.some((tok) => tok.демо);
-      if (!sol.length && !ton.length && !демо) return;
+      const демо = [...new Set(ряд.filter((tok) => tok.демо).map(ключДемо))];
+      if (!sol.length && !ton.length && !демо.length) return;
       идёт = true;
       try {
-        const r = await живойЗапрос(`/api/live?sol=${sol.join(",")}&ton=${ton.join(",")}${демо ? "&demo=1" : ""}`);
+        const r = await живойЗапрос(`/api/live?sol=${sol.join(",")}&ton=${ton.join(",")}${демо.length ? `&demo=${демо.join(",")}` : ""}`);
         const j = r.ok ? await r.json() : null;
         if (!живо || !j || !j.curves) return;
         const курсSol = solUsd();
@@ -30728,18 +30781,19 @@ function mapTokenRow(row) {
         const подставить = (prev) => {
           let тронуто = false;
           const следующий = prev.map((tok) => {
-            const к = j.curves[tok.демо ? ДЕМО_MINT : tok.chain === "solana" ? tok.address : tok.curveAddress];
+            const к = j.curves[tok.демо ? mintДемо(tok) : tok.chain === "solana" ? tok.address : tok.curveAddress];
             // Возраст демо-токена — с сервера: там он живёт с первого
             // запуска, а своё «минуту назад» телефон ставил при каждом открытии.
-            if (j.demoCreated > 0) демоСоздан = j.demoCreated;
-            if (tok.демо && j.demoCreated > 0 && tok.createdAt !== j.demoCreated) { тронуто = true; tok = { ...tok, createdAt: j.demoCreated }; }
-            if (tok.демо && j.demoStats) {
-              const ст = j.demoStats, курсД = курсTon;
+            const д = tok.демо && j.demos ? j.demos[ключДемо(tok)] : null;
+            if (д && д.created > 0) демоСозданы[ключДемо(tok)] = д.created;
+            if (д && д.created > 0 && tok.createdAt !== д.created) { тронуто = true; tok = { ...tok, createdAt: д.created }; }
+            if (д && д.stats) {
+              const ст = д.stats, курсД = курсСетиДемо(tok, курсTon);
               const цифры = { tx24h: ст.tx24, holders: ст.holders, vol: fmtCompact(ст.vol24 * курсД), liq: fmtCompact(ст.liquidity * курсД), vol24hNum: ст.vol24 * курсД, xHandle: ст.x || null };
               if (tok.tx24h !== цифры.tx24h || tok.holders !== цифры.holders || tok.vol !== цифры.vol || tok.xHandle !== цифры.xHandle) { тронуто = true; tok = { ...tok, ...цифры }; }
             }
             if (!к || !(к.price > 0) || (tok.priceTon === к.price && tok.raisedTon === к.raised)) return tok;
-            const курс = tok.chain === "solana" ? курсSol : курсTon;
+            const курс = tok.демо ? курсСетиДемо(tok, курсTon) : tok.chain === "solana" ? курсSol : курсTon;
             тронуто = true;
             /* Процент за сутки — вместе с ценой. Цену суточной давности
                выводим один раз из того процента, что пришёл с лентой, и
@@ -31654,7 +31708,9 @@ function mapTokenRow(row) {
     // обращении к цене. Приводим к общему виду ленты.
     // Токены сетей EVM открываются своей карточкой: экран токена TON и
     // Solana читает кривую своих цепочек и в EVM показал бы нули.
-    if (этоEVM(t.chain)) {
+    // Демо-токены EVM — обычной карточкой: их цифры живут в api/live, а
+    // не на кривой сети, которую читает карточка EVM.
+    if (этоEVM(t.chain) && !t.демо) {
       setEvmТокен(t.price == null ? localTokenToFeedShape(t) : t);
       return;
     }
