@@ -23479,7 +23479,6 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
               <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 4 }}>
                 <ТекстСЧислами text={`0 — без покупки, до ${число(верх)} ${единица}`} />
               </span>
-              <ВыборСкорости сеть={сетьЗапуска} style={{ marginTop: 14 }} />
             </>
           );
         })()}

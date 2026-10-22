@@ -151,7 +151,7 @@ export async function продатьВнутреннимTON({ tokenId, коли�
 
 export async function запуститьВнутренним({ имя, тикер, взносSol = 0 }) {
   return await запрос("/api/wallet-solana?action=launch", {
-    name: имя, ticker: тикер, buySol: взносSol, speed: скоростьСделки(), requestKey: ключЗапроса(),
+    name: имя, ticker: тикер, buySol: взносSol, requestKey: ключЗапроса(),
   });
 }
 
@@ -338,7 +338,7 @@ export async function состояниеEVM() {
 
 export async function запуститьEVM({ сеть, имя, тикер, metadataUrl, взнос = 0 }) {
   return await запрос(апи("/api/wallet-evm?action=launch"), {
-    chain: сеть, name: имя, ticker: тикер, metadataUrl, buyAmount: взнос, speed: скоростьСделки(), requestKey: ключЗапроса(),
+    chain: сеть, name: имя, ticker: тикер, metadataUrl, buyAmount: взнос, speed: "normal", requestKey: ключЗапроса(),
   });
 }
 
