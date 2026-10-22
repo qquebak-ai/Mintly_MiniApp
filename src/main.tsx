@@ -214,3 +214,27 @@ function нарисовать() {
    уже состоявшегося входа. Отрисовку не блокируем ошибкой обмена — без
    сессии сайт всё равно должен открыться. */
 разобратьВозвратOAuth().catch(() => {}).then(нарисовать);
+
+/* Свежая сборка без ручного перезапуска. Telegram держит мини-приложение
+   открытым часами, и после выкладки человек продолжал видеть старый вид.
+   Когда приложение снова выходит на экран, сверяем свой файл сборки с тем,
+   что отдаёт сайт; разошлись — перезагружаемся. Посреди работы не
+   дёргаем: только при возвращении из фона, не чаще раза в минуту. */
+(() => {
+  if (typeof document === "undefined") return;
+  const свой = [...document.scripts].map((s) => s.src).find((src) => /\/assets\/index-[\w-]+\.js/.test(src));
+  if (!свой) return; // разработка: сборки нет
+  const имя = свой.match(/index-[\w-]+\.js/)[0];
+  let проверено = 0;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || Date.now() - проверено < 60000) return;
+    проверено = Date.now();
+    fetch(`/?v=${Date.now()}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.text() : ""))
+      .then((html) => {
+        const там = (html.match(/index-[\w-]+\.js/) || [])[0];
+        if (там && там !== имя) window.location.reload();
+      })
+      .catch(() => {});
+  });
+})();
