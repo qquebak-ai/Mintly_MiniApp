@@ -2825,6 +2825,11 @@ function GlobalStyle() {
         62%  { opacity: 1; transform: translateX(-50%) translateY(3px) scale(1.015); }
         100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
       }
+      @keyframes тостВход {
+        0%   { opacity: 0; transform: translateY(-120%) scale(0.9); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes тостУход { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-130%) scale(0.96); } }
       @keyframes toastOut { from{opacity:1; transform:translateX(-50%) translateY(0) scale(1);} to{opacity:0; transform:translateX(-50%) translateY(-22px) scale(0.98);} }
       @keyframes rocketUp { 0%{ transform:translateY(0) scale(0.75); opacity:0; } 18%{ opacity:0.9; } 100%{ transform:translateY(-70px) scale(1); opacity:0; } }
       @keyframes emberFall { 0%{ transform:translateY(-4px) scale(0.5); opacity:0; } 15%{ opacity:0.9; } 75%{ opacity:0.55; } 100%{ transform:translateY(60px) scale(1.1); opacity:0; } }
@@ -7829,164 +7834,143 @@ function ЖивоеЧисло({ текст, className = "", style = {} }) {
   return <УмныйТекст text={текст} className={className} style={style} />;
 }
 
-function Toast({ toast, insetTop = 0, onClose = () => {} }) {
+/* Уведомления стопкой, как баннеры iOS. Новое приходит сверху, прежние
+   не пропадают, а уходят под него краешками стекла — видно, что их
+   несколько, и ни одно не теряется. Каждая карточка сама считает свою
+   жизнь и сама уходит; смахнуть или ткнуть можно только верхнюю. */
+const ТОСТ_ЦВЕТ = {
+  удача: ["#3BDB86", "#1E9F5A"],
+  отказ: ["#FF6F7C", "#D9334A"],
+  подсказка: ["#5A5A63", "#2E2E35"],
+};
+
+function КарточкаТоста({ т, глубина, onClose }) {
   const [тяга, setТяга] = useState(0);
   const [уходит, setУходит] = useState(false);
-  /* Появление — это CSS-анимация, а она перекрывает inline-стиль: пока
-     она висит на элементе (а с fill-mode висит и после конца), сдвиг за
-     пальцем не применяется — карточка не двигается вовсе. */
-  const [появилась, setПоявилась] = useState(false);
   const жест = useRef(null);
-
-  /* Всё время жизни карточка считает сама, по часам, и никакие внешние
-     таймеры в этом не участвуют: раньше их сбрасывал каждый следующий
-     вызов, и карточка то исчезала мгновенно, то висела вдвое дольше
-     срока, то оставалась до перезагрузки. */
   const закрытьRef = useRef(onClose);
   useEffect(() => { закрытьRef.current = onClose; }, [onClose]);
+  const убрать = useCallback(() => {
+    setУходит(true);
+    setTimeout(() => закрытьRef.current(), TOAST_OUT_MS);
+  }, []);
+  /* Срок по часам, а не одним таймером: ушедшая в фон вкладка
+     притормаживает таймеры, и карточка висела бы дольше обещанного. */
   useEffect(() => {
-    if (!toast) return;
-    setТяга(0);
-    setУходит(false);
-    setПоявилась(false);
     const показано = Date.now();
     const id = setInterval(() => {
-      const прошло = Date.now() - показано;
-      if (прошло > 520) setПоявилась(true);
-      if (прошло >= ЖИЗНЬ_ТОСТА) setУходит(true);
-      if (прошло >= ЖИЗНЬ_ТОСТА + TOAST_OUT_MS) {
-        clearInterval(id);
-        закрытьRef.current();
-      }
-    }, 120);
+      if (Date.now() - показано >= ЖИЗНЬ_ТОСТА) { clearInterval(id); убрать(); }
+    }, 150);
     return () => clearInterval(id);
-  }, [toast]);
+  }, [убрать]);
 
-  if (!toast) return null;
+  const { вид, заголовок, текст } = разобратьТост(т.текст);
+  const [с1, с2] = ТОСТ_ЦВЕТ[вид] || ТОСТ_ЦВЕТ.удача;
+  const Значок = вид === "отказ" ? AlertTriangle : вид === "подсказка" ? Info : Check;
+  const верхняя = глубина === 0;
 
-  const { вид, заголовок, текст } = разобратьТост(toast.текст);
-  const цвет = вид === "отказ" ? "#FF5C6B" : вид === "подсказка" ? "#E4E1DA" : "#31D07B";
-  const Значок = вид === "отказ" ? AlertTriangle : вид === "подсказка" ? Info : CheckCircle2;
-
-  function начало(e) {
-    const т = e.touches && e.touches[0];
-    if (т) жест.current = { y0: т.clientY };
-  }
-  function ход(e) {
-    const т = e.touches && e.touches[0];
-    if (!жест.current || !т) return;
-    // Вверх тянется свободно, вниз — почти нет: карточка живёт у верхней
-    // кромки, и тащить её вглубь экрана некуда.
-    const dy = т.clientY - жест.current.y0;
-    // Путь держим в самом жесте, а не в состоянии: состояние приезжает
-    // следующим кадром, и при быстром смахивании в конце жеста оно ещё
-    // нулевое — карточка оставалась на месте.
+  const начать = (y) => { if (верхняя) жест.current = { y0: y, путь: 0 }; };
+  const вести = (y) => {
+    if (!жест.current) return;
+    const dy = y - жест.current.y0;
     жест.current.путь = dy;
-    setТяга(dy < 0 ? dy : dy * 0.18);
-  }
-  function конец() {
-    const ушло = жест.current && жест.current.путь != null ? жест.current.путь : тяга;
+    // Вниз карточка почти не тянется: она живёт у верхней кромки.
+    setТяга(dy < 0 ? dy : dy * 0.15);
+  };
+  const кончить = () => {
+    const путь = жест.current ? жест.current.путь : 0;
     жест.current = null;
-    // Порог мягкий: короткого движения вверх достаточно.
-    if (ушло < -24) { setУходит(true); setTimeout(() => закрытьRef.current(), TOAST_OUT_MS); return; }
+    if (путь < -22) { haptic("light"); убрать(); return; }
     setТяга(0);
-  }
-  function началоУк(e) {
-    if (e.pointerType === "touch") return;
-    жест.current = { y0: e.clientY };
-  }
-  function ходУк(e) {
-    if (e.pointerType === "touch" || !жест.current) return;
-    const dy = e.clientY - жест.current.y0;
-    жест.current.путь = dy;
-    setТяга(dy < 0 ? dy : dy * 0.18);
-  }
-  function конецУк(e) {
-    if (e.pointerType === "touch") return;
-    конец();
-  }
+  };
 
-  /* Порталом и выше всего: карточку показывают и поверх листов —
-     «Получить», настроек, окна сделки. Пока она жила внутри страницы,
-     лист её просто накрывал, и человек не видел ни удачи, ни отказа. */
-  return createPortal(
+  /* Нижние карточки — только краешки: та же форма, что у верхней,
+     сдвинута вниз и ужата. Их текст спрятан, иначе он просвечивал бы
+     сквозь стекло верхней. */
+  const сдвиг = глубина * 9 + тяга;
+  return (
     <div
-      /* Та же пометка, что у листов: без неё main.tsx отдаёт
-         вертикальный жест Telegram — карточка висит у верхней кромки, а
-         там окно забирает движение себе, и смахнуть её было нельзя. */
-      data-sheet="1"
-      onTouchStart={начало}
-      onTouchMove={ход}
-      onTouchEnd={конец}
-      onTouchCancel={конец}
-      onPointerDown={началоУк}
-      onPointerMove={ходУк}
-      onPointerUp={конецУк}
-      onPointerCancel={конецУк}
-      /* Нажатие тоже убирает: если жест почему-то не прошёл, у человека
-         всегда остаётся простой способ — ткнуть. */
-      onClick={() => { setУходит(true); setTimeout(() => закрытьRef.current(), TOAST_OUT_MS); }}
-      onAnimationEnd={() => { if (!уходит) setПоявилась(true); }}
+      onTouchStart={(e) => e.touches[0] && начать(e.touches[0].clientY)}
+      onTouchMove={(e) => e.touches[0] && вести(e.touches[0].clientY)}
+      onTouchEnd={кончить}
+      onTouchCancel={кончить}
+      onPointerDown={(e) => { if (e.pointerType !== "touch") начать(e.clientY); }}
+      onPointerMove={(e) => { if (e.pointerType !== "touch") вести(e.clientY); }}
+      onPointerUp={(e) => { if (e.pointerType !== "touch") кончить(); }}
+      onClick={() => { if (верхняя) убрать(); }}
       style={{
-        position: "fixed", top: insetTop + 14, left: "50%", zIndex: 620,
-        width: "calc(100% - 28px)", maxWidth: 420,
-        willChange: "transform, opacity",
-        animation: уходит
-          ? `toastOut ${TOAST_OUT_MS}ms cubic-bezier(0.4,0,1,1) both`
-          : (появилась ? "none" : "toastCardIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both"),
-        transform: `translateX(-50%) translateY(${тяга}px)`,
-        transition: жест.current ? "none" : "transform 260ms cubic-bezier(0.22, 0.85, 0.25, 1)",
-        // Жест целиком наш: при pan-y браузер забирал вертикальное
-        // движение себе.
+        position: верхняя ? "relative" : "absolute", inset: верхняя ? undefined : 0,
+        zIndex: 10 - глубина,
+        transform: `translateY(${сдвиг}px) scale(${1 - глубина * 0.05})`,
+        transformOrigin: "50% 100%",
+        transition: жест.current ? "none" : "transform 420ms cubic-bezier(0.22, 1.25, 0.36, 1), opacity 300ms ease",
+        opacity: глубина > 1 ? 0.55 : 1,
+        pointerEvents: верхняя ? "auto" : "none",
         touchAction: "none",
       }}
     >
-      {/* Карточка не следует теме приложения: как и системные
-          уведомления, она всегда тёмное стекло со светлым текстом —
-          иначе на белой теме белое на белом. */}
       <div
-        className="flex items-center"
         style={{
-          position: "relative", overflow: "hidden",
-          gap: 11, padding: "12px 14px", borderRadius: 18,
-          background: "rgba(22,22,26,0.86)",
-          backdropFilter: "blur(18px) saturate(1.2)",
-          WebkitBackdropFilter: "blur(18px) saturate(1.2)",
-          border: "1px solid rgba(255,255,255,0.10)",
-          boxShadow: "0 14px 38px rgba(0,0,0,0.45)",
+          animation: уходит
+            ? `тостУход ${TOAST_OUT_MS}ms cubic-bezier(0.4, 0, 1, 1) both`
+            : "тостВход 560ms cubic-bezier(0.2, 1.25, 0.32, 1) both",
+          display: "flex", alignItems: текст ? "flex-start" : "center", gap: 11,
+          padding: "11px 14px 12px 11px", borderRadius: 24, height: "100%", boxSizing: "border-box",
+          // Всегда тёмное стекло, как системные баннеры: на светлой теме
+          // белая карточка на белом потерялась бы.
+          background: глубина ? "rgba(44,44,50,0.8)" : "rgba(28,28,33,0.74)",
+          backdropFilter: "blur(30px) saturate(1.8)",
+          WebkitBackdropFilter: "blur(30px) saturate(1.8)",
+          border: "0.5px solid rgba(255,255,255,0.16)",
+          boxShadow: верхняя ? "0 18px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)" : "0 8px 20px rgba(0,0,0,0.35)",
         }}
       >
-        {/* Цвет держит только значок и тонкая кромка слева: заливать
-            цветом всю карточку — кричать там, где достаточно сказать. */}
         <span aria-hidden style={{
-          position: "absolute", left: 0, top: 12, bottom: 12, width: 3,
-          borderRadius: 999, background: цвет, opacity: 0.9,
-        }} />
-        <span
-          className="flex items-center justify-center flex-shrink-0"
-          style={{ width: 30, height: 30, borderRadius: 12, background: hexA(цвет, 0.16) }}
-        >
-          <Значок size={16} color={цвет} />
+          width: 38, height: 38, borderRadius: 11, flexShrink: 0,
+          background: `linear-gradient(160deg, ${с1}, ${с2})`,
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          opacity: верхняя ? 1 : 0,
+        }}>
+          <Значок size={19} color="#FFFFFF" strokeWidth={2.6} />
         </span>
-        <span className="flex-1 min-w-0">
-          <span style={{
-            display: "block", fontFamily: displayFont, fontSize: 14.5, fontWeight: 700,
-            color: "#F3F3F6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            {заголовок}
+        <span className="min-w-0" style={{ flex: 1, opacity: верхняя ? 1 : 0, transition: "opacity 200ms ease" }}>
+          <span className="flex items-baseline" style={{ gap: 8 }}>
+            <span style={{
+              flex: 1, minWidth: 0, fontFamily: displayFont, fontSize: 14.5, fontWeight: 700, color: "#F5F5F7",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>{заголовок}</span>
+            <span style={{ fontFamily: bodyFont, fontSize: 12, color: "rgba(245,245,247,0.45)", flexShrink: 0 }}>
+              {lang === "EN" ? "now" : "сейчас"}
+            </span>
           </span>
           {текст && (
             <span style={{
-              display: "block", fontFamily: bodyFont, fontSize: 12.5, lineHeight: 1.35,
-              color: "rgba(243,243,246,0.68)", marginTop: 2,
-            }}>
-              {текст}
-            </span>
+              display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+              fontFamily: bodyFont, fontSize: 13.5, lineHeight: 1.35, color: "rgba(245,245,247,0.78)", marginTop: 2,
+            }}>{текст}</span>
           )}
         </span>
-        {/* Крестика нет: карточка уходит смахиванием вверх и сама через
-            четыре секунды. Кнопка на её месте только отнимала ширину у
-            текста и ловила случайные нажатия. */}
+      </div>
+    </div>
+  );
+}
+
+function Toast({ toasts = [], insetTop = 0, onClose = () => {} }) {
+  if (!toasts.length || typeof document === "undefined") return null;
+  const видимые = toasts.slice(-3);
+  /* Порталом и выше всего: уведомление показывают и поверх листов —
+     «Получить», настроек, окна сделки. Пометка data-sheet отдаёт нам
+     вертикальный жест, иначе его забирал Telegram и смахнуть было нельзя. */
+  return createPortal(
+    <div data-sheet="1" aria-live="polite" style={{
+      position: "fixed", top: insetTop + 10, left: 0, right: 0, zIndex: 620,
+      display: "flex", justifyContent: "center", padding: "0 10px", pointerEvents: "none",
+    }}>
+      <div style={{ position: "relative", width: "100%", maxWidth: 420, pointerEvents: "auto" }}>
+        {видимые.map((т, i) => (
+          <КарточкаТоста key={т.номер} т={т} глубина={видимые.length - 1 - i} onClose={() => onClose(т.номер)} />
+        ))}
       </div>
     </div>,
     document.body,
@@ -30155,7 +30139,7 @@ const FEE_PERCENT = 0; // комиссии площадки нет
   // Global toast — rendered once at the root (not nested inside any
   // scrolling view), so it's never clipped no matter which screen
   // triggered it.
-  const [toast, setToast] = useState(null);
+  const [toasts, setToasts] = useState([]);
   /* Праздник на успешной покупке — по дизайн-плану частицы отмечают
      удачные действия. Слой общий: покупка случается на разных экранах, а
      конфетти должно лететь поверх всего. */
@@ -30171,11 +30155,7 @@ const FEE_PERCENT = 0; // комиссии площадки нет
   /* Предохранитель: что бы ни случилось внутри карточки, через шесть
      секунд сообщение снимается отсюда. Зависимость одна — само
      сообщение, поэтому перерисовки приложения этот таймер не сбивают. */
-  useEffect(() => {
-    if (!toast) return;
-    const id = setTimeout(() => setToast(null), ЖИЗНЬ_ТОСТА + 2000);
-    return () => clearTimeout(id);
-  }, [toast]);
+  const снятьТост = useCallback((номер) => setToasts((все) => все.filter((т) => т.номер !== номер)), []);
 
   /* Показ сообщения. Здесь только «что показать»: когда убрать —
      решает сама карточка по часам (см. Toast). Раньше этим занимались
@@ -30193,8 +30173,13 @@ const FEE_PERCENT = 0; // комиссии площадки нет
     // Тот же текст дважды подряд — одно сообщение, а не два.
     if (своё.текст === текст && теперь - своё.когда < 2000) return;
     последнийToast.current = { текст, когда: теперь };
-    setToast({ текст, номер: ++номерToast.current });
-    haptic();
+    const номер = ++номерToast.current;
+    // Стопка, а не замена: прежнее уходит под новое и досчитывает свой срок.
+    setToasts((все) => [...все, { текст, номер }].slice(-4));
+    // Предохранитель: что бы ни случилось в карточке, она снимется.
+    setTimeout(() => снятьТост(номер), ЖИЗНЬ_ТОСТА + 2500);
+    const вид = разобратьТост(текст).вид;
+    haptic(вид === "отказ" ? "error" : вид === "удача" ? "success" : "light");
   }
 
 
@@ -33265,12 +33250,7 @@ function mapTokenRow(row) {
           Ждать чёрный экран с котом ради тех же двух секунд незачем. */}
       {/* Конфетти после создания аккаунта больше нет — по просьбе: аккаунт
           создан, и человек просто оказывается на главной. */}
-      <Toast
-        key={toast ? toast.номер : 0}
-        toast={toast}
-        insetTop={insetTop}
-        onClose={() => setToast(null)}
-      />
+      <Toast toasts={toasts} insetTop={insetTop} onClose={снятьТост} />
 
       {/* Проход в кошелёк из чата. Приложение здесь — только мостик к
           TonConnect: показывать за эту секунду ленту и графики незачем,
