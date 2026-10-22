@@ -23,6 +23,8 @@
 
 import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -93,8 +95,31 @@ async function профильX(handle) {
  * подставляет их в анкету. */
 const СЕКРЕТ_STATE = X_CLIENT_SECRET || String(process.env.APP_WALLET_KEY || "") || String(process.env.TELEGRAM_BOT_TOKEN || "");
 const подписьState = (строка) => crypto.createHmac("sha256", СЕКРЕТ_STATE).update(строка).digest("base64url");
-const ЗАГОТОВКИ_X = new Map(); // telegram id -> { handle, профиль, ts }
 const ЖИЗНЬ_ЗАГОТОВКИ_МС = 15 * 60 * 1000;
+/* Заготовки переживают перезапуск сервера: он перезапускается при каждом
+   обновлении, и человек, вошедший через X за минуту до этого, создавал
+   аккаунт уже без привязки — память была пуста. Лежат в файле рядом с
+   остальным состоянием (.state), пишутся при каждом изменении. */
+const ФАЙЛ_ЗАГОТОВОК = path.join(process.env.LIVE_STATE_DIR || path.join(process.cwd(), ".state"), "x-prefill.json");
+class ЗаготовкиНаДиске extends Map {
+  constructor() {
+    super();
+    try {
+      const з = JSON.parse(fs.readFileSync(ФАЙЛ_ЗАГОТОВОК, "utf8")) || {};
+      for (const [к, v] of Object.entries(з)) if (v && Date.now() - v.ts < ЖИЗНЬ_ЗАГОТОВКИ_МС) super.set(к, v);
+    } catch { /* файла ещё нет */ }
+  }
+  сохранить() {
+    try {
+      fs.mkdirSync(path.dirname(ФАЙЛ_ЗАГОТОВОК), { recursive: true });
+      const живые = Object.fromEntries([...this.entries()].filter(([, v]) => Date.now() - v.ts < ЖИЗНЬ_ЗАГОТОВКИ_МС));
+      fs.writeFileSync(ФАЙЛ_ЗАГОТОВОК, JSON.stringify(живые), { mode: 0o600 });
+    } catch { /* не записалось — останется память */ }
+  }
+  set(к, v) { super.set(к, v); this.сохранить(); return this; }
+  delete(к) { const было = super.delete(к); this.сохранить(); return было; }
+}
+const ЗАГОТОВКИ_X = new ЗаготовкиНаДиске(); // telegram id -> { handle, профиль, ts }
 
 function состояниеЗаписи(tg) {
   const срок = Date.now() + ЖИЗНЬ_STATE_МС;
