@@ -28,21 +28,21 @@ const СЕТИ = {
     // Виртуальный запас задаёт стартовую цену и сумму сбора к выходу на
     // биржу: сбор ≈ 2,93 × запас. Порог равен по деньгам 85 SOL у
     // pump.fun: 4,1 BNB → к выходу собирается около 12 BNB.
-    virtualNative: "4.1",
+    virtualNative: "1.365",
     env: "EVM_CURVE_BSC",
   },
   base: {
     chainId: 8453, rpc: "https://mainnet.base.org",
     weth: "0x4200000000000000000000000000000000000006",
     dexFactory: "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6", // Uniswap V2
-    virtualNative: "1.23", // к выходу около 3,6 ETH
+    virtualNative: "0.4095", // к выходу около 1,2 ETH
     env: "EVM_CURVE_BASE",
   },
   eth: {
     chainId: 1, rpc: "https://ethereum-rpc.publicnode.com",
     weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     dexFactory: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f", // Uniswap V2
-    virtualNative: "1.23",
+    virtualNative: "0.4095",
     env: "EVM_CURVE_ETH",
   },
 };
@@ -60,19 +60,19 @@ const ТЕСТОВЫЕ = {
     chainId: 97, rpc: "https://bsc-testnet-rpc.publicnode.com",
     weth: "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",       // WBNB testnet
     dexFactory: "0x6725F303b657a9451d8BA641348b6761A6CC7a17", // PancakeSwap V2 testnet
-    virtualNative: "0.041", env: "EVM_CURVE_BSC",
+    virtualNative: "0.01365", env: "EVM_CURVE_BSC",
   },
   base: {
     chainId: 84532, rpc: "https://sepolia.base.org",
     weth: "0x4200000000000000000000000000000000000006",
     dexFactory: "0x7Ae58f10f7849cA6F5fB71b7f45CB416c9204b1e", // Uniswap V2, Base Sepolia
-    virtualNative: "0.0123", env: "EVM_CURVE_BASE",
+    virtualNative: "0.004095", env: "EVM_CURVE_BASE",
   },
   eth: {
     chainId: 11155111, rpc: "https://ethereum-sepolia-rpc.publicnode.com",
     weth: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
     dexFactory: "0xF62c03E08ada871A0bEb309762E260a7a6a880E6", // Uniswap V2, Sepolia
-    virtualNative: "0.0123", env: "EVM_CURVE_ETH",
+    virtualNative: "0.004095", env: "EVM_CURVE_ETH",
   },
 };
 
