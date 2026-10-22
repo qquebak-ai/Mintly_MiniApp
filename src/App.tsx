@@ -9077,6 +9077,9 @@ function localTokenToFeedShape(entry) {
     // цифрами демо TON.
     демоСеть: entry.демоСеть || null,
     curveAddress: entry.curveAddress || null,
+    // Пул биржи после выхода с кривой: без него карточка из ленты не
+    // знала, что токен уже на бирже, и торговала бы по закрытой кривой.
+    dexPoolAddress: entry.dexPoolAddress || null,
     curveJettonWallet: entry.curveJettonWallet || null,
     chain: этоEVM(entry.chain) ? entry.chain : entry.chain === "solana" ? "solana" : "ton",
     // Сеть тащим дальше: по ней в списке ставится пометка «тест», и без
@@ -20359,7 +20362,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   // Рынок открыт: пул принял обе половины ликвидности и торгует. Между
   // закрытием кривой и этим моментом проходит несколько блоков —
   // покупать в это время физически не у кого.
-  const рынокОткрыт = !!(token.dexPoolAddress && poolState && poolState.ready);
+  // Пул биржи после выхода — STON.fi, Raydium или Uniswap/PancakeSwap.
+  const пулБиржи = useПулБиржи(token);
+  const рынокОткрыт = !!((token.dexPoolAddress && poolState && poolState.ready) || пулБиржи);
 
   // Real OHLCV (via GeckoTerminal's data API — no iframe, no branding) when
   // the token is backed by a live on-chain pool; a synthetic random-walk
@@ -20502,7 +20507,12 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
      там лента и есть источник. */
   // Демо-токен тоже живёт на «кривой» — её цена приходит с сервера.
   const своя_кривая = !!(token.демо || token.curveAddress || (token.chain === "solana" && token.tokenAddress));
-  const живаяЦена = (своя && своя.priceUsd > 0) ? своя.priceUsd : ценаТокена;
+  // На бирже цену даёт пул: закрытая кривая показала бы последнюю цену
+  // перед выходом и стояла бы на ней.
+  const курсПула = token.chain === "solana" ? solUsd() : этоEVM(token.chain) ? курсМонетыEVM(token.chain, КЕШ_КУРСОВ_EVM) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
+  const живаяЦена = пулБиржи && пулБиржи.price > 0 && курсПула > 0
+    ? пулБиржи.price * курсПула
+    : (своя && своя.priceUsd > 0) ? своя.priceUsd : ценаТокена;
   const капОкна = своя_кривая
     ? живаяЦена * выпускТокена
     : (token.mcapNum > 0 ? token.mcapNum : ценаТокена * выпускТокена);
@@ -20581,9 +20591,14 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
   const стоимостьПозиции = useMemo(() => {
     const поЦене = (позиция || 0) * (живаяЦена > 0 ? живаяЦена : token.price);
     const курс = token.chain === "solana" ? solUsd() : tonUsd();
+    // На бирже позиция стоит столько, сколько отдаст за неё пул.
+    if (пулБиржи && позиция > 0 && курсПула > 0) {
+      const чистыми = позиция * (1 - (пулБиржи.fee || 0));
+      return ((пулБиржи.native * чистыми) / (пулБиржи.tokens + чистыми)) * курсПула;
+    }
     const выручка = выручкаПоКривой(своя && своя.резервы, позиция || 0);
     return выручка != null && курс > 0 ? выручка * курс : поЦене;
-  }, [позиция, живаяЦена, token.price, token.chain, своя]);
+  }, [позиция, живаяЦена, token.price, token.chain, своя, пулБиржи, курсПула]);
 
   /* Сколько ждём, прежде чем показать страницу как есть: у токена с
      биржи истории может не быть вовсе, и плашки иначе остались бы
@@ -20870,13 +20885,50 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
      между сделками и правда стоит на месте, так что это не выдумка, а
      единственное, что о токене известно. Ничего не выдумываем и сверх
      того: тени и объём остаются нулевыми. */
+  /* После выхода на биржу график продолжается ценой пула: сервер пишет
+     её раз в полминуты (api/dex-history.js), здесь из точек собираются
+     свечи того же интервала и встают после последней свечи кривой. */
+  const [точкиПула, setТочкиПула] = useState(null);
+  useEffect(() => {
+    setТочкиПула(null);
+    if (!пулБиржи) return undefined;
+    let живо = true;
+    const адрес = token.tokenAddress || token.address;
+    const читать = () => fetch(апи(`/api/dex-history?token=${encodeURIComponent(адрес)}`)).then((r) => r.json())
+      .then((j) => { if (живо && j && Array.isArray(j.points)) setТочкиПула(j.points); }).catch(() => {});
+    читать();
+    const id = setInterval(читать, 30000);
+    return () => { живо = false; clearInterval(id); };
+  }, [!!пулБиржи, token.tokenAddress, token.address]); // eslint-disable-line react-hooks/exhaustive-deps
   const графДанные = useMemo(() => {
-    if (chartData && chartData.candles && chartData.candles.length) return chartData;
+    const основа = (chartData && chartData.candles && chartData.candles.length) ? chartData : null;
+    if (основа && пулБиржи && курсПула > 0) {
+      const шаг = TF_SECONDS[tf] || 60;
+      const свечи = [...основа.candles];
+      const после = свечи.length ? свечи[свечи.length - 1].time : 0;
+      // Последняя точка — живая цена пула, чтобы свеча не ждала записи.
+      const точки = [...(точкиПула || []), [Date.now(), пулБиржи.price]];
+      for (const [мс, цена] of точки) {
+        const t = Math.floor(мс / 1000 / шаг) * шаг;
+        const usd = цена * курсПула;
+        if (!(usd > 0) || t < после) continue;
+        const посл = свечи[свечи.length - 1];
+        if (посл && посл.time === t) {
+          // Копией: свечи кривой лежат в состоянии, менять их на месте нельзя.
+          свечи[свечи.length - 1] = { ...посл, close: usd, high: Math.max(посл.high, usd), low: Math.min(посл.low, usd) };
+        } else {
+          const open = посл ? посл.close : usd;
+          свечи.push({ time: t, open, high: Math.max(open, usd), low: Math.min(open, usd), close: usd });
+        }
+      }
+      return { ...основа, candles: свечи };
+    }
+    if (основа) return основа;
     const цена = (своя && своя.priceUsd > 0) ? своя.priceUsd : 0;
     if (!(цена > 0)) return null;
     const ряд = flatCandles(цена, tf);
     return ряд ? { ...ряд, tf, isLive: false } : null;
-  }, [chartData, своя, tf, запущенВ]);
+  }, [chartData, своя, tf, запущенВ, пулБиржи, точкиПула, курсПула]);
   const scaledCandles = useMemo(() => {
     if (!графДанные?.candles) return null;
     // Без множителя рисовать нечего: раньше в этот момент график молча
@@ -21565,7 +21617,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
 
       {/* Путь до биржи и её итог: у токенов на своей кривой это главное
           число после цены, у остальных блока просто нет. */}
-      {curve && curve.graduated ? (
+      {(curve && curve.graduated) || пулБиржи ? (
         <div className="flex items-start gap-3" style={{ padding: 14, borderRadius: 16, background: T.surface, border: `1px solid ${hexA(рынокОткрыт ? T.up : T.warning, 0.35)}` }}>
           <ShieldCheck size={17} color={рынокОткрыт ? T.up : T.warning} style={{ flexShrink: 0, marginTop: 1 }} />
           <div>
@@ -22322,6 +22374,28 @@ function ВыборСкорости({ сеть, style, onChange = null }) {
     </div>
   );
 }
+/* Пул биржи токена площадки после выхода с кривой — резервы и цена
+   (api/dex-pool.js). Спрашиваем только у тех, кто вышел: у Solana и TON
+   адрес пула пишет сервер, у EVM пару заводит сама фабрика, и сервер
+   найдёт её по токену. Ответ «не готов» значит «торгуем по кривой». */
+function useПулБиржи(token, активно = true) {
+  const [пул, setПул] = useState(null);
+  const цепь = token ? (token.chain === "solana" ? "solana" : этоEVM(token.chain) ? token.chain : "ton") : null;
+  const нужен = !!(активно && token && !token.демо && (token.dexPoolAddress || этоEVM(token.chain)) && (token.tokenAddress || token.address));
+  const адрес = token ? (token.tokenAddress || token.address) : null;
+  useEffect(() => {
+    setПул(null);
+    if (!нужен) return undefined;
+    let живо = true;
+    const читать = () => fetch(апи(`/api/dex-pool?chain=${цепь}&token=${encodeURIComponent(адрес)}${token.dexPoolAddress ? `&pool=${encodeURIComponent(token.dexPoolAddress)}` : ""}`))
+      .then((r) => r.json()).then((j) => { if (живо && j) setПул(j.ready ? j : null); }).catch(() => {});
+    читать();
+    const id = setInterval(читать, 8000);
+    return () => { живо = false; clearInterval(id); };
+  }, [нужен, цепь, адрес, token && token.dexPoolAddress]); // eslint-disable-line react-hooks/exhaustive-deps
+  return пул;
+}
+
 function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, walletTonBalance = 0, tonPriceUsd = 0, heldAmount = null, curveState = null }) {
   // Курс SOL нужен только окну сделки по токену Solana — там он один раз
   // пересчитывает введённую сумму в примерное количество токенов.
@@ -22339,6 +22413,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // Первым делом: остальные хуки читают tradeModal, и объявить его ниже
   // значит обратиться к нему до создания.
   const [tradeModal, closing] = useClosing(tradeModalProp);
+  const пулБиржи = useПулБиржи(token, !!tradeModalProp);
   const [mode, setMode] = useState(tradeModal ? tradeModal.mode : "buy");
   // Цветовой отклик переключателя: нажал «купить» — зелёная вспышка,
   // «продать» — красная.
@@ -22550,6 +22625,15 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // каждой из быстрых сумм, которые показывают свой итог прямо на кнопке.
   function оценкаНа(amount) {
     let estimate;
+    if (пулБиржи) {
+      /* Токен на бирже: постоянное произведение резервов пула, ставка
+         удерживается со входа — так считает и сама биржа. */
+      const чистыми = amount * (1 - (пулБиржи.fee || 0));
+      estimate = isBuy
+        ? (пулБиржи.tokens * чистыми) / (пулБиржи.native + чистыми)
+        : (пулБиржи.native * чистыми) / (пулБиржи.tokens + чистыми);
+      return Math.max(0, estimate);
+    }
     if (curveState) {
       // Комиссию берём из самой кривой: у токенов, запущенных до её
       // введения, она нулевая и такой останется навсегда.

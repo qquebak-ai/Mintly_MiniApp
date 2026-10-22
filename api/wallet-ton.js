@@ -379,6 +379,25 @@ async function записать(db, user, kind, amount, hash) {
   }).then(() => {}, () => {});
 }
 
+/* Токен вышел на STON.fi — сделка обменом через роутер биржи, а не по
+   кривой. Пул STON.fi узнаём по адресу: роутер считает его из пары
+   жетонов, и если в базе записан именно он — токен на бирже; иначе там
+   прежний собственный пул токена, и сделка идёт старым путём. */
+async function сделкаНаSTON(токен, кеш, { покупка, сумма, кошелёк }) {
+  if (!(кеш && кеш.graduated) || !токен.dex_pool_address || !токен.address) return null;
+  const { адресПула, сделкаВПуле } = await import("./_stonfi.js");
+  const { Address, Cell, internal } = await библиотеки();
+  const пул = await адресПула(токен.address).catch(() => null);
+  if (!пул || !пул.equals(Address.parse(токен.dex_pool_address))) return null;
+  const т = await сделкаВПуле({ jetton: токен.address, покупка, сумма, кошелёк });
+  return internal({
+    to: Address.parse(т.to),
+    value: BigInt(т.value),
+    body: т.body ? Cell.fromBase64(т.body) : undefined,
+    bounce: true,
+  });
+}
+
 export default async function handler(req, res) {
   const db = admin();
   const набор = ключи();
@@ -445,7 +464,10 @@ export default async function handler(req, res) {
 
       const { internal, SendMode } = await библиотеки();
       const { сообщенияЗапуска } = await import("./_tonLaunchCore.js");
-      const { пакеты, адреса } = await сообщенияЗапуска({ admin: строка.address, metadataUrl: метаданные, buyTon: покупка });
+      // Есть кошелёк ликвидности — токен выйдет на STON.fi (api/ton-migrate.js).
+      const { кошелёкЛиквидности } = await import("./_stonfi.js");
+      const ликв = await кошелёкЛиквидности().catch(() => null);
+      const { пакеты, адреса } = await сообщенияЗапуска({ admin: строка.address, metadataUrl: метаданные, buyTon: покупка, ликвидность: ликв ? ликв.адрес : null });
       const { пара, кошелёк: открытый } = await подписант(строка, набор, user);
 
       /* Кошелёк v4 отправляет не больше четырёх сообщений за раз, поэтому
@@ -490,7 +512,7 @@ export default async function handler(req, res) {
 
       const { data: токен } = await db
         .from("tokens")
-        .select("id, curve_address, dex_pool_address, chain, curve_cache(graduated)")
+        .select("id, address, curve_address, dex_pool_address, chain, curve_cache(graduated)")
         .eq("id", tokenId)
         .maybeSingle();
       if (!токен || (токен.chain || "ton") !== "ton") return res.status(404).json({ error: "token_not_found" });
@@ -500,8 +522,11 @@ export default async function handler(req, res) {
       if (!адресРынка) return res.status(400).json({ error: "no_curve" });
 
       const есть = await баланс(строка.address);
-      const нужно = сумма + 0.2;   // покупка плюс газ контракта и сети
+      const нужно = сумма + 0.45;   // покупка плюс газ контракта и сети (у биржи газ больше)
       if (есть < нужно) return res.status(400).json({ error: "not_enough", have: есть, need: нужно });
+
+      // Вышел на STON.fi — покупка обменом через роутер биржи.
+      const наБирже = await сделкаНаSTON(токен, кеш, { покупка: true, сумма, кошелёк: строка.address });
 
       /* Двойное нажатие не должно превращаться во вторую покупку: тот
          же ключ запроса возвращает исход первой. */
@@ -526,7 +551,7 @@ export default async function handler(req, res) {
         seqno,
         secretKey: пара.secretKey,
         sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
-        messages: [internal({
+        messages: [наБирже || internal({
           to: Address.parse(адресРынка),
           value: toNano(сумма.toFixed(9)) + ГАЗ_ПОКУПКИ,
           body: тело_,
@@ -575,7 +600,8 @@ export default async function handler(req, res) {
       if (!(сколькоБигом > 0n)) return res.status(400).json({ error: "not_enough" });
 
       const есть = await баланс(строка.address);
-      if (есть < 0.25) return res.status(400).json({ error: "not_enough_gas", have: есть, need: 0.25 });
+      if (есть < 0.35) return res.status(400).json({ error: "not_enough_gas", have: есть, need: 0.35 });
+      const наБирже = await сделкаНаSTON(токен, кеш, { покупка: false, сумма: Number(сколькоБигом) / 1e9, кошелёк: строка.address });
 
       /* Та же отметка, что и у покупки: повтор запроса не продаёт
          жетоны второй раз. */
@@ -607,7 +633,7 @@ export default async function handler(req, res) {
         seqno,
         secretKey: пара.secretKey,
         sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
-        messages: [internal({
+        messages: [наБирже || internal({
           to: Address.parse(мой.address),
           value: ГАЗ_ПРОДАЖИ,
           body: тело_,

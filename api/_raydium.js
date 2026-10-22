@@ -114,3 +114,82 @@ export function инструкцииПула({ владелец, mint, токе�
 export function инструкцияСжечьLP({ владелец, lpСчёт, lp, сколько }) {
   return createBurnInstruction(lpСчёт, lp, владелец, BigInt(сколько));
 }
+
+/* Состояние пула: адреса и резервы, нужные для обмена. Раскладка —
+   PoolState программы raydium-cp-swap. Резервы — остатки хранилищ за
+   вычетом накопленных комиссий протокола и фонда: так считает и сама
+   программа. */
+export async function прочитатьПул(connection, пул) {
+  const инфо = await connection.getAccountInfo(пул);
+  if (!инфо || инфо.data.length < 381) return null;
+  const d = инфо.data;
+  const ключ = (o) => new PublicKey(d.subarray(o, o + 32));
+  const u64 = (o) => d.readBigUInt64LE(o);
+  const п = {
+    программа: инфо.owner, настройка: ключ(8), хран0: ключ(72), хран1: ключ(104),
+    m0: ключ(168), m1: ключ(200), прог0: ключ(232), прог1: ключ(264), наблюдение: ключ(296),
+    комиссии0: u64(341) + u64(357), комиссии1: u64(349) + u64(365),
+  };
+  const [в0, в1] = await Promise.all([п.хран0, п.хран1].map((х) => connection.getTokenAccountBalance(х)));
+  п.резерв0 = BigInt(в0.value.amount) - п.комиссии0;
+  п.резерв1 = BigInt(в1.value.amount) - п.комиссии1;
+  return п;
+}
+
+// Ставка обмена настройки №0 — 0,25%, в миллионных долях, как у программы.
+const СТАВКА_ОБМЕНА = 2500n;
+
+/* Сколько выйдет при обмене amountIn — та же формула, что в программе:
+   сначала удерживается ставка, потом постоянное произведение. */
+export function котировкаПула(резервВход, резервВыход, amountIn) {
+  const чистыми = BigInt(amountIn) - (BigInt(amountIn) * СТАВКА_ОБМЕНА + 999_999n) / 1_000_000n;
+  if (чистыми <= 0n || резервВход <= 0n || резервВыход <= 0n) return 0n;
+  return (резервВыход * чистыми) / (резервВход + чистыми);
+}
+
+/* Обмен в пуле: SOL → токен (покупка) или токен → SOL (продажа).
+   SOL заворачивается в wSOL на время сделки и разворачивается обратно
+   тем же сообщением. */
+export function инструкцииОбмена({ владелец, пул, п, mint, покупка, amountIn, minOut }) {
+  const токенПервый = п.m0.equals(mint);
+  const wsol = getAssociatedTokenAddressSync(NATIVE_MINT, владелец);
+  const своиТокены = getAssociatedTokenAddressSync(mint, владелец);
+  const вход = покупка ? NATIVE_MINT : mint;
+  const выход = покупка ? mint : NATIVE_MINT;
+  const хранВход = вход.equals(п.m0) ? п.хран0 : п.хран1;
+  const хранВыход = выход.equals(п.m0) ? п.хран0 : п.хран1;
+  const прогВход = вход.equals(п.m0) ? п.прог0 : п.прог1;
+  const прогВыход = выход.equals(п.m0) ? п.прог0 : п.прог1;
+  void токенПервый;
+  const ключ = (pubkey, isWritable = false, isSigner = false) => ({ pubkey, isWritable, isSigner });
+  const власть = pda([Buffer.from("vault_and_lp_mint_auth_seed")], п.программа);
+  return [
+    ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+    createAssociatedTokenAccountIdempotentInstruction(владелец, wsol, владелец, NATIVE_MINT),
+    createAssociatedTokenAccountIdempotentInstruction(владелец, своиТокены, владелец, mint),
+    ...(покупка ? [
+      SystemProgram.transfer({ fromPubkey: владелец, toPubkey: wsol, lamports: BigInt(amountIn) }),
+      createSyncNativeInstruction(wsol),
+    ] : []),
+    new TransactionInstruction({
+      programId: п.программа,
+      keys: [
+        ключ(владелец, false, true),
+        ключ(власть),
+        ключ(п.настройка),
+        ключ(пул, true),
+        ключ(покупка ? wsol : своиТокены, true),
+        ключ(покупка ? своиТокены : wsol, true),
+        ключ(хранВход, true),
+        ключ(хранВыход, true),
+        ключ(прогВход),
+        ключ(прогВыход),
+        ключ(вход),
+        ключ(выход),
+        ключ(п.наблюдение, true),
+      ],
+      data: Buffer.concat([дискриминатор("swap_base_input"), u64(amountIn), u64(minOut)]),
+    }),
+    createCloseAccountInstruction(wsol, владелец, владелец),
+  ];
+}

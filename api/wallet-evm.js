@@ -41,6 +41,9 @@ const БОЕВЫЕ = {
   bsc: {
     chainId: 56, имя: "BNB Chain", монета: "BNB", обозреватель: "https://bscscan.com",
     rpc: process.env.EVM_RPC_BSC || "https://bsc-dataseed.bnbchain.org",
+    // Роутеры V2 сверены по сети: factory() и WETH() совпадают с теми,
+    // куда фабрика кривой выводит токен (contracts/evm/deploy.mjs).
+    роутер: "0x10ED43C718714eb63d5aA57B78B54704E256024E", // PancakeSwap V2
     стейблы: [
       { тикер: "USDT", адрес: "0x55d398326f99059fF775485246999027B3197955", знаков: 18 },
       { тикер: "USDC", адрес: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", знаков: 18 },
@@ -49,6 +52,7 @@ const БОЕВЫЕ = {
   base: {
     chainId: 8453, имя: "Base", монета: "ETH", обозреватель: "https://basescan.org",
     rpc: process.env.EVM_RPC_BASE || "https://mainnet.base.org",
+    роутер: "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24", // Uniswap V2
     стейблы: [
       { тикер: "USDC", адрес: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", знаков: 6 },
       { тикер: "USDT", адрес: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2", знаков: 6 },
@@ -57,6 +61,7 @@ const БОЕВЫЕ = {
   eth: {
     chainId: 1, имя: "Ethereum", монета: "ETH", обозреватель: "https://etherscan.io",
     rpc: process.env.EVM_RPC_ETH || "https://ethereum-rpc.publicnode.com",
+    роутер: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", // Uniswap V2
     стейблы: [
       { тикер: "USDT", адрес: "0xdAC17F958D2ee523a2206206994597C13D831ec7", знаков: 6 },
       { тикер: "USDC", адрес: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", знаков: 6 },
@@ -66,9 +71,9 @@ const БОЕВЫЕ = {
 
 // В тестовых сетях настоящих стейблов нет — только монета сети.
 const ТЕСТОВЫЕ_СЕТИ = {
-  bsc: { chainId: 97, имя: "BNB Chain", монета: "BNB", обозреватель: "https://testnet.bscscan.com", rpc: process.env.EVM_RPC_BSC || "https://bsc-testnet-rpc.publicnode.com", стейблы: [] },
-  base: { chainId: 84532, имя: "Base", монета: "ETH", обозреватель: "https://sepolia.basescan.org", rpc: process.env.EVM_RPC_BASE || "https://sepolia.base.org", стейблы: [] },
-  eth: { chainId: 11155111, имя: "Ethereum", монета: "ETH", обозреватель: "https://sepolia.etherscan.io", rpc: process.env.EVM_RPC_ETH || "https://ethereum-sepolia-rpc.publicnode.com", стейблы: [] },
+  bsc: { chainId: 97, имя: "BNB Chain", монета: "BNB", обозреватель: "https://testnet.bscscan.com", rpc: process.env.EVM_RPC_BSC || "https://bsc-testnet-rpc.publicnode.com", роутер: "0xD99D1c33F9fC3444f8101754aBC46c52416550D1", стейблы: [] },
+  base: { chainId: 84532, имя: "Base", монета: "ETH", обозреватель: "https://sepolia.basescan.org", rpc: process.env.EVM_RPC_BASE || "https://sepolia.base.org", роутер: "0x1689E7B1F10000AE47eBfE339a4f69dECd19F602", стейблы: [] },
+  eth: { chainId: 11155111, имя: "Ethereum", монета: "ETH", обозреватель: "https://sepolia.etherscan.io", rpc: process.env.EVM_RPC_ETH || "https://ethereum-sepolia-rpc.publicnode.com", роутер: "0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3", стейблы: [] },
 };
 
 export const СЕТИ = Object.fromEntries(Object.entries(ТЕСТОВЫЕ ? ТЕСТОВЫЕ_СЕТИ : БОЕВЫЕ).map(([к, с]) => [к, {
@@ -91,7 +96,19 @@ const ABI_КРИВОЙ = [
   "function launchFee() view returns (uint256)",
   "event Created(address indexed token, address indexed creator, string name, string symbol, string uri)",
 ];
-const ABI_ТОКЕНА = ["function balanceOf(address) view returns (uint256)"];
+const ABI_ТОКЕНА = [
+  "function balanceOf(address) view returns (uint256)",
+  "function allowance(address, address) view returns (uint256)",
+  "function approve(address, uint256) returns (bool)",
+];
+// После выхода на биржу сделки идут через роутер V2 той же биржи, куда
+// кривая сама завела пару.
+const ABI_РОУТЕРА = [
+  "function WETH() view returns (address)",
+  "function getAmountsOut(uint256 amountIn, address[] path) view returns (uint256[] amounts)",
+  "function swapExactETHForTokensSupportingFeeOnTransferTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) payable",
+  "function swapExactTokensForETHSupportingFeeOnTransferTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)",
+];
 const ВИРТ_ТОКЕНОВ = 1_073_000_000n * 10n ** 18n;
 const ПРОДАЁТСЯ = 800_000_000n * 10n ** 18n;
 
@@ -357,6 +374,16 @@ export default async function handler(req, res) {
       const { Contract, parseUnits, formatUnits } = await ethersLib();
       const к = new Contract(с.фабрика, ABI_КРИВОЙ, await провайдер(сеть));
       const сумма = String(req.query.amount || "0");
+      // На бирже котирует роутер: у закрытой кривой quoteBuy вернул бы ноль.
+      const кривая = await к.curves(токен);
+      if (кривая.graduated) {
+        const роутер = new Contract(с.роутер, ABI_РОУТЕРА, await провайдер(сеть));
+        const weth = await роутер.WETH();
+        const продажа = String(req.query.side) === "sell";
+        const вход = parseUnits(Number(сумма).toFixed(18), 18);
+        const [, out] = await роутер.getAmountsOut(вход, продажа ? [токен, weth] : [weth, токен]);
+        return res.status(200).json({ out: Number(formatUnits(out, 18)), dex: true, ...(продажа ? null : { spent: Number(сумма) }) });
+      }
       if (String(req.query.side) === "sell") {
         // «Всё» приходит дробным числом и при округлении может выйти на
         // пылинку больше проданного — контракт такое отвергает.
@@ -455,7 +482,34 @@ export default async function handler(req, res) {
       const w = await подписант(строка, набор, user, сеть);
       const к = new Contract(с.фабрика, ABI_КРИВОЙ, w);
       let tx;
-      if (действие === "buy") {
+      const [, , , вышел] = await к.curves(токен);
+      if (вышел) {
+        /* Кривая закрыта, токен на бирже: обмен через роутер V2. Срок —
+           десять минут: дольше висящая сделка исполнилась бы по цене,
+           которой человек уже не видел. */
+        const роутер = new Contract(с.роутер, ABI_РОУТЕРА, w);
+        const weth = await роутер.WETH();
+        const срок = BigInt(Math.floor(Date.now() / 1000) + 600);
+        const газ = await платаЗаСкорость(сеть, скорость);
+        if (действие === "buy") {
+          const value = parseUnits(сумма.toFixed(18), 18);
+          const путь = [weth, токен];
+          const [, ожидаем] = await роутер.getAmountsOut(value, путь);
+          tx = await роутер.swapExactETHForTokensSupportingFeeOnTransferTokens((ожидаем * (10000n - проск)) / 10000n, путь, строка.address, срок, { value, ...газ });
+        } else {
+          const tokensIn = тело.raw && /^\d+$/.test(String(тело.raw)) ? BigInt(тело.raw) : parseUnits(сумма.toFixed(18), 18);
+          const путь = [токен, weth];
+          const т = new Contract(токен, ABI_ТОКЕНА, w);
+          // Разрешение роутеру — один раз и сразу на всё: второе
+          // подтверждение на каждую продажу только удлиняло бы сделку.
+          if ((await т.allowance(строка.address, с.роутер)) < tokensIn) {
+            const одобр = await т.approve(с.роутер, (1n << 256n) - 1n, газ);
+            await одобр.wait(1, 120_000);
+          }
+          const [, ожидаем] = await роутер.getAmountsOut(tokensIn, путь);
+          tx = await роутер.swapExactTokensForETHSupportingFeeOnTransferTokens(tokensIn, (ожидаем * (10000n - проск)) / 10000n, путь, строка.address, срок, газ);
+        }
+      } else if (действие === "buy") {
         const value = parseUnits(сумма.toFixed(18), 18);
         const [ожидаем] = await к.quoteBuy(токен, value);
         tx = await к.buy(токен, (ожидаем * (10000n - проск)) / 10000n, { value, ...(await платаЗаСкорость(сеть, скорость)) });

@@ -469,6 +469,14 @@ if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.GRADUATE_LOOP !== "0") 
       await вывестиНаБиржу();
     } catch (err) {
       console.warn("[выход на DEX]", err && err.message);
+    }
+    // TON — отдельной попыткой: сбой Solana не должен держать выход TON.
+    try {
+      const { вывестиTonНаБиржу, записатьЦеныПулов } = await import("../api/ton-migrate.js");
+      await вывестиTonНаБиржу();
+      await записатьЦеныПулов();
+    } catch (err) {
+      console.warn("[выход TON]", err && err.message);
     } finally {
       setTimeout(круг, ШАГ_ВЫХОДА_МС);
     }

@@ -44,6 +44,7 @@ import { createClient } from "@supabase/supabase-js";
 import { проверитьТранзакцию } from "./_txguard.js";
 import { собратьЗапуск, собратьСделку, собратьЗакрытие, состояние as состояниеКривой, ОСНОВНАЯ_СЕТЬ } from "./solana-launch.js";
 import { котировка, сделка as свопJupiter, SOL_MINT } from "./solana.js";
+import { собратьОбменБиржи } from "./_dexSolana.js";
 import { нуженВторойКлюч } from "./_second.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -1174,21 +1175,29 @@ export default async function handler(req, res) {
       if (оп.повтор) return res.status(200).json({ signature: оп.signature, repeat: true });
 
       try {
-        const собрано = await собратьСделку({
-          wallet: строка.address,
-          mint: String(тело.mint),
-          продажа,
-          amount: сумма,
-          minOut: тело.minOut,
-          скорость: ["normal", "fast", "turbo"].includes(тело.speed) ? тело.speed : "normal",
-        });
+        /* Вышел на биржу — сделка идёт в пуле: кривая закрыта, и её
+           инструкция отбилась бы. Адрес пула пишет сервер, заведя его
+           (api/solana-migrate.js). */
+        const { data: запись } = await db.from("tokens").select("dex_pool_address").eq("address", String(тело.mint)).maybeSingle();
+        const пул = запись && запись.dex_pool_address;
+        const собрано = пул
+          ? await собратьОбменБиржи({ wallet: строка.address, mint: String(тело.mint), пул, продажа, amount: сумма, slippageBps: тело.slippageBps })
+          : await собратьСделку({
+            wallet: строка.address,
+            mint: String(тело.mint),
+            продажа,
+            amount: сумма,
+            minOut: тело.minOut,
+            скорость: ["normal", "fast", "turbo"].includes(тело.speed) ? тело.speed : "normal",
+          });
         const подпись = await подписатьИОтправить({
           db, user, строка, набор,
-          base64: собрано.transaction, дело: "trade",
+          base64: собрано.transaction, дело: пул ? "dex" : "trade",
           // При продаже с кошелька уходит только аренда счёта и комиссия.
           максПеревода: (продажа ? 0.01 : сумма + 0.01) * LAMPORTS,
           // Итог сделки — всем зрителям графика сразу после отправки.
-          послеОтправки: () => {
+          // У пула биржи потока кривой нет — ему и сообщать нечего.
+          послеОтправки: пул ? null : () => {
             import("./curve-stream.js").then(({ ожидаемаяСделка }) => ожидаемаяСделка(String(тело.mint), {
               продажа, sol: продажа ? 0 : сумма, tokens: продажа ? собрано.tokens : 0,
               // Ставка кривой: в мейннете процент, в тестовых сетях ноль.

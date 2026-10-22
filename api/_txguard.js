@@ -35,6 +35,9 @@ const ВЫЧИСЛЕНИЯ = "ComputeBudget111111111111111111111111111111";
 const ЗАМЕТКА = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr";
 const МЕТАДАННЫЕ = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s";
 const JUPITER = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
+// Пулы Raydium CPMM — куда токены площадки выходят после кривой.
+const RAYDIUM_CPMM = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C";
+const RAYDIUM_CPMM_DEVNET = "DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb";
 
 // Номера инструкций системной программы (первые четыре байта данных).
 const СИС = { СОЗДАТЬ: 0, НАЗНАЧИТЬ: 1, ПЕРЕВОД: 2, ВЫДЕЛИТЬ: 8, ПЕРЕВОД_С_СЕМЕНЕМ: 11 };
@@ -62,6 +65,14 @@ const ПРАВИЛА = {
     системные: [СИС.СОЗДАТЬ, СИС.ПЕРЕВОД, СИС.НАЗНАЧИТЬ, СИС.ВЫДЕЛИТЬ],
     // Обёртка SOL и её закрытие обратно: без них своп не проходит.
     токенные: [ТОК.СИНХРОН, ТОК.ЗАКРЫТЬ, ТОК.ПЕРЕВОД, ТОК.ПЕРЕВОД_ТОЧНЫЙ],
+    кривая: false,
+  },
+  // Сделка в пуле биржи после выхода с кривой: обёртка SOL, обмен,
+  // разворот обратно. Других программ тут быть не может.
+  dex: {
+    программы: [СИСТЕМНАЯ, ТОКЕНЫ, АТА, ВЫЧИСЛЕНИЯ, RAYDIUM_CPMM, RAYDIUM_CPMM_DEVNET],
+    системные: [СИС.ПЕРЕВОД],
+    токенные: [ТОК.СИНХРОН, ТОК.ЗАКРЫТЬ],
     кривая: false,
   },
   withdraw: {
