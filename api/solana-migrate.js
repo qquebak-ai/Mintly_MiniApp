@@ -17,7 +17,7 @@
  */
 import { createClient } from "@supabase/supabase-js";
 import { Connection, Keypair, PublicKey, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { getAssociatedTokenAddressSync, createBurnInstruction } from "@solana/spl-token";
 import { состояние, ОСНОВНАЯ_СЕТЬ } from "./solana-launch.js";
 import { инструкцииПула, инструкцияСжечьLP, ЦЕНА_ПУЛА_SOL } from "./_raydium.js";
 
@@ -70,9 +70,20 @@ export async function вывестиНаБиржу() {
       const mint = new PublicKey(tok.address);
       const своиТокены = getAssociatedTokenAddressSync(mint, ключ.publicKey);
       const остаток = await connection.getTokenAccountBalance(своиТокены).catch(() => null);
-      const токенов = остаток && остаток.value ? BigInt(остаток.value.amount) : 0n;
-      if (!(токенов > 0n)) continue;
+      const есть = остаток && остаток.value ? BigInt(остаток.value.amount) : 0n;
+      if (!(есть > 0n)) continue;
       const лампортов = BigInt(Math.max(0, Math.round(st.graduationSol - ЦЕНА_ПУЛА_SOL * LAMPORTS)));
+      /* Пул открывается по последней цене кривой, а не по всему остатку:
+         если порог меньше полного выкупа (в devnet), непроданного
+         остаётся много, и пул из всего остатка стоил бы в разы дешевле
+         кривой — первый же продавец обвалил бы цену. Цена конца кривой —
+         (запас + порог) / (токены − проданное по ней); лишнее сжигается.
+         В mainnet остаток и так совпадает с этой долей. */
+      const x = BigInt(Math.round(st.virtualSol)) + BigInt(Math.round(st.graduationSol));
+      const y = (BigInt(Math.round(st.virtualSol)) * BigInt(Math.round(st.virtualTokens))) / x;
+      const поЦене = (лампортов * y) / x;
+      const токенов = поЦене > 0n && поЦене < есть ? поЦене : есть;
+      const лишнее = есть - токенов;
       const наКошельке = BigInt(await connection.getBalance(ключ.publicKey));
       if (наКошельке < лампортов + BigInt(Math.round(ЦЕНА_ПУЛА_SOL * LAMPORTS))) {
         console.warn("[выход на DEX]", tok.ticker, "на кошельке ликвидности не хватает SOL");
@@ -82,7 +93,12 @@ export async function вывестиНаБиржу() {
       const { инструкции, пул, lp, lpСчёт } = инструкцииПула({ владелец: ключ.publicKey, mint, токенов, лампортов, сеть });
       // Пул уже есть — значит прошлая попытка дошла до сети, а запись в
       // базу не успела: только записываем.
-      if (!(await connection.getAccountInfo(пул))) await отправить(connection, ключ, инструкции);
+      if (!(await connection.getAccountInfo(пул))) {
+        // Лишнее сгорает в той же транзакции, что заводит пул: иначе оно
+        // осталось бы у площадки.
+        const сжечь = лишнее > 0n ? [createBurnInstruction(своиТокены, mint, ключ.publicKey, лишнее)] : [];
+        await отправить(connection, ключ, [...сжечь, ...инструкции]);
+      }
 
       // LP-токены сжигаем: ликвидность заперта навсегда, как у pump.fun.
       const lpОстаток = await connection.getTokenAccountBalance(lpСчёт).catch(() => null);

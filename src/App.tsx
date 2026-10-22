@@ -20320,7 +20320,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
      цене, а график — о капитализации, и числа не сходились. */
   // На сайте шкала по умолчанию в капитализации — так её читают на
   // терминалах; цена за один токен с шестью нулями ничего не говорит.
-  const [chartMode, setChartMode] = useState(() => (этоПК() ? "mcap" : "price"));
+  // Как у pump.fun: график — в капитализации. Цена мемкоина — это
+  // семь нулей после запятой, а капитализацию читают одним взглядом.
+  const [chartMode, setChartMode] = useState("mcap");
   const [tf, setTf] = useState(() => {
     try {
       if (typeof window !== "undefined") {
