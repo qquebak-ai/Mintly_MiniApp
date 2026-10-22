@@ -6638,6 +6638,30 @@ function fmtSince(iso) {
    что и вкладка транзакций у токена; показываем по одной сделке за раз и
    раз в несколько секунд переключаем — так строка остаётся узкой и не
    отвлекает от виджета под ней. */
+/* Последняя лента сделок каждой цепочки — в памяти и на телефоне.
+   Приложение подтягивает её при запуске, и раздел «Мемпад» показывает
+   строку сразу, а не через секунду после открытия. */
+const ЛЕНТА_КЛЮЧ = "mintly_trades_feed_";
+const лентаКеш = new Map();
+function лентаИзПамяти(цепочка) {
+  if (лентаКеш.has(цепочка)) return лентаКеш.get(цепочка);
+  try {
+    const j = JSON.parse(localStorage.getItem(ЛЕНТА_КЛЮЧ + цепочка) || "null");
+    if (j && Array.isArray(j.rows)) { лентаКеш.set(цепочка, j); return j; }
+  } catch { /* приватный режим */ }
+  return null;
+}
+async function лентаСделок(цепочка) {
+  const r = await fetch(апи(`/api/trades-feed?limit=50&chain=${цепочка}`));
+  if (!r.ok) return null;
+  const j = await r.json();
+  if (j && Array.isArray(j.rows)) {
+    лентаКеш.set(цепочка, j);
+    try { localStorage.setItem(ЛЕНТА_КЛЮЧ + цепочка, JSON.stringify(j)); } catch { /* приватный режим */ }
+  }
+  return j;
+}
+
 function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "ton" }) {
   const [buys, setBuys] = useState([]);
   // Пока не пришёл первый ответ, на месте ленты стоит скелет той же
@@ -6692,14 +6716,13 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
 
     const нужная = этоEVM(сеть) ? сеть : сеть === "sol" ? "solana" : "ton";
 
-    async function прочитать() {
-      let j = null;
-      try {
+    async function прочитать(готовый = null) {
+      let j = готовый;
+      if (!j) try {
         // Лента своя у каждой цепочки: в общем списке последних сделок
         // раздел GRAM оставался пустым — все свежие шли в Solana.
-        const r = await fetch(апи(`/api/trades-feed?limit=50&chain=${нужная}`));
-        if (!r.ok) { if (!брошено) setLoaded(true); return; }
-        j = await r.json();
+        j = await лентаСделок(нужная);
+        if (!j) { if (!брошено) setLoaded(true); return; }
       } catch { if (!брошено) setLoaded(true); return; }
       if (брошено) return;
       // Даже пустой ответ — это ответ: держать скелет, пока сделок нет,
@@ -6754,6 +6777,10 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
       setBuys(очередь);
     }
 
+    /* Лента — сразу из памяти: её подтянули ещё при запуске
+       приложения, и раздел открывается со строкой, а не ждёт ответа. */
+    const заранее = лентаИзПамяти(нужная);
+    if (заранее) прочитать(заранее);
     прочитать();
     const iv = setInterval(() => {
       if (typeof document === "undefined" || document.visibilityState === "visible") прочитать();
@@ -19012,8 +19039,8 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
           background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", видКарты.металл ? 0.3 : 0.13)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
           transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
         }} />}
-        {/* Тонкая светлая кромка — край минимальной карты на чёрном фоне. */}
-        {видКарты.минимал && <span aria-hidden style={{ position: "absolute", inset: 0, borderRadius: 24, boxShadow: видКарты.металл ? `inset 0 0 0 1px ${hexA("#FFFFFF", 0.22)}, inset 0 1px 0 ${hexA("#FFFFFF", 0.35)}` : `inset 0 0 0 1px ${hexA("#FFFFFF", 0.07)}`, pointerEvents: "none" }} />}
+        {/* Обводки у карты нет: светлая кайма по краю читалась белой
+            рамкой вокруг тёмного металла. */}
         {/* Отблеск наклона: полоса света едет по карте вслед за углом и
             гаснет, когда карта встаёт ровно. */}
         <span aria-hidden style={{
@@ -29269,6 +29296,11 @@ const FEE_PERCENT = 0; // комиссии площадки нет
       return "ton";
     }
   });
+  // Ленту сделок мемпада подтягиваем заранее — раздел откроется с ней.
+  useEffect(() => {
+    const цепочка = этоEVM(сетьМемпада) ? сетьМемпада : сетьМемпада === "sol" ? "solana" : "ton";
+    лентаСделок(цепочка).catch(() => {});
+  }, [сетьМемпада]);
   useEffect(() => {
     try { if (typeof window !== "undefined") window.localStorage.setItem("mintly.network", сетьМемпада); } catch { /* приватный режим */ }
   }, [сетьМемпада]);

@@ -25,6 +25,8 @@ const СТРОК = 50;
 // Сделки идут поштучно, а лента и так листает медленно: пять секунд
 // памяти снимают десяток одинаковых запросов с открытых экранов.
 const ПАМЯТЬ_МС = 5000;
+// Сколько отдаём постаревший ответ, пока фоном собирается свежий.
+const ДОЛЬШЕ_МС = 10 * 60 * 1000;
 // Сколько запуск считается новостью. Полчаса: за это время его увидит
 // каждый, кто был в приложении, а назавтра он в ленту уже не вернётся.
 const ЗАПУСК_СВЕЖ_МС = 30 * 60 * 1000;
@@ -49,11 +51,22 @@ export default async function handler(req, res) {
   const цепочка = ["ton", "bsc", "base", "eth"].includes(запрошена) ? запрошена : "solana";
   const ключКеша = цепочка;
   const было = кеш.get(ключКеша);
-  if (было && было.до > Date.now()) {
-    res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Cache-Control", "no-store");
+  /* Ответ — из памяти сразу, даже если он постарел: раздел открывается
+     с лентой, а не ждёт секунду, пока три запроса к базе пройдут по
+     очереди. Свежий список собирается фоном и уйдёт следующему запросу. */
+  if (было && было.до > Date.now()) return res.status(200).json(было.тело);
+  if (было && Date.now() - было.до < ДОЛЬШЕ_МС) {
+    if (!было.идёт) {
+      было.идёт = собрать(db, req, цепочка, ключКеша).catch(() => null).finally(() => { было.идёт = null; });
+    }
     return res.status(200).json(было.тело);
   }
+  const итог = await собрать(db, req, цепочка, ключКеша);
+  return итог.ошибка ? res.status(500).json(итог.ошибка) : res.status(200).json(итог.тело);
+}
 
+async function собрать(db, req, цепочка, ключКеша) {
   const предел = Math.min(СТРОК, Math.max(5, Number((req.query && req.query.limit) || СТРОК) || СТРОК));
 
   // Токены этой цепочки: по их адресам отбираются и сделки, и запуски.
@@ -64,7 +77,7 @@ export default async function handler(req, res) {
     .not("address", "is", null)
     .order("created_at", { ascending: false })
     .limit(300);
-  if (бедаТокенов) return res.status(500).json({ error: "db", detail: бедаТокенов.message });
+  if (бедаТокенов) return { ошибка: { error: "db", detail: бедаТокенов.message } };
   const адресаЦепочки = (цепочкаТокенов || []).map((т) => т.address).filter(Boolean);
 
   /* Обмены сюда не попадают: side «swap» — это перекладывание своих
@@ -86,7 +99,7 @@ export default async function handler(req, res) {
       : Promise.resolve({ data: [], error: null }),
   ]);
   const error = поАдресуОтвет.error || поИдОтвет.error;
-  if (error) return res.status(500).json({ error: "db", detail: error.message });
+  if (error) return { ошибка: { error: "db", detail: error.message } };
   const собранные = new Map();
   for (const с of [...(поАдресуОтвет.data || []), ...(поИдОтвет.data || [])]) собранные.set(с.id, с);
   const сделки = [...собранные.values()]
@@ -200,6 +213,5 @@ export default async function handler(req, res) {
   };
 
   кеш.set(ключКеша, { до: Date.now() + ПАМЯТЬ_МС, тело });
-  res.setHeader("Cache-Control", "no-store");
-  return res.status(200).json(тело);
+  return { тело };
 }
