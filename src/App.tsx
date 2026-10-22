@@ -5399,7 +5399,9 @@ const СУММЫ_ПОКУПКИ_GRAM = [1, 5, 25];
    эти три кнопки, и нажатие сразу отправляет сделку. Живёт на телефоне:
    это привычка руки, а не данные аккаунта. */
 const БЫСТРЫЕ_КЛЮЧ = "mintly_quick_trade";
-const БЫСТРЫЕ_ПО_УМОЛЧАНИЮ = { oneClick: false, buy: { SOL: [0.1, 0.5, 1], TON: СУММЫ_ПОКУПКИ_GRAM }, sell: [25, 50, 100] };
+const БЫСТРЫЕ_ПО_УМОЛЧАНИЮ = { oneClick: false, buy: { SOL: [0.1, 0.5, 1], TON: СУММЫ_ПОКУПКИ_GRAM, BNB: [0.01, 0.05, 0.1], ETH: [0.005, 0.01, 0.05] }, sell: [25, 50, 100] };
+// Монета быстрых сумм для сети токена: у Base и Ethereum она общая — ETH.
+const монетаБыстрых = (token) => (token && token.chain === "solana" ? "SOL" : token && token.chain === "bsc" ? "BNB" : token && этоEVM(token.chain) ? "ETH" : "TON");
 function тройка(v, запас, макс = Infinity) {
   return Array.isArray(v) && v.length === 3 && v.every((x) => Number(x) > 0 && Number(x) <= макс) ? v.map(Number) : запас;
 }
@@ -5409,7 +5411,7 @@ function быстрыеНастройки() {
   const д = БЫСТРЫЕ_ПО_УМОЛЧАНИЮ;
   return {
     oneClick: !!о.oneClick,
-    buy: { SOL: тройка(о.buy && о.buy.SOL, д.buy.SOL), TON: тройка(о.buy && о.buy.TON, д.buy.TON) },
+    buy: Object.fromEntries(Object.keys(д.buy).map((к) => [к, тройка(о.buy && о.buy[к], д.buy[к])])),
     sell: тройка(о.sell, д.sell, 100),
   };
 }
@@ -20247,7 +20249,7 @@ function КарточкаСтрок({ заголовок, строки }) {
   );
 }
 
-function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = true, connected = true, themeKey, currentUserId = null, onNeedAuth, onOpenProfile, tonPriceUsd = 0, walletAddress = null, onManage = null, изменение24 = null }) {
+function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = null, unlocked = true, connected = true, themeKey, currentUserId = null, onNeedAuth, onOpenProfile, tonPriceUsd = 0, walletAddress = null, onManage = null, изменение24 = null }) {
   // График вынесен из вкладок наверх, поэтому здесь остались только
   // разделы под ним: держатели, лента, о токене.
   // Экран открывается на статистике: цифры рынка важнее ленты чужих
@@ -20530,6 +20532,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
      суточное движение цены. */
   const [вложено, setВложено] = useState(null);
   const [листВыхода, setЛистВыхода] = useState(false);
+  const [быстрые] = useБыстрые();
   useEffect(() => {
     let брошено = false;
     setВложено(null);
@@ -21588,7 +21591,36 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
 
         {/* Кнопки сделки живут здесь же: решение принимается по позиции,
             а не по отдельному блоку внизу страницы. */}
-        {curve && curve.graduated && !рынокОткрыт ? null : (
+        {curve && curve.graduated && !рынокОткрыт ? null : быстрые.oneClick && onQuick ? (
+          /* Покупка в 1 клик: вместо двух кнопок — свои суммы покупки и
+             доли продажи из настроек. Нажатие сразу отправляет сделку. */
+          <div className="flex flex-col" style={{ gap: 8 }}>
+            {[["buy", быстрые.buy[монетаБыстрых(token)] || [], ГРАДИЕНТ_РОСТА, "#06210F"], ["sell", быстрые.sell, ГРАДИЕНТ_ПАДЕНИЯ, "#FFFFFF"]].map(([вид, суммы, фон, цвет]) => (
+              <div key={вид} className="flex" style={{ gap: 8 }}>
+                {суммы.map((v) => (
+                  <button
+                    key={v}
+                    disabled={вид === "sell" && !(позиция > 0)}
+                    onClick={() => {
+                      haptic("medium");
+                      if (вид === "buy") onQuick("buy", v);
+                      // Доля позиции — от того, что лежит на кошельке сейчас;
+                      // «всё» без хвоста округления, который сеть отбила бы.
+                      else onQuick("sell", v >= 100 ? позиция : Math.floor(позиция * v / 100 * 1e6) / 1e6);
+                    }}
+                    className="fx-tap flex-1 rounded-[14px] py-2.5"
+                    style={{
+                      fontFamily: displayFont, fontWeight: 700, fontSize: 14, border: "none",
+                      background: фон, backgroundSize: "220% 220%", animation: "кнопкаПереливается 5.5s ease-in-out infinite",
+                      color: цвет, opacity: вид === "sell" && !(позиция > 0) ? 0.4 : 1, fontVariantNumeric: "tabular-nums",
+                    }}>
+                    {вид === "buy" ? `${v} ${монетаБыстрых(token) === "TON" ? ТИКЕР_TON : монетаБыстрых(token)}` : `${v}%`}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
           <div className="flex gap-2">
             <button
               onClick={() => { setВспышка("buy"); onBuy(); }}
@@ -22598,7 +22630,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // использования — ниже на него смотрят и предел суммы, и подписи.
   const соло = token.chain === "solana";
   const монета = соло ? "SOL" : ТИКЕР_TON;
-  const ключМонеты = соло ? "SOL" : "TON";
+  const ключМонеты = монетаБыстрых(token);
   const сохранитьТройку = (тройка) => (isBuy
     ? сохранитьБыстрые({ buy: { ...быстрые.buy, [ключМонеты]: тройка } })
     : сохранитьБыстрые({ sell: тройка }));
@@ -24416,7 +24448,7 @@ function НастройкаБыстрых() {
       <div className="flex items-center justify-between rounded-[20px] py-3 px-3.5" style={{ background: T.surfaceHi, gap: 12 }}>
         <span className="flex flex-col" style={{ minWidth: 0 }}>
           <span style={{ fontFamily: bodyFont, color: T.ice, fontSize: 14.5 }}>Покупка в 1 клик</span>
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2, lineHeight: 1.4 }}>Окно сделки покажет только три суммы — нажатие сразу покупает или продаёт</span>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2, lineHeight: 1.4 }}>На странице токена вместо «Купить» и «Продать» — твои суммы и доли: нажатие сразу покупает или продаёт</span>
         </span>
         <ToggleSwitch on={н.oneClick} onChange={(v) => { haptic("light"); сохранить({ oneClick: v }); }} />
       </div>
@@ -24424,6 +24456,10 @@ function НастройкаБыстрых() {
       <БыстрыеСуммы значения={н.buy.SOL} подпись={(v) => `${v} SOL`} onВыбор={() => {}} onСохранить={(т) => сохранить({ buy: { ...н.buy, SOL: т } })} />
       <div style={строка}>Покупка, {ТИКЕР_TON}</div>
       <БыстрыеСуммы значения={н.buy.TON} подпись={(v) => `${v} ${ТИКЕР_TON}`} onВыбор={() => {}} onСохранить={(т) => сохранить({ buy: { ...н.buy, TON: т } })} />
+      <div style={строка}>Покупка, BNB</div>
+      <БыстрыеСуммы значения={н.buy.BNB} подпись={(v) => `${v} BNB`} onВыбор={() => {}} onСохранить={(т) => сохранить({ buy: { ...н.buy, BNB: т } })} />
+      <div style={строка}>Покупка, ETH (Base и Ethereum)</div>
+      <БыстрыеСуммы значения={н.buy.ETH} подпись={(v) => `${v} ETH`} onВыбор={() => {}} onСохранить={(т) => сохранить({ buy: { ...н.buy, ETH: т } })} />
       <div style={строка}>Продажа, доля позиции</div>
       <БыстрыеСуммы значения={н.sell} подпись={(v) => `${v}%`} макс={100} onВыбор={() => {}} onСохранить={(т) => сохранить({ sell: т })} />
     </div>
@@ -32614,6 +32650,18 @@ function mapTokenRow(row) {
     return true;
   }
   function handleBuy() { if (token && token.демо) { showToast("Это демо-токен — его нельзя купить"); return; } if (нуженКошелёкНаСайте()) return; if (requireUnlockRoot()) setTradeModal({ mode: "buy" }); }
+  /* Сделка в 1 клик со страницы токена: сумма (или количество при
+     продаже) приходит готовой, окно сделки не открывается. Проверки те
+     же, что у кнопок «Купить» и «Продать». */
+  function быстраяСделка(mode, сумма) {
+    if (token && token.демо) { showToast(mode === "buy" ? "Это демо-токен — его нельзя купить" : "Это демо-токен — его нельзя продать"); return; }
+    if (нуженКошелёкНаСайте()) return;
+    if (!requireUnlockRoot()) return;
+    if (!(сумма > 0)) return;
+    const монета = монетаБыстрых(token) === "TON" ? ТИКЕР_TON : монетаБыстрых(token);
+    const pay = mode === "buy" ? `${сумма.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}` : сумма.toLocaleString("ru-RU");
+    confirmTrade(mode, pay, "", "", сумма, 0);
+  }
   function handleSell() { if (token && token.демо) { showToast("Это демо-токен — его нельзя продать"); return; } if (нуженКошелёкНаСайте()) return; if (requireUnlockRoot()) setTradeModal({ mode: "sell" }); }
   // Своя запись о сделке. Цепочка знает о переводе, но не знает, кто
   // его сделал из приложения и по какому курсу — а без этого не
@@ -33219,7 +33267,7 @@ function mapTokenRow(row) {
             />
             </div>
           )}
-          {view === "token" && <div className={уходСтраницы ? "fx-view-out" : undefined} style={undefined}><TokenDetail t={token} изменение24={изменениеОткрытого} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} unlocked={accountCreated} connected={connected} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} /></div>}
+          {view === "token" && <div className={уходСтраницы ? "fx-view-out" : undefined} style={undefined}><TokenDetail t={token} изменение24={изменениеОткрытого} onBack={backFromToken} showToast={showToast} onBuy={handleBuy} onSell={handleSell} onQuick={быстраяСделка} unlocked={accountCreated} connected={connected} themeKey={appSettings.theme} currentUserId={userId} onNeedAuth={openCreateProfile} onOpenProfile={openUserProfile} tonPriceUsd={tonPriceUsd} walletAddress={walletAddress} onManage={свойТокен ? () => setManageToken_(свойТокен) : null} /></div>}
           {view === "create" && (
             <div className={уходСтраницы ? "fx-view-out" : undefined}>
             <CreateView
