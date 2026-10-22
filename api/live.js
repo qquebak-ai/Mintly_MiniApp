@@ -151,8 +151,8 @@ function статистикаДемо(к) {
   let сделок = 0, объём = 0;
   for (const [м, кол, о] of д.минуты) if (м >= граница) { сделок += кол; объём += о; }
   // X «создателя» демо-токена — официальный X площадки, если он задан
-  // (MINTLY_X_HANDLE); нет — у демо X не показывается вовсе.
-  const x = String(process.env.MINTLY_X_HANDLE || "").replace(/^@/, "").trim();
+  // (MINTLY_X_HANDLE), по умолчанию — @Mintlycompany.
+  const x = String(process.env.MINTLY_X_HANDLE || "Mintlycompany").replace(/^@/, "").trim();
   // Изменение за сутки — от цены сутки назад (или от самой ранней, если
   // демо моложе суток): один и тот же процент и в ленте, и в карточке.
   const тогда = д.цены24.length ? д.цены24[0][1] : 0;
