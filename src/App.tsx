@@ -23471,7 +23471,15 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
                   style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: T.ice, fontFamily: displayFont, fontSize: 18, fontWeight: 700, padding: 0 }}
                 />
                 <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 15, fontWeight: 700 }}>{единица}</span>
-                <button type="button" onClick={() => { haptic("light"); setForm((f) => ({ ...f, buyAmount: String(верх) })); }} className="fx-tap"
+                <button type="button" onClick={() => {
+                  haptic("light");
+                  // «Макс» — всё, что есть на кошельке, за вычетом запаса на
+                  // комиссию сети, но не больше, чем примет кривая. Округляем
+                  // вниз до шага: вверх — и запуску не хватит на газ.
+                  const есть = остатокСети != null ? Math.max(0, остатокСети - ЗАПАС_ЗАПУСКА) : верх;
+                  const v = Math.floor(Math.min(верх, есть) / шаг + 1e-9) * шаг;
+                  setForm((f) => ({ ...f, buyAmount: v > 0 ? String(Number(v.toFixed(вEVM ? 3 : 2))) : "" }));
+                }} className="fx-tap"
                   style={{ padding: "6px 10px", borderRadius: 999, border: `1px solid ${T.line}`, background: "transparent", color: T.ice, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
                   Макс
                 </button>
