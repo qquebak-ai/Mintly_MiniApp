@@ -22633,24 +22633,9 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
             Нажатие — и сделка ушла. Под суммой — сколько придёт. */}
         {быстрые.oneClick ? (
           <>
-        <div className="flex items-center justify-between" style={{ marginTop: 16 }}>
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{isBuy ? "Купить в 1 клик" : "Продать в 1 клик"}</span>
-          {/* «Доступно» — это и есть «МАКС»: нажатие ставит весь остаток. */}
-          <span role="button" onClick={() => { haptic("light"); setPct(1); }} className="fx-tap" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, cursor: "pointer" }}>
-            {t("available")}: {соло
-              // Пока баланс кошелька приложения не приехал, предела нет.
-              ? (solБаланс == null
-                ? <РазмытаяСумма образец={isBuy ? "0,0000 SOL" : `0 000 ${token.ticker}`} />
-                : isBuy
-                  ? `${(solДоступно || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} SOL`
-                  : `${solБаланс.token.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${token.ticker}`)
-              : isBuy
-                ? `${spendableTon.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${ТИКЕР_TON}`
-                : balanceKnown
-                  ? `${holdingTokens.toLocaleString("ru-RU")} ${token.ticker}`
-                  : <РазмытаяСумма образец={`0 000 ${token.ticker}`} />}
-          </span>
-        </div>
+        {/* В 1 клик — только суммы: строка «Доступно» и подпись режима
+            здесь лишние, нажатие на сумму само и есть сделка. */}
+        <div style={{ marginTop: 16 }} />
             <БыстрыеСуммы
               крупно
               цвет={isBuy ? T.up : T.down}
