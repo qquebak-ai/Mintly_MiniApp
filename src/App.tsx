@@ -21154,12 +21154,21 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
         else if (цена > 0) setChartData((prev) => {
           if (!prev || !prev.candles || !prev.candles.length) return prev;
           const свечи = prev.candles.slice();
-          const последняя = { ...свечи[свечи.length - 1] };
-          if (последняя.close === цена) return prev;
-          последняя.close = цена;
-          последняя.high = Math.max(последняя.high, цена);
-          последняя.low = Math.min(последняя.low, цена);
-          свечи[свечи.length - 1] = последняя;
+          const было = свечи[свечи.length - 1];
+          if (было.close === цена) return prev;
+          /* Сделка в новом интервале — новая свеча сразу, от закрытия
+             прежней. Раньше цена всегда двигала последнюю свечу: в новой
+             минуте первая сделка сначала тянула прошлую свечу, а через
+             секунду, когда приходил ряд с сервера, та вставала на место
+             и только тогда появлялась новая. */
+          const шагTf = TF_SECONDS[prev.tf || tf] || 60;
+          const сейчас = Math.floor(Date.now() / 1000 / шагTf) * шагTf;
+          if (было.time < сейчас) {
+            свечи.push({ time: сейчас, open: было.close, high: Math.max(было.close, цена), low: Math.min(было.close, цена), close: цена });
+            const объём = (prev.volume || []).concat([{ time: сейчас, value: 0, color: hexA(цена >= было.close ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ, 0.32) }]);
+            return { ...prev, candles: свечи, volume: объём };
+          }
+          свечи[свечи.length - 1] = { ...было, close: цена, high: Math.max(было.high, цена), low: Math.min(было.low, цена) };
           return { ...prev, candles: свечи };
         });
       } catch { /* сеть моргнула — следующий круг */ } finally { идёт = false; }
