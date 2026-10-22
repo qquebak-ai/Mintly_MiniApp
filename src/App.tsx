@@ -24726,7 +24726,9 @@ function PinLockScreen({ pin, profile, onUnlock, onForgot }) {
  * разделы.
  */
 const ГРУППЫ_НАСТРОЕК = [
-  ["security", "notify", "language", "theme"],
+  // Быстрая сделка — отдельной строкой рядом с уведомлениями: пункт был
+  // заведён, но в группы не попал, и найти его в настройках было нельзя.
+  ["security", "notify", "quick", "language", "theme"],
   // Поддержка живёт в боковом меню, реферальная программа — там же, рядом
   // с аккаунтом X: в настройках они только дублировались.
   ["architecture", "privacy"],
@@ -24738,27 +24740,52 @@ const ГРУППЫ_НАСТРОЕК = [
    карандашом, что и в окне сделки: правка здесь видна и там. */
 function НастройкаБыстрых() {
   const [н, сохранить] = useБыстрые();
-  const строка = { fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 16 };
+  const ru = lang !== "EN";
+  const монеты = [
+    ["SOL", "SOL", "Solana"],
+    ["TON", ТИКЕР_TON, "TON"],
+    ["BNB", "BNB", "BNB Chain"],
+    ["ETH", "ETH", "Base, Ethereum"],
+  ];
   return (
-    <div className="mt-2">
-      <div className="flex items-center justify-between rounded-[20px] py-3 px-3.5" style={{ background: T.surfaceHi, gap: 12 }}>
+    <>
+      {/* Сначала разрешение: без него суммы ниже ничего не меняют. */}
+      <div className="fx-card flex items-center justify-between" style={{ animationDelay: "40ms", gap: 12, padding: "14px 16px", borderRadius: 22, background: T.surface }}>
         <span className="flex flex-col" style={{ minWidth: 0 }}>
-          <span style={{ fontFamily: bodyFont, color: T.ice, fontSize: 14.5 }}>Покупка в 1 клик</span>
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2, lineHeight: 1.4 }}>На странице токена вместо «Купить» и «Продать» — твои суммы и доли: нажатие сразу покупает или продаёт</span>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>{ru ? "Покупка в 1 клик" : "One-tap trading"}</span>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 3, lineHeight: 1.4 }}>
+            {н.oneClick
+              ? (ru ? "Включено: нажатие на сумму сразу отправляет сделку" : "On: tapping an amount sends the trade right away")
+              : (ru ? "Выключено: на странице токена обычные «Купить» и «Продать»" : "Off: the token page shows the usual Buy and Sell")}
+          </span>
         </span>
         <ToggleSwitch on={н.oneClick} onChange={(v) => { haptic("light"); сохранить({ oneClick: v }); }} />
       </div>
-      <div style={строка}>Покупка, SOL</div>
-      <БыстрыеСуммы значения={н.buy.SOL} подпись={(v) => `${v} SOL`} onВыбор={() => {}} onСохранить={(т) => сохранить({ buy: { ...н.buy, SOL: т } })} />
-      <div style={строка}>Покупка, {ТИКЕР_TON}</div>
-      <БыстрыеСуммы значения={н.buy.TON} подпись={(v) => `${v} ${ТИКЕР_TON}`} onВыбор={() => {}} onСохранить={(т) => сохранить({ buy: { ...н.buy, TON: т } })} />
-      <div style={строка}>Покупка, BNB</div>
-      <БыстрыеСуммы значения={н.buy.BNB} подпись={(v) => `${v} BNB`} onВыбор={() => {}} onСохранить={(т) => сохранить({ buy: { ...н.buy, BNB: т } })} />
-      <div style={строка}>Покупка, ETH (Base и Ethereum)</div>
-      <БыстрыеСуммы значения={н.buy.ETH} подпись={(v) => `${v} ETH`} onВыбор={() => {}} onСохранить={(т) => сохранить({ buy: { ...н.buy, ETH: т } })} />
-      <div style={строка}>Продажа, доля позиции</div>
-      <БыстрыеСуммы значения={н.sell} подпись={(v) => `${v}%`} макс={100} onВыбор={() => {}} onСохранить={(т) => сохранить({ sell: т })} />
-    </div>
+
+      <div className="fx-card" style={{ animationDelay: "100ms", opacity: н.oneClick ? 1 : 0.55, transition: `opacity ${EASE}` }}>
+        <SectionTitle>{ru ? "Суммы покупки" : "Buy amounts"}</SectionTitle>
+        <div className="flex flex-col" style={{ gap: 14, padding: "14px 16px", borderRadius: 22, background: T.surface }}>
+          {монеты.map(([ключ, тикер, сеть]) => (
+            <div key={ключ}>
+              <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginBottom: 6 }}>{тикер} · {сеть}</div>
+              <БыстрыеСуммы значения={н.buy[ключ]} подпись={(v) => `${v} ${тикер}`} onВыбор={() => {}} onСохранить={(т) => сохранить({ buy: { ...н.buy, [ключ]: т } })} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="fx-card" style={{ animationDelay: "160ms", opacity: н.oneClick ? 1 : 0.55, transition: `opacity ${EASE}` }}>
+        <SectionTitle>{ru ? "Доли продажи" : "Sell shares"}</SectionTitle>
+        <div style={{ padding: "14px 16px", borderRadius: 22, background: T.surface }}>
+          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginBottom: 6 }}>{ru ? "Процент от позиции" : "Percent of position"}</div>
+          <БыстрыеСуммы значения={н.sell} подпись={(v) => `${v}%`} макс={100} onВыбор={() => {}} onСохранить={(т) => сохранить({ sell: т })} />
+        </div>
+      </div>
+
+      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.5 }}>
+        {ru ? "Нажми на карандаш, чтобы поменять суммы. Сеть сама берёт свою монету: в Solana — SOL, в TON — GRAM." : "Tap the pencil to change amounts. Each network uses its own coin."}
+      </p>
+    </>
   );
 }
 
@@ -25571,7 +25598,7 @@ const ДЛИННЫЕ_РАЗДЕЛЫ = new Set(["support", "architecture", "priva
 /* Эти разделы — страницы, а не листы: в них листают, заполняют анкету и
    переписываются, и большая карточка поверх приложения только съедала
    место по краям. Выглядят как «Достижения» — заголовок слева и списки. */
-const ПОЛНОЭКРАННЫЕ = new Set(["referral", "x", "support"]);
+const ПОЛНОЭКРАННЫЕ = new Set(["referral", "x", "support", "quick"]);
 
 /* Группа строк одной плашкой с тонкими разделителями — как списки на
    главной и в кошельке, вместо отдельной пилюли на каждую строку. */
@@ -25990,6 +26017,7 @@ function SettingsPanel({
   if (ПОЛНОЭКРАННЫЕ.has(item.key)) {
     const подводка = item.key === "referral" ? t("referralDesc")
       : item.key === "support" ? t("supportFaqLead")
+        : item.key === "quick" ? (lang === "EN" ? "Your amounts instead of Buy and Sell on the token page — one tap trades." : "Свои суммы вместо «Купить» и «Продать» на странице токена — одно нажатие и сделка.")
         : lang === "EN" ? "Your X name, avatar and badge show up across Mintly." : "Ник, аватар и значок из X видны везде в Mintly.";
     return createPortal(
       <div
