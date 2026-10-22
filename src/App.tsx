@@ -20630,6 +20630,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
      суточное движение цены. */
   const [вложено, setВложено] = useState(null);
   const [листВыхода, setЛистВыхода] = useState(false);
+  // Последний честный итог позиции — его держим, пока история догоняет кошелёк.
+  const прошлыйИтог = useRef(0);
+  useEffect(() => { прошлыйИтог.current = 0; }, [token.id]);
   const [быстрые] = useБыстрые();
   useEffect(() => {
     let брошено = false;
@@ -20646,13 +20649,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       const св = await состояниеВнутреннего();
       if (!св || !св.address) return null;
       const r = await fetch(апи(`/api/solana?action=position-cost&wallet=${св.address}&mint=${encodeURIComponent(адрес)}`)).then((x) => x.json());
-      return r && Number.isFinite(r.net) && r.trades > 0 ? { вложено: r.net, сделок: r.trades } : null;
+      return r && Number.isFinite(r.net) && r.trades > 0 ? { вложено: r.net, сделок: r.trades, токенов: (Number(r.bought) || 0) - (Number(r.sold) || 0) } : null;
     };
     const читать = () => поСети().catch(() => null)
       .then((и) => и || вложеноВТокен(currentUserId, адрес))
       .then((и) => { if (!брошено && и) setВложено(и); });
     читать();
-    const своя = () => setTimeout(читать, 1500);
+    // Сеть отдаёт свежую сделку в истории не сразу — перечитываем
+    // несколько раз, пока она не попадёт в расчёт.
+    const своя = () => { for (const мс of [1500, 4000, 8000, 15000]) setTimeout(читать, мс); };
     if (typeof window !== "undefined") window.addEventListener("mintly:сделка", своя);
     return () => {
       брошено = true;
@@ -21687,8 +21692,18 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
                ноль», и оно прятало настоящий минус: если создатель продал
                всё своё, у тебя остаётся весь выпуск, а денег в кривой —
                меньше, чем ты в неё положил. */
+            /* Вложенное считается по истории сделок в сети, а она отстаёт
+               от остатка кошелька на несколько секунд: только что купленные
+               токены уже лежат на кошельке, а их цена ещё не в расчёте —
+               выходил ложный плюс, который через секунду падал в ноль.
+               Пока количество из истории не сходится с кошельком, держим
+               прежнее значение. */
+            const сходится = !вложено || вложено.токенов == null
+              || Math.abs(вложено.токенов - позиция) <= Math.max(1, позиция * 0.005);
             let итог = вложеноUSD > 0 ? стоимостьПозиции - вложеноUSD : 0;
             if (Math.abs(итог) < Math.max(0.01, вложеноUSD * 0.005)) итог = 0;
+            if (!сходится) итог = прошлыйИтог.current;
+            else прошлыйИтог.current = итог;
             const плюс = итог >= 0;
             return (
               <span style={{ fontFamily: monoFont, fontSize: 12.5, color: итог === 0 ? T.faint : плюс ? T.up : T.down }}>
