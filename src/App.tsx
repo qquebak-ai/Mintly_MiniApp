@@ -31645,6 +31645,11 @@ function mapTokenRow(row) {
       setEvmТокен(t.price == null ? localTokenToFeedShape(t) : t);
       return;
     }
+    /* Строка ленты, у которой цена уже есть, открывалась как есть, а адрес
+       монеты в ней лежит в address, не в tokenAddress. Экран токена и окно
+       сделки читают tokenAddress — и у токена из «Твоих токенов» продажа
+       показывала «Доступно: 0», хотя монеты на кошельке были. */
+    if (t.price != null && !t.tokenAddress && t.address) t = { ...t, tokenAddress: t.address };
     setToken(t.price == null ? localTokenToFeedShape(t) : t);
     setView("token");
     запомнитьТокен(t);
