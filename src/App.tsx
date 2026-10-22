@@ -6794,6 +6794,45 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
     };
   }, [своиПоАдресу, сеть]);
 
+  /* Сделки демо-токена этой сети — тоже в ленту. Его сделки сервер
+     разыгрывает сам и в базу не пишет, поэтому в сетях, где настоящих
+     сделок ещё нет (BNB, Base, Ethereum), лента оставалась пустой. Темп —
+     как у блоков сети: строка появляется вместе с каждой сделкой. */
+  const демоСети = useMemo(() => {
+    const нужная = этоEVM(сеть) ? сеть : сеть === "sol" ? "solana" : "ton";
+    return (curveTokens || []).find((tok) => tok && tok.демо && (tok.chain || "ton") === нужная) || null;
+  }, [curveTokens, сеть]);
+  const ключДемоСети = демоСети ? `${демоСети.id}:${ключДемо(демоСети)}` : "";
+  useEffect(() => {
+    if (!демоСети) return undefined;
+    let живо = true;
+    const виденные = new Set();
+    const сеть_ = ключДемо(демоСети);
+    const mint = mintДемо(демоСети);
+    const читать = async () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      try {
+        const r = await живойЗапрос(`/api/live?demo=${сеть_}`);
+        const j = r.ok ? await r.json() : null;
+        if (!живо || !j || !j.trades) return;
+        const курс = курсСетиДемо(демоСети, tonUsd());
+        const новые = (j.trades[mint] || [])
+          .filter((с) => !виденные.has(с.id))
+          .map((с) => { виденные.add(с.id); return { id: `demo:${с.id}`, kind: с.side, at: new Date(с.at).toISOString(), from: null, volCoin: Number(с.coin) || 0, volUsd: (Number(с.coin) || 0) * курс, token: демоСети }; });
+        setLoaded(true);
+        if (!новые.length) return;
+        const очередь = [...новые, ...collectedRef.current]
+          .sort((a, b) => new Date(b.at) - new Date(a.at))
+          .slice(0, 60);
+        collectedRef.current = очередь;
+        setBuys(очередь);
+      } catch { /* сеть моргнула — следующий круг */ }
+    };
+    читать();
+    const id = setInterval(читать, 1500);
+    return () => { живо = false; clearInterval(id); };
+  }, [ключДемоСети]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     // Следить не за чем — значит лента уже «загружена»: без этого раздел
     // ждал бы её до самого предохранителя, хотя ждать нечего.
@@ -8399,7 +8438,18 @@ const mintДемо = (tok) => ДЕМО_СЕТИ[ключДемо(tok)] ? ДЕМ�
 function курсСетиДемо(tok, курсTon) {
   const к = ключДемо(tok);
   if (к === "sol") return solUsd();
-  if (к && к !== "ton") return курсМонетыEVM(ДЕМО_СЕТИ[к].chain, КЕШ_КУРСОВ_EVM);
+  if (к && к !== "ton") {
+    // Курсы EVM грузит хук кошелька и мемпада EVM; демо в общей ленте
+    // живёт и без них — просим курс сами, один раз.
+    if (!КЕШ_КУРСОВ_EVM.ts) {
+      КЕШ_КУРСОВ_EVM.ts = 1;
+      fetch(апи("/api/market-rates")).then((r) => r.json()).then((j) => {
+        const цена = (о) => Number(о && (о.price != null ? о.price : о)) || 0;
+        Object.assign(КЕШ_КУРСОВ_EVM, { bnb: цена(j && j.bnb) || КЕШ_КУРСОВ_EVM.bnb, eth: цена(j && j.eth) || КЕШ_КУРСОВ_EVM.eth, ts: Date.now() });
+      }).catch(() => { КЕШ_КУРСОВ_EVM.ts = 0; });
+    }
+    return курсМонетыEVM(ДЕМО_СЕТИ[к].chain, КЕШ_КУРСОВ_EVM);
+  }
   return курсTon > 0 ? курсTon : tonUsd();
 }
 /* Когда демо-токены появились — по словам сервера (/api/live, demos).
@@ -8995,6 +9045,9 @@ function localTokenToFeedShape(entry) {
     dexName: null,
     ownerId: entry.ownerId || null,
     демо: !!entry.демо,
+    // Сеть демо-токена: без неё демо Solana или BNB открывалось с
+    // цифрами демо TON.
+    демоСеть: entry.демоСеть || null,
     curveAddress: entry.curveAddress || null,
     curveJettonWallet: entry.curveJettonWallet || null,
     chain: этоEVM(entry.chain) ? entry.chain : entry.chain === "solana" ? "solana" : "ton",
@@ -11415,7 +11468,7 @@ function fmtЦенаМелкая(p) {
 
 
 function МемпадEVM({ сеть, onOpen, myTokens = [] }) {
-  // Только запуски Mintly: токены с биржи убраны — их цифры приходят
+  // Только свои запуски: токены с биржи убраны — их цифры приходят
   // раз в полминуты, а лента должна жить в реальном времени.
   const свои = useMemo(() => (myTokens || [])
     .filter((tok) => tok && tok.chain === сеть)
@@ -11435,7 +11488,8 @@ function МемпадEVM({ сеть, onOpen, myTokens = [] }) {
       идёт = true;
       try {
         const { криваяEVM } = await import("./appWallet");
-        const ряд = свои.slice(0, 20);
+        // Демо кривой в сети нет — его цифры приходят общим живым опросом.
+        const ряд = свои.filter((tok) => tok.tokenAddress && !tok.демо).slice(0, 20);
         // Предел в три секунды: запрос, замороженный свёрнутым Telegram,
         // иначе держал бы опрос и после возвращения.
         const предел = () => new Promise((r) => setTimeout(() => r(null), 3000));
@@ -11457,14 +11511,41 @@ function МемпадEVM({ сеть, onOpen, myTokens = [] }) {
     return { ...tok, price: цена, mcapNum: цена * TOKEN_FIXED_SUPPLY, raisedTon: к.realNative, graduationTon: к.graduationNative, graduated: к.graduated };
   }), [свои, рынкиСвоих, курсыEVM, сеть]);
   const с = СЕТИ_EVM[сеть];
+  const витрина = useMemo(() => [...своиСЦифрами]
+    .filter((tok) => tok.mcapNum > 0 && !tok.graduated)
+    .sort((a, b) => (b.mcapNum || 0) - (a.mcapNum || 0))
+    .slice(0, SPOTLIGHT_COUNT), [своиСЦифрами]);
+  const [номерВитрины, setНомерВитрины] = useState(0);
+  useEffect(() => {
+    if (витрина.length < 2) return undefined;
+    const id = setInterval(() => setНомерВитрины((i) => i + 1), SPOTLIGHT_ROTATE_MS);
+    return () => clearInterval(id);
+  }, [витрина.length]);
   return (
     <div className="flex flex-col" style={{ gap: 20, paddingTop: 8, paddingBottom: 16 }}>
       <ЗаголовокРаздела>Мемпад</ЗаголовокРаздела>
       <div className="flex items-center" style={{ gap: 10, marginTop: -8 }}>
         <img src={с.лого} alt="" width={22} height={22} style={{ borderRadius: "50%" }} />
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600 }}>{с.имя} · запуски Mintly</span>
+        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, fontWeight: 600 }}>{с.имя}</span>
       </div>
       <RecentBuysTicker сеть={сеть} tokens={[]} curveTokens={свои} onOpen={onOpen} />
+      {/* «В центре внимания» — как в TON и Solana: крупнейшие по
+          капитализации, по кругу раз в восемь секунд. */}
+      {витрина.length > 0 && (
+        <div>
+          <div style={{ fontFamily: displayFont, color: T.muted, fontSize: 13, fontWeight: 500, letterSpacing: "0.02em", textTransform: "uppercase", marginBottom: 10 }}>
+            {t("mempadSpotlight")}
+          </div>
+          <ВитринаСпотлайта
+            key={витрина[номерВитрины % витрина.length].id}
+            token={витрина[номерВитрины % витрина.length]}
+            всего={витрина.length}
+            активная={номерВитрины % витрина.length}
+            onТочка={setНомерВитрины}
+            onOpen={onOpen}
+          />
+        </div>
+      )}
       {свои.length > 0 ? (
         <div className="flex flex-col">
           {своиСЦифрами.slice(0, 30).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)}
@@ -15291,7 +15372,6 @@ function ПульсПК({ curveTokens = [], onOpenToken, onGoCreate, сеть = 
       <div className="flex items-end justify-between" style={{ marginBottom: 18, gap: 16 }}>
         <div>
           <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 30, fontWeight: 800, letterSpacing: "-0.02em" }}>Пульс</div>
-          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 4 }}>Все запуски Mintly в реальном времени</div>
         </div>
         <div className="flex items-center" style={{ gap: 10 }}>
           <КнопкаУведомленийПК />
@@ -17316,9 +17396,13 @@ function useКурсыEVM() {
     const загрузить = async () => {
       if (Date.now() - КЕШ_КУРСОВ_EVM.ts < 60000 && КЕШ_КУРСОВ_EVM.eth > 0) { if (живо) setКурсы({ ...КЕШ_КУРСОВ_EVM }); return; }
       try {
-        const j = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=binancecoin,ethereum&vs_currencies=usd").then((r) => r.json());
-        const bnb = Number(j && j.binancecoin && j.binancecoin.usd) || 0;
-        const eth = Number(j && j.ethereum && j.ethereum.usd) || 0;
+        // Свой сервер, а не CoinGecko напрямую: у того лимит на всех, и
+        // без ответа капитализация токенов BNB, Base и Ethereum стояла
+        // пустой — а с ней и «В центре внимания» этих сетей.
+        const j = await fetch(апи("/api/market-rates")).then((r) => r.json());
+        const цена = (о) => Number(о && (о.price != null ? о.price : о)) || 0;
+        const bnb = цена(j && j.bnb);
+        const eth = цена(j && j.eth);
         if (bnb > 0 || eth > 0) Object.assign(КЕШ_КУРСОВ_EVM, { bnb: bnb || КЕШ_КУРСОВ_EVM.bnb, eth: eth || КЕШ_КУРСОВ_EVM.eth, ts: Date.now() });
         if (живо) setКурсы({ ...КЕШ_КУРСОВ_EVM });
       } catch { /* курс не пришёл — остаётся прежний */ }
