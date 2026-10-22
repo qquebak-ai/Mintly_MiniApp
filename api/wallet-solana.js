@@ -1213,6 +1213,7 @@ export default async function handler(req, res) {
           // Сколько токенов ушло и сколько монет за них пришло — по
           // расчёту самой кривой, а не по оценке из окна.
           tokens: собрано.tokens,
+          bought: собрано.bought != null ? собрано.bought : null,
           solOut: собрано.solOut,
         });
       } catch (e) {

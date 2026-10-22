@@ -543,6 +543,19 @@ function выплатаЗа(кривая, единиц) {
   return продавцу > 0n ? Number(продавцу) / LAMPORTS : 0;
 }
 
+// Сколько токенов даст кривая за сумму в SOL — та же формула x·y = k.
+async function получуЗа(инфоОбещание, sol) {
+  const info = await инфоОбещание;
+  const с = info && поляКривой(info.data);
+  if (!с || !(sol > 0)) return null;
+  const вход = BigInt(Math.round(sol * LAMPORTS * (1 - (с.feeBps || 0) / 10000)));
+  const монеты = BigInt(с.virtualSol) + BigInt(с.realSol);
+  const токены = BigInt(с.virtualTokens) - BigInt(с.tokensSold);
+  if (вход <= 0n || токены <= 0n) return null;
+  const выдача = токены - (монеты * токены) / (монеты + вход);
+  return выдача > 0n ? Number(выдача) / ЕДИНИЦА : null;
+}
+
 /* Покупка и продажа на уже заведённой кривой. */
 export async function собратьСделку({ wallet, mint, продажа, amount, minOut, скорость = "normal" }) {
   const темп = СКОРОСТИ[скорость] || СКОРОСТИ.normal;
@@ -561,6 +574,10 @@ export async function собратьСделку({ wallet, mint, продажа,
   /* Блок берём сразу, вместе с остальным: он нужен в любом случае, а
      ждать его после всех проверок — лишний круг к узлу на каждой сделке. */
   const блок = свежийБлок(connection);
+  /* Для покупки заодно читаем кривую: сколько токенов придёт, приложение
+     пишет в историю. Раньше в ответ уходила сумма в SOL под именем
+     tokens, и покупка значилась как «1 токен за 1 SOL». */
+  const кривуюДляПокупки = продажа ? null : connection.getAccountInfo(curve).catch(() => null);
 
   let единиц = Math.round(Number(amount) * ЕДИНИЦА);
   let выплата = null;
@@ -613,7 +630,8 @@ export async function собратьСделку({ wallet, mint, продажа,
     // Что на самом деле уходит и приходит: количество после подрезки под
     // остаток и запас кривой, и выплата за него. По этим числам
     // приложение пишет историю, а не по оценке из окна.
-    tokens: единиц / ЕДИНИЦА,
+    tokens: продажа ? единиц / ЕДИНИЦА : null,
+    bought: продажа ? null : await получуЗа(кривуюДляПокупки, Number(amount)),
     solOut: выплата,
   };
 }

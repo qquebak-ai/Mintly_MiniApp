@@ -170,7 +170,7 @@ export async function сделкаВнутренним({ mint, продажа = 
   if (!j || !j.signature) throw new Error("сделка не прошла");
   // Вместе с подписью приходят настоящие числа сделки: сколько токенов
   // ушло и сколько монет пришло. История пишется по ним.
-  return { signature: j.signature, tokens: j.tokens, solOut: j.solOut };
+  return { signature: j.signature, tokens: j.tokens, bought: j.bought, solOut: j.solOut };
 }
 
 /* Курс обмена. Спрашивается на каждое изменение суммы, поэтому без

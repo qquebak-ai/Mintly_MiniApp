@@ -19258,6 +19258,8 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
      цена, по которой эти токены были куплены (средняя по всем покупкам
      токена), в долларах по курсу на момент сделки. Нет продаж — ноль. */
   const [заДеньСделки, setЗаДеньСделки] = useState({ итог: 0, вложено: 0 });
+  const внутрRef = useRef(null);
+  внутрRef.current = внутр;
   useEffect(() => {
     if (!userId) return undefined;
     let живо = true;
@@ -19268,21 +19270,40 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
       if (!живо || !data) return;
       const полночь = new Date(); полночь.setHours(0, 0, 0, 0);
       const купли = new Map(); // токен -> { монет, токенов }
-      let итог = 0, вложено = 0;
+      const продажи = new Map(); // токен -> [{ монет, токенов, курс }] за сегодня
       for (const с of data) {
         const к = купли.get(с.token_address) || { монет: 0, токенов: 0 };
         const монет = Number(с.ton_amount) || 0, токенов = Number(с.token_amount) || 0, курс = Number(с.ton_price_usd) || 0;
-        /* Покупка без количества токенов (так писались покупки в 1 клик)
-           в среднюю не идёт: её монеты без токенов задирали среднюю цену,
-           и продажа своего же токена в ноль показывала минус в разы. */
-        if (с.side === "buy") { if (токенов > 0 && монет > 0) { к.монет += монет; к.токенов += токенов; купли.set(с.token_address, к); } continue; }
+        /* Записи с ценой дороже тысячной монеты за токен — испорченные:
+           так писались покупки, где вместо количества токенов стояла сумма. */
+        if (с.side === "buy") { if (токенов > 0 && монет > 0 && монет / токенов < 0.001) { к.монет += монет; к.токенов += токенов; купли.set(с.token_address, к); } continue; }
         if (с.side !== "sell" || new Date(с.created_at) < полночь) continue;
-        // Ни одной покупки с количеством — цену покупки не знаем, считаем
-        // продажу в ноль, а не выдумываем убыток.
-        const средняя = к.токенов > 0 ? к.монет / к.токенов : (токенов > 0 ? монет / токенов : 0);
-        const себестоимость = токенов * средняя;
-        итог += (монет - себестоимость) * курс;
-        вложено += себестоимость * курс;
+        const список = продажи.get(с.token_address) || [];
+        список.push({ монет, токенов, курс, средняя: к.токенов > 0 ? к.монет / к.токенов : 0 });
+        продажи.set(с.token_address, список);
+      }
+      /* Средняя цена покупки токенов Solana — по самой сети: таблица
+         сделок теряла количество у части покупок, и по ней своя же покупка
+         с продажей в ноль выглядела убытком на треть. Сеть знает, сколько
+         SOL ушло и сколько токенов пришло на кошелёк. */
+      const кошелёкSol = внутрRef.current && внутрRef.current.address;
+      const сети = new Map();
+      if (кошелёкSol) {
+        await Promise.all([...продажи.keys()].filter((а) => а && адресSolanaОк(а)).map((адрес) =>
+          fetch(апи(`/api/solana?action=position-cost&wallet=${encodeURIComponent(кошелёкSol)}&mint=${encodeURIComponent(адрес)}`))
+            .then((r) => (r.ok ? r.json() : null))
+            .then((j) => { if (j && j.bought > 0 && j.spentSol > 0) сети.set(адрес, j.spentSol / j.bought); })
+            .catch(() => {})));
+      }
+      if (!живо) return;
+      let итог = 0, вложено = 0;
+      for (const [адрес, список] of продажи) {
+        for (const п of список) {
+          const средняя = сети.get(адрес) || п.средняя || (п.токенов > 0 ? п.монет / п.токенов : 0);
+          const себестоимость = п.токенов * средняя;
+          итог += (п.монет - себестоимость) * п.курс;
+          вложено += себестоимость * п.курс;
+        }
       }
       setЗаДеньСделки({ итог, вложено });
     };
@@ -19291,7 +19312,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
     window.addEventListener("mintly:сделка", поСделке);
     const id = setInterval(читать, 60000);
     return () => { живо = false; clearInterval(id); window.removeEventListener("mintly:сделка", поСделке); };
-  }, [userId]);
+  }, [userId, внутр && внутр.address]);
   const заДень = заДеньСделки.итог;
   const заДеньПроцент = заДеньСделки.вложено > 0 ? (заДень / заДеньСделки.вложено) * 100 : 0;
 
@@ -33360,9 +33381,9 @@ function mapTokenRow(row) {
         /* Сколько токенов — по ответу кривой и для покупки: в 1 клик оценки
            из окна нет вовсе, и покупка писалась с нулём токенов — без цены
            сделки её стрелку на графике было не поставить. */
-        const проданоТокенов = Number(итог && итог.tokens) > 0
-          ? Number(итог.tokens)
-          : (mode === "sell" ? rawAmount : (Number(rawEstimate) || 0));
+        const проданоТокенов = mode === "sell"
+          ? (Number(итог && итог.tokens) > 0 ? Number(итог.tokens) : rawAmount)
+          : (Number(итог && итог.bought) > 0 ? Number(итог.bought) : (Number(rawEstimate) || 0));
         const монет = mode === "buy"
           ? rawAmount
           : (Number(итог && итог.solOut) > 0 ? Number(итог.solOut) : (Number(rawEstimate) || 0));

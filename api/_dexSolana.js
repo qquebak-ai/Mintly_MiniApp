@@ -48,7 +48,8 @@ export async function собратьОбменБиржи({ wallet, mint, пул,
   }).compileToV0Message());
   return {
     transaction: Buffer.from(tx.serialize()).toString("base64"),
-    tokens: продажа ? Number(amountIn) / ЕДИНИЦА : Number(выйдет) / ЕДИНИЦА,
+    tokens: продажа ? Number(amountIn) / ЕДИНИЦА : null,
+    bought: продажа ? null : Number(выйдет) / ЕДИНИЦА,
     solOut: продажа ? Number(выйдет) / LAMPORTS : 0,
     программа: п.программа.toBase58(),
   };
