@@ -1900,7 +1900,14 @@ function fmtPrice(p) {
   // из-за одной ненайденной величины.
   const n = typeof p === "number" ? p : (p === null || p === "" || p === undefined ? NaN : Number(p));
   if (!Number.isFinite(n)) return "—";
-  return "$" + n.toFixed(n < 0.001 ? 6 : 4);
+  /* Шесть знаков после запятой съедали цену целиком: у свежего токена
+     она бывает в стомиллионных долях, и шкала графика стояла сплошь из
+     «$0.000000». Мелкой цене оставляем четыре значащие цифры. */
+  if (n > 0 && n < 0.001) {
+    const нулей = Math.floor(-Math.log10(n));
+    return "$" + n.toFixed(Math.min(14, нулей + 4)).replace(/0+$/, "");
+  }
+  return "$" + n.toFixed(4);
 }
 /* Подпись деления на оси времени. Формат зависит от шага: на минутах
    важен час и минута, на днях — дата, а год не нужен нигде — история у
@@ -23815,10 +23822,14 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
              сделку сверх остатка контракт отвергает. Хватит ли денег,
              подскажет строка под ползунком. */
           const ДОЛЯ_ВЕРХА = 0.999;
+          /* Стартовая покупка не должна брать порог целиком: кривая тогда
+             закрывалась прямо в запуске, токен уходил на биржу без единой
+             сделки, а карточка показывала пустую кривую и цену старта. */
+          const ДО_ПОРОГА = 0.9;
           const верхПоКривой = (() => {
             if (вEVM) {
               const хочу = ПРОДАЖА_EVM * ДОЛЯ_ВЕРХА;
-              return (ВИРТ_EVM * хочу) / (ВИРТ_ТОКЕНОВ_EVM - хочу);
+              return ДО_ПОРОГА * (ВИРТ_EVM * хочу) / (ВИРТ_ТОКЕНОВ_EVM - хочу);
             }
             if (вSolana) {
               const к = кривScolana;
@@ -23826,17 +23837,17 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
               const хочу = к.tokensForSale * ДОЛЯ_ВЕРХА;
               const потолок = (к.virtualSol * хочу) / (к.virtualTokens - хочу) / 1e9;
               const порог = (Number(к.graduationSol) || Infinity) / 1e9;
-              return Math.min(потолок, порог) / (1 - (Number(к.feeBps) || 0) / 10000);
+              return ДО_ПОРОГА * Math.min(потолок, порог) / (1 - (Number(к.feeBps) || 0) / 10000);
             }
             const vTon = Number(CURVE_PARAMS.virtualTon) / 1e9;
             const vTok = Number(CURVE_PARAMS.virtualTokens) / 1e9;
             const хочу = (Number(CURVE_PARAMS.tokensForSale) / 1e9) * ДОЛЯ_ВЕРХА;
             const потолок = (vTon * хочу) / (vTok - хочу);
             const порог = Number(CURVE_PARAMS.graduationTon) / 1e9;
-            return Math.min(потолок, порог) / (1 - Number(CURVE_PARAMS.feeBps) / 10000);
+            return ДО_ПОРОГА * Math.min(потолок, порог) / (1 - Number(CURVE_PARAMS.feeBps) / 10000);
           })();
           const верх = верхПоКривой > 0
-            ? Number((Math.ceil(верхПоКривой / шаг - 1e-9) * шаг).toFixed(вEVM ? 3 : 2))
+            ? Number((Math.floor(верхПоКривой / шаг + 1e-9) * шаг).toFixed(вEVM ? 3 : 2))
             : (вEVM ? 1 : вSolana ? 2 : 50);
           const сейчас = Math.min(верх, Number.isFinite(суммаПокупки) ? суммаПокупки : 0);
           const число = (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: вEVM ? 3 : вSolana ? 2 : 1 });
