@@ -16765,7 +16765,9 @@ function ЭкранВывода({
             placeholder="······"
             style={{
               padding: "16px 14px", borderRadius: 16, textAlign: "center",
-              border: `1px solid ${кодБеда ? T.down : (кодГоден ? T.up : T.line)}`,
+              // Зелёным не красим: шесть набранных цифр ещё не значат, что
+              // код верный, — проверка будет по кнопке. Красным — только отказ.
+              border: `1px solid ${кодБеда ? T.down : T.line}`,
               background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 26,
               letterSpacing: "0.32em", outline: "none", transition: "border-color 200ms ease",
             }}
