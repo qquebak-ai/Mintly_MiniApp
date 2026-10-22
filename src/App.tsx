@@ -529,7 +529,7 @@ const STR = {
     tickerBought: "купил", tickerSold: "продал", tickerLaunched: "запущен", tickerCreated: "создал",
     // В ленте говорим о токене, а не о том, кто нажал кнопку: «купили на».
     tickerBoughtFor: "купили на", tickerSoldFor: "продали на",
-    sinceJustNow: "только что", sinceMin: "м", sinceHour: "ч", mempadFilterNew: "Новые", mempadFilterTrend: "Трендовые", mempadFilterHot: "Горячие", mempadFilterSoon: "Скоро на бирже", mempadFilterVol: "По обороту", mempadFilterBluming: "В росте", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Создать токен", homeActionMempad: "Мемпад", homeActionProfile: "Профиль",
+    sinceJustNow: "только что", sinceMin: "м", sinceHour: "ч", mempadFilterNew: "Новые", mempadFilterTrend: "Трендовые", mempadFilterHot: "Горячие", mempadFilterSoon: "Почти на DEX", mempadFilterMigrated: "На DEX", mempadFilterVol: "По обороту", mempadFilterBluming: "В росте", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Создать токен", homeActionMempad: "Мемпад", homeActionProfile: "Профиль",
     feedTitle: "Прямо сейчас",
     feedSub: "Что происходит на площадке",
     feedTrade: "${ticker} купили на {ton} GRAM",
@@ -1252,7 +1252,7 @@ const STR = {
     mempadLaunchToken: "Launch token",
     tickerBought: "bought", tickerSold: "sold", tickerLaunched: "launched", tickerCreated: "created",
     tickerBoughtFor: "bought for", tickerSoldFor: "sold for",
-    sinceJustNow: "just now", sinceMin: "m", sinceHour: "h", mempadFilterNew: "New", mempadFilterTrend: "Trending", mempadFilterHot: "Hot", mempadFilterSoon: "Almost listed", mempadFilterVol: "By volume", mempadFilterBluming: "Bluming", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Launch token", homeActionMempad: "Mempad", homeActionProfile: "Profile",
+    sinceJustNow: "just now", sinceMin: "m", sinceHour: "h", mempadFilterNew: "New", mempadFilterTrend: "Trending", mempadFilterHot: "Hot", mempadFilterSoon: "Final stretch", mempadFilterMigrated: "Migrated", mempadFilterVol: "By volume", mempadFilterBluming: "Bluming", mempadFilterDex: "DEX", mempadFilterSol: "Solana", homeActionLaunch: "Launch token", homeActionMempad: "Mempad", homeActionProfile: "Profile",
     feedTitle: "Right now",
     feedSub: "What's happening here",
     feedTrade: "${ticker} bought for {ton} GRAM",
@@ -1292,7 +1292,7 @@ const STR = {
     gradTitle: "Until the exchange listing",
     gradLeft: "{left} GRAM to go",
     gradDone: "Curve closed — the token is heading to an exchange",
-    gradNote: "Once the curve holds {target} GRAM, trading here closes. The collected GRAM and the remaining supply go to the platform wallet — the exchange pair is created from them.",
+    gradNote: "Once the curve holds {target} GRAM, trading here closes and the token moves to a DEX on its own: the collected GRAM and the remaining supply become the pool.",
     gradClosedTitle: "Curve closed",
     gradClosedBody: "The token reached {target} GRAM. The curve is done, and everything it collected — plus the unsold supply — is moving into the token's own pool. Trading reopens right here once it lands.",
     gradListedTitle: "Free market",
@@ -8157,11 +8157,14 @@ function RocketIconFX() {
    arranged differently.
 --------------------------------------------------------- */
 const MEMPAD_FILTERS = [
+  // Первые три — колонки Pulse у Axiom: новые, почти на DEX, на DEX.
   { id: "new", labelKey: "mempadFilterNew" },
-  { id: "trend", labelKey: "mempadFilterTrend" },
-  // «Скоро на бирже» — те, у кого кривая почти собрана: момент, когда
+  // «Почти на DEX» — те, у кого кривая почти собрана: момент, когда
   // токен интересен больше всего, а найти его раньше было негде.
   { id: "soon", labelKey: "mempadFilterSoon" },
+  // «На DEX» — как Migrated у Axiom: кривая закрылась, токен торгуется в пуле.
+  { id: "dex", labelKey: "mempadFilterMigrated" },
+  { id: "trend", labelKey: "mempadFilterTrend" },
   { id: "vol", labelKey: "mempadFilterVol" },
   // Вкладки «DEX» здесь больше нет: она отбирала пары с биржи, а мемпад
   // теперь показывает только запуски площадки.
@@ -9518,7 +9521,7 @@ function TrustPanel({ token, testnet = false, holders = null }) {
    Оба числа берутся у самой кривой: цель зашита в контракт при запуске,
    и у токенов, созданных до смены настроек, она своя. Считать по
    настройкам приложения нельзя — покажем чужую цель. */
-function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false }) {
+function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false, монета = ТИКЕР_TON }) {
   if (!(targetTon > 0)) return null;
   const pct = Math.max(0, Math.min(100, (raisedTon / targetTon) * 100));
   const left = Math.max(0, targetTon - raisedTon);
@@ -9546,14 +9549,14 @@ function GraduationBar({ raisedTon = 0, targetTon = 0, compact = false }) {
       </div>
       <div className="flex items-center justify-between" style={{ marginTop: 7 }}>
         <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 12 }}>
-          <ТекстСЧислами text={`${fmtTon(raisedTon)} / ${fmtTon(targetTon)}`} /> {ТИКЕР_TON}
+          <ТекстСЧислами text={`${fmtTon(raisedTon)} / ${fmtTon(targetTon)}`} /> {монета}
         </span>
         {!done && (
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}><ТекстСЧислами text={trf("gradLeft", { left: fmtTon(left) })} /></span>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}><ТекстСЧислами text={trf("gradLeft", { left: fmtTon(left) }).replace(/GRAM/g, монета)} /></span>
         )}
       </div>
       <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.45, marginTop: 8 }}>
-        <ТекстСЧислами text={trf("gradNote", { target: fmtTon(targetTon) })} />
+        <ТекстСЧислами text={trf("gradNote", { target: fmtTon(targetTon) }).replace(/GRAM/g, монета)} />
       </p>
     </div>
   );
@@ -11891,7 +11894,13 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
         .filter((tok) => !tok.graduated)
         .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     }
-    /* «Скоро на бирже» — кривые, отсортированные по тому, сколько
+    /* «На DEX» — вышедшие: самые свежие выходы сверху. */
+    if (filter === "dex") {
+      return свои
+        .filter((tok) => tok.graduated)
+        .sort((a, b) => new Date(b.listedAt || b.createdAt || 0) - new Date(a.listedAt || a.createdAt || 0));
+    }
+    /* «Почти на DEX» — кривые, отсортированные по тому, сколько
        осталось собрать. */
     if (filter === "soon") {
       return свои
@@ -21368,10 +21377,14 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, unlocked = tr
             </p>
           </div>
         </div>
-      ) : curve ? (
+      ) : !token.демо && Number((своя && своя.цель) || token.graduationTon || (curve && Number(curve.graduationTon) / 1e9)) > 0 ? (
+        /* Путь до биржи — как «Bonding curve» у Axiom, во всех сетях и
+           на живых цифрах: собранное приходит каждые 0,3 с. Раньше шкала
+           была только у TON и стояла на месте до перезахода. */
         <GraduationBar
-          raisedTon={Number(curve.realTon) / 1e9}
-          targetTon={Number(curve.graduationTon) / 1e9}
+          raisedTon={собраноЖиво}
+          targetTon={Number((своя && своя.цель) || token.graduationTon || Number(curve.graduationTon) / 1e9)}
+          монета={token.chain === "solana" ? "SOL" : этоEVM(token.chain) ? СЕТИ_EVM[token.chain].монета : ТИКЕР_TON}
         />
       ) : null}
 
