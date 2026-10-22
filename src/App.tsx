@@ -30421,6 +30421,7 @@ function mapTokenRow(row) {
      продать можно было, только найдя свой токен в ленте и открыв его. */
   const [walletHoldings, setWalletHoldings] = useState([]);
   const [holdingsReady, setHoldingsReady] = useState(false);
+  const [holdingsTick, setHoldingsTick] = useState(0);
   useEffect(() => {
     if (!communityTokens.length) {
       setWalletHoldings([]);
@@ -30473,7 +30474,19 @@ function mapTokenRow(row) {
       if (!cancelled) { setWalletHoldings(found); setHoldingsReady(true); }
     })();
     return () => { cancelled = true; };
-  }, [connected, walletAddress, communityTokens, balanceRefreshTick]);
+  }, [connected, walletAddress, communityTokens, balanceRefreshTick, holdingsTick]);
+
+  /* Остатки перечитываем, когда открывают кошелёк, и ещё дважды после
+     своей сделки: узел Solana видит продажу не сразу, и через две с
+     половиной секунды он ещё отдавал прежний остаток — продав всё,
+     человек продолжал видеть токены в «Твоих токенах». */
+  useEffect(() => { if (view === "wallet") setHoldingsTick((n) => n + 1); }, [view]);
+  useEffect(() => {
+    const таймеры = [];
+    const послеСделки = () => { for (const мс of [6000, 15000]) таймеры.push(setTimeout(() => setHoldingsTick((n) => n + 1), мс)); };
+    window.addEventListener("mintly:сделка", послеСделки);
+    return () => { window.removeEventListener("mintly:сделка", послеСделки); таймеры.forEach(clearTimeout); };
+  }, []);
 
   const [appSettings, setAppSettings] = useState(() => {
     const base = { language: "RU", theme: "Dark", pinEnabled: false };
