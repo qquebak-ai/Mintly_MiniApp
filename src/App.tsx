@@ -11478,6 +11478,11 @@ function ФонСпотлайта({ вид }) {
         const г = п.createLinearGradient(0, 0, 0, h);
         г.addColorStop(0, "#0B0706"); г.addColorStop(0.55, "#1A0B06"); г.addColorStop(0.85, "#3A1206"); г.addColorStop(1, "#5A1A05");
         п.fillStyle = г; п.fillRect(0, 0, w, h);
+        // Обычная сетка позади огня — та же клетка, что у «роста»: витрина
+        // остаётся терминалом, а не просто костром.
+        п.strokeStyle = "rgba(255,200,170,0.07)"; п.lineWidth = 1;
+        for (let x = 0; x <= w; x += 28) { п.beginPath(); п.moveTo(x + 0.5, 0); п.lineTo(x + 0.5, h); п.stroke(); }
+        for (let y = 0; y <= h; y += 28) { п.beginPath(); п.moveTo(0, y + 0.5); п.lineTo(w, y + 0.5); п.stroke(); }
         for (let k = 0; k < 7; k++) {
           const x = сз(0, w), y = сз(h * 0.1, h * 0.6), r = сз(w * 0.15, w * 0.35);
           const д = п.createRadialGradient(x, y, 0, x, y, r);
