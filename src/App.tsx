@@ -8856,7 +8856,7 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
           <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>
             <ТекстСЧислами text={fmtUSD(tok.mcapNum)} />
           </div>
-          <div style={{ fontFamily: bodyFont, color: рост ? T.up : T.down, fontSize: 13, fontWeight: 700, marginTop: 3 }}>
+          <div style={{ fontFamily: bodyFont, color: Math.abs(tok.change || 0) < 0.05 ? T.faint : рост ? T.up : T.down, fontSize: 13, fontWeight: 700, marginTop: 3 }}>
             {рост ? "+" : ""}<ТекстСЧислами text={(tok.change || 0).toFixed(1)} />%
           </div>
         </div>
@@ -11596,7 +11596,7 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
   const подписи = (
     <>
       <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 600 }}>${token.ticker}</span>
-      <span style={{ fontFamily: monoFont, color: рост ? T.up : T.down, fontSize: 13 }}>
+      <span style={{ fontFamily: monoFont, color: Math.abs(token.change || 0) < 0.05 ? T.faint : рост ? T.up : T.down, fontSize: 13 }}>
         {рост ? "+" : ""}<ТекстСЧислами text={(token.change || 0).toFixed(1)} />%
       </span>
     </>
@@ -11620,7 +11620,7 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
       </span>
       <span className="flex items-center justify-center" style={{ position: "relative", zIndex: 1, gap: 8, marginTop: 14 }}>
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800 }}>${token.ticker}</span>
-        <span style={{ fontFamily: monoFont, color: рост ? T.up : T.down, fontSize: 15, fontWeight: 700 }}>
+        <span style={{ fontFamily: monoFont, color: Math.abs(token.change || 0) < 0.05 ? T.faint : рост ? T.up : T.down, fontSize: 15, fontWeight: 700 }}>
           {рост ? "+" : ""}<ТекстСЧислами text={(token.change || 0).toFixed(1)} />%
         </span>
       </span>
@@ -15417,7 +15417,7 @@ function БегущаяСтрокаПК({ tokens = [], onOpen, грузится 
         <TokenAvatar size={22} tone={рост ? "up" : "down"} src={tok.logoUrl} />
         <span style={{ fontFamily: displayFont, fontWeight: 800, color: T.ice, fontSize: 13.5 }}>${tok.ticker}</span>
         <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}><ТекстСЧислами text={fmtUSD(tok.mcapNum)} /></span>
-        <span style={{ fontFamily: bodyFont, color: рост ? T.up : T.down, fontSize: 13, fontWeight: 700 }}>{рост ? "+" : ""}<ТекстСЧислами text={(tok.change || 0).toFixed(1)} />%</span>
+        <span style={{ fontFamily: bodyFont, color: Math.abs(tok.change || 0) < 0.05 ? T.faint : рост ? T.up : T.down, fontSize: 13, fontWeight: 700 }}>{рост ? "+" : ""}<ТекстСЧислами text={(tok.change || 0).toFixed(1)} />%</span>
       </button>
     );
   };
@@ -15519,7 +15519,7 @@ const СтрокаПульса = React.memo(function СтрокаПульса({ 
       <div style={{ textAlign: "right", flexShrink: 0 }}>
         <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 11, fontWeight: 600 }}>MC</div>
         <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800 }}><ТекстСЧислами text={fmtUSD(tok.mcapNum)} /></div>
-        <div style={{ fontFamily: bodyFont, color: рост ? T.up : T.down, fontSize: 12, fontWeight: 700, marginTop: 2 }}>
+        <div style={{ fontFamily: bodyFont, color: Math.abs(tok.change || 0) < 0.05 ? T.faint : рост ? T.up : T.down, fontSize: 12, fontWeight: 700, marginTop: 2 }}>
           {рост ? "+" : ""}<ТекстСЧислами text={(tok.change || 0).toFixed(1)} />%
         </div>
       </div>
@@ -19207,7 +19207,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
     const id = setInterval(читать, 60000);
     return () => { живо = false; clearInterval(id); window.removeEventListener("mintly:сделка", поСделке); };
   }, [userId]);
-  const заДень = адресВнутри ? заДеньСделки.итог : 0;
+  const заДень = заДеньСделки.итог;
   const заДеньПроцент = заДеньСделки.вложено > 0 ? (заДень / заДеньСделки.вложено) * 100 : 0;
 
   /* Всё ли пришло. Ноль, показанный до ответа сети, человек читает как
@@ -19520,7 +19520,8 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
           const центы = Math.round(заДень * 100) / 100;
           const плюс = центы >= 0;
           return (
-            <div style={{ position: "relative", marginTop: 4, fontFamily: bodyFont, fontSize: 14, fontWeight: 700, color: центы === 0 ? hexA("#FFFFFF", 0.55) : плюс ? T.up : T.down, fontVariantNumeric: "tabular-nums", ...туман }}>
+            // Без размытия загрузки: PNL известен сразу — пока сделок нет, это ноль.
+            <div style={{ position: "relative", marginTop: 4, fontFamily: bodyFont, fontSize: 14, fontWeight: 700, color: центы === 0 ? hexA("#FFFFFF", 0.55) : плюс ? T.up : T.down, fontVariantNumeric: "tabular-nums" }}>
               <УмныйТекст text={`PNL ${плюс ? "+" : "−"}$${Math.abs(центы).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${плюс ? "+" : "−"}${Math.abs(заДеньПроцент).toFixed(2)}%)`} />
             </div>
           );
@@ -20368,6 +20369,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   const [фиксШкалы, setФиксШкалы] = useState(() => { try { return localStorage.getItem("mintly_chart_fixed") === "1"; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem("mintly_chart_fixed", фиксШкалы ? "1" : "0"); } catch { /* приватный режим */ } }, [фиксШкалы]);
   const [chartLoading, setChartLoading] = useState(true);
+  // Последняя живая цена свечи: { time, close, at } — см. обновление ряда.
+  const живаяЦенаRef = useRef(null);
   const chartSrcRef = useRef(null);
   // Нажатие «Повторить» на пустом графике: меняем число — и загрузка
   // начинается заново, не дожидаясь общего круга обновления.
@@ -20753,6 +20756,19 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       // Интервал едет вместе со свечами: экран рисует их, только когда
       // они и вправду за выбранный интервал, а не «какие пришли».
       if (result) {
+        /* Ряд с сервера отстаёт от живой цены на секунду-другую: сделка
+           уже пришла потоком и сдвинула свечу, а перечитанная история её
+           ещё не знает. Без этого свеча после покупки ехала вверх, потом
+           назад к старому ряду и снова вверх — тряслась. Пока живая цена
+           свежая, последнюю свечу ряда берём по ней. */
+        const ж = живаяЦенаRef.current;
+        if (ж && Date.now() - ж.at < 8000 && result.candles && result.candles.length) {
+          const свечи = result.candles.slice();
+          const п = свечи[свечи.length - 1];
+          if (п.time === ж.time) свечи[свечи.length - 1] = { ...п, close: ж.close, high: Math.max(п.high, ж.close), low: Math.min(п.low, ж.close) };
+          else if (п.time < ж.time) свечи.push({ time: ж.time, open: п.close, high: Math.max(п.close, ж.close), low: Math.min(п.close, ж.close), close: ж.close });
+          result = { ...result, candles: свечи };
+        }
         setChartData({ ...result, tf: reqTf, isLive: true });
         setChartLoading(false);
         return flat ? "flat" : "real";
@@ -20893,6 +20909,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
             if (Math.abs(цена - было.close) <= было.close * 1e-6) return prev;
             const шагTf = TF_SECONDS[prev.tf || tf] || 60;
             const сейчасСвеча = Math.floor(Date.now() / 1000 / шагTf) * шагTf;
+            живаяЦенаRef.current = { time: Math.max(было.time, сейчасСвеча), close: цена, at: Date.now() };
             if (было.time < сейчасСвеча) {
               свечи.push({ time: сейчасСвеча, open: было.close, high: Math.max(было.close, цена), low: Math.min(было.close, цена), close: цена });
               const объём = (prev.volume || []).concat([{ time: сейчасСвеча, value: 0, color: hexA(цена >= было.close ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ, 0.32) }]);
@@ -21231,6 +21248,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
              и только тогда появлялась новая. */
           const шагTf = TF_SECONDS[prev.tf || tf] || 60;
           const сейчас = Math.floor(Date.now() / 1000 / шагTf) * шагTf;
+          живаяЦенаRef.current = { time: Math.max(было.time, сейчас), close: цена, at: Date.now() };
           if (было.time < сейчас) {
             свечи.push({ time: сейчас, open: было.close, high: Math.max(было.close, цена), low: Math.min(было.close, цена), close: цена });
             const объём = (prev.volume || []).concat([{ time: сейчас, value: 0, color: hexA(цена >= было.close ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ, 0.32) }]);
@@ -21517,7 +21535,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
           }}>
             <ЖивоеЧисло значение={капОкна} текст={fmtUSD(капОкна)} />
           </div>
-          <div style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 15, marginTop: 2, color: ростОкна ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ }}>
+          {/* Ноль — серым: «+0.00%» зелёным выглядел как рост, которого не было. */}
+          <div style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 15, marginTop: 2, color: Math.abs(процентОкна) < 0.005 ? T.faint : ростОкна ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ }}>
             <ЖивоеЧисло
               значение={процентОкна}
               текст={`${ростОкна ? "+" : "−"}${fmtUSD(Math.abs(дельтаОкна))} (${ростОкна ? "+" : "−"}${Math.abs(процентОкна).toFixed(2)}%)`}
