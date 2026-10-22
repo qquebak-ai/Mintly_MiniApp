@@ -15981,18 +15981,80 @@ function ЭкранПолучить({ открыт, onClose, адрес = "", а
     скопироватьВБуфер(адресСети);
   }
 
+  /* Картинка адреса: настоящий QR этой сети со знаком сети посередине
+     и под ним адрес целиком. Отправляют её, а не голую строку: по фото
+     переводят, наведя камеру кошелька, а подпись видна глазами. */
+  async function картинкаАдреса() {
+    const QR = await import("qrcode");
+    const Ш = 1080, В = 1350;
+    const c = document.createElement("canvas");
+    c.width = Ш; c.height = В;
+    const x = c.getContext("2d");
+    x.fillStyle = "#0B0B0C"; x.fillRect(0, 0, Ш, В);
+    x.fillStyle = "#F4F1EA"; x.textAlign = "center";
+    x.font = `800 64px ${displayFont}`;
+    x.fillText(`Мой адрес · ${подписьСети}`, Ш / 2, 150);
+    // Код — чёрным по белому с полями: камера кошелька читает такой
+    // надёжнее всего, тёмная тема для него только помеха.
+    const сторона = 720, лево = (Ш - сторона) / 2, верх = 220;
+    x.fillStyle = "#FFFFFF";
+    x.beginPath(); if (x.roundRect) x.roundRect(лево - 40, верх - 40, сторона + 80, сторона + 80, 48); else x.rect(лево - 40, верх - 40, сторона + 80, сторона + 80); x.fill();
+    const код = document.createElement("canvas");
+    await QR.toCanvas(код, адресСети, { errorCorrectionLevel: "H", margin: 0, width: сторона, color: { dark: "#0B0B0C", light: "#FFFFFF" } });
+    x.drawImage(код, лево, верх, сторона, сторона);
+    // Знак сети в центре: коррекция H выдерживает закрытые 30% кода.
+    try {
+      const лого = await new Promise((готово, отказ) => { const i = new Image(); i.onload = () => готово(i); i.onerror = отказ; i.src = сетьПунктом.лого; });
+      const р = 150, цx = Ш / 2, цy = верх + сторона / 2;
+      x.fillStyle = "#FFFFFF"; x.beginPath(); x.arc(цx, цy, р / 2 + 14, 0, Math.PI * 2); x.fill();
+      x.save(); x.beginPath(); x.arc(цx, цy, р / 2, 0, Math.PI * 2); x.clip();
+      x.drawImage(лого, цx - р / 2, цy - р / 2, р, р); x.restore();
+    } catch { /* без знака код всё равно читается */ }
+    // Адрес целиком, двумя-тремя строками моноширинным: по нему сверяют.
+    x.fillStyle = "#F4F1EA"; x.font = `600 38px ui-monospace, "SF Mono", Menlo, monospace`;
+    const вСтроке = 24;
+    const строки = адресСети.match(new RegExp(`.{1,${вСтроке}}`, "g")) || [адресСети];
+    строки.forEach((с, i) => x.fillText(с, Ш / 2, верх + сторона + 130 + i * 52));
+    x.fillStyle = "rgba(244,241,234,0.5)"; x.font = `500 30px ${bodyFont}`;
+    x.fillText(`Отправляй только в сети ${подписьСети}`, Ш / 2, В - 70);
+    return c;
+  }
+
   async function поделиться() {
     if (!адресСети) return;
     haptic("light");
-    // В Telegram делимся его же окном, снаружи — системным.
+    const подпись = `Мой адрес ${подписьСети}:\n${адресСети}`;
+    let холст = null;
+    try { холст = await картинкаАдреса(); } catch { /* ниже — запасной путь */ }
     const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+    // В Telegram — готовым сообщением с фото: бот сохраняет его, а клиент
+    // показывает выбор чата (тот же путь, что у карточки токена).
+    if (tg && tg.initData && tg.shareMessage && холст) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const ключ = data && data.session && data.session.access_token;
+        if (ключ) {
+          const r = await fetch(апи("/api/share-card"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${ключ}` },
+            body: JSON.stringify({ image: холст.toDataURL("image/jpeg", 0.9), link: `https://t.me/${TG_BOT}`, caption: подпись }),
+          });
+          const j = await r.json().catch(() => null);
+          if (j && j.id) { tg.shareMessage(j.id); return; }
+        }
+      } catch { /* ниже — запасной путь */ }
+    }
+    if (холст) {
+      const blob = await new Promise((г) => холст.toBlob(г, "image/png"));
+      const файл = blob ? new File([blob], `mintly-${сетьПрихода || "address"}.png`, { type: "image/png" }) : null;
+      if (файл && navigator.canShare && navigator.canShare({ files: [файл] })) {
+        try { await navigator.share({ files: [файл], text: подпись }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+      }
+    }
     if (tg && tg.openTelegramLink) {
-      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(адресСети)}`);
+      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(адресСети)}&text=${encodeURIComponent(`Мой адрес ${подписьСети}`)}`);
       return;
     }
-    try {
-      if (navigator.share) { await navigator.share({ text: адресСети }); return; }
-    } catch { /* отменили — молчим */ }
     копировать();
   }
 
