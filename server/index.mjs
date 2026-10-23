@@ -47,6 +47,11 @@ globalThis.fetch = async (адрес, настройки = {}) => {
   return родной(адрес, { ...настройки, headers: заголовки });
 };
 const ПОРТ = Number(process.env.PORT) || 8080;
+/* Слушаем только себя: снаружи к нам ходят через nginx. Раньше порт
+   был открыт на всех адресах, и напрямую, мимо nginx, обходились и его
+   ограничитель частоты, и заголовок с адресом клиента — его можно было
+   прислать любым. */
+const ХОСТ = process.env.HOST || "127.0.0.1";
 
 /* Кому разрешено обращаться. Браузер спросит об этом на каждом запросе с
    чужого домена, а домен у сайта и правда чужой: страницы отдаёт CDN, а
@@ -55,6 +60,30 @@ const СВОИ = (process.env.ALLOW_ORIGINS || "https://mintly.company,https://w
   .split(",")
   .map((с) => с.trim())
   .filter(Boolean);
+
+/* Свои имена сайта. Host приходит от клиента как есть: nginx пускает
+   сюда и запросы с чужим именем (первый блок server — блок по
+   умолчанию). А обработчики строят из него адреса — метаданных токена,
+   картинок бота. Чужое имя заменяем своим. */
+const СВОИ_ИМЕНА = new Set([
+  ...СВОИ.map((о) => { try { return new URL(о).host; } catch { return ""; } }),
+  "api.mintly.company",
+  ...String(process.env.ALLOW_HOSTS || "").split(",").map((с) => с.trim()),
+].filter(Boolean));
+const ИМЯ_ПО_УМОЛЧАНИЮ = [...СВОИ_ИМЕНА][0] || "mintly.company";
+
+/* Адрес клиента — один и надёжный. Обработчики считают попытки по
+   первому адресу из X-Forwarded-For, а nginx лишь дописывает настоящий
+   в конец присланного: «X-Forwarded-For: 1.2.3.4» от клиента делал
+   каждый его запрос запросом с нового адреса, и ограничения по адресу
+   не держали. Верим только X-Real-IP, который ставит сам nginx, и
+   только когда запрос пришёл от него. */
+function адресКлиента(req) {
+  const сокет = String((req.socket && req.socket.remoteAddress) || "").replace(/^::ffff:/, "");
+  const отNginx = сокет === "127.0.0.1" || сокет === "::1";
+  const реальный = отNginx ? String(req.headers["x-real-ip"] || "").trim() : "";
+  return /^[0-9a-f.:]{3,45}$/i.test(реальный) ? реальный : сокет;
+}
 
 /* Обработчики берём с диска: это те же файлы, что уходят на Vercel, и
    никакой отдельной копии для сервера не заводится — разъехаться им
@@ -266,6 +295,14 @@ const сервер = http.createServer(async (req, res) => {
   const адрес = new URL(req.url, "http://x");
   дополнить(res);
 
+  const ip = адресКлиента(req);
+  req.headers["x-forwarded-for"] = ip;
+  req.headers["x-real-ip"] = ip;
+  // X-Forwarded-Host nginx не ставит — значит, его прислал клиент.
+  delete req.headers["x-forwarded-host"];
+  const имя = String(req.headers.host || "").toLowerCase();
+  if (!СВОИ_ИМЕНА.has(имя) && !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(имя)) req.headers.host = ИМЯ_ПО_УМОЛЧАНИЮ;
+
   const откуда = req.headers.origin;
   if (откуда && СВОИ.includes(откуда)) {
     res.setHeader("Access-Control-Allow-Origin", откуда);
@@ -274,7 +311,9 @@ const сервер = http.createServer(async (req, res) => {
   }
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    // X-Second-Key — билет подтверждения почтой для вывода (api/_second.js):
+    // без него в списке браузер не пустил бы запрос на другой домен API.
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Second-Key");
     res.setHeader("Access-Control-Max-Age", "86400");
     res.status(204).end();
     return;
@@ -345,7 +384,7 @@ const сервер = http.createServer(async (req, res) => {
 сервер.keepAliveTimeout = 65000;
 сервер.headersTimeout = 66000;
 
-сервер.listen(ПОРТ, () => console.log(`[сервер] порт ${ПОРТ}, маршрутов ${маршруты.size}`));
+сервер.listen(ПОРТ, ХОСТ, () => console.log(`[сервер] ${ХОСТ}:${ПОРТ}, маршрутов ${маршруты.size}`));
 
 /* Обход ленты — своим циклом.
  *
@@ -472,9 +511,10 @@ if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.GRADUATE_LOOP !== "0") 
     }
     // TON — отдельной попыткой: сбой Solana не должен держать выход TON.
     try {
-      const { вывестиTonНаБиржу, записатьЦеныПулов } = await import("../api/ton-migrate.js");
+      const { вывестиTonНаБиржу, записатьЦеныПулов, отказыСтарыхТокенов } = await import("../api/ton-migrate.js");
       await вывестиTonНаБиржу();
       await записатьЦеныПулов();
+      await отказыСтарыхТокенов();
     } catch (err) {
       console.warn("[выход TON]", err && err.message);
     } finally {

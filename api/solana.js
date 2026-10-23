@@ -402,6 +402,82 @@ export async function отправить(signedBase64) {
   return подпись || null;
 }
 
+/* Вложенное в позицию — общий расчёт на одинаковые запросы и кеш на
+   три секунды: дольше нельзя, после своей сделки приложение перечитывает
+   позицию, пока сеть не покажет её. Дорогое — разбор транзакций — помним
+   долго: подтверждённая транзакция не меняется, и повторный расчёт
+   спрашивает у узла только новые. */
+const ПОЗИЦИЯ_МС = 3_000;
+const позицииКеш = new Map(); // кошелёк|mint -> { ts, тело }
+const позицииВПути = new Map(); // кошелёк|mint -> Promise
+const разборКеш = new Map(); // подпись|кошелёк|mint -> { дSol, дТок } | null
+const расчётыПоАдресу = new Map(); // ip -> [метки времени]
+
+function можноПосчитать(ip) {
+  const сейчас = Date.now();
+  const свои = (расчётыПоАдресу.get(ip) || []).filter((т) => сейчас - т < 60_000);
+  if (свои.length >= 20) { расчётыПоАдресу.set(ip, свои); return false; }
+  свои.push(сейчас);
+  расчётыПоАдресу.set(ip, свои);
+  if (расчётыПоАдресу.size > 5000) {
+    for (const [к, v] of расчётыПоАдресу) if (!v.length || сейчас - v[v.length - 1] > 60_000) расчётыПоАдресу.delete(к);
+  }
+  return true;
+}
+
+function посчитатьПозицию(кошелёк, mint) {
+  const ключ = `${кошелёк}|${mint}`;
+  if (позицииВПути.has(ключ)) return позицииВПути.get(ключ);
+  const расчёт = (async () => {
+    const { PublicKey } = await import("@solana/web3.js");
+    const { getAssociatedTokenAddressSync } = await import("@solana/spl-token");
+    const счёт = getAssociatedTokenAddressSync(new PublicKey(mint), new PublicKey(кошелёк)).toBase58();
+    const подписи = (await rpc("getSignaturesForAddress", [счёт, { limit: 200 }]).catch(() => null)) || [];
+    let ушлоSol = 0, пришлоSol = 0, купленоТок = 0, проданоТок = 0, сделок = 0;
+    const годные = подписи.filter((п) => !п.err);
+    const нужно = годные.filter((п) => !разборКеш.has(`${п.signature}|${ключ}`));
+    for (let i = 0; i < нужно.length; i += 25) {
+      const пачка = нужно.slice(i, i + 25);
+      const txs = await Promise.all(пачка.map((п) => rpc("getTransaction", [п.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" }]).catch(() => undefined)));
+      txs.forEach((tx, j) => {
+        // Узел не ответил — не запоминаем: спросим в следующий раз.
+        if (tx === undefined) return;
+        let разбор = null;
+        if (tx && tx.meta && !tx.meta.err) {
+          const ключи = (tx.transaction.message.accountKeys || []).map((к) => (typeof к === "string" ? к : к.pubkey));
+          const я = ключи.indexOf(кошелёк);
+          if (я >= 0) {
+            const ток = (список) => (список || []).filter((б) => б.mint === mint && б.owner === кошелёк).reduce((с, б) => с + (Number(б.uiTokenAmount && б.uiTokenAmount.uiAmount) || 0), 0);
+            разбор = {
+              дSol: ((tx.meta.postBalances[я] || 0) - (tx.meta.preBalances[я] || 0)) / 1e9,
+              дТок: ток(tx.meta.postTokenBalances) - ток(tx.meta.preTokenBalances),
+            };
+          }
+        }
+        // Пустой ответ (tx === null) — транзакция ещё не видна узлу: её
+        // тоже не запоминаем.
+        if (tx !== null) разборКеш.set(`${пачка[j].signature}|${ключ}`, разбор);
+      });
+    }
+    for (const п of годные) {
+      const разбор = разборКеш.get(`${п.signature}|${ключ}`);
+      if (!разбор) continue;
+      if (разбор.дТок > 0) { купленоТок += разбор.дТок; ушлоSol += Math.max(0, -разбор.дSol); сделок += 1; }
+      else if (разбор.дТок < 0) { проданоТок += -разбор.дТок; пришлоSol += Math.max(0, разбор.дSol); сделок += 1; }
+    }
+    if (разборКеш.size > 50_000) разборКеш.clear();
+    const тело = { spentSol: ушлоSol, receivedSol: пришлоSol, bought: купленоТок, sold: проданоТок, trades: сделок, net: ушлоSol - пришлоSol };
+    позицииКеш.set(ключ, { ts: Date.now(), тело });
+    if (позицииКеш.size > 5000) {
+      for (const [к, v] of позицииКеш) if (Date.now() - v.ts > ПОЗИЦИЯ_МС) позицииКеш.delete(к);
+    }
+    return тело;
+  })();
+  позицииВПути.set(ключ, расчёт);
+  расчёт.finally(() => позицииВПути.delete(ключ)).catch(() => {});
+  return расчёт;
+}
+
 export default async function handler(req, res) {
   const действие = String((req.query && req.query.action) || "");
   try {
@@ -473,28 +549,22 @@ export default async function handler(req, res) {
       const кошелёк = String(req.query.wallet || "");
       const mint = String(req.query.mint || "");
       if (!адресОк(кошелёк) || !адресОк(mint)) return res.status(400).json({ error: "bad_request" });
-      const { PublicKey } = await import("@solana/web3.js");
-      const { getAssociatedTokenAddressSync } = await import("@solana/spl-token");
-      const счёт = getAssociatedTokenAddressSync(new PublicKey(mint), new PublicKey(кошелёк)).toBase58();
-      const подписи = (await rpc("getSignaturesForAddress", [счёт, { limit: 200 }]).catch(() => null)) || [];
-      let ушлоSol = 0, пришлоSol = 0, купленоТок = 0, проданоТок = 0, сделок = 0;
-      for (let i = 0; i < подписи.length; i += 25) {
-        const пачка = подписи.slice(i, i + 25).filter((п) => !п.err);
-        const txs = await Promise.all(пачка.map((п) => rpc("getTransaction", [п.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" }]).catch(() => null)));
-        for (const tx of txs) {
-          if (!tx || !tx.meta || tx.meta.err) continue;
-          const ключи = (tx.transaction.message.accountKeys || []).map((к) => (typeof к === "string" ? к : к.pubkey));
-          const я = ключи.indexOf(кошелёк);
-          if (я < 0) continue;
-          const дельтаSol = ((tx.meta.postBalances[я] || 0) - (tx.meta.preBalances[я] || 0)) / 1e9;
-          const ток = (список) => (список || []).filter((б) => б.mint === mint && б.owner === кошелёк).reduce((с, б) => с + (Number(б.uiTokenAmount && б.uiTokenAmount.uiAmount) || 0), 0);
-          const дельтаТок = ток(tx.meta.postTokenBalances) - ток(tx.meta.preTokenBalances);
-          if (дельтаТок > 0) { купленоТок += дельтаТок; ушлоSol += Math.max(0, -дельтаSol); сделок += 1; }
-          else if (дельтаТок < 0) { проданоТок += -дельтаТок; пришлоSol += Math.max(0, дельтаSol); сделок += 1; }
-        }
-      }
       res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ spentSol: ушлоSol, receivedSol: пришлоSol, bought: купленоТок, sold: проданоТок, trades: сделок, net: ушлоSol - пришлоSol });
+      const ключ = `${кошелёк}|${mint}`;
+      const было = позицииКеш.get(ключ);
+      if (было && Date.now() - было.ts < ПОЗИЦИЯ_МС && !req.query.fresh) return res.status(200).json(было.тело);
+      /* Расчёт — до двухсот запросов к узлу Solana, и без ограничений
+         любой мог гонять его по чужим кошелькам, выбирая весь лимит узла:
+         сделки у всех вставали. Теперь — кеш, общий расчёт на одинаковые
+         запросы и потолок частоты на адрес. */
+      const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "?";
+      if (!позицииВПути.has(ключ) && !можноПосчитать(ip)) {
+        if (было) return res.status(200).json(было.тело);
+        res.setHeader("Retry-After", "30");
+        return res.status(429).json({ error: "too_many_requests" });
+      }
+      const тело = await посчитатьПозицию(кошелёк, mint);
+      return res.status(200).json(тело);
     }
 
     if (действие === "balances") {

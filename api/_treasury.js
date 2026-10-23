@@ -18,6 +18,7 @@
 
 import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import { поочерёдно, дождатьсяПеревода } from "./_walletLock.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -35,18 +36,29 @@ export function админ() {
   return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 }
 
+// Ключ — в том же виде, что у кошельков (api/wallet-solana.js): hex или
+// base64. Раньше здесь понимался только base64, а на сервере ключ лежит
+// hex-строкой — и обмен между сетями молча считался выключенным.
 function разобратьКлюч(строка) {
-  if (!строка) return null;
+  const s = String(строка || "").trim();
+  if (!s) return null;
   try {
-    const b = Buffer.from(String(строка), "base64");
+    const b = /^[0-9a-f]{64}$/i.test(s) ? Buffer.from(s, "hex") : Buffer.from(s, "base64");
     return b.length === 32 ? b : null;
   } catch { return null; }
 }
 
+const меткаКлюча = (ключ) => crypto.createHash("sha256").update(ключ).digest("hex").slice(0, 8);
+
+// Текущий и прежний ключ: строки, закрытые до смены APP_WALLET_KEY,
+// должны читаться и здесь, как у самих кошельков.
 export function ключи() {
   const текущий = разобратьКлюч(process.env.APP_WALLET_KEY);
   if (!текущий) return null;
-  return { текущий, метка: crypto.createHash("sha256").update(текущий).digest("hex").slice(0, 8) };
+  const прежний = разобратьКлюч(process.env.APP_WALLET_KEY_OLD);
+  const набор = new Map([[меткаКлюча(текущий), текущий]]);
+  if (прежний) набор.set(меткаКлюча(прежний), прежний);
+  return { текущий, метка: меткаКлюча(текущий), набор };
 }
 
 /* Шифрование то же, что у кошельков людей, только вместо владельца —
@@ -61,12 +73,27 @@ function зашифровать(данные, ключ, метка) {
   return Buffer.concat([соль, шифр.getAuthTag(), тело]).toString("base64");
 }
 
-function расшифровать(строка, ключ, метка) {
+function расшифроватьКлючом(строка, ключ, метка) {
   const b = Buffer.from(String(строка), "base64");
   const шифр = crypto.createDecipheriv("aes-256-gcm", ключ, b.subarray(0, 12));
   шифр.setAuthTag(b.subarray(12, 28));
-  шифр.setAAD(Buffer.from(String(метка)));
+  if (метка) шифр.setAAD(Buffer.from(String(метка)));
   return Buffer.concat([шифр.update(b.subarray(28)), шифр.final()]);
+}
+
+/* Расшифровка с перебором ключей — как в api/wallet-solana.js: сперва
+   ключом из key_id, потом остальными; без связанных данных — только для
+   строк кошельков людей, заведённых до этого правила. */
+export function открытьСекрет(строка, набор, метка, { безМетки = false } = {}) {
+  const порядок = строка.key_id && набор.набор.has(строка.key_id)
+    ? [набор.набор.get(строка.key_id)]
+    : [...набор.набор.values()];
+  for (const ключ of порядок) {
+    for (const аад of безМетки ? [метка, null] : [метка]) {
+      try { return расшифроватьКлючом(строка.secret_enc, ключ, аад); } catch { /* следующий */ }
+    }
+  }
+  throw new Error("ключ кошелька не читается");
 }
 
 // --- Solana ------------------------------------------------------------
@@ -183,7 +210,7 @@ export async function отправитьИзКазны(строка, набор,
 
   if (строка.chain === "solana") {
     const { Keypair, Connection, PublicKey, SystemProgram, Transaction } = await библиотекиSol();
-    const секрет = расшифровать(строка.secret_enc, набор.текущий, "treasury:solana");
+    const секрет = открытьСекрет(строка, набор, "treasury:solana");
     const пара = Keypair.fromSecretKey(new Uint8Array(секрет));
     const соединение = new Connection(RPC, "confirmed");
     const tx = new Transaction().add(SystemProgram.transfer({
@@ -199,29 +226,45 @@ export async function отправитьИзКазны(строка, набор,
     const подпись = await соединение.sendRawTransaction(tx.serialize(), {
       skipPreflight: false, preflightCommitment: "processed", maxRetries: 5,
     });
+    /* Ждём подтверждения и смотрим на исход: раньше подпись возвращалась
+       сразу, и обмен считался выплаченным, даже если перевод упал в сети
+       (два обмена разом, а запаса на оба не хватило). */
+    const итог = await соединение.confirmTransaction({ signature: подпись, blockhash, lastValidBlockHeight }, "confirmed");
+    if (итог.value && итог.value.err) throw new Error(`выплата отклонена: ${JSON.stringify(итог.value.err)}`);
     return подпись;
   }
 
-  const { mnemonicToPrivateKey, WalletContractV4, TonClient, internal, toNano, Address } = await библиотекиTon();
-  const слова = расшифровать(строка.secret_enc, набор.текущий, "treasury:ton").toString("utf8").split(" ");
-  const пара = await mnemonicToPrivateKey(слова);
-  const контракт = WalletContractV4.create({ workchain: 0, publicKey: пара.publicKey });
-  const client = клиентTon(TonClient);
-  const кошелёк = client.open(контракт);
-  const seqno = await кошелёк.getSeqno();
-  await кошелёк.sendTransfer({
-    secretKey: пара.secretKey,
-    seqno,
-    messages: [internal({
-      to: Address.parse(куда),
-      value: toNano(сумма.toFixed(9)),
-      // Обычный перевод без тела: получатель — простой кошелёк, читать
-      // ему нечего.
-      body: "",
-      bounce: false,
-    })],
+  /* Выплаты TON — строго по одной. У кошелька казны один счётчик seqno
+     на всех: два обмена разных людей разом брали один номер, сеть
+     принимала только первый перевод, а второй обмен всё равно получал
+     статус «выплачено». Следующая выплата ждёт, пока сеть не примет
+     предыдущую. */
+  return поочерёдно("treasury:ton", async () => {
+    const { mnemonicToPrivateKey, WalletContractV4, TonClient, internal, toNano, Address } = await библиотекиTon();
+    const слова = открытьСекрет(строка, набор, "treasury:ton").toString("utf8").split(" ");
+    const пара = await mnemonicToPrivateKey(слова);
+    const контракт = WalletContractV4.create({ workchain: 0, publicKey: пара.publicKey });
+    const client = клиентTon(TonClient);
+    const кошелёк = client.open(контракт);
+    const seqno = await кошелёк.getSeqno();
+    const получатель = Address.parse(куда);
+    const сколько = toNano(сумма.toFixed(9));
+    const тело = await кошелёк.createTransfer({
+      secretKey: пара.secretKey,
+      seqno,
+      messages: [internal({
+        to: получатель,
+        value: сколько,
+        // Обычный перевод без тела: получатель — простой кошелёк, читать
+        // ему нечего.
+        body: "",
+        bounce: false,
+      })],
+    });
+    await кошелёк.send(тело);
+    // У TON подписи как таковой нет — возвращаем хеш транзакции казны.
+    const хеш = await дождатьсяПеревода(client, контракт.address, тело, (м) =>
+      м.info.type === "internal" && м.info.dest.equals(получатель) && м.info.value.coins === сколько);
+    return `ton:${хеш}`;
   });
-  // У TON подписи как таковой нет — возвращаем номер, по которому
-  // перевод отличим от соседних.
-  return `seqno:${seqno}`;
 }

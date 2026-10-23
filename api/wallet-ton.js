@@ -29,6 +29,7 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 import { нуженВторойКлюч } from "./_second.js";
+import { занять, свободныйНомер, занятьНомер } from "./_walletLock.js";
 
 const TESTNET = process.env.TON_TESTNET === "1";
 const TONAPI = TESTNET ? "https://testnet.tonapi.io" : "https://tonapi.io";
@@ -379,6 +380,133 @@ async function записать(db, user, kind, amount, hash) {
   }).then(() => {}, () => {});
 }
 
+/* Кривая и жетон — настоящие ли.
+ *
+ * Адрес кривой и сам жетон записывает в строку токена браузер создателя,
+ * и правит их он же. Раньше покупка отправляла монеты по этому адресу
+ * не глядя: подставь свой кошелёк — и все покупатели платят тебе. Теперь
+ * адрес кривой сверяется с тем, что получается из кода кривой площадки и
+ * её параметров (админ — кошелёк создателя в приложении, комиссия и
+ * получатель ликвидности — наши), а у жетона проверяется стандартный код
+ * и отказ от выпуска: допечатать токены и слить их в кривую некому. */
+const проверенныеКривые = new Map(); // токен|кривая -> { итог, до }
+async function проверкаКривой(db, токен) {
+  const ключ = `${токен.id}|${токен.curve_address}`;
+  const было = проверенныеКривые.get(ключ);
+  // Проверенное до конца не меняется — его помним; «ещё с админом» и
+  // сбой сети перепроверяем через пятнадцать секунд.
+  if (было && (было.итог.безАдмина || было.до > Date.now())) return было.итог;
+  const итог = { кривая: false, безАдмина: false, админ: null };
+  try {
+    const { Address, Cell } = await библиотеки();
+    const { data: владелец } = !токен.owner_id ? { data: null } : await db.from("app_wallets").select("address")
+      .eq("user_id", токен.owner_id).eq("chain", "ton").maybeSingle();
+    /* Админ кривой — кошелёк создателя в приложении; у аккаунта, который
+       удалили, его уже нет, и тогда сверяем по кошельку из строки токена.
+       Подменить им ничего нельзя: права админа у кривой — только
+       привязать кошелёк жетона, а его привязку мы проверяем ниже. */
+    const админы = [...new Set([владелец && владелец.address, токен.creator_wallet].filter(Boolean))];
+    if (админы.length && токен.address && токен.curve_address) {
+      const { адресаКривойПлощадки, отпечатокМинтера, кошелёкЖетонаКривой } = await import("./_tonLaunchCore.js");
+      const { кошелёкЛиквидности } = await import("./_stonfi.js");
+      const ликв = await кошелёкЛиквидности().catch(() => null);
+      const ожидаем = [];
+      for (const адм of админы) {
+        try { ожидаем.push(...(await адресаКривойПлощадки({ admin: адм, jettonMaster: токен.address, ликвидность: ликв ? ликв.адрес : null }))); } catch { /* не адрес TON */ }
+      }
+      if (ожидаем.includes(Address.parse(токен.curve_address).toRawString())) {
+        const заголовки = TONAPI_KEY ? { Authorization: `Bearer ${TONAPI_KEY}` } : {};
+        const [счёт, жетон] = await Promise.all([
+          fetch(`${TONAPI}/v2/blockchain/accounts/${encodeURIComponent(токен.address)}`, { headers: заголовки, signal: AbortSignal.timeout(8000) }).then((r) => (r.ok ? r.json() : null)),
+          fetch(`${TONAPI}/v2/jettons/${encodeURIComponent(токен.address)}`, { headers: заголовки, signal: AbortSignal.timeout(8000) }).then((r) => (r.ok ? r.json() : null)),
+        ]);
+        const код = счёт && счёт.code ? Cell.fromBoc(Buffer.from(счёт.code, "hex"))[0].hash().toString("hex") : "";
+        // Кошелёк жетона у кривой — восьмое поле data() после чисел и
+        // флага (contracts/src/bonding_curve.tact, CurveData).
+        let привязан = "";
+        try {
+          const { TonClient } = await библиотеки();
+          const c = new TonClient({
+            endpoint: process.env.TONCENTER_URL
+              || (TESTNET ? "https://testnet.toncenter.com/api/v2/jsonRPC" : "https://toncenter.com/api/v2/jsonRPC"),
+            apiKey: process.env.TONCENTER_API_KEY || undefined,
+          });
+          const ответ = await c.runMethod(Address.parse(токен.curve_address), "data");
+          ответ.stack.skip(8);
+          const а = ответ.stack.readAddressOpt();
+          привязан = а ? а.toRawString() : "";
+        } catch { /* узел не ответил — проверим в следующий раз */ }
+        const свой = привязан && привязан === кошелёкЖетонаКривой({ curve: токен.curve_address, jettonMaster: токен.address });
+        итог.кривая = код === отпечатокМинтера() && !!жетон && !!свой;
+        итог.безАдмина = итог.кривая && !жетон.admin;
+        итог.админ = жетон && жетон.admin && жетон.admin.address ? жетон.admin.address : null;
+      }
+    }
+  } catch (e) {
+    console.warn("[wallet-ton] проверка кривой не удалась:", e && e.message);
+  }
+  проверенныеКривые.set(ключ, { итог, до: Date.now() + 15000 });
+  if (проверенныеКривые.size > 2000) проверенныеКривые.clear();
+  return итог;
+}
+
+/* Покупать — только у кривой, где допечатать токены уже некому.
+   Продавать — у любой настоящей кривой: закрыть держателям выход из-за
+   того, что создатель не отказался от выпуска, значило бы запереть их
+   деньги. */
+export async function криваяНастоящая(db, токен, { продажа = false } = {}) {
+  const п = await проверкаКривой(db, токен);
+  return продажа ? п.кривая : п.кривая && п.безАдмина;
+}
+
+/* Отказ от выпуска у токенов, запущенных до того, как отказ вошёл в сам
+   запуск, и у запусков, оборвавшихся до пакета с ним. Админ жетона —
+   кошелёк создателя в приложении, ключ от него у сервера: пока админ
+   жив, создатель может по своей фразе допечатать токенов и слить их в
+   кривую. Отказ стоит 0,03 TON с кошелька создателя. Зовёт его круг
+   выхода на биржу (api/ton-migrate.js). */
+export async function отказатьсяОтВыпуска(db, токен) {
+  const набор = ключи();
+  if (!db || !набор || !токен.owner_id || !токен.address || !токен.curve_address) return false;
+  const п = await проверкаКривой(db, токен);
+  if (!п.кривая || п.безАдмина || !п.админ) return false;
+  const { Address, internal, SendMode } = await библиотеки();
+  const { data: строка } = await db.from("app_wallets").select(ПОЛЯ)
+    .eq("user_id", токен.owner_id).eq("chain", "ton").maybeSingle();
+  // Админ — не кошелёк создателя в приложении: ключа от него у нас нет.
+  if (!строка || !Address.parse(п.админ).equals(Address.parse(строка.address))) return false;
+  if ((await баланс(строка.address)) < 0.06) return false;
+  const user = { id: токен.owner_id };
+  let отпустить;
+  try { отпустить = занять(номерКошелька(user)); } catch { return false; }
+  try {
+    const { сообщениеОтказа } = await import("./_tonLaunchCore.js");
+    const м = await сообщениеОтказа({ admin: строка.address, jettonMaster: токен.address });
+    const { пара, кошелёк: открытый } = await подписант(строка, набор, user);
+    const seqno = await свободныйНомер(открытый, номерКошелька(user));
+    await открытый.sendTransfer({
+      seqno,
+      secretKey: пара.secretKey,
+      sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+      messages: [internal({ to: м.to, value: м.value, body: м.body, bounce: true })],
+    });
+    занятьНомер(номерКошелька(user), seqno);
+    проверенныеКривые.delete(`${токен.id}|${токен.curve_address}`);
+    return true;
+  } catch (e) {
+    console.warn("[wallet-ton] отказ от выпуска не ушёл:", токен.id, e && e.message);
+    return false;
+  } finally {
+    отпустить();
+  }
+}
+
+/* Один перевод за раз. Кошелёк TON нумерует переводы (seqno), и второй,
+   отправленный до того, как сеть приняла первый, получал тот же номер —
+   сеть молча отбрасывала его, а в истории он значился сделкой. Замок и
+   номер — общие с обменом через казну (api/_walletLock.js). */
+const номерКошелька = (user) => `ton:${user.id}`;
+
 /* Токен вышел на STON.fi — сделка обменом через роутер биржи, а не по
    кривой. Пул STON.fi узнаём по адресу: роутер считает его из пары
    жетонов, и если в базе записан именно он — токен на бирже; иначе там
@@ -408,6 +536,7 @@ export default async function handler(req, res) {
   }
   if (!db || !набор) return res.status(503).json({ error: "not_configured" });
 
+  let отпустить = null;
   try {
     const user = await хозяин(req, db);
     if (!user) return res.status(401).json({ error: "unauthorized" });
@@ -431,6 +560,10 @@ export default async function handler(req, res) {
 
     if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
     const тело = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    /* Тратящие действия — по одному на кошелёк: иначе пачка одновременных
+       выводов проходила проверку предела за сутки по одной и той же сумме,
+       а покупки разом брали один seqno. */
+    if (["launch", "buy", "sell", "withdraw"].includes(действие)) отпустить = занять(номерКошелька(user));
 
     /* Запуск токена кошельком приложения.
        Из браузера приходит только адрес метаданных (их браузер уже
@@ -474,7 +607,7 @@ export default async function handler(req, res) {
          запуск — два перевода: контракты и затем покупка. Второй ждёт,
          пока сеть примет первый (счётчик seqno вырастет), иначе его
          отвергнут как повтор. */
-      let seqno = await открытый.getSeqno();
+      let seqno = await свободныйНомер(открытый, номерКошелька(user));
       const подписи = [];
       for (let i = 0; i < пакеты.length; i += 1) {
         if (i > 0) {
@@ -497,6 +630,7 @@ export default async function handler(req, res) {
         подписи.push(`seqno:${seqno}`);
       }
 
+      занятьНомер(номерКошелька(user), seqno);
       await завершить(db, оп.id, подписи.join(","));
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ ok: true, ...адреса, wallet: строка.address, bought: подписи.length > 1 });
@@ -512,7 +646,7 @@ export default async function handler(req, res) {
 
       const { data: токен } = await db
         .from("tokens")
-        .select("id, address, curve_address, dex_pool_address, chain, curve_cache(graduated)")
+        .select("id, owner_id, creator_wallet, address, curve_address, dex_pool_address, chain, curve_cache(graduated)")
         .eq("id", tokenId)
         .maybeSingle();
       if (!токен || (токен.chain || "ton") !== "ton") return res.status(404).json({ error: "token_not_found" });
@@ -520,6 +654,10 @@ export default async function handler(req, res) {
       const кеш = Array.isArray(токен.curve_cache) ? токен.curve_cache[0] : токен.curve_cache;
       const адресРынка = (кеш && кеш.graduated && токен.dex_pool_address) || токен.curve_address;
       if (!адресРынка) return res.status(400).json({ error: "no_curve" });
+      // На кривую — только на проверенную (на бирже пул сверяет роутер).
+      if (!(кеш && кеш.graduated) && !(await криваяНастоящая(db, токен))) {
+        return res.status(400).json({ error: "unverified_curve" });
+      }
 
       const есть = await баланс(строка.address);
       const нужно = сумма + 0.45;   // покупка плюс газ контракта и сети (у биржи газ больше)
@@ -546,7 +684,7 @@ export default async function handler(req, res) {
         .storeCoins(0n)   // без ограничения проскальзывания: цену считает контракт
         .endCell();
 
-      const seqno = await открытый.getSeqno();
+      const seqno = await свободныйНомер(открытый, номерКошелька(user));
       await открытый.sendTransfer({
         seqno,
         secretKey: пара.secretKey,
@@ -559,6 +697,7 @@ export default async function handler(req, res) {
         })],
       });
 
+      занятьНомер(номерКошелька(user), seqno);
       await завершить(db, оп.id, `seqno:${seqno}`);
       res.setHeader("Cache-Control", "no-store");
       // Только пока сделка идёт по самой кривой: адрес рынка — это пул
@@ -583,13 +722,16 @@ export default async function handler(req, res) {
 
       const { data: токен } = await db
         .from("tokens")
-        .select("id, address, curve_address, dex_pool_address, chain, curve_cache(graduated)")
+        .select("id, owner_id, creator_wallet, address, curve_address, dex_pool_address, chain, curve_cache(graduated)")
         .eq("id", tokenId)
         .maybeSingle();
       if (!токен || (токен.chain || "ton") !== "ton") return res.status(404).json({ error: "token_not_found" });
       const кеш = Array.isArray(токен.curve_cache) ? токен.curve_cache[0] : токен.curve_cache;
       const рынок = (кеш && кеш.graduated && токен.dex_pool_address) || токен.curve_address;
       if (!рынок || !токен.address) return res.status(400).json({ error: "no_curve" });
+      if (!(кеш && кеш.graduated) && !(await криваяНастоящая(db, токен, { продажа: true }))) {
+        return res.status(400).json({ error: "unverified_curve" });
+      }
 
       const мой = await жетонныйКошелёк(строка.address, токен.address);
       if (!мой) return res.status(400).json({ error: "no_jetton_wallet" });
@@ -628,7 +770,7 @@ export default async function handler(req, res) {
         .storeRef(пометка)
         .endCell();
 
-      const seqno = await открытый.getSeqno();
+      const seqno = await свободныйНомер(открытый, номерКошелька(user));
       await открытый.sendTransfer({
         seqno,
         secretKey: пара.secretKey,
@@ -641,6 +783,7 @@ export default async function handler(req, res) {
         })],
       });
 
+      занятьНомер(номерКошелька(user), seqno);
       await завершить(db, опПродажи.id, `seqno:${seqno}`);
       res.setHeader("Cache-Control", "no-store");
       if (!(кеш && кеш.graduated)) подтолкнутьЦену(tokenId, токен.curve_address).catch(() => {});
@@ -709,7 +852,7 @@ export default async function handler(req, res) {
 
       const { internal, toNano, Address, SendMode } = await библиотеки();
       const { пара, кошелёк: открытый } = await подписант(строка, набор, user);
-      const seqno = await открытый.getSeqno();
+      const seqno = await свободныйНомер(открытый, номерКошелька(user));
       await открытый.sendTransfer({
         seqno,
         secretKey: пара.secretKey,
@@ -721,6 +864,7 @@ export default async function handler(req, res) {
         })],
       });
 
+      занятьНомер(номерКошелька(user), seqno);
       await завершить(db, оп.id, `seqno:${seqno}`);
       await сообщить(db, user.id,
         `Отправлено ${сумма.toFixed(4)} ${ТИКЕР} на <code>${куда}</code>`);
@@ -730,6 +874,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "unknown_action" });
   } catch (err) {
     console.error("[wallet-ton]", err && err.message);
-    return res.status(500).json({ error: "failed", detail: String((err && err.message) || err).slice(0, 200) });
+    const код = (err && err.код) || 500;
+    return res.status(код).json({ error: код === 409 ? "wallet_busy" : "failed", detail: String((err && err.message) || err).slice(0, 200) });
+  } finally {
+    if (отпустить) отпустить();
   }
 }

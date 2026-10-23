@@ -1823,6 +1823,17 @@ async function setup(req, res) {
   }
 }
 
+// Сети, из которых приходят вебхуки (core.telegram.org/bots/webhooks).
+// Адрес клиента ставит server/index.mjs по X-Real-IP от nginx.
+function изСетиTelegram(req) {
+  const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim().replace(/^::ffff:/, "");
+  const ч = ip.split(".").map(Number);
+  if (ч.length !== 4 || ч.some((x) => !Number.isInteger(x) || x < 0 || x > 255)) return false;
+  const n = ((ч[0] * 256 + ч[1]) * 256 + ч[2]) * 256 + ч[3];
+  const в = (a, b, c, маска) => Math.floor(n / 2 ** (32 - маска)) === Math.floor((((a * 256 + b) * 256 + c) * 256) / 2 ** (32 - маска));
+  return в(149, 154, 160, 20) || в(91, 108, 4, 22);
+}
+
 export default async function handler(req, res) {
   запомнитьАдрес(req);
 
@@ -1862,7 +1873,11 @@ export default async function handler(req, res) {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "method_not_allowed" });
   }
-  if (WEBHOOK_SECRET && req.headers["x-telegram-bot-api-secret-token"] !== WEBHOOK_SECRET) {
+  /* Без секрета Telegram ничем не подписывает обновления, и раньше их
+     тогда принимали от кого угодно: подделанное сообщение «от» любого
+     человека проходило как настоящее. Нет секрета — пускаем только
+     адреса, с которых Telegram шлёт вебхуки. */
+  if (WEBHOOK_SECRET ? req.headers["x-telegram-bot-api-secret-token"] !== WEBHOOK_SECRET : !изСетиTelegram(req)) {
     return res.status(401).json({ error: "bad_secret" });
   }
   if (!BOT_TOKEN || !SUPABASE_URL || !SERVICE_ROLE_KEY) {

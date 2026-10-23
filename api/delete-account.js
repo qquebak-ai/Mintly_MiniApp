@@ -56,6 +56,102 @@ const СВОЁ = [
   ["profiles", "id"],
 ];
 
+/* Токены, которыми торгуют другие, вместе с аккаунтом не стираются.
+   Строка токена — это и страница, и дорога к сделке: без неё держатели
+   не могли бы продать в приложении то, что купили, и удаление аккаунта
+   становилось способом запереть их деньги. У таких токенов только
+   снимается владелец. Не вышло (в базе owner_id ещё обязателен) —
+   аккаунт не удаляем вовсе, пока ничего не тронуто. */
+async function отвязатьТокены(admin, id) {
+  const { data: свои, error } = await admin.from("tokens").select("id").eq("owner_id", id);
+  if (error) return НЕТ_ТАБЛИЦЫ.has(error.code) ? null : error.message;
+  const чужие = [];
+  for (const т of свои || []) {
+    const { count } = await admin.from("trades").select("id", { count: "exact", head: true })
+      .eq("token_id", т.id).neq("user_id", id);
+    if ((count || 0) > 0) чужие.push(т.id);
+  }
+  if (!чужие.length) return null;
+  const { error: снять } = await admin.from("tokens").update({ owner_id: null }).in("id", чужие);
+  return снять ? снять.message : null;
+}
+
+/* Деньги на кошельках приложения.
+ *
+ * Ключи от кошельков лежат только у нас (app_wallets, app_seeds), и
+ * удаление аккаунта стирало их вместе с деньгами: случайное нажатие — или
+ * чужая сессия — и монеты на адресах оставались навсегда без хозяина.
+ * Теперь, пока человек не записал фразу (проверка в api/wallet-seed.js),
+ * аккаунт с деньгами не удаляется: сперва вывести. Не смогли спросить
+ * сеть — считаем, что деньги есть: ошибиться в эту сторону безопаснее. */
+const RPC_SOL = process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com";
+const TONAPI = process.env.TON_TESTNET === "1" ? "https://testnet.tonapi.io" : "https://tonapi.io";
+const TONAPI_KEY = process.env.TONAPI_KEY || "";
+
+async function rpcSol(method, params) {
+  const r = await fetch(RPC_SOL, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    signal: AbortSignal.timeout(8000),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || "rpc");
+  return j.result;
+}
+
+async function tonapi(путь) {
+  const r = await fetch(`${TONAPI}${путь}`, {
+    headers: TONAPI_KEY ? { Authorization: `Bearer ${TONAPI_KEY}` } : {},
+    signal: AbortSignal.timeout(8000),
+  });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`tonapi ${r.status}`);
+  return r.json();
+}
+
+async function деньгиНаКошельках(admin, id) {
+  const { data: кошельки } = await admin.from("app_wallets").select("chain, address").eq("user_id", id);
+  const где = [];
+  for (const к of кошельки || []) {
+    try {
+      if (к.chain === "solana") {
+        const баланс = await rpcSol("getBalance", [к.address]);
+        let есть = Number((баланс && баланс.value) || 0) > 1_000_000;
+        for (const programId of ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"]) {
+          if (есть) break;
+          const счета = await rpcSol("getTokenAccountsByOwner", [к.address, { programId }, { encoding: "jsonParsed" }]);
+          есть = ((счета && счета.value) || []).some((с) => Number(с?.account?.data?.parsed?.info?.tokenAmount?.amount || 0) > 0);
+        }
+        if (есть) где.push("solana");
+      } else if (к.chain === "ton") {
+        const счёт = await tonapi(`/v2/accounts/${encodeURIComponent(к.address)}`);
+        let есть = Number((счёт && счёт.balance) || 0) > 50_000_000;
+        if (!есть) {
+          const жетоны = await tonapi(`/v2/accounts/${encodeURIComponent(к.address)}/jettons`);
+          есть = ((жетоны && жетоны.balances) || []).some((ж) => BigInt(ж.balance || "0") > 0n);
+        }
+        if (есть) где.push("ton");
+      } else if (к.chain === "evm") {
+        const { СЕТИ } = await import("./wallet-evm.js");
+        for (const [сеть, с] of Object.entries(СЕТИ)) {
+          const r = await fetch(с.rpc, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getBalance", params: [к.address, "latest"] }),
+            signal: AbortSignal.timeout(8000),
+          });
+          const j = await r.json();
+          if (j.error) throw new Error(j.error.message || "rpc");
+          if (BigInt(j.result || "0x0") > 100_000_000_000_000n) { где.push(сеть); break; }
+        }
+      }
+    } catch (e) {
+      console.warn("[delete-account] остаток не проверить:", к.chain, e && e.message);
+      где.push(к.chain);
+    }
+  }
+  return где;
+}
+
 // Нет такой таблицы или колонки — база отвечает этими кодами. Для нас
 // это «удалять нечего», а не поломка.
 const НЕТ_ТАБЛИЦЫ = new Set(["42P01", "42703", "PGRST205", "PGRST204"]);
@@ -145,6 +241,23 @@ export default async function handler(req, res) {
         if (у.email === служебный || String(мета.telegram_id || "") === String(тг)) все.add(у.id);
       }
       if (список.users.length < 1000) break;
+    }
+  }
+
+  // Фраза записана — деньги человек вернёт по ней в любом кошельке.
+  // Не записана — с деньгами на кошельках аккаунт не удаляем.
+  for (const кто of все) {
+    const { data: фраза } = await admin.from("app_seeds").select("confirmed_at").eq("user_id", кто).maybeSingle();
+    if (фраза && фраза.confirmed_at) continue;
+    const где = await деньгиНаКошельках(admin, кто);
+    if (где.length) return res.status(409).json({ error: "wallet_not_empty", chains: [...new Set(где)] });
+  }
+
+  for (const кто of все) {
+    const беда = await отвязатьТокены(admin, кто);
+    if (беда) {
+      console.error("[delete-account] токены не отвязать:", беда);
+      return res.status(409).json({ error: "tokens_have_holders" });
     }
   }
 

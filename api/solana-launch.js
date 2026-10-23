@@ -67,7 +67,7 @@ export function ключЛиквидности() {
   if (!сырой || !Keypair) return null;
   try { return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(сырой))); } catch { return null; }
 }
-const адресЛиквидности = () => {
+export const адресЛиквидности = () => {
   const к = ключЛиквидности();
   return к ? к.publicKey.toBase58() : LIQUIDITY_ЗАДАН;
 };
@@ -557,7 +557,7 @@ async function получуЗа(инфоОбещание, sol) {
 }
 
 /* Покупка и продажа на уже заведённой кривой. */
-export async function собратьСделку({ wallet, mint, продажа, amount, minOut, скорость = "normal" }) {
+export async function собратьСделку({ wallet, mint, продажа, amount, minOut, скорость = "normal", slippageBps = 500 }) {
   const темп = СКОРОСТИ[скорость] || СКОРОСТИ.normal;
   await библиотеки();
   const programId = программа();
@@ -600,6 +600,16 @@ export async function собратьСделку({ wallet, mint, продажа,
     выплата = выплатаЗа(расчёт && расчёт.кривая, единиц);
   }
 
+  /* Защита от проскальзывания — всегда. Раньше нижняя граница была
+     нулём, если её не прислало приложение (а оно не присылало): в боевой
+     сети такую сделку бот «зажимает» с двух сторон — покупает перед ней
+     и продаёт сразу после, — и человек получает в разы меньше. Теперь
+     граница считается здесь, по самой кривой: ожидаемое минус допуск. */
+  const допуск = Math.max(50, Math.min(5000, Math.round(Number(slippageBps) || 500)));
+  const ожидаем = продажа ? выплата : await получуЗа(кривуюДляПокупки, Number(amount));
+  const снизу = Number(ожидаем) > 0 ? Number(ожидаем) * (1 - допуск / 10000) : 0;
+  const границаВыхода = Math.max(Number(minOut) || 0, снизу);
+
   const tx = new Transaction();
   приоритет(tx, ЕДИНИЦ_НА_СДЕЛКУ, темп.цена);
   if (!продажа) {
@@ -617,8 +627,8 @@ export async function собратьСделку({ wallet, mint, продажа,
       ...(продажа ? [] : [{ pubkey: SystemProgram.programId, isSigner: false, isWritable: false }]),
     ],
     data: продажа
-      ? инструкцияПродажи(единиц, Math.round(Number(minOut || 0) * LAMPORTS))
-      : инструкцияПокупки(Math.round(Number(amount) * LAMPORTS), Math.round(Number(minOut || 0) * ЕДИНИЦА)),
+      ? инструкцияПродажи(единиц, Math.floor(границаВыхода * LAMPORTS))
+      : инструкцияПокупки(Math.round(Number(amount) * LAMPORTS), Math.floor(границаВыхода * ЕДИНИЦА)),
   }));
 
   чаевыеJito(tx, payer, темп.чаевые);
@@ -631,7 +641,7 @@ export async function собратьСделку({ wallet, mint, продажа,
     // остаток и запас кривой, и выплата за него. По этим числам
     // приложение пишет историю, а не по оценке из окна.
     tokens: продажа ? единиц / ЕДИНИЦА : null,
-    bought: продажа ? null : await получуЗа(кривуюДляПокупки, Number(amount)),
+    bought: продажа ? null : ожидаем,
     solOut: выплата,
   };
 }

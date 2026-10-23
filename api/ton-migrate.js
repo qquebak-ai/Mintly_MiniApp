@@ -21,7 +21,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { Address, internal, SendMode, toNano } from "@ton/ton";
 import { состояние } from "./refresh-curves.js";
-import { клиент, кошелёкЛиквидности, кошелёкВладельца, сообщенияЛиквидности, адресПула, телоВыхода } from "./_stonfi.js";
+import { клиент, кошелёкЛиквидности, кошелёкВладельца, сообщенияЛиквидности, адресПула, резервыПула, телоВыхода } from "./_stonfi.js";
+import { криваяНастоящая, отказатьсяОтВыпуска } from "./wallet-ton.js";
 
 // На кошельке всегда остаётся запас на газ следующих выходов.
 const ЗАПАС_ГАЗА = toNano("1");
@@ -61,7 +62,7 @@ export async function вывестиTonНаБиржу() {
   const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
   const { data: токены, error } = await db
     .from("tokens")
-    .select("id, address, curve_address, ticker, chain")
+    .select("id, address, curve_address, ticker, chain, owner_id, creator_wallet")
     .or("chain.is.null,chain.eq.ton")
     .not("curve_address", "is", null)
     .is("dex_pool_address", null)
@@ -78,12 +79,30 @@ export async function вывестиTonНаБиржу() {
     try {
       const st = await состояние(tok.curve_address);
       if (!st || !st.graduated) continue;
+      /* Адрес кривой и жетон в строке токена пишет браузер создателя. Без
+         проверки поддельная «кривая» (свой контракт, отвечающий «закрыта,
+         деньги есть») тянула бы газ Graduate каждые полминуты, а свой
+         жетон с придуманной ценой конца кривой — весь TON кошелька
+         ликвидности в пул, который подделавший тут же и выкупит. */
+      if (!(await криваяНастоящая(db, tok, { продажа: true }))) continue;
       const жетонов = await балансЖетона(c, tok.address, мой);
       if (жетонов > 0n) {
         // Шаг 2: ликвидность пришла — в пул по цене конца кривой.
+        /* Пул на эту пару уже кто-то завёл — с какой угодно ценой. Вклад
+           в него по нашей цене ушёл бы в разницу курсов: лишнее с одной
+           стороны остаётся в пуле, и его забирает хозяин первых LP. Такой
+           выход — только руками. */
+        const чужой = await резервыПула(tok.address).catch(() => null);
+        if (чужой && (чужой.ton > 0n || чужой.жетон > 0n)) {
+          console.warn("[выход TON]", tok.ticker, "пул STON.fi на эту пару уже есть", чужой.пул.toString(), "— выход отложен");
+          continue;
+        }
         const x = st.virtualTon + st.graduationTon;
         const y = (st.virtualTon * st.virtualTokens) / x;
         let тонов = (жетонов * x) / y;
+        // Не больше, чем отдала кривая: жетоны на кошелёк ликвидности
+        // может прислать кто угодно, а платить за них нашим TON незачем.
+        if (тонов > st.graduationTon) тонов = st.graduationTon;
         const свободно = баланс - ЗАПАС_ГАЗА;
         if (тонов > свободно) тонов = свободно;
         if (тонов <= 0n) { console.warn("[выход TON]", tok.ticker, "на кошельке ликвидности мало TON"); continue; }
@@ -113,6 +132,41 @@ export async function вывестиTonНаБиржу() {
     }
   }
   return сделано;
+}
+
+/* Отказ от выпуска у старых токенов — по нескольку за круг.
+   Проверка стоит двух запросов к tonapi, поэтому каждый токен
+   спрашиваем не чаще раза в десять минут, а отказавшийся — больше
+   никогда (до перезапуска). */
+const следующаяПроверка = new Map(); // id -> когда
+export async function отказыСтарыхТокенов() {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return 0;
+  const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const { data: токены } = await db
+    .from("tokens")
+    .select("id, address, curve_address, owner_id, creator_wallet, chain")
+    .or("chain.is.null,chain.eq.ton")
+    .not("curve_address", "is", null)
+    .not("owner_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  let проверено = 0;
+  let отправлено = 0;
+  const сейчас = Date.now();
+  for (const tok of токены || []) {
+    if (проверено >= 4) break;
+    if ((следующаяПроверка.get(tok.id) || 0) > сейчас) continue;
+    проверено += 1;
+    следующаяПроверка.set(tok.id, сейчас + 10 * 60 * 1000);
+    try {
+      if (await криваяНастоящая(db, tok)) { следующаяПроверка.set(tok.id, Infinity); continue; }
+      if (await отказатьсяОтВыпуска(db, tok)) отправлено += 1;
+    } catch (e) {
+      console.warn("[отказ от выпуска]", tok.id, e && e.message);
+    }
+  }
+  if (следующаяПроверка.size > 20000) следующаяПроверка.clear();
+  return отправлено;
 }
 
 /* Цены пулов площадки — для продолжения графика (api/dex-history.js).

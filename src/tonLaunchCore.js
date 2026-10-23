@@ -84,6 +84,19 @@ export async function сообщенияЗапуска({ admin, metadataUrl, buy
   }
 
   const второй = [];
+
+  /* Отказ от выпуска. Админ жетона — кошелёк создателя, а фразу от него
+     человек может увидеть и унести в любой кошелёк. С правом выпуска это
+     значило бы: напечатать сколько угодно токенов и продать их в кривую,
+     забрав деньги всех покупателей. Поэтому сразу после выпуска запаса
+     админ меняется на «никого» — сообщения одному адресату доходят по
+     порядку, и выпуск успевает раньше. Кошелёк v4 шлёт до четырёх
+     сообщений за раз: не влезло в первый пакет — уходит первым во второй. */
+  const отказ = [];
+  await минтер.sendChangeAdmin(провайдерНового(минтер), копилка(адм, отказ), null, { value: toNano("0.05") });
+  if (первый.length < 4) первый.push(...отказ);
+  else второй.push(...отказ);
+
   const покупка = Math.max(0, Number(buyTon) || 0);
   if (покупка > 0) {
     второй.push({
@@ -96,6 +109,7 @@ export async function сообщенияЗапуска({ admin, metadataUrl, buy
 
   return {
     пакеты: [первый, второй].filter((п) => п.length),
+    отказОтВыпуска: true,
     адреса: {
       jettonMaster: жетон.toString(),
       curve: кривая.address.toString(),
@@ -103,4 +117,55 @@ export async function сообщенияЗапуска({ admin, metadataUrl, buy
       pool: пул ? пул.address.toString() : null,
     },
   };
+}
+
+/* Проверка кривой перед сделкой. Строку токена пишет браузер создателя,
+   и адрес кривой в ней мог бы указывать куда угодно — хоть на свой
+   кошелёк. Настоящая кривая площадки — та, чей адрес получается из кода
+   кривой и параметров площадки: админ — кошелёк создателя в приложении,
+   жетон — из строки, комиссия и получатель ликвидности — наши. Подделать
+   такой адрес нельзя: он и есть отпечаток кода вместе с данными. */
+export async function адресаКривойПлощадки({ admin, jettonMaster, ликвидность = null }) {
+  const адм = typeof admin === "string" ? Address.parse(admin) : admin;
+  const жетон = typeof jettonMaster === "string" ? Address.parse(jettonMaster) : jettonMaster;
+  const комиссия = Address.parse(АДРЕС_КОМИССИИ);
+  const адреса = [];
+  if (ликвидность) {
+    const получатель = typeof ликвидность === "string" ? Address.parse(ликвидность) : ликвидность;
+    адреса.push((await curveContract({ admin: адм, jettonMaster: жетон, feeWallet: комиссия, graduationDestination: получатель })).address);
+  }
+  const пул = await poolContract({ admin: адм, jettonMaster: жетон, feeWallet: комиссия });
+  адреса.push((await curveContract({ admin: адм, jettonMaster: жетон, feeWallet: комиссия, graduationDestination: пул.address })).address);
+  return адреса.map((а) => а.toRawString());
+}
+
+/* Отказ от выпуска у уже запущенного жетона: для токенов, запущенных до
+   того, как отказ вошёл в сам запуск, и для запусков, оборвавшихся до
+   пакета с отказом (см. api/wallet-ton.js, отказатьсяОтВыпуска). */
+export async function сообщениеОтказа({ admin, jettonMaster }) {
+  const адм = typeof admin === "string" ? Address.parse(admin) : admin;
+  const жетон = typeof jettonMaster === "string" ? Address.parse(jettonMaster) : jettonMaster;
+  const список = [];
+  const провайдер = {
+    async internal(via, m) {
+      await via.send({ to: жетон, value: m.value, bounce: m.bounce ?? true, sendMode: m.sendMode, body: m.body });
+    },
+  };
+  await JettonMinter.createFromAddress(жетон).sendChangeAdmin(провайдер, копилка(адм, список), null, { value: toNano("0.03") });
+  return список[0];
+}
+
+/* Кошелёк жетона у кривой — тот, что привязывает запуск. Админ кривой
+   может привязать любой адрес, и привязка у кривой одна: собранная по
+   фразе создателя кривая с подставным кошельком брала бы TON за жетоны,
+   которых не отдаёт, и платила бы за «продажи» из подставного кошелька. */
+export function кошелёкЖетонаКривой({ curve, jettonMaster }) {
+  const кривая = typeof curve === "string" ? Address.parse(curve) : curve;
+  const жетон = typeof jettonMaster === "string" ? Address.parse(jettonMaster) : jettonMaster;
+  return JettonWallet.createFromConfig({ owner: кривая, jettonMaster: жетон }).address.toRawString();
+}
+
+// Отпечаток кода стандартного минтера жетона, которым запускает площадка.
+export function отпечатокМинтера() {
+  return JettonMinter.createFromConfig({ admin: Address.parse(АДРЕС_КОМИССИИ), content: beginCell().endCell() }).init.code.hash().toString("hex");
 }

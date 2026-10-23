@@ -171,8 +171,10 @@ let курсКеш = { значение: 0, ts: 0 };
    прочерка, поэтому кеш возвращается даже устаревшим. */
 let курсSolКеш = { значение: 0, ts: 0 };
 
-export async function курсSol() {
-  if (курсSolКеш.значение > 0 && Date.now() - курсSolКеш.ts < 300000) return курсSolКеш.значение;
+// свежесть — сколько миллисекунд курс можно брать из памяти. Обмен между
+// сетями просит минуту: по пятиминутному курсу его можно было обыгрывать.
+export async function курсSol(свежесть = 300000) {
+  if (курсSolКеш.значение > 0 && Date.now() - курсSolКеш.ts < свежесть) return курсSolКеш.значение;
   try {
     const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
     if (res.ok) {
@@ -199,8 +201,8 @@ export async function курсSol() {
   return курсSolКеш.значение;
 }
 
-export async function курсTon() {
-  if (курсКеш.значение > 0 && Date.now() - курсКеш.ts < 300000) return курсКеш.значение;
+export async function курсTon(свежесть = 300000) {
+  if (курсКеш.значение > 0 && Date.now() - курсКеш.ts < свежесть) return курсКеш.значение;
   try {
     const res = await fetch("https://tonapi.io/v2/rates?tokens=ton&currencies=usd");
     if (res.ok) {

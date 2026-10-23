@@ -22,6 +22,7 @@
 import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { фразаПользователя, новаяФраза } from "./_seed.js";
+import { свежийВход } from "./_second.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -128,14 +129,19 @@ export default async function handler(req, res) {
          иначе слова на экране не открывали бы то, что за ними стоит.
          Дальше (вход из строки «Секретная фраза») отдаём как есть:
          там за фразой уже могут лежать деньги. */
-      let фраза;
-      if (!состояние.начато) {
-        фраза = await новаяФраза(db, user, набор);
-        const { error: убрать } = await db.from("app_wallets").delete().eq("user_id", user.id);
-        if (убрать) console.error("[wallet-seed] прежние кошельки не убраны:", убрать.message);
-      } else {
-        фраза = await фразаПользователя(db, user, набор);
-      }
+      /* Кошельки не удаляем никогда. Раньше первый показ заводил новую
+         фразу и стирал заведённые кошельки — вместе с ключами от денег,
+         если на адрес уже что-то пришло (а у старых аккаунтов и украденной
+         сессии так и было бы). Новая фраза — только пока кошельков нет
+         вовсе; иначе показываем ту, из которой они выведены. */
+      // Повторный показ — только из свежего входа: украденный токен
+      // обновления помнит время старого входа и сюда не пройдёт, а
+      // приложение в Telegram входит заново само (см. src/appWallet.js).
+      if (состояние.начато && !свежийВход(req)) return res.status(403).json({ error: "need_fresh_login" });
+      const { data: кошельки } = await db.from("app_wallets").select("chain").eq("user_id", user.id).limit(1);
+      const фраза = !состояние.начато && !(кошельки && кошельки.length)
+        ? await новаяФраза(db, user, набор)
+        : await фразаПользователя(db, user, набор);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ words: String(фраза).trim().split(/\s+/) });
     }

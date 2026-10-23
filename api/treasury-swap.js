@@ -20,9 +20,9 @@
  *   TREASURY_MIN_USD   — нижняя граница: мелочь не стоит комиссии сети.
  */
 
-import crypto from "node:crypto";
-import { админ, ключи, казна, остаток, отправитьИзКазны, СЕТЬ_TON, СЕТЬ_SOL } from "./_treasury.js";
+import { админ, ключи, казна, остаток, отправитьИзКазны, открытьСекрет, СЕТЬ_TON, СЕТЬ_SOL } from "./_treasury.js";
 import { курсSol, курсTon } from "./_market.js";
+import { занять, свободныйНомер, занятьНомер, дождатьсяПеревода } from "./_walletLock.js";
 
 const RPC = process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com";
 const TESTNET = process.env.TON_TESTNET === "1";
@@ -41,14 +41,6 @@ const ОБМЕНОВ_В_МИНУТУ = Number(process.env.TREASURY_RATE || 3);
 const ЗАПАС_SOL = 0.003;
 const ЗАПАС_TON = 0.05;
 
-function расшифровать(строка, ключ, владелец) {
-  const b = Buffer.from(String(строка), "base64");
-  const шифр = crypto.createDecipheriv("aes-256-gcm", ключ, b.subarray(0, 12));
-  шифр.setAuthTag(b.subarray(12, 28));
-  шифр.setAAD(Buffer.from(String(владелец)));
-  return Buffer.concat([шифр.update(b.subarray(28)), шифр.final()]);
-}
-
 async function хозяин(req, db) {
   const заголовок = req.headers.authorization || "";
   const токен = заголовок.startsWith("Bearer ") ? заголовок.slice(7) : "";
@@ -61,7 +53,7 @@ async function хозяин(req, db) {
 async function кошелёкЧеловека(db, user_id, chain) {
   const { data } = await db
     .from("app_wallets")
-    .select("user_id, chain, address, secret_enc")
+    .select("user_id, chain, address, secret_enc, key_id")
     .eq("user_id", user_id).eq("chain", chain).maybeSingle();
   return data || null;
 }
@@ -88,8 +80,9 @@ async function остатокЧеловека(chain, адрес) {
 async function перевестиВКазну({ строка, набор, user_id, chain, куда, сумма }) {
   if (chain === "solana") {
     const { Keypair, Connection, PublicKey, SystemProgram, Transaction } = await import("@solana/web3.js");
-    const секрет = расшифровать(строка.secret_enc, набор.текущий, user_id);
+    const секрет = открытьСекрет(строка, набор, user_id, { безМетки: true });
     const пара = Keypair.fromSecretKey(new Uint8Array(секрет));
+    if (пара.publicKey.toBase58() !== строка.address) throw new Error("ключ не от этого адреса");
     const соединение = new Connection(RPC, "confirmed");
     const tx = new Transaction().add(SystemProgram.transfer({
       fromPubkey: пара.publicKey,
@@ -104,9 +97,12 @@ async function перевестиВКазну({ строка, набор, user_i
     const подпись = await соединение.sendRawTransaction(tx.serialize(), {
       skipPreflight: false, preflightCommitment: "processed", maxRetries: 5,
     });
-    /* Ждём подтверждения: платить из казны по неподтверждённому переводу
-       нельзя — он ещё может не дойти. */
-    await соединение.confirmTransaction({ signature: подпись, blockhash, lastValidBlockHeight }, "confirmed");
+    /* Ждём подтверждения и смотрим на исход. Упавшая транзакция тоже
+       «подтверждается» — с ошибкой внутри, без исключения, и раньше обмен
+       по ней считался оплаченным: человек успевал увести монеты по своей
+       фразе в другом кошельке, перевод в казну падал, а казна платила. */
+    const итог = await соединение.confirmTransaction({ signature: подпись, blockhash, lastValidBlockHeight }, "confirmed");
+    if (итог.value && итог.value.err) throw new Error(`перевод отклонён: ${JSON.stringify(итог.value.err)}`);
     return подпись;
   }
 
@@ -114,36 +110,52 @@ async function перевестиВКазну({ строка, набор, user_i
   const { Address, internal, toNano } = core;
   const { TonClient, WalletContractV4 } = ton;
   const { mnemonicToPrivateKey } = crypt;
-  const слова = расшифровать(строка.secret_enc, набор.текущий, user_id).toString("utf8").split(" ");
-  const пара = await mnemonicToPrivateKey(слова);
+  /* Записи бывают двух видов, как в api/wallet-ton.js: готовая пара
+     («hex:» и шестьдесят четыре байта) у кошельков из общей фразы и
+     мнемоника у старых. Раньше здесь читали только мнемонику — из пары
+     получался чужой пустой кошелёк, и обмен из GRAM не проходил. */
+  const тайна = открытьСекрет(строка, набор, user_id, { безМетки: true }).toString("utf8");
+  let пара;
+  if (тайна.startsWith("hex:")) {
+    const байты = Buffer.from(тайна.slice(4), "hex");
+    пара = { publicKey: байты.subarray(32), secretKey: байты };
+  } else {
+    пара = await mnemonicToPrivateKey(тайна.split(" "));
+  }
   const контракт = WalletContractV4.create({ workchain: 0, publicKey: пара.publicKey });
+  if (!контракт.address.equals(Address.parse(строка.address))) throw new Error("ключ не от этого адреса");
   const client = new TonClient({
     endpoint: process.env.TONCENTER_URL
       || (TESTNET ? "https://testnet.toncenter.com/api/v2/jsonRPC" : "https://toncenter.com/api/v2/jsonRPC"),
     apiKey: process.env.TONCENTER_API_KEY || undefined,
   });
   const кошелёк = client.open(контракт);
-  const seqno = await кошелёк.getSeqno();
-  await кошелёк.sendTransfer({
+  // Номер — общий с покупками и выводом этого кошелька (api/wallet-ton.js).
+  const seqno = await свободныйНомер(кошелёк, `ton:${user_id}`);
+  const получатель = Address.parse(куда);
+  const сколько = toNano(сумма.toFixed(9));
+  const тело = await кошелёк.createTransfer({
     secretKey: пара.secretKey,
     seqno,
-    messages: [internal({ to: Address.parse(куда), value: toNano(сумма.toFixed(9)), body: "", bounce: false })],
+    messages: [internal({ to: получатель, value: сколько, body: "", bounce: false })],
   });
-  /* Ждём, пока номер сообщения вырастет: это и значит, что кошелёк
-     отправил. Полминуты хватает; дальше сеть всё равно доставит, но
-     платить из казны вслепую мы не станем. */
-  for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 1000));
-    const сейчас = await кошелёк.getSeqno().catch(() => seqno);
-    if (сейчас > seqno) return `seqno:${seqno}`;
-  }
-  throw new Error("ton_transfer_timeout");
+  await кошелёк.send(тело);
+  занятьНомер(`ton:${user_id}`, seqno);
+  /* Раньше ждали только роста seqno. Но фраза кошелька у человека на
+     руках: свой перевод с тем же номером из другого кошелька сеть
+     принимала вместо нашего, номер рос — и казна платила за перевод,
+     которого не было. Теперь ищем в сети именно наше подписанное
+     сообщение и перевод из него в казну. Подпись живёт минуту, ждём
+     чуть дольше: после этого дойти оно уже не может. */
+  const хеш = await дождатьсяПеревода(client, контракт.address, тело, (м) =>
+    м.info.type === "internal" && м.info.dest.equals(получатель) && м.info.value.coins >= сколько);
+  return `ton:${хеш}`;
 }
 
 /* Курс обмена: обе монеты считаются через доллар. Своей пары SOL/GRAM у
    нас нет, а доллар знают оба источника. */
 async function курсы() {
-  const [sol, ton] = await Promise.all([курсSol().catch(() => 0), курсTon().catch(() => 0)]);
+  const [sol, ton] = await Promise.all([курсSol(60000).catch(() => 0), курсTon(60000).catch(() => 0)]);
   return { sol, ton };
 }
 
@@ -169,6 +181,7 @@ export default async function handler(req, res) {
 
   if (!db || !набор) return res.status(200).json({ enabled: false });
 
+  const отпустить = [];
   try {
     if (действие === "state") {
       const [казнаSol, казнаTon] = await Promise.all([казна(db, набор, "solana"), казна(db, набор, "ton")]);
@@ -210,6 +223,12 @@ export default async function handler(req, res) {
     const user = await хозяин(req, db);
     if (!user) return res.status(401).json({ error: "unauthorized" });
     if (!(сумма > 0)) return res.status(400).json({ error: "bad_amount" });
+
+    /* Один обмен на человека за раз. Одновременные запросы проходили
+       проверку остатка по одному и тому же числу, а два одинаковых
+       перевода Solana в одном блоке — это одна транзакция с одной
+       подписью: в казну приходило один раз, а платила она дважды. */
+    try { отпустить.push(занять(`swap:${user.id}`)); } catch { return res.status(409).json({ error: "in_progress" }); }
 
     const предел = откуда === "SOL" ? ПРЕДЕЛ_SOL : ПРЕДЕЛ_GRAM;
     if (сумма > предел) return res.status(400).json({ error: "too_much", limit: предел });
@@ -296,15 +315,28 @@ export default async function handler(req, res) {
 
     let входнаяПодпись = null;
     try {
-      входнаяПодпись = await перевестиВКазну({
-        строка: мойВход, набор, user_id: user.id,
-        chain: цепочкаВхода, куда: казнаВхода.address, сумма,
-      });
+      // Кошелёк человека — под тем же замком, что сделки и вывод в
+      // api/wallet-ton.js и api/wallet-solana.js.
+      const отпуститьКошелёк = занять(`${цепочкаВхода}:${user.id}`);
+      try {
+        входнаяПодпись = await перевестиВКазну({
+          строка: мойВход, набор, user_id: user.id,
+          chain: цепочкаВхода, куда: казнаВхода.address, сумма,
+        });
+      } finally {
+        отпуститьКошелёк();
+      }
     } catch (e) {
+      const текст = String((e && e.message) || e);
+      /* Не дождались ответа сети — это ещё не значит, что перевода не
+         было. Такой обмен остаётся «начатым» с причиной: его сверяют
+         руками, а не списывают в неудачные. */
       await db.from("treasury_swaps").update({
-        status: "failed", detail: String((e && e.message) || e).slice(0, 300), updated_at: new Date().toISOString(),
+        status: текст === "ton_transfer_timeout" ? "started" : "failed",
+        detail: текст.slice(0, 300), updated_at: new Date().toISOString(),
       }).eq("id", обмен.id);
-      return res.status(502).json({ error: "transfer_failed", detail: String((e && e.message) || e).slice(0, 200) });
+      if (текст === "wallet_busy") return res.status(409).json({ error: "wallet_busy" });
+      return res.status(502).json({ error: "transfer_failed", detail: текст.slice(0, 200) });
     }
 
     await db.from("treasury_swaps").update({
@@ -342,5 +374,7 @@ export default async function handler(req, res) {
   } catch (err) {
     console.warn("[treasury-swap]", err && err.message);
     return res.status(502).json({ error: "failed", detail: String((err && err.message) || err).slice(0, 200) });
+  } finally {
+    for (const ф of отпустить) ф();
   }
 }

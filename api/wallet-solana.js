@@ -42,10 +42,11 @@
 import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { проверитьТранзакцию } from "./_txguard.js";
-import { собратьЗапуск, собратьСделку, собратьЗакрытие, состояние as состояниеКривой, ОСНОВНАЯ_СЕТЬ } from "./solana-launch.js";
+import { собратьЗапуск, собратьСделку, собратьЗакрытие, состояние as состояниеКривой, ОСНОВНАЯ_СЕТЬ, адресЛиквидности } from "./solana-launch.js";
 import { котировка, сделка as свопJupiter, SOL_MINT } from "./solana.js";
 import { собратьОбменБиржи } from "./_dexSolana.js";
 import { нуженВторойКлюч } from "./_second.js";
+import { занять } from "./_walletLock.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -206,6 +207,10 @@ async function кошелёк(db, user, набор) {
     // такой кошелёк оставляем как есть, пусть ошибка будет громкой.
     const баланс = await rpc("getBalance", [data.address]).then((r) => Number(r && r.value)).catch(() => null);
     if (баланс !== 0) return data;
+    // Ноль SOL — ещё не пустой кошелёк: на нём могут лежать токены.
+    const счета = await rpc("getTokenAccountsByOwner", [data.address, { programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }, { encoding: "base64" }])
+      .then((r) => (r && Array.isArray(r.value) ? r.value.length : null)).catch(() => null);
+    if (счета !== 0) return data;
     await db.from("app_wallets").delete().eq("user_id", user.id).eq("chain", "solana");
     // Новый кошелёк заводится не тем же самым действием, а следующим:
     // человек должен явно повторить, чтобы наверняка увидеть свежий
@@ -879,6 +884,36 @@ async function котировкаКривой(db, { вход, выход, сум
   return { out: String(Math.floor(out)), impact: null, curve: true };
 }
 
+/* Пул биржи, в который можно вести сделку.
+ *
+ * Адрес пула лежит в строке токена, а строку правит её владелец — значит,
+ * верить ему нельзя: подставив свой пул (с кривой ценой и своей
+ * ликвидностью), создатель уводил бы деньги покупателей к себе. Годится
+ * только пул, который завёл наш кошелёк ликвидности при выходе с кривой:
+ * его адрес выводится из пары монет, а создатель записан в самом пуле. */
+const проверенныеПулы = new Map(); // пул -> mint
+async function пулНашегоВыхода(mint, пул) {
+  if (!адресОк(String(пул || "")) || !адресОк(String(mint || ""))) return false;
+  if (проверенныеПулы.get(пул) === mint) return true;
+  try {
+    const { PublicKey } = await библиотеки();
+    const { адресаПула } = await import("./_raydium.js");
+    const ожидаем = адресаПула(new PublicKey(mint), ОСНОВНАЯ_СЕТЬ ? "mainnet" : "devnet");
+    if (ожидаем.пул.toBase58() !== пул) return false;
+    const инфо = await rpc("getAccountInfo", [пул, { encoding: "base64" }]);
+    const v = инфо && инфо.value;
+    if (!v || v.owner !== ожидаем.р.программа.toBase58()) return false;
+    const данные = Buffer.from(v.data[0], "base64");
+    if (данные.length < 72) return false;
+    const создатель = new PublicKey(данные.subarray(40, 72)).toBase58();
+    if (создатель !== адресЛиквидности()) return false;
+    проверенныеПулы.set(пул, mint);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /* Правила запуска: честный старт и замок доли создателя.
  *
  * Обещания создателя не должны жить одной строкой в описании — сервер
@@ -972,6 +1007,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ graduated: сделано });
   }
 
+  let отпустить = null;
   try {
     const user = await хозяин(req, db);
     if (!user) return res.status(401).json({ error: "unauthorized" });
@@ -1038,7 +1074,7 @@ export default async function handler(req, res) {
       const вызов = crypto.randomBytes(12).toString("hex");
       await db.from("app_wallets")
         .update({ payout_nonce: вызов, payout_nonce_at: new Date().toISOString() })
-        .eq("user_id", user.id);
+        .eq("user_id", user.id).eq("chain", "solana");
       return res.status(200).json({ message: текстВызова(адрес, вызов) });
     }
 
@@ -1064,7 +1100,9 @@ export default async function handler(req, res) {
       const поле = сразу
         ? { payout_address: адрес, payout_pending: null, payout_pending_at: null, payout_nonce: null }
         : { payout_pending: адрес, payout_pending_at: new Date().toISOString(), payout_nonce: null };
-      await db.from("app_wallets").update(поле).eq("user_id", user.id);
+      // Только строка Solana: без сети адрес Solana ложился и в кошелёк
+      // TON, и вывод там упирался в чужой адрес.
+      await db.from("app_wallets").update(поле).eq("user_id", user.id).eq("chain", "solana");
       await db.from("wallet_ops").insert({ user_id: user.id, kind: "payout_bind", amount: 0, address: адрес, ip });
 
       if (!сразу) {
@@ -1078,7 +1116,7 @@ export default async function handler(req, res) {
     if (действие === "payout-cancel") {
       await db.from("app_wallets")
         .update({ payout_pending: null, payout_pending_at: null })
-        .eq("user_id", user.id);
+        .eq("user_id", user.id).eq("chain", "solana");
       return res.status(200).json({ ok: true });
     }
 
@@ -1088,7 +1126,7 @@ export default async function handler(req, res) {
       const порог = тело.above == null ? null : Number(тело.above);
       if (порог != null && !(порог > 0)) return res.status(400).json({ error: "bad_amount" });
       if (порог != null && !строка.payout_address) return res.status(400).json({ error: "no_payout" });
-      await db.from("app_wallets").update({ sweep_above: порог }).eq("user_id", user.id);
+      await db.from("app_wallets").update({ sweep_above: порог }).eq("user_id", user.id).eq("chain", "solana");
       return res.status(200).json({ sweepAbove: порог });
     }
 
@@ -1179,7 +1217,9 @@ export default async function handler(req, res) {
            инструкция отбилась бы. Адрес пула пишет сервер, заведя его
            (api/solana-migrate.js). */
         const { data: запись } = await db.from("tokens").select("dex_pool_address").eq("address", String(тело.mint)).maybeSingle();
-        const пул = запись && запись.dex_pool_address;
+        const пулИзБазы = запись && запись.dex_pool_address;
+        // Пул из базы — только если его завели мы (см. пулНашегоВыхода).
+        const пул = пулИзБазы && (await пулНашегоВыхода(String(тело.mint), пулИзБазы)) ? пулИзБазы : null;
         const собрано = пул
           ? await собратьОбменБиржи({ wallet: строка.address, mint: String(тело.mint), пул, продажа, amount: сумма, slippageBps: тело.slippageBps })
           : await собратьСделку({
@@ -1188,6 +1228,7 @@ export default async function handler(req, res) {
             продажа,
             amount: сумма,
             minOut: тело.minOut,
+            slippageBps: тело.slippageBps,
             скорость: ["normal", "fast", "turbo"].includes(тело.speed) ? тело.speed : "normal",
           });
         const подпись = await подписатьИОтправить({
@@ -1256,7 +1297,8 @@ export default async function handler(req, res) {
             mint: свой,
             продажа: !покупкаКривой,
             amount: покупкаКривой ? Number(сумма) / LAMPORTS : Number(сумма) / 1e6,
-            minOut: 0,
+            // Нижнюю границу выхода сборщик считает сам, по кривой.
+            slippageBps: Number(тело.slippage) || 500,
           });
           собранная = собрано && собрано.transaction;
           поКривой = !!собранная;
@@ -1266,7 +1308,8 @@ export default async function handler(req, res) {
       if (!собранная) {
         const кот = await котировка({
           input: вход, output: выход, amount: сумма,
-          slippageBps: Number(тело.slippage) || 150,
+          // Допуск от 0,5% до 30%: больше — это уже подарок ботам.
+          slippageBps: Math.max(50, Math.min(3000, Number(тело.slippage) || 150)),
         });
         if (!кот) throw new Error("маршрут не найден");
         собранная = await свопJupiter({ quote: кот, wallet: строка.address });
@@ -1294,6 +1337,9 @@ export default async function handler(req, res) {
     if (действие === "withdraw") {
       const отказ2 = await нуженВторойКлюч(req, db, user);
       if (отказ2) return res.status(403).json({ error: отказ2 });
+      /* Один вывод за раз (api/_walletLock.js): пачка одновременных
+         запросов проходила проверку предела за сутки по одной сумме. */
+      отпустить = занять(`solana:${user.id}`);
       /* Куда выводим. Привязанный адрес — тот, владение которым доказано
          подписью: если он есть, деньги уходят только на него, и присланный
          в запросе адрес должен с ним совпадать — иначе привязка не значила
@@ -1349,6 +1395,8 @@ export default async function handler(req, res) {
   } catch (err) {
     const код = (err && err.код) || 502;
     console.warn("[wallet-solana]", err && err.message);
-    return res.status(код).json({ error: "failed", detail: String((err && err.message) || err).slice(0, 200) });
+    return res.status(код).json({ error: код === 409 && err.message === "wallet_busy" ? "wallet_busy" : "failed", detail: String((err && err.message) || err).slice(0, 200) });
+  } finally {
+    if (отпустить) отпустить();
   }
 }

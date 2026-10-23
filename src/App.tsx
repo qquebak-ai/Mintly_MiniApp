@@ -856,6 +856,8 @@ const STR = {
     loggedOut: "Вы вышли из аккаунта",
     accountDeleted: "Аккаунт удалён",
     accountDeleteFailed: "Не удалось удалить аккаунт — база не дала. Ты остался в аккаунте.",
+    accountDeleteHasFunds: "На кошельке остались деньги, а секретная фраза не записана — сначала выведи их или запиши фразу, иначе они пропадут вместе с аккаунтом",
+    accountDeleteHasHolders: "Твоими токенами торгуют другие люди — пока аккаунт удалить нельзя, напиши в поддержку",
     connectWalletTrade: "Подключи TON-кошелёк, чтобы торговать",
     solConnecting: "Открываю Phantom — подтверди подключение",
     solWalletTitle: "Кошелёк Solana",
@@ -875,6 +877,8 @@ const STR = {
     // Отказы сделки словами, а не кодом: код на экране человеку ничего
     // не объясняет, а причина у каждого отказа понятная.
     errCreatorLocked: "Ты создатель — продажа закрыта до выхода на биржу, так обещано в токене",
+    errWalletBusy: "Предыдущая операция кошелька ещё идёт — подожди несколько секунд",
+    errUnverifiedCurve: "Токен не прошёл проверку контракта — сделки с ним закрыты",
     errFairStart: "Честный старт: первую минуту покупают только из приложения",
     errNotEnough: "Не хватает монет на кошельке приложения",
     errNotEnoughGas: "Не хватает на комиссию сети — пополни кошелёк",
@@ -1579,6 +1583,8 @@ const STR = {
     loggedOut: "You've logged out",
     accountDeleted: "Account deleted",
     accountDeleteFailed: "Could not delete the account — the database refused. You are still signed in.",
+    accountDeleteHasFunds: "Your wallet still holds funds and the secret phrase is not saved — withdraw them or save the phrase first, otherwise they will be lost with the account",
+    accountDeleteHasHolders: "Other people trade your tokens — the account can't be deleted yet, contact support",
     connectWalletTrade: "Connect a TON wallet to trade",
     solConnecting: "Opening Phantom — approve the connection",
     solWalletTitle: "Solana wallet",
@@ -1596,6 +1602,8 @@ const STR = {
     solFailed: "Didn't go through",
     toastDone: "Done", toastFail: "Didn't go through", toastNote: "Heads up",
     errCreatorLocked: "You are the creator — selling is locked until the token lists, as promised",
+    errWalletBusy: "The previous wallet operation is still in progress — wait a few seconds",
+    errUnverifiedCurve: "This token failed the contract check — trading is closed",
     errFairStart: "Fair start: the first minute is for app buyers only",
     errNotEnough: "Not enough coins in the app wallet",
     errNotEnoughGas: "Not enough for the network fee — top up the wallet",
@@ -16493,9 +16501,11 @@ function ЭкранВывода({
     setКодБеда("");
     let сошлось = false;
     try {
-      const { error } = await supabase.auth.verifyOtp({ email: почта, token: код.trim(), type: "email" });
-      сошлось = !error;
-    } catch (e) { /* сеть не ответила — код считаем неподтверждённым */ }
+      // Код проверяет сервер и выдаёт билет второго ключа: без него вывод
+      // он не пропустит (см. api/second-key.js).
+      const { подтвердитьКодПочты } = await import("./appWallet");
+      сошлось = await подтвердитьКодПочты(код.trim());
+    } catch (e) { /* неверный код или сеть не ответила — не подтверждено */ }
     if (!сошлось) {
       setКодБеда(t("withdrawCodeBad"));
       setИдёт(false);
@@ -16524,6 +16534,7 @@ function ЭкранВывода({
       const текст = String((e && e.message) || "");
       // Сервер отвечает короткими метками — переводим их в человеческие.
       if (текст.includes("need_2fa")) showToast("Подтверди вывод кодом из почты — открой вывод заново");
+      else if (текст.includes("need_fresh_login")) showToast("Для вывода нужен свежий вход — закрой приложение и открой заново");
       else if (текст.includes("payout_locked")) showToast(t("withdrawLocked"));
       else if (текст.includes("bad_address") || текст.includes("same_address")) showToast(t("withdrawBadAddress"));
       else if (текст.includes("daily_limit")) showToast(t("withdrawDailyLimit"));
@@ -25264,7 +25275,12 @@ function ПрофильX({ открыт, onClose, handle, профиль, сво
   const п = профиль || {};
   const число = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(".0", "")} млн` : n >= 1e4 ? `${(n / 1e3).toFixed(1).replace(".0", "")} тыс.` : (n || 0).toLocaleString("ru-RU"));
   const присоединился = п.joined ? new Date(п.joined) : null;
-  const ссылка = (url) => { try { const tg = window.Telegram && window.Telegram.WebApp; if (tg && tg.openLink) tg.openLink(url); else window.open(url, "_blank"); } catch { /* ссылка не открылась */ } };
+  /* Сайт и баннер — из анкеты X, их пишет сам владелец профиля. Только
+     http и https: javascript:-адрес, открытый на сайте через window.open,
+     выполнился бы с правами страницы (кошелёк, сессия). */
+  const годная = (url) => { try { const u = new URL(String(url)); return u.protocol === "https:" || u.protocol === "http:" ? u.href : null; } catch { return null; } };
+  const ссылка = (url) => { const адрес = годная(url); if (!адрес) return; try { const tg = window.Telegram && window.Telegram.WebApp; if (tg && tg.openLink) tg.openLink(адрес); else window.open(адрес, "_blank", "noopener,noreferrer"); } catch { /* ссылка не открылась */ } };
+  const баннер = п.banner ? годная(п.banner) : null;
   /* Закрывается только кнопкой «Назад» Telegram. Карточка лежит порталом,
      но события React всё равно всплывают к листу настроек под ней — и его
      жест «смахнуть вниз» закрывал всё разом. Касания здесь дальше не идут. */
@@ -25274,7 +25290,7 @@ function ПрофильX({ открыт, onClose, handle, профиль, сво
       {/* Баннер — как шапка профиля в X; нет баннера — ровная плашка. */}
       {/* Шапка уходит под панель Telegram до самого верха: с отступом
           над ней оставалась чёрная полоса, и фон выглядел обрезанным. */}
-      <div style={{ height: "calc(150px + var(--tg-inset-top, 0px))", background: п.banner ? `center/cover no-repeat url(${п.banner})` : T.surfaceHi }} />
+      <div style={{ height: "calc(150px + var(--tg-inset-top, 0px))", background: баннер ? `center/cover no-repeat url(${JSON.stringify(баннер)})` : T.surfaceHi }} />
       <div style={{ padding: "0 16px" }}>
         <div className="flex items-end justify-between" style={{ marginTop: -44 }}>
           <span style={{ width: 88, height: 88, borderRadius: "50%", border: "4px solid #000", background: T.surfaceHi, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -25298,7 +25314,7 @@ function ПрофильX({ открыт, onClose, handle, профиль, сво
         ) : null}
         <div className="flex flex-wrap" style={{ gap: "6px 16px", marginTop: 12, fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>
           {п.location ? <span>📍 {п.location}</span> : null}
-          {п.website ? <button onClick={() => ссылка(п.website)} className="fx-tap" style={{ background: "none", border: "none", padding: 0, color: "#1D9BF0", fontSize: 14 }}>🔗 {String(п.website).replace(/^https?:\/\//, "")}</button> : null}
+          {п.website && годная(п.website) ? <button onClick={() => ссылка(п.website)} className="fx-tap" style={{ background: "none", border: "none", padding: 0, color: "#1D9BF0", fontSize: 14 }}>🔗 {String(п.website).replace(/^https?:\/\//, "")}</button> : null}
           {присоединился && !isNaN(присоединился) ? <span>В X с {присоединился.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}</span> : null}
         </div>
         <div className="flex" style={{ gap: 18, marginTop: 14, fontFamily: bodyFont, fontSize: 14.5 }}>
@@ -33076,7 +33092,7 @@ function mapTokenRow(row) {
       const тело = await ответ.json().catch(() => ({}));
       if (!ответ.ok || !тело.ok) {
         console.warn("[mintly] аккаунт не удалён:", тело.error || ответ.status, тело.detail || "");
-        showToast(t("accountDeleteFailed"));
+        showToast(t(тело.error === "wallet_not_empty" ? "accountDeleteHasFunds" : тело.error === "tokens_have_holders" ? "accountDeleteHasHolders" : "accountDeleteFailed"));
         return;
       }
       if (тело.warnings) console.warn("[mintly] при удалении остались хвосты:", тело.warnings);
@@ -33133,6 +33149,8 @@ function mapTokenRow(row) {
     const сырое = String((e && e.message) || e || "").trim();
     const словарь = {
       creator_locked: "errCreatorLocked",
+      wallet_busy: "errWalletBusy",
+      unverified_curve: "errUnverifiedCurve",
       fair_start: "errFairStart",
       not_enough: "errNotEnough",
       not_enough_gas: "errNotEnoughGas",

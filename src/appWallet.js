@@ -27,13 +27,33 @@ async function токен() {
   return (data && data.session && data.session.access_token) || null;
 }
 
+/* Билет второго ключа: его выдаёт сервер, проверив код с почты
+   (api/second-key.js). Живёт в памяти страницы и уходит заголовком с
+   каждой денежной просьбой, пока не истёк. */
+let второйКлюч = null;
+export async function подтвердитьКодПочты(код) {
+  const t = await токен();
+  if (!t) throw new Error("нужен вход в аккаунт");
+  const res = await fetch(апи("/api/second-key"), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ code: String(код || "").trim() }),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json || !json.ticket) throw new Error((json && json.error) || `ошибка ${res.status}`);
+  второйКлюч = { билет: json.ticket, до: Number(json.expiresAt) * 1000 };
+  return true;
+}
+
 async function запрос(путь, тело) {
   const t = await токен();
   if (!t) throw new Error("нужен вход в аккаунт");
+  const билет = второйКлюч && второйКлюч.до > Date.now() + 5000 ? второйКлюч.билет : null;
   const res = await fetch(путь, {
     method: тело ? "POST" : "GET",
     headers: {
       Authorization: `Bearer ${t}`,
+      ...(билет ? { "X-Second-Key": билет } : {}),
       ...(тело ? { "Content-Type": "application/json" } : {}),
     },
     body: тело ? JSON.stringify(тело) : undefined,
@@ -281,8 +301,32 @@ export async function состояниеФразы() {
   return запрос(апи("/api/wallet-seed?action=state"));
 }
 
+/* Повторный показ фразы сервер пускает только из свежего входа.
+   Внутри Telegram входим заново молча — по подписи, которую Telegram
+   выдал при открытии приложения, — и спрашиваем ещё раз. */
+async function войтиЗаново() {
+  const wa = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+  const initData = wa && wa.initData;
+  if (!initData) return false;
+  const res = await fetch(апи("/api/telegram-auth"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initData }),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json || !json.token_hash) return false;
+  const { error } = await supabase.auth.verifyOtp({ token_hash: json.token_hash, type: "magiclink" });
+  return !error;
+}
+
 export async function показатьФразу() {
-  return запрос(апи("/api/wallet-seed?action=reveal"), {});
+  try {
+    return await запрос(апи("/api/wallet-seed?action=reveal"), {});
+  } catch (e) {
+    if (!String((e && e.message) || "").includes("need_fresh_login")) throw e;
+    if (!(await войтиЗаново())) throw e;
+    return запрос(апи("/api/wallet-seed?action=reveal"), {});
+  }
 }
 
 export async function отметитьФразу() {
