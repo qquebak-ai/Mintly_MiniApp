@@ -504,6 +504,37 @@ export async function отказатьсяОтВыпуска(db, токен) {
   }
 }
 
+/* Своя сделка TON — до вести. Сервер отвечает, когда перевод ушёл, а
+   кривая исполняет его через несколько секунд. Наблюдатель спрашивает
+   кривую, пока изменение не пришло, и отдаёт его вестям (api/notify.js):
+   сделавшему — «прошла», владельцу токена — о покупке или продаже. Без
+   него о сделке писал только обход раз в десять минут. */
+async function следитьЗаСвоейСделкой(токен, user, { продажа, сумма = 0, штук = 0 }) {
+  if (!process.env.TRADING_BOT_TOKEN || !токен.curve_address || !токен.address) return;
+  try {
+    const [{ вестиПоКривой, своюСделку, своюСделкуЖдём }, { состояние }] = await Promise.all([
+      import("./notify.js"), import("./refresh-curves.js"),
+    ]);
+    const ид = своюСделку(токен.address, { userId: user.id, продажа, сумма, штук, сказать: true });
+    const до = Date.now() + 45_000;
+    let прошлое = null;
+    while (Date.now() < до && своюСделкуЖдём(токен.address, ид)) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const st = await состояние(токен.curve_address).catch(() => null);
+      if (!st) continue;
+      const собрано = Number(st.realTon) / 1e9;
+      if (прошлое === собрано) continue;
+      прошлое = собрано;
+      await вестиПоКривой({
+        tokenId: токен.id, собрано, продано: Number(st.tokensSold) / 1e9,
+        цель: Number(st.graduationTon) / 1e9, закрыта: !!st.graduated, от: Date.now(),
+      });
+    }
+  } catch (e) {
+    console.warn("[wallet-ton] наблюдатель сделки:", e && e.message);
+  }
+}
+
 /* Один перевод за раз. Кошелёк TON нумерует переводы (seqno), и второй,
    отправленный до того, как сеть приняла первый, получал тот же номер —
    сеть молча отбрасывала его, а в истории он значился сделкой. Замок и
@@ -712,7 +743,10 @@ export default async function handler(req, res) {
       // Только пока сделка идёт по самой кривой: адрес рынка — это пул
       // биржи, если токен уже закрылся, а состояние() умеет читать
       // только контракт кривой.
-      if (!(кеш && кеш.graduated)) подтолкнутьЦену(tokenId, токен.curve_address).catch(() => {});
+      if (!(кеш && кеш.graduated)) {
+        подтолкнутьЦену(tokenId, токен.curve_address).catch(() => {});
+        следитьЗаСвоейСделкой(токен, user, { продажа: false, сумма }).catch(() => {});
+      }
       return res.status(200).json({ ok: true, seqno });
     }
 
@@ -797,7 +831,10 @@ export default async function handler(req, res) {
       занятьНомер(номерКошелька(user), seqno);
       await завершить(db, опПродажи.id, `seqno:${seqno}`);
       res.setHeader("Cache-Control", "no-store");
-      if (!(кеш && кеш.graduated)) подтолкнутьЦену(tokenId, токен.curve_address).catch(() => {});
+      if (!(кеш && кеш.graduated)) {
+        подтолкнутьЦену(tokenId, токен.curve_address).catch(() => {});
+        следитьЗаСвоейСделкой(токен, user, { продажа: true, штук: Number(сколькоБигом) / 1e9 }).catch(() => {});
+      }
       return res.status(200).json({ ok: true, seqno });
     }
 

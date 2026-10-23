@@ -766,7 +766,7 @@ function Приветствие({ onРаздел }) {
         картинка={<Комиссия />} />
 
       <Раздел id="покупка" обратно
-        текст={<><Строки верх="Покупка" низ="за секунду" /><Пояснение ключ="archKeysBody" /></>}
+        текст={<><Строки верх="Покупка" низ="за секунду" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.6, maxWidth: 480, marginTop: 24 }}>Сумма, одно нажатие — и токены в кошельке. Свечи графика двигаются вместе со сделками.</p></>}
         картинка={<СценаПокупки />} />
 
       <section style={{ minHeight: "92vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 70, padding: "80px 40px" }}>
@@ -782,10 +782,18 @@ function Приветствие({ onРаздел }) {
       <section style={{ minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 40px" }}>
         <Появись style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <Строки верх="Один аккаунт" низ="на телефоне и ПК" размер={80} />
-          <Пояснение ключ="archRiskBody" поЦентру />
+          <Пояснение ключ="archKeysBody" поЦентру />
           <button onClick={() => setОкно(true)} style={{ ...кнопкаГлавная, height: 66, padding: "0 64px", fontSize: 20, borderRadius: 18, marginTop: 38 }}>Начать</button>
         </Появись>
       </section>
+
+      {/* Риски — не рекламный текст, а оговорка: мелко, в самом низу, как
+          подпись под договором. */}
+      <footer style={{ padding: "0 40px 48px", display: "flex", justifyContent: "center" }}>
+        <p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 13.5, lineHeight: 1.6, maxWidth: 720, margin: 0, textAlign: "center", opacity: 0.75 }}>
+          {текстУстройства("archRiskBody")}
+        </p>
+      </footer>
 
     </div>
   );

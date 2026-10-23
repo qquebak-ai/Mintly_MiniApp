@@ -438,11 +438,15 @@ export default async function handler(req, res) {
   let молчат = 0;
   let залистили = 0;
   const описания = new Map();
+  // Когда прочитано состояние каждой кривой — по этому времени вести о
+  // сделках (api/notify.js) не дадут старому числу перебить новое из потока.
+  const прочитано = new Map();
   for (const tok of tokens) {
     // Токены Solana идут своей дорогой: их кривая живёт в другой цепочке,
     // и запрос к tonapi по её адресу возвращал пустоту — такой токен
     // просто не попадал в витрину и молчал в уведомлениях.
     if (цепочка(tok) === "solana") {
+      прочитано.set(tok.id, Date.now());
       const строка = await ветвьSolana(tok, прошлыеКеши.get(tok.id));
       if (строка) строки.push(строка); else молчат += 1;
       continue;
@@ -450,6 +454,7 @@ export default async function handler(req, res) {
 
     const st = await состояние(tok.curve_address);
     if (!st) { молчат += 1; continue; }
+    прочитано.set(tok.id, Date.now());
 
     const params = {
       virtualTon: st.virtualTon || DEFAULT_VIRTUAL_TON,
@@ -529,6 +534,26 @@ export default async function handler(req, res) {
 
   const { error: writeError } = await admin.from("curve_cache").upsert(строки, { onConflict: "token_id" });
   if (writeError) return res.status(500).json({ error: "cache_failed", detail: writeError.message });
+
+  /* Вести о сделках, которые увидел этот круг. У TON своего потока нет, и
+     кривую, изменившуюся мимо приложения, замечает только он; у Solana
+     это подстраховка потока. Отдаём все кривые, а не только сдвинувшиеся
+     с прошлого круга: известие, отложенное из-за запаса, иначе потерялось
+     бы — уже обработанное вести отсекают сами, без базы. Чтение отстаёт
+     от потока на секунды, отсюда запас. */
+  if (process.env.TRADING_BOT_TOKEN) {
+    (async () => {
+      const { вестиПоКривой } = await import("./notify.js");
+      // По одной, в фоне: после перезапуска памяти у вестей нет, и все
+      // кривые разом ушли бы в базу пачкой в две сотни запросов.
+      for (const с of строки) {
+        await вестиПоКривой({
+          tokenId: с.token_id, собрано: с.real_ton, продано: с.tokens_sold, цель: с.graduation_ton,
+          закрыта: с.graduated, от: прочитано.get(с.token_id) || Date.now(), запас: 15_000,
+        }).catch(() => {});
+      }
+    })().catch(() => {});
+  }
 
   // Заодно чиним логотип в самой карточке токена: обход всё равно
   // прочитал метаданные, а без этого поле оставалось пустым у всех, кто
