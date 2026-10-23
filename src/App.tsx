@@ -20393,7 +20393,22 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     return свечи;
   };
   // Новое ли событие: старое (по времени сервера) свечу не двигает.
-  const событиеСвежее = (ms) => !(ms > 0 && живаяЦенаRef.current && живаяЦенаRef.current.ms > ms);
+  /* Своя сделка, нарисованная в миг нажатия. Пока сеть её не увидела,
+     поток и опрос ещё несколько раз присылают состояние до сделки — с
+     более поздним временем сервера, — и свеча откатывалась назад, а
+     потом снова прыгала: глазу казалось, что сделка появилась через
+     полторы секунды. Пока ждём (не дольше 8 секунд), цену «до сделки»
+     не берём. */
+  const ожиданиеRef = useRef(null);
+  const ценаДоСделки = (цена) => {
+    const о = ожиданиеRef.current;
+    if (!о) return false;
+    if (Date.now() > о.до) { ожиданиеRef.current = null; return false; }
+    const доВерха = о.покупка ? цена < о.было + (о.цена - о.было) * 0.5 : цена > о.было + (о.цена - о.было) * 0.5;
+    if (!доВерха) ожиданиеRef.current = null;
+    return доВерха;
+  };
+  const событиеСвежее = (ms, цена) => !(ms > 0 && живаяЦенаRef.current && живаяЦенаRef.current.ms > ms) && !(цена > 0 && ценаДоСделки(цена));
   const chartSrcRef = useRef(null);
   // Нажатие «Повторить» на пустом графике: меняем число — и загрузка
   // начинается заново, не дожидаясь общего круга обновления.
@@ -20993,7 +21008,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
           }
           if (!(цена > 0)) return;
           const msСобытия = Number(весть.ms) || 0;
-          if (!событиеСвежее(msСобытия)) return;
+          if (!событиеСвежее(msСобытия, цена)) return;
           /* Сделка видна сразу, своей свечой. Последняя свеча — та, где
              была последняя сделка, и она может быть давней: пустых свечей
              на графике нет. Новая сделка в новом интервале открывает новую
@@ -21165,6 +21180,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
         const шагTf = TF_SECONDS[prev.tf || tf] || 60;
         const сейчасСвеча = Math.floor(сейчасМс / 1000 / шагTf) * шагTf;
         живаяЦенаRef.current = { time: Math.max(было.time, сейчасСвеча), close: цена, at: сейчасМс, ms: сейчасМс };
+        ожиданиеRef.current = { покупка, цена, было: было.close, до: сейчасМс + 8000 };
         if (было.time < сейчасСвеча) {
           свечи.push({ time: сейчасСвеча, open: было.close, high: Math.max(было.close, цена), low: Math.min(было.close, цена), close: цена });
           return { ...prev, candles: свечи, volume: (prev.volume || []).concat([{ time: сейчасСвеча, value: 0, color: hexA(цена >= было.close ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ, 0.32) }]) };
@@ -21393,7 +21409,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
           }
           return { ...база, candles: свечи, volume: объём };
         });
-        else if (цена > 0 && событиеСвежее(Number(к.ms) || 0)) setChartData((prev) => {
+        else if (цена > 0 && событиеСвежее(Number(к.ms) || 0, цена)) setChartData((prev) => {
           if (!prev || !prev.candles || !prev.candles.length) return prev;
           const свечи = prev.candles.slice();
           const было = свечи[свечи.length - 1];
