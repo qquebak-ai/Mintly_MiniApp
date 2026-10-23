@@ -552,10 +552,18 @@ export default async function handler(req, res) {
        проверяется до записи. */
     // Старые профили могли остаться без telegram_id — их узнаём по
     // служебному адресу, иначе вернувшегося попросили бы придумать ник.
-    const { data: поТелеграму, error: поТгErr } = await admin.from("profiles").select("id, nickname")
+    const { data: поТелеграму, error: поТгErr } = await admin.from("profiles").select("id, nickname, telegram_id")
       .or(`telegram_id.eq.${tgUser.id},email.eq."${email}"`).limit(5);
     if (поТгErr) return fail(res, 500, "lookup_failed", поТгErr.message);
-    const готовый = (поТелеграму || []).find((п) => п && п.nickname) || null;
+    /* Сначала — профиль с этим telegram_id: его ставит только сервер.
+       Поле email профиля браузер правит сам, и раньше чужой профиль с
+       вписанным «tg<id>@telegram.local» находился первым — человек входил
+       в чужой аккаунт и пополнял чужой кошелёк. По адресу узнаём только
+       старые профили, у которых telegram_id ещё нет. */
+    const свои = поТелеграму || [];
+    const готовый = свои.find((п) => п && п.nickname && String(п.telegram_id) === String(tgUser.id))
+      || свои.find((п) => п && п.nickname && п.telegram_id == null)
+      || null;
     const ужеЕсть = !!готовый;
     /* Законченный аккаунт этого Telegram — входим именно в него, по его
        id, а не по служебному адресу tg<id>@telegram.local. После
