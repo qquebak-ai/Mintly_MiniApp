@@ -486,6 +486,31 @@ if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.CURVES_LOOP !== "0") {
   console.log(`[кривые] цикл раз в ${Math.round(ШАГ_КРИВЫХ_МС / 1000)} с`);
 }
 
+/* Живые цены всех кривых площадки — в памяти сервера с первой секунды.
+ *
+ * Лента спрашивает «что сдвинулось» (api/live.js, since) и получает цены
+ * всех токенов сразу, сколько бы их ни было в списке. Для этого сервер
+ * сам держит все кривые: поток программы Solana, подписку на кривые TON
+ * (api/_tonWatch.js) и события фабрик EVM (api/_evmWatch.js). Раньше
+ * поток поднимался только с первым зрителем, а TON и EVM в ленте жили
+ * опросом по очереди и стояли на месте. */
+if (process.env.LIVE_WATCH !== "0") {
+  (async () => {
+    try {
+      const [{ слушатьКривые }, { наблюдатьЗаКривымиTON }, { наблюдатьЗаEVM }] = await Promise.all([
+        import("../api/curve-stream.js"), import("../api/_tonWatch.js"), import("../api/_evmWatch.js"),
+      ]);
+      // Пустой слушатель держит поток Solana поднятым и без зрителей.
+      слушатьКривые(() => {});
+      наблюдатьЗаКривымиTON();
+      await наблюдатьЗаEVM();
+      console.log("[живые цены] наблюдатели Solana, TON и EVM подключены");
+    } catch (err) {
+      console.warn("[живые цены]", err && err.message);
+    }
+  })();
+}
+
 /* Выход на биржу — тем же способом.
  *
  * Кривая Solana, набравшая порог, сама не закрывается: закрыть её зовёт
@@ -542,8 +567,9 @@ const ШАГ_ВЕСТЕЙ_МС = Number(process.env.NOTIFY_INTERVAL_MS) || 2 * 6
 /* Вести о сделках — в миг изменения кривой. Поток Solana держит одну
    подписку на программу площадки и сообщает о каждом изменении счёта
    кривой; по нему владелец узнаёт о покупке или продаже сразу, а не
-   через круг обхода. Сделки TON приносит наблюдатель после своей сделки
-   (api/wallet-ton.js) и круг кривых (api/refresh-curves.js). */
+   через круг обхода. Сделки TON приносит подписка на кривые TON
+   (api/_tonWatch.js), наблюдатель после своей сделки (api/wallet-ton.js)
+   и круг кривых (api/refresh-curves.js). */
 if (process.env.TRADING_BOT_TOKEN && process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NOTIFY_LOOP !== "0") {
   (async () => {
     try {

@@ -1,6 +1,8 @@
 /* Частый опрос живых кривых: цена, собранное и свежие сделки.
  *
  *   GET /api/live?sol=<mint,…>&ton=<адрес кривой,…>
+ *   GET /api/live?since=<мс>  — все кривые, сдвинувшиеся после метки:
+ *                              для списков, где токенов сотни
  *
  * Отвечает из памяти сервера (api/_live.js), поэтому его можно звать
  * каждые 0,3 секунды. Solana приходит потоком от узла — там задержка
@@ -13,8 +15,10 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { прочитатьЖивое, записатьЖивое } from "./_live.js";
-import { держатьКривую } from "./curve-stream.js";
+import { прочитатьЖивое, записатьЖивое, живыеПосле } from "./_live.js";
+import { держатьКривую, потокЖив } from "./curve-stream.js";
+import { наблюдательTONЖив } from "./_tonWatch.js";
+import { наблюдательEVMЖив } from "./_evmWatch.js";
 import { ДЕМО_ТОКЕНЫ } from "./_demoTokens.js";
 
 const ШАГ_TON_МС = Math.max(200, Number(process.env.TON_LIVE_MS) || 400);
@@ -316,9 +320,18 @@ export default async function handler(req, res) {
 
   const кривые = {};
   const сделки = {};
-  for (const ключ of [...sol, ...ton, ...демоСети.map((к) => ДЕМО_СЕТИ[к].mint)]) {
-    const з = прочитатьЖивое(ключ);
-    if (!з || !з.событие) continue;
+  /* since — всё, что сдвинулось после метки телефона. Сделки сюда не
+     кладём: их ждёт только открытая карточка, а она спрашивает свою
+     кривую по имени. */
+  // Метка ответа — до чтения памяти: сдвиг, пришедший во время ответа,
+  // попадёт в следующий.
+  const метка = Date.now();
+  const после = Number(req.query && req.query.since);
+  const сдвиги = Number.isFinite(после) && после >= 0 ? живыеПосле(после) : [];
+  const поИмени = [...sol, ...ton, ...демоСети.map((к) => ДЕМО_СЕТИ[к].mint)];
+  const сделкиДля = new Set(поИмени);
+  for (const [ключ, з] of [...сдвиги, ...поИмени.map((к) => [к, прочитатьЖивое(к)])]) {
+    if (!з || !з.событие || кривые[ключ]) continue;
     const с = з.событие;
     кривые[ключ] = {
       price: с.price, raised: с.raised, sold: с.sold != null ? с.sold : null,
@@ -328,7 +341,7 @@ export default async function handler(req, res) {
       // что и весь ряд свечей; готовое число дало бы скачки свечи.
       ...(с.vSol != null ? { vSol: с.vSol, vTokens: с.vTokens, realSol: с.realSol } : null),
     };
-    if (з.сделки.length) сделки[ключ] = з.сделки.slice(0, 30);
+    if (сделкиДля.has(ключ) && з.сделки.length) сделки[ключ] = з.сделки.slice(0, 30);
   }
   // history=<сеть> — история цены одного демо для графика; «1» — TON,
   // как раньше.
@@ -340,5 +353,8 @@ export default async function handler(req, res) {
     // Прежние поля — для приложений, открытых до обновления.
     ...(демоСети.includes("ton") ? { demoCreated: демо.ton.создан, demoStats: статистикаДемо("ton") } : null),
   } : null;
-  return res.status(200).json({ at: Date.now(), curves: кривые, trades: сделки, ...демоОтвет, ...(история ? { history: история } : null) });
+  /* Кто держит кривые сам: пока наблюдатель сети жив, телефону незачем
+     перечислять её токены — хватит since. */
+  const следят = { sol: потокЖив(), ton: наблюдательTONЖив(), evm: наблюдательEVMЖив() };
+  return res.status(200).json({ at: метка, curves: кривые, trades: сделки, watch: следят, ...демоОтвет, ...(история ? { history: история } : null) });
 }

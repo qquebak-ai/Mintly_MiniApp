@@ -232,6 +232,10 @@ let сокет = null;
 let живПоток = false;
 let попытка = 0;
 
+// Жив ли поток: по нему api/live.js говорит телефону, нужен ли ещё
+// перечень кривых Solana в опросе.
+export function потокЖив() { return живПоток; }
+
 function поднятьПоток() {
   if (сокет || typeof WebSocket !== "function") return;
   if (!RPC || !адресОк(ПРОГРАММА)) return;

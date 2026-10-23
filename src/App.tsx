@@ -11645,6 +11645,18 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
    Читается из памяти своего сервера (api/live.js), поэтому так часто
    спрашивать можно. */
 const ЖИВОЙ_ОПРОС_МС = 300;
+/* Чьи кривые сервер держит сам (api/live.js отвечает полем watch): пока
+   наблюдатель сети жив, её токены в опросе не перечисляются. */
+const НАБЛЮДАТЕЛИ_ЖИВЫХ = { sol: false, ton: false, evm: false };
+/* Ключ токена в живой памяти сервера: у Solana — mint, у TON — адрес
+   кривой, у EVM — «сеть:адрес токена» (адрес один во всех сетях EVM). */
+function ключЖивого(tok) {
+  if (!tok) return "";
+  if (tok.демо) return mintДемо(tok);
+  if (tok.chain === "solana") return tok.address || tok.tokenAddress || "";
+  if (этоEVM(tok.chain)) return `${tok.chain}:${String(tok.address || tok.tokenAddress || "").toLowerCase()}`;
+  return tok.curveAddress || "";
+}
 /* Запрос живых цифр с пределом в три секунды. Свёрнутый Telegram
    замораживает сеть, и запрос, ушедший перед сворачиванием, мог не
    вернуться никогда — опрос ждал его и после возвращения стоял. */
@@ -11693,6 +11705,11 @@ function МемпадEVM({ сеть, onOpen, myTokens = [] }) {
     let идёт = false;
     const читать = async () => {
       if (идёт || document.visibilityState === "hidden") return;
+      /* Наблюдатель EVM на сервере жив — цены своих кривых приносит общий
+         опрос ленты (НАБЛЮДАТЕЛИ_ЖИВЫХ), и спрашивать узел по токену
+         незачем: прежние числа отсюда сбрасываем, чтобы не перекрывали
+         живые. */
+      if (НАБЛЮДАТЕЛИ_ЖИВЫХ.evm) { setРынкиСвоих((было) => (Object.keys(было).length ? {} : было)); return; }
       идёт = true;
       try {
         const { криваяEVM } = await import("./appWallet");
@@ -32247,7 +32264,14 @@ function mapTokenRow(row) {
    * фоне. Опрос своего сервера (api/live.js) отвечает из памяти и стоит
    * копейки, поэтому капитализация в ленте и на главной не отстаёт от
    * сети больше чем на треть секунды. Следующий круг не уходит, пока не
-   * вернулся прошлый. */
+   * вернулся прошлый.
+   *
+   * Спрашиваем не списком, а «что сдвинулось после прошлого ответа»
+   * (since): сервер сам держит все кривые площадки — Solana, TON и EVM.
+   * Раньше в опрос уходили первые шестьдесят токенов, и «Почти на DEX»,
+   * где стоят токены постарше, не двигался вовсе, а цены EVM в ленту не
+   * приходили никогда. Перечень остаётся только для сети, чей наблюдатель
+   * на сервере сейчас не жив. */
   const списокДляЖивого = useRef([]);
   useEffect(() => {
     const все = new Map();
@@ -32257,24 +32281,29 @@ function mapTokenRow(row) {
   useEffect(() => {
     let живо = true;
     let идёт = false;
+    // Метка сервера из прошлого ответа: следующий спросит всё, что позже.
+    let метка = 0;
     const шаг = async () => {
       if (идёт || (typeof document !== "undefined" && document.visibilityState === "hidden")) return;
       const ряд = списокДляЖивого.current;
-      const sol = ряд.filter((tok) => tok.chain === "solana" && tok.address).map((tok) => tok.address);
-      const ton = ряд.filter((tok) => tok.chain !== "solana" && !этоEVM(tok.chain) && tok.curveAddress).map((tok) => tok.curveAddress);
+      const следят = НАБЛЮДАТЕЛИ_ЖИВЫХ;
+      const sol = следят.sol ? [] : ряд.filter((tok) => tok.chain === "solana" && tok.address).map((tok) => tok.address);
+      const ton = следят.ton ? [] : ряд.filter((tok) => tok.chain !== "solana" && !этоEVM(tok.chain) && tok.curveAddress).map((tok) => tok.curveAddress);
       const демо = [...new Set(ряд.filter((tok) => tok.демо).map(ключДемо))];
-      if (!sol.length && !ton.length && !демо.length) return;
       идёт = true;
       try {
-        const r = await живойЗапрос(`/api/live?sol=${sol.join(",")}&ton=${ton.join(",")}${демо.length ? `&demo=${демо.join(",")}` : ""}`);
+        const r = await живойЗапрос(`/api/live?since=${метка}&sol=${sol.join(",")}&ton=${ton.join(",")}${демо.length ? `&demo=${демо.join(",")}` : ""}`);
         const j = r.ok ? await r.json() : null;
         if (!живо || !j || !j.curves) return;
+        if (j.watch) Object.assign(НАБЛЮДАТЕЛИ_ЖИВЫХ, { sol: !!j.watch.sol, ton: !!j.watch.ton, evm: !!j.watch.evm });
+        if (Number(j.at) > 0) метка = Number(j.at);
+        if (!Object.keys(j.curves).length && !j.demos) return;
         const курсSol = solUsd();
         const курсTon = tonPriceUsd > 0 ? tonPriceUsd : tonUsd();
         const подставить = (prev) => {
           let тронуто = false;
           const следующий = prev.map((tok) => {
-            const к = j.curves[tok.демо ? mintДемо(tok) : tok.chain === "solana" ? tok.address : tok.curveAddress];
+            const к = j.curves[ключЖивого(tok)];
             // Возраст демо-токена — с сервера: там он живёт с первого
             // запуска, а своё «минуту назад» телефон ставил при каждом открытии.
             const д = tok.демо && j.demos ? j.demos[ключДемо(tok)] : null;
@@ -32285,8 +32314,10 @@ function mapTokenRow(row) {
               const цифры = { tx24h: ст.tx24, holders: ст.holders, vol: fmtCompact(ст.vol24 * курсД), liq: fmtCompact(ст.liquidity * курсД), vol24hNum: ст.vol24 * курсД, xHandle: ст.x || null, ...(ст.change24 != null ? { change: ст.change24 } : null) };
               if (tok.tx24h !== цифры.tx24h || tok.holders !== цифры.holders || tok.vol !== цифры.vol || tok.xHandle !== цифры.xHandle || tok.change !== цифры.change) { тронуто = true; tok = { ...tok, ...цифры }; }
             }
-            if (!к || !(к.price > 0) || (tok.priceTon === к.price && tok.raisedTon === к.raised)) return tok;
-            const курс = tok.демо ? курсСетиДемо(tok, курсTon) : tok.chain === "solana" ? курсSol : курсTon;
+            if (!к || !(к.price > 0) || (tok.priceTon === к.price && tok.raisedTon === к.raised && !!tok.graduated === !!к.graduated)) return tok;
+            const курс = tok.демо ? курсСетиДемо(tok, курсTon)
+              : этоEVM(tok.chain) ? курсМонетыEVM(tok.chain, КЕШ_КУРСОВ_EVM)
+                : tok.chain === "solana" ? курсSol : курсTon;
             тронуто = true;
             /* Процент за сутки — вместе с ценой. Цену суточной давности
                выводим один раз из того процента, что пришёл с лентой, и

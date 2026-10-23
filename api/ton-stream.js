@@ -45,10 +45,10 @@ function написать(res, событие) {
  * функцию — она толкает результат всем, кто слушает список (мемпад,
  * главная) и конкретно эту кривую (открытая карточка токена), не
  * дожидаясь ни минутного обхода, ни следующего опроса. */
-export function протолкнутьЦену(address, { price, raised, graduation, graduated }) {
+export function протолкнутьЦену(address, { price, raised, sold = null, graduation, graduated }) {
   if (!адресОк(address) || !(price > 0)) return;
   const событие = { address, price, raised, graduation, graduated: !!graduated, at: Math.floor(Date.now() / 1000) };
-  записатьЖивое(address, { price, raised, graduation, graduated: !!graduated });
+  записатьЖивое(address, { price, raised, sold, graduation, graduated: !!graduated });
   const запись = кривые.get(address);
   if (запись) for (const res of запись.зрители) написать(res, { tx: null, ...событие });
   for (const res of общие) написать(res, событие);

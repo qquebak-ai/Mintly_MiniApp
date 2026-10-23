@@ -368,6 +368,7 @@ async function подтолкнутьЦену(tokenId, curveAddress) {
     протолкнутьЦену(curveAddress, {
       price: свежаяЦена,
       raised: Number(st.realTon) / 1e9,
+      sold: Number(st.tokensSold) / 1e9,
       graduation: Number(st.graduationTon) / 1e9,
       graduated: false,
     });
