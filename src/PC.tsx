@@ -13,7 +13,7 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
-import TonLaunchApp from "./App";
+import TonLaunchApp, { текстУстройства } from "./App";
 import { апи } from "./апи";
 
 const БОТ = import.meta.env.VITE_TG_BOT || "MintlyAppbot";
@@ -684,6 +684,17 @@ function СтрелкаВниз({ onClick, видна = true }) {
   );
 }
 
+/* Пояснение под заголовком раздела — текст из «Как устроено» в
+   приложении (archCurveBody и соседи). Раньше здесь стояли свои короткие
+   подписи, и они говорили о площадке меньше, чем тот раздел. */
+function Пояснение({ ключ, поЦентру = false }) {
+  return (
+    <p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.6, maxWidth: поЦентру ? 660 : 480, margin: поЦентру ? "24px auto 0" : "24px 0 0", textWrap: "pretty" }}>
+      {текстУстройства(ключ)}
+    </p>
+  );
+}
+
 /* Разделы шапки — те же, что в приложении. Открыть любой можно только
    с аккаунтом: приложение само встречает гостя своим окном регистрации и
    входа, а после него открывает тот раздел, на который нажали. */
@@ -743,19 +754,19 @@ function Приветствие({ onРаздел }) {
       </section>
 
       <Раздел id="запуск"
-        текст={<><Строки верх="Запуск токена" низ="за секунды" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Логотип, название, тикер — и монета уже торгуется на кривой. Без кода и без биржи.</p></>}
+        текст={<><Строки верх="Запуск токена" низ="за секунды" /><Пояснение ключ="archCurveBody" /></>}
         картинка={<СценаЗапуска />} />
 
       <Раздел id="сети" обратно
-        текст={<><Строки верх="Все сети" низ="в одном месте" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Gram, Solana, BNB Chain, Base и Ethereum — живая лента запусков всех сетей.</p></>}
+        текст={<><Строки верх="Все сети" низ="в одном месте" /><Пояснение ключ="archDataBody" /></>}
         картинка={<СценаСетей />} />
 
       <Раздел id="комиссия"
-        текст={<Строки верх="Комиссия" низ="0%" размер={80} />}
+        текст={<><Строки верх="Комиссия" низ="0%" размер={80} /><Пояснение ключ="archFeeBody" /></>}
         картинка={<Комиссия />} />
 
       <Раздел id="покупка" обратно
-        текст={<><Строки верх="Покупка" низ="за секунду" /><p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, lineHeight: 1.55, maxWidth: 460, marginTop: 24 }}>Сумма, одно нажатие — и токены в кошельке. Свечи графика двигаются вместе со сделками.</p></>}
+        текст={<><Строки верх="Покупка" низ="за секунду" /><Пояснение ключ="archKeysBody" /></>}
         картинка={<СценаПокупки />} />
 
       <section style={{ minHeight: "92vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 70, padding: "80px 40px" }}>
@@ -763,6 +774,7 @@ function Приветствие({ onРаздел }) {
           <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.2 }}>
             Доведи токен до <span className="прив-серый" style={{ color: Ц.тусклый }}>DEX</span> —<br />получи <span className="прив-серый" style={{ color: Ц.тусклый }}>лимитированную</span> карту
           </div>
+          <Пояснение ключ="archSupplyBody" поЦентру />
         </Появись>
         <Появись задержка={150}><КартаDEX /></Появись>
       </section>
@@ -770,7 +782,7 @@ function Приветствие({ onРаздел }) {
       <section style={{ minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 40px" }}>
         <Появись style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <Строки верх="Один аккаунт" низ="на телефоне и ПК" размер={80} />
-          <p className="прив-серый" style={{ color: Ц.тусклый, fontSize: 19, marginTop: 22 }}>Токены, кошелёк и история — те же, что в приложении.</p>
+          <Пояснение ключ="archRiskBody" поЦентру />
           <button onClick={() => setОкно(true)} style={{ ...кнопкаГлавная, height: 66, padding: "0 64px", fontSize: 20, borderRadius: 18, marginTop: 38 }}>Начать</button>
         </Появись>
       </section>

@@ -22,7 +22,7 @@
 
 import { админ, ключи, казна, остаток, отправитьИзКазны, открытьСекрет, СЕТЬ_TON, СЕТЬ_SOL } from "./_treasury.js";
 import { курсSol, курсTon } from "./_market.js";
-import { занять, свободныйНомер, занятьНомер, дождатьсяПеревода } from "./_walletLock.js";
+import { занять, занятьПоОчереди, свободныйНомер, занятьНомер, дождатьсяПеревода } from "./_walletLock.js";
 
 const RPC = process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com";
 const TESTNET = process.env.TON_TESTNET === "1";
@@ -317,7 +317,10 @@ export default async function handler(req, res) {
     try {
       // Кошелёк человека — под тем же замком, что сделки и вывод в
       // api/wallet-ton.js и api/wallet-solana.js.
-      const отпуститьКошелёк = занять(`${цепочкаВхода}:${user.id}`);
+      // У TON — общая очередь со сделками (номер перевода у кошелька один).
+      const отпуститьКошелёк = цепочкаВхода === "ton"
+        ? await занятьПоОчереди(`ton:${user.id}`)
+        : занять(`${цепочкаВхода}:${user.id}`);
       try {
         входнаяПодпись = await перевестиВКазну({
           строка: мойВход, набор, user_id: user.id,

@@ -29,7 +29,7 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 import { нуженВторойКлюч } from "./_second.js";
-import { занять, свободныйНомер, занятьНомер } from "./_walletLock.js";
+import { занятьПоОчереди, свободныйНомер, занятьНомер } from "./_walletLock.js";
 
 const TESTNET = process.env.TON_TESTNET === "1";
 const TONAPI = TESTNET ? "https://testnet.tonapi.io" : "https://tonapi.io";
@@ -273,7 +273,9 @@ async function выведеноЗаСутки(db, user) {
    первого. Вторая — шквал: больше нескольких операций в минуту от одного
    человека не пропускаем. В Solana это давно так; в TON вывода это не
    было, и повторное нажатие отправляло деньги ещё раз. */
-const ОПЕРАЦИЙ_В_МИНУТУ = Number(process.env.TON_WALLET_RATE || 6);
+// Быстрые нажатия — несколько сделок за секунды, и они должны проходить;
+// предел только против шквала.
+const ОПЕРАЦИЙ_В_МИНУТУ = Number(process.env.TON_WALLET_RATE || 40);
 
 async function начать(db, user, { дело, сумма = 0, адрес = null, ключЗапроса = null, ip = null }) {
   const минуту = new Date(Date.now() - 60_000).toISOString();
@@ -478,7 +480,8 @@ export async function отказатьсяОтВыпуска(db, токен) {
   if ((await баланс(строка.address)) < 0.06) return false;
   const user = { id: токен.owner_id };
   let отпустить;
-  try { отпустить = занять(номерКошелька(user)); } catch { return false; }
+  // Фоновая работа: если кошелёк занят сделками, придём в следующий круг.
+  try { отпустить = await занятьПоОчереди(номерКошелька(user), { ждать: 1000, предел: 0 }); } catch { return false; }
   try {
     const { сообщениеОтказа } = await import("./_tonLaunchCore.js");
     const м = await сообщениеОтказа({ admin: строка.address, jettonMaster: токен.address });
@@ -562,8 +565,9 @@ export default async function handler(req, res) {
     const тело = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     /* Тратящие действия — по одному на кошелёк: иначе пачка одновременных
        выводов проходила проверку предела за сутки по одной и той же сумме,
-       а покупки разом брали один seqno. */
-    if (["launch", "buy", "sell", "withdraw"].includes(действие)) отпустить = занять(номерКошелька(user));
+       а покупки разом брали один seqno. Сделки при этом не отказывают, а
+       встают в очередь: быстрые нажатия проходят одно за другим. */
+    if (["launch", "buy", "sell", "withdraw"].includes(действие)) отпустить = await занятьПоОчереди(номерКошелька(user));
 
     /* Запуск токена кошельком приложения.
        Из браузера приходит только адрес метаданных (их браузер уже
@@ -659,8 +663,15 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "unverified_curve" });
       }
 
-      const есть = await баланс(строка.address);
-      const нужно = сумма + 0.45;   // покупка плюс газ контракта и сети (у биржи газ больше)
+      /* Сперва ждём, пока сеть примет прошлую сделку этого кошелька (номер
+         seqno вырос), и только потом смотрим остаток — у того же узла, что
+         отвечает за номер. Иначе при быстрых нажатиях вторая покупка
+         проверялась по остатку до первой. */
+      const { пара, контракт, client, кошелёк: открытый } = await подписант(строка, набор, user);
+      const seqno = await свободныйНомер(открытый, номерКошелька(user));
+      const есть = await client.getBalance(контракт.address).then((б) => Number(б) / 1e9).catch(() => баланс(строка.address));
+      // Покупка плюс газ: у кривой — 0,15 на сообщение и сеть, у биржи больше.
+      const нужно = сумма + (кеш && кеш.graduated ? 0.45 : 0.2);
       if (есть < нужно) return res.status(400).json({ error: "not_enough", have: есть, need: нужно });
 
       // Вышел на STON.fi — покупка обменом через роутер биржи.
@@ -676,7 +687,6 @@ export default async function handler(req, res) {
       if (оп.повтор) return res.status(200).json({ ok: true, repeat: true });
 
       const { beginCell, internal, toNano, Address, SendMode } = await библиотеки();
-      const { пара, кошелёк: открытый } = await подписант(строка, набор, user);
 
       const тело_ = beginCell()
         .storeUint(OP_BUY, 32)
@@ -684,7 +694,6 @@ export default async function handler(req, res) {
         .storeCoins(0n)   // без ограничения проскальзывания: цену считает контракт
         .endCell();
 
-      const seqno = await свободныйНомер(открытый, номерКошелька(user));
       await открытый.sendTransfer({
         seqno,
         secretKey: пара.secretKey,
@@ -733,6 +742,10 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "unverified_curve" });
       }
 
+      // Как у покупки: остатки читаем после того, как прошлая сделка
+      // этого кошелька принята сетью.
+      const { пара, контракт, client, кошелёк: открытый } = await подписант(строка, набор, user);
+      const seqno = await свободныйНомер(открытый, номерКошелька(user));
       const мой = await жетонныйКошелёк(строка.address, токен.address);
       if (!мой) return res.status(400).json({ error: "no_jetton_wallet" });
       // Больше, чем есть, не продаём: сеть такое сообщение просто
@@ -741,7 +754,7 @@ export default async function handler(req, res) {
       const сколькоБигом = мой.balance != null && BigInt(мой.balance) < хочет ? BigInt(мой.balance) : хочет;
       if (!(сколькоБигом > 0n)) return res.status(400).json({ error: "not_enough" });
 
-      const есть = await баланс(строка.address);
+      const есть = await client.getBalance(контракт.address).then((б) => Number(б) / 1e9).catch(() => баланс(строка.address));
       if (есть < 0.35) return res.status(400).json({ error: "not_enough_gas", have: есть, need: 0.35 });
       const наБирже = await сделкаНаSTON(токен, кеш, { покупка: false, сумма: Number(сколькоБигом) / 1e9, кошелёк: строка.address });
 
@@ -755,7 +768,6 @@ export default async function handler(req, res) {
       if (опПродажи.повтор) return res.status(200).json({ ok: true, repeat: true });
 
       const { beginCell, internal, Address, SendMode } = await библиотеки();
-      const { пара, кошелёк: открытый } = await подписант(строка, набор, user);
 
       const пометка = beginCell().storeBit(false).storeUint(SELL_OP, 32).storeCoins(0n).endCell();
       const тело_ = beginCell()
@@ -770,7 +782,6 @@ export default async function handler(req, res) {
         .storeRef(пометка)
         .endCell();
 
-      const seqno = await свободныйНомер(открытый, номерКошелька(user));
       await открытый.sendTransfer({
         seqno,
         secretKey: пара.secretKey,
@@ -875,7 +886,7 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("[wallet-ton]", err && err.message);
     const код = (err && err.код) || 500;
-    return res.status(код).json({ error: код === 409 ? "wallet_busy" : "failed", detail: String((err && err.message) || err).slice(0, 200) });
+    return res.status(код).json({ error: код === 409 ? "wallet_busy" : код === 429 ? "too_often" : "failed", detail: String((err && err.message) || err).slice(0, 200) });
   } finally {
     if (отпустить) отпустить();
   }

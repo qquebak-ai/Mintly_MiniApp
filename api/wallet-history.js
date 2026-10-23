@@ -115,6 +115,9 @@ async function пополненияSolana(адрес, чужие) {
     const стало = Number((мета.postBalances || [])[место]) || 0;
     const разница = (стало - было) / 1e9;
     const подпись = tx.transaction.signatures[0];
+    // Вторая сторона перевода — для окна подробностей: кто прислал
+    // (плательщик комиссии) или куда ушло (у кого баланс вырос больше всех).
+    const адреса = ключи.map((к) => (typeof к === "string" ? к : к.pubkey));
     if (разница > МЕЛОЧЬ) {
       ряд.push({
         id: `in-${подпись}`,
@@ -122,6 +125,7 @@ async function пополненияSolana(адрес, чужие) {
         kind: "deposit",
         amount: разница,
         signature: подпись,
+        address: адреса[0] && адреса[0] !== адрес ? адреса[0] : null,
         createdAt: new Date((tx.blockTime || 0) * 1000).toISOString(),
       });
       continue;
@@ -134,12 +138,19 @@ async function пополненияSolana(адрес, чужие) {
        Порог здесь выше пыли: комиссия сети сама по себе не перевод. */
     const ушло = -разница;
     if (ушло > РАСХОД_ОТ) {
+      let кому = null, больше = 0;
+      адреса.forEach((а, i) => {
+        if (а === адрес) return;
+        const рост = (Number((мета.postBalances || [])[i]) || 0) - (Number((мета.preBalances || [])[i]) || 0);
+        if (рост > больше) { больше = рост; кому = а; }
+      });
       ряд.push({
         id: `out-${подпись}`,
         chain: "solana",
         kind: "withdraw",
         amount: ушло,
         signature: подпись,
+        address: кому,
         createdAt: new Date((tx.blockTime || 0) * 1000).toISOString(),
       });
     }
@@ -189,6 +200,7 @@ async function пополненияTON(адрес, чужие) {
           kind: намПришло ? "deposit" : "withdraw",
           amount: сумма,
           signature: событие.event_id,
+          address: (намПришло ? откого : кому) || null,
           createdAt: new Date((событие.timestamp || 0) * 1000).toISOString(),
         });
       }
@@ -258,16 +270,159 @@ async function безОшибки(обещание, запасное) {
   }
 }
 
+/* Подробности одной транзакции — для окна в истории.
+ *
+ * Статус и комиссию знает только сеть, поэтому спрашиваем её, когда
+ * человек открыл строку, и помним ответ: подтверждённая транзакция уже
+ * не меняется. Отвечаем только про кошелёк самого человека — чужую
+ * подпись сюда не подставить, ответ будет «не найдено». */
+const КЛАСТЕР_SOL = /devnet/.test(RPC) ? "?cluster=devnet" : /testnet/.test(RPC) ? "?cluster=testnet" : "";
+const TONVIEWER = TESTNET ? "https://testnet.tonviewer.com" : "https://tonviewer.com";
+const подробностиКеш = new Map(); // сеть|ид -> ответ
+
+async function tonapi(путь) {
+  const res = await fetch(`${TONAPI}${путь}`, {
+    headers: TONAPI_KEY ? { Authorization: `Bearer ${TONAPI_KEY}` } : {},
+    signal: AbortSignal.timeout(8000),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`tonapi ${res.status}`);
+  return res.json();
+}
+
+async function подробностиSolana(подпись, адрес) {
+  const j = await rpc({
+    jsonrpc: "2.0", id: 1, method: "getTransaction",
+    params: [подпись, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" }],
+  });
+  const tx = j && j.result;
+  // Узел ещё не видит транзакцию: она в пути или не дошла.
+  if (!tx) return { status: "pending", hash: подпись, explorer: `https://solscan.io/tx/${подпись}${КЛАСТЕР_SOL}` };
+  const ключи = ((tx.transaction && tx.transaction.message && tx.transaction.message.accountKeys) || [])
+    .map((к) => (typeof к === "string" ? к : к.pubkey));
+  if (!ключи.includes(адрес)) return null;
+  return {
+    status: tx.meta && tx.meta.err ? "failed" : "success",
+    fee: (Number(tx.meta && tx.meta.fee) || 0) / 1e9,
+    feeCoin: "SOL",
+    time: tx.blockTime ? new Date(tx.blockTime * 1000).toISOString() : null,
+    hash: подпись,
+    explorer: `https://solscan.io/tx/${подпись}${КЛАСТЕР_SOL}`,
+    final: true,
+  };
+}
+
+// Итог события tonapi: все действия прошли — успех; комиссия — то, что
+// заплатил сам кошелёк (extra со знаком минус).
+function итогСобытия(событие, хеш) {
+  const действия = (событие && событие.actions) || [];
+  const провал = действия.some((д) => д.status && д.status !== "ok");
+  const extra = Number(событие && событие.extra) || 0;
+  return {
+    status: событие.in_progress ? "pending" : провал ? "failed" : "success",
+    fee: extra < 0 ? -extra / 1e9 : 0,
+    feeCoin: "TON",
+    time: событие.timestamp ? new Date(событие.timestamp * 1000).toISOString() : null,
+    hash: хеш,
+    explorer: `${TONVIEWER}/transaction/${хеш}`,
+    final: !событие.in_progress,
+  };
+}
+
+async function подробностиTON(ид, адрес) {
+  /* Свои переводы записаны номером «seqno:N»: хеша у отправленного
+     сообщения до его исполнения нет. Находим транзакцию кошелька с этим
+     номером, а итог берём у всего события — покупка проходит в кривой,
+     уже за пределами кошелька. */
+  const номер = /^seqno:(\d+)/.exec(String(ид));
+  let хеш = номер ? null : String(ид);
+  let запаснойИтог = null;
+  if (номер) {
+    const j = await tonapi(`/v2/blockchain/accounts/${encodeURIComponent(адрес)}/transactions?limit=100`);
+    const tx = ((j && j.transactions) || []).find((т) => т.in_msg && т.in_msg.msg_type === "ext_in_msg"
+      && т.in_msg.decoded_body && Number(т.in_msg.decoded_body.seqno) === Number(номер[1]));
+    if (!tx) return { status: "pending", hash: null, explorer: `${TONVIEWER}/${адрес}` };
+    хеш = tx.hash;
+    запаснойИтог = {
+      status: tx.success && !tx.aborted ? "success" : "failed",
+      fee: (Number(tx.total_fees) || 0) / 1e9,
+      feeCoin: "TON",
+      time: tx.utime ? new Date(tx.utime * 1000).toISOString() : null,
+      hash: tx.hash,
+      explorer: `${TONVIEWER}/transaction/${tx.hash}`,
+      final: true,
+    };
+  }
+  const событие = await tonapi(`/v2/accounts/${encodeURIComponent(адрес)}/events/${encodeURIComponent(хеш)}`).catch(() => null);
+  if (событие) return итогСобытия(событие, хеш);
+  return запаснойИтог;
+}
+
+async function подробностиEVM(сеть, хеш, адрес) {
+  const { СЕТИ } = await import("./wallet-evm.js");
+  const с = СЕТИ[сеть];
+  if (!с) return null;
+  const вызов = (method, params) => fetch(с.rpc, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    signal: AbortSignal.timeout(8000),
+  }).then((r) => r.json()).then((j) => j && j.result);
+  const [tx, чек] = await Promise.all([вызов("eth_getTransactionByHash", [хеш]), вызов("eth_getTransactionReceipt", [хеш])]);
+  const ссылка = `${с.обозреватель}/tx/${хеш}`;
+  if (!tx) return { status: "pending", hash: хеш, explorer: ссылка };
+  if (String(tx.from || "").toLowerCase() !== String(адрес || "").toLowerCase()
+    && String(tx.to || "").toLowerCase() !== String(адрес || "").toLowerCase()) return null;
+  if (!чек) return { status: "pending", hash: хеш, explorer: ссылка };
+  const газ = BigInt(чек.gasUsed || "0x0") * BigInt(чек.effectiveGasPrice || tx.gasPrice || "0x0");
+  return {
+    status: чек.status === "0x1" ? "success" : "failed",
+    fee: Number(газ) / 1e18,
+    feeCoin: с.монета,
+    time: null,
+    hash: хеш,
+    explorer: ссылка,
+    final: true,
+  };
+}
+
+async function подробности(db, user, req, res) {
+  const сеть = String((req.query && req.query.chain) || "");
+  const ид = String((req.query && req.query.id) || "").split(",")[0].trim();
+  if (!ид || ид.length > 140 || !/^[A-Za-z0-9:_-]+$/.test(ид)) return res.status(400).json({ error: "bad_request" });
+  const вид = сеть === "ton" ? "ton" : ["bsc", "base", "eth"].includes(сеть) ? "evm" : "solana";
+  const { data: кошелёк } = await db.from("app_wallets").select("address")
+    .eq("user_id", user.id).eq("chain", вид).maybeSingle();
+  if (!кошелёк || !кошелёк.address) return res.status(404).json({ error: "no_wallet" });
+  const ключ = `${user.id}|${сеть}|${ид}`;
+  const было = подробностиКеш.get(ключ);
+  res.setHeader("Cache-Control", "no-store");
+  if (было) return res.status(200).json(было);
+  try {
+    const итог = вид === "ton" ? await подробностиTON(ид, кошелёк.address)
+      : вид === "evm" ? await подробностиEVM(сеть, ид, кошелёк.address)
+        : await подробностиSolana(ид, кошелёк.address);
+    if (!итог) return res.status(404).json({ error: "not_found" });
+    if (итог.final) {
+      подробностиКеш.set(ключ, итог);
+      if (подробностиКеш.size > 5000) подробностиКеш.clear();
+    }
+    return res.status(200).json(итог);
+  } catch (e) {
+    return res.status(502).json({ error: "upstream", detail: String((e && e.message) || e).slice(0, 120) });
+  }
+}
+
 export default async function handler(req, res) {
   const db = admin();
   if (!db) return res.status(503).json({ error: "not_configured" });
 
   const user = await хозяин(req, db);
   if (!user) return res.status(401).json({ error: "unauthorized" });
+  if (String((req.query && req.query.action) || "") === "tx") return подробности(db, user, req, res);
 
   const [{ data, error }, { data: кошельки }] = await Promise.all([
     db.from("wallet_ops")
-      .select("id, chain, kind, amount, signature, created_at")
+      .select("id, chain, kind, amount, address, signature, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(ПРЕДЕЛ),
@@ -276,12 +431,15 @@ export default async function handler(req, res) {
 
   if (error) return res.status(500).json({ error: "db", detail: error.message });
 
+  // Сеть — как записана: у операций Solana её нет вовсе (кошелёк был
+  // один), у EVM это bsc, base или eth — раньше их считали Solana.
   const свои = (data || []).map((о) => ({
     id: `op-${о.id}`,
-    chain: о.chain === "ton" ? "ton" : "solana",
+    chain: о.chain || "solana",
     kind: о.kind,
     amount: Number(о.amount) || 0,
     signature: о.signature || null,
+    address: о.address || null,
     createdAt: о.created_at,
   }));
 
@@ -289,8 +447,8 @@ export default async function handler(req, res) {
   // продаж и обменов, которые тоже пополняют кошелёк.
   const наши = new Set(свои.map((о) => о.signature).filter(Boolean));
   const входящие = (await Promise.all(
-    (кошельки || []).map((к) => неДольше(
-      пополнения(к.chain === "ton" ? "ton" : "solana", к.address, наши),
+    (кошельки || []).filter((к) => к.chain === "ton" || к.chain === "solana").map((к) => неДольше(
+      пополнения(к.chain, к.address, наши),
       ЖДЁМ_СЕТЬ_МС,
       [],
     )),

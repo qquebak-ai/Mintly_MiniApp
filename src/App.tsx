@@ -843,6 +843,17 @@ const STR = {
     launchNotEnough: "На кошельке {have} — для запуска нужно {need} вместе с комиссией сети",
     opLaunch: "запуск токена", opWithdraw: "Отправлено", opDeposit: "Пополнено", opSweep: "перевод на свой адрес",
     opGraduate: "выход на биржу", opBind: "привязка адреса", opOther: "операция",
+    histBuy: "Покупка {t}", histSell: "Продажа {t}", histLaunch: "Запуск {t}", histLaunchToken: "Запуск токена",
+    histSwap: "Обмен {a} → {b}", histDeposit: "Пополнение", histWithdraw: "Вывод", histSweep: "Автовывод",
+    histGraduate: "Выход на биржу", histBind: "Привязка адреса вывода", histOther: "Операция",
+    histAll: "Все", histBuys: "Покупки", histSells: "Продажи", histTransfers: "Переводы", histLaunches: "Запуски",
+    histToday: "Сегодня", histYesterday: "Вчера", histTo: "на", histFrom: "от", histEmpty: "Здесь пока пусто",
+    histDate: "Дата", histNetwork: "Сеть", histGave: "Отдал", histGot: "Получил", histSent: "Отправлено",
+    histReceived: "Получено", histPrice: "Цена за токен", histUsd: "Сумма в $", histFee: "Комиссия сети",
+    histTx: "Транзакция", histToAddr: "Кому", histFromAddr: "От кого", histAddress: "Адрес", histRaised: "Собрано",
+    histOk: "Подтверждена", histPending: "В обработке", histFailed: "Не прошла", histChecking: "Проверяем в сети…",
+    histNoSig: "Подпись этой транзакции не сохранилась — статус и комиссию сеть не подскажет.",
+    histOpenIn: "Открыть в {name}", histCopy: "Скопировать", histUsdThen: "по курсу в момент сделки", histUsdNow: "по текущему курсу",
     launchFailedTitle: "Не удалось запустить токен",
     retry: "Повторить",
     viewOnExplorer: "Открыть в обозревателе",
@@ -878,6 +889,7 @@ const STR = {
     // не объясняет, а причина у каждого отказа понятная.
     errCreatorLocked: "Ты создатель — продажа закрыта до выхода на биржу, так обещано в токене",
     errWalletBusy: "Предыдущая операция кошелька ещё идёт — подожди несколько секунд",
+    errTooFast: "Слишком много сделок сразу — дождись, пока пройдут прошлые",
     errUnverifiedCurve: "Токен не прошёл проверку контракта — сделки с ним закрыты",
     errFairStart: "Честный старт: первую минуту покупают только из приложения",
     errNotEnough: "Не хватает монет на кошельке приложения",
@@ -1570,6 +1582,17 @@ const STR = {
     launchNotEnough: "Wallet holds {have} — the launch needs {need} including the network fee",
     opLaunch: "token launch", opWithdraw: "Sent", opDeposit: "Received", opSweep: "sent to your address",
     opGraduate: "listing", opBind: "address link", opOther: "operation",
+    histBuy: "Buy {t}", histSell: "Sell {t}", histLaunch: "Launch {t}", histLaunchToken: "Token launch",
+    histSwap: "Swap {a} → {b}", histDeposit: "Received", histWithdraw: "Sent", histSweep: "Auto-withdrawal",
+    histGraduate: "DEX listing", histBind: "Payout address linked", histOther: "Operation",
+    histAll: "All", histBuys: "Buys", histSells: "Sells", histTransfers: "Transfers", histLaunches: "Launches",
+    histToday: "Today", histYesterday: "Yesterday", histTo: "to", histFrom: "from", histEmpty: "Nothing here yet",
+    histDate: "Date", histNetwork: "Network", histGave: "Paid", histGot: "Got", histSent: "Sent",
+    histReceived: "Received", histPrice: "Price per token", histUsd: "Value in $", histFee: "Network fee",
+    histTx: "Transaction", histToAddr: "To", histFromAddr: "From", histAddress: "Address", histRaised: "Raised",
+    histOk: "Confirmed", histPending: "Pending", histFailed: "Failed", histChecking: "Checking the network…",
+    histNoSig: "This transaction's signature wasn't saved — the network can't tell its status and fee.",
+    histOpenIn: "Open in {name}", histCopy: "Copy", histUsdThen: "at the time of the trade", histUsdNow: "at the current rate",
     launchFailedTitle: "Couldn't launch the token",
     retry: "Retry",
     viewOnExplorer: "View on explorer",
@@ -1603,6 +1626,7 @@ const STR = {
     toastDone: "Done", toastFail: "Didn't go through", toastNote: "Heads up",
     errCreatorLocked: "You are the creator — selling is locked until the token lists, as promised",
     errWalletBusy: "The previous wallet operation is still in progress — wait a few seconds",
+    errTooFast: "Too many trades at once — wait for the previous ones to go through",
     errUnverifiedCurve: "This token failed the contract check — trading is closed",
     errFairStart: "Fair start: the first minute is for app buyers only",
     errNotEnough: "Not enough coins in the app wallet",
@@ -1638,6 +1662,10 @@ const STR = {
 function t(key) {
   return (STR[lang] && STR[lang][key]) || STR.RU[key] || key;
 }
+/* Тексты раздела «Как устроено» — их же показывает приветствие сайта
+   (src/PC.tsx): одно описание площадки на оба места, без второй копии,
+   которая разошлась бы с первой при первой же правке. */
+export function текстУстройства(ключ) { return t(ключ); }
 /* Many components use `t` as a prop name for "token", which shadows the
    global t() translation function inside their scope. tr()/trf() are
    plain aliases to t()/tf() for use inside exactly those components. */
@@ -13609,25 +13637,33 @@ function ДостиженияСтрокой({ achievements = [], onOpenAchieveme
 /* В какой монете считалась сделка. Отдельного поля для сети в записи
    нет, но адрес токена сам о ней говорит: в TON он начинается с EQ или
    UQ, в Solana это base58 без такого начала. */
-function монетаСделки(с) {
-  // У операций кошелька сеть сказана прямо: там нет ни токена, ни его
-  // адреса, по которому её обычно узнают.
-  if (с && с.chain) return с.chain === "solana" ? "SOL" : ТИКЕР_TON;
-  const сеть = с && с.tokens && (Array.isArray(с.tokens) ? с.tokens[0] : с.tokens);
-  if (сеть && сеть.chain) return сеть.chain === "solana" ? "SOL" : ТИКЕР_TON;
+// Монета каждой сети: у EVM своя (BNB, ETH), раньше там писался GRAM.
+const МОНЕТА_СЕТИ = { solana: "SOL", ton: ТИКЕР_TON, bsc: "BNB", base: "ETH", eth: "ETH" };
+
+/* Сеть сделки или операции. У операций кошелька она сказана прямо, у
+   сделки — в записи о токене, а у старых сделок без неё — в самом
+   адресе токена: в TON он начинается с EQ или UQ, в Solana это base58. */
+function сетьСделки(с) {
+  if (с && с.chain) return с.chain;
+  const т = с && с.tokens && (Array.isArray(с.tokens) ? с.tokens[0] : с.tokens);
+  if (т && т.chain) return т.chain;
   const адрес = String((с && с.token_address) || "");
-  if (!адрес) return ТИКЕР_TON;
-  return /^(EQ|UQ|kQ|0Q)/.test(адрес) ? ТИКЕР_TON : "SOL";
+  if (!адрес || /^(EQ|UQ|kQ|0Q)/.test(адрес)) return "ton";
+  return /^0x[0-9a-fA-F]{40}$/.test(адрес) ? "bsc" : "solana";
+}
+
+function монетаСделки(с) {
+  return МОНЕТА_СЕТИ[сетьСделки(с)] || ТИКЕР_TON;
 }
 
 /* Сделки с сетью токена. Сеть спрашиваем у самой записи о токене: у
    старых сделок адрес не сохранялся, и по нему сеть было не узнать.
    Если связь читать нельзя — берём без неё, лишь бы список не пропал. */
 async function сделкиСсетью(userId, предел) {
-  const поля = "id, ticker, side, ton_amount, token_amount, created_at, token_address, token_id";
+  const поля = "id, ticker, side, ton_amount, token_amount, ton_price_usd, created_at, token_address, token_id";
   const сЖивой = await supabase
     .from("trades")
-    .select(`${поля}, tokens ( chain )`)
+    .select(`${поля}, tokens ( chain, logo_url )`)
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(предел);
@@ -13722,8 +13758,12 @@ const ЖДЁМ_ИСТОРИЮ_МС = 8000;
    заготовок, даже если данные не менялись. */
 const памятьИстории = new Map(); // `${userId}:${предел}` -> строки
 
-function useСделки(userId, предел, тик = 0) {
-  const ключПамяти = `${userId || ""}:${предел}`;
+/* сделочные — отдать и операции кошелька, которые повторяют сделки
+   (trade, buy, sell, swap). Списку они не нужны, а истории нужны: у них
+   есть подпись транзакции, по которой окно показывает статус, комиссию
+   и ссылку в обозреватель. */
+function useСделки(userId, предел, тик = 0, сделочные = false) {
+  const ключПамяти = `${userId || ""}:${предел}:${сделочные ? 1 : 0}`;
   /* Две половины истории читаются порознь и показываются порознь.
      Раньше их ждали вместе: сделки лежат в базе и приходят почти сразу,
      а операции кошелька сервер собирает, обходя цепочку, — и список
@@ -13749,7 +13789,7 @@ function useСделки(userId, предел, тик = 0) {
         // иначе перевод стоял бы в списке дважды.
         забытьОперации(new Set((операции || []).map((о) => о.signature || о.id).filter(Boolean)));
         setОперацииРяд((операции || [])
-          .filter((о) => !ОПЕРАЦИИ_СДЕЛОК.has(о.kind) && о.amount >= 0)
+          .filter((о) => о.amount >= 0)
           .map((о) => ({
             id: о.id,
             // Подпись остаётся при строке: по ней своя копия перевода
@@ -13763,6 +13803,8 @@ function useСделки(userId, предел, тик = 0) {
             created_at: о.createdAt,
             token_address: null,
             chain: о.chain,
+            address: о.address || null,
+            сделочная: ОПЕРАЦИИ_СДЕЛОК.has(о.kind),
           })));
         setСвои(свежиеОперации());
       });
@@ -13791,14 +13833,15 @@ function useСделки(userId, предел, тик = 0) {
     if (сделкиРяд == null && операцииРяд == null) {
       return свои.length ? свои.slice(0, предел) : изПамяти;
     }
-    const сСервера = [...(сделкиРяд || []), ...(операцииРяд || [])];
+    const сСервера = [...(сделкиРяд || []), ...(операцииРяд || []).filter((о) => сделочные || !о.сделочная)];
     const известные = new Set(сСервера.map((о) => о.signature).filter(Boolean));
     const мои = свои.filter((о) => !о.signature || !известные.has(о.signature));
     const всё = [...мои, ...сСервера]
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, предел);
-    return всё;
-  }, [сделкиРяд, операцииРяд, предел, изПамяти, свои]);
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    // Истории режем после сверки: операции сделок там уходят в строки
+    // сделок и места в пределе не занимают.
+    return сделочные ? всё : всё.slice(0, предел);
+  }, [сделкиРяд, операцииРяд, предел, изПамяти, свои, сделочные]);
 
   useEffect(() => {
     if (ряд && userId) памятьИстории.set(ключПамяти, ряд);
@@ -17248,6 +17291,56 @@ function КлавишиОбмена({ onКлавиша, onОчистить = nul
   );
 }
 
+/* Запись своей сделки — надёжно.
+ *
+ * Строка уходит в базу сразу после ответа сервера, и раньше одна неудача
+ * (сеть моргнула, приложение закрыли) стирала сделку из истории и её
+ * кружок с графика. Теперь строка сперва ложится в память телефона, а
+ * уходит оттуда, только когда база её приняла; не приняла — повторяем,
+ * а то, что не ушло совсем, досылаем при следующем входе. Номер строки
+ * задаём сами: повтор той же записи база узнаёт и второй раз не пишет. */
+const ЭТО_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const НЕЗАПИСАННЫЕ_КЛЮЧ = "mintly.незаписанные_сделки";
+
+function новыйUuid() {
+  try { if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID(); } catch { /* старый движок */ }
+  const h = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, "0");
+  return `${h()}${h()}-${h()}-4${h().slice(1)}-${(8 + Math.floor(Math.random() * 4)).toString(16)}${h().slice(1)}-${h()}${h()}${h()}`;
+}
+
+function незаписанныеСделки() {
+  try {
+    const было = JSON.parse(localStorage.getItem(НЕЗАПИСАННЫЕ_КЛЮЧ) || "[]");
+    return Array.isArray(было) ? было : [];
+  } catch { return []; }
+}
+
+function сохранитьНезаписанные(ряд) {
+  try { localStorage.setItem(НЕЗАПИСАННЫЕ_КЛЮЧ, JSON.stringify(ряд.slice(-50))); } catch { /* приватный режим */ }
+}
+
+async function записатьСделкуНадёжно(строка, попытка = 0) {
+  if (!попытка) сохранитьНезаписанные([...незаписанныеСделки().filter((с) => с.id !== строка.id), строка]);
+  let error = null;
+  try { ({ error } = await supabase.from("trades").insert(строка)); } catch (e) { error = e; }
+  // 23505 — такая строка уже есть: прошлая попытка дошла, ответ потерялся.
+  if (!error || error.code === "23505") {
+    сохранитьНезаписанные(незаписанныеСделки().filter((с) => с.id !== строка.id));
+    if (typeof window !== "undefined") {
+      try { window.dispatchEvent(new Event("mintly:сделка-записана")); } catch { /* старый движок */ }
+    }
+    return;
+  }
+  console.warn("[mintly] не удалось записать сделку:", error && error.message);
+  if (попытка < 3) setTimeout(() => записатьСделкуНадёжно(строка, попытка + 1), 1500 * (попытка + 1));
+}
+
+function дослатьНезаписанныеСделки(userId) {
+  for (const с of незаписанныеСделки()) {
+    if (с && с.user_id === userId) записатьСделкуНадёжно(с, 1);
+  }
+}
+
 /* Обмен в истории кошелька.
  *
  * История читает сделки человека, и обмен обязан попадать туда же:
@@ -17776,17 +17869,23 @@ function ДействиеКошелька({ icon: Icon, label, onClick }) {
 // Ключ строки истории: подпись, если она есть, иначе собственный id.
 const c_id = (с) => String((с && с.id) || "");
 
-/* Свои запуски: id токена → когда создан. Нужны истории, чтобы отличить
-   стартовую покупку от обычной: в базе обе лежат покупкой, а человек
-   этот токен не купил — он его создал. */
+/* Свои запуски: id токена → когда создан, тикер, логотип и сеть. По ним
+   история отличает стартовую покупку от обычной (в базе обе лежат
+   покупкой, а человек этот токен не купил — он его создал) и подписывает
+   именем токена запуск, у которого стартовой покупки не было. */
 function useМоиЗапуски(userId, тик = 0) {
   const [запуски, setЗапуски] = useState(() => new Map());
   useEffect(() => {
     if (!userId) { setЗапуски(new Map()); return undefined; }
     let живо = true;
-    supabase.from("tokens").select("id, created_at").eq("owner_id", userId).then(({ data }) => {
+    supabase.from("tokens").select("id, created_at, ticker, logo_url, chain").eq("owner_id", userId).then(({ data }) => {
       if (!живо || !data) return;
-      setЗапуски(new Map(data.map((р) => [String(р.id), new Date(р.created_at).getTime()])));
+      setЗапуски(new Map(data.map((р) => [String(р.id), {
+        at: new Date(р.created_at).getTime(),
+        тикер: String(р.ticker || "").toUpperCase(),
+        лого: р.logo_url || null,
+        сеть: р.chain || "ton",
+      }])));
     }, () => {});
     return () => { живо = false; };
   }, [userId, тик]);
@@ -17797,26 +17896,501 @@ function useМоиЗапуски(userId, тик = 0) {
 // его создания.
 function этоЗапуск(с, запуски, ряд) {
   if (!с || с.side !== "buy" || !с.token_id) return false;
-  const создан = запуски.get(String(с.token_id));
-  if (!создан) return false;
+  const свой = запуски.get(String(с.token_id));
+  if (!свой) return false;
   const когда = new Date(с.created_at).getTime();
-  if (!(когда - создан < 10 * 60 * 1000)) return false;
+  if (!(когда - свой.at < 10 * 60 * 1000)) return false;
   // Если покупок этого токена у человека несколько — запуск только самая ранняя.
   return !ряд.some((д) => д !== с && д.side === "buy" && String(д.token_id) === String(с.token_id)
     && new Date(д.created_at).getTime() < когда);
 }
 
-function ИсторияКошелька({ userId, тик = 0, безЗаголовка = false, предел = 12 }) {
+/* Значки и курсы сетей для истории. Логотип монеты стоит там, где у
+   строки нет своего токена: перевод, пополнение, обмен. */
+const ЛОГО_МОНЕТЫ_СЕТИ = { solana: "/coins/sol.png", ton: "/coins/gram.png", bsc: "/coins/bnb.svg", base: "/coins/base.svg", eth: "/coins/eth.svg" };
+const ИМЯ_СЕТИ_ИСТОРИИ = { solana: "Solana", ton: "TON", bsc: "BNB Chain", base: "Base", eth: "Ethereum" };
+const КУРС_МОНЕТЫ_ИСТОРИИ = { SOL: "sol", [ТИКЕР_TON]: "gram", TON: "gram", BNB: "bnb", ETH: "eth" };
+const СЕТЬ_МОНЕТЫ_ИСТОРИИ = { SOL: "solana", [ТИКЕР_TON]: "ton", TON: "ton", BNB: "bsc", ETH: "eth" };
+const ВИД_ОПЕРАЦИИ = { launch: "launch", withdraw: "withdraw", deposit: "deposit", sweep: "sweep", graduate: "graduate", payout_bind: "bind" };
+
+/* Курс на момент сделки — только правдоподобный. Раньше у сделок Solana
+   в эту колонку писали курс TON, и доллары по старым строкам врали в
+   десятки раз; такой курс отбрасываем и берём сегодняшний. */
+const КОРИДОР_КУРСА = { SOL: [10, 5000], [ТИКЕР_TON]: [0.05, 100], TON: [0.05, 100], BNB: [30, 10000], ETH: [200, 50000] };
+function курсТогда(с) {
+  const к = КОРИДОР_КУРСА[с.монета];
+  return к && с.курсТогда >= к[0] && с.курсТогда <= к[1] ? с.курсТогда : 0;
+}
+
+/* История в одном виде для всех источников: сделки из базы, операции
+   кошелька с сервера и свои только что отправленные переводы.
+   У сделки в базе нет подписи транзакции — она есть у операции
+   кошелька, которую сервер записал для той же сделки. Сводим их по сети,
+   виду, сумме и времени: так у покупки появляются статус, комиссия и
+   ссылка в обозреватель, а операция-двойник не стоит в списке второй
+   строкой. */
+function собратьИсторию(ряд, запуски) {
+  const опСделок = ряд.filter((с) => с.сделочная);
+  const обычные = ряд.filter((с) => !с.сделочная);
+  const занятые = new Set();
+  const когда = (с) => new Date(с.created_at).getTime();
+  const ближайшая = (кандидаты, с, окно) => {
+    let лучшая = null;
+    let разница = Infinity;
+    for (const о of кандидаты) {
+      if (занятые.has(о.id)) continue;
+      const d = Math.abs(когда(о) - когда(с));
+      if (d <= окно && d < разница) { лучшая = о; разница = d; }
+    }
+    if (лучшая) занятые.add(лучшая.id);
+    return лучшая;
+  };
+  const близко = (a, b) => Math.abs(a - b) <= Math.max(1e-9, 0.02 * Math.max(Math.abs(a), Math.abs(b)));
+  const сетьОп = (о) => о.chain || "solana";
+  const итог = [];
+
+  for (const с of обычные) {
+    if (!этоСделка(с)) continue;
+    const т = с.tokens && (Array.isArray(с.tokens) ? с.tokens[0] : с.tokens);
+    if (с.side === "swap") {
+      const [отдал = "", получил = ""] = String(с.ticker || "").split("→").map((x) => x.trim().toUpperCase());
+      const сеть = СЕТЬ_МОНЕТЫ_ИСТОРИИ[отдал] || "solana";
+      const оп = ближайшая(опСделок.filter((о) => сетьОп(о) === сеть && (о.side === "swap" || о.side === "trade")), с, 3 * 60 * 1000);
+      итог.push({
+        id: String(с.id), вид: "swap", сеть, монета: отдал || МОНЕТА_СЕТИ[сеть],
+        сумма: Number(с.ton_amount) || 0, знак: -1,
+        обмен: { отдал, получил, получено: Number(с.token_amount) || 0 },
+        тикер: null, лого: ЛОГО_МОНЕТЫ_СЕТИ[сеть] || null, токенов: null, курсТогда: Number(с.ton_price_usd) || 0,
+        время: с.created_at, подпись: (оп && оп.signature) || null, адрес: null,
+      });
+      continue;
+    }
+    const сеть = сетьСделки(с);
+    const запуск = этоЗапуск(с, запуски, обычные);
+    const свой = с.token_id ? запуски.get(String(с.token_id)) : null;
+    let оп = null;
+    if (запуск) {
+      оп = ближайшая(обычные.filter((о) => о.side === "launch" && сетьОп(о) === сеть), с, 10 * 60 * 1000);
+    }
+    if (!оп) {
+      const сумма = Number(с.ton_amount) || 0;
+      const годные = опСделок.filter((о) => {
+        if (сетьОп(о) !== сеть) return false;
+        const есть = Number(о.ton_amount) || 0;
+        if (с.side === "buy") {
+          if (о.side === "buy" || о.side === "swap") return !(есть > 0) || близко(есть, сумма);
+          return о.side === "trade" && есть > 0 && близко(есть, сумма);
+        }
+        // Продажа: у Solana сумма операции нулевая, у TON в ней число токенов.
+        return о.side === "sell" || о.side === "swap" || (о.side === "trade" && !(есть > 0));
+      });
+      оп = ближайшая(годные, с, 3 * 60 * 1000);
+    }
+    итог.push({
+      id: String(с.id), вид: запуск ? "launch" : с.side, сеть, монета: МОНЕТА_СЕТИ[сеть] || ТИКЕР_TON,
+      тикер: String(с.ticker || "").toUpperCase() || (свой && свой.тикер) || null,
+      лого: (т && т.logo_url) || (свой && свой.лого) || null,
+      сумма: Number(с.ton_amount) || 0, знак: с.side === "sell" ? 1 : -1,
+      токенов: Number(с.token_amount) || 0, курсТогда: Number(с.ton_price_usd) || 0,
+      время: с.created_at, подпись: (оп && оп.signature) || null, адрес: null,
+    });
+  }
+
+  for (const с of обычные) {
+    if (этоСделка(с) || занятые.has(с.id)) continue;
+    const сеть = сетьОп(с);
+    const вид = ВИД_ОПЕРАЦИИ[с.side] || "other";
+    // Запуск без стартовой покупки — подписываем токеном, заведённым
+    // в те же минуты.
+    let тикер = null, лого = null;
+    if (вид === "launch" || вид === "graduate") {
+      let лучший = null, d0 = Infinity;
+      for (const з of запуски.values()) {
+        if ((з.сеть || "ton") !== сеть) continue;
+        const d = Math.abs(з.at - когда(с));
+        if (вид === "launch" ? d < 10 * 60 * 1000 && d < d0 : false) { d0 = d; лучший = з; }
+      }
+      if (лучший) { тикер = лучший.тикер; лого = лучший.лого; }
+    }
+    итог.push({
+      id: String(с.id), вид, сеть, монета: МОНЕТА_СЕТИ[сеть] || ТИКЕР_TON,
+      тикер, лого, сумма: Number(с.ton_amount) || 0,
+      // Выход на биржу — деньги кривой, а не кошелька; привязка адреса
+      // денег не двигает вовсе.
+      знак: вид === "deposit" ? 1 : вид === "graduate" || вид === "bind" ? 0 : -1,
+      токенов: null, курсТогда: 0, время: с.created_at, подпись: с.signature || null, адрес: с.address || null,
+    });
+  }
+  return итог.sort((a, b) => new Date(b.время) - new Date(a.время));
+}
+
+function заголовокСтроки(с) {
+  switch (с.вид) {
+    case "buy": return tf("histBuy", { t: с.тикер || "?" });
+    case "sell": return tf("histSell", { t: с.тикер || "?" });
+    case "launch": return с.тикер ? tf("histLaunch", { t: с.тикер }) : t("histLaunchToken");
+    case "swap": return tf("histSwap", { a: (с.обмен && с.обмен.отдал) || "?", b: (с.обмен && с.обмен.получил) || "?" });
+    case "deposit": return t("histDeposit");
+    case "withdraw": return t("histWithdraw");
+    case "sweep": return t("histSweep");
+    case "graduate": return t("histGraduate");
+    case "bind": return t("histBind");
+    default: return t("histOther");
+  }
+}
+
+const локальИстории = () => (lang === "EN" ? "en-US" : "ru-RU");
+
+function fmtТокеновИстории(n) {
+  const v = Number(n) || 0;
+  if (v >= 1000) return Math.round(v).toLocaleString("ru-RU");
+  return v.toLocaleString("ru-RU", { maximumFractionDigits: v >= 1 ? 2 : 6 });
+}
+
+function fmtUsdИстории(v) {
+  if (!(v > 0)) return "";
+  if (v < 0.01) return "<$0.01";
+  return `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fmtЦеныИстории(v) {
+  if (!(v > 0)) return "—";
+  return v.toLocaleString("en-US", v >= 1 ? { maximumFractionDigits: 4 } : { maximumSignificantDigits: 3 });
+}
+
+function подписьСтроки(с) {
+  const часы = new Date(с.время).toLocaleTimeString(локальИстории(), { hour: "2-digit", minute: "2-digit" });
+  let хвост = "";
+  if ((с.вид === "buy" || с.вид === "launch") && с.токенов > 0 && с.тикер) хвост = `+${fmtТокеновИстории(с.токенов)} ${с.тикер}`;
+  else if (с.вид === "sell" && с.токенов > 0 && с.тикер) хвост = `−${fmtТокеновИстории(с.токенов)} ${с.тикер}`;
+  else if (с.вид === "swap" && с.обмен && с.обмен.получено > 0) хвост = `+${fmtСумма(с.обмен.получено)} ${с.обмен.получил}`;
+  else if (с.адрес && с.вид === "deposit") хвост = `${t("histFrom")} ${shortAddr(с.адрес)}`;
+  else if (с.адрес && (с.вид === "withdraw" || с.вид === "sweep" || с.вид === "bind")) хвост = `${t("histTo")} ${shortAddr(с.адрес)}`;
+  return хвост ? `${часы} · ${хвост}` : часы;
+}
+
+// В каком фильтре строка: переводы — всё, что двигает монету без токена.
+const ФИЛЬТРЫ_ИСТОРИИ = [
+  { id: "all", ключ: "histAll", годится: () => true },
+  { id: "buy", ключ: "histBuys", годится: (с) => с.вид === "buy" },
+  { id: "sell", ключ: "histSells", годится: (с) => с.вид === "sell" },
+  { id: "move", ключ: "histTransfers", годится: (с) => ["deposit", "withdraw", "sweep", "swap", "bind"].includes(с.вид) },
+  { id: "launch", ключ: "histLaunches", годится: (с) => с.вид === "launch" || с.вид === "graduate" },
+];
+
+function деньИстории(iso) {
+  const д = new Date(iso);
+  const сегодня = new Date();
+  const вчера = new Date();
+  вчера.setDate(вчера.getDate() - 1);
+  const тот = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (тот(д, сегодня)) return t("histToday");
+  if (тот(д, вчера)) return t("histYesterday");
+  return д.toLocaleDateString(локальИстории(), {
+    day: "numeric", month: "long", ...(д.getFullYear() !== сегодня.getFullYear() ? { year: "numeric" } : {}),
+  });
+}
+
+/* Курсы монет для долларов в истории — общий кеш курсов приложения. */
+const КЛЮЧИ_КУРСОВ_ИСТОРИИ = ["sol", "gram", "bnb", "eth"];
+const курсыИзКешаИстории = () => Object.fromEntries(КЛЮЧИ_КУРСОВ_ИСТОРИИ.map((к) => [к, (КЕШ_КУРСА_МОНЕТЫ.get(к) || {}).price || 0]));
+function useКурсыИстории() {
+  const [курсы, setКурсы] = useState(курсыИзКешаИстории);
+  useEffect(() => {
+    let живо = true;
+    получитьКурсМонеты("sol").then(() => { if (живо) setКурсы(курсыИзКешаИстории()); }, () => {});
+    return () => { живо = false; };
+  }, []);
+  return курсы;
+}
+
+function долларыСтроки(с, курсы) {
+  const курс = курсТогда(с) || курсы[КУРС_МОНЕТЫ_ИСТОРИИ[с.монета]] || 0;
+  return (Number(с.сумма) || 0) * курс;
+}
+
+/* Значок действия в углу аватарки. Пришли деньги — зелёный, всё
+   остальное — светлый: цвет говорит только о приходе. */
+function значокДействия(вид) {
+  switch (вид) {
+    case "buy": return { Icon: ArrowDownLeft, приход: false };
+    case "sell": return { Icon: ArrowUpRight, приход: true };
+    case "launch": return { Icon: Rocket, приход: false };
+    case "swap": return { Icon: Repeat, приход: false };
+    case "deposit": return { Icon: ArrowDownLeft, приход: true };
+    case "graduate": return { Icon: Rocket, приход: true };
+    case "bind": return { Icon: Link2, приход: false };
+    default: return { Icon: ArrowUpRight, приход: false };
+  }
+}
+
+function АватарСтроки({ с, size = 40 }) {
+  const [сломан, setСломан] = useState(false);
+  const картинка = !сломан && (с.лого || (!с.тикер ? ЛОГО_МОНЕТЫ_СЕТИ[с.сеть] : null));
+  const з = значокДействия(с.вид);
+  const бейдж = Math.round(size * 0.44);
+  return (
+    <span style={{ position: "relative", width: size, height: size, flexShrink: 0, display: "inline-block" }}>
+      {картинка ? (
+        <img
+          src={картинка}
+          alt=""
+          width={size}
+          height={size}
+          onError={() => setСломан(true)}
+          style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", display: "block", background: T.surfaceHi }}
+        />
+      ) : (
+        <span
+          className="flex items-center justify-center"
+          style={{ width: size, height: size, borderRadius: "50%", background: T.surfaceHi, fontFamily: displayFont, fontWeight: 800, fontSize: Math.round(size * 0.4), color: T.ice }}
+        >
+          {String(с.тикер || с.монета || "?").slice(0, 1)}
+        </span>
+      )}
+      <span
+        className="flex items-center justify-center"
+        style={{
+          position: "absolute", right: -3, bottom: -3, width: бейдж, height: бейдж, borderRadius: "50%",
+          background: з.приход ? T.up : T.ice, border: `2px solid ${T.bg}`,
+        }}
+      >
+        <з.Icon size={Math.round(бейдж * 0.6)} strokeWidth={3} color={з.приход ? "#000000" : T.bg} />
+      </span>
+    </span>
+  );
+}
+
+function суммаСтроки(с) {
+  if (с.вид === "bind") return "";
+  const знак = с.знак > 0 ? "+" : с.знак < 0 ? "−" : "";
+  return `${знак}${fmtСумма(с.сумма)} ${с.монета}`;
+}
+
+function цветСуммы(с) {
+  return с.знак > 0 ? T.up : с.знак < 0 ? T.ice : T.muted;
+}
+
+function СтрокаИстории({ с, курсы, onOpen }) {
+  const доллары = долларыСтроки(с, курсы);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="fx-tap flex items-center w-full"
+      style={{ gap: 12, padding: "11px 2px", background: "transparent", border: "none", textAlign: "left", cursor: "pointer" }}
+    >
+      <АватарСтроки с={с} />
+      <div className="flex-1 min-w-0">
+        <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em" }}>
+          {заголовокСтроки(с)}
+        </div>
+        <div className="truncate" style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5, marginTop: 3 }}>
+          <ТекстСЧислами text={подписьСтроки(с)} />
+        </div>
+      </div>
+      <div className="text-right" style={{ flexShrink: 0 }}>
+        <div style={{ fontFamily: monoFont, fontSize: 14, fontWeight: 700, color: цветСуммы(с), fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+          <ТекстСЧислами text={суммаСтроки(с)} />
+        </div>
+        {доллары > 0 && с.вид !== "bind" && (
+          <div style={{ fontFamily: monoFont, fontSize: 12, color: T.faint, marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
+            {fmtUsdИстории(доллары)}
+          </div>
+        )}
+      </div>
+    </button>
+  );
+}
+
+/* Окно одной транзакции. Всё, что известно из истории, видно сразу, а
+   статус и комиссию сервер спрашивает у сети (api/wallet-history.js,
+   action=tx) — подтверждённую транзакцию он помнит, второй раз её не
+   ищут. */
+function ОкноОперации({ строка, onClose, курсы, insetTop = 0, insetBottom = 0 }) {
+  const [сеть, setСеть] = useState(null);
+  const [грузим, setГрузим] = useState(false);
+  const [скопировано, setСкопировано] = useState("");
+  const ид = строка && строка.id;
+
+  useEffect(() => {
+    setСеть(null);
+    setСкопировано("");
+    if (!строка || !строка.подпись) { setГрузим(false); return undefined; }
+    let живо = true;
+    setГрузим(true);
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const токен = data && data.session && data.session.access_token;
+        if (!токен) return;
+        const r = await fetch(апи(`/api/wallet-history?action=tx&chain=${encodeURIComponent(строка.сеть)}&id=${encodeURIComponent(строка.подпись)}`), {
+          headers: { Authorization: `Bearer ${токен}` },
+        });
+        const j = await r.json().catch(() => null);
+        if (живо && r.ok && j) setСеть(j);
+      } catch { /* сеть не ответила — окно покажет то, что знает само */ }
+      finally { if (живо) setГрузим(false); }
+    })();
+    return () => { живо = false; };
+  }, [ид]);
+
+  const скопировать = (что, текст) => {
+    скопироватьВБуфер(текст);
+    haptic("light");
+    setСкопировано(что);
+    setTimeout(() => setСкопировано((было) => (было === что ? "" : было)), 1500);
+  };
+  const открыть = (url) => {
+    try {
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (tg && tg.openLink) tg.openLink(url); else window.open(url, "_blank", "noopener,noreferrer");
+    } catch { /* ссылка не открылась */ }
+  };
+
+  const с = строка;
+  const доллары = с ? долларыСтроки(с, курсы) : 0;
+  const поля = [];
+  if (с) {
+    поля.push({ имя: t("histDate"), значение: new Date(с.время).toLocaleString(локальИстории(), { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) });
+    поля.push({ имя: t("histNetwork"), значение: ИМЯ_СЕТИ_ИСТОРИИ[с.сеть] || с.сеть });
+    if (с.вид === "buy" || с.вид === "launch") {
+      поля.push({ имя: t("histGave"), значение: `${fmtСумма(с.сумма)} ${с.монета}` });
+      if (с.токенов > 0) поля.push({ имя: t("histGot"), значение: `${fmtТокеновИстории(с.токенов)} ${с.тикер || ""}` });
+    } else if (с.вид === "sell") {
+      if (с.токенов > 0) поля.push({ имя: t("histGave"), значение: `${fmtТокеновИстории(с.токенов)} ${с.тикер || ""}` });
+      поля.push({ имя: t("histGot"), значение: `${fmtСумма(с.сумма)} ${с.монета}` });
+    } else if (с.вид === "swap" && с.обмен) {
+      поля.push({ имя: t("histGave"), значение: `${fmtСумма(с.сумма)} ${с.обмен.отдал}` });
+      if (с.обмен.получено > 0) поля.push({ имя: t("histGot"), значение: `${fmtСумма(с.обмен.получено)} ${с.обмен.получил}` });
+    } else if (с.вид === "deposit") {
+      поля.push({ имя: t("histReceived"), значение: `${fmtСумма(с.сумма)} ${с.монета}` });
+      if (с.адрес) поля.push({ имя: t("histFromAddr"), значение: shortAddr(с.адрес), копия: с.адрес, ключ: "адрес" });
+    } else if (с.вид === "withdraw" || с.вид === "sweep") {
+      поля.push({ имя: t("histSent"), значение: `${fmtСумма(с.сумма)} ${с.монета}` });
+      if (с.адрес) поля.push({ имя: t("histToAddr"), значение: shortAddr(с.адрес), копия: с.адрес, ключ: "адрес" });
+    } else if (с.вид === "graduate") {
+      поля.push({ имя: t("histRaised"), значение: `${fmtСумма(с.сумма)} ${с.монета}` });
+    } else if (с.вид === "bind" && с.адрес) {
+      поля.push({ имя: t("histAddress"), значение: shortAddr(с.адрес), копия: с.адрес, ключ: "адрес" });
+    }
+    if ((с.вид === "buy" || с.вид === "sell" || с.вид === "launch") && с.токенов > 0 && с.сумма > 0) {
+      const цена = с.сумма / с.токенов;
+      const вДолларах = доллары > 0 ? доллары / с.токенов : 0;
+      поля.push({ имя: t("histPrice"), значение: `${fmtЦеныИстории(цена)} ${с.монета}${вДолларах > 0 ? ` · $${fmtЦеныИстории(вДолларах)}` : ""}` });
+    }
+    if (доллары > 0 && с.вид !== "bind") поля.push({ имя: t("histUsd"), значение: fmtUsdИстории(доллары), заметка: курсТогда(с) ? t("histUsdThen") : t("histUsdNow") });
+    if (с.подпись) {
+      поля.push({
+        имя: t("histFee"),
+        значение: сеть && сеть.fee > 0 ? `${fmtСумма(сеть.fee)} ${сеть.feeCoin || с.монета}` : сеть ? "—" : null,
+      });
+      const хеш = (сеть && сеть.hash) || (/^seqno:/.test(с.подпись) ? "" : с.подпись);
+      if (хеш) поля.push({ имя: t("histTx"), значение: shortAddr(хеш), копия: хеш, ключ: "хеш" });
+    }
+  }
+  const статус = сеть && сеть.status;
+  const пилюля = !с || !с.подпись ? null
+    : грузим && !сеть ? { текст: t("histChecking"), цвет: T.muted }
+      : статус === "success" ? { текст: t("histOk"), цвет: T.up }
+        : статус === "failed" ? { текст: t("histFailed"), цвет: T.down }
+          : статус === "pending" ? { текст: t("histPending"), цвет: T.warning }
+            : null;
+  const ссылка = сеть && сеть.explorer;
+  const обозреватель = !ссылка ? ""
+    : /solscan/.test(ссылка) ? "Solscan" : /tonviewer/.test(ссылка) ? "Tonviewer"
+      : /bscscan/.test(ссылка) ? "BscScan" : /basescan/.test(ссылка) ? "BaseScan" : /etherscan/.test(ссылка) ? "Etherscan" : "обозревателе";
+
+  return (
+    <ЭкранСнизу открыт={!!строка} onClose={onClose} insetTop={insetTop} insetBottom={insetBottom}>
+      {с && (
+        <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "6px 18px 28px" }}>
+          <div className="flex flex-col items-center text-center" style={{ gap: 8, paddingTop: 6 }}>
+            <АватарСтроки с={с} size={64} />
+            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14.5, marginTop: 6 }}>{заголовокСтроки(с)}</div>
+            {с.вид !== "bind" && (
+              <div style={{ fontFamily: displayFont, color: цветСуммы(с), fontSize: 34, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+                <ТекстСЧислами text={суммаСтроки(с)} />
+              </div>
+            )}
+            {доллары > 0 && с.вид !== "bind" && (
+              <div style={{ fontFamily: monoFont, color: T.muted, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{fmtUsdИстории(доллары)}</div>
+            )}
+            {пилюля && (
+              <span className="flex items-center" style={{ gap: 7, marginTop: 6, padding: "6px 12px", borderRadius: 999, background: hexA(пилюля.цвет, 0.14), color: пилюля.цвет, fontFamily: bodyFont, fontSize: 13, fontWeight: 700 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: пилюля.цвет }} />
+                {пилюля.текст}
+              </span>
+            )}
+          </div>
+
+          <div style={{ marginTop: 22, background: T.surface, borderRadius: 18, padding: "2px 16px" }}>
+            {поля.map((п, i) => (
+              <div key={п.имя} className="flex items-center justify-between" style={{ gap: 14, padding: "13px 0", borderTop: i ? `1px solid ${T.line}` : "none" }}>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, flexShrink: 0 }}>{п.имя}</span>
+                <span className="flex items-center justify-end min-w-0" style={{ gap: 8 }}>
+                  {п.значение == null ? (
+                    <span className="fx-skeleton" style={{ width: 84, height: 14, borderRadius: 6, display: "inline-block" }} />
+                  ) : (
+                    <span className="flex flex-col items-end min-w-0">
+                      <span className="truncate" style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 600, fontVariantNumeric: "tabular-nums", maxWidth: "100%" }}>
+                        <ТекстСЧислами text={п.значение} />
+                      </span>
+                      {п.заметка && <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 11.5, marginTop: 2 }}>{п.заметка}</span>}
+                    </span>
+                  )}
+                  {п.копия && (
+                    <button
+                      type="button"
+                      aria-label={t("histCopy")}
+                      onClick={() => скопировать(п.ключ, п.копия)}
+                      className="fx-tap flex items-center justify-center"
+                      style={{ width: 28, height: 28, borderRadius: 9, background: T.surfaceHi, border: "none", flexShrink: 0 }}
+                    >
+                      {скопировано === п.ключ ? <Check size={14} color={T.up} strokeWidth={2.6} /> : <Copy size={14} color={T.muted} strokeWidth={2.2} />}
+                    </button>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {!с.подпись && с.вид !== "bind" && (
+            <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5, lineHeight: 1.5, marginTop: 12, padding: "0 4px" }}>{t("histNoSig")}</div>
+          )}
+
+          {ссылка && (
+            <button
+              type="button"
+              onClick={() => { haptic("light"); открыть(ссылка); }}
+              className="fx-tap flex items-center justify-center w-full"
+              style={{ gap: 8, marginTop: 16, height: 52, borderRadius: 16, background: T.ice, color: T.bg, border: "none", fontFamily: displayFont, fontSize: 15.5, fontWeight: 700 }}
+            >
+              {tf("histOpenIn", { name: обозреватель })}
+              <ExternalLink size={16} strokeWidth={2.4} />
+            </button>
+          )}
+        </div>
+      )}
+    </ЭкранСнизу>
+  );
+}
+
+function ИсторияКошелька({ userId, тик = 0, безЗаголовка = false, предел = 12, insetTop = 0, insetBottom = 0 }) {
   /* Только что сделанный перевод список подмешивает сам: своя копия
      лежит в памяти вкладки и исчезает, когда та же операция приходит с
      сервера — они сходятся по подписи. */
-  const ряд = useСделки(userId, предел, тик);
+  const ряд = useСделки(userId, предел, тик, true);
   const запуски = useМоиЗапуски(userId, тик);
+  const курсы = useКурсыИстории();
+  const [фильтр, setФильтр] = useState("all");
+  const [открыта, setОткрыта] = useState(null);
+  const строки = useMemo(() => (ряд ? собратьИсторию(ряд, запуски).slice(0, предел) : null), [ряд, запуски, предел]);
 
   /* Страница истории открывается раньше, чем приходят строки. Пустой
      лист в этот миг выглядел поломкой, поэтому на их месте стоят
      размытые заготовки: та же высота строки, тот же ритм. */
-  if (!ряд) {
+  if (!строки) {
     return (
       <section style={{ marginTop: безЗаголовка ? 0 : 22 }}>
         {!безЗаголовка && (
@@ -17824,9 +18398,20 @@ function ИсторияКошелька({ userId, тик = 0, безЗаголо
             {t("walletHistory")}
           </div>
         )}
-        <ЗагрузкаБлока высота={Math.min(предел, 7) * 46} />
+        <ЗагрузкаБлока высота={Math.min(предел, 7) * 62} />
       </section>
     );
+  }
+
+  const правило = ФИЛЬТРЫ_ИСТОРИИ.find((ф) => ф.id === фильтр) || ФИЛЬТРЫ_ИСТОРИИ[0];
+  const видимые = строки.filter(правило.годится);
+  // Группы по дням — как в кошельках: «Сегодня», «Вчера», дальше дата.
+  const группы = [];
+  for (const с of видимые) {
+    const день = деньИстории(с.время);
+    const последняя = группы[группы.length - 1];
+    if (последняя && последняя.день === день) последняя.строки.push(с);
+    else группы.push({ день, строки: [с] });
   }
 
   return (
@@ -17838,70 +18423,44 @@ function ИсторияКошелька({ userId, тик = 0, безЗаголо
           {t("walletHistory")}
         </div>
       )}
-      {ряд.length === 0 ? (
-        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5 }}>
-          {t("noActivityYet")}
+      <div className="no-scrollbar flex" style={{ gap: 8, overflowX: "auto", margin: "0 -18px", padding: "2px 18px 4px" }}>
+        {ФИЛЬТРЫ_ИСТОРИИ.map((ф) => {
+          const выбран = ф.id === фильтр;
+          return (
+            <button
+              key={ф.id}
+              type="button"
+              onClick={() => { if (!выбран) { haptic("light"); setФильтр(ф.id); } }}
+              className="fx-tap"
+              style={{
+                flexShrink: 0, padding: "8px 15px", borderRadius: 999, border: "none",
+                background: выбран ? T.ice : T.surfaceHi, color: выбран ? T.bg : T.muted,
+                fontFamily: bodyFont, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap",
+                transition: "background 160ms ease, color 160ms ease",
+              }}
+            >
+              {t(ф.ключ)}
+            </button>
+          );
+        })}
+      </div>
+      {видимые.length === 0 ? (
+        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.5, marginTop: 18 }}>
+          {строки.length === 0 ? t("noActivityYet") : t("histEmpty")}
         </div>
       ) : (
-        <div className="flex flex-col" style={{ gap: 2 }}>
-          {ряд.map((с) => {
-            const обмен = с.side === "swap";
-            // Расход — всё, кроме продажи: покупка, запуск токена, вывод,
-            // свод излишков. Приход бывает только у продажи.
-            const покупка = !этоПриход(с);
-            const создал = этоЗапуск(с, запуски, ряд);
-            return (
-              /* Ни подложки, ни разделителей: серая плитка под каждой
-                 строкой спорила с чёрным фоном, а линия резала список на
-                 куски. Строки разводит один зазор — как в ленте мемпада.
-                 Цвет остался там, где он что-то значит: в кружке и в
-                 сумме. */
-              <div
-                key={с.id}
-                className="flex items-center"
-                style={{ gap: 12, padding: "13px 2px" }}
-              >
-                {/* Одна стрелка, без кружка и обводки вокруг: любая рамка в
-                    строке без подложки снова читается как плитка. Место под
-                    иконку фиксируем шириной, чтобы заголовки стояли в
-                    колонку. */}
-                <span
-                  className="flex items-center justify-center"
-                  style={{ width: 20, flexShrink: 0 }}
-                >
-                  {обмен
-                    ? <Repeat size={17} strokeWidth={2.4} color="#E4E1DA" />
-                    : создал
-                      ? <Rocket size={17} strokeWidth={2.2} color={T.electric} />
-                    : покупка
-                      ? <ArrowDownRight size={17} strokeWidth={2.4} color={КОШ_ПАДЕНИЕ_ТЕКСТ} />
-                      : <ArrowUpRight size={17} strokeWidth={2.4} color={КОШ_ПРИХОД_ТЕКСТ} />}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700, letterSpacing: "-0.01em" }}>
-                    {обмен
-                      ? `${t("swapTitle")} ${String(с.ticker || "").replace("→", " → ")}`
-                      : этоСделка(с)
-                        ? `${создал ? t("tickerCreated") : покупка ? t("tickerBought") : t("tickerSold")} $${String(с.ticker || "?").toUpperCase()}`
-                        : названиеОперации(с)}
-                  </div>
-                  <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 2 }}>{fmtSince(с.created_at)}</div>
-                </div>
-                {/* Сумма тоже цветная: в чёрной строке без подложки это
-                    единственное, что отличает приход от расхода на скорости. */}
-                <div style={{
-                  fontFamily: monoFont, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap",
-                  fontVariantNumeric: "tabular-nums",
-                  color: обмен ? T.ice : покупка ? КОШ_ПАДЕНИЕ_ТЕКСТ : КОШ_ПРИХОД_ТЕКСТ,
-                }}>
-                  {обмен ? "" : покупка ? "−" : "+"}<ТекстСЧислами text={fmtСумма(Number(с.ton_amount) || 0)} />
-                  {обмен ? "" : ` ${монетаСделки(с)}`}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        группы.map((г) => (
+          <div key={г.день}>
+            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, fontWeight: 700, margin: "18px 2px 4px" }}>{г.день}</div>
+            <div className="flex flex-col">
+              {г.строки.map((с) => (
+                <СтрокаИстории key={с.id} с={с} курсы={курсы} onOpen={() => { haptic("light"); setОткрыта(с); }} />
+              ))}
+            </div>
+          </div>
+        ))
       )}
+      <ОкноОперации строка={открыта} onClose={() => setОткрыта(null)} курсы={курсы} insetTop={insetTop} insetBottom={insetBottom} />
     </section>
   );
 }
@@ -19888,6 +20447,8 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             тик={тик + своиОбновления}
             безЗаголовка
             предел={60}
+            insetTop={insetTop}
+            insetBottom={insetBottom}
           />
         </div>
       </ЭкранСнизу>
@@ -20592,6 +21153,12 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   // Свечи до мгновенной отрисовки своей сделки — чтобы откатить её, если
   // сеть сделку не приняла.
   const снимокДоСделки = useRef(null);
+  /* Свои сделки, нарисованные, но ещё не увиденные сетью. Быстрые
+     нажатия идут одно за другим, и каждая следующая считается от
+     резервов после предыдущих — иначе пять покупок подряд двигали цену
+     как одна. Сделка из списка уходит, когда резервы кривой обновились
+     (значит, сеть её уже учла) или когда она не прошла. */
+  const ждутСети = useRef([]);
   useEffect(() => {
     /* Читаем всегда, пока карточка открыта, а не только пока лента
        молчит: цена в ленте обновляется обходом раз в минуту, и после
@@ -20780,11 +21347,19 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     читать();
     const id = setInterval(читать, 15000);
     const послеСделки = () => setTimeout(читать, 1500);
-    if (typeof window !== "undefined") window.addEventListener("mintly:сделка", послеСделки);
+    // Запись сделки легла в базу — кружок встаёт уже из неё, сразу.
+    const записана = () => читать();
+    if (typeof window !== "undefined") {
+      window.addEventListener("mintly:сделка", послеСделки);
+      window.addEventListener("mintly:сделка-записана", записана);
+    }
     return () => {
       брошено = true;
       clearInterval(id);
-      if (typeof window !== "undefined") window.removeEventListener("mintly:сделка", послеСделки);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("mintly:сделка", послеСделки);
+        window.removeEventListener("mintly:сделка-записана", записана);
+      }
     };
   }, [currentUserId, token.tokenAddress, token.address, token.демо, token.ownerId, token.chain, token.createdAt]);
 
@@ -21170,6 +21745,24 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
      поздним ms потом спокойно подтвердит или поправит цену. */
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
+    // Резервы после всех своих сделок в пути — от них считается следующая.
+    /* Сделка в пути считается, пока состояние кривой то же, от которого
+       её считали: сдвинулось собранное или проданное — сеть её учла (или
+       чужую), и дальше её несут уже сами резервы. Резервы перечитываются
+       раз в пару секунд новым объектом, поэтому сравниваем числа, а не
+       сам объект. */
+    const резервыПослеСвоих = (р) => {
+      let x = р.vМонеты + (р.собрано || 0), y = р.vТокены - (р.продано || 0);
+      const сейчас = Date.now();
+      ждутСети.current = ждутСети.current.filter((с) => с.база.собрано === (р.собрано || 0)
+        && с.база.продано === (р.продано || 0) && сейчас - с.at < 20000);
+      for (const с of ждутСети.current) {
+        const k = x * y;
+        x = с.покупка ? x + с.сумма : k / (y + с.сумма);
+        y = k / x;
+      }
+      return { x, y };
+    };
     const старт = (e) => {
       const d = e && e.detail;
       if (!d || d.tokenId !== token.id || !(d.сумма > 0)) return;
@@ -21177,7 +21770,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       if (!р || !(р.vМонеты > 0) || !(р.vТокены > 0)) return;
       const курс = token.chain === "solana" ? (курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd()) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
       if (!(курс > 0)) return;
-      const x = р.vМонеты + (р.собрано || 0), y = р.vТокены - (р.продано || 0);
+      const { x, y } = резервыПослеСвоих(р);
       if (!(x > 0) || !(y > 0)) return;
       const k = x * y;
       const покупка = d.mode === "buy";
@@ -21187,7 +21780,10 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       if (!(монет > 0) || !(токенов > 0)) return;
       const цена = (новыйX / новыйY) * курс;
       const сейчасМс = Date.now();
-      снимокДоСделки.current = { живая: живаяЦенаRef.current, candles: null };
+      // Снимок — до первой из сделок в пути: откат последней не должен
+      // стирать те, что ещё идут.
+      if (!ждутСети.current.length || !снимокДоСделки.current) снимокДоСделки.current = { живая: живаяЦенаRef.current, candles: null };
+      ждутСети.current.push({ ид: d.ид || сейчасМс, база: { собрано: р.собрано || 0, продано: р.продано || 0 }, at: сейчасМс, покупка, сумма: d.сумма });
       setChartData((prev) => {
         if (!prev || !prev.candles || !prev.candles.length) return prev;
         if (снимокДоСделки.current && !снимокДоСделки.current.candles) снимокДоСделки.current.candles = prev.candles;
@@ -21207,7 +21803,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       const монета = token.chain === "solana" ? "SOL" : ТИКЕР_TON;
       const ценаМонеты = монет / токенов;
       setМеткиСделок((было) => [...(было || []), {
-        time: Math.floor(сейчасМс / 1000), side: покупка ? "buy" : "sell", dev: false, стрелка: true, мгновенная: true,
+        time: Math.floor(сейчасМс / 1000), side: покупка ? "buy" : "sell", dev: false, стрелка: true, мгновенная: true, ид: d.ид || сейчасМс,
         ценаМонеты, ценаUsd: ценаМонеты * курс,
         когда: new Date(сейчасМс).toLocaleTimeString(lang === "EN" ? "en-US" : "ru-RU", { hour: "2-digit", minute: "2-digit" }),
         сумма: `${fmtCoin(монет)} ${монета} · ${fmtUSD(монет * курс)}`,
@@ -21217,10 +21813,32 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     const отмена = (e) => {
       const d = e && e.detail;
       if (!d || d.tokenId !== token.id) return;
+      // Уходит только своя метка: остальные сделки в пути ещё идут.
+      setМеткиСделок((было) => (было || []).filter((м) => !(м.мгновенная && (d.ид == null || м.ид === d.ид))));
+      ждутСети.current = d.ид == null ? [] : ждутСети.current.filter((с) => с.ид !== d.ид);
+      const р = резервыДляСделкиRef.current;
+      if (ждутСети.current.length && р) {
+        /* Остались другие сделки в пути — цену не откатываем к снимку, а
+           пересчитываем без отменённой. */
+        const курс = token.chain === "solana" ? (курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd()) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
+        const { x, y } = резервыПослеСвоих(р);
+        if (курс > 0 && x > 0 && y > 0) {
+          const цена = (x / y) * курс;
+          if (живаяЦенаRef.current) живаяЦенаRef.current = { ...живаяЦенаRef.current, close: цена };
+          setChartData((prev) => {
+            if (!prev || !prev.candles || !prev.candles.length) return prev;
+            const свечи = prev.candles.slice();
+            const п = свечи[свечи.length - 1];
+            свечи[свечи.length - 1] = { ...п, close: цена, high: Math.max(п.open, цена, п.close === п.high ? цена : п.high), low: Math.min(п.open, цена, п.close === п.low ? цена : п.low) };
+            return { ...prev, candles: свечи };
+          });
+          return;
+        }
+      }
       const сн = снимокДоСделки.current;
       снимокДоСделки.current = null;
       ожиданиеRef.current = null;
-      setМеткиСделок((было) => (было || []).filter((м) => !м.мгновенная));
+      ждутСети.current = [];
       if (!сн) return;
       живаяЦенаRef.current = сн.живая;
       if (сн.candles) setChartData((prev) => (prev ? { ...prev, candles: сн.candles } : prev));
@@ -21923,7 +22541,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
                       if (вид === "buy") onQuick("buy", v);
                       // Доля позиции — от того, что лежит на кошельке сейчас;
                       // «всё» без хвоста округления, который сеть отбила бы.
-                      else onQuick("sell", v >= 100 ? позиция : Math.floor(позиция * v / 100 * 1e6) / 1e6);
+                      else onQuick("sell", v >= 100 ? позиция : Math.floor(позиция * v / 100 * 1e6) / 1e6, позиция);
                     }}
                     className="fx-tap flex-1 rounded-[14px] py-2.5"
                     style={{
@@ -22264,6 +22882,14 @@ const MIN_LAUNCH_USD = 5;
 const MIN_LAUNCH_ENFORCED = !TON_TESTNET_NETWORK;
 const МИНИМУМ_В_SOLANA = SOL_NETWORK === "mainnet";
 const NETWORK_FEE_TON = 0.05;
+/* Запас под газ сделки — ровно тот, что проверяет сервер перед отправкой
+   (api/wallet-ton.js, api/wallet-solana.js). Меньший запас здесь значил,
+   что сделка на почти пустом кошельке сперва рисовалась на графике, а
+   отказ приходил потом. */
+const ЗАПАС_SOL_СДЕЛКИ = 0.01;
+const ЗАПАС_TON_КРИВОЙ = 0.2;
+const ЗАПАС_TON_БИРЖИ = 0.45;
+const ЗАПАС_TON_ПРОДАЖИ = 0.35;
 const SLIPPAGE_OPTIONS = [0.5, 1, 3];
 
 function parseAmount(str) {
@@ -30237,6 +30863,10 @@ const FEE_PERCENT = 0; // комиссии площадки нет
   // адресу подключённого кошелька (не требует ключа для базовых запросов,
   // но без ключа лимит очень низкий — см. TONAPI_KEY выше).
   const [tonBalance, setTonBalance] = useState(0);
+  /* Остаток SOL на кошельке приложения — для проверки до сделки: без него
+     покупка на пустом кошельке сперва рисовалась на графике и только
+     потом откатывалась отказом сервера. null — ещё не знаем. */
+  const [solВнутр, setSolВнутр] = useState(null);
   const [tonPriceUsd, setTonPriceUsd] = useState(0);
   /* Курс SOL как состояние приложения: сам solUsd() живёт в переменной
      модуля, и React о его появлении не узнаёт. Нужен здесь, чтобы числа
@@ -30289,6 +30919,20 @@ const FEE_PERCENT = 0; // комиссии площадки нет
     const id = setInterval(шаг, 15000);
     return () => { жив = false; clearInterval(id); };
   }, [balanceRefreshTick]);
+  // Остаток SOL — пока открыт токен Solana: на нём проверяется сделка.
+  const открытSolana = view === "token" && !!token && token.chain === "solana";
+  useEffect(() => {
+    if (!открытSolana) return undefined;
+    let жив = true;
+    const шаг = async () => {
+      const { состояниеВнутреннего } = await import("./appWallet");
+      const с = await состояниеВнутреннего().catch(() => null);
+      if (жив && с && с.address && с.sol != null) setSolВнутр(Number(с.sol) || 0);
+    };
+    шаг();
+    const id = setInterval(шаг, 8000);
+    return () => { жив = false; clearInterval(id); };
+  }, [открытSolana, balanceRefreshTick]);
   const [tonPriceChecked, setTonPriceChecked] = useState(false);
   useEffect(() => {
     // Два источника: если один недоступен (у CoinGecko бывает лимит на
@@ -33127,14 +33771,14 @@ function mapTokenRow(row) {
   /* Сделка в 1 клик со страницы токена: сумма (или количество при
      продаже) приходит готовой, окно сделки не открывается. Проверки те
      же, что у кнопок «Купить» и «Продать». */
-  function быстраяСделка(mode, сумма) {
+  function быстраяСделка(mode, сумма, позиция = null) {
     if (token && token.демо) { showToast(mode === "buy" ? "Это демо-токен — его нельзя купить" : "Это демо-токен — его нельзя продать"); return; }
     if (нуженКошелёкНаСайте()) return;
     if (!requireUnlockRoot()) return;
     if (!(сумма > 0)) return;
     const монета = монетаБыстрых(token) === "TON" ? ТИКЕР_TON : монетаБыстрых(token);
     const pay = mode === "buy" ? `${сумма.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}` : сумма.toLocaleString("ru-RU");
-    confirmTrade(mode, pay, "", "", сумма, 0);
+    confirmTrade(mode, pay, "", "", сумма, 0, mode === "sell" ? позиция : null);
   }
   function handleSell() { if (token && token.демо) { showToast("Это демо-токен — его нельзя продать"); return; } if (нуженКошелёкНаСайте()) return; if (requireUnlockRoot()) setTradeModal({ mode: "sell" }); }
   // Своя запись о сделке. Цепочка знает о переводе, но не знает, кто
@@ -33150,6 +33794,9 @@ function mapTokenRow(row) {
     const словарь = {
       creator_locked: "errCreatorLocked",
       wallet_busy: "errWalletBusy",
+      too_often: "errTooOften",
+      too_many: "errTooFast",
+      trade_in_flight: "errTooFast",
       unverified_curve: "errUnverifiedCurve",
       fair_start: "errFairStart",
       not_enough: "errNotEnough",
@@ -33165,9 +33812,14 @@ function mapTokenRow(row) {
 
   function recordTrade(side, tonAmount, tokenAmount) {
     if (!userId) return;
-    supabase.from("trades").insert({
+    записатьСделкуНадёжно({
+      id: новыйUuid(),
       user_id: userId,
-      token_id: token && token.id ? token.id : null,
+      /* У токена из ленты id — не номер строки в базе («solana_<пул>»), и
+         запись с ним база отбивала целиком: сделка не сохранялась, и её
+         кружок пропадал с графика после перезапуска. Токен из ленты
+         узнаётся по адресу, этого хватает. */
+      token_id: token && ЭТО_UUID.test(String(token.id || "")) ? token.id : null,
       // У токена из ленты адрес лежит в tokenAddress, у своего — в
       // address. Раньше брали только второе, и у сделок в Solana адрес
       // оставался пустым: история потом считала их сделками в TON.
@@ -33182,10 +33834,10 @@ function mapTokenRow(row) {
          доллары в ленте, таблица лучших, прибыль — врало в семьдесят
          раз. */
       ton_price_usd: ((token && token.chain === "solana" ? solUsd() : tonPriceUsd) || 0),
-    }).then(({ error }) => {
-      if (error) console.warn("[mintly] не удалось записать сделку:", error.message);
     });
   }
+  // Сделки, чья запись не легла в базу в прошлый раз, — досылаем при входе.
+  useEffect(() => { if (userId) дослатьНезаписанныеСделки(userId); }, [userId]);
 
   /* Покупка одним касанием из чата: сумма уже названа, окно сделки не
      нужно — сразу собираем транзакцию и отдаём её кошельку. Если
@@ -33239,37 +33891,40 @@ function mapTokenRow(row) {
      каждом экране, а весит прилично. */
   async function свопSolana({ token, amountSol, продажа = false, количество = 0 }) {
     /* eslint-disable-next-line no-param-reassign */
-    const { состояниеВнутреннего, свопВнутренним, сделкаВнутренним } = await import("./appWallet");
+    const { адресВнутреннего, свопВнутренним, сделкаВнутренним } = await import("./appWallet");
 
     const SOL = "So11111111111111111111111111111111111111112";
 
     // Пока пары на бирже нет, весь оборот идёт через кривую площадки.
     const наКривойСети = !token.poolAddress && !!token.curveAddress;
-    const внутренний = await состояниеВнутреннего();
-    if (!внутренний || !внутренний.address) throw new Error(t("needAccountShort"));
-
-    // Точность токена у каждого своя, и ошибка здесь — это ошибка в
-    // тысячу раз по сумме. Поэтому не угадываем: спрашиваем сеть вместе
-    // с балансом, там она приходит вместе со счётом.
-    let десятичные = 6;
-    if (продажа) {
-      const b = await fetch(апи(`/api/solana?action=balances&wallet=${внутренний.address}&mint=${token.tokenAddress}`))
-        .then((r) => r.json())
-        .catch(() => null);
-      if (b && b.decimals > 0) десятичные = b.decimals;
-      if (b && b.token > 0 && количество > b.token) количество = b.token;
-    }
 
     /* Токен, который ещё на нашей кривой, торгуется только кривой:
        маршрутизатор биржи о нём не знает (а в тестовой сети — ни о
        каком вовсе), поэтому идти к нему бессмысленно. Заодно этой же
-       ручкой проверяются обещания создателя и пишется история. */
+       ручкой проверяются обещания создателя и пишется история.
+       Сделка уходит сразу: остаток и точность токена сервер знает сам и
+       больше, чем есть, не продаст — ждать их здесь значило терять время. */
     if (наКривойСети) {
       return await сделкаВнутренним({
         mint: token.tokenAddress,
         продажа,
         amount: продажа ? количество : Number(amountSol || 0),
       });
+    }
+
+    const адрес = await адресВнутреннего();
+    if (!адрес) throw new Error(t("needAccountShort"));
+
+    // Точность токена у каждого своя, и ошибка здесь — это ошибка в
+    // тысячу раз по сумме. Поэтому не угадываем: спрашиваем сеть вместе
+    // с балансом, там она приходит вместе со счётом.
+    let десятичные = 6;
+    if (продажа) {
+      const b = await fetch(апи(`/api/solana?action=balances&wallet=${адрес}&mint=${token.tokenAddress}`))
+        .then((r) => r.json())
+        .catch(() => null);
+      if (b && b.decimals > 0) десятичные = b.decimals;
+      if (b && b.token > 0 && количество > b.token) количество = b.token;
     }
 
     const вход = продажа ? token.tokenAddress : SOL;
@@ -33280,46 +33935,103 @@ function mapTokenRow(row) {
     return await свопВнутренним({ вход, выход, сумма });
   }
 
-  /* Замок на время сделки. Сеть подтверждает перевод не мгновенно, и
-     пока она думает, позиция в приложении ещё прежняя: раньше это
-     позволяло продать одни и те же токены несколько раз подряд — в
-     истории набиралась пачка одинаковых продаж, а до сети доезжала
-     одна. Теперь вторая отправка не проходит, пока не ответила первая. */
-  const сделкаИдёт = useRef(false);
+  /* Сделки в пути — брони денег и токенов.
+   *
+   * Раньше вторая сделка не уходила, пока не ответила первая: быстрые
+   * нажатия просто терялись. Теперь каждое нажатие — своя сделка, но
+   * сперва проверяется, хватит ли на неё с учётом тех, что ещё идут:
+   * покупка на пустом кошельке не рисуется на графике вовсе, вместо
+   * свечи с откатом — сразу отказ. От спама — дребезг двойного касания
+   * и не больше четырёх сделок в пути разом.
+   *
+   * Бронь снимается, когда сделка не прошла, а у прошедшей — когда
+   * баланс обновился (значит, сеть её учла) или истёк срок. */
+  const вПути = useRef({ брони: [], последняя: 0 });
+  const занятоВПути = (сеть, tokenId) => {
+    const сейчас = Date.now();
+    вПути.current.брони = вПути.current.брони.filter((б) => !б.готова || б.до > сейчас);
+    let монет = 0, токенов = 0;
+    for (const б of вПути.current.брони) {
+      if (б.сеть === сеть) монет += б.монет;
+      if (tokenId && б.tokenId === tokenId) токенов += б.токенов;
+    }
+    return { монет, токенов, штук: вПути.current.брони.filter((б) => !б.готова).length };
+  };
+  // Баланс обновился — прошедшие сделки в нём уже учтены.
+  useEffect(() => { вПути.current.брони = вПути.current.брони.filter((б) => !(б.готова && б.сеть === "ton")); }, [tonBalance]);
+  useEffect(() => { вПути.current.брони = вПути.current.брони.filter((б) => !(б.готова && б.сеть === "solana")); }, [solВнутр]);
 
-  async function confirmTrade(mode, payAmount, receiveAmount, unit, rawAmount, rawEstimate) {
-    if (сделкаИдёт.current) return;
-    сделкаИдёт.current = true;
+  async function confirmTrade(mode, payAmount, receiveAmount, unit, rawAmount, rawEstimate, доступноТокенов = null) {
+    if (!token) return;
+    const сейчас = Date.now();
+    const сумма = Number(rawAmount) || 0;
+    if (!(сумма > 0)) return;
+    // Два касания за сотню миллисекунд — это одно нажатие, а не две сделки.
+    if (сейчас - вПути.current.последняя < 120) return;
+    const сеть = token.chain === "solana" ? "solana" : "ton";
+    const покупка = mode === "buy";
+    const занято = занятоВПути(сеть, token.id);
+    if (занято.штук >= 4) { haptic("error"); showToast(t("errTooFast")); return; }
+    /* Запас на газ — тот же, что проверяет сервер (api/wallet-ton.js,
+       api/wallet-solana.js): иначе отказ приходил уже после свечи. */
+    const запас = сеть === "solana" ? ЗАПАС_SOL_СДЕЛКИ : (token.graduated ? ЗАПАС_TON_БИРЖИ : ЗАПАС_TON_КРИВОЙ);
+    if (покупка) {
+      const есть = сеть === "solana" ? solВнутр : tonBalance;
+      if (сеть === "ton" && !(tonPriceUsd > 0)) { showToast(t("rateLoadingRetry")); return; }
+      if (есть != null && сумма + запас + занято.монет > есть + 1e-9) {
+        haptic("error");
+        const монета = сеть === "solana" ? "SOL" : ТИКЕР_TON;
+        showToast(tf("insufficientTon", {
+          have: `${Math.max(0, есть - занято.монет).toFixed(3)} ${монета}`,
+          need: `${(сумма + запас).toFixed(сеть === "solana" ? 3 : 2)} ${монета}`,
+        }));
+        return;
+      }
+    } else {
+      const есть = доступноТокенов != null ? доступноТокенов : chainHolding;
+      if (сеть === "ton" && есть == null) { showToast(t("balanceLoading")); return; }
+      if (есть != null && сумма > (есть - занято.токенов) * 1.000001 + 1e-9) { haptic("error"); showToast(t("insufficientSellAmount")); return; }
+      if (сеть === "ton" && tonBalance < ЗАПАС_TON_ПРОДАЖИ + занято.монет) {
+        haptic("error");
+        showToast(tf("insufficientTon", { have: `${tonBalance.toFixed(3)} ${ТИКЕР_TON}`, need: `${ЗАПАС_TON_ПРОДАЖИ.toFixed(2)} ${ТИКЕР_TON}` }));
+        return;
+      }
+    }
+    вПути.current.последняя = сейчас;
+    const ид = `${сейчас.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const бронь = {
+      ид, сеть, tokenId: token.id, готова: false, до: 0,
+      монет: покупка ? сумма + запас : (сеть === "ton" ? ЗАПАС_TON_ПРОДАЖИ : 0),
+      токенов: покупка ? 0 : сумма,
+    };
+    вПути.current.брони.push(бронь);
     /* Окно закрываем сразу, не дожидаясь сети: ждать было не только
        долго, но и опасно — открытая кнопка принимала второе нажатие. */
     setTradeModal(null);
-    /* Свеча сделки рисуется до ответа сети. Не прошла сделка — отказ
-       сервера, нет денег, сеть отбила — нарисованное откатываем: иначе
-       график рос от сделок, которых не было. Признак удачи один —
-       событие «mintly:сделка» этого токена. */
-    const id = token && token.id;
+    /* Свеча сделки рисуется до ответа сети. Не прошла сделка — откатываем
+       ровно её: у каждой сделки свой номер, и соседние в пути остаются. */
     let прошла = false;
-    const удача = (e) => { if (e && e.detail && e.detail.tokenId === id) прошла = true; };
-    if (typeof window !== "undefined") window.addEventListener("mintly:сделка", удача);
     try {
-      await провестиСделку(mode, payAmount, receiveAmount, unit, rawAmount, rawEstimate);
+      прошла = !!(await провестиСделку(mode, payAmount, receiveAmount, unit, rawAmount, rawEstimate, ид, доступноТокенов));
     } finally {
-      сделкаИдёт.current = false;
-      if (typeof window !== "undefined") {
-        window.removeEventListener("mintly:сделка", удача);
-        if (!прошла && id) {
-          try { window.dispatchEvent(new CustomEvent("mintly:сделка-отмена", { detail: { tokenId: id } })); } catch { /* старый движок */ }
+      if (прошла) {
+        бронь.готова = true;
+        бронь.до = Date.now() + (сеть === "ton" ? 25000 : 8000);
+      } else {
+        вПути.current.брони = вПути.current.брони.filter((б) => б !== бронь);
+        if (typeof window !== "undefined") {
+          try { window.dispatchEvent(new CustomEvent("mintly:сделка-отмена", { detail: { tokenId: token.id, ид } })); } catch { /* старый движок */ }
         }
       }
     }
   }
 
-  async function провестиСделку(mode, payAmount, receiveAmount, unit, rawAmount, rawEstimate) {
+  async function провестиСделку(mode, payAmount, receiveAmount, unit, rawAmount, rawEstimate, ид = null, доступноТокенов = null) {
     /* График не ждёт сети: в миг нажатия страница токена сама считает
        итог по кривой и рисует свечу и стрелку. Ответ сервера и поток
        потом лишь подтверждают то же число. */
     if (token && !token.демо && typeof window !== "undefined") {
-      try { window.dispatchEvent(new CustomEvent("mintly:сделка-старт", { detail: { tokenId: token.id, mode, сумма: Number(rawAmount) || 0 } })); }
+      try { window.dispatchEvent(new CustomEvent("mintly:сделка-старт", { detail: { tokenId: token.id, mode, сумма: Number(rawAmount) || 0, ид } })); }
       catch { /* старый движок — дождёмся потока */ }
     }
     // Токен из ленты Solana торгуется в своей сети и своим кошельком:
@@ -33360,10 +34072,11 @@ function mapTokenRow(row) {
            поверх всего этого только мешала. Говорим только об отказе. */
         setBalanceRefreshTick((n) => n + 1);
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 2500);
+        return true;
       } catch (e) {
         showToast(`${t("solFailed")}: ${текстОтказа(e)}`);
+        return false;
       }
-      return;
     }
 
     if (mode === "buy") {
@@ -33371,18 +34084,8 @@ function mapTokenRow(row) {
       // modal is denominated in TON, not USD), so no USD conversion is
       // needed here — we only still require tonPriceUsd to be loaded so
       // the estimated token amount shown to the user was computed correctly.
-      if (!(tonPriceUsd > 0)) { showToast(t("rateLoadingRetry")); return; }
+      // Курс и остаток проверены до свечи (confirmTrade).
       const totalTon = rawAmount;
-      const spendableTon = Math.max(0, tonBalance - NETWORK_FEE_TON);
-      // Цифрами, а не общими словами: человек должен сразу видеть,
-      // сколько не хватает, и не идти проверять кошелёк отдельно.
-      if (totalTon > spendableTon) {
-        showToast(tf("insufficientTon", {
-          have: `${tonBalance.toFixed(3)} TON`,
-          need: `${(totalTon + NETWORK_FEE_TON).toFixed(2)} TON`,
-        }));
-        return;
-      }
       try {
         /* Покупку отправляет кошелёк приложения: наружу уходит только
            «этот токен, столько-то TON», а сообщение на кривую собирает
@@ -33398,9 +34101,11 @@ function mapTokenRow(row) {
         // пару секунд на подтверждение, потом перезапрашиваем его.
         setBalanceRefreshTick((n) => n + 1);
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 2500);
+        return true;
       } catch (err) {
         const detail = текстОтказа(err);
         showToast(detail ? `${t("txCancelled")} — ${detail}` : t("txCancelled"));
+        return false;
       }
     } else {
       // Can't sell more than is actually held — re-checked here too, not
@@ -33408,9 +34113,9 @@ function mapTokenRow(row) {
       // Баланс берём тот же, что показан в окне, — из сети. Локальный
       // счётчик знает только о сделках через это приложение, поэтому у
       // него ноль, и продажа молча обрывалась здесь же.
-      const held = chainHolding;
-      if (held == null) { showToast(t("balanceLoading")); return; }
-      if (rawAmount > held) { showToast(t("insufficientSellAmount")); return; }
+      // Остаток проверен до свечи (confirmTrade) — с учётом продаж в пути.
+      const held = доступноТокенов != null ? доступноТокенов : chainHolding;
+      if (held == null) { showToast(t("balanceLoading")); return false; }
       try {
         /* Продажа на кривой — перевод жетонов на неё с пометкой
            «продажа»: кривая присылает TON обратно. Жетоны лежат на
@@ -33426,6 +34131,7 @@ function mapTokenRow(row) {
         setTradeModal(null);
         setBalanceRefreshTick((n) => n + 1);
         setTimeout(() => setBalanceRefreshTick((n) => n + 1), 2500);
+        return true;
       } catch (err) {
         // Текст ошибки показываем целиком: консоли внутри Telegram нет, а
         // отличить отказ пользователя от отклонённого запроса иначе
@@ -33433,6 +34139,7 @@ function mapTokenRow(row) {
         const detail = текстОтказа(err);
         console.error("[mintly] продажа не прошла:", err);
         showToast(detail ? `${t("txCancelled")} — ${detail}` : t("txCancelled"));
+        return false;
       }
     }
   }
