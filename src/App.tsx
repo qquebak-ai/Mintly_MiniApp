@@ -11379,17 +11379,67 @@ function ФонКлеток({ клетка = 26 }) {
   );
 }
 
-/* Живой фон витрины «в центре внимания» — три сюжета по кругу: огонь,
- * падающие деньги и рост. Подборка листается раз в восемь секунд, и у
- * каждого токена в ней свой фон: так смена токена видна сразу, а не
- * только по тикеру.
+/* Живой фон витрины «в центре внимания» — аврора в цвет самого токена.
+ * Цвета берутся из аватарки: три самых насыщенных оттенка становятся
+ * большими мягкими пятнами света, которые медленно перетекают друг в
+ * друга, как фон плеера в Apple Music. Под ними — едва заметная сетка,
+ * гаснущая к краям. Сюжеты с огнём и монетами читались самодельными.
  *
- * Холст, а не сотня элементов с CSS-анимацией: частиц много, они живут
- * доли секунды, и пересоздавать под них узлы страницы — это лаги на
- * телефоне. Кадры идут, только пока витрина на экране и вкладка открыта;
- * при «уменьшить движение» рисуется один неподвижный кадр. */
-const ВИДЫ_ФОНА_СПОТЛАЙТА = ["огонь", "монеты", "ракета"];
-function ФонСпотлайта({ вид }) {
+ * Холст, а не CSS-фильтры: размытие на телефоне дорогое, а радиальные
+ * градиенты мягкие сами по себе. Кадры идут, только пока витрина на
+ * экране и вкладка открыта; при «уменьшить движение» — один кадр. */
+const кешЦветовАватарки = new Map();
+function запаснойЦвет(ключ) {
+  let х = 0;
+  for (const c of String(ключ || "")) х = (х * 31 + c.charCodeAt(0)) >>> 0;
+  const тон = х % 360;
+  return [`hsl(${тон},70%,55%)`, `hsl(${(тон + 40) % 360},75%,50%)`, `hsl(${(тон + 320) % 360},65%,45%)`];
+}
+function цветаАватарки(src, ключ) {
+  return new Promise((готово) => {
+    if (!src) { готово(запаснойЦвет(ключ)); return; }
+    if (кешЦветовАватарки.has(src)) { готово(кешЦветовАватарки.get(src)); return; }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const к = document.createElement("canvas");
+        к.width = 24; к.height = 24;
+        const с = к.getContext("2d", { willReadFrequently: true });
+        с.drawImage(img, 0, 0, 24, 24);
+        const d = с.getImageData(0, 0, 24, 24).data;
+        // Корзины по тону: в каждой копим цвет с весом насыщенности.
+        const корзины = Array.from({ length: 12 }, () => ({ r: 0, g: 0, b: 0, в: 0 }));
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i + 3] < 200) continue;
+          const r = d[i], g = d[i + 1], b = d[i + 2];
+          const макс = Math.max(r, g, b), мин = Math.min(r, g, b);
+          const нас = макс ? (макс - мин) / макс : 0;
+          if (нас < 0.25 || макс < 50) continue;
+          let тон = 0;
+          if (макс === r) тон = ((g - b) / (макс - мин)) % 6;
+          else if (макс === g) тон = (b - r) / (макс - мин) + 2;
+          else тон = (r - g) / (макс - мин) + 4;
+          const к2 = корзины[((Math.round(тон * 2) % 12) + 12) % 12];
+          const вес = нас * нас;
+          к2.r += r * вес; к2.g += g * вес; к2.b += b * вес; к2.в += вес;
+        }
+        const лучшие = корзины.filter((к2) => к2.в > 0).sort((a, b2) => b2.в - a.в).slice(0, 3)
+          .map((к2) => `rgb(${Math.round(к2.r / к2.в)},${Math.round(к2.g / к2.в)},${Math.round(к2.b / к2.в)})`);
+        const итог = лучшие.length ? [...лучшие, ...запаснойЦвет(ключ)].slice(0, 3) : запаснойЦвет(ключ);
+        кешЦветовАватарки.set(src, итог);
+        готово(итог);
+      } catch {
+        // Картинка с чужого сайта без разрешения — пиксели не прочесть.
+        готово(запаснойЦвет(ключ));
+      }
+    };
+    img.onerror = () => готово(запаснойЦвет(ключ));
+    img.src = src;
+  });
+}
+
+function ФонСпотлайта({ src, ключ }) {
   const холстRef = useRef(null);
   useEffect(() => {
     const холст = холстRef.current;
@@ -11397,209 +11447,68 @@ function ФонСпотлайта({ вид }) {
     const ctx = холст.getContext("2d");
     if (!ctx) return undefined;
     const тихо = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let w = 0, h = 0, dpr = 1;
+    let w = 0, h = 0, dpr = 1, цвета = запаснойЦвет(ключ), жив = true;
+    const сетка = document.createElement("canvas");
+    const нарисоватьСетку = () => {
+      сетка.width = холст.width; сетка.height = холст.height;
+      const п = сетка.getContext("2d");
+      if (!п) return;
+      п.setTransform(dpr, 0, 0, dpr, 0, 0);
+      п.strokeStyle = "rgba(255,255,255,0.045)"; п.lineWidth = 1;
+      for (let x = 0; x <= w; x += 26) { п.beginPath(); п.moveTo(x + 0.5, 0); п.lineTo(x + 0.5, h); п.stroke(); }
+      for (let y = 0; y <= h; y += 26) { п.beginPath(); п.moveTo(0, y + 0.5); п.lineTo(w, y + 0.5); п.stroke(); }
+      // Сетка гаснет к краям: видна только в середине, под токеном.
+      п.globalCompositeOperation = "destination-in";
+      const м = п.createRadialGradient(w / 2, h * 0.45, 0, w / 2, h * 0.45, Math.max(w, h) * 0.6);
+      м.addColorStop(0, "rgba(0,0,0,1)"); м.addColorStop(1, "rgba(0,0,0,0)");
+      п.fillStyle = м; п.fillRect(0, 0, w, h);
+    };
     const размер = () => {
       const r = холст.getBoundingClientRect();
       dpr = Math.min(2, window.devicePixelRatio || 1);
       w = Math.max(1, r.width); h = Math.max(1, r.height);
       холст.width = Math.round(w * dpr); холст.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      нарисоватьПодложку();
+      нарисоватьСетку();
     };
-    const сл = (a, b) => a + Math.random() * (b - a);
-    /* Подложка — тёмный градиент своего оттенка и обычная сетка. Рисуется
-       один раз на размер; кадр кладёт её готовой картинкой. */
-    const подложка = document.createElement("canvas");
-    const ТОН = {
-      огонь: ["#0B0706", "#1C0C07", "rgba(255,200,170,0.06)", "rgba(255,110,40,0.20)"],
-      монеты: ["#0A0905", "#1A1507", "rgba(255,230,160,0.06)", "rgba(255,200,80,0.16)"],
-      ракета: ["#05070D", "#0B1020", "rgba(170,190,255,0.06)", "rgba(110,140,255,0.14)"],
-    }[вид] || ["#07080A", "#101216", "rgba(255,255,255,0.05)", "rgba(255,255,255,0.08)"];
-    function нарисоватьПодложку() {
-      подложка.width = холст.width; подложка.height = холст.height;
-      const п = подложка.getContext("2d");
-      if (!п) return;
-      п.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const г = п.createLinearGradient(0, 0, 0, h);
-      г.addColorStop(0, ТОН[0]); г.addColorStop(1, ТОН[1]);
-      п.fillStyle = г; п.fillRect(0, 0, w, h);
-      п.strokeStyle = ТОН[2]; п.lineWidth = 1;
-      for (let x = 0; x <= w; x += 28) { п.beginPath(); п.moveTo(x + 0.5, 0); п.lineTo(x + 0.5, h); п.stroke(); }
-      for (let y = 0; y <= h; y += 28) { п.beginPath(); п.moveTo(0, y + 0.5); п.lineTo(w, y + 0.5); п.stroke(); }
-      // Мягкое зарево снизу — от огня, от золота, от сопла.
-      const з = п.createRadialGradient(w / 2, h * 1.05, 0, w / 2, h * 1.05, h * 0.9);
-      з.addColorStop(0, ТОН[3]); з.addColorStop(1, "rgba(0,0,0,0)");
-      п.fillStyle = з; п.fillRect(0, 0, w, h);
-    }
-    const основа = () => { ctx.clearRect(0, 0, w, h); ctx.drawImage(подложка, 0, 0, w, h); };
     размер();
-    const частицы = [];
+    // Пятна: у каждого своя орбита и темп; цикл движения — 6–8 секунд.
+    const пятна = [
+      { ц: 0, ax: 0.30, ay: 0.22, cx: 0.30, cy: 0.35, r: 0.75, темп: 0.95, ф: 0 },
+      { ц: 1, ax: 0.28, ay: 0.25, cx: 0.72, cy: 0.55, r: 0.70, темп: 0.8, ф: 2.1 },
+      { ц: 2, ax: 0.25, ay: 0.20, cx: 0.45, cy: 0.85, r: 0.65, темп: 1.05, ф: 4.2 },
+      { ц: 0, ax: 0.22, ay: 0.18, cx: 0.80, cy: 0.15, r: 0.5, темп: 0.9, ф: 1.3 },
+    ];
     let время = 0;
-
-    /* Огонь: настоящие языки пламени, а не пятна. Каждый язык — гладкая
-       капля из двух кривых Безье в три слоя (красный, оранжевый, жёлтый),
-       медленно качается и дышит по высоте. Сверху редкие искры. */
-    const языки = [];
-    const собратьЯзыки = () => {
-      языки.length = 0;
-      const n = Math.max(5, Math.round(w / 46));
-      for (let i = 0; i < n; i++) {
-        языки.push({ x: (i + 0.5) * (w / n) + сл(-8, 8), ш: сл(30, 46), в: сл(0.14, 0.26), фаза: сл(0, 6.3), темп: сл(0.7, 1.1) });
+    const кадр = (dt) => {
+      время += dt / 1000;
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "#060608";
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = "lighter";
+      const большая = Math.max(w, h);
+      for (const п of пятна) {
+        const t = время * п.темп * 0.9 + п.ф;
+        const x = (п.cx + Math.sin(t) * п.ax) * w;
+        const y = (п.cy + Math.cos(t * 0.8) * п.ay) * h;
+        const r = п.r * большая * (1 + Math.sin(t * 1.3) * 0.08);
+        const г = ctx.createRadialGradient(x, y, 0, x, y, r);
+        const ц = цвета[п.ц] || цвета[0];
+        г.addColorStop(0, ц.replace("rgb(", "rgba(").replace("hsl(", "hsla(").replace(")", ",0.55)"));
+        г.addColorStop(0.45, ц.replace("rgb(", "rgba(").replace("hsl(", "hsla(").replace(")", ",0.18)"));
+        г.addColorStop(1, ц.replace("rgb(", "rgba(").replace("hsl(", "hsla(").replace(")", ",0)"));
+        ctx.fillStyle = г;
+        ctx.fillRect(0, 0, w, h);
       }
+      ctx.globalCompositeOperation = "source-over";
+      // Затемнение к низу и краям: подписи читаются на любом цвете.
+      const т = ctx.createLinearGradient(0, 0, 0, h);
+      т.addColorStop(0, "rgba(6,6,8,0.15)"); т.addColorStop(0.55, "rgba(6,6,8,0.35)"); т.addColorStop(1, "rgba(6,6,8,0.75)");
+      ctx.fillStyle = т; ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(сетка, 0, 0, w, h);
     };
-    собратьЯзыки();
-    function язык(x, низ, ш, в, наклон) {
-      ctx.beginPath();
-      ctx.moveTo(x - ш / 2, низ);
-      ctx.bezierCurveTo(x - ш / 2, низ - в * 0.42, x - ш * 0.18 + наклон * 0.4, низ - в * 0.72, x + наклон, низ - в);
-      ctx.bezierCurveTo(x + ш * 0.18 + наклон * 0.4, низ - в * 0.72, x + ш / 2, низ - в * 0.42, x + ш / 2, низ);
-      ctx.closePath();
-      ctx.fill();
-    }
-    function огонь(dt) {
-      время += dt / 1000;
-      основа();
-      const низ = h + 4;
-      // Пламя — фон, а не главное: невысокое и полупрозрачное, чтобы
-      // подписи над ним читались.
-      const слои = [["rgba(214,48,24,0.32)", 1, 1], ["rgba(255,122,30,0.4)", 0.72, 0.78], ["rgba(255,214,90,0.5)", 0.42, 0.5]];
-      for (const [цвет, кш, кв] of слои) {
-        ctx.fillStyle = цвет;
-        for (const я of языки) {
-          const t = время * я.темп + я.фаза;
-          const дыхание = 1 + Math.sin(t * 1.6) * 0.08 + Math.sin(t * 2.7) * 0.04;
-          const наклон = Math.sin(t * 0.9) * я.ш * 0.22;
-          язык(я.x, низ, я.ш * кш, h * я.в * дыхание * кв, наклон * кв);
-        }
-      }
-      // Искры: редкие, поднимаются не спеша и гаснут.
-      if (Math.random() < dt * 0.004) частицы.push({ x: сл(0, w), y: h * сл(0.7, 0.85), vy: сл(14, 26), vx: сл(-4, 4), t: 0, life: сл(2, 3.5), r: сл(0.8, 1.6) });
-      for (let i = частицы.length - 1; i >= 0; i--) {
-        const ч = частицы[i];
-        ч.t += dt / 1000;
-        const к = ч.t / ч.life;
-        if (к >= 1) { частицы.splice(i, 1); continue; }
-        ч.y -= ч.vy * dt / 1000; ч.x += (ч.vx + Math.sin(ч.t * 2) * 5) * dt / 1000;
-        ctx.fillStyle = `rgba(255,190,90,${0.8 * (1 - к)})`;
-        ctx.beginPath(); ctx.arc(ч.x, ч.y, ч.r, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-
-    /* Монеты: золотые, с ободком, внутренним кольцом и знаком. Падают
-       медленно и вращаются вокруг вертикали — ребром монета видна как
-       тонкая полоска, как у настоящей. */
-    function монета(ч) {
-      const r = ч.r;
-      const сж = Math.cos(ч.поворот);
-      const ширина = Math.max(0.12, Math.abs(сж));
-      ctx.save();
-      ctx.translate(ч.x, ч.y);
-      ctx.rotate(ч.наклон);
-      ctx.globalAlpha = ч.a;
-      // Ребро: тёмное золото чуть сдвинуто — даёт толщину.
-      ctx.fillStyle = "#9A6B12";
-      ctx.beginPath(); ctx.ellipse(сж > 0 ? -1.6 : 1.6, 0, r * ширина, r, 0, 0, Math.PI * 2); ctx.fill();
-      const г = ctx.createLinearGradient(-r, -r, r, r);
-      г.addColorStop(0, "#FFE9A3"); г.addColorStop(0.45, "#F2C24B"); г.addColorStop(1, "#C08A1E");
-      ctx.fillStyle = г;
-      ctx.beginPath(); ctx.ellipse(0, 0, r * ширина, r, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = "rgba(150,100,20,0.7)"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.ellipse(0, 0, r * ширина * 0.74, r * 0.74, 0, 0, Math.PI * 2); ctx.stroke();
-      if (ширина > 0.45) {
-        ctx.scale(ширина, 1);
-        ctx.fillStyle = "rgba(140,92,16,0.85)";
-        ctx.font = `800 ${Math.round(r * 1.05)}px ${displayFont}`;
-        ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText("$", 0, 1);
-      }
-      ctx.restore();
-    }
-    function монеты(dt) {
-      if (частицы.length < Math.max(6, Math.round(w / 34)) && Math.random() < dt * 0.006) {
-        частицы.push({ x: сл(10, w - 10), y: -20, r: сл(7, 12), vy: сл(16, 30), поворот: сл(0, 6.3), vп: сл(1.2, 2.4), наклон: сл(-0.3, 0.3), фаза: сл(0, 6.3), t: 0, a: сл(0.55, 0.9) });
-      }
-      основа();
-      for (let i = частицы.length - 1; i >= 0; i--) {
-        const ч = частицы[i];
-        ч.t += dt / 1000;
-        ч.y += ч.vy * dt / 1000;
-        ч.x += Math.sin(ч.t * 0.9 + ч.фаза) * 8 * dt / 1000;
-        ч.поворот += ч.vп * dt / 1000;
-        if (ч.y > h + 24) { частицы.splice(i, 1); continue; }
-        монета(ч);
-      }
-    }
-
-    /* Ракета: не спеша поднимается снизу вверх по правой стороне, с
-       дрожащим пламенем из сопла и тающим дымом позади. Вокруг —
-       мерцающие звёзды. Ушла за край — через паузу стартует снова. */
-    const звёзды = Array.from({ length: 36 }, () => ({ x: Math.random(), y: Math.random(), r: сл(0.5, 1.3), фаза: сл(0, 6.3) }));
-    let полёт = 0;
-    function ракетаФигура(x, y, м) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(0.12);
-      ctx.scale(м, м);
-      // Пламя из сопла — две капли, дрожат по длине.
-      const дрожь = 1 + Math.sin(время * 22) * 0.12 + Math.sin(время * 13) * 0.08;
-      ctx.fillStyle = "rgba(255,140,40,0.9)";
-      ctx.beginPath(); ctx.moveTo(-6, 22); ctx.quadraticCurveTo(0, 22 + 26 * дрожь, 6, 22); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "rgba(255,230,140,0.95)";
-      ctx.beginPath(); ctx.moveTo(-3.5, 22); ctx.quadraticCurveTo(0, 22 + 15 * дрожь, 3.5, 22); ctx.closePath(); ctx.fill();
-      // Стабилизаторы.
-      ctx.fillStyle = "#E5484D";
-      ctx.beginPath(); ctx.moveTo(-9, 8); ctx.lineTo(-17, 22); ctx.lineTo(-8, 20); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(9, 8); ctx.lineTo(17, 22); ctx.lineTo(8, 20); ctx.closePath(); ctx.fill();
-      // Корпус.
-      const к = ctx.createLinearGradient(-10, 0, 10, 0);
-      к.addColorStop(0, "#C9CED8"); к.addColorStop(0.5, "#F4F6FA"); к.addColorStop(1, "#AEB4C0");
-      ctx.fillStyle = к;
-      ctx.beginPath();
-      ctx.moveTo(0, -30);
-      ctx.bezierCurveTo(11, -18, 11, 4, 8, 22);
-      ctx.lineTo(-8, 22);
-      ctx.bezierCurveTo(-11, 4, -11, -18, 0, -30);
-      ctx.closePath(); ctx.fill();
-      // Нос.
-      ctx.fillStyle = "#E5484D";
-      ctx.beginPath(); ctx.moveTo(0, -30); ctx.bezierCurveTo(6, -24, 8, -19, 8.6, -16); ctx.lineTo(-8.6, -16); ctx.bezierCurveTo(-8, -19, -6, -24, 0, -30); ctx.closePath(); ctx.fill();
-      // Иллюминатор.
-      ctx.fillStyle = "#2B3A55"; ctx.beginPath(); ctx.arc(0, -4, 4.6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#7CC4FF"; ctx.beginPath(); ctx.arc(0, -4, 3.2, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.beginPath(); ctx.arc(-1, -5.2, 1, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
-    function ракета(dt) {
-      время += dt / 1000;
-      основа();
-      for (const з of звёзды) {
-        ctx.fillStyle = `rgba(220,230,255,${0.25 + 0.35 * (0.5 + 0.5 * Math.sin(время * 1.3 + з.фаза))})`;
-        ctx.beginPath(); ctx.arc(з.x * w, з.y * h, з.r, 0, Math.PI * 2); ctx.fill();
-      }
-      полёт += dt / 9000;
-      if (полёт > 1.25) полёт = 0;
-      const м = Math.max(0.8, Math.min(1.25, h / 260));
-      const x = w * 0.8 - полёт * w * 0.08;
-      const y = h + 60 * м - полёт * (h + 140 * м);
-      if (полёт <= 1 && Math.random() < dt * 0.05) частицы.push({ x: x - 3 * м, y: y + 44 * м, r: сл(4, 7) * м, t: 0, life: сл(1.6, 2.6), vx: сл(-6, 6) });
-      for (let i = частицы.length - 1; i >= 0; i--) {
-        const ч = частицы[i];
-        ч.t += dt / 1000;
-        const к = ч.t / ч.life;
-        if (к >= 1) { частицы.splice(i, 1); continue; }
-        ч.x += ч.vx * dt / 1000;
-        ctx.fillStyle = `rgba(200,210,230,${0.22 * (1 - к)})`;
-        ctx.beginPath(); ctx.arc(ч.x, ч.y, ч.r * (1 + к * 1.8), 0, Math.PI * 2); ctx.fill();
-      }
-      if (полёт <= 1) ракетаФигура(x, y, м);
-    }
-
-    const кадр = вид === "огонь" ? огонь : вид === "монеты" ? монеты : ракета;
-    if (тихо) {
-      // Один неподвижный кадр: сцену прогоняем вперёд, чтобы он не был пустым.
-      for (let i = 0; i < 90; i++) кадр(16);
-      return undefined;
-    }
+    цветаАватарки(src, ключ).then((ц) => { if (жив) { цвета = ц; if (тихо) кадр(0); } });
+    if (тихо) { кадр(0); return () => { жив = false; }; }
     let raf = 0, было = 0, видно = true;
     const шаг = (ts) => {
       const dt = было ? Math.min(50, ts - было) : 16;
@@ -11618,8 +11527,8 @@ function ФонСпотлайта({ вид }) {
     const вкладка = () => { if (document.hidden) стоп(); else пуск(); };
     document.addEventListener("visibilitychange", вкладка);
     пуск();
-    return () => { стоп(); if (io) io.disconnect(); if (ro) ro.disconnect(); document.removeEventListener("visibilitychange", вкладка); };
-  }, [вид]);
+    return () => { жив = false; стоп(); if (io) io.disconnect(); if (ro) ro.disconnect(); document.removeEventListener("visibilitychange", вкладка); };
+  }, [src, ключ]);
   return <canvas ref={холстRef} aria-hidden style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", display: "block" }} />;
 }
 
@@ -11635,7 +11544,6 @@ function ФонСпотлайта({ вид }) {
  * Без шапки всё по-прежнему: строка с аурой по цвету логотипа —
  * растягивать на треть экрана нечего. */
 function ВитринаСпотлайта({ token, всего = 1, активная = 0, onТочка, onOpen }) {
-  const вид = ВИДЫ_ФОНА_СПОТЛАЙТА[активная % ВИДЫ_ФОНА_СПОТЛАЙТА.length];
   const xHandle = useXАвтора(token.ownerId) || token.xHandle || null;
   const строкаX = xHandle ? <span className="flex" style={{ marginTop: 4, minWidth: 0 }} onClick={(e) => e.stopPropagation()}><СсылкаXАвтора handle={xHandle} /></span> : null;
   const рост = token.change >= 0;
@@ -11673,10 +11581,9 @@ function ВитринаСпотлайта({ token, всего = 1, активн�
       className="fx-tap w-full flex flex-col items-center text-center"
       style={{ gap: 0, padding: "26px 18px 18px", borderRadius: 24, background: "#050505", border: "none", position: "relative", overflow: "hidden" }}
     >
-      {/* Фон — только сама анимация со своей подложкой: размытый
-          логотип и баннер под ней спорили с огнём и деньгами. */}
+      {/* Фон — аврора из цветов аватарки этого токена: у каждого свой. */}
       <span aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: 24 }}>
-        <ФонСпотлайта вид={вид} />
+        <ФонСпотлайта src={token.logoUrl} ключ={token.ticker || token.id} />
       </span>
       <span style={{ position: "relative", zIndex: 1 }}>
         <TokenAvatar size={96} tone={рост ? "up" : "down"} src={token.logoUrl} />
