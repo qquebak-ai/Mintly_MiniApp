@@ -20578,6 +20578,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   useEffect(() => { setСвоя(null); setРезервыСети(null); }, [token.id]);
   // Последние резервы кривой — для мгновенного расчёта своей сделки.
   const резервыДляСделкиRef = useRef(null);
+  // Свечи до мгновенной отрисовки своей сделки — чтобы откатить её, если
+  // сеть сделку не приняла.
+  const снимокДоСделки = useRef(null);
   useEffect(() => {
     /* Читаем всегда, пока карточка открыта, а не только пока лента
        молчит: цена в ленте обновляется обходом раз в минуту, и после
@@ -21173,8 +21176,10 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       if (!(монет > 0) || !(токенов > 0)) return;
       const цена = (новыйX / новыйY) * курс;
       const сейчасМс = Date.now();
+      снимокДоСделки.current = { живая: живаяЦенаRef.current, candles: null };
       setChartData((prev) => {
         if (!prev || !prev.candles || !prev.candles.length) return prev;
+        if (снимокДоСделки.current && !снимокДоСделки.current.candles) снимокДоСделки.current.candles = prev.candles;
         const свечи = prev.candles.slice();
         const было = свечи[свечи.length - 1];
         const шагTf = TF_SECONDS[prev.tf || tf] || 60;
@@ -21198,8 +21203,20 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
         поЦене: `${fmtCompact(токенов)} ${token.ticker || ""} по ${fmtPrice(ценаМонеты * курс)}`,
       }]);
     };
+    const отмена = (e) => {
+      const d = e && e.detail;
+      if (!d || d.tokenId !== token.id) return;
+      const сн = снимокДоСделки.current;
+      снимокДоСделки.current = null;
+      ожиданиеRef.current = null;
+      setМеткиСделок((было) => (было || []).filter((м) => !м.мгновенная));
+      if (!сн) return;
+      живаяЦенаRef.current = сн.живая;
+      if (сн.candles) setChartData((prev) => (prev ? { ...prev, candles: сн.candles } : prev));
+    };
     window.addEventListener("mintly:сделка-старт", старт);
-    return () => window.removeEventListener("mintly:сделка-старт", старт);
+    window.addEventListener("mintly:сделка-отмена", отмена);
+    return () => { window.removeEventListener("mintly:сделка-старт", старт); window.removeEventListener("mintly:сделка-отмена", отмена); };
   }, [token.id, token.chain, token.ticker, tf, курсSolДляГрафика, tonPriceUsd]);
 
   const курсСтрелок = token.chain === "solana" ? (курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd()) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
@@ -33258,10 +33275,24 @@ function mapTokenRow(row) {
     /* Окно закрываем сразу, не дожидаясь сети: ждать было не только
        долго, но и опасно — открытая кнопка принимала второе нажатие. */
     setTradeModal(null);
+    /* Свеча сделки рисуется до ответа сети. Не прошла сделка — отказ
+       сервера, нет денег, сеть отбила — нарисованное откатываем: иначе
+       график рос от сделок, которых не было. Признак удачи один —
+       событие «mintly:сделка» этого токена. */
+    const id = token && token.id;
+    let прошла = false;
+    const удача = (e) => { if (e && e.detail && e.detail.tokenId === id) прошла = true; };
+    if (typeof window !== "undefined") window.addEventListener("mintly:сделка", удача);
     try {
       await провестиСделку(mode, payAmount, receiveAmount, unit, rawAmount, rawEstimate);
     } finally {
       сделкаИдёт.current = false;
+      if (typeof window !== "undefined") {
+        window.removeEventListener("mintly:сделка", удача);
+        if (!прошла && id) {
+          try { window.dispatchEvent(new CustomEvent("mintly:сделка-отмена", { detail: { tokenId: id } })); } catch { /* старый движок */ }
+        }
+      }
     }
   }
 
