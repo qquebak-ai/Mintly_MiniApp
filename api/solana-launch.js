@@ -726,7 +726,9 @@ export async function состояние(mint) {
   const programId = программа();
   const connection = new Connection(RPC, "confirmed");
   const curve = кривуюДля(new PublicKey(mint), programId);
-  const info = await connection.getAccountInfo(curve);
+  // Вместе со слотом: по нему живая память отличает прочитанное от более
+  // свежего, что уже принёс поток (api/_live.js).
+  const { context, value: info } = await connection.getAccountInfoAndContext(curve);
   if (!info || info.data.length < 160) return null;
 
   const поля = поляКривой(info.data);
@@ -761,6 +763,7 @@ export async function состояние(mint) {
     // Куда кривая отдаст ликвидность — по нему видно, может ли сервер
     // сам завести пул (api/solana-migrate.js).
     destination: поля.destination ? new PublicKey(поля.destination).toBase58() : null,
+    слот: (context && context.slot) || null,
   };
 }
 

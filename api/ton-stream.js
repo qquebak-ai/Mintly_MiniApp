@@ -45,13 +45,22 @@ function написать(res, событие) {
  * функцию — она толкает результат всем, кто слушает список (мемпад,
  * главная) и конкретно эту кривую (открытая карточка токена), не
  * дожидаясь ни минутного обхода, ни следующего опроса. */
+/* Состояние TON прочитано get-методом, а у него нет порядка: tonapi
+   отвечает то с одного узла, то с другого, и отставший возвращает цену
+   до сделки. Поэтому это «чтение» — живая память не даст ему откатить
+   кривую назад без подтверждения (api/_live.js). Ответ — то, что
+   ответила память: «ждёт» значит «перечитай чуть позже». */
 export function протолкнутьЦену(address, { price, raised, sold = null, graduation, graduated }) {
-  if (!адресОк(address) || !(price > 0)) return;
-  const событие = { address, price, raised, graduation, graduated: !!graduated, at: Math.floor(Date.now() / 1000) };
-  записатьЖивое(address, { price, raised, sold, graduation, graduated: !!graduated });
+  if (!адресОк(address) || !(price > 0)) return { принято: false, изменилось: false, событие: null };
+  const итог = записатьЖивое(address, { price, raised, sold, graduation, graduated: !!graduated }, { чтение: true });
+  // Не принятое и не сдвинувшееся не рассылаем: списки и карточки
+  // получили бы прошлую цену как новость.
+  if (!итог.принято || !итог.изменилось) return итог;
+  const событие = { address, price, raised, graduation, graduated: !!graduated, at: Math.floor(Date.now() / 1000), ms: итог.событие.ms };
   const запись = кривые.get(address);
   if (запись) for (const res of запись.зрители) написать(res, { tx: null, ...событие });
   for (const res of общие) написать(res, событие);
+  return итог;
 }
 
 async function слушать(адрес, запись) {

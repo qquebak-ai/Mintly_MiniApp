@@ -20,7 +20,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { записатьЖивое } from "./_live.js";
+import { записатьЖивое, прочитатьЖивое } from "./_live.js";
 
 const ВИРТ_ТОКЕНОВ = 1_073_000_000n * 10n ** 18n;
 const ПРОДАЁТСЯ = 800_000_000n * 10n ** 18n;
@@ -75,6 +75,12 @@ async function один(rpc, method, params) {
 }
 
 const слово = (данные, i) => BigInt(`0x${данные.slice(2 + i * 64, 2 + (i + 1) * 64) || "0"}`);
+/* Порядок события в сети: блок и номер события в нём. По нему живая
+   память не даёт более раннему состоянию лечь поверх позднего
+   (api/_live.js). Засев читает кривую на блоке, до которого события
+   уже разобраны, — его итог стоит в конце того блока. */
+const ВНУТРИ_БЛОКА = 100_000;
+const порядокСобытия = (л) => Number(BigInt(л.blockNumber || "0x0")) * ВНУТРИ_БЛОКА + Number(BigInt(л.logIndex || "0x0"));
 const адресИзТемы = (тема) => `0x${String(тема).slice(-40)}`.toLowerCase();
 
 function цена(вирт, собрано, продано) {
@@ -101,13 +107,12 @@ async function события(сеть, с, з, от, до) {
         price: цена(з.вирт, собрано, продано),
         raised: Number(собрано) / 1e18, sold: Number(продано) / 1e18,
         graduation: цель, graduated: false,
-      });
+      }, { порядок: порядокСобытия(л) });
     } else {
       // Выход на биржу: цена дальше живёт в пуле, кривая — закрыта.
-      const { прочитатьЖивое } = await import("./_live.js");
       const было = прочитатьЖивое(ключ);
       const п = было && было.событие;
-      if (п) записатьЖивое(ключ, { price: п.price, raised: п.raised, sold: п.sold, graduation: цель, graduated: true });
+      if (п) записатьЖивое(ключ, { price: п.price, raised: п.raised, sold: п.sold, graduation: цель, graduated: true }, { порядок: порядокСобытия(л) });
     }
   }
 }
@@ -199,19 +204,24 @@ async function засеять(СЕТИ, ТЕСТОВЫЕ) {
   for (const т of data || []) {
     const адрес = String(т.address || "").toLowerCase();
     if (!/^0x[0-9a-f]{40}$/.test(адрес) || засеяно.has(`${т.chain}:${адрес}`)) continue;
+    // Кривую уже ведут события — засевать нечего.
+    if (прочитатьЖивое(`${т.chain}:${адрес}`)) { засеяно.add(`${т.chain}:${адрес}`); continue; }
     if (!поСетям.has(т.chain)) поСетям.set(т.chain, []);
     поСетям.get(т.chain).push(адрес);
   }
   for (const [сеть, адреса] of поСетям) {
     const с = СЕТИ[сеть];
     const з = состояние.get(сеть);
-    if (!с || !с.фабрика || !з || !(з.вирт > 0n)) continue;
+    if (!с || !с.фабрика || !з || !(з.вирт > 0n) || !з.блок) continue;
     const цель = Number((з.вирт * ВИРТ_ТОКЕНОВ) / (ВИРТ_ТОКЕНОВ - ПРОДАЁТСЯ) - з.вирт) / 1e18;
     for (let i = 0; i < адреса.length; i += 20) {
       const кусок = адреса.slice(i, i + 20);
+      // На том блоке, до которого события уже разобраны: сделки после него
+      // придут событиями, и состояние не перескочит через них назад.
+      const блок = з.блок;
       const ответы = await вызов(с.rpc, кусок.map((а, к) => ({
         jsonrpc: "2.0", id: к, method: "eth_call",
-        params: [{ to: с.фабрика, data: `${выбор}${а.slice(2).padStart(64, "0")}` }, "latest"],
+        params: [{ to: с.фабрика, data: `${выбор}${а.slice(2).padStart(64, "0")}` }, `0x${блок.toString(16)}`],
       }))).catch(() => null);
       for (const о of Array.isArray(ответы) ? ответы : []) {
         const а = кусок[о && о.id];
@@ -226,7 +236,7 @@ async function засеять(СЕТИ, ТЕСТОВЫЕ) {
           price: цена(з.вирт, собрано, продано),
           raised: Number(собрано) / 1e18, sold: Number(продано) / 1e18,
           graduation: цель, graduated: слово(r, 3) !== 0n,
-        });
+        }, { порядок: блок * ВНУТРИ_БЛОКА + (ВНУТРИ_БЛОКА - 1) });
       }
     }
   }

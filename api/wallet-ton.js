@@ -381,6 +381,19 @@ async function подтолкнутьЦену(tokenId, curveAddress) {
     const свежаяЦена = цена(st.realTon, params);
     if (!(свежаяЦена > 0)) return;
 
+    /* Сначала — в живую память: она сверит чтение с тем, что уже знает,
+       и отставшее (сделка ещё не легла, узел tonapi отстал) не примет.
+       Тогда и в кеш ленты его не пишем. */
+    const { протолкнутьЦену } = await import("./ton-stream.js");
+    const итог = протолкнутьЦену(curveAddress, {
+      price: свежаяЦена,
+      raised: Number(st.realTon) / 1e9,
+      sold: Number(st.tokensSold) / 1e9,
+      graduation: Number(st.graduationTon) / 1e9,
+      graduated: false,
+    });
+    if (!итог.изменилось) return;
+
     const db = admin();
     if (db) {
       await db.from("curve_cache").update({
@@ -392,15 +405,6 @@ async function подтолкнутьЦену(tokenId, curveAddress) {
         updated_at: new Date().toISOString(),
       }).eq("token_id", tokenId);
     }
-
-    const { протолкнутьЦену } = await import("./ton-stream.js");
-    протолкнутьЦену(curveAddress, {
-      price: свежаяЦена,
-      raised: Number(st.realTon) / 1e9,
-      sold: Number(st.tokensSold) / 1e9,
-      graduation: Number(st.graduationTon) / 1e9,
-      graduated: false,
-    });
   } catch (err) {
     console.warn("[wallet-ton] не удалось протолкнуть цену:", err && err.message);
   }

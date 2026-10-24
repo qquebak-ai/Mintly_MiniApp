@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { прочитатьЖивое, записатьЖивое, живыеПосле } from "./_live.js";
 import { держатьКривую, потокЖив } from "./curve-stream.js";
-import { наблюдательTONЖив } from "./_tonWatch.js";
+import { наблюдательTONЖив, кривуюTONВедёт } from "./_tonWatch.js";
 import { наблюдательEVMЖив } from "./_evmWatch.js";
 import { ДЕМО_ТОКЕНЫ } from "./_demoTokens.js";
 
@@ -270,6 +270,8 @@ const TON_RPS = Math.max(1, Number(process.env.TON_LIVE_RPS) || 4);
 let tonПоследний = 0;
 
 async function перечитатьTon(адрес) {
+  // Кривую ведёт поток tonapi — он перечитает её после каждой сделки.
+  if (кривуюTONВедёт(адрес)) return;
   let з = опросTon.get(адрес);
   if (!з) { з = { спрошено: 0, идёт: false }; опросTon.set(адрес, з); }
   if (з.идёт || Date.now() - з.спрошено < ШАГ_TON_МС || tonВРаботе >= МАКС_TON_РАЗОМ) return;
@@ -283,13 +285,14 @@ async function перечитатьTon(адрес) {
     const st = await состояние(адрес);
     if (!st) return;
     const params = { virtualTon: st.virtualTon || DEFAULT_VIRTUAL_TON, virtualTokens: st.virtualTokens || DEFAULT_VIRTUAL_TOKENS };
+    // Чтение без порядка: отставший узел tonapi не откатит цену назад.
     записатьЖивое(адрес, {
       price: цена(st.realTon, params),
       raised: Number(st.realTon) / 1e9,
       sold: Number(st.tokensSold) / 1e9,
       graduation: Number(st.graduationTon) / 1e9,
       graduated: !!st.graduated,
-    });
+    }, { чтение: true });
   } catch { /* сеть не ответила — отдадим прежнее */ } finally {
     з.идёт = false;
     tonВРаботе -= 1;

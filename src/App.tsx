@@ -3387,6 +3387,27 @@ const ПЕРИОДЫ = [
 ];
 const TF_SECONDS = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400, D1: 86400, W1: 604800, MN1: 2592000 };
 
+/* Часы сервера. Живые события помечены его временем (ms), а свечи и
+   своя сделка, нарисованная в миг нажатия, считались по часам телефона.
+   У телефона, который спешит или отстаёт на пару секунд, сделка уходила
+   в соседнюю свечу и возвращалась, когда приезжала история, а свежие
+   события сервера казались ему старыми и отбрасывались. Сдвиг берём из
+   ответов /api/live (поле at) — по самому быстрому обмену: чем короче
+   круг, тем точнее середина. Раз в минуту замер обновляется, даже если
+   круг вышел длиннее, — часы телефона могли подвестись. */
+let сдвигЧасов = 0;
+let кругЧасов = Infinity;
+let часыСверены = 0;
+function сверитьЧасы(at, послано, пришло) {
+  if (!(at > 0) || !(пришло >= послано)) return;
+  const круг = пришло - послано;
+  if (круг > кругЧасов && Date.now() - часыСверены < 60_000) return;
+  кругЧасов = круг;
+  часыСверены = Date.now();
+  сдвигЧасов = at - (послано + пришло) / 2;
+}
+const серверСейчас = () => Date.now() + сдвигЧасов;
+
 /* ---------------------------------------------------------
    REAL MARKET DATA — TON meme pools via GeckoTerminal's public
    on-chain API (api.geckoterminal.com, no key required). This is
@@ -4826,9 +4847,65 @@ async function loadCurveTrades(curveAddress, testnet, feeBps, priority = TON_PRI
    выбросить остальные. Две: одной пауза не читается, а десяток — это
    уже пустой экран вместо графика. */
 
-function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL, rate = tonUsd(), запущен = 0) {
+/* Свежие сделки из живой памяти сервера, которых ещё нет в истории.
+   История (обход сервера) отстаёт на десятки секунд, а у живой сделки
+   есть время, когда её увидел сервер, и состояние кривой после неё.
+   Живая считается уже записанной, если в истории рядом по времени есть
+   сделка той же стороны и почти той же суммы; каждая запись покрывает
+   только одну живую. */
+function хвостИзЖивых(история, сделки) {
+  const живые = (сделки || []).filter((с) => с && с.raised != null && с.at > 0 && с.coin > 0).slice().sort((a, b) => a.at - b.at);
+  if (!живые.length) return [];
+  const ряд = история || [];
+  const последнее = ряд.length ? ряд[ряд.length - 1].time : 0;
+  // У записей TON стороны нет — её видно по тому, куда сдвинулся резерв.
+  const сторона = (i) => {
+    const т = ряд[i];
+    if (т.kind) return т.kind;
+    const пред = i > 0 ? ряд[i - 1].realTon : т.realTon - т.ton;
+    return т.realTon >= пред ? "buy" : "sell";
+  };
+  const занятые = new Set();
+  const хвост = [];
+  for (const с of живые) {
+    const сек = с.at / 1000;
+    let покрыта = false;
+    for (let i = ряд.length - 1; i >= 0 && ряд[i].time >= сек - 60; i--) {
+      if (занятые.has(i) || ряд[i].time > сек + 5) continue;
+      const сумма = Number(ряд[i].ton) / 1e9;
+      if (сторона(i) === с.side && Math.abs(сумма - с.coin) <= Math.max(0.02, с.coin * 0.06)) {
+        занятые.add(i);
+        покрыта = true;
+        break;
+      }
+    }
+    // Увидена раньше последней записи истории — значит, и случилась раньше
+    // неё, и история её уже знает.
+    if (покрыта || сек < последнее) continue;
+    хвост.push({
+      time: Math.floor(сек),
+      ton: BigInt(Math.round(с.coin * 1e9)),
+      realTon: BigInt(Math.max(0, Math.round(с.raised * 1e9))),
+      kind: с.side,
+    });
+  }
+  return хвост;
+}
+
+function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL, rate = tonUsd(), запущен = 0, хвост = []) {
   const params = curveParamsOf(state);
-  const now = Math.floor(Date.now() / 1000);
+  // «Сейчас» — по часам сервера: по ним же стоят живые свечи карточки.
+  const now = Math.floor(серверСейчас() / 1000);
+  /* Хвост — сделки, которые сервер уже видел, а история ещё нет (см.
+     хвостИзЖивых): у каждой своё время и своё состояние после неё.
+     Раньше все они сливались в одну свечу «сейчас», и сделка, нарисованная
+     живьём в прошлой минуте, при перечитывании ряда переезжала в текущую,
+     а когда история её догоняла, возвращалась обратно. */
+  const хв = (хвост || []).filter((т) => т && т.time > 0 && т.realTon != null);
+  // Резерв перед хвостом — от него судим, обрезана ли история.
+  const доХвоста = хв.length
+    ? (хв[0].kind === "sell" ? хв[0].realTon + хв[0].ton : хв[0].realTon - хв[0].ton)
+    : (state?.realTon != null ? state.realTon : null);
 
   // История считается по сделкам, но резерв в ней набирается с нуля от
   // самой старой прочитанной транзакции — а читается их только двести.
@@ -4849,8 +4926,8 @@ function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL,
      маленькую разницу не трогаем вовсе: её покажет последняя свеча,
      закрытая ценой из состояния. */
   let shift = 0n;
-  if (state?.realTon != null && list.length) {
-    const разница = state.realTon - list[list.length - 1].realTon;
+  if (доХвоста != null && state?.realTon != null && list.length) {
+    const разница = доХвоста - list[list.length - 1].realTon;
     // Только вверх и только заметную. Обрезанная история всегда «ниже»
     // настоящего резерва, и это единственный случай, когда ряд нужно
     // поднимать. Разница вниз бывает после продажи, которая ещё не
@@ -4863,18 +4940,27 @@ function buildCurveCandles(trades, timeframe, state = null, limit = CHART_TOTAL,
     const r = v + shift;
     return r > 0n ? r : 0n;
   };
-  const points = list.map((tr) => ({
-    time: tr.time,
-    price: curvePriceFromReserve(reserveAt(tr.realTon), params) * rate,
-    volume: Number(tr.ton) / 1e9 * rate,
-  }));
+  const послеИстории = list.length ? list[list.length - 1].time : 0;
+  const points = [
+    ...list.map((tr) => ({
+      time: tr.time,
+      price: curvePriceFromReserve(reserveAt(tr.realTon), params) * rate,
+      volume: Number(tr.ton) / 1e9 * rate,
+    })),
+    // Хвост — по настоящему резерву: он взят у самой кривой, сдвигать нечего.
+    ...хв.map((tr) => ({
+      time: Math.max(tr.time, послеИстории),
+      price: curvePriceFromReserve(tr.realTon > 0n ? tr.realTon : 0n, params) * rate,
+      volume: Number(tr.ton) / 1e9 * rate,
+    })),
+  ];
   // Цена до первой известной сделки — резерв, который был перед ней, а не
   // ноль: у обрезанной истории до неё кривая уже стояла не в начале.
-  const first = list[0];
+  const first = list[0] || хв[0];
   const beforeFirst = first
     ? (first.kind === "sell" ? first.realTon + first.ton : first.realTon - first.ton)
     : 0n;
-  const startPrice = curvePriceFromReserve(reserveAt(beforeFirst), params) * rate;
+  const startPrice = curvePriceFromReserve(list.length ? reserveAt(beforeFirst) : (beforeFirst > 0n ? beforeFirst : 0n), params) * rate;
 
   // Шаг ровно тот, что выбран кнопкой. Раньше он укрупнялся сам, чтобы
   // вся история влезла в отведённое число свечей, — и у токена
@@ -5233,10 +5319,19 @@ async function сделкиSolИзКеша(tokenId) {
  * тысячу: после этого «цена» из формулы выходит сразу в SOL за штуку, и
  * курс к доллару подставляется как есть, без второго множителя, который
  * пришлось бы протаскивать через всю сборку. */
-async function свечиКривойSol(mint, tokenId, timeframe, курсSolUsd, запущен = 0, limit = CHART_TOTAL) {
+async function свечиКривойSol(mint, tokenId, timeframe, курсSolUsd, запущен = 0, limit = CHART_TOTAL, живое = null) {
   if (!mint || !(курсSolUsd > 0)) return null;
-  const { состояниеКривойSol } = await import("./solLaunch");
-  const st = await состояниеКривойSol(mint);
+  /* Состояние «сейчас» — из живой памяти сервера, если карточка её
+     получает (с резервами из потока): своё чтение подтверждённого блока
+     отстаёт от потока, и последняя свеча откатывалась к цене до сделки. */
+  const ж = живое && живое.состояние;
+  let st = null;
+  if (ж && ж.vSol > 0 && ж.vTokens > 0 && ж.realSol != null) {
+    st = { virtualSol: ж.vSol, virtualTokens: ж.vTokens, realSol: ж.realSol, feeBps: 0 };
+  } else {
+    const { состояниеКривойSol } = await import("./solLaunch");
+    st = await состояниеКривойSol(mint);
+  }
   if (!st || !(st.virtualSol > 0) || !(st.virtualTokens > 0)) return null;
 
   const состояние = {
@@ -5318,7 +5413,8 @@ async function свечиКривойSol(mint, tokenId, timeframe, курсSolUs
   }
   const собраноЧисто = собрано - аренда;
   const недостаёт = realSol - собраноЧисто - вОчереди;
-  if (Math.abs(недостаёт) > 1) хв.очередь.push({ time: Math.floor(Date.now() / 1000), дельта: недостаёт });
+  // Время хвоста — когда сервер увидел это состояние, а не часы телефона.
+  if (Math.abs(недостаёт) > 1) хв.очередь.push({ time: Math.floor(((ж && Number(ж.ms)) || серверСейчас()) / 1000), дельта: недостаёт });
   /* Очередь не чистим по совпадению сумм: купить и продать всё — это
      тоже совпадение, и с ним пропадали обе сделки, а график сжимался в
      одну черту. Хвосты уходят, только когда их покрыла история. */
@@ -5337,7 +5433,7 @@ async function свечиКривойSol(mint, tokenId, timeframe, курсSolUs
   return buildCurveCandles(ряд, timeframe, состояние, limit, курсSolUsd, запущен);
 }
 
-async function fetchCurveOHLCV(curveAddress, timeframe, testnet, rate = tonUsd(), tokenId = null, запущен = 0) {
+async function fetchCurveOHLCV(curveAddress, timeframe, testnet, rate = tonUsd(), tokenId = null, запущен = 0, живое = null) {
   if (!(rate > 0)) return null;
   // Состояние нужно не только ради последней точки: в нём лежат
   // параметры, с которыми развёрнута именно эта кривая. Без него
@@ -5359,7 +5455,15 @@ async function fetchCurveOHLCV(curveAddress, timeframe, testnet, rate = tonUsd()
   const trades = изБазы
     || (await fetchCurveTrades(curveAddress, testnet, curveParamsOf(state).feeBps, TON_PRIORITY.chart));
   if (trades == null) return null;
-  return buildCurveCandles(trades, timeframe, state, CHART_TOTAL, rate, запущен);
+  /* Состояние «сейчас» и свежие сделки — из живой памяти сервера, когда
+     карточка её получает: там они упорядочены (api/_live.js), а свой
+     запрос к tonapi мог попасть на отставший узел, и последняя свеча ряда
+     откатывалась к цене до сделки. Запасы кривой — из прочитанного: они
+     не меняются. */
+  const ж = живое && живое.состояние;
+  if (!ж || ж.raised == null) return buildCurveCandles(trades, timeframe, state, CHART_TOTAL, rate, запущен);
+  const сейчас = { ...state, realTon: BigInt(Math.max(0, Math.round(ж.raised * 1e9))) };
+  return buildCurveCandles(trades, timeframe, сейчас, CHART_TOTAL, rate, запущен, хвостИзЖивых(trades, живое.сделки));
 }
 
 // Lightweight REAL-price feed for the small sparkline previews (feed
@@ -6959,8 +7063,7 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
     const читать = async () => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       try {
-        const r = await живойЗапрос(`/api/live?demo=${сеть_}`);
-        const j = r.ok ? await r.json() : null;
+        const j = await живойJSON(`/api/live?demo=${сеть_}`);
         if (!живо || !j || !j.trades) return;
         const курс = курсСетиДемо(демоСети[0], tonUsd());
         const новые = демоСети.flatMap((tok) => (j.trades[mintДемо(tok)] || [])
@@ -11673,6 +11776,16 @@ function живойЗапрос(путь) {
   const таймер = стоп ? setTimeout(() => стоп.abort(), 3000) : null;
   return fetch(апи(путь), { cache: "no-store", signal: стоп ? стоп.signal : undefined })
     .finally(() => { if (таймер) clearTimeout(таймер); });
+}
+// Ответ живого опроса — разобранным, и заодно сверка часов с сервером.
+async function живойJSON(путь) {
+  const послано = Date.now();
+  const r = await живойЗапрос(путь);
+  const пришло = Date.now();
+  if (!r.ok) return null;
+  const j = await r.json();
+  if (j) сверитьЧасы(Number(j.at), послано, пришло);
+  return j;
 }
 
 function MempadView(props) {
@@ -21055,6 +21168,27 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
      последнюю свечу всегда закрываем живой ценой: иначе свеча прыгала
      между двумя источниками — вверх, назад, снова вверх. */
   const живаяЦенаRef = useRef(null);
+  /* Состояние кривой «сейчас» — одно на всю карточку: из памяти сервера
+     (/api/live и поток Solana), где оно упорядочено по сети
+     (api/_live.js). Ряд свечей, шапка и расчёт своей сделки берут его, а
+     не читают кривую каждый сам: свой запрос к tonapi попадал то на
+     свежий узел, то на отставший, и последняя свеча ряда откатывалась к
+     цене до сделки, а через круг возвращалась. Вместе с ним — свежие
+     сделки, которых ещё нет в истории: на графике у каждой своя точка. */
+  const живоеRef = useRef(null); // { состояние, сделки, получено }
+  // Живое — если свежее: опрос идёт каждые 0,3 с, и тишина дольше
+  // четырёх секунд значит, что память сервера сейчас не отвечает.
+  const живоеСвежее = () => {
+    const ж = живоеRef.current;
+    return ж && Date.now() - ж.получено < 4000 ? ж : null;
+  };
+  // Только вперёд по времени сервера: повтор старого лишь продлевает свежесть.
+  const принятьЖивое = (с, сделки = null) => {
+    if (!с || !(с.price > 0)) return;
+    const было = живоеRef.current;
+    if (было && (Number(было.состояние.ms) || 0) > (Number(с.ms) || 0)) { было.получено = Date.now(); return; }
+    живоеRef.current = { состояние: с, сделки: сделки || (было ? было.сделки : []), получено: Date.now() };
+  };
   const сЖивойЦеной = (свечиРяда) => {
     const ж = живаяЦенаRef.current;
     if (!ж || Date.now() - ж.at > 20000 || !свечиРяда || !свечиРяда.length) return свечиРяда;
@@ -21267,7 +21401,23 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     const кривая = token.chain === "solana" ? !!token.tokenAddress : !!token.curveAddress;
     if (!кривая) return;
     let брошено = false;
-    const читать = () => рынокКривойСразу(token).then((м) => { if (!брошено && м) { setСвоя(м); if (м.резервы) setРезервыСети({ ...м.резервы, at: Date.now() }); } });
+    /* Прямое чтение дополняет живое, но не перебивает его: цена,
+       собранное и проданное — из памяти сервера, пока она отвечает.
+       Иначе отставший узел раз в пару секунд возвращал в шапку цену до
+       сделки. */
+    const читать = () => рынокКривойСразу(token).then((м) => {
+      if (брошено || !м) return;
+      setСвоя((было) => {
+        if (!было || !живоеСвежее() || !(было.priceCoin > 0)) return м;
+        return {
+          ...м,
+          priceCoin: было.priceCoin, priceUsd: было.priceUsd, mcapUsd: было.mcapUsd,
+          raised: было.raised, продано: было.продано != null ? было.продано : м.продано, graduated: было.graduated,
+          резервы: м.резервы ? { ...м.резервы, собрано: было.raised, продано: было.продано != null ? было.продано : м.резервы.продано } : м.резервы,
+        };
+      });
+      if (м.резервы) setРезервыСети({ ...м.резервы, at: Date.now() });
+    });
     читать();
     // Свой круг: кривая отвечает быстрее обхода. На свою сделку
     // отзываемся сразу, не дожидаясь круга. Круг короткий — чужая
@@ -21379,6 +21529,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
      видны только у создателя (D). Свои читаются прямо из базы — политика
      отдаёт человеку его строки, — а сделки создателя сводит сервер. */
   const [меткиСделок, setМеткиСделок] = useState(null);
+  /* Своя сделка, нарисованная в миг нажатия, и её запись в базе — одна
+     стрелка. Запись ложится на секунду-другую позже нажатия, и у границы
+     свечи стрелка перескакивала в соседнюю. Время нажатия запоминаем за
+     записью и дальше ставим её туда же. */
+  const времяСвоихRef = useRef(new Map()); // id записи -> время нажатия, с
   useEffect(() => {
     let брошено = false;
     setМеткиСделок(null);
@@ -21387,7 +21542,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     const читать = async () => {
       const [свои, дев] = await Promise.all([
         currentUserId
-          ? supabase.from("trades").select("side, created_at, ton_amount, token_amount, ton_price_usd").eq("user_id", currentUserId).eq("token_address", адрес)
+          ? supabase.from("trades").select("id, side, created_at, ton_amount, token_amount, ton_price_usd").eq("user_id", currentUserId).eq("token_address", адрес)
             .order("created_at", { ascending: false }).limit(100).then((r) => r.data || []).catch(() => [])
           : Promise.resolve([]),
         fetch(апи(`/api/dev-trades?token=${encodeURIComponent(адрес)}`)).then((r) => r.json()).catch(() => null),
@@ -21427,7 +21582,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
         };
       };
       const метки = [
-        ...свои.map((с) => ({ time: вСек(с.created_at), side: с.side, dev: false, ...стрелка(с) })),
+        ...свои.map((с) => ({ id: с.id, time: времяСвоихRef.current.get(с.id) ?? вСек(с.created_at), side: с.side, dev: false, ...стрелка(с) })),
         ...(девЭтоЯ ? [] : ((дев && дев.trades) || []).map((с) => ({
           time: вСек(с.at), side: с.side, dev: true,
           когда: new Date(с.at).toLocaleTimeString(lang === "EN" ? "en-US" : "ru-RU", { hour: "2-digit", minute: "2-digit" }),
@@ -21436,12 +21591,32 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       ].filter((м) => Number.isFinite(м.time)).sort((a, b) => a.time - b.time);
       /* Мгновенные стрелки (поставленные в миг нажатия) держим, пока их
          запись не появилась в базе, — иначе стрелка мигала: была, пропала
-         до записи сделки, появилась снова. */
+         до записи сделки, появилась снова. У каждой — своя запись: раньше
+         одна запись снимала все мгновенные той же стороны за 45 секунд, и
+         после трёх быстрых покупок две стрелки пропадали до своих записей
+         и появлялись снова. Запись — не раньше нажатия: прошлая покупка
+         новую не закрывает. */
       setМеткиСделок((было) => {
-        const сейчас = Date.now() / 1000;
-        const мгновенные = (было || []).filter((м) => м.мгновенная && сейчас - м.time < 60
-          && !метки.some((н) => !н.dev && н.side === м.side && Math.abs(н.time - м.time) < 45));
-        return мгновенные.length ? [...метки, ...мгновенные].sort((a, b) => a.time - b.time) : метки;
+        const сейчас = серверСейчас() / 1000;
+        const занятые = new Set();
+        const мгновенные = [];
+        for (const м of (было || []).filter((х) => х.мгновенная).sort((a, b) => a.time - b.time)) {
+          let пара = null;
+          for (const н of метки) {
+            if (н.dev || занятые.has(н) || н.side !== м.side || времяСвоихRef.current.has(н.id)) continue;
+            const д = н.time - м.time;
+            if (д < -3 || д > 120) continue;
+            if (!пара || Math.abs(д) < Math.abs(пара.time - м.time)) пара = н;
+          }
+          if (пара) {
+            занятые.add(пара);
+            if (пара.id != null) времяСвоихRef.current.set(пара.id, м.time);
+            пара.time = м.time;
+            continue;
+          }
+          if (сейчас - м.time < 120) мгновенные.push(м);
+        }
+        return [...метки, ...мгновенные].sort((a, b) => a.time - b.time);
       });
     };
     читать();
@@ -21532,11 +21707,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       // токена, вышедшего на биржу, есть оба адреса, и раньше свежий
       // биржевой график тут же затирался историей кривой.
       if (!result && curveSol) {
-        result = await свечиКривойSol(token.tokenAddress, token.id, tf, курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd(), запущенВ);
+        result = await свечиКривойSol(token.tokenAddress, token.id, tf, курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd(), запущенВ, CHART_TOTAL, живоеСвежее());
         if (result) src = "curve";
       }
       if (!result && !curveSol && token.curveAddress) {
-        result = await fetchCurveOHLCV(token.curveAddress, tf, TON_TESTNET_NETWORK, tonPriceUsd > 0 ? tonPriceUsd : tonUsd(), token.id, запущенВ);
+        result = await fetchCurveOHLCV(token.curveAddress, tf, TON_TESTNET_NETWORK, tonPriceUsd > 0 ? tonPriceUsd : tonUsd(), token.id, запущенВ, живоеСвежее());
         if (result) src = "curve";
       }
       // Запасной истории курса от tonapi здесь больше нет. Это другой
@@ -21616,9 +21791,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     async function refresh() {
       let fresh = null;
       if (curveSol) {
-        fresh = await свечиКривойSol(token.tokenAddress, token.id, tf, курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd(), запущенВ);
+        fresh = await свечиКривойSol(token.tokenAddress, token.id, tf, курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd(), запущенВ, CHART_TOTAL, живоеСвежее());
       } else if (curveChart) {
-        fresh = await fetchCurveOHLCV(token.curveAddress, tf, TON_TESTNET_NETWORK, tonPriceUsd > 0 ? tonPriceUsd : tonUsd(), token.id, запущенВ);
+        fresh = await fetchCurveOHLCV(token.curveAddress, tf, TON_TESTNET_NETWORK, tonPriceUsd > 0 ? tonPriceUsd : tonUsd(), token.id, запущенВ, живоеСвежее());
       } else {
         // Только биржа. Если она не ответила — на экране остаётся то, что
         // уже нарисовано, и следующий круг спросит снова.
@@ -21697,6 +21872,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
           }
           if (!(цена > 0)) return;
           const msСобытия = Number(весть.ms) || 0;
+          // Поток приносит и резервы — это и есть состояние «сейчас».
+          принятьЖивое({ price: весть.price, raised: весть.raised, sold: весть.sold, graduated: весть.graduated, vSol: весть.vSol, vTokens: весть.vTokens, realSol: весть.realSol, ms: msСобытия });
           if (!событиеСвежее(msСобытия, цена)) return;
           /* Сделка видна сразу, своей свечой. Последняя свеча — та, где
              была последняя сделка, и она может быть давней: пустых свечей
@@ -21709,8 +21886,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
             const было = свечи[свечи.length - 1];
             if (Math.abs(цена - было.close) <= было.close * 1e-6) return prev;
             const шагTf = TF_SECONDS[prev.tf || tf] || 60;
-            const сейчасСвеча = Math.floor(Date.now() / 1000 / шагTf) * шагTf;
-            живаяЦенаRef.current = { time: Math.max(было.time, сейчасСвеча), close: цена, at: Date.now(), ms: msСобытия || Date.now() };
+            // Свеча — по времени события на сервере, а не по часам телефона.
+            const сейчасСвеча = Math.floor((msСобытия || серверСейчас()) / 1000 / шагTf) * шагTf;
+            живаяЦенаRef.current = { time: Math.max(было.time, сейчасСвеча), close: цена, at: Date.now(), ms: msСобытия || серверСейчас() };
             if (было.time < сейчасСвеча) {
               свечи.push({ time: сейчасСвеча, open: было.close, high: Math.max(было.close, цена), low: Math.min(было.close, цена), close: цена });
               const объём = (prev.volume || []).concat([{ time: сейчасСвеча, value: 0, color: hexA(цена >= было.close ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ, 0.32) }]);
@@ -21839,6 +22017,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   // Цена сделки в единицах графика: в режиме капитализации свечи
   // умножены на выпуск — стрелки умножаем так же.
   резервыДляСделкиRef.current = резервыСети || (своя && своя.резервы) || null;
+  /* Резервы для расчёта своей сделки: постоянные запасы кривой — из
+     прочитанного, собранное и проданное — из живой памяти, если она
+     свежая. Прочитанное могло отстать на сделку, и своя покупка
+     рисовалась от прошлой цены, а потом свеча перескакивала. */
+  const слитьРезервы = (р) => {
+    const ж = живоеСвежее();
+    if (!р || !ж || ж.состояние.raised == null) return р;
+    return { ...р, собрано: ж.состояние.raised, продано: ж.состояние.sold != null ? ж.состояние.sold : р.продано };
+  };
   /* Своя сделка на графике — в миг нажатия. Новое состояние кривой
      считаем сами по тем же резервам (x·y = k), двигаем живую свечу и
      ставим стрелку. Метка времени — сейчас, поэтому поток с более
@@ -21866,7 +22053,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     const старт = (e) => {
       const d = e && e.detail;
       if (!d || d.tokenId !== token.id || !(d.сумма > 0)) return;
-      const р = резервыДляСделкиRef.current;
+      const р = слитьРезервы(резервыДляСделкиRef.current);
       if (!р || !(р.vМонеты > 0) || !(р.vТокены > 0)) return;
       const курс = token.chain === "solana" ? (курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd()) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
       if (!(курс > 0)) return;
@@ -21879,11 +22066,13 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       const монет = Math.abs(новыйX - x), токенов = Math.abs(y - новыйY);
       if (!(монет > 0) || !(токенов > 0)) return;
       const цена = (новыйX / новыйY) * курс;
-      const сейчасМс = Date.now();
+      // Время на графике — по часам сервера, сроки ожидания — по своим.
+      const сейчасМс = серверСейчас();
+      const теперь = Date.now();
       // Снимок — до первой из сделок в пути: откат последней не должен
       // стирать те, что ещё идут.
       if (!ждутСети.current.length || !снимокДоСделки.current) снимокДоСделки.current = { живая: живаяЦенаRef.current, candles: null };
-      ждутСети.current.push({ ид: d.ид || сейчасМс, база: { собрано: р.собрано || 0, продано: р.продано || 0 }, at: сейчасМс, покупка, сумма: d.сумма });
+      ждутСети.current.push({ ид: d.ид || теперь, база: { собрано: р.собрано || 0, продано: р.продано || 0 }, at: теперь, покупка, сумма: d.сумма });
       setChartData((prev) => {
         if (!prev || !prev.candles || !prev.candles.length) return prev;
         if (снимокДоСделки.current && !снимокДоСделки.current.candles) снимокДоСделки.current.candles = prev.candles;
@@ -21891,8 +22080,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
         const было = свечи[свечи.length - 1];
         const шагTf = TF_SECONDS[prev.tf || tf] || 60;
         const сейчасСвеча = Math.floor(сейчасМс / 1000 / шагTf) * шагTf;
-        живаяЦенаRef.current = { time: Math.max(было.time, сейчасСвеча), close: цена, at: сейчасМс, ms: сейчасМс };
-        ожиданиеRef.current = { покупка, цена, было: было.close, до: сейчасМс + 8000 };
+        живаяЦенаRef.current = { time: Math.max(было.time, сейчасСвеча), close: цена, at: теперь, ms: сейчасМс };
+        ожиданиеRef.current = { покупка, цена, было: было.close, до: теперь + 8000 };
         if (было.time < сейчасСвеча) {
           свечи.push({ time: сейчасСвеча, open: было.close, high: Math.max(было.close, цена), low: Math.min(было.close, цена), close: цена });
           return { ...prev, candles: свечи, volume: (prev.volume || []).concat([{ time: сейчасСвеча, value: 0, color: hexA(цена >= было.close ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ, 0.32) }]) };
@@ -21903,7 +22092,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       const монета = token.chain === "solana" ? "SOL" : ТИКЕР_TON;
       const ценаМонеты = монет / токенов;
       setМеткиСделок((было) => [...(было || []), {
-        time: Math.floor(сейчасМс / 1000), side: покупка ? "buy" : "sell", dev: false, стрелка: true, мгновенная: true, ид: d.ид || сейчасМс,
+        time: Math.floor(сейчасМс / 1000), side: покупка ? "buy" : "sell", dev: false, стрелка: true, мгновенная: true, ид: d.ид || теперь,
         ценаМонеты, ценаUsd: ценаМонеты * курс,
         когда: new Date(сейчасМс).toLocaleTimeString(lang === "EN" ? "en-US" : "ru-RU", { hour: "2-digit", minute: "2-digit" }),
         сумма: `${fmtCoin(монет)} ${монета} · ${fmtUSD(монет * курс)}`,
@@ -21916,7 +22105,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       // Уходит только своя метка: остальные сделки в пути ещё идут.
       setМеткиСделок((было) => (было || []).filter((м) => !(м.мгновенная && (d.ид == null || м.ид === d.ид))));
       ждутСети.current = d.ид == null ? [] : ждутСети.current.filter((с) => с.ид !== d.ид);
-      const р = резервыДляСделкиRef.current;
+      const р = слитьРезервы(резервыДляСделкиRef.current);
       if (ждутСети.current.length && р) {
         /* Остались другие сделки в пути — цену не откатываем к снимку, а
            пересчитываем без отменённой. */
@@ -22053,6 +22242,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
      число сделок за сутки прямо на глазах. База — цифры обхода, с
      которыми карточка открылась; первую пачку живых сделок он уже
      учёл, поэтому её только запоминаем. */
+  // Живое — своё у каждой кривой: смена курса или интервала его не сбрасывает.
+  useEffect(() => { живоеRef.current = null; }, [token.id]);
   useEffect(() => {
     setЖивыеСделки([]);
     setПрирост({ объём: 0, сделок: 0 });
@@ -22071,8 +22262,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       if (идёт || document.visibilityState === "hidden") return;
       идёт = true;
       try {
-        const r = await живойЗапрос(token.демо ? `/api/live?demo=${сетьДемо}${историяЕсть ? "" : `&history=${сетьДемо}`}` : `/api/live?${sol ? "sol" : "ton"}=${encodeURIComponent(ключ)}`);
-        const j = r.ok ? await r.json() : null;
+        const j = await живойJSON(token.демо ? `/api/live?demo=${сетьДемо}${историяЕсть ? "" : `&history=${сетьДемо}`}` : `/api/live?${sol ? "sol" : "ton"}=${encodeURIComponent(ключ)}`);
         /* Демо: свечи из истории цен, что копит сервер, — по одной на
            шаг выбранного интервала, без пустых свечей впереди. */
         const д = token.демо && j && j.demos ? j.demos[сетьДемо] : null;
@@ -22098,6 +22288,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
         const курс = token.демо ? курсСетиДемо(token, tonPriceUsd) : sol ? solUsd() : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
         const курсГрафика = sol ? (курсSolДляГрафика > 0 ? курсSolДляГрафика : курс) : курс;
         const сделки = (j.trades && j.trades[ключ]) || [];
+        if (!token.демо) принятьЖивое(к, сделки);
         if (!token.демо) {
           let объём = 0, сделок = 0;
           for (const с of сделки) {
@@ -22139,7 +22330,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
            живых цен: новая свеча на каждом шаге интервала. */
         if (token.демо && цена > 0) setChartData((prev) => {
           const шагTf = TF_SECONDS[tf] || 60;
-          const сейчас = Math.floor(Date.now() / 1000 / шагTf) * шагTf;
+          const сейчас = Math.floor(серверСейчас() / 1000 / шагTf) * шагTf;
           const база = prev && prev.tf === tf && prev.candles && prev.candles.length
             ? prev : { candles: [], volume: [], tf, isLive: true };
           const свечи = база.candles.slice();
@@ -22166,8 +22357,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
              секунду, когда приходил ряд с сервера, та вставала на место
              и только тогда появлялась новая. */
           const шагTf = TF_SECONDS[prev.tf || tf] || 60;
-          const сейчас = Math.floor(Date.now() / 1000 / шагTf) * шагTf;
-          живаяЦенаRef.current = { time: Math.max(было.time, сейчас), close: цена, at: Date.now(), ms: Number(к.ms) || Date.now() };
+          // Свеча — по времени события на сервере, а не по часам телефона.
+          const сейчас = Math.floor((Number(к.ms) || серверСейчас()) / 1000 / шагTf) * шагTf;
+          живаяЦенаRef.current = { time: Math.max(было.time, сейчас), close: цена, at: Date.now(), ms: Number(к.ms) || серверСейчас() };
           if (было.time < сейчас) {
             свечи.push({ time: сейчас, open: было.close, high: Math.max(было.close, цена), low: Math.min(было.close, цена), close: цена });
             const объём = (prev.volume || []).concat([{ time: сейчас, value: 0, color: hexA(цена >= было.close ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ, 0.32) }]);
@@ -22187,9 +22379,19 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
      она и есть, и второй раз её не показываем. */
   const сделкиНаЭкране = useMemo(() => {
     const база = trades || [];
-    const новые = живыеСделки.filter((ж) => !база.some((б) => б.kind === ж.kind
-      && Math.abs(new Date(б.at).getTime() - new Date(ж.at).getTime()) < 30000
-      && Math.abs((б.volTon || 0) - ж.volTon) <= Math.max(1e-9, ж.volTon * 0.05)));
+    /* Каждая запись ленты закрывает только одну живую сделку: две
+       одинаковые покупки подряд иначе прятались обе, пока лента не
+       дочитает вторую, — и та пропадала, а потом появлялась снова. */
+    const занятые = new Set();
+    const новые = живыеСделки.filter((ж) => {
+      const t = new Date(ж.at).getTime();
+      const i = база.findIndex((б, k) => !занятые.has(k) && б.kind === ж.kind
+        && Math.abs(new Date(б.at).getTime() - t) < 30000
+        && Math.abs((б.volTon || 0) - ж.volTon) <= Math.max(1e-9, ж.volTon * 0.05));
+      if (i < 0) return true;
+      занятые.add(i);
+      return false;
+    });
     if (!trades && !новые.length) return trades;
     return [...новые, ...база];
   }, [trades, живыеСделки]);
@@ -32491,8 +32693,7 @@ function mapTokenRow(row) {
       const демо = [...new Set(ряд.filter((tok) => tok.демо).map(ключДемо))];
       идёт = true;
       try {
-        const r = await живойЗапрос(`/api/live?since=${метка}&sol=${sol.join(",")}&ton=${ton.join(",")}${демо.length ? `&demo=${демо.join(",")}` : ""}`);
-        const j = r.ok ? await r.json() : null;
+        const j = await живойJSON(`/api/live?since=${метка}&sol=${sol.join(",")}&ton=${ton.join(",")}${демо.length ? `&demo=${демо.join(",")}` : ""}`);
         if (!живо || !j || !j.curves) return;
         if (j.watch) Object.assign(НАБЛЮДАТЕЛИ_ЖИВЫХ, { sol: !!j.watch.sol, ton: !!j.watch.ton, evm: !!j.watch.evm });
         if (Number(j.at) > 0) метка = Number(j.at);
