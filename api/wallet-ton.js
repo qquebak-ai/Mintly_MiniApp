@@ -262,7 +262,8 @@ async function выведеноЗаСутки(db, user) {
     // называется wallet_ops, а сеть различается колонкой chain.
     .from("wallet_ops")
     .select("amount")
-    .eq("user_id", user.id).eq("chain", "ton").eq("kind", "withdraw")
+    // Перевод человеку уносит деньги так же, как вывод, — он в пределе.
+    .eq("user_id", user.id).eq("chain", "ton").in("kind", ["withdraw", "transfer"])
     .gte("created_at", сутки);
   return (data || []).reduce((с, о) => с + (Number(о.amount) || 0), 0);
 }
@@ -868,7 +869,19 @@ export default async function handler(req, res) {
          его нет, адрес можно назвать прямо в запросе. Иначе деньги с
          внутреннего кошелька просто некуда забрать. */
       const { Address: АдресTON } = await библиотеки();
-      const названный = String(тело.address || "").trim();
+      /* Перевод человеку Mintly по нику — как в Solana (api/_transfer.js):
+         адрес берётся из его кошелька в приложении, привязка вывода такой
+         перевод закрывает. */
+      let кому = null;
+      let названный = String(тело.address || "").trim();
+      if (тело.toUser) {
+        const { человекПоИд } = await import("./_transfer.js");
+        кому = await человекПоИд(db, String(тело.toUser));
+        if (!кому) return res.status(404).json({ error: "user_not_found" });
+        if (кому.id === user.id) return res.status(400).json({ error: "self" });
+        if (строка.payout_address) return res.status(400).json({ error: "payout_locked", payout: строка.payout_address });
+        названный = (await кошелёк(db, { id: кому.id }, набор)).address;
+      }
       if (названный) {
         try { АдресTON.parse(названный); } catch { return res.status(400).json({ error: "bad_address" }); }
       }
@@ -894,7 +907,7 @@ export default async function handler(req, res) {
          вернёт исход первого, а не отправит деньги ещё раз. */
       const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || null;
       const оп = await начать(db, user, {
-        дело: "withdraw", сумма, адрес: куда,
+        дело: кому ? "transfer" : "withdraw", сумма, адрес: куда,
         ключЗапроса: String(тело.requestKey || "").slice(0, 64) || null, ip,
       });
       if (оп.повтор) return res.status(200).json({ ok: true, sent: сумма, repeat: true });
@@ -915,8 +928,20 @@ export default async function handler(req, res) {
 
       занятьНомер(номерКошелька(user), seqno);
       await завершить(db, оп.id, `seqno:${seqno}`);
-      await сообщить(db, user.id,
-        `Отправлено ${сумма.toFixed(4)} ${ТИКЕР} на <code>${куда}</code>`);
+      if (кому) {
+        /* Хеша у перевода до исполнения нет — ключ строки получателя
+           собран из отправителя и номера seqno: он один на перевод. */
+        const { записатьПолучение, сообщитьПолучателю } = await import("./_transfer.js");
+        await записатьПолучение(db, {
+          получатель: кому.id, сеть: "ton", сумма, откуда: строка.address,
+          подпись: `seqno:${seqno}`, ключ: `tin:${user.id}:${seqno}`,
+        });
+        const { data: я } = await db.from("profiles").select("nickname").eq("id", user.id).maybeSingle();
+        сообщитьПолучателю(db, кому.id, { отКого: (я && я.nickname) || "?", сумма, монета: ТИКЕР });
+      }
+      await сообщить(db, user.id, кому
+        ? `Отправлено ${сумма.toFixed(4)} ${ТИКЕР} <b>@${кому.nickname}</b>`
+        : `Отправлено ${сумма.toFixed(4)} ${ТИКЕР} на <code>${куда}</code>`);
       return res.status(200).json({ ok: true, sent: сумма });
     }
 

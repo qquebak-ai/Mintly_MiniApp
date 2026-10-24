@@ -841,12 +841,16 @@ const STR = {
     themeChangedWhite: "Тема изменена: Белая",
     themeChangedDark: "Тема изменена: Тёмная",
     launchNotEnough: "На кошельке {have} — для запуска нужно {need} вместе с комиссией сети",
-    opLaunch: "запуск токена", opWithdraw: "Отправлено", opDeposit: "Пополнено", opSweep: "перевод на свой адрес",
+    opLaunch: "запуск токена", opWithdraw: "Отправлено", opDeposit: "Получено", opSweep: "перевод на свой адрес",
     opGraduate: "выход на биржу", opBind: "привязка адреса", opOther: "операция",
+    opTransfer: "Отправлено @{n}", opTransferIn: "Получено от @{n}",
     histBuy: "Покупка {t}", histSell: "Продажа {t}", histLaunch: "Запуск {t}", histLaunchToken: "Запуск токена",
-    histSwap: "Обмен {a} → {b}", histDeposit: "Пополнение", histWithdraw: "Вывод", histSweep: "Автовывод",
+    histSwap: "Обмен {a} → {b}", histDeposit: "Получено", histWithdraw: "Отправлено", histSweep: "Автовывод",
     histGraduate: "Выход на биржу", histBind: "Привязка адреса вывода", histOther: "Операция",
     histAll: "Все", histBuys: "Покупки", histSells: "Продажи", histTransfers: "Переводы", histLaunches: "Запуски",
+    histIn: "Получено", histOut: "Отправлено", histFromUser: "от @{n}", histToUser: "@{n}",
+    sendOrNick: "или @ник", sendToUserLabel: "Пользователь Mintly — перевод по нику", sendUserNotFound: "Такого ника в Mintly нет",
+    sendUserSelf: "Это ваш ник", sendUserLocked: "Включена привязка адреса вывода — переводы людям закрыты",
     histToday: "Сегодня", histYesterday: "Вчера", histTo: "на", histFrom: "от", histEmpty: "Здесь пока пусто",
     histDate: "Дата", histNetwork: "Сеть", histGave: "Отдал", histGot: "Получил", histSent: "Отправлено",
     histReceived: "Получено", histPrice: "Цена за токен", histUsd: "Сумма в $", histFee: "Комиссия сети",
@@ -1582,10 +1586,14 @@ const STR = {
     launchNotEnough: "Wallet holds {have} — the launch needs {need} including the network fee",
     opLaunch: "token launch", opWithdraw: "Sent", opDeposit: "Received", opSweep: "sent to your address",
     opGraduate: "listing", opBind: "address link", opOther: "operation",
+    opTransfer: "Sent to @{n}", opTransferIn: "Received from @{n}",
     histBuy: "Buy {t}", histSell: "Sell {t}", histLaunch: "Launch {t}", histLaunchToken: "Token launch",
     histSwap: "Swap {a} → {b}", histDeposit: "Received", histWithdraw: "Sent", histSweep: "Auto-withdrawal",
     histGraduate: "DEX listing", histBind: "Payout address linked", histOther: "Operation",
     histAll: "All", histBuys: "Buys", histSells: "Sells", histTransfers: "Transfers", histLaunches: "Launches",
+    histIn: "Received", histOut: "Sent", histFromUser: "from @{n}", histToUser: "to @{n}",
+    sendOrNick: "or @nickname", sendToUserLabel: "Mintly user — send by nickname", sendUserNotFound: "No Mintly user with this nickname",
+    sendUserSelf: "That's your own nickname", sendUserLocked: "Payout address lock is on — transfers to people are off",
     histToday: "Today", histYesterday: "Yesterday", histTo: "to", histFrom: "from", histEmpty: "Nothing here yet",
     histDate: "Date", histNetwork: "Network", histGave: "Paid", histGot: "Got", histSent: "Sent",
     histReceived: "Received", histPrice: "Price per token", histUsd: "Value in $", histFee: "Network fee",
@@ -13813,7 +13821,9 @@ function useСделки(userId, предел, тик = 0, сделочные = 
             // узнаёт себя в серверном списке и уходит, а не висит вторым
             // таким же рядом.
             signature: о.signature || null,
-            side: о.kind,               // launch | withdraw | deposit | sweep | graduate | payout_bind
+            side: о.kind,               // launch | withdraw | deposit | transfer | transfer_in | sweep | graduate | payout_bind
+            // Человек Mintly на той стороне перевода по нику.
+            кто: о.counterparty || null,
             ticker: null,
             ton_amount: о.amount,
             token_amount: null,
@@ -13874,6 +13884,8 @@ function названиеОперации(с) {
     case "launch": return t("opLaunch");
     case "withdraw": return t("opWithdraw");
     case "deposit": return t("opDeposit");
+    case "transfer": return с.кто ? tf("opTransfer", { n: с.кто.nick }) : t("opWithdraw");
+    case "transfer_in": return с.кто ? tf("opTransferIn", { n: с.кто.nick }) : t("opDeposit");
     case "sweep": return t("opSweep");
     case "graduate": return t("opGraduate");
     case "payout_bind": return t("opBind");
@@ -13886,7 +13898,7 @@ function названиеОперации(с) {
 const этоСделка = (с) => с && (с.side === "buy" || с.side === "sell" || с.side === "swap");
 // Приход — продажа и пополнение кошелька снаружи; всё остальное в
 // списке уходит с кошелька.
-const этоПриход = (с) => с && (с.side === "sell" || с.side === "deposit");
+const этоПриход = (с) => с && (с.side === "sell" || с.side === "deposit" || с.side === "transfer_in");
 
 function МояАктивность({ userId, тик = 0 }) {
   const ряд = useСделки(userId, 5, тик);
@@ -16367,6 +16379,11 @@ function ЭкранВывода({
   const [метка, setМетка] = useState("");
   const [добавляем, setДобавляем] = useState(false);
   const [новый, setНовый] = useState("");
+  /* Получатель — человек Mintly по нику. Поле «кому» принимает и адрес,
+     и ник: друга знают по нику, а адрес из сорока восьми знаков — способ
+     ошибиться одной буквой. Адрес его кошелька сервер найдёт сам. */
+  const [человек, setЧеловек] = useState(null); // { id, nickname, avatar }
+  const [поиск, setПоиск] = useState({ ник: "", кто: null, беда: "" });
 
   /* Всё поле — начисто при каждом открытии, включая адрес. Подставленный
      прошлый получатель — это перевод не туда: сеть переключили, деньги
@@ -16375,6 +16392,7 @@ function ЭкранВывода({
     if (!открыт) {
       setШаг("адрес"); setАдрес(""); setВвод(""); setВсё(false); setИдёт(false);
       setКод(""); setКодБеда(""); setДобавляем(false); setНовый(""); setМетка("");
+      setЧеловек(null); setПоиск({ ник: "", кто: null, беда: "" });
     }
   }, [открыт]);
   // «Назад» Telegram: с кода — к сумме, с суммы — к адресу, с адреса — закрыть.
@@ -16416,9 +16434,40 @@ function ЭкранВывода({
   const тестовая = вEVM ? !!(сетиEVM && сетиEVM.тестовые) : сеть === "ton" ? TON_TESTNET_NETWORK : SOL_NETWORK !== "mainnet";
   const чистый = адрес.trim();
   const адресОкей = адресСетиОк(сеть, чистый);
+  /* Ник в поле — тот, что начат с «@», или короткая строка по правилу
+     ника. Начало адреса тоже бывает похоже на ник, поэтому без «@» мы
+     только показываем найденного, а «такого нет» не говорим. */
+  const ник = (() => {
+    if (адресОкей) return null;
+    const без = чистый.replace(/^@/, "");
+    if (!/^[A-Za-z][A-Za-z0-9_.]{3,19}$/.test(без)) return null;
+    return без;
+  })();
+  useEffect(() => {
+    if (!открыт || !ник) return undefined;
+    let живо = true;
+    const таймер = setTimeout(async () => {
+      try {
+        const { найтиЧеловека } = await import("./appWallet");
+        const кто = await найтиЧеловека(ник);
+        if (живо) setПоиск({ ник, кто, беда: кто ? "" : "not_found" });
+      } catch (e) {
+        const т = String((e && e.message) || "");
+        if (живо) setПоиск({ ник, кто: null, беда: т.includes("self") ? "self" : т.includes("not_found") ? "not_found" : "error" });
+      }
+    }, 350);
+    return () => { живо = false; clearTimeout(таймер); };
+  }, [открыт, ник]);
+  const найден = ник && поиск.ник === ник ? поиск.кто : null;
   const имяСети = (к) => (ВСЕ_СЕТИ.find((с) => с.ключ === к) || {}).имя || к;
   const беда = (() => {
     const полная = вEVM ? 42 : сеть === "ton" ? 48 : 32;
+    if (ник) {
+      if (поиск.ник !== ник) return null;
+      if (поиск.беда === "self") return t("sendUserSelf");
+      if (поиск.беда === "not_found" && чистый.startsWith("@")) return t("sendUserNotFound");
+      return null;
+    }
     if (!чистый || (!адресОкей && чистый.length < полная)) return null;
     if (!адресОкей) {
       // Адрес верный, но другой сети — говорим прямо, какой.
@@ -16431,8 +16480,9 @@ function ЭкранВывода({
     return null;
   })();
   const адресГоден = адресОкей && !беда;
-  const можно = адресГоден && монет > 0 && !многовато && !идёт;
-  const короткий = адрес ? `${адрес.trim().slice(0, 4)}…${адрес.trim().slice(-4)}` : "";
+  const можноДальше = адресГоден || !!найден;
+  const можно = (адресГоден || !!человек) && монет > 0 && !многовато && !идёт;
+  const короткий = человек ? `@${человек.nickname}` : адрес ? `${адрес.trim().slice(0, 4)}…${адрес.trim().slice(-4)}` : "";
 
   function клавиша(к) {
     setВсё(false);
@@ -16579,23 +16629,27 @@ function ЭкранВывода({
     setИдёт(true);
     try {
       const кошелёк = await import("./appWallet");
+      // Человеку Mintly — по id: адрес его кошелька сервер берёт сам.
+      const куда = человек ? { кому: человек.id } : { адрес: адрес.trim() };
       const ответ = вEVM
-        ? await кошелёк.вывестиEVM({ сеть, amount: монет, all: всё, адрес: адрес.trim() })
-        : await (сеть === "ton" ? кошелёк.вывестиСВнутреннегоTON : кошелёк.вывестиСВнутреннего)({ amount: монет, all: всё, адрес: адрес.trim() });
+        ? await кошелёк.вывестиEVM({ сеть, amount: монет, all: всё, ...куда })
+        : await (сеть === "ton" ? кошелёк.вывестиСВнутреннегоTON : кошелёк.вывестиСВнутреннего)({ amount: монет, all: всё, ...куда });
       const ушло = ответ && ответ.sent != null ? Number(ответ.sent) : (ответ && ответ.amount != null ? Number(ответ.amount) : монет);
       showToast(tf("withdrawSent", { sum: `${fmtСумма(ушло)} ${единицаСети}` }));
       // В тестовой сети перевод легко счесть пропавшим: кошелёк
       // получателя по умолчанию смотрит в боевую.
       if (тестовая) setTimeout(() => showToast(t("withdrawTestnetHint")), 2600);
       haptic("success");
-      onГотово(ушло, (ответ && (ответ.signature || ответ.seqno)) || null, сеть);
+      onГотово(ушло, (ответ && (ответ.signature || ответ.seqno)) || null, сеть, человек);
       onClose();
     } catch (e) {
       const текст = String((e && e.message) || "");
       // Сервер отвечает короткими метками — переводим их в человеческие.
       if (текст.includes("need_2fa")) showToast("Подтверди вывод кодом из почты — открой вывод заново");
       else if (текст.includes("need_fresh_login")) showToast("Для вывода нужен свежий вход — закрой приложение и открой заново");
-      else if (текст.includes("payout_locked")) showToast(t("withdrawLocked"));
+      else if (текст.includes("payout_locked")) showToast(человек ? t("sendUserLocked") : t("withdrawLocked"));
+      else if (текст.includes("user_not_found")) showToast(t("sendUserNotFound"));
+      else if (текст.includes("self")) showToast(t("sendUserSelf"));
       else if (текст.includes("bad_address") || текст.includes("same_address")) showToast(t("withdrawBadAddress"));
       else if (текст.includes("daily_limit")) showToast(t("withdrawDailyLimit"));
       else if (текст.includes("bad_amount")) showToast(t("withdrawNotEnough"));
@@ -16626,20 +16680,20 @@ function ЭкранВывода({
               <ПолеСЖивымТекстом
                 value={адрес}
                 onChange={(e) => setАдрес(e.target.value)}
-                placeholder={вEVM ? "0x…" : сеть === "ton" ? "UQ…" : "5x…"}
+                placeholder={`${вEVM ? "0x…" : сеть === "ton" ? "UQ…" : "5x…"} ${t("sendOrNick")}`}
                 spellCheck={false}
                 autoCapitalize="off"
                 autoCorrect="off"
                 style={{
                   flex: 1, padding: "15px 44px 15px 14px", borderRadius: 16,
-                  border: `1px solid ${беда ? T.down : (адресГоден ? T.up : T.line)}`,
+                  border: `1px solid ${беда ? T.down : (адресГоден || найден ? T.up : T.line)}`,
                   background: T.surface, color: T.ice, fontFamily: monoFont, fontSize: 16, outline: "none",
                   transition: "border-color 200ms ease",
                 }}
               />
               {/* Галочка вместо слов: адрес разобран и сходится по
                   контрольной сумме — значит, дальше можно. */}
-              {адресГоден && (
+              {(адресГоден || найден) && (
                 <span
                   key={чистый}
                   className="flex items-center justify-center"
@@ -16670,6 +16724,20 @@ function ЭкранВывода({
               место они занимают всегда. */}
           {беда && (
             <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5, animation: "меткаПришла 200ms ease-out both" }}>{беда}</span>
+          )}
+          {найден && (
+            <button
+              onClick={() => { setЧеловек(найден); setШаг("сумма"); haptic("light"); }}
+              className="fx-tap flex items-center text-left"
+              style={{ gap: 12, padding: "11px 14px", borderRadius: 16, border: "none", background: hexA(T.up, 0.1), animation: "меткаПришла 200ms ease-out both" }}
+            >
+              <ЛицоЧеловека ник={найден.nickname} src={найден.avatar} size={40} />
+              <span className="flex flex-col" style={{ minWidth: 0, flex: 1, gap: 2 }}>
+                <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>@{найден.nickname}</span>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{t("sendToUserLabel")}</span>
+              </span>
+              <ChevronRight size={18} color={T.muted} />
+            </button>
           )}
 
           {/* Книга — под полем. Набранный адрес кладётся в неё той же
@@ -16768,13 +16836,13 @@ function ЭкранВывода({
 
         <div style={{ padding: "14px 18px 22px", flexShrink: 0 }}>
           <button
-            onClick={() => { if (адресГоден) { setШаг("сумма"); haptic("light"); } }}
-            disabled={!адресГоден}
+            onClick={() => { if (можноДальше) { setЧеловек(адресГоден ? null : найден); setШаг("сумма"); haptic("light"); } }}
+            disabled={!можноДальше}
             className="fx-tap w-full"
             style={{
               padding: "16px 0", borderRadius: 12, border: "none",
-              ...(адресГоден ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
-              color: адресГоден ? PRISM_TEXT : T.muted,
+              ...(можноДальше ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
+              color: можноДальше ? PRISM_TEXT : T.muted,
               fontFamily: displayFont, fontSize: 16, fontWeight: 800,
             }}
           >
@@ -17928,7 +17996,7 @@ const ЛОГО_МОНЕТЫ_СЕТИ = { solana: "/coins/sol.png", ton: "/coins/
 const ИМЯ_СЕТИ_ИСТОРИИ = { solana: "Solana", ton: "TON", bsc: "BNB Chain", base: "Base", eth: "Ethereum" };
 const КУРС_МОНЕТЫ_ИСТОРИИ = { SOL: "sol", [ТИКЕР_TON]: "gram", TON: "gram", BNB: "bnb", ETH: "eth" };
 const СЕТЬ_МОНЕТЫ_ИСТОРИИ = { SOL: "solana", [ТИКЕР_TON]: "ton", TON: "ton", BNB: "bsc", ETH: "eth" };
-const ВИД_ОПЕРАЦИИ = { launch: "launch", withdraw: "withdraw", deposit: "deposit", sweep: "sweep", graduate: "graduate", payout_bind: "bind" };
+const ВИД_ОПЕРАЦИИ = { launch: "launch", withdraw: "withdraw", deposit: "deposit", transfer: "transfer", transfer_in: "transfer_in", sweep: "sweep", graduate: "graduate", payout_bind: "bind" };
 
 /* Курс на момент сделки — только правдоподобный. Раньше у сделок Solana
    в эту колонку писали курс TON, и доллары по старым строкам врали в
@@ -18034,8 +18102,9 @@ function собратьИсторию(ряд, запуски) {
       тикер, лого, сумма: Number(с.ton_amount) || 0,
       // Выход на биржу — деньги кривой, а не кошелька; привязка адреса
       // денег не двигает вовсе.
-      знак: вид === "deposit" ? 1 : вид === "graduate" || вид === "bind" ? 0 : -1,
+      знак: вид === "deposit" || вид === "transfer_in" ? 1 : вид === "graduate" || вид === "bind" ? 0 : -1,
       токенов: null, курсТогда: 0, время: с.created_at, подпись: с.signature || null, адрес: с.address || null,
+      кто: с.кто || null,
     });
   }
   return итог.sort((a, b) => new Date(b.время) - new Date(a.время));
@@ -18047,8 +18116,10 @@ function заголовокСтроки(с) {
     case "sell": return tf("histSell", { t: с.тикер || "?" });
     case "launch": return с.тикер ? tf("histLaunch", { t: с.тикер }) : t("histLaunchToken");
     case "swap": return tf("histSwap", { a: (с.обмен && с.обмен.отдал) || "?", b: (с.обмен && с.обмен.получил) || "?" });
-    case "deposit": return t("histDeposit");
-    case "withdraw": return t("histWithdraw");
+    case "deposit":
+    case "transfer_in": return t("histDeposit");
+    case "withdraw":
+    case "transfer": return t("histWithdraw");
     case "sweep": return t("histSweep");
     case "graduate": return t("histGraduate");
     case "bind": return t("histBind");
@@ -18081,17 +18152,22 @@ function подписьСтроки(с) {
   if ((с.вид === "buy" || с.вид === "launch") && с.токенов > 0 && с.тикер) хвост = `+${fmtТокеновИстории(с.токенов)} ${с.тикер}`;
   else if (с.вид === "sell" && с.токенов > 0 && с.тикер) хвост = `−${fmtТокеновИстории(с.токенов)} ${с.тикер}`;
   else if (с.вид === "swap" && с.обмен && с.обмен.получено > 0) хвост = `+${fmtСумма(с.обмен.получено)} ${с.обмен.получил}`;
-  else if (с.адрес && с.вид === "deposit") хвост = `${t("histFrom")} ${shortAddr(с.адрес)}`;
-  else if (с.адрес && (с.вид === "withdraw" || с.вид === "sweep" || с.вид === "bind")) хвост = `${t("histTo")} ${shortAddr(с.адрес)}`;
+  // Перевод человеку Mintly — по нику, как в Phantom по имени контакта.
+  else if (с.кто && с.вид === "transfer_in") хвост = tf("histFromUser", { n: с.кто.nick });
+  else if (с.кто && с.вид === "transfer") хвост = tf("histToUser", { n: с.кто.nick });
+  else if (с.адрес && (с.вид === "deposit" || с.вид === "transfer_in")) хвост = `${t("histFrom")} ${shortAddr(с.адрес)}`;
+  else if (с.адрес && (с.вид === "withdraw" || с.вид === "transfer" || с.вид === "sweep" || с.вид === "bind")) хвост = `${t("histTo")} ${shortAddr(с.адрес)}`;
   return хвост ? `${часы} · ${хвост}` : часы;
 }
 
-// В каком фильтре строка: переводы — всё, что двигает монету без токена.
+// В каком фильтре строка. Переводы — двумя чипсами, как в кошельках:
+// пришло на кошелёк (снаружи или от человека Mintly) и ушло с него.
 const ФИЛЬТРЫ_ИСТОРИИ = [
   { id: "all", ключ: "histAll", годится: () => true },
   { id: "buy", ключ: "histBuys", годится: (с) => с.вид === "buy" },
   { id: "sell", ключ: "histSells", годится: (с) => с.вид === "sell" },
-  { id: "move", ключ: "histTransfers", годится: (с) => ["deposit", "withdraw", "sweep", "swap", "bind"].includes(с.вид) },
+  { id: "in", ключ: "histIn", годится: (с) => с.вид === "deposit" || с.вид === "transfer_in" },
+  { id: "out", ключ: "histOut", годится: (с) => ["withdraw", "transfer", "sweep"].includes(с.вид) },
   { id: "launch", ключ: "histLaunches", годится: (с) => с.вид === "launch" || с.вид === "graduate" },
 ];
 
@@ -18134,7 +18210,8 @@ function значокДействия(вид) {
     case "sell": return { Icon: ArrowUpRight, приход: true };
     case "launch": return { Icon: Rocket, приход: false };
     case "swap": return { Icon: Repeat, приход: false };
-    case "deposit": return { Icon: ArrowDownLeft, приход: true };
+    case "deposit":
+    case "transfer_in": return { Icon: ArrowDownLeft, приход: true };
     case "graduate": return { Icon: Rocket, приход: true };
     case "bind": return { Icon: Link2, приход: false };
     default: return { Icon: ArrowUpRight, приход: false };
@@ -18143,7 +18220,9 @@ function значокДействия(вид) {
 
 function АватарСтроки({ с, size = 40 }) {
   const [сломан, setСломан] = useState(false);
-  const картинка = !сломан && (с.лого || (!с.тикер ? ЛОГО_МОНЕТЫ_СЕТИ[с.сеть] : null));
+  // Перевод человеку Mintly — его лицо, как контакт в Phantom.
+  const лицо = с.кто ? (с.кто.avatar || null) : null;
+  const картинка = !сломан && (с.кто ? лицо : (с.лого || (!с.тикер ? ЛОГО_МОНЕТЫ_СЕТИ[с.сеть] : null)));
   const з = значокДействия(с.вид);
   const бейдж = Math.round(size * 0.44);
   return (
@@ -18162,7 +18241,7 @@ function АватарСтроки({ с, size = 40 }) {
           className="flex items-center justify-center"
           style={{ width: size, height: size, borderRadius: "50%", background: T.surfaceHi, fontFamily: displayFont, fontWeight: 800, fontSize: Math.round(size * 0.4), color: T.ice }}
         >
-          {String(с.тикер || с.монета || "?").slice(0, 1)}
+          {String((с.кто && с.кто.nick) || с.тикер || с.монета || "?").slice(0, 1).toUpperCase()}
         </span>
       )}
       <span
@@ -18280,12 +18359,14 @@ function ОкноОперации({ строка, onClose, курсы, insetTop 
     } else if (с.вид === "swap" && с.обмен) {
       поля.push({ имя: t("histGave"), значение: `${fmtСумма(с.сумма)} ${с.обмен.отдал}` });
       if (с.обмен.получено > 0) поля.push({ имя: t("histGot"), значение: `${fmtСумма(с.обмен.получено)} ${с.обмен.получил}` });
-    } else if (с.вид === "deposit") {
+    } else if (с.вид === "deposit" || с.вид === "transfer_in") {
       поля.push({ имя: t("histReceived"), значение: `${fmtСумма(с.сумма)} ${с.монета}` });
-      if (с.адрес) поля.push({ имя: t("histFromAddr"), значение: shortAddr(с.адрес), копия: с.адрес, ключ: "адрес" });
-    } else if (с.вид === "withdraw" || с.вид === "sweep") {
+      if (с.кто) поля.push({ имя: t("histFromAddr"), значение: `@${с.кто.nick}` });
+      if (с.адрес) поля.push({ имя: с.кто ? t("histAddress") : t("histFromAddr"), значение: shortAddr(с.адрес), копия: с.адрес, ключ: "адрес" });
+    } else if (с.вид === "withdraw" || с.вид === "transfer" || с.вид === "sweep") {
       поля.push({ имя: t("histSent"), значение: `${fmtСумма(с.сумма)} ${с.монета}` });
-      if (с.адрес) поля.push({ имя: t("histToAddr"), значение: shortAddr(с.адрес), копия: с.адрес, ключ: "адрес" });
+      if (с.кто) поля.push({ имя: t("histToAddr"), значение: `@${с.кто.nick}` });
+      if (с.адрес) поля.push({ имя: с.кто ? t("histAddress") : t("histToAddr"), значение: shortAddr(с.адрес), копия: с.адрес, ключ: "адрес" });
     } else if (с.вид === "graduate") {
       поля.push({ имя: t("histRaised"), значение: `${fmtСумма(с.сумма)} ${с.монета}` });
     } else if (с.вид === "bind" && с.адрес) {
@@ -20502,7 +20583,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
         курс={курсСети}
         единица={единица}
         showToast={showToast}
-        onГотово={(ушло, подпись, сетьВывода) => {
+        onГотово={(ушло, подпись, сетьВывода, человек) => {
           // Списываем сразу и тут же будим историю: запись о переводе
           // сервер уже сделал, её надо только прочитать.
           if (ушло > 0) {
@@ -20513,7 +20594,9 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             const своя = {
               id: `свой-${подпись || Date.now()}`,
               signature: подпись || null,
-              side: "withdraw",
+              // Перевод человеку Mintly — с его ником, как придёт с сервера.
+              side: человек ? "transfer" : "withdraw",
+              кто: человек ? { nick: человек.nickname, avatar: человек.avatar || null } : null,
               ticker: null,
               ton_amount: ушло,
               token_amount: null,

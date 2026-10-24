@@ -163,10 +163,41 @@ function p_ок(п) {
   return !п.err;
 }
 
+/* Адреса TON. tonapi отдаёт их в сыром виде («0:…»), а кошелёк записан
+   в дружеском (UQ…/EQ…), и сверка по хвосту строки не сходилась
+   никогда: хвост дружеского адреса — контрольная сумма, у сырого — сам
+   счёт. Пополнения TON из-за этого в историю не попадали вовсе. Теперь
+   оба вида приводятся к сырому, а наружу адрес уходит дружеским — его и
+   узнаёт человек. */
+let тон = null;
+async function адресаTON() {
+  if (!тон) тон = await import("@ton/core");
+  const сырой = (а) => { try { return тон.Address.parse(String(а)).toRawString(); } catch { return String(а || "").toLowerCase(); } };
+  const дружеский = (а) => { try { return тон.Address.parse(String(а)).toString({ bounceable: false, testOnly: TESTNET }); } catch { return а || null; } };
+  return { сырой, дружеский };
+}
+
+/* Кривые TON площадки — по ним отсеиваются выплаты за продажу и возвраты
+   газа: это не пополнение, а сама сделка, она уже в истории. */
+let кривыеTON = { до: 0, набор: new Set() };
+async function площадкаTON(db) {
+  if (кривыеTON.до > Date.now()) return кривыеTON.набор;
+  const { сырой } = await адресаTON();
+  const { data } = await db.from("tokens").select("curve_address, dex_pool_address").not("curve_address", "is", null).limit(3000);
+  const набор = new Set();
+  for (const т of data || []) {
+    if (т.curve_address) набор.add(сырой(т.curve_address));
+    if (т.dex_pool_address) набор.add(сырой(т.dex_pool_address));
+  }
+  кривыеTON = { до: Date.now() + 5 * 60 * 1000, набор };
+  return набор;
+}
+
 /* Входящие переводы в TON. tonapi отдаёт готовые события с разбором по
    действиям — самим считать балансы не нужно. */
-async function пополненияTON(адрес, чужие) {
+async function пополненияTON(адрес, чужие, площадка = new Set()) {
   try {
+    const { сырой, дружеский } = await адресаTON();
     const res = await fetch(`${TONAPI}/v2/accounts/${адрес}/events?limit=${ВХОДЯЩИХ}`, {
       headers: TONAPI_KEY ? { Authorization: `Bearer ${TONAPI_KEY}` } : {},
     });
@@ -183,11 +214,13 @@ async function пополненияTON(адрес, чужие) {
         if (!(сумма > МЕЛОЧЬ)) continue;
         if (действие.status && действие.status !== "ok") continue;
         if (чужие.has(событие.event_id)) continue;
-        const наш = String(адрес || "");
-        const кому = String(п.recipient.address || "");
-        const откого = String((п.sender && п.sender.address) || "");
-        const намПришло = !кому || !наш || похожи(кому, наш);
-        const мыОтправили = !!откого && !!наш && похожи(откого, наш);
+        const наш = сырой(адрес);
+        const кому = сырой(п.recipient.address);
+        const откого = п.sender && п.sender.address ? сырой(п.sender.address) : "";
+        const намПришло = кому === наш;
+        const мыОтправили = !!откого && откого === наш;
+        // Выплата кривой или пула за продажу и возврат газа — часть сделки.
+        if (намПришло && площадка.has(откого)) continue;
         // Ни то ни другое — событие чужого кошелька, нам его показывать
         // нечего.
         if (!намПришло && !мыОтправили) continue;
@@ -200,7 +233,10 @@ async function пополненияTON(адрес, чужие) {
           kind: намПришло ? "deposit" : "withdraw",
           amount: сумма,
           signature: событие.event_id,
-          address: (намПришло ? откого : кому) || null,
+          address: дружеский(намПришло ? откого : кому),
+          // От контракта, а не от кошелька: такой приход сверяется со
+          // своими сделками рядом по времени (см. сверкаTON).
+          изКонтракта: намПришло && п.sender && п.sender.is_wallet === false,
           createdAt: new Date((событие.timestamp || 0) * 1000).toISOString(),
         });
       }
@@ -211,14 +247,7 @@ async function пополненияTON(адрес, чужие) {
   }
 }
 
-// Адрес TON пишется в трёх видах сразу; для сверки хватает последних
-// знаков — они одинаковы у всех представлений одного счёта.
-function похожи(a, b) {
-  const хвост = (s) => String(s).replace(/[^A-Za-z0-9]/g, "").slice(-8).toLowerCase();
-  return хвост(a) === хвост(b);
-}
-
-async function пополнения(chain, адрес, чужие) {
+async function пополнения(chain, адрес, чужие, площадка) {
   if (!адрес) return [];
   const ключ = `${chain}|${адрес}`;
   const было = кеш.get(ключ);
@@ -234,7 +263,7 @@ async function пополнения(chain, адрес, чужие) {
   if (было && было.вПути) return было.вПути;
 
   const чтение = (chain === "ton"
-    ? пополненияTON(адрес, чужие)
+    ? пополненияTON(адрес, чужие, площадка)
     : пополненияSolana(адрес, чужие))
     .then((ряд) => {
       кеш.set(ключ, { до: Date.now() + ПАМЯТЬ_МС, ряд, вПути: null });
@@ -385,6 +414,59 @@ async function подробностиEVM(сеть, хеш, адрес) {
   };
 }
 
+/* Свои переводы TON записаны номером «seqno:N» — хеша до исполнения нет,
+   — и подпись не сводит их с тем же переводом, прочитанным из сети. Сводим
+   по сути: то же направление, тот же адрес, та же сумма (±1%), рядом по
+   времени. Приход от контракта рядом со своей сделкой TON — выплата за
+   продажу через биржу: он уже в истории как продажа. */
+async function сверкаTON(изСети, свои) {
+  const тонСвои = свои.filter((о) => о.chain === "ton");
+  if (!тонСвои.length) return изСети;
+  const { сырой } = await адресаTON();
+  const когда = (о) => new Date(о.createdAt).getTime() || 0;
+  const рядом = (а, б, мс) => Math.abs(когда(а) - когда(б)) <= мс;
+  const близко = (а, б) => Math.abs(а - б) <= Math.max(1e-9, 0.01 * Math.max(а, б));
+  const занятые = new Set();
+  return изСети.filter((р) => {
+    if (р.chain !== "ton") return true;
+    const уход = р.kind === "withdraw";
+    const пара = тонСвои.find((о) => !занятые.has(о.id)
+      && (уход ? ["withdraw", "transfer", "sweep"].includes(о.kind) : о.kind === "transfer_in")
+      && близко(Number(о.amount) || 0, р.amount)
+      && (!о.address || !р.address || сырой(о.address) === сырой(р.address))
+      && рядом(о, р, 15 * 60 * 1000));
+    if (пара) {
+      занятые.add(пара.id);
+      // У прихода от человека своя подпись — номер чужого seqno: окну
+      // подробностей нужен настоящий хеш события, он у строки из сети.
+      if (пара.kind === "transfer_in") пара.signature = р.signature;
+      return false;
+    }
+    if (!уход && р.изКонтракта && тонСвои.some((о) => ["sell", "buy", "trade", "swap"].includes(о.kind) && рядом(о, р, 5 * 60 * 1000))) return false;
+    return true;
+  }).map(({ изКонтракта, ...р }) => р);
+}
+
+/* Ник и аватар второй стороны перевода между людьми Mintly. Только для
+   переводов по нику: человек сам выбрал получателя (или получил от
+   него), и показать ник вместо адреса — не раскрыть чужое. Адрес
+   кошелька по-прежнему лежит в строке — для окна подробностей. */
+async function людиПереводов(db, свои) {
+  const нужные = свои.filter((о) => (о.kind === "transfer" || о.kind === "transfer_in") && о.address);
+  if (!нужные.length) return;
+  const адреса = [...new Set(нужные.map((о) => о.address))];
+  const { data: кошельки } = await db.from("app_wallets").select("user_id, address").in("address", адреса);
+  const чей = new Map((кошельки || []).map((к) => [к.address, к.user_id]));
+  const ид = [...new Set([...чей.values()])];
+  if (!ид.length) return;
+  const { data: люди } = await db.from("profiles").select("id, nickname, avatar_url").in("id", ид);
+  const кто = new Map((люди || []).map((л) => [л.id, л]));
+  for (const о of нужные) {
+    const л = кто.get(чей.get(о.address));
+    if (л && л.nickname) о.counterparty = { nick: л.nickname, avatar: л.avatar_url || null };
+  }
+}
+
 async function подробности(db, user, req, res) {
   const сеть = String((req.query && req.query.chain) || "");
   const ид = String((req.query && req.query.id) || "").split(",")[0].trim();
@@ -446,15 +528,18 @@ export default async function handler(req, res) {
   // Подписи своих операций: по ним входящие отличаются от собственных
   // продаж и обменов, которые тоже пополняют кошелёк.
   const наши = new Set(свои.map((о) => о.signature).filter(Boolean));
+  const площадка = await площадкаTON(db).catch(() => new Set());
   const входящие = (await Promise.all(
     (кошельки || []).filter((к) => к.chain === "ton" || к.chain === "solana").map((к) => неДольше(
-      пополнения(к.chain, к.address, наши),
+      пополнения(к.chain, к.address, наши, площадка),
       ЖДЁМ_СЕТЬ_МС,
       [],
     )),
   )).flat();
+  const изСети = await сверкаTON(входящие, свои);
+  await людиПереводов(db, свои);
 
-  const всё = [...свои, ...входящие]
+  const всё = [...свои, ...изСети]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, ПРЕДЕЛ);
 

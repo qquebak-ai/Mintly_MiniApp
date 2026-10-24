@@ -251,12 +251,12 @@ async function остатки(адрес) {
 }
 
 const ОПЕРАЦИЙ_В_МИНУТУ = 6;
-async function начать(db, user, { дело, сеть, сумма = 0, ключЗапроса = null, ip = null }) {
+async function начать(db, user, { дело, сеть, сумма = 0, адрес = null, ключЗапроса = null, ip = null }) {
   const минуту = new Date(Date.now() - 60_000).toISOString();
   const { count } = await db.from("wallet_ops").select("id", { count: "exact", head: true }).eq("user_id", user.id).gt("created_at", минуту);
   if ((count || 0) >= ОПЕРАЦИЙ_В_МИНУТУ) throw Object.assign(new Error("слишком часто"), { код: 429 });
   const { data, error } = await db.from("wallet_ops")
-    .insert({ user_id: user.id, chain: сеть, kind: дело, amount: сумма, request_key: ключЗапроса, ip })
+    .insert({ user_id: user.id, chain: сеть, kind: дело, amount: сумма, address: адрес, request_key: ключЗапроса, ip })
     .select("id").single();
   if (error) {
     if (ключЗапроса) {
@@ -332,6 +332,18 @@ async function платаЗаСкорость(сеть, скорость) {
   return г.gasPrice ? { gasPrice: (г.gasPrice * (10n + (м - 10n) / 2n)) / 10n } : {};
 }
 
+/* Число монет — в мельчайшие единицы без хвоста двоичной дроби: 0.3
+   через toFixed(18) превращалось в 0.299999999999999989, и перевод «0,3»
+   уходил на пылинку меньше. Короткая запись числа в JS точна до нужных
+   знаков; экспоненту (1e-7) расписываем дробью. */
+function вЕдиницы(parseUnits, число) {
+  const n = Number(число) || 0;
+  let с = String(n);
+  if (/e/i.test(с)) с = n.toFixed(18).replace(/0+$/, "").replace(/\.$/, "");
+  const [ц, д = ""] = с.split(".");
+  return parseUnits(д ? `${ц}.${д.slice(0, 18)}` : ц, 18);
+}
+
 function сетьИз(значение) {
   const с = String(значение || "").trim();
   return Object.prototype.hasOwnProperty.call(СЕТИ, с) ? с : null;
@@ -380,14 +392,14 @@ export default async function handler(req, res) {
         const роутер = new Contract(с.роутер, ABI_РОУТЕРА, await провайдер(сеть));
         const weth = await роутер.WETH();
         const продажа = String(req.query.side) === "sell";
-        const вход = parseUnits(Number(сумма).toFixed(18), 18);
+        const вход = вЕдиницы(parseUnits, сумма);
         const [, out] = await роутер.getAmountsOut(вход, продажа ? [токен, weth] : [weth, токен]);
         return res.status(200).json({ out: Number(formatUnits(out, 18)), dex: true, ...(продажа ? null : { spent: Number(сумма) }) });
       }
       if (String(req.query.side) === "sell") {
         // «Всё» приходит дробным числом и при округлении может выйти на
         // пылинку больше проданного — контракт такое отвергает.
-        let tokensIn = parseUnits(Number(сумма).toFixed(18), 18);
+        let tokensIn = вЕдиницы(parseUnits, сумма);
         const c = await к.curves(токен);
         if (tokensIn > c.sold) tokensIn = c.sold;
         const out = await к.quoteSell(токен, tokensIn);
@@ -452,7 +464,7 @@ export default async function handler(req, res) {
       const w = await подписант(строка, набор, user, сеть);
       const к = new Contract(с.фабрика, ABI_КРИВОЙ, w);
       const плата = await к.launchFee();
-      const value = плата + parseUnits(покупка.toFixed(18), 18);
+      const value = плата + вЕдиницы(parseUnits, покупка);
       const tx = await к.create(имя, тикер, метаданные, 0, { value, ...(await платаЗаСкорость(сеть, скорость)) });
       const r = await tx.wait(1, 120_000);
       if (!r || r.status !== 1) throw new Error("запуск не прошёл");
@@ -492,12 +504,12 @@ export default async function handler(req, res) {
         const срок = BigInt(Math.floor(Date.now() / 1000) + 600);
         const газ = await платаЗаСкорость(сеть, скорость);
         if (действие === "buy") {
-          const value = parseUnits(сумма.toFixed(18), 18);
+          const value = вЕдиницы(parseUnits, сумма);
           const путь = [weth, токен];
           const [, ожидаем] = await роутер.getAmountsOut(value, путь);
           tx = await роутер.swapExactETHForTokensSupportingFeeOnTransferTokens((ожидаем * (10000n - проск)) / 10000n, путь, строка.address, срок, { value, ...газ });
         } else {
-          const tokensIn = тело.raw && /^\d+$/.test(String(тело.raw)) ? BigInt(тело.raw) : parseUnits(сумма.toFixed(18), 18);
+          const tokensIn = тело.raw && /^\d+$/.test(String(тело.raw)) ? BigInt(тело.raw) : вЕдиницы(parseUnits, сумма);
           const путь = [токен, weth];
           const т = new Contract(токен, ABI_ТОКЕНА, w);
           // Разрешение роутеру — один раз и сразу на всё: второе
@@ -510,13 +522,13 @@ export default async function handler(req, res) {
           tx = await роутер.swapExactTokensForETHSupportingFeeOnTransferTokens(tokensIn, (ожидаем * (10000n - проск)) / 10000n, путь, строка.address, срок, газ);
         }
       } else if (действие === "buy") {
-        const value = parseUnits(сумма.toFixed(18), 18);
+        const value = вЕдиницы(parseUnits, сумма);
         const [ожидаем] = await к.quoteBuy(токен, value);
         tx = await к.buy(токен, (ожидаем * (10000n - проск)) / 10000n, { value, ...(await платаЗаСкорость(сеть, скорость)) });
       } else {
         // Продают в токенах; «всё» приходит точной строкой raw, чтобы
         // округление не оставило пылинку на кошельке.
-        const tokensIn = тело.raw && /^\d+$/.test(String(тело.raw)) ? BigInt(тело.raw) : parseUnits(сумма.toFixed(18), 18);
+        const tokensIn = тело.raw && /^\d+$/.test(String(тело.raw)) ? BigInt(тело.raw) : вЕдиницы(parseUnits, сумма);
         const ожидаем = await к.quoteSell(токен, tokensIn);
         tx = await к.sell(токен, tokensIn, (ожидаем * (10000n - проск)) / 10000n, await платаЗаСкорость(сеть, скорость));
       }
@@ -535,8 +547,20 @@ export default async function handler(req, res) {
       const отказ = await нуженВторойКлюч(req, db, user);
       if (отказ) return res.status(403).json({ error: отказ });
       const { getAddress, parseUnits, formatUnits } = await ethersLib();
+      /* Перевод человеку Mintly по нику — как в TON и Solana
+         (api/_transfer.js): адрес — его кошелёк в приложении. */
+      let человек = null;
+      let названный = String(тело.address || "").trim();
+      if (тело.toUser) {
+        const { человекПоИд } = await import("./_transfer.js");
+        человек = await человекПоИд(db, String(тело.toUser));
+        if (!человек) return res.status(404).json({ error: "user_not_found" });
+        if (человек.id === user.id) return res.status(400).json({ error: "self" });
+        if (строка.payout_address) return res.status(400).json({ error: "payout_locked", payout: строка.payout_address });
+        названный = (await кошелёк(db, { id: человек.id }, набор)).address;
+      }
       let кому;
-      try { кому = getAddress(String(тело.address || "").trim()); } catch { return res.status(400).json({ error: "bad_address" }); }
+      try { кому = getAddress(названный); } catch { return res.status(400).json({ error: "bad_address" }); }
       // Привязанный адрес вывода главнее названного — как в TON и Solana.
       if (строка.payout_address && кому.toLowerCase() !== String(строка.payout_address).toLowerCase()) {
         return res.status(400).json({ error: "payout_locked", payout: строка.payout_address });
@@ -550,9 +574,9 @@ export default async function handler(req, res) {
       const цена = ((газ.maxFeePerGas || газ.gasPrice || 0n) * 12n) / 10n;
       const наГаз = 21000n * цена;
       const всё = !!тело.all;
-      const сумма = всё ? есть - наГаз : parseUnits(Number(тело.amount || 0).toFixed(18), 18);
+      const сумма = всё ? есть - наГаз : вЕдиницы(parseUnits, тело.amount || 0);
       if (!(сумма > 0n) || сумма + наГаз > есть) return res.status(400).json({ error: "bad_amount" });
-      const оп = await начать(db, user, { дело: "withdraw", сеть, сумма: Number(formatUnits(сумма, 18)), ключЗапроса, ip });
+      const оп = await начать(db, user, { дело: человек ? "transfer" : "withdraw", сеть, сумма: Number(formatUnits(сумма, 18)), адрес: кому, ключЗапроса, ip });
       if (оп.повтор) return res.status(200).json({ ok: true, repeat: true, tx: оп.signature });
       const w = await подписант(строка, набор, user, сеть);
       // Цену газа задаём сами — ту же, из которой посчитан запас: иначе
@@ -561,11 +585,21 @@ export default async function handler(req, res) {
         ? { maxFeePerGas: цена, maxPriorityFeePerGas: газ.maxPriorityFeePerGas && газ.maxPriorityFeePerGas < цена ? газ.maxPriorityFeePerGas : цена }
         : { gasPrice: цена };
       const tx = await w.sendTransaction({ to: кому, value: сумма, gasLimit: 21000n, ...плата });
+      // Перевод записывает сам обработчик — наблюдатель блоков второй раз
+      // его не кладёт (api/_evmWatch.js).
+      import("./_evmWatch.js").then(({ свойПереводEVM }) => свойПереводEVM(tx.hash)).catch(() => {});
       // Ждём подтверждения, как у сделок: иначе следующий перевод считал
       // бы остаток без этого и упирался в нехватку.
       const r = await tx.wait(1, 120_000);
       if (!r || r.status !== 1) throw new Error("перевод не прошёл");
       await завершить(db, оп.id, tx.hash);
+      if (человек) {
+        const { записатьПолучение, сообщитьПолучателю } = await import("./_transfer.js");
+        const ушло = Number(formatUnits(сумма, 18));
+        await записатьПолучение(db, { получатель: человек.id, сеть, сумма: ушло, откуда: строка.address, подпись: tx.hash, ключ: `in:${String(tx.hash).toLowerCase()}` });
+        const { data: я } = await db.from("profiles").select("nickname").eq("id", user.id).maybeSingle();
+        сообщитьПолучателю(db, человек.id, { отКого: (я && я.nickname) || "?", сумма: ушло, монета: с.монета });
+      }
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ ok: true, tx: tx.hash, sent: Number(formatUnits(сумма, 18)), signature: tx.hash });
     }

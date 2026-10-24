@@ -403,7 +403,10 @@ async function выведеноЗаСутки(db, user) {
     .from("wallet_ops")
     .select("amount")
     .eq("user_id", user.id)
-    .eq("kind", "withdraw")
+    // Только своя сеть: суммы TON и SOL в одном пределе не складываются.
+    // Перевод человеку уносит деньги так же, как вывод, — он в пределе.
+    .eq("chain", "solana")
+    .in("kind", ["withdraw", "transfer"])
     .gt("created_at", сутки);
   return (data || []).reduce((s, r) => s + (Number(r.amount) || 0), 0);
 }
@@ -1380,7 +1383,21 @@ export default async function handler(req, res) {
          бы ничего. Пока привязки нет, адрес можно назвать прямо здесь:
          кошелёк заведён внутри приложения, и без этого вывести деньги
          человеку было бы просто нечем. */
-      const названный = String(тело.address || "").trim();
+      /* Перевод человеку Mintly по нику: адрес — его кошелёк в
+         приложении, его сервер берёт сам (api/_transfer.js). Привязанный
+         адрес вывода обещает «деньги уходят только туда» — перевод
+         другому человеку это обещание нарушил бы, поэтому с привязкой он
+         закрыт так же, как вывод на чужой адрес. */
+      let кому = null;
+      let названный = String(тело.address || "").trim();
+      if (тело.toUser) {
+        const { человекПоИд } = await import("./_transfer.js");
+        кому = await человекПоИд(db, String(тело.toUser));
+        if (!кому) return res.status(404).json({ error: "user_not_found" });
+        if (кому.id === user.id) return res.status(400).json({ error: "self" });
+        if (строка.payout_address) return res.status(400).json({ error: "payout_locked", payout: строка.payout_address });
+        названный = (await кошелёк(db, { id: кому.id }, набор)).address;
+      }
       if (названный && !адресОк(названный)) return res.status(400).json({ error: "bad_address" });
       if (строка.payout_address && названный && названный !== строка.payout_address) {
         return res.status(400).json({ error: "payout_locked", payout: строка.payout_address });
@@ -1401,7 +1418,7 @@ export default async function handler(req, res) {
       }
 
       const оп = await начать(db, user, {
-        дело: "withdraw", сумма, адрес: куда, ключЗапроса, ip,
+        дело: кому ? "transfer" : "withdraw", сумма, адрес: куда, ключЗапроса, ip,
       });
       if (оп.повтор) return res.status(200).json({ signature: оп.signature, amount: сумма, repeat: true });
 
@@ -1419,8 +1436,15 @@ export default async function handler(req, res) {
         throw e;
       }
       await завершить(db, оп.id, подпись);
-      await сообщить(db, user.id,
-        `Отправлено ${сумма.toFixed(4)} SOL на <code>${куда}</code>`);
+      if (кому) {
+        const { записатьПолучение, сообщитьПолучателю } = await import("./_transfer.js");
+        await записатьПолучение(db, { получатель: кому.id, сеть: "solana", сумма, откуда: строка.address, подпись, ключ: `in:${подпись}` });
+        const { data: я } = await db.from("profiles").select("nickname").eq("id", user.id).maybeSingle();
+        сообщитьПолучателю(db, кому.id, { отКого: (я && я.nickname) || "?", сумма, монета: "SOL" });
+      }
+      await сообщить(db, user.id, кому
+        ? `Отправлено ${сумма.toFixed(4)} SOL <b>@${кому.nickname}</b>`
+        : `Отправлено ${сумма.toFixed(4)} SOL на <code>${куда}</code>`);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ signature: подпись, amount: сумма });
     }

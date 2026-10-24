@@ -260,18 +260,26 @@ export async function обменМеждуСетями({ откуда, сумм�
 /* Вывод. Адрес не передаётся: сервер отправит только на привязанный —
    тот, владение которым доказано подписью. all — «всё, что есть»:
    сервер оставит запас на комиссию, иначе перевод не пройдёт вовсе. */
-export async function вывестиСВнутреннего({ amount, all = false, адрес = "" }) {
+export async function вывестиСВнутреннего({ amount, all = false, адрес = "", кому = null }) {
   return await запрос("/api/wallet-solana?action=withdraw", {
-    amount, all, address: адрес || undefined, requestKey: ключЗапроса(),
+    amount, all, address: адрес || undefined, toUser: кому || undefined, requestKey: ключЗапроса(),
   });
 }
 
 /* Вывод в TON — та же дорога, только другая ручка. Адрес, как и в
    Solana, нужен лишь пока не привязан постоянный. */
-export async function вывестиСВнутреннегоTON({ amount, all = false, адрес = "" }) {
+export async function вывестиСВнутреннегоTON({ amount, all = false, адрес = "", кому = null }) {
   return await запрос("/api/wallet-ton?action=withdraw", {
-    amount, all, address: адрес || undefined, requestKey: ключЗапроса(),
+    amount, all, address: адрес || undefined, toUser: кому || undefined, requestKey: ключЗапроса(),
   });
+}
+
+/* Перевод человеку Mintly — по нику. Сервер отдаёт ник, аватар и id;
+   адрес кошелька получателя он найдёт сам, когда дойдёт до перевода
+   (toUser в выводе). */
+export async function найтиЧеловека(ник) {
+  const j = await запрос(апи(`/api/transfer?nick=${encodeURIComponent(String(ник || "").replace(/^@/, ""))}`));
+  return j && j.user ? j.user : null;
 }
 
 /* --- Привязка адреса вывода ------------------------------------------
@@ -419,8 +427,8 @@ export async function котировкаEVM({ сеть, токен: адрес, 
 
 /* Вывод монеты сети EVM на чужой адрес. Адрес и сумму сервер проверяет
    сам (контрольная сумма, запас на газ). */
-export async function вывестиEVM({ сеть, amount, all = false, адрес = "" }) {
+export async function вывестиEVM({ сеть, amount, all = false, адрес = "", кому = null }) {
   return await запрос(апи("/api/wallet-evm?action=withdraw"), {
-    chain: сеть, amount, all, address: адрес, requestKey: ключЗапроса(),
+    chain: сеть, amount, all, address: адрес || undefined, toUser: кому || undefined, requestKey: ключЗапроса(),
   });
 }

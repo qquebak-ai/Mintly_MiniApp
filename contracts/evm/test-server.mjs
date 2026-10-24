@@ -164,6 +164,31 @@ await проверка("чужая сеть и кривой адрес отби�
   assert.equal(r.код, 400);
 });
 
+await проверка("перевод человеку Mintly по нику: его кошелёк в приложении, две строки в журнале", async () => {
+  const друг = crypto.randomUUID();
+  таблицы.profiles.push({ id: друг, nickname: "friend_one", avatar_url: null }, { id: "u1", nickname: "leo" });
+  let r = await вызвать("withdraw", { method: "POST", body: { chain: "bsc", toUser: друг, amount: 0.3, requestKey: "t1" } });
+  assert.equal(r.код, 200, JSON.stringify(r.ответ));
+  const кошелёкДруга = таблицы.app_wallets.find((w) => w.user_id === друг);
+  assert.ok(кошелёкДруга, "кошелёк друга заведён");
+  assert.equal(await п.getBalance(кошелёкДруга.address), ethers.parseEther("0.3"));
+  const моя = таблицы.wallet_ops.find((о) => о.request_key === "t1");
+  assert.equal(моя.kind, "transfer");
+  assert.equal(String(моя.address).toLowerCase(), String(кошелёкДруга.address).toLowerCase());
+  const его = таблицы.wallet_ops.find((о) => о.user_id === друг);
+  assert.equal(его.kind, "transfer_in");
+  assert.equal(String(его.address).toLowerCase(), адрес.toLowerCase());
+  assert.equal(его.signature, моя.signature);
+  r = await вызвать("withdraw", { method: "POST", body: { chain: "bsc", toUser: crypto.randomUUID(), amount: 0.1, requestKey: "t2" } });
+  assert.equal(r.ответ.error, "user_not_found");
+  таблицы.profiles.length = 0;
+  // Перевод — своя операция, а у предела частоты счёт за минуту: сдвигаем
+  // её в прошлое, чтобы следующие проверки шли с прежним запасом.
+  for (const о of таблицы.wallet_ops) if (о.request_key === "t1") о.created_at = new Date(Date.now() - 120_000).toISOString();
+  // Узел кеширует одинаковые запросы четверть секунды — даём кешу остыть.
+  await new Promise((r2) => setTimeout(r2, 400));
+});
+
 await проверка("вывод: плохой адрес и свой адрес отбиваются, «всё» уходит за вычетом газа", async () => {
   let r = await вызвать("withdraw", { method: "POST", body: { chain: "bsc", address: "0x123", amount: 1, requestKey: "w0" } });
   assert.equal(r.ответ.error, "bad_address");
@@ -186,9 +211,12 @@ await проверка("вывод: плохой адрес и свой адре
 
 await проверка("с почтой для 2ФА вывод без свежего подтверждения отбивается", async () => {
   таблицы.profiles.push({ id: "u1", mail_2fa: true });
+  // Код с почты спрашивают у того, у кого почта настоящая (api/_second.js).
+  Object.assign(ЧЕЛОВЕК, { email: "leo@example.com", email_confirmed_at: "2026-01-01T00:00:00Z" });
   const r = await вызвать("withdraw", { method: "POST", body: { chain: "bsc", address: "0x8ba1f109551bD432803012645Ac136ddd64DBA72", amount: 0.0001, requestKey: "w9" } });
   assert.equal(r.код, 403);
   assert.equal(r.ответ.error, "need_2fa");
+  delete ЧЕЛОВЕК.email; delete ЧЕЛОВЕК.email_confirmed_at;
   таблицы.profiles.length = 0;
 });
 
