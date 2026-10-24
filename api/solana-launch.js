@@ -298,7 +298,7 @@ async function свежийБлок(connection, изПрогрева = false) {
    такой экономии не стоит, а разница во времени включения в блок на
    загруженной сети — секунды. */
 const ЦЕНА_ЕДИНИЦЫ = Number(process.env.SOLANA_PRIORITY_FEE || 100000); // микролямпорты
-const ЕДИНИЦ_НА_СДЕЛКУ = 220000;
+export const ЕДИНИЦ_НА_СДЕЛКУ = 220000;
 /* Запуск делает шесть дел одной транзакцией — счёт токена, выпуск,
    метаданные, передача права выпуска, кривая и стартовая покупка, —
    поэтому предел вычислений у него свой, повыше. */
@@ -543,10 +543,21 @@ function выплатаЗа(кривая, единиц) {
   return продавцу > 0n ? Number(продавцу) / LAMPORTS : 0;
 }
 
+/* Ставка кривой по mint. В потоке её нет (там только резервы), а для
+   сборки «Молнии» без похода в сеть она нужна — запоминаем её всякий
+   раз, когда счёт кривой прочитан целиком. Ставка задаётся при запуске и
+   дальше не меняется. */
+const ставкиКривых = new Map();
+export function ставкаКривой(mint) {
+  return ставкиКривых.has(mint) ? ставкиКривых.get(mint) : null;
+}
+
 // Сколько токенов даст кривая за сумму в SOL — та же формула x·y = k.
-async function получуЗа(инфоОбещание, sol) {
+// Поля — прочитанный счёт кривой или готовое состояние из потока.
+async function получуЗа(инфоОбещание, sol, mint = null) {
   const info = await инфоОбещание;
-  const с = info && поляКривой(info.data);
+  const с = info && (info.data ? поляКривой(info.data) : info);
+  if (с && info.data && mint) ставкиКривых.set(mint, с.feeBps || 0);
   if (!с || !(sol > 0)) return null;
   const вход = BigInt(Math.round(sol * LAMPORTS * (1 - (с.feeBps || 0) / 10000)));
   const монеты = BigInt(с.virtualSol) + BigInt(с.realSol);
@@ -556,8 +567,11 @@ async function получуЗа(инфоОбещание, sol) {
   return выдача > 0n ? Number(выдача) / ЕДИНИЦА : null;
 }
 
-/* Покупка и продажа на уже заведённой кривой. */
-export async function собратьСделку({ wallet, mint, продажа, amount, minOut, скорость = "normal", slippageBps = 500 }) {
+/* Покупка и продажа на уже заведённой кривой.
+   наценка — SOL площадке за скорость (api/_speed.js): уходит переводом
+   на счёт комиссии в той же транзакции. готоваяКривая — состояние из
+   потока для «Молнии»: покупке тогда не нужен свой круг к узлу. */
+export async function собратьСделку({ wallet, mint, продажа, amount, minOut, скорость = "normal", slippageBps = 500, наценка = 0, готоваяКривая = null }) {
   const темп = СКОРОСТИ[скорость] || СКОРОСТИ.normal;
   await библиотеки();
   const programId = программа();
@@ -577,7 +591,10 @@ export async function собратьСделку({ wallet, mint, продажа,
   /* Для покупки заодно читаем кривую: сколько токенов придёт, приложение
      пишет в историю. Раньше в ответ уходила сумма в SOL под именем
      tokens, и покупка значилась как «1 токен за 1 SOL». */
-  const кривуюДляПокупки = продажа ? null : connection.getAccountInfo(curve).catch(() => null);
+  const ставка = ставкаКривой(mint);
+  const кривуюДляПокупки = продажа ? null
+    : готоваяКривая && ставка != null ? Promise.resolve({ ...готоваяКривая, feeBps: ставка })
+      : connection.getAccountInfo(curve).catch(() => null);
 
   let единиц = Math.round(Number(amount) * ЕДИНИЦА);
   let выплата = null;
@@ -598,6 +615,7 @@ export async function собратьСделку({ wallet, mint, продажа,
     if (расчёт && расчёт.предел != null && единиц > расчёт.предел) единиц = расчёт.предел;
     if (!(единиц > 0)) throw new Error("продавать нечего");
     выплата = выплатаЗа(расчёт && расчёт.кривая, единиц);
+    if (расчёт && расчёт.кривая) ставкиКривых.set(mint, расчёт.кривая.feeBps || 0);
   }
 
   /* Защита от проскальзывания — всегда. Раньше нижняя граница была
@@ -606,7 +624,7 @@ export async function собратьСделку({ wallet, mint, продажа,
      и продаёт сразу после, — и человек получает в разы меньше. Теперь
      граница считается здесь, по самой кривой: ожидаемое минус допуск. */
   const допуск = Math.max(50, Math.min(5000, Math.round(Number(slippageBps) || 500)));
-  const ожидаем = продажа ? выплата : await получуЗа(кривуюДляПокупки, Number(amount));
+  const ожидаем = продажа ? выплата : await получуЗа(кривуюДляПокупки, Number(amount), mint);
   const снизу = Number(ожидаем) > 0 ? Number(ожидаем) * (1 - допуск / 10000) : 0;
   const границаВыхода = Math.max(Number(minOut) || 0, снизу);
 
@@ -632,11 +650,16 @@ export async function собратьСделку({ wallet, mint, продажа,
   }));
 
   чаевыеJito(tx, payer, темп.чаевые);
+  // Наценка площадке за скорость — на счёт комиссии кривой.
+  if (наценка > 0 && FEE_ACCOUNT) {
+    tx.add(SystemProgram.transfer({ fromPubkey: payer, toPubkey: feeWallet, lamports: Math.round(наценка * LAMPORTS) }));
+  }
   tx.feePayer = payer;
   tx.recentBlockhash = await блок;
   return {
     transaction: вBase64(tx),
     curve: curve.toBase58(),
+    наценка: наценка > 0 && FEE_ACCOUNT ? наценка : 0,
     // Что на самом деле уходит и приходит: количество после подрезки под
     // остаток и запас кривой, и выплата за него. По этим числам
     // приложение пишет историю, а не по оценке из окна.
@@ -708,6 +731,7 @@ export async function состояние(mint) {
 
   const поля = поляКривой(info.data);
   if (!поля) return null;
+  ставкиКривых.set(mint, поля.feeBps || 0);
   const {
     версия, закрыта, virtualSol, virtualTokens,
     tokensForSale, graduationSol, feeBps, realSol, tokensSold,

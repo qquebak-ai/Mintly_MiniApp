@@ -159,10 +159,11 @@ export async function состояниеВнутреннегоTON() {
 /* Покупка и продажа на кривой TON — кошельком приложения.
    Наружу уходит только «этот токен, столько-то»: адрес кривой сервер
    берёт из базы по токену, и подсунуть чужой контракт нельзя. */
-export async function купитьВнутреннимTON({ tokenId, сумма }) {
+export async function купитьВнутреннимTON({ tokenId, сумма, скорость = скоростьСделки() }) {
   // Ключ запроса — от повторов: двойное нажатие не должно превращаться
-  // во вторую покупку, сервер по нему вернёт исход первой.
-  return await запрос("/api/wallet-ton?action=buy", { tokenId, amount: сумма, requestKey: ключЗапроса() });
+  // во вторую покупку, сервер по нему вернёт исход первой. Скорость — как
+  // в Solana и EVM: от неё наценка и путь сделки на сервере.
+  return await запрос("/api/wallet-ton?action=buy", { tokenId, amount: сумма, speed: скорость, requestKey: ключЗапроса() });
 }
 
 /* Запуск токена в TON кошельком приложения: сервер получает адрес уже
@@ -171,8 +172,8 @@ export async function запуститьВнутреннимTON({ metadataUrl, b
   return await запрос("/api/wallet-ton?action=launch", { metadataUrl, buyAmount, requestKey: ключЗапроса() });
 }
 
-export async function продатьВнутреннимTON({ tokenId, количество }) {
-  return await запрос("/api/wallet-ton?action=sell", { tokenId, amount: количество, requestKey: ключЗапроса() });
+export async function продатьВнутреннимTON({ tokenId, количество, скорость = скоростьСделки() }) {
+  return await запрос("/api/wallet-ton?action=sell", { tokenId, amount: количество, speed: скорость, requestKey: ключЗапроса() });
 }
 
 /* --- Действия, которые тратят монеты ---------------------------------
@@ -184,8 +185,9 @@ export async function запуститьВнутренним({ имя, тике�
   });
 }
 
-/* Скорость сделки — выбор человека в окне сделки (см. App.tsx): от неё
-   зависят приоритетная надбавка и чаевые Jito, которые соберёт сервер. */
+/* Скорость сделки — выбор человека в окне сделки и в «Быстрой покупке»
+   (см. App.tsx): от неё чаевые сети, наценка площадке и путь сделки на
+   сервере (api/_speed.js). */
 export function скоростьСделки() {
   try { const v = localStorage.getItem("mintly_trade_speed"); return ["normal", "fast", "turbo"].includes(v) ? v : "fast"; } catch { return "fast"; }
 }

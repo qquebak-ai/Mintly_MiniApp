@@ -47,6 +47,7 @@ import { котировка, сделка as свопJupiter, SOL_MINT } from ".
 import { собратьОбменБиржи } from "./_dexSolana.js";
 import { нуженВторойКлюч } from "./_second.js";
 import { занять } from "./_walletLock.js";
+import { темп, скоростьИз, наценка } from "./_speed.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -181,12 +182,21 @@ function admin() {
 
 /* Кто спрашивает. Токен приходит от приложения, проверяет его сам
    Supabase — своей проверки подписи нам не надо. */
+/* Проверенный токен помним полминуты: getUser — это поход в Supabase
+   на каждую сделку, сотня-другая миллисекунд до того, как сделка вообще
+   начнёт собираться. Токен и так живёт до своего срока; дольше половины
+   минуты не держим, чтобы вышедший из аккаунта не торговал дольше. */
+const проверенные = new Map(); // токен -> { до, user }
 async function хозяин(req, db) {
   const заголовок = req.headers.authorization || "";
   const токен = заголовок.startsWith("Bearer ") ? заголовок.slice(7) : "";
   if (!токен) return null;
+  const было = проверенные.get(токен);
+  if (было && было.до > Date.now()) return было.user;
   const { data, error } = await db.auth.getUser(токен);
   if (error || !data || !data.user) return null;
+  проверенные.set(токен, { до: Date.now() + 30_000, user: data.user });
+  if (проверенные.size > 5000) проверенные.clear();
   return data.user;
 }
 
@@ -463,7 +473,25 @@ async function подписатьСлужбой(строка, base64, максП
 
 /* Общий путь для всех действий: проверить собранное, подписать,
    отправить. Ни одна ветка ниже не подписывает в обход этой. */
-async function подписатьИОтправить({ db, user, строка, набор, base64, дело, максПеревода, послеОтправки = null }) {
+/* Подпись транзакции — из её же байтов: первая подпись и есть её имя в
+   сети. «Молния» не ждёт, пока узел ответит на отправку, — проверка
+   исхода начинается сразу. */
+async function подписьИзТранзакции(base64) {
+  const { VersionedTransaction, Transaction } = await библиотеки();
+  const bs58 = (await import("bs58")).default;
+  const сырые = Buffer.from(base64, "base64");
+  try {
+    const v = VersionedTransaction.deserialize(new Uint8Array(сырые));
+    return bs58.encode(v.signatures[0]);
+  } catch {
+    const t = Transaction.from(сырые);
+    return bs58.encode(t.signature);
+  }
+}
+
+async function подписатьИОтправить({ db, user, строка, набор, base64, дело, максПеревода, послеОтправки = null, скорость = "fast" }) {
+  const т = темп(скорость);
+  const турбо = скорость === "turbo";
   await проверитьТранзакцию(base64, {
     владелец: строка.address,
     дело,
@@ -479,10 +507,15 @@ async function подписатьИОтправить({ db, user, строка, 
      что подписывается, разобрано по инструкциям выше. Ретраи оставляем
      узлу: если блок занят, он повторит сам. */
   разослать(подписанная);
-  const подпись = await rpc("sendTransaction", [
+  const отправка = rpc("sendTransaction", [
     подписанная,
     { encoding: "base64", skipPreflight: true, preflightCommitment: "processed", maxRetries: 5 },
   ]);
+  // Отказ узла на саму отправку (блок устарел, нечем платить) — сразу
+  // ошибка, а не ожидание исхода до срока.
+  const отказУзла = отправка.then(() => new Promise(() => {}));
+  отказУзла.catch(() => {});
+  const подпись = турбо ? await подписьИзТранзакции(подписанная) : await отправка;
   /* Повторная отправка той же транзакции, пока она не попала в блок.
      Узел пересылает её лидеру один раз, а пакеты в загруженной сети
      теряются; наш повтор раз в 0,6 с (полтора слота) — бесплатный способ
@@ -495,10 +528,10 @@ async function подписатьИОтправить({ db, user, строка, 
     if (готово) return;
     rpc("sendTransaction", [подписанная, { encoding: "base64", skipPreflight: true, maxRetries: 0 }]).catch(() => {});
     разослать(подписанная);
-  }, 600);
+  }, т.повтор);
   let исход;
   try {
-    исход = await дождаться(подпись);
+    исход = await Promise.race([дождаться(подпись, 20000, т), отказУзла]);
   } finally {
     готово = true;
     clearInterval(повтор);
@@ -521,65 +554,103 @@ async function подписатьИОтправить({ db, user, строка, 
 /* Подписка на исход через WebSocket узла: он сам сообщает, когда
    сделка обработана, — это быстрее любого опроса. Не вышло подключиться
    — молча уступаем опросу. */
+/* Сокет один на сервер. Раньше на каждую сделку открывался свой:
+   рукопожатие TLS и подписка — сотни миллисекунд до того, как узел вообще
+   мог бы сообщить итог. Общий сокет держится открытым, и подписка на
+   подпись уходит сразу. Не вышло подключиться — молча уступаем опросу. */
 const WS = (process.env.SOLANA_WS || RPC.replace(/^http/, "ws")).trim();
-function ждатьПоПодписке(подпись, мс) {
-  return new Promise((resolve) => {
-    if (typeof WebSocket === "undefined") return;
-    let сокет;
-    const закрыть = () => { try { сокет && сокет.close(); } catch { /* уже закрыт */ } };
-    const срок = setTimeout(закрыть, мс);
-    try {
-      сокет = new WebSocket(WS);
-    } catch { clearTimeout(срок); return; }
-    сокет.onopen = () => {
-      сокет.send(JSON.stringify({
-        jsonrpc: "2.0", id: 1, method: "signatureSubscribe",
-        params: [подпись, { commitment: "processed" }],
-      }));
-    };
-    сокет.onmessage = (e) => {
+const исходы = { сокет: null, готов: null, номер: 0, ответы: new Map(), подписки: new Map() };
+function сокетИсходов() {
+  if (исходы.готов) return исходы.готов;
+  if (typeof WebSocket === "undefined") return Promise.reject(new Error("нет WebSocket"));
+  исходы.готов = new Promise((готово, отказ) => {
+    let с;
+    try { с = new WebSocket(WS); } catch (e) { исходы.готов = null; отказ(e); return; }
+    const таймер = setTimeout(() => { try { с.close(); } catch { /* уже */ } }, 5000);
+    с.onopen = () => { clearTimeout(таймер); исходы.сокет = с; готово(с); };
+    с.onmessage = (e) => {
       let м;
       try { м = JSON.parse(String(e.data)); } catch { return; }
+      if (м.id != null && исходы.ответы.has(м.id)) {
+        const f = исходы.ответы.get(м.id);
+        исходы.ответы.delete(м.id);
+        f(м.result);
+        return;
+      }
       if (м.method !== "signatureNotification") return;
-      const значение = м.params && м.params.result && м.params.result.value;
-      clearTimeout(срок);
-      закрыть();
-      resolve(!(значение && значение.err));
+      const п = м.params || {};
+      const f = исходы.подписки.get(п.subscription);
+      if (f) { исходы.подписки.delete(п.subscription); f(п.result && п.result.value); }
     };
-    сокет.onerror = () => { clearTimeout(срок); закрыть(); };
+    const упал = () => {
+      clearTimeout(таймер);
+      if (исходы.сокет === с) исходы.сокет = null;
+      исходы.готов = null;
+      исходы.ответы.clear();
+      исходы.подписки.clear();
+      отказ(new Error("сокет закрыт"));
+    };
+    с.onclose = упал;
+    с.onerror = () => { try { с.close(); } catch { упал(); } };
+  });
+  исходы.готов.catch(() => {});
+  return исходы.готов;
+}
+
+function ждатьПоПодписке(подпись, мс, уровень = "processed") {
+  return new Promise((resolve) => {
+    let номерПодписки = null;
+    let сокет = null;
+    // Не дождались — решит опрос; подписку у узла снимаем, чтобы не копилась.
+    const срок = setTimeout(() => {
+      if (номерПодписки == null) return;
+      исходы.подписки.delete(номерПодписки);
+      try { сокет && сокет.send(JSON.stringify({ jsonrpc: "2.0", id: ++исходы.номер, method: "signatureUnsubscribe", params: [номерПодписки] })); } catch { /* сокет закрыт */ }
+    }, мс);
+    сокетИсходов().then((с) => {
+      сокет = с;
+      const id = ++исходы.номер;
+      исходы.ответы.set(id, (н) => {
+        if (н == null) return;
+        номерПодписки = н;
+        исходы.подписки.set(н, (значение) => { clearTimeout(срок); resolve(!(значение && значение.err)); });
+      });
+      с.send(JSON.stringify({ jsonrpc: "2.0", id, method: "signatureSubscribe", params: [подпись, { commitment: уровень }] }));
+    }).catch(() => { clearTimeout(срок); });
   });
 }
 
 /* Ждём двумя путями разом — подпиской и опросом — и берём то, что
-   ответит первым. Подписка обычно на пару сотен миллисекунд раньше. */
-async function дождаться(подпись, мс = 20000) {
+   ответит первым. Подписка обычно на пару сотен миллисекунд раньше.
+   Уровень и шаг — по скорости (api/_speed.js): «Обычно» ждёт
+   подтверждённого блока, «Быстро» и «Молния» — обработанного. */
+async function дождаться(подпись, мс = 20000, { проверка = 300, подтверждение = "processed" } = {}) {
   let решено = false;
-  const поПодписке = ждатьПоПодписке(подпись, мс).then((и) => { решено = true; return и; });
-  const опросом = опросИсхода(подпись, мс, () => решено);
+  const поПодписке = ждатьПоПодписке(подпись, мс, подтверждение).then((и) => { решено = true; return и; });
+  const опросом = опросИсхода(подпись, мс, () => решено, { шаг: проверка, уровень: подтверждение });
   return Promise.race([поПодписке, опросом]);
 }
 
-async function опросИсхода(подпись, мс, хватит) {
+async function опросИсхода(подпись, мс, хватит, { шаг = 300, уровень = "processed" } = {}) {
   const до = Date.now() + мс;
   // Первый вопрос — почти сразу: узел видит сделку уже через доли
   // секунды, и ждать до неё целый круг значит держать человека у
   // крутящейся кнопки просто так.
-  let пауза = 250;
+  let пауза = Math.min(250, шаг);
   while (Date.now() < до) {
     await new Promise((r) => setTimeout(r, пауза));
     // Подписка уже ответила — дальше спрашивать незачем.
     if (хватит && хватит()) return null;
-    пауза = 300;
+    пауза = шаг;
     const ответ = await rpc("getSignatureStatuses", [[подпись], { searchTransactionHistory: false }])
       .catch(() => null);
     const с = ответ && ответ.value && ответ.value[0];
     if (!с) continue;
     if (с.err) return false;
-    /* Достаточно processed. Это значит «блок с этой сделкой узел
-       обработал»: результат уже известен, и откатывается такой блок
-       редко — а ждать confirmed дольше на полсекунды-секунду, и всё это
-       время человек смотрит на неизменившийся баланс. */
-    if (с.confirmationStatus) return true;
+    /* processed значит «блок с этой сделкой узел обработал»: результат
+       уже известен, и откатывается такой блок редко. «Обычно» ждёт
+       confirmed — на полсекунды-секунду дольше, зато без отката. */
+    if (уровень === "processed" ? с.confirmationStatus : (с.confirmationStatus === "confirmed" || с.confirmationStatus === "finalized")) return true;
   }
   return null;
 }
@@ -1225,17 +1296,23 @@ export default async function handler(req, res) {
         }
       }
 
-      const оп = await начать(db, user, { дело: "trade", сумма: продажа ? 0 : сумма, ключЗапроса, ip });
-      if (оп.повтор) return res.status(200).json({ signature: оп.signature, repeat: true });
+      /* Скорость — выбор человека (api/_speed.js): от неё чаевые сети,
+         наценка площадке и сам путь сделки на сервере. */
+      const скорость = скоростьИз(тело.speed);
+      const турбо = скорость === "turbo";
 
-      try {
-        /* Вышел на биржу — сделка идёт в пуле: кривая закрыта, и её
-           инструкция отбилась бы. Адрес пула пишет сервер, заведя его
-           (api/solana-migrate.js). */
+      /* Сборка сделки. Вышел на биржу — сделка идёт в пуле: кривая
+         закрыта, и её инструкция отбилась бы. Адрес пула пишет сервер,
+         заведя его (api/solana-migrate.js). */
+      const собрать = async () => {
         const { data: запись } = await db.from("tokens").select("dex_pool_address, ticker").eq("address", String(тело.mint)).maybeSingle();
         const пулИзБазы = запись && запись.dex_pool_address;
         // Пул из базы — только если его завели мы (см. пулНашегоВыхода).
         const пул = пулИзБазы && (await пулНашегоВыхода(String(тело.mint), пулИзБазы)) ? пулИзБазы : null;
+        // «Молния» берёт состояние кривой из потока — без круга к узлу.
+        const готоваяКривая = турбо && !продажа && !пул
+          ? await import("./curve-stream.js").then((м) => м.состояниеИзПотока(String(тело.mint))).catch(() => null)
+          : null;
         const собрано = пул
           ? await собратьОбменБиржи({ wallet: строка.address, mint: String(тело.mint), пул, продажа, amount: сумма, slippageBps: тело.slippageBps })
           : await собратьСделку({
@@ -1245,8 +1322,31 @@ export default async function handler(req, res) {
             amount: сумма,
             minOut: тело.minOut,
             slippageBps: тело.slippageBps,
-            скорость: ["normal", "fast", "turbo"].includes(тело.speed) ? тело.speed : "normal",
+            скорость,
+            наценка: наценка("solana", скорость),
+            готоваяКривая,
           });
+        return { запись, пул, собрано };
+      };
+
+      /* Журнал до отправки — по нему повтор нажатия узнаётся. «Молния»
+         пишет его одновременно со сборкой: друг от друга они не зависят,
+         а отправка всё равно ждёт обоих. */
+      let оп, сборка;
+      if (турбо) {
+        [оп, сборка] = await Promise.all([
+          начать(db, user, { дело: "trade", сумма: продажа ? 0 : сумма, ключЗапроса, ip }),
+          собрать().catch((ошибка) => ({ ошибка })),
+        ]);
+      } else {
+        оп = await начать(db, user, { дело: "trade", сумма: продажа ? 0 : сумма, ключЗапроса, ip });
+      }
+      if (оп.повтор) return res.status(200).json({ signature: оп.signature, repeat: true });
+
+      try {
+        if (!сборка) сборка = await собрать();
+        if (сборка.ошибка) throw сборка.ошибка;
+        const { запись, пул, собрано } = сборка;
         /* Своя сделка — вестям (api/notify.js) до отправки: поток кривой
            сообщит о ней раньше, чем сюда вернётся подтверждение, и владелец
            токена не должен получить «купили» о собственной покупке. */
@@ -1257,10 +1357,11 @@ export default async function handler(req, res) {
         let подпись;
         try {
           подпись = await подписатьИОтправить({
-            db, user, строка, набор,
+            db, user, строка, набор, скорость,
             base64: собрано.transaction, дело: пул ? "dex" : "trade",
-            // При продаже с кошелька уходит только аренда счёта и комиссия.
-            максПеревода: (продажа ? 0.01 : сумма + 0.01) * LAMPORTS,
+            // При продаже с кошелька уходит только аренда счёта и комиссия;
+            // сверху — наценка за скорость, если она есть в сборке.
+            максПеревода: ((продажа ? 0.01 : сумма + 0.01) + (Number(собрано.наценка) || 0)) * LAMPORTS,
             // Итог сделки — всем зрителям графика сразу после отправки.
             // У пула биржи потока кривой нет — ему и сообщать нечего.
             послеОтправки: пул ? null : () => {
@@ -1458,3 +1559,6 @@ export default async function handler(req, res) {
     if (отпустить) отпустить();
   }
 }
+
+// Для проверки без сети (как заменитьБазуДляПроверки в api/wallet-evm.js).
+export const дляПроверки = { дождаться, подписьИзТранзакции };

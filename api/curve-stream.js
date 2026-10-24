@@ -235,6 +235,26 @@ let попытка = 0;
 // Жив ли поток: по нему api/live.js говорит телефону, нужен ли ещё
 // перечень кривых Solana в опросе.
 export function потокЖив() { return живПоток; }
+// Когда поток поднялся в последний раз: состояние, пришедшее раньше, могло
+// пропустить сделки, пока поток лежал.
+let потокПоднят = 0;
+
+/* Состояние кривой из потока — для «Молнии»: сборка сделки берёт его,
+   не спрашивая узел, и экономит круг к сети. Только пока поток жив и
+   только то, что пришло после его подъёма: всё, что меняло кривую, поток
+   принёс бы. Своя ожидаемая сделка сюда не годится — она ещё не в сети. */
+export function состояниеИзПотока(mint) {
+  if (!живПоток) return null;
+  const с = последние.get(mint);
+  if (!с || !(с.ms >= потокПоднят) || с.graduated || ждём.has(mint)) return null;
+  if (!(с.vSol > 0) || !(с.vTokens > 0)) return null;
+  return {
+    virtualSol: с.vSol,
+    virtualTokens: с.vTokens,
+    realSol: с.realSol || 0,
+    tokensSold: Math.round((с.sold || 0) * ЕДИНИЦА),
+  };
+}
 
 function поднятьПоток() {
   if (сокет || typeof WebSocket !== "function") return;
@@ -250,6 +270,7 @@ function поднятьПоток() {
   s.onopen = () => {
     попытка = 0;
     живПоток = true;
+    потокПоднят = Date.now();
     try {
       s.send(JSON.stringify({
         jsonrpc: "2.0", id: 1, method: "programSubscribe",

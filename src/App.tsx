@@ -23422,35 +23422,97 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
 /* TradeModal — the buy/sell sheet: pick an amount (with quick %/preset
    chips), see the live conversion, pick slippage tolerance, and confirm.
    Shared between the Buy and Sell CTAs so switching tabs mid-flow works. */
+/* Скорость сделки — как у терминалов: «Обычно», «Быстро», «Молния».
+   Доплата из двух частей (api/_speed.js): чаевые сети за место в
+   ближайшем блоке (в Solana — надбавка и Jito, в EVM — чаевые
+   валидатору; в TON аукциона за блок нет) и наценка площадке за быстрый
+   путь сделки на сервере. Таблицу присылает сервер (/api/speed), здесь —
+   её запасная копия, чтобы выбор рисовался сразу. Выбор один на все сети
+   и запоминается: его читают окно сделки, покупка в 1 клик и сервер
+   (appWallet.js, скоростьСделки). */
 const СКОРОСТИ_СДЕЛКИ = [
-  { id: "normal", имя: "Обычно", плата: "~1–2 с", платаEVM: "газ сети" },
-  { id: "fast", имя: "Быстро", плата: "+0.0001 SOL", платаEVM: "чаевые ×2" },
-  { id: "turbo", имя: "Молния", плата: "+0.001 SOL", платаEVM: "чаевые ×4" },
+  { id: "normal", имя: "Обычно", имяEN: "Normal", суть: "Ждёт подтверждения сети — надёжнее, но дольше", сутьEN: "Waits for network confirmation — safest, slower" },
+  { id: "fast", имя: "Быстро", имяEN: "Fast", суть: "Ближайший блок: чаевые сети, повтор раз в 0,6 с", сутьEN: "Next block: network tip, resend every 0.6 s" },
+  { id: "turbo", имя: "Молния", имяEN: "Turbo", суть: "Отдельная дорога: во все узлы разом, проверка каждые 0,15 с", сутьEN: "Express lane: all nodes at once, checked every 0.15 s" },
 ];
-const ДОПЛАТА_СКОРОСТИ_SOL = { normal: 0, fast: 0.0001, turbo: 0.001 };
+const ТАБЛИЦА_СКОРОСТИ = {
+  markup: {
+    solana: { normal: 0, fast: 0.0002, turbo: 0.001 },
+    ton: { normal: 0, fast: 0.01, turbo: 0.05 },
+    bsc: { normal: 0, fast: 0.00005, turbo: 0.0002 },
+    base: { normal: 0, fast: 0.00001, turbo: 0.00005 },
+    eth: { normal: 0, fast: 0.00001, turbo: 0.00005 },
+  },
+  network: { solana: { normal: 0, fast: 0.00019, turbo: 0.0014 }, ton: { normal: 0, fast: 0, turbo: 0 } },
+  evmTip: { normal: 1, fast: 2, turbo: 4 },
+};
+let таблицаСкоростиПришла = false;
+function useТаблицаСкорости() {
+  const [таблица, setТаблица] = useState(() => ({ ...ТАБЛИЦА_СКОРОСТИ }));
+  useEffect(() => {
+    if (таблицаСкоростиПришла) return undefined;
+    let живо = true;
+    fetch(апи("/api/speed")).then((r) => r.json()).then((j) => {
+      if (!j || !j.markup) return;
+      Object.assign(ТАБЛИЦА_СКОРОСТИ, { markup: j.markup, network: j.network || ТАБЛИЦА_СКОРОСТИ.network, evmTip: j.evmTip || ТАБЛИЦА_СКОРОСТИ.evmTip });
+      таблицаСкоростиПришла = true;
+      if (живо) setТаблица({ ...ТАБЛИЦА_СКОРОСТИ });
+    }).catch(() => {});
+    return () => { живо = false; };
+  }, []);
+  return таблица;
+}
+// Ключ сети в таблице скоростей: sol → solana, EVM — своим именем.
+const сетьСкорости = (сеть) => (сеть === "sol" || сеть === "solana" ? "solana" : этоEVM(сеть) ? сеть : "ton");
+// Доплата за скорость в монете сети. У EVM сетевая часть — множитель
+// чаевых, её размер решает сеть в момент сделки; здесь — только наценка.
+function доплатаСкорости(таблица, сеть, скорость) {
+  const к = сетьСкорости(сеть);
+  const площадке = Number((таблица.markup[к] || {})[скорость]) || 0;
+  const сети = Number(((таблица.network || {})[к] || {})[скорость]) || 0;
+  return площадке + сети;
+}
+const монетаСкорости = (сеть) => (этоEVM(сеть) ? СЕТИ_EVM[сеть].монета : сетьСкорости(сеть) === "solana" ? "SOL" : ТИКЕР_TON);
 const читатьСкорость = () => { try { const v = localStorage.getItem("mintly_trade_speed"); return ["normal", "fast", "turbo"].includes(v) ? v : "fast"; } catch { return "fast"; } };
-
-/* Скорость — как у терминалов: доплата за место в ближайшем блоке.
-   В Solana «Быстро» и «Молния» идут через Jito и попадают в следующий
-   слот, около 0,4 с; в EVM это чаевые валидатору (в BNB Chain — цена
-   газа). В TON аукциона за место в блоке нет — там выбора и не
-   показываем. Выбор один на все сети и запоминается: сервер читает его
-   при каждой сделке и запуске (appWallet.js, скоростьСделки). */
-function ВыборСкорости({ сеть, style, onChange = null }) {
+function запомнитьСкорость(id) {
+  try { localStorage.setItem("mintly_trade_speed", id); } catch { /* приватный режим */ }
+  // Окно сделки и настройки открыты разом — обе стороны видят выбор.
+  try { window.dispatchEvent(new Event("mintly:скорость")); } catch { /* не браузер */ }
+}
+function useСкорость() {
   const [скорость, setСкорость] = useState(читатьСкорость);
-  if (!(сеть === "sol" || этоEVM(сеть))) return null;
-  const evm = этоEVM(сеть);
+  useEffect(() => {
+    const свежая = () => setСкорость(читатьСкорость());
+    window.addEventListener("mintly:скорость", свежая);
+    return () => window.removeEventListener("mintly:скорость", свежая);
+  }, []);
+  return [скорость, (id) => { setСкорость(id); запомнитьСкорость(id); }];
+}
+function ценаСкорости(таблица, сеть, id) {
+  const ru = lang !== "EN";
+  if (id === "normal") return ru ? "без доплаты" : "no extra fee";
+  const чаевые = этоEVM(сеть) ? ` · ${ru ? "чаевые" : "tip"} ×${(таблица.evmTip || {})[id] || 1}` : "";
+  return `+${fmtСумма(доплатаСкорости(таблица, сеть, id))} ${монетаСкорости(сеть)}${чаевые}`;
+}
+
+/* Выбор скорости в окне сделки — во всех сетях, с ценой в монете сети. */
+function ВыборСкорости({ сеть, style, onChange = null }) {
+  const [скорость, выбрать] = useСкорость();
+  const таблица = useТаблицаСкорости();
+  const ru = lang !== "EN";
+  const выбранная = СКОРОСТИ_СДЕЛКИ.find((с) => с.id === скорость) || СКОРОСТИ_СДЕЛКИ[1];
   return (
     <div style={style}>
-      <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>Скорость</span>
+      <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{ru ? "Скорость" : "Speed"}</span>
       <div className="flex gap-1.5 mt-1.5">
         {СКОРОСТИ_СДЕЛКИ.map((с) => (
-          <button key={с.id} type="button" aria-pressed={скорость === с.id} onClick={() => { haptic("light"); setСкорость(с.id); if (onChange) onChange(с.id); try { localStorage.setItem("mintly_trade_speed", с.id); } catch { /* приватный режим */ } }} className="fx-tap rounded-[16px] px-3 py-1.5 flex flex-col items-start" style={{ background: скорость === с.id ? T.ice : T.surfaceHi, color: скорость === с.id ? T.bg : T.muted, border: `1px solid ${скорость === с.id ? T.ice : T.line}`, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
-            <span>{с.имя}</span>
-            <span style={{ fontFamily: monoFont, fontSize: 10.5, fontWeight: 500, opacity: 0.75 }}>{evm ? с.платаEVM : с.плата}</span>
+          <button key={с.id} type="button" aria-pressed={скорость === с.id} onClick={() => { haptic("light"); выбрать(с.id); if (onChange) onChange(с.id); }} className="fx-tap rounded-[16px] px-3 py-1.5 flex flex-col items-start" style={{ flex: 1, minWidth: 0, background: скорость === с.id ? T.ice : T.surfaceHi, color: скорость === с.id ? T.bg : T.muted, border: `1px solid ${скорость === с.id ? T.ice : T.line}`, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
+            <span className="flex items-center" style={{ gap: 4 }}>{с.id === "turbo" && <Zap size={12} strokeWidth={2.6} />}{ru ? с.имя : с.имяEN}</span>
+            <span className="truncate" style={{ maxWidth: "100%", fontFamily: monoFont, fontSize: 10.5, fontWeight: 500, opacity: 0.75 }}>{ценаСкорости(таблица, сеть, с.id)}</span>
           </button>
         ))}
       </div>
+      <span style={{ display: "block", marginTop: 6, fontFamily: bodyFont, color: T.faint, fontSize: 11.5, lineHeight: 1.4 }}>{ru ? выбранная.суть : выбранная.сутьEN}</span>
     </div>
   );
 }
@@ -23503,6 +23565,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   const [amountStr, setAmountStr] = useState(tradeModal?.prefill ? String(tradeModal.prefill) : "");
   const [slippage, setSlippage] = useState(1);
   const [скорость, setСкорость] = useState(читатьСкорость);
+  const таблицаСкорости = useТаблицаСкорости();
   const [быстрые, сохранитьБыстрые] = useБыстрые();
   /* Одно нажатие — одна сделка. Второго подтверждения нет: окно
      закрывается в тот же миг, и нажать ещё раз уже некуда. */
@@ -23982,7 +24045,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           </div>
         </div>
 
-        {соло && <ВыборСкорости сеть="sol" style={{ marginTop: 14 }} onChange={setСкорость} />}
+        <ВыборСкорости сеть={соло ? "sol" : "ton"} style={{ marginTop: 14 }} onChange={setСкорость} />
 
         <div className="flex flex-col gap-1.5" style={{ marginTop: 14, fontFamily: monoFont, fontSize: 12, color: T.muted }}>
           <div className="flex justify-between"><span>{t("rate")}</span><span style={{ color: T.ice }}><ТекстСЧислами text={fmtPrice(token.price)} /> / ${token.ticker}</span></div>
@@ -23992,7 +24055,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           <div className="flex justify-between"><span>{t("networkFee")}</span><span style={{ color: T.ice }}>
             <ТекстСЧислами text={соло
               ? `≈0.003 SOL${solPriceUsd > 0 ? ` ($${(0.003 * solPriceUsd).toFixed(2)})` : ""}`
-              : `${NETWORK_FEE_TON} TON ($${feeUsd.toFixed(2)})`} />
+              : `${NETWORK_FEE_TON} ${ТИКЕР_TON} ($${feeUsd.toFixed(2)})`} />
           </span></div>
           <div className="flex justify-between"><span>{t("minReceive")}</span><span style={{ color: T.ice }}><ТекстСЧислами text={amount > 0 ? (isBuy ? `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 0 })} ${token.ticker}` : `${(estimate * (1 - slippage / 100)).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`) : "—"} /></span></div>
           {/* Итог — сколько всего уйдёт с кошелька: сумма, комиссия сети и
@@ -24002,7 +24065,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
             <div className="flex justify-between" style={{ color: T.ice, fontWeight: 700, fontSize: 13, marginTop: 2 }}>
               <span>{isBuy ? "Итого спишется" : "Итого придёт"}</span>
               <span><ТекстСЧислами text={(() => {
-                const fee = соло ? 0.003 + (ДОПЛАТА_СКОРОСТИ_SOL[скорость] || 0) : NETWORK_FEE_TON;
+                const fee = (соло ? 0.003 : NETWORK_FEE_TON) + доплатаСкорости(таблицаСкорости, соло ? "sol" : "ton", скорость);
                 const сумма = isBuy ? amount + fee : Math.max(0, estimate - fee);
                 const курс = соло ? solPriceUsd : tonPriceUsd;
                 return `${isBuy ? "" : "≈ "}${сумма.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}${курс > 0 ? ` ($${(сумма * курс).toFixed(2)})` : ""}`;
@@ -25509,6 +25572,8 @@ function НастройкаБыстрых() {
         <ToggleSwitch on={н.oneClick} onChange={(v) => { haptic("light"); сохранить({ oneClick: v }); }} />
       </div>
 
+      <НастройкаСкорости />
+
       <div className="fx-card" style={{ animationDelay: "100ms" }}>
         <SectionTitle>{ru ? "Суммы покупки" : "Buy amounts"}</SectionTitle>
         <div className="flex flex-col" style={{ gap: 14, padding: "14px 16px", borderRadius: 22, background: T.surface }}>
@@ -25533,6 +25598,57 @@ function НастройкаБыстрых() {
         {ru ? "Нажми на карандаш, чтобы поменять суммы. Сеть сама берёт свою монету: в Solana — SOL, в TON — GRAM." : "Tap the pencil to change amounts. Each network uses its own coin."}
       </p>
     </>
+  );
+}
+
+/* Скорость в «Быстрой покупке» — одна на все сети, та же, что в окне
+   сделки. Под каждой — что она делает и сколько стоит в каждой монете:
+   без этой строки «Молния» выглядела бы бесплатной. */
+function НастройкаСкорости() {
+  const [скорость, выбрать] = useСкорость();
+  const таблица = useТаблицаСкорости();
+  const ru = lang !== "EN";
+  const монеты = [["sol", "SOL"], ["ton", ТИКЕР_TON], ["bsc", "BNB"], ["base", "ETH"]];
+  return (
+    <div className="fx-card" style={{ animationDelay: "70ms" }}>
+      <SectionTitle>{ru ? "Скорость сделки" : "Trade speed"}</SectionTitle>
+      <div className="flex flex-col" style={{ gap: 8 }}>
+        {СКОРОСТИ_СДЕЛКИ.map((с) => {
+          const выбрана = скорость === с.id;
+          return (
+            <button
+              key={с.id}
+              type="button"
+              aria-pressed={выбрана}
+              onClick={() => { if (!выбрана) { haptic("light"); выбрать(с.id); } }}
+              className="fx-tap flex flex-col text-left"
+              style={{
+                gap: 4, padding: "13px 16px", borderRadius: 20, background: T.surface,
+                border: `1px solid ${выбрана ? T.ice : "transparent"}`, transition: "border-color 160ms ease",
+              }}
+            >
+              <span className="flex items-center justify-between" style={{ gap: 10 }}>
+                <span className="flex items-center" style={{ gap: 6, fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>
+                  {с.id === "turbo" && <Zap size={15} strokeWidth={2.4} />}{ru ? с.имя : с.имяEN}
+                </span>
+                {выбрана && <CheckCircle2 size={17} color={T.ice} />}
+              </span>
+              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.4 }}>{ru ? с.суть : с.сутьEN}</span>
+              <span style={{ fontFamily: monoFont, color: с.id === "normal" ? T.faint : T.ice, fontSize: 11.5, lineHeight: 1.5 }}>
+                <ТекстСЧислами text={с.id === "normal"
+                  ? (ru ? "без доплаты" : "no extra fee")
+                  : монеты.map(([к, м]) => `+${fmtСумма(доплатаСкорости(таблица, к, с.id))} ${м}`).join(" · ")} />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <p style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, lineHeight: 1.5, marginTop: 8 }}>
+        {ru
+          ? "Доплата — чаевые сети за ближайший блок и наценка площадке за быстрый путь сделки. В TON аукциона за блок нет: там «Молния» ускоряет отправку и проверку."
+          : "The extra fee is the network tip for the next block plus a platform markup for the fast lane. TON has no block auction: there Turbo speeds up sending and checking."}
+      </p>
+    </div>
   );
 }
 

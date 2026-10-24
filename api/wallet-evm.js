@@ -26,6 +26,8 @@
 import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { нуженВторойКлюч } from "./_second.js";
+import { занятьПоОчереди } from "./_walletLock.js";
+import { скоростьИз, наценка } from "./_speed.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -121,9 +123,14 @@ async function ethersLib() {
 const провайдеры = new Map();
 async function провайдер(сеть) {
   if (!провайдеры.has(сеть)) {
-    const { JsonRpcProvider, Network } = await ethersLib();
+    const { JsonRpcProvider, Network, FetchRequest } = await ethersLib();
     const с = СЕТИ[сеть];
-    провайдеры.set(сеть, new JsonRpcProvider(с.rpc, Network.from(с.chainId), { staticNetwork: true }));
+    /* Срок на запрос — пятнадцать секунд. По умолчанию библиотека ждёт
+       ответа узла пять минут, а отправка сделки идёт под очередью
+       кошелька: один зависший запрос держал бы все сделки человека. */
+    const запрос = new FetchRequest(с.rpc);
+    запрос.timeout = 15_000;
+    провайдеры.set(сеть, new JsonRpcProvider(запрос, Network.from(с.chainId), { staticNetwork: true }));
   }
   return провайдеры.get(сеть);
 }
@@ -316,10 +323,20 @@ async function виртуальныеЗапасы() {
    советует сам узел; «Быстро» и «Молния» — вдвое и вчетверо больше
    чаевых. Платит покупатель: доплата уходит в газ его же сделки. */
 const МНОЖИТЕЛЬ_СКОРОСТИ = { normal: 10n, fast: 20n, turbo: 40n };
+// Цены газа помним три секунды: спрашивать их на каждую сделку — лишний
+// круг к узлу, а за три секунды они не уходят далеко.
+const ценыГаза = new Map(); // сеть -> { до, г }
+async function данныеГаза(сеть) {
+  const было = ценыГаза.get(сеть);
+  if (было && было.до > Date.now()) return было.г;
+  const г = await (await провайдер(сеть)).getFeeData();
+  ценыГаза.set(сеть, { до: Date.now() + 3000, г });
+  return г;
+}
 async function платаЗаСкорость(сеть, скорость) {
   const м = МНОЖИТЕЛЬ_СКОРОСТИ[скорость] || МНОЖИТЕЛЬ_СКОРОСТИ.fast;
   if (м === 10n) return {};
-  const г = await (await провайдер(сеть)).getFeeData();
+  const г = await данныеГаза(сеть);
   if (г.maxFeePerGas) {
     // Узлы L2 советуют чаевые около нуля — от нуля вдвое ничего не
     // прибавить, поэтому берём хотя бы 0,01 gwei.
@@ -330,6 +347,124 @@ async function платаЗаСкорость(сеть, скорость) {
   // Цена газа без чаевых (BNB Chain): «Быстро» — в полтора раза выше,
   // «Молния» — в два с половиной.
   return г.gasPrice ? { gasPrice: (г.gasPrice * (10n + (м - 10n) / 2n)) / 10n } : {};
+}
+
+/* Номер транзакции (nonce) — свой учёт поверх узла. Узел помнит ответ на
+   одинаковый запрос четверть секунды, и две сделки подряд получали один
+   номер: вторая отбивалась «nonce too low». Номер теперь — больший из
+   того, что говорит узел, и следующего за своим последним; выдаётся под
+   очередью кошелька (api/_walletLock.js), так что быстрые нажатия идут
+   друг за другом, а не друг в друга. */
+const номераEVM = new Map(); // сеть:адрес -> { следующий, at }
+async function номерEVM(п, сеть, адрес) {
+  const узел = await п.getTransactionCount(адрес, "pending");
+  const свой = номераEVM.get(`${сеть}:${String(адрес).toLowerCase()}`);
+  return свой && Date.now() - свой.at < 120_000 ? Math.max(узел, свой.следующий) : узел;
+}
+function занятьНомерEVM(сеть, адрес, nonce) {
+  номераEVM.set(`${сеть}:${String(адрес).toLowerCase()}`, { следующий: Number(nonce) + 1, at: Date.now() });
+  if (номераEVM.size > 5000) номераEVM.clear();
+}
+
+/* Чек сделки — своим опросом, по скорости. Библиотека ждёт блок, опрашивая
+   узел раз в четыре секунды: сделка, попавшая в блок BNB Chain за
+   0,75 с, висела у человека ещё три. «Обычно» спрашивает раз в 1,5 с,
+   «Быстро» — в 0,5 с, «Молния» — каждые 0,15 с. */
+const ШАГ_ЧЕКА = { normal: 1500, fast: 500, turbo: 150 };
+async function чекEVM(с, хеш, скорость) {
+  const шаг = ШАГ_ЧЕКА[скорость] || 500;
+  const до = Date.now() + 120_000;
+  while (Date.now() < до) {
+    const ответ = await fetch(с.rpc, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionReceipt", params: [хеш] }),
+      signal: AbortSignal.timeout(8000),
+    }).then((r) => r.json()).catch(() => null);
+    const чек = ответ && ответ.result;
+    if (чек && чек.blockNumber) return { status: Number(чек.status), blockNumber: Number(чек.blockNumber) };
+    await new Promise((r) => setTimeout(r, шаг));
+  }
+  return null;
+}
+
+/* Газ на сделку — своей оценкой, вместе с ценой и номером. Библиотека
+   оценивает газ уже после них, отдельным кругом к узлу, а узел изредка
+   не отвечает на оценку вовсе: сделка висела до срока запроса и держала
+   очередь кошелька. Здесь у оценки короткий срок по скорости, зависшую
+   спрашиваем заново; отказ узла (сделка не пройдёт) не повторяем. Цена
+   «не меньше» в оценке — ноль: путь исполнения тот же, а ждать цену ради
+   оценки — лишний круг. Запас — пятая часть: оценка — по последнему
+   блоку, а сделка ляжет в следующий. */
+const СРОК_ОЦЕНКИ = { normal: 8000, fast: 4000, turbo: 2500 };
+async function газСделкиEVM(с, { from, to, data, value = 0n }, скорость) {
+  const срок = СРОК_ОЦЕНКИ[скорость] || 4000;
+  let ошибка;
+  for (let попытка = 0; попытка < 3; попытка++) {
+    let ответ;
+    try {
+      ответ = await fetch(с.rpc, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_estimateGas", params: [{ from, to, data, value: "0x" + value.toString(16) }] }),
+        signal: AbortSignal.timeout(срок),
+      }).then((r) => r.json());
+    } catch (e) {
+      ошибка = e;
+      continue;
+    }
+    if (ответ && ответ.result) return (BigInt(ответ.result) * 12n) / 10n;
+    throw new Error((ответ && ответ.error && ответ.error.message) || "оценка газа не удалась");
+  }
+  throw ошибка;
+}
+
+/* «Молния» шлёт подписанную сделку ещё и в свои узлы (EVM_SEND_URLS_<СЕТЬ>
+   через запятую): в блок попадает та копия, что дошла первой, номер у
+   них один — дважды сделка не пройдёт. */
+async function разослатьEVM(сеть, tx) {
+  const адреса = String(process.env[`EVM_SEND_URLS_${сеть.toUpperCase()}`] || "").split(",").map((а) => а.trim()).filter(Boolean);
+  if (!адреса.length) return;
+  let сырой;
+  try { сырой = (await ethersLib()).Transaction.from(tx).serialized; } catch { return; }
+  for (const а of адреса) {
+    fetch(а, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_sendRawTransaction", params: [сырой] }),
+    }).catch(() => {});
+  }
+}
+
+/* Наценка площадке за скорость (api/_speed.js) — отдельным переводом
+   после сделки: в вызов фабрики её не вложить. Получатель — тот же, кому
+   фабрика шлёт комиссию (feeRecipient), или EVM_FEE_ADDRESS. Перевод
+   ждать не нужно: номер за ним закреплён, следующая сделка пойдёт после. */
+const получателиНаценки = new Map();
+async function взятьНаценку(сеть, с, w, ключОчереди, скорость) {
+  const сколько = наценка(сеть, скорость);
+  if (!(сколько > 0) || !с.фабрика) return;
+  try {
+    const { Contract, parseUnits } = await ethersLib();
+    let кому = (process.env.EVM_FEE_ADDRESS || "").trim() || получателиНаценки.get(сеть);
+    if (!кому) {
+      кому = await new Contract(с.фабрика, ["function feeRecipient() view returns (address)"], await провайдер(сеть)).feeRecipient();
+      получателиНаценки.set(сеть, кому);
+    }
+    if (!кому || /^0x0{40}$/i.test(кому)) return;
+    const отпустить = await занятьПоОчереди(ключОчереди, { ждать: 30_000, предел: 6 });
+    try {
+      const nonce = await номерEVM(w.provider, сеть, w.address);
+      const tx = await w.sendTransaction({ to: кому, value: вЕдиницы(parseUnits, сколько), gasLimit: 21000n, nonce });
+      занятьНомерEVM(сеть, w.address, tx.nonce);
+      // Наблюдатель блоков не примет её за вывод (api/_evmWatch.js).
+      import("./_evmWatch.js").then(({ свойПереводEVM }) => свойПереводEVM(tx.hash)).catch(() => {});
+    } finally {
+      отпустить();
+    }
+  } catch (e) {
+    console.warn("[wallet-evm] наценка не ушла:", (e && (e.shortMessage || e.message)) || e);
+  }
 }
 
 /* Число монет — в мельчайшие единицы без хвоста двоичной дроби: 0.3
@@ -446,7 +581,7 @@ export default async function handler(req, res) {
     // Проскальзывание: от 0,5% до 20%, по умолчанию 5% — мемкоин на
     // кривой двигается быстро.
     const проск = BigInt(Math.max(50, Math.min(2000, Number(тело.slippageBps) || 500)));
-    const скорость = String(тело.speed || "fast");
+    const скорость = скоростьИз(тело.speed);
 
     if (действие === "launch") {
       const имя = String(тело.name || "").trim().slice(0, 64);
@@ -465,7 +600,14 @@ export default async function handler(req, res) {
       const к = new Contract(с.фабрика, ABI_КРИВОЙ, w);
       const плата = await к.launchFee();
       const value = плата + вЕдиницы(parseUnits, покупка);
-      const tx = await к.create(имя, тикер, метаданные, 0, { value, ...(await платаЗаСкорость(сеть, скорость)) });
+      const отпуститьЗапуск = await занятьПоОчереди(`evm:${user.id}:${сеть}`, { ждать: 30_000, предел: 4 });
+      let tx;
+      try {
+        tx = await к.create(имя, тикер, метаданные, 0, { value, ...(await платаЗаСкорость(сеть, скорость)), nonce: await номерEVM(await провайдер(сеть), сеть, строка.address) });
+        занятьНомерEVM(сеть, строка.address, tx.nonce);
+      } finally {
+        отпуститьЗапуск();
+      }
       const r = await tx.wait(1, 120_000);
       if (!r || r.status !== 1) throw new Error("запуск не прошёл");
       let токен = null;
@@ -489,12 +631,21 @@ export default async function handler(req, res) {
       const токен = String(тело.token || "");
       const сумма = Number(тело.amount) || 0;
       if (!адресОк(токен) || !(сумма > 0)) return res.status(400).json({ error: "bad_request" });
-      const оп = await начать(db, user, { дело: действие, сеть, сумма, ключЗапроса, ip });
-      if (оп.повтор) return res.status(200).json({ ok: true, repeat: true, tx: оп.signature });
       const w = await подписант(строка, набор, user, сеть);
       const к = new Contract(с.фабрика, ABI_КРИВОЙ, w);
+      // «Молния» пишет журнал одновременно с чтением кривой: друг от друга
+      // они не зависят, а отправка всё равно ждёт обоих.
+      const [оп, кривая] = скорость === "turbo"
+        ? await Promise.all([начать(db, user, { дело: действие, сеть, сумма, ключЗапроса, ip }), к.curves(токен)])
+        : [await начать(db, user, { дело: действие, сеть, сумма, ключЗапроса, ip }), null];
+      if (оп.повтор) return res.status(200).json({ ok: true, repeat: true, tx: оп.signature });
+      const [, , , вышел] = кривая || await к.curves(токен);
+      // Отправка — под очередью кошелька и со своим номером (см. номерEVM).
+      const ключОчереди = `evm:${user.id}:${сеть}`;
+      const п = await провайдер(сеть);
+      const отпустить = await занятьПоОчереди(ключОчереди, { ждать: 30_000, предел: 4 });
       let tx;
-      const [, , , вышел] = await к.curves(токен);
+      try {
       if (вышел) {
         /* Кривая закрыта, токен на бирже: обмен через роутер V2. Срок —
            десять минут: дольше висящая сделка исполнилась бы по цене,
@@ -507,7 +658,7 @@ export default async function handler(req, res) {
           const value = вЕдиницы(parseUnits, сумма);
           const путь = [weth, токен];
           const [, ожидаем] = await роутер.getAmountsOut(value, путь);
-          tx = await роутер.swapExactETHForTokensSupportingFeeOnTransferTokens((ожидаем * (10000n - проск)) / 10000n, путь, строка.address, срок, { value, ...газ });
+          tx = await роутер.swapExactETHForTokensSupportingFeeOnTransferTokens((ожидаем * (10000n - проск)) / 10000n, путь, строка.address, срок, { value, ...газ, nonce: await номерEVM(п, сеть, строка.address) });
         } else {
           const tokensIn = тело.raw && /^\d+$/.test(String(тело.raw)) ? BigInt(тело.raw) : вЕдиницы(parseUnits, сумма);
           const путь = [токен, weth];
@@ -515,26 +666,44 @@ export default async function handler(req, res) {
           // Разрешение роутеру — один раз и сразу на всё: второе
           // подтверждение на каждую продажу только удлиняло бы сделку.
           if ((await т.allowance(строка.address, с.роутер)) < tokensIn) {
-            const одобр = await т.approve(с.роутер, (1n << 256n) - 1n, газ);
-            await одобр.wait(1, 120_000);
+            const одобр = await т.approve(с.роутер, (1n << 256n) - 1n, { ...газ, nonce: await номерEVM(п, сеть, строка.address) });
+            занятьНомерEVM(сеть, строка.address, одобр.nonce);
+            await чекEVM(с, одобр.hash, скорость);
           }
           const [, ожидаем] = await роутер.getAmountsOut(tokensIn, путь);
-          tx = await роутер.swapExactTokensForETHSupportingFeeOnTransferTokens(tokensIn, (ожидаем * (10000n - проск)) / 10000n, путь, строка.address, срок, газ);
+          tx = await роутер.swapExactTokensForETHSupportingFeeOnTransferTokens(tokensIn, (ожидаем * (10000n - проск)) / 10000n, путь, строка.address, срок, { ...газ, nonce: await номерEVM(п, сеть, строка.address) });
         }
       } else if (действие === "buy") {
         const value = вЕдиницы(parseUnits, сумма);
-        const [ожидаем] = await к.quoteBuy(токен, value);
-        tx = await к.buy(токен, (ожидаем * (10000n - проск)) / 10000n, { value, ...(await платаЗаСкорость(сеть, скорость)) });
+        const [[ожидаем], газ, nonce, gasLimit] = await Promise.all([
+          к.quoteBuy(токен, value),
+          платаЗаСкорость(сеть, скорость),
+          номерEVM(п, сеть, строка.address),
+          газСделкиEVM(с, { from: строка.address, to: с.фабрика, data: к.interface.encodeFunctionData("buy", [токен, 0n]), value }, скорость),
+        ]);
+        tx = await к.buy(токен, (ожидаем * (10000n - проск)) / 10000n, { value, ...газ, nonce, gasLimit });
       } else {
         // Продают в токенах; «всё» приходит точной строкой raw, чтобы
         // округление не оставило пылинку на кошельке.
         const tokensIn = тело.raw && /^\d+$/.test(String(тело.raw)) ? BigInt(тело.raw) : вЕдиницы(parseUnits, сумма);
-        const ожидаем = await к.quoteSell(токен, tokensIn);
-        tx = await к.sell(токен, tokensIn, (ожидаем * (10000n - проск)) / 10000n, await платаЗаСкорость(сеть, скорость));
+        const [ожидаем, газ, nonce, gasLimit] = await Promise.all([
+          к.quoteSell(токен, tokensIn),
+          платаЗаСкорость(сеть, скорость),
+          номерEVM(п, сеть, строка.address),
+          газСделкиEVM(с, { from: строка.address, to: с.фабрика, data: к.interface.encodeFunctionData("sell", [токен, tokensIn, 0n]) }, скорость),
+        ]);
+        tx = await к.sell(токен, tokensIn, (ожидаем * (10000n - проск)) / 10000n, { ...газ, nonce, gasLimit });
       }
-      const r = await tx.wait(1, 120_000);
+      занятьНомерEVM(сеть, строка.address, tx.nonce);
+      } finally {
+        отпустить();
+      }
+      if (скорость === "turbo") разослатьEVM(сеть, tx);
+      const r = await чекEVM(с, tx.hash, скорость);
       if (!r || r.status !== 1) throw new Error("сделка не прошла");
       await завершить(db, оп.id, tx.hash);
+      // Наценка за скорость — после того, как сделка прошла.
+      взятьНаценку(сеть, с, w, ключОчереди, скорость);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ ok: true, tx: tx.hash });
     }
@@ -584,7 +753,16 @@ export default async function handler(req, res) {
       const плата = газ.maxFeePerGas
         ? { maxFeePerGas: цена, maxPriorityFeePerGas: газ.maxPriorityFeePerGas && газ.maxPriorityFeePerGas < цена ? газ.maxPriorityFeePerGas : цена }
         : { gasPrice: цена };
-      const tx = await w.sendTransaction({ to: кому, value: сумма, gasLimit: 21000n, ...плата });
+      // Под очередью кошелька и со своим номером — как у сделок (номерEVM):
+      // наценка прошлой сделки могла ещё не дойти до узла.
+      const отпуститьВывод = await занятьПоОчереди(`evm:${user.id}:${сеть}`, { ждать: 30_000, предел: 4 });
+      let tx;
+      try {
+        tx = await w.sendTransaction({ to: кому, value: сумма, gasLimit: 21000n, ...плата, nonce: await номерEVM(п, сеть, строка.address) });
+        занятьНомерEVM(сеть, строка.address, tx.nonce);
+      } finally {
+        отпуститьВывод();
+      }
       // Перевод записывает сам обработчик — наблюдатель блоков второй раз
       // его не кладёт (api/_evmWatch.js).
       import("./_evmWatch.js").then(({ свойПереводEVM }) => свойПереводEVM(tx.hash)).catch(() => {});

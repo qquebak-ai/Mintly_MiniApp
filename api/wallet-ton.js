@@ -29,7 +29,8 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 import { нуженВторойКлюч } from "./_second.js";
-import { занятьПоОчереди, свободныйНомер, занятьНомер } from "./_walletLock.js";
+import { занятьПоОчереди, свободныйНомер, занятьНомер, номерЖдёт } from "./_walletLock.js";
+import { скоростьИз, наценка } from "./_speed.js";
 
 const TESTNET = process.env.TON_TESTNET === "1";
 const TONAPI = TESTNET ? "https://testnet.tonapi.io" : "https://tonapi.io";
@@ -207,6 +208,33 @@ async function подписант(строка, набор, user) {
     apiKey: process.env.TONCENTER_API_KEY || undefined,
   });
   return { пара, контракт, client, кошелёк: client.open(контракт) };
+}
+
+/* Кошелёк комиссии площадки — тот же, что зашит в кривые и пулы
+   (АДРЕС_КОМИССИИ в src/tonLaunchCore.js). На него уходит наценка за
+   скорость (api/_speed.js). */
+const КОШЕЛЁК_КОМИССИИ = (process.env.TON_FEE_ADDRESS || "0QClGN5huzz-Z3bwgxr7GOPe5Jyi8PNKbsNnDFKFNGbjunBZ").trim();
+
+/* Отправка перевода — по скорости. «Обычно» — как раньше: библиотека
+   сперва спрашивает узел, развёрнут ли кошелёк, и шлёт в toncenter.
+   «Быстро» и «Молния» собирают внешнее сообщение сами — кошелёк с
+   номером больше нуля уже развёрнут, спрашивать об этом незачем, это
+   круг к узлу, — и шлют его сразу в toncenter и tonapi: принял любой —
+   перевод в сети, а дубль тот же номер сеть отбросит. */
+async function отправитьПеревод({ кошелёк: открытый, контракт, client }, args, скорость = "fast") {
+  if (скорость === "normal") return открытый.sendTransfer(args);
+  const { external, beginCell, storeMessage } = await библиотеки();
+  const тело = контракт.createTransfer({ seqno: args.seqno, secretKey: args.secretKey, messages: args.messages, sendMode: args.sendMode });
+  const внешнее = external({ to: контракт.address, init: args.seqno === 0 ? контракт.init : undefined, body: тело });
+  const boc = beginCell().store(storeMessage(внешнее)).endCell().toBoc();
+  const пути = [client.sendFile(boc)];
+  пути.push(fetch(`${TONAPI}/v2/blockchain/message`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(TONAPI_KEY ? { Authorization: `Bearer ${TONAPI_KEY}` } : {}) },
+    body: JSON.stringify({ boc: boc.toString("base64") }),
+    signal: AbortSignal.timeout(8000),
+  }).then((r) => { if (!r.ok) throw new Error(`tonapi ${r.status}`); }));
+  await Promise.any(пути).catch((e) => { throw (e && e.errors && e.errors[0]) || e; });
 }
 
 // Последний ответ по адресу: на сбой узла — он, а не ноль (см. Solana).
@@ -511,7 +539,9 @@ export async function отказатьсяОтВыпуска(db, токен) {
    кривую, пока изменение не пришло, и отдаёт его вестям (api/notify.js):
    сделавшему — «прошла», владельцу токена — о покупке или продаже. Без
    него о сделке писал только обход раз в десять минут. */
-async function следитьЗаСвоейСделкой(токен, user, { продажа, сумма = 0, штук = 0 }) {
+async function следитьЗаСвоейСделкой(токен, user, { продажа, сумма = 0, штук = 0, скорость = "fast" }) {
+  // «Молния» спрашивает кривую чаще: «прошла» и весть владельцу — раньше.
+  const шаг = скорость === "turbo" ? 400 : скорость === "fast" ? 900 : 1500;
   if (!process.env.TRADING_BOT_TOKEN || !токен.curve_address || !токен.address) return;
   try {
     const [{ вестиПоКривой, своюСделку, своюСделкуЖдём }, { состояние }] = await Promise.all([
@@ -521,7 +551,7 @@ async function следитьЗаСвоейСделкой(токен, user, { п
     const до = Date.now() + 45_000;
     let прошлое = null;
     while (Date.now() < до && своюСделкуЖдём(токен.address, ид)) {
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, шаг));
       const st = await состояние(токен.curve_address).catch(() => null);
       if (!st) continue;
       const собрано = Number(st.realTon) / 1e9;
@@ -700,11 +730,20 @@ export default async function handler(req, res) {
          seqno вырос), и только потом смотрим остаток — у того же узла, что
          отвечает за номер. Иначе при быстрых нажатиях вторая покупка
          проверялась по остатку до первой. */
-      const { пара, контракт, client, кошелёк: открытый } = await подписант(строка, набор, user);
-      const seqno = await свободныйНомер(открытый, номерКошелька(user));
-      const есть = await client.getBalance(контракт.address).then((б) => Number(б) / 1e9).catch(() => баланс(строка.address));
+      /* Скорость (api/_speed.js): наценка площадке уходит тем же переводом,
+         а «Быстро» и «Молния» читают номер и остаток разом, если прошлый
+         перевод кошелька уже принят. */
+      const скорость = скоростьИз(тело.speed);
+      const надбавка = наценка("ton", скорость);
+      const подпис = await подписант(строка, набор, user);
+      const { пара, контракт, client, кошелёк: открытый } = подпис;
+      const остаток = () => client.getBalance(контракт.address).then((б) => Number(б) / 1e9).catch(() => баланс(строка.address));
+      const разом = скорость !== "normal" && !номерЖдёт(номерКошелька(user));
+      const [seqno, есть] = разом
+        ? await Promise.all([свободныйНомер(открытый, номерКошелька(user)), остаток()])
+        : [await свободныйНомер(открытый, номерКошелька(user)), await остаток()];
       // Покупка плюс газ: у кривой — 0,15 на сообщение и сеть, у биржи больше.
-      const нужно = сумма + (кеш && кеш.graduated ? 0.45 : 0.2);
+      const нужно = сумма + (кеш && кеш.graduated ? 0.45 : 0.2) + надбавка;
       if (есть < нужно) return res.status(400).json({ error: "not_enough", have: есть, need: нужно });
 
       // Вышел на STON.fi — покупка обменом через роутер биржи.
@@ -727,7 +766,7 @@ export default async function handler(req, res) {
         .storeCoins(0n)   // без ограничения проскальзывания: цену считает контракт
         .endCell();
 
-      await открытый.sendTransfer({
+      await отправитьПеревод(подпис, {
         seqno,
         secretKey: пара.secretKey,
         sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
@@ -736,8 +775,8 @@ export default async function handler(req, res) {
           value: toNano(сумма.toFixed(9)) + ГАЗ_ПОКУПКИ,
           body: тело_,
           bounce: true,
-        })],
-      });
+        }), ...(надбавка > 0 ? [internal({ to: Address.parse(КОШЕЛЁК_КОМИССИИ), value: toNano(надбавка.toFixed(9)), bounce: false })] : [])],
+      }, скорость);
 
       занятьНомер(номерКошелька(user), seqno);
       await завершить(db, оп.id, `seqno:${seqno}`);
@@ -747,7 +786,7 @@ export default async function handler(req, res) {
       // только контракт кривой.
       if (!(кеш && кеш.graduated)) {
         подтолкнутьЦену(tokenId, токен.curve_address).catch(() => {});
-        следитьЗаСвоейСделкой(токен, user, { продажа: false, сумма }).catch(() => {});
+        следитьЗаСвоейСделкой(токен, user, { продажа: false, сумма, скорость }).catch(() => {});
       }
       return res.status(200).json({ ok: true, seqno });
     }
@@ -780,9 +819,16 @@ export default async function handler(req, res) {
 
       // Как у покупки: остатки читаем после того, как прошлая сделка
       // этого кошелька принята сетью.
-      const { пара, контракт, client, кошелёк: открытый } = await подписант(строка, набор, user);
-      const seqno = await свободныйНомер(открытый, номерКошелька(user));
-      const мой = await жетонныйКошелёк(строка.address, токен.address);
+      const скорость = скоростьИз(тело.speed);
+      const надбавка = наценка("ton", скорость);
+      const подпис = await подписант(строка, набор, user);
+      const { пара, контракт, client, кошелёк: открытый } = подпис;
+      const разом = скорость !== "normal" && !номерЖдёт(номерКошелька(user));
+      const остаток = () => client.getBalance(контракт.address).then((б) => Number(б) / 1e9).catch(() => баланс(строка.address));
+      // Номер, свой кошелёк жетона и остаток — разом, если прошлый перевод принят.
+      const [seqno, мой, естьСразу] = разом
+        ? await Promise.all([свободныйНомер(открытый, номерКошелька(user)), жетонныйКошелёк(строка.address, токен.address), остаток()])
+        : [await свободныйНомер(открытый, номерКошелька(user)), await жетонныйКошелёк(строка.address, токен.address), null];
       if (!мой) return res.status(400).json({ error: "no_jetton_wallet" });
       // Больше, чем есть, не продаём: сеть такое сообщение просто
       // отобьёт, а газ спишется.
@@ -790,8 +836,8 @@ export default async function handler(req, res) {
       const сколькоБигом = мой.balance != null && BigInt(мой.balance) < хочет ? BigInt(мой.balance) : хочет;
       if (!(сколькоБигом > 0n)) return res.status(400).json({ error: "not_enough" });
 
-      const есть = await client.getBalance(контракт.address).then((б) => Number(б) / 1e9).catch(() => баланс(строка.address));
-      if (есть < 0.35) return res.status(400).json({ error: "not_enough_gas", have: есть, need: 0.35 });
+      const есть = естьСразу != null ? естьСразу : await остаток();
+      if (есть < 0.35 + надбавка) return res.status(400).json({ error: "not_enough_gas", have: есть, need: 0.35 + надбавка });
       const наБирже = await сделкаНаSTON(токен, кеш, { покупка: false, сумма: Number(сколькоБигом) / 1e9, кошелёк: строка.address });
 
       /* Та же отметка, что и у покупки: повтор запроса не продаёт
@@ -818,7 +864,7 @@ export default async function handler(req, res) {
         .storeRef(пометка)
         .endCell();
 
-      await открытый.sendTransfer({
+      await отправитьПеревод(подпис, {
         seqno,
         secretKey: пара.secretKey,
         sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
@@ -827,15 +873,15 @@ export default async function handler(req, res) {
           value: ГАЗ_ПРОДАЖИ,
           body: тело_,
           bounce: true,
-        })],
-      });
+        }), ...(надбавка > 0 ? [internal({ to: Address.parse(КОШЕЛЁК_КОМИССИИ), value: toNano(надбавка.toFixed(9)), bounce: false })] : [])],
+      }, скорость);
 
       занятьНомер(номерКошелька(user), seqno);
       await завершить(db, опПродажи.id, `seqno:${seqno}`);
       res.setHeader("Cache-Control", "no-store");
       if (!(кеш && кеш.graduated)) {
         подтолкнутьЦену(tokenId, токен.curve_address).catch(() => {});
-        следитьЗаСвоейСделкой(токен, user, { продажа: true, штук: Number(сколькоБигом) / 1e9 }).catch(() => {});
+        следитьЗаСвоейСделкой(токен, user, { продажа: true, штук: Number(сколькоБигом) / 1e9, скорость }).catch(() => {});
       }
       return res.status(200).json({ ok: true, seqno });
     }
@@ -954,3 +1000,6 @@ export default async function handler(req, res) {
     if (отпустить) отпустить();
   }
 }
+
+// Для проверки без сети (как заменитьБазуДляПроверки в api/wallet-evm.js).
+export const дляПроверки = { отправитьПеревод, КОШЕЛЁК_КОМИССИИ };
