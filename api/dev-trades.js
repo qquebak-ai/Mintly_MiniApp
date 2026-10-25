@@ -35,12 +35,13 @@ export default async function handler(req, res) {
     if (!токен || !токен.owner_id) { res.status(200).json({ trades: [] }); return; }
     const { data } = await db
       .from("trades")
-      .select("side, created_at, ton_amount")
+      .select("side, created_at, ton_amount, token_amount, ton_price_usd")
       .eq("token_address", адрес)
       .eq("user_id", токен.owner_id)
       .order("created_at", { ascending: false })
       .limit(100);
-    const тело = { owner: токен.owner_id, trades: (data || []).map((с) => ({ side: с.side, at: с.created_at, coin: Number(с.ton_amount) || 0 })) };
+    // Сколько токенов и по какому курсу — для суммы в подсказке над свечой.
+    const тело = { owner: токен.owner_id, trades: (data || []).map((с) => ({ side: с.side, at: с.created_at, coin: Number(с.ton_amount) || 0, tokens: Number(с.token_amount) || 0, usd: (Number(с.ton_amount) || 0) * (Number(с.ton_price_usd) || 0) })) };
     кеш.set(адрес, { до: Date.now() + ПАМЯТЬ_МС, тело });
     res.status(200).json(тело);
   } catch {
