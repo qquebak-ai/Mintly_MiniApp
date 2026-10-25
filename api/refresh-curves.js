@@ -141,6 +141,14 @@ export function цена(realTon, params) {
   return Number(резервTon) / Number(резервТокенов);
 }
 
+/* Короткий след кошелька — хвост адреса. По нему «В центре внимания»
+   (api/spotlight.js) считает, сколько разных людей покупали токен, а сам
+   адрес в истории для графика хранить незачем. */
+export function следКошелька(адрес) {
+  const а = адрес && typeof адрес === "object" ? адрес.address : адрес;
+  return typeof а === "string" && а.length > 16 ? а.toLowerCase().slice(-16) : null;
+}
+
 /* Сделки кривой из её транзакций. У покупки берём приложенную сумму за
    вычетом газа и комиссии, у продажи — сколько TON ушло продавцу: обе
    величины видны в транзакции и не требуют разбора тела сообщения. */
@@ -159,7 +167,7 @@ async function сделки(address, feeBps) {
       const чисто = пришло - (пришло * feeBps) / 10000n;
       if (чисто <= 0n) continue;
       резерв += чисто;
-      ряд.push({ time: tx.utime, ton: чисто, realTon: резерв });
+      ряд.push({ time: tx.utime, ton: чисто, realTon: резерв, покупатель: следКошелька(in_.source) });
     } else if (op === OP_JETTON_NOTIFY) {
       // Продажа: кривая платит TON обычными переводами без опкода.
       const выплата = (tx.out_msgs || []).reduce((s, m) => (opCode(m) ? s : s + BigInt(m.value || 0)), 0n);
@@ -215,6 +223,8 @@ function цепочка(tok) {
 
 const SOL_RPC = process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com";
 const ЛЯМПОРТ = 1_000_000_000;
+// Разрядность токена кривой Solana: цена в SOL за штуку — через неё.
+const ЕДИНИЦА_SOL = 1_000_000;
 // Сколько последних сделок читаем и как часто. Полсотни хватает и на
 // объём за сутки, и на движение цены; чаще раза в пять минут ходить
 // незачем — за минуту у мемкоина в devnet не случается ничего.
@@ -270,7 +280,9 @@ async function сделкиSolana(curveАдрес) {
       const стало = Number((мета.postBalances || [])[место] || 0);
       const дельта = стало - было;
       if (!дельта) continue;
-      ряд.push({ time: Number(tx.blockTime || 0), дельта });
+      // Кто сделал сделку — тот, кто её подписал.
+      const подписант = счета.find((с) => с && typeof с === "object" && с.signer);
+      ряд.push({ time: Number(tx.blockTime || 0), дельта, покупатель: дельта > 0 ? следКошелька(подписант && подписант.pubkey) : null });
     }
   }
   return ряд.filter((с) => с.time > 0).sort((a, b) => a.time - b.time);
@@ -326,7 +338,7 @@ async function ветвьSolana(tok, прошлое) {
       && Date.now() - читалиКогда < SOL_ИСТОРИЯ_МС;
     let сделки = [];
     if (свежая) {
-      сделки = прошлое.trades.map((п) => ({ time: Number(p_время(п)), дельта: Number(п.d || 0) }));
+      сделки = прошлое.trades.map((п) => ({ time: Number(p_время(п)), дельта: Number(п.d || 0), покупатель: п.b || null }));
     } else {
       сделки = await сделкиSolana(tok.curve_address).catch(() => []);
       историяЧитана.set(tok.id, { ts: Date.now(), подпись: последняя });
@@ -335,7 +347,7 @@ async function ветвьSolana(tok, прошлое) {
          строит график от пустой кривой, и вся прошлая торговля
          превращается в одну свечу от нуля. */
       if (!сделки.length && прошлое && Array.isArray(прошлое.trades) && прошлое.trades.length) {
-        сделки = прошлое.trades.map((п) => ({ time: Number(p_время(п)), дельта: Number(п.d || 0) }));
+        сделки = прошлое.trades.map((п) => ({ time: Number(p_время(п)), дельта: Number(п.d || 0), покупатель: п.b || null }));
       }
     }
 
@@ -369,7 +381,18 @@ async function ветвьSolana(tok, прошлое) {
       logo_url: tok.logo_url || null,
       // Сделки храним в лямпортах и знаком: по ним считается и объём, и
       // движение, а сам ряд переживает заходы, когда историю не читаем.
-      trades: сделки.slice(-200).map((с) => ({ t: с.time, d: с.дельта })),
+      // Рядом — цена после сделки (SOL за штуку) и след покупателя: по ним
+      // считается «В центре внимания».
+      trades: (() => {
+        const ряд = сделки.slice(-200);
+        const цены = new Array(ряд.length);
+        let после = st.realSol;
+        for (let i = ряд.length - 1; i >= 0; i--) {
+          цены[i] = (ценаSolПо(Math.max(0, после), st) * ЕДИНИЦА_SOL) / ЛЯМПОРТ;
+          после -= ряд[i].дельта;
+        }
+        return ряд.map((с, i) => ({ t: с.time, d: с.дельта, p: цены[i], ...(с.покупатель ? { b: с.покупатель } : null) }));
+      })(),
       updated_at: new Date().toISOString(),
     };
   } catch {
@@ -522,8 +545,20 @@ export default async function handler(req, res) {
       logo_url: tok.logo_url || (meta && meta.image) || null,
       // История для графика. Нанотоны — строками: в JSON они не
       // помещаются в число без потери точности, а приложение всё равно
-      // приводит их к BigInt.
-      trades: история.map((p) => ({ t: p.time, ton: p.ton.toString(), r: p.realTon.toString() })),
+      // приводит их к BigInt. Рядом — цена после сделки (по параметрам
+      // этой кривой) и след покупателя: по ним считается «В центре
+      // внимания». Обрезанная история (больше двухсот транзакций)
+      // сдвигается под настоящий резерв, как и на графике.
+      trades: (() => {
+        const последний = история.length ? история[история.length - 1].realTon : 0n;
+        const разница = st.realTon - последний;
+        const сдвиг = разница > st.realTon / 3n ? разница : 0n;
+        return история.map((p) => ({
+          t: p.time, ton: p.ton.toString(), r: p.realTon.toString(),
+          p: цена(p.realTon + сдвиг, params),
+          ...(p.покупатель ? { b: p.покупатель } : null),
+        }));
+      })(),
       updated_at: new Date().toISOString(),
     });
   }

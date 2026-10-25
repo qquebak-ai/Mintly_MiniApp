@@ -8432,6 +8432,42 @@ const FEED_DEEP_EVERY = 8;
 const SPOTLIGHT_COUNT = 5;
 const SPOTLIGHT_ROTATE_MS = 8000;
 
+/* «В центре внимания» считает сервер (api/spotlight.js) — одинаково для
+   всех: близость кривой к выходу на биржу, покупки и оборот за 15 минут и
+   рост за час, поровну. Не допускаются вышедшие на биржу, токены без
+   сделок полчаса и те, где покупали меньше трёх человек, не считая
+   создателя. Сервер отдаёт порядок, телефон спрашивает его раз в пять
+   секунд: обогнал — сразу встал выше. Последний ответ по сети помним,
+   чтобы мемпад при повторном открытии не начинал с пустой витрины. */
+const КЕШ_ВИТРИНЫ = {}; // сеть -> [id]
+function useВитрина(сеть, токены) {
+  const [ид, setИд] = useState(() => КЕШ_ВИТРИНЫ[сеть] || []);
+  useEffect(() => {
+    let живо = true;
+    setИд(КЕШ_ВИТРИНЫ[сеть] || []);
+    const читать = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      fetch(апи(`/api/spotlight?chain=${encodeURIComponent(сеть)}`))
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (!живо || !j || !Array.isArray(j.tokens)) return;
+          const новые = j.tokens.map((т) => т.id).slice(0, SPOTLIGHT_COUNT);
+          КЕШ_ВИТРИНЫ[сеть] = новые;
+          setИд((было) => (было.length === новые.length && было.every((x, i) => x === новые[i]) ? было : новые));
+        })
+        .catch(() => {});
+    };
+    читать();
+    const id = setInterval(читать, 5000);
+    return () => { живо = false; clearInterval(id); };
+  }, [сеть]);
+  // Порядок — сервера, сами токены — из ленты: в них живые цифры.
+  return useMemo(() => {
+    const поИд = new Map((токены || []).map((tok) => [String(tok.id), tok]));
+    return ид.map((x) => поИд.get(String(x))).filter(Boolean);
+  }, [ид, токены]);
+}
+
 /* RocketIconFX — the "Создать токен" icon in the corner: same rocket
    glyph, gently bobbing in place, with a small flickering flame
    underneath it (no glow behind the rocket itself). */
@@ -8469,28 +8505,6 @@ const MEMPAD_FILTERS = [
   // теперь показывает только запуски площадки.
   { id: "hot", labelKey: "mempadFilterHot" },
 ];
-
-/* Прошла ли по токену первая заметная сделка.
- *
- * Запуск сам по себе ничего не говорит: монету заводят за пять долларов,
- * и витрина забивалась пустыми графиками, где нет ни одной свечи выше
- * стартовой. Порог — три сотых от сбора: на кривой Solana это около
- * одного SOL, то есть покупка, которая поднимает капитализацию на треть
- * и рисует ту самую первую высокую свечу.
- *
- * Считаем по собранному, а не по числу сделок: сделок может быть десять
- * по центу, и толку от них столько же, сколько от нуля. */
-const ДОЛЯ_ДЛЯ_ВИТРИНЫ = 0.03;
-function прошлаПерваяСвеча(tok) {
-  if (!tok) return false;
-  // Токен, уже вышедший на биржу, на витрине нужен в любом случае.
-  if (tok.graduated) return true;
-  const цель = Number(tok.graduationTon) || 0;
-  const собрано = Number(tok.raisedTon) || 0;
-  // Пока состояние кривой не приехало, судить не о чем — не показываем:
-  // лучше подождать круг обхода, чем светить пустую монету.
-  return цель > 0 && собрано >= цель * ДОЛЯ_ДЛЯ_ВИТРИНЫ;
-}
 
 /* Состоялся ли запуск.
  *
@@ -11861,10 +11875,8 @@ function МемпадEVM({ сеть, onOpen, myTokens = [] }) {
     return { ...tok, price: цена, mcapNum: цена * TOKEN_FIXED_SUPPLY, raisedTon: к.realNative, graduationTon: к.graduationNative, graduated: к.graduated };
   }), [свои, рынкиСвоих, курсыEVM, сеть]);
   const с = СЕТИ_EVM[сеть];
-  const витрина = useMemo(() => [...своиСЦифрами]
-    .filter((tok) => tok.mcapNum > 0 && !tok.graduated)
-    .sort((a, b) => (b.mcapNum || 0) - (a.mcapNum || 0))
-    .slice(0, SPOTLIGHT_COUNT), [своиСЦифрами]);
+  // «В центре внимания» — тот же порядок сервера, что и в TON и Solana.
+  const витрина = useВитрина(сеть, своиСЦифрами);
   const [номерВитрины, setНомерВитрины] = useState(0);
   useEffect(() => {
     if (витрина.length < 2) return undefined;
@@ -12278,27 +12290,9 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   }, [localTokens, сеть]);
 
-  const spotlightTop = useMemo(() => {
-    /* В центре внимания — только запуски площадки. Раньше сюда попадали
-       пары с биржи, и мемпад показывал чужие монеты вперемешку со
-       своими: человек открывал карточку, а купить там было нечего —
-       кривой нет, торги идут не у нас.
-       Сначала те, по которым уже прошла сделка: запуск сам по себе на
-       витрину не тянет. Но если таких ещё нет — показываем что есть,
-       иначе витрина пропадает с экрана целиком. Проверку на пробную сеть
-       здесь держать нельзя: пока площадка работает в devnet, она
-       отсеивает вообще всё. */
-    const сТорговлей = свои.filter((tok) => прошлаПерваяСвеча(tok));
-    const источник = сТорговлей.length ? сТорговлей : свои;
-    if (!источник.length) return [];
-    const ranked = (win) =>
-      [...источник]
-        .filter((tok) => (tok[win] || 0) > 0)
-        .sort((a, b) => (b[win] || 0) - (a[win] || 0));
-    const byActivity = ["tx1h", "tx6h", "tx24h"].map(ranked).find((list) => list.length);
-    const list = byActivity || [...источник].sort((a, b) => b.mcapNum - a.mcapNum);
-    return list.slice(0, SPOTLIGHT_COUNT);
-  }, [свои]);
+  // В центре внимания — порядок сервера (см. useВитрина), только запуски
+  // площадки этой сети. Нечего показать — витрины нет вовсе.
+  const spotlightTop = useВитрина(сеть, свои);
 
   const [spotIdx, setSpotIdx] = useState(0);
   useEffect(() => {
