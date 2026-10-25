@@ -5196,6 +5196,9 @@ async function рынокКривойСразу(token) {
           vТокены: st.virtualTokens / 1e6,
           собрано: st.solСобрано,
           продано: st.продано,
+          // Ставка кривой, в долях от 10 000: она берётся с покупки до того,
+          // как монеты лягут в кривую.
+          комиссия: Number(st.feeBps) || 0,
         },
       };
     }
@@ -5215,6 +5218,7 @@ async function рынокКривойСразу(token) {
         vТокены: Number(m.state.virtualTokens) / 1e9,
         собрано: Number(m.state.realTon) / 1e9,
         продано: Number(m.state.tokensSold) / 1e9,
+        комиссия: Number(m.state.feeBps) || 0,
       },
     };
   } catch {
@@ -21808,10 +21812,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
            середине её хода: со стороны это и есть дёрганье. */
         const было = prev.candles;
         const стало = сЖивойЦеной(fresh.candles);
+        /* Тень последней свечи — тоже перемена: пик своей сделки,
+           нарисованный до сети, оставался тенью и после подтверждения,
+           потому что ряд с тем же закрытием считался «тем же». */
+        const пБыло = было[было.length - 1], пСтало = стало[стало.length - 1];
+        const рядом = (a, b) => Math.abs(a - b) <= Math.abs(b) * 1e-9;
         const тоЖе = prev.tf === reqTf
           && было.length === стало.length
-          && было[было.length - 1].time === стало[стало.length - 1].time
-          && Math.abs(было[было.length - 1].close - стало[стало.length - 1].close) <= Math.abs(стало[стало.length - 1].close) * 1e-9
+          && пБыло.time === пСтало.time
+          && рядом(пБыло.close, пСтало.close) && рядом(пБыло.high, пСтало.high) && рядом(пБыло.low, пСтало.low)
           && было[0].time === стало[0].time;
         if (тоЖе) return prev;
         return { ...prev, candles: стало, volume: fresh.volume, tf: reqTf };
@@ -22061,7 +22070,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       if (!(x > 0) || !(y > 0)) return;
       const k = x * y;
       const покупка = d.mode === "buy";
-      const новыйX = покупка ? x + d.сумма : k / (y + d.сумма);
+      /* В кривую при покупке ложится сумма за вычетом её ставки. Без этого
+         своя покупка рисовалась выше, чем проходила в сети, и после
+         подтверждения у свечи из одних покупок оставалась тень. */
+      const вход = покупка ? d.сумма * (1 - (Number(р.комиссия) || 0) / 10000) : d.сумма;
+      const новыйX = покупка ? x + вход : k / (y + вход);
       const новыйY = k / новыйX;
       const монет = Math.abs(новыйX - x), токенов = Math.abs(y - новыйY);
       if (!(монет > 0) || !(токенов > 0)) return;
@@ -22072,7 +22085,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       // Снимок — до первой из сделок в пути: откат последней не должен
       // стирать те, что ещё идут.
       if (!ждутСети.current.length || !снимокДоСделки.current) снимокДоСделки.current = { живая: живаяЦенаRef.current, candles: null };
-      ждутСети.current.push({ ид: d.ид || теперь, база: { собрано: р.собрано || 0, продано: р.продано || 0 }, at: теперь, покупка, сумма: d.сумма });
+      ждутСети.current.push({ ид: d.ид || теперь, база: { собрано: р.собрано || 0, продано: р.продано || 0 }, at: теперь, покупка, сумма: вход });
       setChartData((prev) => {
         if (!prev || !prev.candles || !prev.candles.length) return prev;
         if (снимокДоСделки.current && !снимокДоСделки.current.candles) снимокДоСделки.current.candles = prev.candles;
@@ -22090,12 +22103,14 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
         return { ...prev, candles: свечи };
       });
       const монета = token.chain === "solana" ? "SOL" : ТИКЕР_TON;
-      const ценаМонеты = монет / токенов;
+      // В подписи стрелки — сколько заплачено, с комиссией, как и в записи сделки.
+      const заплачено = покупка ? d.сумма : монет;
+      const ценаМонеты = заплачено / токенов;
       setМеткиСделок((было) => [...(было || []), {
         time: Math.floor(сейчасМс / 1000), side: покупка ? "buy" : "sell", dev: false, стрелка: true, мгновенная: true, ид: d.ид || теперь,
         ценаМонеты, ценаUsd: ценаМонеты * курс,
         когда: new Date(сейчасМс).toLocaleTimeString(lang === "EN" ? "en-US" : "ru-RU", { hour: "2-digit", minute: "2-digit" }),
-        сумма: `${fmtCoin(монет)} ${монета} · ${fmtUSD(монет * курс)}`,
+        сумма: `${fmtCoin(заплачено)} ${монета} · ${fmtUSD(заплачено * курс)}`,
         поЦене: `${fmtCompact(токенов)} ${token.ticker || ""} по ${fmtPrice(ценаМонеты * курс)}`,
       }]);
     };
@@ -22105,32 +22120,46 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       // Уходит только своя метка: остальные сделки в пути ещё идут.
       setМеткиСделок((было) => (было || []).filter((м) => !(м.мгновенная && (d.ид == null || м.ид === d.ид))));
       ждутСети.current = d.ид == null ? [] : ждутСети.current.filter((с) => с.ид !== d.ид);
-      const р = слитьРезервы(резервыДляСделкиRef.current);
-      if (ждутСети.current.length && р) {
-        /* Остались другие сделки в пути — цену не откатываем к снимку, а
-           пересчитываем без отменённой. */
-        const курс = token.chain === "solana" ? (курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd()) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
-        const { x, y } = резервыПослеСвоих(р);
-        if (курс > 0 && x > 0 && y > 0) {
-          const цена = (x / y) * курс;
-          if (живаяЦенаRef.current) живаяЦенаRef.current = { ...живаяЦенаRef.current, close: цена };
-          setChartData((prev) => {
-            if (!prev || !prev.candles || !prev.candles.length) return prev;
-            const свечи = prev.candles.slice();
-            const п = свечи[свечи.length - 1];
-            свечи[свечи.length - 1] = { ...п, close: цена, high: Math.max(п.open, цена, п.close === п.high ? цена : п.high), low: Math.min(п.open, цена, п.close === п.low ? цена : п.low) };
-            return { ...prev, candles: свечи };
-          });
-          return;
-        }
-      }
       const сн = снимокДоСделки.current;
-      снимокДоСделки.current = null;
-      ожиданиеRef.current = null;
-      ждутСети.current = [];
-      if (!сн) return;
-      живаяЦенаRef.current = сн.живая;
-      if (сн.candles) setChartData((prev) => (prev ? { ...prev, candles: сн.candles } : prev));
+      if (!ждутСети.current.length) { снимокДоСделки.current = null; ожиданиеRef.current = null; }
+      /* Цена без отменённой — живое состояние и сделки, что ещё в пути.
+         Раньше, когда в пути не оставалось ничего, график откатывался к
+         снимку до первой сделки пачки — вместе с прошедшими, — и они
+         возвращались со следующим опросом. */
+      const р = слитьРезервы(резервыДляСделкиRef.current);
+      const курс = token.chain === "solana" ? (курсSolДляГрафика > 0 ? курсSolДляГрафика : solUsd()) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
+      const { x, y } = р ? резервыПослеСвоих(р) : { x: 0, y: 0 };
+      const цена = курс > 0 && x > 0 && y > 0 ? (x / y) * курс : 0;
+      if (!(цена > 0)) {
+        // Считать не из чего — к снимку, как раньше.
+        if (сн && !ждутСети.current.length) {
+          живаяЦенаRef.current = сн.живая;
+          if (сн.candles) setChartData((prev) => (prev ? { ...prev, candles: сн.candles } : prev));
+        }
+        return;
+      }
+      // Свеча до пачки — по ней тень: пик отменённой сделки в тень не
+      // входит, её не было.
+      const доПачки = сн && сн.candles && сн.candles.length ? сн.candles[сн.candles.length - 1] : null;
+      setChartData((prev) => {
+        if (!prev || !prev.candles || !prev.candles.length) return prev;
+        const свечи = prev.candles.slice();
+        const п = свечи[свечи.length - 1];
+        // Свеча, которую открыла отменённая сделка и где больше ничего не
+        // было, уходит целиком: пустая черта на месте несостоявшейся
+        // покупки читалась как сделка.
+        if (доПачки && п.time > доПачки.time && Math.abs(цена - п.open) <= Math.abs(п.open) * 1e-9 && !ждутСети.current.length) {
+          свечи.pop();
+          const пр = свечи[свечи.length - 1];
+          if (пр) свечи[свечи.length - 1] = { ...пр, close: цена, high: Math.max(пр.high, цена), low: Math.min(пр.low, цена) };
+          if (живаяЦенаRef.current && пр) живаяЦенаRef.current = { ...живаяЦенаRef.current, time: пр.time, close: цена };
+          return { ...prev, candles: свечи, volume: (prev.volume || []).filter((о) => о.time <= (пр ? пр.time : 0)) };
+        }
+        const база = доПачки && доПачки.time === п.time ? доПачки : { high: п.open, low: п.open };
+        свечи[свечи.length - 1] = { ...п, close: цена, high: Math.max(база.high, п.open, цена), low: Math.min(база.low, п.open, цена) };
+        if (живаяЦенаRef.current) живаяЦенаRef.current = { ...живаяЦенаRef.current, close: цена };
+        return { ...prev, candles: свечи };
+      });
     };
     window.addEventListener("mintly:сделка-старт", старт);
     window.addEventListener("mintly:сделка-отмена", отмена);
