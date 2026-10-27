@@ -20103,6 +20103,8 @@ function МастерФразы({
 }
 
 function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none", фраза = null, setФраза = () => {}, запросФразы = 0, onСтрелкаФразы = () => {}, ник = "" }) {
+  // Тариф (выбранная скорость) красит шёлк на карте баланса.
+  const [скоростьКарты] = useСкорость();
   // Вид карты берём из купленного в магазине; неизвестный id — обычная
   // карта Mintly, а не пустая заливка.
   const видКарты = WALLET_SKIN_BY_ID[скинКарты] || WALLET_SKIN_BY_ID.none;
@@ -20755,43 +20757,9 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             Mintly, у которого поверх ещё бегут отдельные кольца, карта
             стояла с застывшей заливкой. Маска и перелив на разных
             элементах друг другу не мешают. */}
-        <span key={ключПереливаКарты} aria-hidden style={{
-          position: "absolute", inset: 0,
-          // Оттенков больше, чем нужно для простого градиента: розовый,
-          // сиреневый, синий и почти чёрный ходят друг за другом, и
-          // поверхность не повторяет один и тот же переход.
-          // У ткани сама карта — ровная тёмная подложка: плетение живёт
-          // отдельным слоем ниже, иначе его не сдвинуть плавно.
-          background: ткань ? "#131319" : видКарты.fill,
-          backgroundSize: ткань ? undefined : (видКарты.size || "320% 320%"),
-          animation: ткань || видКарты.минимал
-            ? "none"
-            : `картаПереливается ${ходКарты.длительность}s ease-in-out ${ходКарты.сдвиг}s infinite`,
-        }} />
-        {ткань && <СлойКарбона fill={видКарты.fill} size={видКарты.size} />}
-        {/* Волны от касаний — поверх заливки, но под текстом. */}
-        {/* Блик бежит и по металлу: без него стальная карта выглядела
-            плоской картинкой. */}
-        {(!видКарты.минимал || видКарты.металл) && <div key={ключПереливаКарты} aria-hidden style={{
-          position: "absolute", top: -70, left: -90, width: 260, height: 320,
-          background: `linear-gradient(90deg, ${hexA("#FFFFFF", 0)} 0%, ${hexA("#FFFFFF", видКарты.металл ? 0.3 : 0.13)} 50%, ${hexA("#FFFFFF", 0)} 100%)`,
-          transform: "rotate(18deg)", animation: "картаБлик 7s ease-in-out infinite", pointerEvents: "none",
-        }} />}
-        {/* Обводки у карты нет: светлая кайма по краю читалась белой
-            рамкой вокруг тёмного металла. */}
-        {/* Отблеск наклона: полоса света едет по карте вслед за углом и
-            гаснет, когда карта встаёт ровно. */}
-        <span aria-hidden style={{
-          position: "absolute", left: "-20%", right: "-20%", top: "-60%", height: "120%", pointerEvents: "none",
-          background: `linear-gradient(180deg, ${hexA("#FFFFFF", 0)} 30%, ${hexA("#FFFFFF", 0.22)} 50%, ${hexA("#FFFFFF", 0)} 70%)`,
-          transform: "translateY(calc(var(--наклон, 0) * 3.2%))",
-          opacity: "calc(var(--наклонМодуль, 0) / 14)",
-        }} />
-        {/* Ткани свет достаётся отдельно: широкая мягкая полоса ходит
-            поперёк плетения, как по капоту, и добавляет объёма там, где
-            сам рисунок неподвижен. Плюс наклонный отблеск сверху —
-            углеволокно всегда чуть бликует по краю. */}
-        {ткань && <СлоиТкани />}
+        {/* Фон карты — шёлк с приветствия на чёрном, в цвет тарифа, как у
+            карточки PnL: Free серый, Pro зелёный, Turbo переливается. */}
+        <ФонШёлк вРамке тон={{ fast: "pro", turbo: "turbo" }[скоростьКарты] || null} />
         {/* Подпись вида — мелко, в правом нижнем углу карты. */}
         {видКарты.подпись && (
           <span aria-hidden style={{
@@ -20811,30 +20779,11 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             растянутым шрифтом и полупрозрачно: оно читается как часть
             рисунка карты и не спорит с балансом. Угол взят по диагонали
             карты (210 на ~358 точек). */}
-        {!видКарты.минимал && <span aria-hidden style={{
-          position: "absolute", left: "50%", top: "50%", pointerEvents: "none", whiteSpace: "nowrap",
-          transform: "translate(-50%, -50%) rotate(-30deg) scaleX(1.55)",
-          fontFamily: "'ШрифтШирмы', 'Jost', sans-serif", fontSize: 40, fontWeight: 600,
-          letterSpacing: "0.14em", textTransform: "uppercase", color: hexA("#FFFFFF", 0.08),
-        }}>
-          Mintly
-        </span>}
-        {/* У металла знак — крупно, уходит за правый край, как тиснение. */}
-        {видКарты.металл && (
-          <svg aria-hidden width={230} height={230} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", right: -62, top: "50%", marginTop: -115, pointerEvents: "none" }}>
-            <defs>
-              <linearGradient id="тиснение" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.13" />
-                <stop offset="1" stopColor="#FFFFFF" stopOpacity="0.03" />
-              </linearGradient>
-            </defs>
-            <path d={ПУТЬ_ЗВЕЗДЫ} fill="url(#тиснение)" stroke={hexA("#FFFFFF", 0.16)} strokeWidth="0.6" />
-          </svg>
-        )}
         {/* Знак приложения — в углу, где у карт стоит логотип банка. */}
-        {!видКарты.металл && <svg aria-hidden width={видКарты.минимал ? 34 : 40} height={видКарты.минимал ? 34 : 40} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: видКарты.минимал ? 14 : 12, right: видКарты.минимал ? 16 : 14, pointerEvents: "none" }}>
-          <path d={ПУТЬ_ЗВЕЗДЫ} fill={hexA("#FFFFFF", видКарты.минимал ? 0.8 : 0.9)} />
-        </svg>}
+        {/* Знак приложения — крупно в углу, белым, как на карточке PnL. */}
+        <svg aria-hidden width={72} height={72} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: 14, right: 14, pointerEvents: "none" }}>
+          <path d={ПУТЬ_ЗВЕЗДЫ} fill="#FFFFFF" />
+        </svg>
         {/* Имя держателя, как на дебетовой карте: ник заглавными, с
             разрядкой, внизу карты. Чипа с монетами там больше нет —
             монеты видны в активах ниже. */}
@@ -24250,8 +24199,8 @@ function КарточкаPnL({ открыт, onClose, token, итог = 0, вл�
       г.textBaseline = "alphabetic";
       // Белый знак Mintly в углу, как на прежней карточке.
       г.save();
-      г.translate(PNL_Ш - 72 - 64, 48);
-      г.scale(64 / 200, 64 / 200);
+      г.translate(PNL_Ш - 56 - 250, 44);
+      г.scale(250 / 200, 250 / 200);
       г.fillStyle = "#FFFFFF";
       г.fill(знак);
       г.restore();
