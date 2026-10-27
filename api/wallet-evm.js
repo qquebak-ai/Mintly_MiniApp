@@ -142,6 +142,21 @@ async function провайдер(сеть) {
 let тестоваяБаза = null;
 export function заменитьБазуДляПроверки(db) { тестоваяБаза = db; }
 
+/* Ключ EVM-кошелька человека — для подписи на Hyperliquid (api/hyperliquid.js).
+   Тот же кошелёк и тот же адрес, что в приложении: строка берётся из базы,
+   а заводится, только если её ещё нет, — тем же путём, что и здесь. */
+export async function подписьEVMЧеловека(db, user) {
+  const набор = ключи();
+  if (!набор) throw new Error("not_configured");
+  const строка = await кошелёк(db, user, набор);
+  const { Wallet } = await ethersLib();
+  const тайна = расшифровать(строка, набор, user.id);
+  if (!тайна.startsWith("hex:")) throw new Error("ключ кошелька не того вида");
+  const w = new Wallet("0x" + тайна.slice(4));
+  if (w.address.toLowerCase() !== String(строка.address).toLowerCase()) throw new Error("ключ не от этого адреса");
+  return w;
+}
+
 function admin() {
   if (тестоваяБаза) return тестоваяБаза;
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return null;
