@@ -24183,6 +24183,11 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   const [amountStr, setAmountStr] = useState(tradeModal?.prefill ? String(tradeModal.prefill) : "");
   const [slippage, setSlippage] = useState(1);
   const [скорость, setСкорость] = useState(читатьСкорость);
+  // Как исполнить: сейчас по рынку или лимитной заявкой по цене.
+  const [типЗаявки, setТипЗаявки] = useState("market");
+  const [цельКап, setЦельКап] = useState("");
+  const [заявки, setЗаявки] = useState(null);
+  const [ставим, setСтавим] = useState(false);
   const таблицаСкорости = useТаблицаСкорости();
   const [быстрые, сохранитьБыстрые] = useБыстрые();
   /* Одно нажатие — одна сделка. Второго подтверждения нет: окно
@@ -24338,6 +24343,25 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
     }
   }, [tradeModal]);
 
+  // Свои заявки по этому токену — когда открыта вкладка «Лимит».
+  useEffect(() => {
+    if (!tradeModalProp || типЗаявки !== "limit" || !token) return undefined;
+    let живо = true;
+    const читать = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const ключ = data && data.session && data.session.access_token;
+        if (!ключ) { if (живо) setЗаявки([]); return; }
+        const r = await fetch(апи("/api/limit-orders?action=list"), { headers: { Authorization: `Bearer ${ключ}` } });
+        const j = await r.json().catch(() => null);
+        if (живо) setЗаявки(((j && j.orders) || []).filter((з) => String(з.token_id) === String(token.id)));
+      } catch { if (живо) setЗаявки([]); }
+    };
+    читать();
+    const id = setInterval(читать, 5000);
+    return () => { живо = false; clearInterval(id); };
+  }, [tradeModalProp, типЗаявки, token && token.id]);
+
   if (!tradeModal) return null;
 
   // null означает «баланс ещё не пришёл из сети». Подставлять сюда
@@ -24488,7 +24512,45 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
     отправить(a, оценкаНа(a));
   }
 
+  /* Лимитная заявка: цель — капитализация в долларах (её человек и видит
+     на странице токена), а сервер хранит цену одного токена в монете
+     сети — по ней сверяет поток кривых (api/_limitWorker.js). */
+  const курсМонетыЗаявки = соло ? (solPriceUsd > 0 ? solPriceUsd : solUsd()) : tonPriceUsd;
+  const цельЧисло = parseAmount(цельКап);
+  const ценаЗаявки = цельЧисло > 0 && курсМонетыЗаявки > 0 ? цельЧисло / TOKEN_FIXED_SUPPLY / курсМонетыЗаявки : 0;
+  const можноЗаявку = типЗаявки === "limit" && amount > 0 && !overMax && ценаЗаявки > 0 && !ставим;
+  async function запросЗаявок(путь, тело) {
+    const { data } = await supabase.auth.getSession();
+    const ключ = data && data.session && data.session.access_token;
+    if (!ключ) throw new Error("no_session");
+    const r = await fetch(апи(`/api/limit-orders?action=${путь}`), {
+      method: тело ? "POST" : "GET",
+      headers: { Authorization: `Bearer ${ключ}`, ...(тело ? { "Content-Type": "application/json" } : {}) },
+      body: тело ? JSON.stringify(тело) : undefined,
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((j && j.error) || `ошибка ${r.status}`);
+    return j;
+  }
+  const обновитьЗаявки = () => запросЗаявок("list").then((j) => setЗаявки((j.orders || []).filter((з) => String(з.token_id) === String(token.id)))).catch(() => setЗаявки([]));
+  async function поставитьЗаявку() {
+    if (!можноЗаявку) return;
+    setСтавим(true);
+    try {
+      // Покупка — на откате вниз до цели, продажа — на росте до неё.
+      await запросЗаявок("create", { tokenId: token.id, side: isBuy ? "buy" : "sell", amount, price: ценаЗаявки, direction: isBuy ? "below" : "above" });
+      haptic("success");
+      setЦельКап(""); setAmountStr("");
+      обновитьЗаявки();
+    } catch (e) {
+      haptic("error");
+    } finally {
+      setСтавим(false);
+    }
+  }
+
   function handleConfirm() {
+    if (типЗаявки === "limit") { поставитьЗаявку(); return; }
     if (!canConfirm || отправлено.current) return;
     отправлено.current = true;
     отправить(amount, estimate);
@@ -24580,11 +24642,16 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
         {/* Как исполнить: мгновенно — самой быстрой дорогой, по рынку —
            с выбранной ниже скоростью. */}
         <div className="flex" style={{ gap: 6, marginTop: 10 }}>
-          {[["instant", "Мгновенно", Zap], ["market", "По рынку", null]].map(([к, подпись, Иконка]) => {
-            const вкл = (к === "instant") === (скорость === "turbo");
+          {[["instant", "Мгновенно", Zap], ["market", "По рынку", null], ["limit", "Лимит", null]].map(([к, подпись, Иконка]) => {
+            const вкл = к === "limit" ? типЗаявки === "limit" : типЗаявки !== "limit" && (к === "instant") === (скорость === "turbo");
             return (
               <button key={к} type="button"
-                onClick={() => { haptic("light"); const v = к === "instant" ? "turbo" : "fast"; setСкорость(v); запомнитьСкорость(v); }}
+                onClick={() => {
+                  haptic("light");
+                  if (к === "limit") { setТипЗаявки("limit"); return; }
+                  setТипЗаявки("market");
+                  const v = к === "instant" ? "turbo" : "fast"; setСкорость(v); запомнитьСкорость(v);
+                }}
                 className="fx-tap flex items-center"
                 style={{ gap: 5, padding: "7px 12px", borderRadius: 999, border: "none", background: вкл ? hexA(T.ice, 0.12) : "transparent", color: вкл ? T.ice : T.muted, fontFamily: bodyFont, fontSize: 13, fontWeight: 700 }}>
                 {Иконка && <Иконка size={13} />}{подпись}
@@ -24595,7 +24662,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
 
         {/* Покупка в 1 клик: только три свои суммы (на продаже — доли).
             Нажатие — и сделка ушла. Под суммой — сколько придёт. */}
-        {быстрые.oneClick ? (
+        {быстрые.oneClick && типЗаявки !== "limit" ? (
           <>
         {/* В 1 клик — только суммы: строка «Доступно» и подпись режима
             здесь лишние, нажатие на сумму само и есть сделка. */}
@@ -24665,6 +24732,51 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           onСохранить={сохранитьТройку}
         />
 
+        {типЗаявки === "limit" && (
+          <div className="flex flex-col" style={{ gap: 8, marginTop: 14 }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>
+              {isBuy ? "Купить, когда капитализация опустится до" : "Продать, когда капитализация вырастет до"}
+            </span>
+            <div className="flex items-center gap-2 rounded-[20px] px-3.5 py-3" style={{ background: T.bg }}>
+              <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 21.5, fontWeight: 700 }}>$</span>
+              <ПолеСЖивымТекстом
+                value={цельКап}
+                onChange={(e) => setЦельКап(e.target.value.replace(/[^0-9.,]/g, ""))}
+                placeholder={fmtCompact((token.mcapNum || 0) * (isBuy ? 0.7 : 2)).replace("$", "")}
+                inputMode="decimal"
+                style={{ fontFamily: displayFont, fontWeight: 700, color: T.ice, fontSize: 21.5, background: "transparent", border: "none", outline: "none", flex: 1, minWidth: 0 }}
+              />
+              <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 13 }}>сейчас {fmtUSD(token.mcapNum || 0)}</span>
+            </div>
+            {заявки && заявки.length > 0 && (
+              <div className="flex flex-col" style={{ gap: 6, marginTop: 4 }}>
+                {заявки.slice(0, 6).map((з) => {
+                  const кап = Number(з.price) * TOKEN_FIXED_SUPPLY * курсМонетыЗаявки;
+                  const открыта = з.status === "open";
+                  return (
+                    <div key={з.id} className="flex items-center" style={{ gap: 10, padding: "10px 12px", borderRadius: 16, background: T.bg }}>
+                      <span style={{ fontFamily: displayFont, color: з.side === "buy" ? T.up : T.down, fontSize: 13.5, fontWeight: 800 }}>{з.side === "buy" ? "Купить" : "Продать"}</span>
+                      <span style={{ flex: 1, minWidth: 0, fontFamily: monoFont, color: T.ice, fontSize: 13 }}>
+                        {Number(з.amount).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} {з.side === "buy" ? монета : token.ticker} · {кап > 0 ? fmtUSD(кап) : "—"}
+                      </span>
+                      {открыта ? (
+                        <button type="button" onClick={() => { haptic("light"); запросЗаявок("cancel", { id: з.id }).then(обновитьЗаявки, () => {}); }} className="fx-tap"
+                          style={{ padding: "5px 10px", borderRadius: 999, border: `1px solid ${T.lineHi}`, background: "transparent", color: T.ice, fontFamily: bodyFont, fontSize: 12, fontWeight: 700 }}>
+                          Отменить
+                        </button>
+                      ) : (
+                        <span style={{ fontFamily: bodyFont, fontSize: 12, fontWeight: 700, color: з.status === "filled" ? T.up : T.muted }}>
+                          {з.status === "filled" ? "Исполнена" : з.status === "failed" ? "Не прошла" : з.status === "executing" ? "Исполняется" : "Отменена"}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="rounded-[20px] p-3.5 mt-3.5" style={{ background: T.bg, border: "none" }}>
           <div className="flex items-center justify-between">
             <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("youReceive")}</span>
@@ -24723,7 +24835,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           )}
         </div>
 
-        <button onClick={handleConfirm} disabled={!canConfirm} className="fx-tap w-full rounded-[12px] min-h-[52px] py-3 mt-5" style={{
+        <button onClick={handleConfirm} disabled={типЗаявки === "limit" ? !можноЗаявку : !canConfirm} className="fx-tap w-full rounded-[12px] min-h-[52px] py-3 mt-5" style={{
           fontFamily: displayFont, fontWeight: 700, fontSize: 15,
           // Покупка — фирменным градиентом, продажа — цветом падения:
           // два действия не должны выглядеть одинаково, и по цвету видно,
@@ -24733,12 +24845,14 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
              продажа красным: ещё до прочтения надписи видно, что сейчас
              произойдёт. */
           // Спокойная светлая кнопка вместо зелёно-красных переливов.
-          background: canConfirm ? T.ice : T.surfaceHi,
-          color: canConfirm ? T.bg : T.muted,
-          opacity: canConfirm ? 1 : 0.6,
+          background: (типЗаявки === "limit" ? можноЗаявку : canConfirm) ? T.ice : T.surfaceHi,
+          color: (типЗаявки === "limit" ? можноЗаявку : canConfirm) ? T.bg : T.muted,
+          opacity: (типЗаявки === "limit" ? можноЗаявку : canConfirm) ? 1 : 0.6,
           transition: "background 220ms ease, color 220ms ease",
         }}>
-          {amount > 0
+          {типЗаявки === "limit"
+            ? (ставим ? "Ставим заявку…" : !(amount > 0) ? t("enterAmount") : !(цельЧисло > 0) ? "Укажите капитализацию" : "Поставить заявку")
+            : amount > 0
             ? (isBuy
               ? `${t("buyFor")} ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`
               : `${t("sellFor")} ${amount.toLocaleString("ru-RU")} ${token.ticker}`)

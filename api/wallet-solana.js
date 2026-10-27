@@ -49,6 +49,7 @@ import { нуженВторойКлюч } from "./_second.js";
 import { занять } from "./_walletLock.js";
 import { темп, скоростьИз, наценка } from "./_speed.js";
 import { быстрыйОстаток } from "./_остаток.js";
+import { ВНУТРЕННИЙ_ВХОД } from "./_внутри.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1094,7 +1095,9 @@ export default async function handler(req, res) {
 
   let отпустить = null;
   try {
-    const user = await хозяин(req, db);
+    // Изнутри сервера (лимитная заявка, api/_limitWorker.js) человек уже
+    // известен; снаружи метку не подделать — это символ (api/_внутри.js).
+    const user = req[ВНУТРЕННИЙ_ВХОД] || await хозяин(req, db);
     if (!user) return res.status(401).json({ error: "unauthorized" });
     let строка = await освежитьПривязку(db, await кошелёк(db, user, набор));
     const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || null;

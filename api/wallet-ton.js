@@ -32,6 +32,7 @@ import { нуженВторойКлюч } from "./_second.js";
 import { занятьПоОчереди, свободныйНомер, занятьНомер, номерЖдёт } from "./_walletLock.js";
 import { скоростьИз, наценка } from "./_speed.js";
 import { быстрыйОстаток } from "./_остаток.js";
+import { ВНУТРЕННИЙ_ВХОД } from "./_внутри.js";
 
 const TESTNET = process.env.TON_TESTNET === "1";
 const TONAPI = TESTNET ? "https://testnet.tonapi.io" : "https://tonapi.io";
@@ -609,7 +610,9 @@ export default async function handler(req, res) {
 
   let отпустить = null;
   try {
-    const user = await хозяин(req, db);
+    // Изнутри сервера (лимитная заявка, api/_limitWorker.js) человек уже
+    // известен; снаружи метку не подделать — это символ (api/_внутри.js).
+    const user = req[ВНУТРЕННИЙ_ВХОД] || await хозяин(req, db);
     if (!user) return res.status(401).json({ error: "unauthorized" });
     const строка = await освежитьПривязку(db, await кошелёк(db, user, набор));
 

@@ -29,6 +29,7 @@ import { нуженВторойКлюч } from "./_second.js";
 import { занятьПоОчереди } from "./_walletLock.js";
 import { скоростьИз, наценка } from "./_speed.js";
 import { быстрыйОстаток } from "./_остаток.js";
+import { ВНУТРЕННИЙ_ВХОД } from "./_внутри.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -557,7 +558,9 @@ export default async function handler(req, res) {
   if (!db || !набор) return res.status(503).json({ error: "not_configured" });
 
   try {
-    const user = await хозяин(req, db);
+    // Изнутри сервера (лимитная заявка, api/_limitWorker.js) человек уже
+    // известен; снаружи метку не подделать — это символ (api/_внутри.js).
+    const user = req[ВНУТРЕННИЙ_ВХОД] || await хозяин(req, db);
     if (!user) return res.status(401).json({ error: "unauthorized" });
     const строка = await кошелёк(db, user, набор);
 
