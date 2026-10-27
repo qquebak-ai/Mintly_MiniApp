@@ -15726,7 +15726,7 @@ function ценаРынка(p) {
   return n.toPrecision(4);
 }
 
-function ГрафикРынка({ coin }) {
+function ГрафикРынка({ coin, линии = [], цена = 0 }) {
   const [шаг, setШаг] = useState("15m");
   const [свечи, setСвечи] = useState(null);
   useEffect(() => {
@@ -15736,28 +15736,65 @@ function ГрафикРынка({ coin }) {
     const id = setInterval(читать, 5000);
     return () => { живо = false; clearInterval(id); };
   }, [coin, шаг]);
-  const Ш = 360, В = 220;
+  const Ш = 360, В = 240;
   const ряд = (свечи || []).slice(-80);
-  const мин = Math.min(...ряд.map((с) => с.l)), макс = Math.max(...ряд.map((с) => с.h));
-  const y = (v) => В - 8 - ((v - мин) / Math.max(1e-12, макс - мин)) * (В - 16);
+  // Последняя свеча — по живой цене из списка рынков, чтобы не ждать опроса свечей.
+  if (ряд.length && цена > 0) {
+    const п = ряд[ряд.length - 1];
+    ряд[ряд.length - 1] = { ...п, c: цена, h: Math.max(п.h, цена), l: Math.min(п.l, цена) };
+  }
+  let мин = Math.min(...ряд.map((с) => с.l)), макс = Math.max(...ряд.map((с) => с.h));
+  /* Линии позиции раздвигают шкалу, если стоят рядом; далёкую (ликвидация
+     при 1–2× плече) не тянем — иначе свечи сплющились бы в полоску, её
+     метка просто прижимается к краю со стрелкой. */
+  const размах = Math.max(1e-12, макс - мин);
+  for (const л of линии) if (л.цена > 0 && л.цена > мин - размах && л.цена < макс + размах) { мин = Math.min(мин, л.цена); макс = Math.max(макс, л.цена); }
+  const поле = (макс - мин) * 0.06;
+  мин -= поле; макс += поле;
+  const y = (v) => В - ((v - мин) / Math.max(1e-12, макс - мин)) * В;
   const ш = Ш / Math.max(1, ряд.length);
+  const метка = (v) => Math.max(0, Math.min(100, (y(v) / В) * 100));
   return (
     <div className="flex flex-col" style={{ gap: 10 }}>
       <div style={{ height: В, position: "relative" }}>
         {!свечи ? <ЗагрузкаБлока высота={В} /> : (
-          <svg viewBox={`0 0 ${Ш} ${В}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
-            {ряд.map((с, i) => {
-              const рост = с.c >= с.o;
-              const цвет = рост ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
-              const x = i * ш + ш / 2;
+          <>
+            <svg viewBox={`0 0 ${Ш} ${В}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
+              {ряд.map((с, i) => {
+                const рост = с.c >= с.o;
+                const цвет = рост ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
+                const x = i * ш + ш / 2;
+                return (
+                  <g key={с.t}>
+                    <line x1={x} x2={x} y1={y(с.h)} y2={y(с.l)} stroke={цвет} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+                    <rect x={x - ш * 0.32} width={ш * 0.64} y={Math.min(y(с.o), y(с.c))} height={Math.max(1, Math.abs(y(с.o) - y(с.c)))} fill={цвет} rx={0.6} />
+                  </g>
+                );
+              })}
+              {цена > 0 && <line x1={0} x2={Ш} y1={y(цена)} y2={y(цена)} stroke={hexA(T.ice, 0.35)} strokeWidth={1} strokeDasharray="2 4" vectorEffect="non-scaling-stroke" />}
+              {линии.filter((л) => л.цена > мин && л.цена < макс).map((л, i) => (
+                <line key={i} x1={0} x2={Ш} y1={y(л.цена)} y2={y(л.цена)} stroke={л.цвет} strokeWidth={1.4} strokeDasharray={л.пунктир ? "6 5" : undefined} vectorEffect="non-scaling-stroke" />
+              ))}
+            </svg>
+            {/* Подписи линий — HTML поверх: текст в растянутом SVG тянулся бы. */}
+            {линии.filter((л) => л.цена > 0).map((л, i) => {
+              const внутри = л.цена > мин && л.цена < макс;
               return (
-                <g key={с.t}>
-                  <line x1={x} x2={x} y1={y(с.h)} y2={y(с.l)} stroke={цвет} strokeWidth={1} />
-                  <rect x={x - ш * 0.32} width={ш * 0.64} y={Math.min(y(с.o), y(с.c))} height={Math.max(1, Math.abs(y(с.o) - y(с.c)))} fill={цвет} rx={0.6} />
-                </g>
+                <span key={i} style={{
+                  position: "absolute", left: 0, top: `${метка(л.цена)}%`, transform: `translateY(${внутри ? "-50%" : метка(л.цена) <= 0 ? "0" : "-100%"})`,
+                  padding: "3px 8px", borderRadius: 8, background: л.цвет, color: "#000000",
+                  fontFamily: monoFont, fontSize: 11.5, fontWeight: 800, whiteSpace: "nowrap", pointerEvents: "none",
+                }}>
+                  {внутри ? "" : л.цена > макс ? "↑ " : "↓ "}{л.подпись} ${ценаРынка(л.цена)}
+                </span>
               );
             })}
-          </svg>
+            {цена > 0 && (
+              <span style={{ position: "absolute", right: 0, top: `${метка(цена)}%`, transform: "translateY(-50%)", padding: "3px 7px", borderRadius: 8, background: T.ice, color: T.bg, fontFamily: monoFont, fontSize: 11.5, fontWeight: 800, pointerEvents: "none" }}>
+                ${ценаРынка(цена)}
+              </span>
+            )}
+          </>
         )}
       </div>
       <div className="flex" style={{ gap: 6 }}>
@@ -15781,7 +15818,30 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
   const usd = parseAmount(сумма);
   // Доступно — биржа плюс карта приложения: недостающее сделка добирает с карты.
   const свободно = счёт ? счёт.withdrawable + наКарте(счёт) : null;
-  const можно = usd >= 10 && (свободно == null || usd <= свободно + 1e-9) && !шлём;
+  const можно = usd >= 10 && (свободно == null || usd <= свободно + 1e-9) && !шлём && !(счёт && счёт.pending);
+  /* Что будет, если открыть: размер, вход, ликвидация, комиссия. Вход —
+     текущая цена (заявка «по рынку»); ликвидация — грубо, как у
+     отдельной маржи: цена, при которой убыток съедает залог за вычетом
+     поддерживающей маржи (половина от 1/максимального плеча). */
+  const лонг = сторона === "long";
+  const объём = usd * плечо;
+  const монет = рынок.price > 0 ? объём / рынок.price : 0;
+  const поддержка = 1 / (2 * Math.max(1, рынок.maxLeverage));
+  const ликвидация = рынок.price > 0 && плечо > 1
+    ? рынок.price * (лонг ? 1 - 1 / плечо + поддержка : 1 + 1 / плечо - поддержка) : null;
+  const комиссия = объём * 0.00045;
+  const сКарты = счёт ? Math.max(0, usd - счёт.withdrawable) : 0;
+  const подробно = usd >= 10;
+  // Линии на графике: своя позиция — вход и ликвидация; набираемая сделка — пунктиром.
+  const линии = [];
+  if (позиция) {
+    линии.push({ цена: позиция.entry, цвет: позиция.size > 0 ? T.up : T.down, подпись: `Вход ${позиция.size > 0 ? "лонг" : "шорт"}` });
+    if (позиция.liquidation) линии.push({ цена: позиция.liquidation, цвет: "#FF9F43", подпись: "Ликвидация" });
+  }
+  if (подробно && !позиция) {
+    линии.push({ цена: рынок.price, цвет: лонг ? T.up : T.down, подпись: лонг ? "Вход лонг" : "Вход шорт", пунктир: true });
+    if (ликвидация) линии.push({ цена: ликвидация, цвет: "#FF9F43", подпись: "Ликвидация", пунктир: true });
+  }
   async function открыть() {
     if (!можно) return;
     setШлём(true); haptic("medium");
@@ -15818,7 +15878,7 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
           <span style={{ fontFamily: monoFont, fontSize: 15, fontWeight: 700, color: рынок.change >= 0 ? T.up : T.down }}>{рынок.change >= 0 ? "+" : ""}{рынок.change.toFixed(2)}%</span>
         </span>
       </div>
-      <ГрафикРынка coin={рынок.coin} />
+      <ГрафикРынка coin={рынок.coin} линии={линии} цена={рынок.price} />
       {позиция && (
         <div className="flex flex-col" style={{ gap: 10, padding: 14, borderRadius: 16, background: T.surface }}>
           <div className="flex items-center justify-between">
@@ -15858,8 +15918,30 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
           </span>
           <Ползунок value={плечо} min={1} max={Math.max(1, рынок.maxLeverage)} step={1} onChange={(v) => setПлечо(Math.round(v))} формат={(v) => `${Math.round(v)}×`} ariaLabel="Плечо" />
         </div>
-        <button onClick={открыть} disabled={!можно} className="fx-tap w-full" style={{ height: 52, borderRadius: 16, border: "none", background: можно ? T.ice : T.surfaceHi, color: можно ? T.bg : T.muted, fontFamily: displayFont, fontSize: 16, fontWeight: 800 }}>
-          {шлём ? <ЗнакЗагрузки size={20} всегда /> : сторона === "long" ? "Открыть лонг" : "Открыть шорт"}
+        {подробно && (
+          <div className="fx-step-in flex flex-col" style={{ gap: 9, padding: "12px 14px", borderRadius: 14, background: T.bg }}>
+            {[
+              ["Размер позиции", `$${объём.toFixed(2)}`],
+              ["В монетах", `${монет < 1 ? монет.toPrecision(3) : монет.toFixed(3)} ${рынок.name}`],
+              ["Цена входа", `≈ $${ценаРынка(рынок.price)}`],
+              ["Ликвидация", ликвидация ? `≈ $${ценаРынка(ликвидация)}` : "нет при 1×"],
+              ["Залог", `$${usd.toFixed(2)}`],
+              ["Комиссия биржи", `≈ $${комиссия.toFixed(2)}`],
+              ...(сКарты > 0.005 ? [["С карты", `≈ $${сКарты.toFixed(2)} в SOL · ~1 мин`]] : []),
+            ].map(([к, з]) => (
+              <span key={к} className="flex items-center justify-between" style={{ gap: 10 }}>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, fontWeight: 600 }}>{к}</span>
+                <span style={{ fontFamily: monoFont, color: к === "Ликвидация" && ликвидация ? "#FF9F43" : T.ice, fontSize: 13.5, fontWeight: 700, textAlign: "right" }}>{з}</span>
+              </span>
+            ))}
+          </div>
+        )}
+        <button onClick={открыть} disabled={!можно} className="fx-tap w-full" style={{ height: 52, borderRadius: 16, border: "none", background: можно ? (лонг ? T.up : T.down) : T.surfaceHi, color: можно ? "#000000" : T.muted, fontFamily: displayFont, fontSize: 16, fontWeight: 800 }}>
+          {счёт && счёт.pending ? "Пополняем с карты… позиция откроется сама"
+            : шлём ? (сКарты > 0.005 ? "Берём SOL с карты…" : "Открываем…")
+            : usd > 0 && usd < 10 ? "Минимум $10"
+            : свободно != null && usd > свободно + 1e-9 ? "Не хватает на карте"
+            : лонг ? `Открыть лонг${подробно ? ` · $${объём.toFixed(0)}` : ""}` : `Открыть шорт${подробно ? ` · $${объём.toFixed(0)}` : ""}`}
         </button>
       </div>
     </div>
@@ -15896,6 +15978,14 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
     const a = setInterval(читать, 2000), b = setInterval(обновитьСчёт, 5000);
     return () => { живо = false; clearInterval(a); clearInterval(b); };
   }, [открыт, обновитьСчёт]);
+  /* Рынок открывается с верха страницы: список мог быть пролистан, и
+     страница рынка открывалась там же — имя уезжало под шапку Telegram. */
+  const кореньРынков = useRef(null);
+  useEffect(() => {
+    let э = кореньРынков.current && кореньРынков.current.parentElement;
+    while (э && !(э.scrollHeight > э.clientHeight && /auto|scroll/.test(getComputedStyle(э).overflowY))) э = э.parentElement;
+    if (э) э.scrollTop = 0; else if (typeof window !== "undefined") window.scrollTo(0, 0);
+  }, [выбран]);
   useНазадТелеграм(открыт && !!выбран, () => setВыбран(null));
   useНазадТелеграм(открыт && !выбран && !вкладка, onClose);
   if (!открыт && !вкладка) return null;
@@ -15914,7 +16004,7 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
   }, [зачисляется, счёт, обновитьСчёт]);
 
   const тело = (
-    <div className={вкладка ? "fx-view" : "fx-sheet-in no-scrollbar"} style={вкладка ? { padding: "8px 16px 40px" } : { position: "fixed", inset: 0, zIndex: 455, background: T.bg, overflowY: "auto", overscrollBehavior: "contain",
+    <div ref={кореньРынков} className={вкладка ? "fx-view" : "fx-sheet-in no-scrollbar"} style={вкладка ? { padding: "8px 16px 40px" } : { position: "fixed", inset: 0, zIndex: 455, background: T.bg, overflowY: "auto", overscrollBehavior: "contain",
       padding: `calc(${insetTop}px + 10px) 16px calc(${insetBottom}px + 40px)` }}>
       <div className="flex flex-col" style={{ gap: 22, maxWidth: 560, margin: "0 auto" }}>
         {!hasTelegramBack() && (!вкладка || выбран) && (
