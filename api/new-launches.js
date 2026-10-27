@@ -4,9 +4,17 @@
  *
  * Открытая: в ответе только публичные данные сети. Кеш — секунда, этого
  * хватает, чтобы тысяча телефонов не будили обработчик тысячу раз. */
-import { свежиеЗапуски, лентаЖива, картинкаЗапуска } from "./_launchStream.js";
+import { свежиеЗапуски, лентаЖива, картинкаЗапуска, сделкиЗапуска } from "./_launchStream.js";
 
 export default async function handler(req, res) {
+  // ?trades=<mint> — сделки свежего токена для графика его страницы.
+  const поТокену = String((req.query && req.query.trades) || "");
+  if (поТокену) {
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(поТокену)) return res.status(400).json({ error: "bad_request" });
+    res.setHeader("Cache-Control", "public, max-age=1");
+    const д = сделкиЗапуска(поТокену);
+    return д ? res.status(200).json(д) : res.status(404).json({ error: "unknown" });
+  }
   // ?logo=<mint> — картинка токена из памяти сервера.
   const mint = String((req.query && req.query.logo) || "");
   if (mint) {

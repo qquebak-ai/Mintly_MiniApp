@@ -25,6 +25,18 @@ const ПОВТОРЫ_МС = [2000, 5000, 10000, 20000];
 const ШЛЮЗ = "https://pump.mypinata.cloud/ipfs/";
 const КАРТИНКА_БАЙТ = 1_500_000;
 const картинки = new Map();       // mint -> { байты, тип } | Promise
+const СДЕЛОК_НА_ТОКЕН = 600;
+
+/* Сделка из потока — точка графика: цена в SOL за токен по виртуальным
+   резервам кривой (так её считает сама площадка) и капитализация. */
+function записатьСделку(з, j, создание = false) {
+  const vSol = Number(j.vSolInBondingCurve), vTok = Number(j.vTokensInBondingCurve);
+  const цена = vSol > 0 && vTok > 0 ? vSol / vTok : 0;
+  if (!(цена > 0)) return;
+  if (!з.сделки) з.сделки = [];
+  з.сделки.push([Date.now(), цена, Number(j.solAmount) || 0, создание ? 2 : j.txType === "sell" ? 0 : 1]);
+  if (з.сделки.length > СДЕЛОК_НА_ТОКЕН) з.сделки.splice(0, з.сделки.length - СДЕЛОК_НА_ТОКЕН);
+}
 
 const лента = [];                 // свежие сверху
 const поАдресу = new Map();
@@ -123,6 +135,8 @@ function принять(событие) {
       изменён: Date.now(),
       logo: null,
     };
+    // Первая покупка автора идёт в том же событии — это первая точка графика.
+    записатьСделку(з, j, true);
     лента.unshift(з);
     поАдресу.set(з.mint, з);
     // Старые уходят — и их сделки больше не нужны.
@@ -140,6 +154,7 @@ function принять(событие) {
   if (з && Number(j.marketCapSol) > 0) {
     з.mcapSol = Number(j.marketCapSol);
     з.изменён = Date.now();
+    записатьСделку(з, j);
   }
 }
 
@@ -191,6 +206,13 @@ export function свежиеЗапуски(после = 0) {
       curve: з.curve, creator: з.creator, mcapSol: з.mcapSol, createdAt: new Date(з.at).toISOString(),
       twitter: з.twitter || null, telegram: з.telegram || null, website: з.website || null,
     }));
+}
+
+/* Сделки токена с момента создания — для графика на его странице.
+   [время мс, цена в SOL, сумма в SOL, 1 покупка / 0 продажа / 2 создание]. */
+export function сделкиЗапуска(mint) {
+  const з = поАдресу.get(mint);
+  return з ? { createdAt: з.at, mcapSol: з.mcapSol, trades: з.сделки || [] } : null;
 }
 
 export function лентаЖива() { return !!(сокет && сокет.readyState === 1); }

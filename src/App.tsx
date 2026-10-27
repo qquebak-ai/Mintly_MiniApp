@@ -21765,6 +21765,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   // семь нулей после запятой, а капитализацию читают одним взглядом.
   const [chartMode, setChartMode] = useState("mcap");
   const [tf, setTf] = useState(() => {
+    /* Токен с pump.fun/letsbonk живёт минуты: на часовом графике вся его
+       жизнь — одна свеча. Открываем минутный, выбор человека не трогаем. */
+    if (String((token && token.id) || "").startsWith("pump-") && TIMEFRAMES.includes("M1")) return "M1";
     try {
       if (typeof window !== "undefined") {
         const saved = window.localStorage.getItem("mintly_chart_tf");
@@ -22630,7 +22633,47 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     const id = setInterval(читать, 30000);
     return () => { живо = false; clearInterval(id); };
   }, [!!пулБиржи, token.tokenAddress, token.address]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* Токен, только что созданный на pump.fun или letsbonk: у бирж его ещё
+     нет, свечей ждать неоткуда. Сервер видит каждую его сделку в потоке
+     площадки (api/_launchStream.js) — из них график и строится, раз в
+     полторы секунды, с первой сделки автора. */
+  const запускСоСтороны = String(token.id || "").startsWith("pump-");
+  const [сделкиСтороны, setСделкиСтороны] = useState(null);
+  useEffect(() => {
+    setСделкиСтороны(null);
+    if (!запускСоСтороны) return undefined;
+    let живо = true;
+    const читать = () => fetch(апи(`/api/new-launches?trades=${encodeURIComponent(token.tokenAddress || token.address)}`))
+      .then((r) => (r.ok ? r.json() : null)).then((j) => { if (живо && j && Array.isArray(j.trades)) setСделкиСтороны(j.trades); }).catch(() => {});
+    читать();
+    const id = setInterval(читать, 1500);
+    return () => { живо = false; clearInterval(id); };
+  }, [запускСоСтороны, token.tokenAddress, token.address]);
   const графДанные = useMemo(() => {
+    if (запускСоСтороны) {
+      const курс = solUsd();
+      const шаг = TF_SECONDS[tf] || 60;
+      const свечи = [], объём = [];
+      for (const [мс, ценаSol, суммаSol, вид] of сделкиСтороны || []) {
+        const usd = ценаSol * курс;
+        if (!(usd > 0)) continue;
+        const t = Math.floor(мс / 1000 / шаг) * шаг;
+        const посл = свечи[свечи.length - 1];
+        if (посл && посл.time === t) {
+          посл.close = usd; посл.high = Math.max(посл.high, usd); посл.low = Math.min(посл.low, usd);
+          объём[объём.length - 1].value += суммаSol * курс;
+        } else {
+          const open = посл ? посл.close : usd;
+          свечи.push({ time: t, open, high: Math.max(open, usd), low: Math.min(open, usd), close: usd });
+          объём.push({ time: t, value: суммаSol * курс, color: hexA(вид === 0 ? T.down : T.up, 0.32) });
+        }
+      }
+      if (свечи.length) return { candles: свечи, volume: объём, tf, isLive: true };
+      // Сделок ещё не пришло — ровная линия по капитализации из ленты
+      // (у pump.fun и letsbonk выпуск — миллиард).
+      const ряд = token.mcapNum > 0 ? flatCandles(token.mcapNum / 1e9, tf) : null;
+      return ряд ? { ...ряд, tf, isLive: false } : null;
+    }
     const основа = (chartData && chartData.candles && chartData.candles.length) ? chartData : null;
     if (основа && пулБиржи && курсПула > 0) {
       const шаг = TF_SECONDS[tf] || 60;
@@ -22662,7 +22705,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     if (!(цена > 0)) return null;
     const ряд = flatCandles(цена, tf);
     return ряд ? { ...ряд, tf, isLive: false } : null;
-  }, [chartData, своя, tf, запущенВ, пулБиржи, точкиПула, курсПула, chartLoading]);
+  }, [chartData, своя, tf, запущенВ, пулБиржи, точкиПула, курсПула, chartLoading, запускСоСтороны, сделкиСтороны, token.mcapNum]);
   const scaledCandles = useMemo(() => {
     if (!графДанные?.candles) return null;
     // Без множителя рисовать нечего: раньше в этот момент график молча
@@ -23160,7 +23203,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
      нельзя — тогда показываем страницу как есть, с честным сообщением
      вместо графика. */
   const числаЕсть = token.mcapNum > 0 || ценаТокена > 0;
-  const страницаГотова = ждёмДольше || (числаЕсть && chartReady);
+  // Запуск с pump.fun/letsbonk открывается сразу: всё нужное уже есть в ленте.
+  const страницаГотова = ждёмДольше || (числаЕсть && chartReady) || (запускСоСтороны && числаЕсть);
 
   if (!страницаГотова) {
     return <ЭкранЗагрузкиЗнака />;
