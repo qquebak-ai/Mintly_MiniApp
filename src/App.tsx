@@ -707,7 +707,7 @@ const STR = {
     pinRowSub: "Запрашивать код при каждом открытии Mintly",
     enablePinFirst: "Сначала включи PIN-код",
     changePinCta: "Сменить PIN-код",
-    referralDesc: "Приглашай друзей — получай монеты за каждого, кто заведёт аккаунт по твоей ссылке. Тратить их можно в магазине.",
+    referralDesc: "Монеты за каждого друга по твоей ссылке.",
     refPerFriend: "За каждого друга",
     refEarned: "Заработано монет",
     refVolume: "Оборот друзей",
@@ -1450,7 +1450,7 @@ const STR = {
     pinRowSub: "Require a code every time Mintly opens",
     enablePinFirst: "Enable PIN code first",
     changePinCta: "Change PIN code",
-    referralDesc: "Invite friends — earn coins for everyone who signs up through your link. Spend them in the shop.",
+    referralDesc: "Coins for every friend who joins via your link.",
     refPerFriend: "Per friend",
     refEarned: "Coins earned",
     refVolume: "Friends' volume",
@@ -12976,36 +12976,38 @@ function КарточкаМонеты({ монета: монетаВход, ск
   const изм = Math.round(((данные && данные.change24) || 0) * 100) / 100;
   const цвет = изм === 0 ? T.faint : изм > 0 ? T.up : T.down;
   const тикер = м.тикер;
+  /* Действия — круглыми кнопками, как под картой кошелька: один язык
+     на весь раздел, а не серые плитки. */
   const кнопка = (Icon, подпись, действие) => (
     <button
       onClick={() => { haptic("light"); onClose(); действие && действие(); }}
-      className="fx-tap flex-1 flex flex-col items-center justify-center"
-      style={{ gap: 7, height: 74, borderRadius: 18, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: bodyFont, fontSize: 13, fontWeight: 600 }}
+      className="fx-tap flex flex-col items-center"
+      style={{ gap: 8, flex: 1, background: "transparent", border: "none", color: T.ice, fontFamily: bodyFont, fontSize: 13.5, fontWeight: 600 }}
     >
-      <Icon size={20} color={T.ice} /> {подпись}
+      <span style={{ width: 60, height: 60, borderRadius: "50%", background: T.ice, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Icon size={22} color={T.bg} strokeWidth={2.4} />
+      </span>
+      {подпись}
     </button>
   );
+  /* Карточка монеты без одинокой подписи сети в углу: сеть видна
+     значком на логотипе. Сверху — логотип и курс крупно по центру,
+     под графиком — сколько её у тебя, одной строкой без серых пометок. */
   const лист = (
-    <div className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 85, background: T.bg, overflowY: "auto", padding: "calc(24px + var(--tg-inset-top, 0px)) 16px calc(28px + var(--tg-inset-bottom, 0px))" }}>
-      <div className="flex justify-end" style={{ marginBottom: 14 }}>
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{м.сеть}</span>
-      </div>
-      <div className="flex items-center" style={{ gap: 14 }}>
-        <img src={м.лого} alt="" width={56} height={56} style={{ borderRadius: "50%" }} />
-        <div>
-          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 26, fontWeight: 800, lineHeight: 1.1 }}>{м.имя}</div>
-          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 3 }}>{тикер}</div>
+    <div className={уходит ? "fx-sheet-out" : "fx-sheet-in"} style={{ position: "fixed", inset: 0, zIndex: 85, background: T.bg, overflowY: "auto", padding: "calc(30px + var(--tg-inset-top, 0px)) 16px calc(28px + var(--tg-inset-bottom, 0px))" }}>
+      <div className="flex flex-col items-center text-center">
+        <img src={м.лого} alt="" width={76} height={76} style={{ borderRadius: "50%", boxShadow: `0 12px 34px ${hexA(цвет, 0.22)}` }} />
+        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 20, fontWeight: 800, marginTop: 14 }}>{м.имя}</div>
+        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 48, fontWeight: 800, marginTop: 6, lineHeight: 1, letterSpacing: "-0.03em" }}>
+          <ТекстСЧислами text={fmtКурс(цена)} />
         </div>
+        <span style={{ marginTop: 12, padding: "6px 12px", borderRadius: 999, background: hexA(цвет, 0.14), color: цвет, fontFamily: displayFont, fontSize: 14.5, fontWeight: 700 }}>
+          <ТекстСЧислами text={`${изм > 0 ? "+" : ""}${изм.toFixed(2)}% · 24ч`} />
+        </span>
       </div>
-      <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 46, fontWeight: 800, marginTop: 22, lineHeight: 1 }}>
-        <ТекстСЧислами text={fmtКурс(цена)} />
-      </div>
-      <div style={{ fontFamily: bodyFont, color: цвет, fontSize: 15, fontWeight: 700, marginTop: 8 }}>
-        <ТекстСЧислами text={`${изм > 0 ? "+" : ""}${изм.toFixed(2)}% за сутки`} />
-      </div>
-      <div style={{ margin: "22px -16px 0", height: 200 }}>
+      <div style={{ margin: "26px -16px 0", height: 190 }}>
         {путь && (
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="200" aria-hidden>
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="190" aria-hidden>
             <defs>
               <linearGradient id={`монета-${монета}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0" stopColor={цвет} stopOpacity="0.26" />
@@ -13017,18 +13019,16 @@ function КарточкаМонеты({ монета: монетаВход, ск
           </svg>
         )}
       </div>
-      <div className="flex items-center justify-between" style={{ padding: "18px 2px", borderTop: `1px solid ${T.line}`, borderBottom: `1px solid ${T.line}`, marginTop: 18 }}>
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14.5 }}>На кошельке</span>
-        <span className="flex flex-col items-end" style={{ gap: 3 }}>
-          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800 }}>
-            <ТекстСЧислами text={`${сколько.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${тикер}`} />
-          </span>
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
-            <ТекстСЧислами text={цена > 0 ? `≈ $${(сколько * цена).toFixed(2)}` : "—"} />
-          </span>
+      <div className="flex items-center" style={{ gap: 14, marginTop: 22, padding: "16px 18px", borderRadius: 24, background: `linear-gradient(135deg, ${hexA(цвет, 0.12)}, ${hexA(T.ice, 0.04)})` }}>
+        <img src={м.лого} alt="" width={40} height={40} style={{ borderRadius: "50%" }} />
+        <span style={{ flex: 1, minWidth: 0, fontFamily: displayFont, color: T.ice, fontSize: 20, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+          <ТекстСЧислами text={`${сколько.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${тикер}`} />
+        </span>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+          <ТекстСЧислами text={цена > 0 ? `$${(сколько * цена).toFixed(2)}` : "—"} />
         </span>
       </div>
-      <div className="flex" style={{ gap: 10, marginTop: 20 }}>
+      <div className="flex" style={{ gap: 10, marginTop: 26 }}>
         {кнопка(ArrowUpRight, t("walletActBuy"), onSend)}
         {кнопка(ArrowDownLeft, t("walletActReceive"), onReceive)}
         {кнопка(Repeat, t("walletActSwap"), onSwap)}
@@ -15573,59 +15573,63 @@ function useУведомленияПодключены() {
    одной, с небольшим сдвигом: экран собирается, а не выпрыгивает. */
 function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} }) {
   const уведомления = useУведомленияПодключены();
-  const широкий = (ключ, i, { заголовок, текст, кнопка, Значок, цвет, onClick, скоро = false }) => (
+  /* Не серые плашки, а подсвеченные изнутри карточки: у каждой свой
+     цвет (Telegram, X, бот), он светится от значка и тает к краю по
+     чёрному, а край — тонкая линия того же цвета. Подписей серым нет:
+     название и кнопка говорят всё сами. */
+  const широкий = (ключ, i, { заголовок, кнопка, Значок, цвет, onClick, скоро = false }) => (
     <button
       key={ключ}
       onClick={скоро ? undefined : () => { haptic("light"); onClick(); }}
       className="fx-tap fx-card w-full flex items-center text-left"
-      // Тот же вид, что у плиток ниже и у остального приложения: ровная
-      // поверхность, белый значок, белая кнопка. Цветные заливки
-      // (голубая, жёлтая) выбивались из чёрно-белого интерфейса.
       style={{
-        gap: 14, padding: "16px 16px", borderRadius: 22, border: "none", background: T.surface,
+        gap: 14, padding: "18px 16px", borderRadius: 24, border: "none",
+        background: `radial-gradient(130% 160% at 0% 50%, ${hexA(цвет, 0.2)}, ${hexA(цвет, 0)} 58%), ${T.bg}`,
+        boxShadow: `inset 0 0 0 1px ${hexA(цвет, 0.22)}`,
         animationDelay: `${i * 60}ms`,
       }}
     >
-      <span className="flex items-center justify-center flex-shrink-0" style={{ width: 46, height: 46, borderRadius: 999, background: T.surfaceHi }}>
-        <Значок size={21} color={T.ice} />
+      <span className="flex items-center justify-center flex-shrink-0" style={{ width: 48, height: 48, borderRadius: 999, background: hexA(цвет, 0.16), boxShadow: `0 0 24px ${hexA(цвет, 0.35)}` }}>
+        <Значок size={22} color={цвет} />
       </span>
-      <span className="flex flex-col" style={{ flex: 1, minWidth: 0, gap: 3 }}>
-        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 800 }}>{заголовок}</span>
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.35 }}>{текст}</span>
-      </span>
+      <span style={{ flex: 1, minWidth: 0, fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800, letterSpacing: "-0.01em" }}>{заголовок}</span>
       <span style={{
-        flexShrink: 0, padding: "8px 14px", borderRadius: 999, fontFamily: displayFont, fontSize: 12.5, fontWeight: 800,
+        flexShrink: 0, padding: "9px 16px", borderRadius: 999, fontFamily: displayFont, fontSize: 13, fontWeight: 800,
         background: скоро ? "transparent" : T.ice, color: скоро ? T.faint : T.bg,
         boxShadow: скоро ? `inset 0 0 0 1px ${T.lineHi}` : "none",
       }}>{скоро ? "Скоро" : кнопка}</span>
     </button>
   );
-  const плитка = (ключ, i, { заголовок, текст, Значок, onClick }) => (
+  const плитка = (ключ, i, { заголовок, Значок, цвет, onClick }) => (
     <button
       key={ключ}
       onClick={() => { haptic("light"); onClick(); }}
-      className="fx-tap fx-card flex flex-col text-left"
-      style={{ flex: 1, minWidth: 0, gap: 10, padding: 16, borderRadius: 22, border: "none", background: T.surface, animationDelay: `${i * 60}ms` }}
+      className="fx-tap fx-card flex flex-col justify-between text-left"
+      style={{
+        flex: 1, minWidth: 0, minHeight: 132, padding: 18, borderRadius: 24, border: "none",
+        background: `radial-gradient(120% 120% at 0% 0%, ${hexA(цвет, 0.24)}, ${hexA(цвет, 0)} 62%), ${T.bg}`,
+        boxShadow: `inset 0 0 0 1px ${hexA(цвет, 0.22)}`,
+        animationDelay: `${i * 60}ms`,
+      }}
     >
-      <Значок size={24} color={T.ice} />
-      <span className="flex flex-col" style={{ gap: 3 }}>
-        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 800 }}>{заголовок}</span>
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.35 }}>{текст}</span>
+      <span className="flex items-center justify-center" style={{ width: 46, height: 46, borderRadius: 16, background: hexA(цвет, 0.16) }}>
+        <Значок size={24} color={цвет} />
       </span>
+      <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800, letterSpacing: "-0.01em" }}>{заголовок}</span>
     </button>
   );
   return (
     <section className="flex flex-col" style={{ gap: 12 }}>
-      {широкий("канал", 0, { заголовок: "Канал Mintly", текст: "Новости и громкие запуски", кнопка: "Открыть", Значок: Send, цвет: "#2AABEE", onClick: () => открытьТелеграм(КАНАЛ_MINTLY), скоро: !КАНАЛ_MINTLY })}
-      {широкий("x", 1, { заголовок: "Mintly в X", текст: "@Mintlycompany — новости и анонсы", кнопка: "Открыть", Значок: ЗнакX, цвет: "#FFFFFF", onClick: () => {
+      {широкий("канал", 0, { заголовок: "Канал Mintly", кнопка: "Открыть", Значок: Send, цвет: "#2AABEE", onClick: () => открытьТелеграм(КАНАЛ_MINTLY), скоро: !КАНАЛ_MINTLY })}
+      {широкий("x", 1, { заголовок: "Mintly в X", кнопка: "Открыть", Значок: ЗнакX, цвет: "#FFFFFF", onClick: () => {
         try { const tg = window.Telegram && window.Telegram.WebApp; if (tg && tg.openLink) tg.openLink(X_MINTLY); else window.open(X_MINTLY, "_blank"); } catch { /* ссылка не открылась */ }
       } })}
       {широкий("бот", 2, уведомления
-        ? { заголовок: "Уведомления подключены", текст: "Покупки ваших токенов приходят в бот", кнопка: "Настроить", Значок: Bell, цвет: "#F5C04E", onClick: () => открытьТелеграм(БОТ_MINTLY.replace("?start=app", "")) }
-        : { заголовок: "Уведомления", текст: "Покупки ваших токенов — в боте", кнопка: "Подключить", Значок: Bell, цвет: "#F5C04E", onClick: подключитьУведомления })}
+        ? { заголовок: "Уведомления", кнопка: "Настроить", Значок: Bell, цвет: "#F5C04E", onClick: () => открытьТелеграм(БОТ_MINTLY.replace("?start=app", "")) }
+        : { заголовок: "Уведомления", кнопка: "Подключить", Значок: Bell, цвет: "#F5C04E", onClick: подключитьУведомления })}
       <div className="flex" style={{ gap: 12 }}>
-        {плитка("запуск", 3, { заголовок: "Запустить", текст: "Свой мемкоин за минуту", Значок: Rocket, onClick: onGoCreate })}
-        {плитка("мемпад", 4, { заголовок: "Мемпад", текст: "Все свежие токены", Значок: ЗначокОбмен, onClick: () => onGoTab("mempad") })}
+        {плитка("запуск", 3, { заголовок: "Запустить", Значок: Rocket, цвет: "#B79CFF", onClick: onGoCreate })}
+        {плитка("мемпад", 4, { заголовок: "Мемпад", Значок: ЗначокОбмен, цвет: T.up, onClick: () => onGoTab("mempad") })}
       </div>
     </section>
   );
@@ -16065,10 +16069,12 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
       // всё окно вместо того, чтобы закрыть страницу.
       data-sheet="1"
       style={{
-        /* Лист начинается там, где его ручка, — под шапкой Telegram, а не
-           у самого верха экрана: над ним видна затемнённая страница, и
-           сразу понятно, что это лист, который смахивают вниз. */
-        position: "fixed", top: insetTop, left: 0, right: 0, bottom: 0, zIndex: 400, background: T.bg,
+        /* Во весь экран: прежний лист начинался под шапкой Telegram, и
+           над ним проступал край страницы позади — заголовок «Кошелёк»
+           торчал над окном транзакции обрывком. Шапку Telegram обходит
+           отступ сверху, а не сам лист. */
+        position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 400, background: T.bg,
+        paddingTop: insetTop,
         display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto",
         // На мониторе — окно посреди экрана, а не столбик во всю высоту.
         ...(этоПК() ? { top: "6vh", bottom: "6vh", maxWidth: 620, borderRadius: 22, boxShadow: "0 30px 80px rgba(0,0,0,0.6)", border: `1px solid ${T.line}` } : null),
@@ -16077,7 +16083,7 @@ function ЭкранСнизу({ открыт, onClose, заголовок = "", 
         overflow: "hidden",
         transform: уходит ? "translateY(100%)" : `translateY(${тяга}px)`,
         transition: жест.current ? "none" : `transform ${УХОД_ЛИСТА}ms cubic-bezier(0.22, 0.85, 0.25, 1)`,
-        borderTopLeftRadius: 22, borderTopRightRadius: 22,
+        borderTopLeftRadius: этоПК() ? 22 : 0, borderTopRightRadius: этоПК() ? 22 : 0,
         /* Сам лист не полупрозрачный: сквозь него не должно просвечивать
            ничего — страница позади показывается там, где лист уже уехал,
            а не сквозь него. */
@@ -18138,11 +18144,13 @@ function ДействиеКошелька({ icon: Icon, label, onClick }) {
     >
       <span
         className="flex items-center justify-center"
-        style={{ width: 54, height: 54, borderRadius: 18, background: T.surfaceHi }}
+        // Светлый круг вместо серой плитки: действие видно сразу, и
+        // подпись под ним белая, а не серая приписка.
+        style={{ width: 56, height: 56, borderRadius: "50%", background: T.ice }}
       >
-        <Icon size={20} strokeWidth={1.9} color={T.ice} />
+        <Icon size={21} strokeWidth={2.3} color={T.bg} />
       </span>
-      <span style={{ fontFamily: bodyFont, fontSize: 12, color: T.muted }}>{label}</span>
+      <span style={{ fontFamily: bodyFont, fontSize: 12.5, fontWeight: 600, color: T.ice }}>{label}</span>
     </button>
   );
 }
@@ -18273,6 +18281,8 @@ function собратьИсторию(ряд, запуски) {
       id: String(с.id), вид: запуск ? "launch" : с.side, сеть, монета: МОНЕТА_СЕТИ[сеть] || ТИКЕР_TON,
       тикер: String(с.ticker || "").toUpperCase() || (свой && свой.тикер) || null,
       лого: (т && т.logo_url) || (свой && свой.лого) || null,
+      // По ним аватарка сделки ведёт в сам токен.
+      tokenId: с.token_id || null, адресТокена: с.token_address || null,
       сумма: Number(с.ton_amount) || 0, знак: с.side === "sell" ? 1 : -1,
       токенов: Number(с.token_amount) || 0, курсТогда: Number(с.ton_price_usd) || 0,
       время: с.created_at, подпись: (оп && оп.signature) || null, адрес: null,
@@ -18406,7 +18416,7 @@ function значокДействия(вид) {
   switch (вид) {
     case "buy": return { Icon: ArrowDownLeft, приход: false };
     case "sell": return { Icon: ArrowUpRight, приход: true };
-    case "launch": return { Icon: Rocket, приход: false };
+    case "launch": return { Icon: Rocket, приход: false, запуск: true };
     case "swap": return { Icon: Repeat, приход: false };
     case "deposit":
     case "transfer_in": return { Icon: ArrowDownLeft, приход: true };
@@ -18416,11 +18426,39 @@ function значокДействия(вид) {
   }
 }
 
+/* Логотипы токенов для истории по адресу. У части сделок в базе нет
+   ссылки на токен (token_id пуст — сделка записана до появления строки
+   токена), и покупка стояла буквой «M» вместо картинки. Такие логотипы
+   дочитываем одним запросом по адресам и помним до перезапуска. */
+const логоПоАдресу = new Map(); // адрес -> { лого, id } | null
+const слушателиЛого = new Set();
+async function дочитатьЛого(адреса) {
+  const нужно = [...new Set(адреса)].filter((а) => а && !логоПоАдресу.has(а)).slice(0, 60);
+  if (!нужно.length) return;
+  for (const а of нужно) логоПоАдресу.set(а, null);
+  try {
+    const { data } = await supabase.from("tokens").select("id, address, logo_url").in("address", нужно);
+    for (const р of data || []) логоПоАдресу.set(р.address, { лого: р.logo_url || null, id: р.id });
+  } catch { /* не ответила база — останется буква */ }
+  for (const ф of слушателиЛого) ф();
+}
+function useЛогоИстории(ряд) {
+  const [, перерисовать] = useState(0);
+  useEffect(() => {
+    const ф = () => перерисовать((n) => n + 1);
+    слушателиЛого.add(ф);
+    return () => { слушателиЛого.delete(ф); };
+  }, []);
+  const ключ = (ряд || []).filter((с) => !с.лого && с.адресТокена).map((с) => с.адресТокена).join(",");
+  useEffect(() => { if (ключ) дочитатьЛого(ключ.split(",")); }, [ключ]);
+}
+
 function АватарСтроки({ с, size = 40 }) {
   const [сломан, setСломан] = useState(false);
   // Перевод человеку Mintly — его лицо, как контакт в Phantom.
   const лицо = с.кто ? (с.кто.avatar || null) : null;
-  const картинка = !сломан && (с.кто ? лицо : (с.лого || (!с.тикер ? ЛОГО_МОНЕТЫ_СЕТИ[с.сеть] : null)));
+  const поАдресу = с.адресТокена ? логоПоАдресу.get(с.адресТокена) : null;
+  const картинка = !сломан && (с.кто ? лицо : (с.лого || (поАдресу && поАдресу.лого) || (!с.тикер ? ЛОГО_МОНЕТЫ_СЕТИ[с.сеть] : null)));
   const з = значокДействия(с.вид);
   const бейдж = Math.round(size * 0.44);
   return (
@@ -18446,10 +18484,12 @@ function АватарСтроки({ с, size = 40 }) {
         className="flex items-center justify-center"
         style={{
           position: "absolute", right: -3, bottom: -3, width: бейдж, height: бейдж, borderRadius: "50%",
-          background: з.приход ? T.up : T.ice, border: `2px solid ${T.bg}`,
+          // Запуск — своим переливом, как главная кнопка приложения: это
+          // не трата, а рождение токена, и белая стрелка его не отличала.
+          ...(з.запуск ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: з.приход ? T.up : T.ice }), border: `2px solid ${T.bg}`,
         }}
       >
-        <з.Icon size={Math.round(бейдж * 0.6)} strokeWidth={3} color={з.приход ? "#000000" : T.bg} />
+        <з.Icon size={Math.round(бейдж * (з.запуск ? 0.66 : 0.6))} strokeWidth={з.запуск ? 2.4 : 3} color={з.приход ? "#000000" : з.запуск ? PRISM_TEXT : T.bg} />
       </span>
     </span>
   );
@@ -18602,7 +18642,24 @@ function ОкноОперации({ строка, onClose, курсы, insetTop 
       {с && (
         <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "6px 18px 28px" }}>
           <div className="flex flex-col items-center text-center" style={{ gap: 8, paddingTop: 6 }}>
-            <АватарСтроки с={с} size={64} />
+            {/* Аватарка сделки ведёт в токен: оттуда и докупают, и продают. */}
+            {(() => {
+              const поАдресу = с.адресТокена ? логоПоАдресу.get(с.адресТокена) : null;
+              const ид = с.tokenId || (поАдресу && поАдресу.id) || null;
+              const можно = (ид || с.адресТокена) && ["buy", "sell", "launch", "graduate"].includes(с.вид);
+              if (!можно) return <АватарСтроки с={с} size={72} />;
+              return (
+                <button type="button" aria-label={с.тикер ? `$${с.тикер}` : "Токен"} className="fx-tap"
+                  onClick={() => {
+                    haptic("light");
+                    onClose();
+                    try { window.dispatchEvent(new CustomEvent("mintly:открыть-токен", { detail: { id: ид, address: с.адресТокена } })); } catch { /* старый движок */ }
+                  }}
+                  style={{ background: "transparent", border: "none", padding: 0 }}>
+                  <АватарСтроки с={с} size={72} />
+                </button>
+              );
+            })()}
             <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14.5, marginTop: 6 }}>{заголовокСтроки(с)}</div>
             {с.вид !== "bind" && (
               <div style={{ fontFamily: displayFont, color: цветСуммы(с), fontSize: 34, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
@@ -18672,6 +18729,17 @@ function ОкноОперации({ строка, onClose, курсы, insetTop 
   );
 }
 
+/* Переход в токен из истории закрывает листы кошелька: иначе карточка
+   токена открывалась под ними, и казалось, что ничего не произошло. */
+function ЗакрытьПриТокене({ onЗакрыть }) {
+  useEffect(() => {
+    const ф = () => onЗакрыть();
+    window.addEventListener("mintly:открыть-токен", ф);
+    return () => window.removeEventListener("mintly:открыть-токен", ф);
+  }, [onЗакрыть]);
+  return null;
+}
+
 function ИсторияКошелька({ userId, тик = 0, безЗаголовка = false, предел = 12, insetTop = 0, insetBottom = 0 }) {
   /* Только что сделанный перевод список подмешивает сам: своя копия
      лежит в памяти вкладки и исчезает, когда та же операция приходит с
@@ -18682,6 +18750,7 @@ function ИсторияКошелька({ userId, тик = 0, безЗаголо
   const [фильтр, setФильтр] = useState("all");
   const [открыта, setОткрыта] = useState(null);
   const строки = useMemo(() => (ряд ? собратьИсторию(ряд, запуски).slice(0, предел) : null), [ряд, запуски, предел]);
+  useЛогоИстории(строки);
 
   /* Страница истории открывается раньше, чем приходят строки. Пустой
      лист в этот миг выглядел поломкой, поэтому на их месте стоят
@@ -20266,6 +20335,13 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
           // Лицевая сторона настоящего 3D-разворота: обратную сторону не
           // видно, пока карта не довернулась мимо ребра.
           backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
+          /* Одной backface-visibility iOS не верит: вернулся в приложение
+             из фона — слои пересобраны без 3D, и оборот на секунду ложился
+             поверх лица зеркальным. Поэтому невидимая сторона ещё и
+             прячется сама — ровно на середине поворота, когда карта
+             стоит ребром. */
+          visibility: переворотКарты ? "hidden" : "visible",
+          transition: `visibility 0s linear ${ПЕРЕВОРОТ_КАРТЫ_МС / 2}ms`,
           transform: `translateZ(${ТОЛЩИНА_КАРТЫ / 2}px)`,
           /* Обрезка по скруглению у iOS не держится, если внутри что-то
              ходит (блик, волны, ткань): дети вылезают за угол квадратом.
@@ -20443,6 +20519,8 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
         style={{
           position: "absolute", inset: 0, borderRadius: 24, overflow: "hidden",
           backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
+          visibility: переворотКарты ? "visible" : "hidden",
+          transition: `visibility 0s linear ${ПЕРЕВОРОТ_КАРТЫ_МС / 2}ms`,
           transform: `rotateY(180deg) translateZ(${ТОЛЩИНА_КАРТЫ / 2}px)`,
           // Та же маска, что у лицевой стороны: без неё скругление на iOS
           // не держит анимированную заливку внутри, и кнопки снизу
@@ -20570,9 +20648,8 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
           onClick={() => setИсторияОткрыта(true)}
         />
       </div>
-      <div style={{ margin: "22px 16px 0" }}>
-        <ЖивыеКарточки onOpen={setМонетаОткрыта} />
-      </div>
+      {/* Курсов списком больше нет: курс монеты открывается нажатием на
+          неё в «Моих активах» — там же, где видно, сколько её лежит. */}
       <КарточкаМонеты
         монета={монетаОткрыта}
         сколько={монетаОткрыта === "sol" ? солНаКошельке
@@ -20614,19 +20691,19 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             сразу, сколько чего лежит и сколько это в долларах. Нажатие
             выбирает сеть — ею и работают «отправить», «получить» и
             «обменять». */}
-        <div style={{ marginBottom: 12 }}>
-          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700 }}>
+        <div style={{ marginBottom: 6 }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em" }}>
             {t("walletAssets")}
           </span>
         </div>
         <div className="flex flex-col" style={{ gap: 2, marginBottom: 22 }}>
           {[
-            { ключ: "sol", тикер: "SOL", имя: "Solana", лого: "/coins/sol.png", сколько: солНаКошельке, курс: курсSol },
-            { ключ: "ton", тикер: ТИКЕР_TON, имя: "Gram", лого: "/coins/gram.png", сколько: тонНаКошельке, курс: tonPriceUsd },
+            { ключ: "sol", монета: "sol", тикер: "SOL", имя: "Solana", лого: "/coins/sol.png", сколько: солНаКошельке, курс: курсSol },
+            { ключ: "ton", монета: "gram", тикер: ТИКЕР_TON, имя: "Gram", лого: "/coins/gram.png", сколько: тонНаКошельке, курс: tonPriceUsd },
             // Монеты сетей EVM — каждая своей строкой, даже с нулём: так
             // видно, куда ещё можно положить деньги.
             ...Object.entries(СЕТИ_EVM).map(([к, с]) => ({
-              ключ: к, тикер: `${с.монета} · ${с.имя}`, имя: к === "bsc" ? "BNB" : "Ethereum",
+              ключ: к, монета: к === "bsc" ? "bnb" : к, тикер: `${с.монета} · ${с.имя}`, имя: к === "bsc" ? "BNB" : "Ethereum",
               лого: к === "base" ? "/coins/eth.svg" : с.лого, сеть: к === "base" ? с.лого : null,
               сколько: Number(остатокEVM(к) && остатокEVM(к).native) || 0, курс: курсМонетыEVM(к, курсыEVM),
             })),
@@ -20637,15 +20714,14 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
               сколько: Number(остатокEVM(к) && остатокEVM(к).tokens && остатокEVM(к).tokens[т]) || 0, курс: 1,
             }))),
           ].map((монета) => (
-            /* Строка, а не кнопка: выбирать тут нечего — сеть перевода
-               спрашивается там, где она и нужна, на пополнении. */
+            /* Нажатие на монету сети открывает её карточку с курсом и
+               графиком; у стейблов курса нет — строка просто строка. */
             <div
               key={монета.ключ}
-              className="w-full flex items-center"
-              // Строка один в один как в курсах выше: тот же размер
-              // иконки, те же кегли и жирность — два списка подряд
-              // читаются одним.
-              style={{ gap: 14, padding: "13px 2px" }}
+              role={монета.монета ? "button" : undefined}
+              onClick={монета.монета ? () => { haptic("light"); setМонетаОткрыта(монета.монета); } : undefined}
+              className={`w-full flex items-center${монета.монета ? " fx-tap" : ""}`}
+              style={{ gap: 14, padding: "13px 2px", cursor: монета.монета ? "pointer" : "default" }}
             >
               <span style={{ position: "relative", width: 44, height: 44, flexShrink: 0 }}>
                 <img
@@ -20681,8 +20757,8 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
           ))}
         </div>
 
-        <div style={{ marginBottom: 12 }}>
-          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700 }}>
+        <div style={{ marginBottom: 6 }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em" }}>
             {t("walletHoldings")}
           </span>
         </div>
@@ -20741,6 +20817,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
 
       </div>
 
+      <ЗакрытьПриТокене onЗакрыть={() => setИсторияОткрыта(false)} />
       <ЭкранСнизу
         открыт={историяОткрыта}
         onClose={() => setИсторияОткрыта(false)}
@@ -26143,17 +26220,16 @@ function FaqItem({ item, open, onToggle }) {
   );
 }
 
-function SupportChat({ accountCreated, showToast, onRead }) {
+function SupportChat({ accountCreated, showToast, onRead, insetBottom = 0 }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-  // Начинаем с частых вопросов, а не с пустого поля: у большинства вопрос
-  // из списка, и ответ нужен сейчас.
-  const [mode, setMode] = useState("faq");
-  // Из чата — обратно к вопросам кнопкой «Назад» Telegram.
-  useНазадТелеграм(mode !== "faq", () => setMode("faq"));
-  const [openQuestion, setOpenQuestion] = useState(null);
+  /* Частые вопросы живут прямо в переписке: нажал вопрос — он и ответ
+     встают в чат пузырями, как от поддержки. Раньше это был отдельный
+     экран со списком, а сам чат открывался ещё одной кнопкой. На сервер
+     эти пузыри не уходят: ответ готовый, ждать его не нужно. */
+  const [местные, setМестные] = useState([]);
   const дно = useRef(null);
 
   async function load() {
@@ -26170,25 +26246,22 @@ function SupportChat({ accountCreated, showToast, onRead }) {
     if (!accountCreated) { setLoading(false); return; }
     load();
     const t = setInterval(load, 12000);
+    // Чат открыт сразу — значит, ответы прочитаны в тот же миг.
+    supabase.rpc("support_mark_seen").then(() => {}, () => {});
+    if (onRead) onRead();
     return () => clearInterval(t);
   }, [accountCreated]);
 
-  /* Прочитанными ответы становятся при входе в переписку, а не при
-     открытии окна: окно открывается на списке вопросов, и до самих
-     ответов человек может не дойти. Отметь мы их раньше — метка на
-     пункте настроек погасла бы, а ответ так и остался бы непрочитанным. */
+  // Внизу — последнее сообщение: ради него переписку и открывают.
   useEffect(() => {
-    if (mode !== "chat" || !accountCreated) return;
-    supabase.rpc("support_mark_seen").then(() => {}, () => {});
-    if (onRead) onRead();
-  }, [mode, accountCreated]);
+    if (дно.current && дно.current.scrollIntoView) дно.current.scrollIntoView({ block: "end" });
+  }, [messages.length, местные.length]);
 
-  // Показываем последнее сообщение, а не начало переписки: ради него
-  // окно и открывают.
-  useEffect(() => {
-    if (mode !== "chat") return;
-    if (дно.current && дно.current.scrollIntoView) дно.current.scrollIntoView({ block: "nearest" });
-  }, [messages.length, mode]);
+  function спросить(item) {
+    haptic("light");
+    const ид = `${item.id}-${Date.now()}`;
+    setМестные((пр) => [...пр, { id: `${ид}-q`, body: pickLabel(item.q), from_admin: false, at: Date.now() }, { id: `${ид}-a`, body: pickLabel(item.a), from_admin: true, at: Date.now() + 1 }]);
+  }
 
   async function send() {
     const text = draft.trim();
@@ -26230,114 +26303,67 @@ function SupportChat({ accountCreated, showToast, onRead }) {
     }
   }
 
-  if (!accountCreated) {
+  const пузырь = (m) => {
+    const свой = !m.from_admin;
     return (
-      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, textAlign: "center", marginTop: 6 }}>
-        {t("supportNeedAccount")}
-      </p>
-    );
-  }
-
-  if (mode === "faq") {
-    return (
-      <div className="fx-swap flex flex-col" style={{ gap: 22 }}>
-        <button
-          onClick={() => setMode("chat")}
-          className="fx-tap fx-card w-full flex items-center text-left"
-          style={{ animationDelay: "40ms", gap: 12, padding: "14px 16px", borderRadius: 22, background: T.surface, border: "none" }}
-        >
-          <span style={{ width: 40, height: 40, borderRadius: 13, flexShrink: 0, background: T.surfaceHi, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <MessageCircle size={18} color={T.ice} />
-          </span>
-          <span className="min-w-0" style={{ flex: 1 }}>
-            <span style={{ display: "block", fontFamily: displayFont, fontSize: 15, fontWeight: 700, color: T.ice }}>{lang === "EN" ? "Chat with support" : "Чат с поддержкой"}</span>
-            <span style={{ display: "block", fontFamily: bodyFont, fontSize: 12.5, color: T.muted, marginTop: 2 }}>
-              {messages.length ? (lang === "EN" ? `${messages.length} messages in the thread` : `Сообщений в переписке: ${messages.length}`) : (lang === "EN" ? "Answers come here and in the bot" : "Ответ придёт сюда и в бота")}
-            </span>
-          </span>
-          <ChevronRight size={16} color={T.faint} />
-        </button>
-        <div className="fx-card" style={{ animationDelay: "100ms" }}>
-          <SectionTitle>{lang === "EN" ? "Common questions" : "Частые вопросы"}</SectionTitle>
-          <ГруппаСтрок>
-          {SUPPORT_FAQ.map((item) => (
-            <FaqItem
-              key={item.id}
-              item={item}
-              open={openQuestion === item.id}
-              // Открыт всегда один: раскрытые разом ответы превращают
-              // список в простыню, по которой уже не найти свой вопрос.
-              onToggle={() => setOpenQuestion(openQuestion === item.id ? null : item.id)}
-            />
-          ))}
-          </ГруппаСтрок>
+      <div key={m.id} style={{ alignSelf: свой ? "flex-end" : "flex-start", maxWidth: "86%", animation: "fadeInUp 240ms ease-out both" }}>
+        <div style={{
+          fontFamily: bodyFont, fontSize: 14.5, lineHeight: 1.45,
+          color: свой ? PRISM_TEXT : T.ice,
+          background: свой ? PRISM : T.surfaceHi,
+          borderRadius: 20,
+          // Угол со стороны автора срезан — видно, кто говорит, без подписей.
+          borderBottomRightRadius: свой ? 6 : 20,
+          borderBottomLeftRadius: свой ? 20 : 6,
+          padding: "10px 14px", whiteSpace: "pre-wrap", wordBreak: "break-word",
+        }}>
+          {m.body}
         </div>
       </div>
     );
-  }
+  };
 
+  const лента = [...messages, ...местные];
   return (
-    <div className="fx-swap flex flex-col">
-      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5 }}>
-        {t("supportDesc")}
-      </p>
-
-      <div className="flex flex-col gap-2" style={{ marginTop: 14, minHeight: 120 }}>
-        {loading && !messages.length && (
-          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, textAlign: "center", padding: "18px 0" }}>…</div>
-        )}
-        {!loading && !messages.length && (
-          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, textAlign: "center", padding: "18px 0", lineHeight: 1.5 }}>
-            {t("supportEmpty")}
+    <div className="flex flex-col" style={{ flex: 1, minHeight: 0 }}>
+      <div className="no-scrollbar flex flex-col" style={{ flex: 1, minHeight: 0, overflowY: "auto", gap: 8, padding: "4px 0 12px" }}>
+        {/* Первое слово — за поддержкой: приветствие и частые вопросы
+            кнопками. Пустой экран с «переписки пока нет» не звал писать. */}
+        <div style={{ alignSelf: "flex-start", maxWidth: "92%" }}>
+          <div style={{ fontFamily: bodyFont, fontSize: 14.5, lineHeight: 1.45, color: T.ice, background: T.surfaceHi, borderRadius: 20, borderBottomLeftRadius: 6, padding: "10px 14px" }}>
+            {lang === "EN" ? "Hi! Pick a question or write your own." : "Привет! Выбери вопрос или напиши свой."}
           </div>
+          <div className="flex flex-wrap" style={{ gap: 6, marginTop: 8 }}>
+            {SUPPORT_FAQ.map((item) => (
+              <button key={item.id} onClick={() => спросить(item)} className="fx-tap"
+                style={{ padding: "8px 12px", borderRadius: 999, background: "transparent", border: `1px solid ${T.lineHi}`, color: T.ice, fontFamily: bodyFont, fontSize: 13, textAlign: "left" }}>
+                {pickLabel(item.q)}
+              </button>
+            ))}
+          </div>
+        </div>
+        {!accountCreated && пузырь({ id: "need", body: t("supportNeedAccount"), from_admin: true })}
+        {loading && !messages.length && accountCreated && (
+          <div style={{ alignSelf: "center", padding: "10px 0" }}><ЗнакЗагрузки size={28} /></div>
         )}
-        {messages.map((m) => {
-          const свой = !m.from_admin;
-          return (
-            <div key={m.id} style={{ alignSelf: свой ? "flex-end" : "flex-start", maxWidth: "86%" }}>
-              <div style={{
-                fontFamily: bodyFont, fontSize: 11.5, color: T.muted,
-                textAlign: свой ? "right" : "left", marginBottom: 3,
-              }}>
-                {свой ? t("supportYou") : (m.admin_name || t("supportTeam"))}
-              </div>
-              <div style={{
-                fontFamily: bodyFont, fontSize: 14, lineHeight: 1.45,
-                color: свой ? PRISM_TEXT : T.ice,
-                background: свой ? PRISM : T.surfaceHi,
-                border: свой ? "none" : `1px solid ${T.line}`,
-                borderRadius: 18,
-                // Угол со стороны своего автора срезан меньше — так с
-                // одного взгляда видно, кто говорит, даже без подписи.
-                borderBottomRightRadius: свой ? 6 : 18,
-                borderBottomLeftRadius: свой ? 18 : 6,
-                padding: "9px 13px", whiteSpace: "pre-wrap", wordBreak: "break-word",
-              }}>
-                {m.body}
-              </div>
-            </div>
-          );
-        })}
+        {лента.map(пузырь)}
         <div ref={дно} />
       </div>
 
-      {/* Поле ввода липнет к низу окна: переписка растёт вверх, а писать
-          человек хочет не прокручивая. */}
-      <div style={{
-        position: "sticky", bottom: 0, marginTop: 12, paddingTop: 10, paddingBottom: 2,
-        background: T.bg,
-      }}>
+      {/* Поле — у самого низа экрана, как в любом мессенджере. */}
+      <div style={{ flexShrink: 0, paddingTop: 8, paddingBottom: insetBottom + 10, background: T.bg }}>
         <div className="flex items-end gap-2">
           <ПолеСЖивымТекстом как="textarea"
             value={draft}
             onChange={(e) => setDraft(e.target.value.slice(0, 2000))}
             placeholder={t("supportPlaceholder")}
-            rows={2}
+            rows={1}
+            disabled={!accountCreated}
             style={{
-              flex: 1, minWidth: 0, resize: "none",
+              flex: 1, minWidth: 0, resize: "none", maxHeight: 120,
               fontFamily: bodyFont, fontSize: 16, lineHeight: 1.4, color: T.ice,
-              background: T.surface, border: "none", borderRadius: 18,
-              padding: "10px 13px", outline: "none",
+              background: T.surface, border: "none", borderRadius: 22,
+              padding: "12px 16px", outline: "none",
             }}
           />
           <button
@@ -26346,8 +26372,8 @@ function SupportChat({ accountCreated, showToast, onRead }) {
             className={`fx-tap flex items-center justify-center${sending ? " fx-busy" : ""}`}
             style={{
               width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
-              ...(draft.trim() && !sending ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surfaceHi }),
-              border: draft.trim() && !sending ? "none" : `1px solid ${T.line}`,
+              ...(draft.trim() && !sending ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: T.surface }),
+              border: "none",
             }}
           >
             <Send size={16} color={draft.trim() && !sending ? PRISM_TEXT : T.muted} />
@@ -26563,7 +26589,7 @@ function ЗаявкаНаГалочку({ запросX, handle }) {
     return (
       <div className="flex items-center" style={{ gap: 12, padding: "14px 16px", borderRadius: 22, background: T.surface }}>
         <ГалочкаЛица size={22} />
-        <div style={{ fontFamily: bodyFont, color: T.ice, fontSize: 14.5, lineHeight: 1.4 }}>Проверенное лицо — галочка видна рядом с @{handle} везде в Mintly</div>
+        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>Галочка выдана</div>
       </div>
     );
   }
@@ -26571,7 +26597,7 @@ function ЗаявкаНаГалочку({ запросX, handle }) {
     return (
       <div className="flex items-center" style={{ gap: 12, padding: "14px 16px", borderRadius: 22, background: T.surface }}>
         <ЗнакЗагрузки size={22} />
-        <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.4 }}>Заявка на галочку проверенного лица на проверке — ответ придёт в боте</div>
+        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>Галочка на проверке</div>
       </div>
     );
   }
@@ -26719,35 +26745,42 @@ function ПодключениеX({ showToast }) {
     const ru = lang !== "EN";
     return (
       <>
-        {/* Шапка как профиль в самом X: баннер, аватар, имя и цифры. Нажатие
-            открывает карточку целиком. */}
+        {/* Профиль X — крупно и по центру, как витрина: баннер растворяется
+            светом за аватаркой, статус — значком на её краю, а не строкой
+            «аккаунт подтверждён» сбоку. Нажатие открывает карточку целиком. */}
         <button
           onClick={() => { haptic("light"); setПрофильОткрыт(true); }}
-          className="fx-tap fx-card w-full text-left"
-          style={{ animationDelay: "40ms", padding: 0, borderRadius: 22, overflow: "hidden", background: T.surface, border: "none" }}
+          className="fx-tap fx-card w-full flex flex-col items-center text-center"
+          style={{ animationDelay: "40ms", position: "relative", padding: "30px 16px 24px", borderRadius: 28, overflow: "hidden", background: T.surface, border: "none", isolation: "isolate" }}
         >
-          <div style={{ height: 92, background: п.banner ? `center/cover no-repeat url(${п.banner})` : T.surfaceHi }} />
-          <div style={{ padding: "0 16px 16px" }}>
-            <div className="flex items-end justify-between" style={{ marginTop: -30 }}>
-              <span style={{ width: 64, height: 64, borderRadius: "50%", border: `4px solid ${T.surface}`, background: T.surfaceHi, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {п.avatar ? <img src={п.avatar} alt="" width={64} height={64} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ЗнакX size={22} color={T.muted} />}
-              </span>
-              <span className="flex items-center" style={{ gap: 5, fontFamily: bodyFont, fontSize: 12.5, color: T.up, paddingBottom: 6 }}>
-                <CheckCircle2 size={14} color={T.up} /> {t("xConnected")}
-              </span>
-            </div>
-            <div className="flex items-center" style={{ gap: 5, marginTop: 10 }}>
-              <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800 }}>{п.name || состояние.handle}</span>
-              <ЗначкиX handle={состояние.handle} size={16} />
-            </div>
-            <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, marginTop: 1 }}>@{состояние.handle}</div>
-            {(п.followers != null || п.following != null) && (
-              <div className="flex" style={{ gap: 16, marginTop: 10, fontFamily: bodyFont, fontSize: 13.5 }}>
-                <span><b style={{ color: T.ice, fontVariantNumeric: "tabular-nums" }}>{число(п.followers)}</b> <span style={{ color: T.muted }}>{ru ? "читателей" : "followers"}</span></span>
-                <span><b style={{ color: T.ice, fontVariantNumeric: "tabular-nums" }}>{число(п.following)}</b> <span style={{ color: T.muted }}>{ru ? "в читаемых" : "following"}</span></span>
-              </div>
-            )}
-          </div>
+          {п.banner && (
+            <span aria-hidden style={{ position: "absolute", inset: 0, zIndex: -1, background: `center/cover no-repeat url(${п.banner})`, opacity: 0.35, filter: "blur(18px) saturate(1.3)", transform: "scale(1.2)" }} />
+          )}
+          <span aria-hidden style={{ position: "absolute", inset: 0, zIndex: -1, background: `linear-gradient(180deg, ${hexA(T.surface, 0)} 0%, ${T.surface} 78%)` }} />
+          <span style={{ position: "relative", width: 96, height: 96 }}>
+            <span style={{ width: 96, height: 96, borderRadius: "50%", background: T.surfaceHi, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 10px 30px ${hexA("#000000", 0.45)}` }}>
+              {п.avatar ? <img src={п.avatar} alt="" width={96} height={96} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ЗнакX size={30} color={T.muted} />}
+            </span>
+            {/* Статус — значком снизу справа: связь с X подтверждена. */}
+            <span aria-label={t("xConnected")} style={{ position: "absolute", right: -2, bottom: -2, width: 30, height: 30, borderRadius: "50%", background: T.ice, border: `3px solid ${T.surface}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <ЗнакX size={13} color={T.bg} />
+            </span>
+          </span>
+          <span className="flex items-center justify-center" style={{ gap: 6, marginTop: 14 }}>
+            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800, letterSpacing: "-0.01em" }}>{п.name || состояние.handle}</span>
+            <ЗначкиX handle={состояние.handle} size={18} />
+          </span>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 15, marginTop: 2 }}>@{состояние.handle}</span>
+          {(п.followers != null || п.following != null) && (
+            <span className="flex" style={{ gap: 10, marginTop: 18 }}>
+              {[[п.followers, ru ? "читателей" : "followers"], [п.following, ru ? "читает" : "following"]].map(([n, подпись]) => (
+                <span key={подпись} className="flex flex-col items-center" style={{ minWidth: 104, padding: "10px 14px", borderRadius: 18, background: hexA(T.ice, 0.06) }}>
+                  <b style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{число(n)}</b>
+                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5 }}>{подпись}</span>
+                </span>
+              ))}
+            </span>
+          )}
         </button>
         <ПрофильX открыт={профильОткрыт} onClose={() => setПрофильОткрыт(false)} handle={состояние.handle} профиль={состояние.profile} />
 
@@ -27195,7 +27228,7 @@ function SettingsPanel({
       break;
     }
     case "support":
-      body = <SupportChat accountCreated={accountCreated} showToast={showToast} onRead={onSupportRead} />;
+      body = <SupportChat accountCreated={accountCreated} showToast={showToast} onRead={onSupportRead} insetBottom={insetBottom} />;
       break;
     case "architecture":
       /* Разделами, а не сплошным текстом: человек читает то, что его
@@ -27232,20 +27265,27 @@ function SettingsPanel({
   }
 
   if (ПОЛНОЭКРАННЫЕ.has(item.key)) {
+    /* Под заголовком — одна короткая строка, не больше. У поддержки её
+       нет вовсе: там сразу переписка, и подводка над подводкой была
+       лишь текстом поверх текста. */
     const подводка = item.key === "referral" ? t("referralDesc")
-      : item.key === "support" ? t("supportFaqLead")
-        : item.key === "quick" ? (lang === "EN" ? "Your amounts instead of Buy and Sell on the token page — one tap trades." : "Свои суммы вместо «Купить» и «Продать» на странице токена — одно нажатие и сделка.")
-        : lang === "EN" ? "Your X name, avatar and badge show up across Mintly." : "Ник, аватар и значок из X видны везде в Mintly.";
+      : item.key === "support" ? ""
+        : item.key === "quick" ? (lang === "EN" ? "Your amounts — one tap trades." : "Свои суммы — одно нажатие и сделка.")
+        : item.key === "tariff" ? ""
+        : lang === "EN" ? "Your X profile across Mintly." : "Твой профиль X везде в Mintly.";
+    // Чат держит высоту экрана сам: переписка прокручивается, поле внизу.
+    const чат = item.key === "support";
     return createPortal(
       <div
         data-sheet="1"
         className={`no-scrollbar ${уходит || closing ? "fx-sheet-out" : "fx-sheet-in"}`}
         style={{
-          position: "fixed", inset: 0, zIndex: 460, background: T.bg, overflowY: "auto", overscrollBehavior: "contain",
-          padding: `calc(${insetTop}px + 10px) 16px calc(${insetBottom}px + 40px)`,
+          position: "fixed", inset: 0, zIndex: 460, background: T.bg, overflowY: чат ? "hidden" : "auto", overscrollBehavior: "contain",
+          padding: чат ? `calc(${insetTop}px + 10px) 16px 0` : `calc(${insetTop}px + 10px) 16px calc(${insetBottom}px + 40px)`,
+          ...(чат ? { display: "flex", flexDirection: "column" } : null),
         }}
       >
-        <div className="flex flex-col" style={{ gap: 22, maxWidth: 520, margin: "0 auto" }}>
+        <div className="flex flex-col" style={{ gap: 22, maxWidth: 520, margin: "0 auto", width: "100%", ...(чат ? { flex: 1, minHeight: 0 } : null) }}>
           {!hasTelegramBack() && (
             <button onClick={закрытьПанель} className="fx-tap flex items-center gap-1 self-start" style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.muted, background: "none", border: "none" }}>
               <ChevronLeft size={16} /> {t("back")}
@@ -27253,7 +27293,7 @@ function SettingsPanel({
           )}
           <div className="fx-card">
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.1, textWrap: "balance" }}>{t(item.tKey)}</span>
-            <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, marginTop: 6 }}>{подводка}</p>
+            {подводка && <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, marginTop: 6 }}>{подводка}</p>}
           </div>
           {body}
         </div>
@@ -33765,6 +33805,24 @@ function mapTokenRow(row) {
     showToast(t("pinResetToast"));
   }
 
+  /* Открыть токен по id или адресу — из истории кошелька и других мест,
+     где под рукой только сделка, а не строка ленты. */
+  const openTokenRef = useRef(null);
+  // Ссылка на свежую openToken: слушатель выше живёт всё время, а
+  // функция пересоздаётся на каждой перерисовке.
+  useEffect(() => { openTokenRef.current = openToken; });
+  useEffect(() => {
+    const ф = async (e) => {
+      const { id, address } = (e && e.detail) || {};
+      if (!id && !address) return;
+      const запрос = supabase.from("tokens").select("*");
+      const { data } = await (id ? запрос.eq("id", id) : запрос.eq("address", address)).maybeSingle();
+      if (data && openTokenRef.current) openTokenRef.current(localTokenToFeedShape(mapTokenRow(data)));
+    };
+    window.addEventListener("mintly:открыть-токен", ф);
+    return () => window.removeEventListener("mintly:открыть-токен", ф);
+  }, []);
+
   async function openToken(t) {
     if (!t) return;
     // Топ приходит из RPC leaderboard: там только тикер, логотип и
@@ -35224,7 +35282,10 @@ function mapTokenRow(row) {
             // него: если подсвечивать «создать» и сам раздел разом,
             // получаются два выбранных кружка сразу. Пока открыт запуск,
             // раздел под ним подсветку временно уступает.
-            const active = id === "create" ? view === "create" : tab === id && view !== "create";
+            /* Горит только раздел, который сейчас на экране: ушёл в
+               достижения, профиль или карточку токена — главная уже не
+               «текущая», и белый кружок под ней сбивал с толку. */
+            const active = id === "create" ? view === "create" : tab === id && view === id;
             const скрыт = свёрнута && id !== "mempad";
             // Прячущиеся кружки уезжают к мемпаду вместе с краем капсулы
             // и гаснут раньше, чем он до них дойдёт.
