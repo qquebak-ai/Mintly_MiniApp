@@ -7352,7 +7352,18 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
         </span>
         </>
         )}
-        <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 12, whiteSpace: "nowrap" }}>{fmtSince(b.at)}</span>
+        {/* Вместо «только что» — сила сделки, как полоски связи: чем
+            крупнее покупка, тем больше столбиков горит. Время в живой
+            ленте и так «сейчас», а размер сделки — то, на что смотрят. */}
+        <span aria-hidden className="flex items-end" style={{ gap: 2, height: 14, flexShrink: 0 }}>
+          {(() => {
+            const usd = Number(b.volUsd) || 0;
+            const сила = usd >= 1000 ? 5 : usd >= 200 ? 4 : usd >= 50 ? 3 : usd >= 10 ? 2 : 1;
+            return [0, 1, 2, 3, 4].map((н) => (
+              <span key={н} style={{ width: 3, height: 5 + н * 2.25, borderRadius: 1.5, background: н < сила ? цветСобытия : T.lineHi }} />
+            ));
+          })()}
+        </span>
       </div>
     </button>
     </div>
