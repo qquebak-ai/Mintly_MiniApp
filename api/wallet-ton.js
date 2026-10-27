@@ -343,6 +343,14 @@ async function завершить(db, id, signature) {
   await db.from("wallet_ops").update({ signature: signature || null }).eq("id", id);
 }
 
+/* Перевод не ушёл — строки в журнале быть не должно (как в Solana):
+   иначе в истории висела трата, которой не было, она съедала предел за
+   сутки, а ключ запроса на честный повтор отвечал «уже сделано». */
+async function отменить(db, id) {
+  if (!id) return;
+  try { await db.from("wallet_ops").delete().eq("id", id); } catch { /* журнал не главнее самой ошибки */ }
+}
+
 /* Весточка в бота. Деньги ушли из кошелька — человек должен узнать об
    этом, даже если приложение в этот момент закрыто. Молчание бота саму
    операцию не отменяет. */
@@ -689,25 +697,30 @@ export default async function handler(req, res) {
          отвергнут как повтор. */
       let seqno = await свободныйНомер(открытый, номерКошелька(user));
       const подписи = [];
-      for (let i = 0; i < пакеты.length; i += 1) {
-        if (i > 0) {
-          const было = seqno;
-          // Блок в TON — доли секунды, а спрашивали раз в две секунды:
-          // покупка после запуска ждала лишнее. Теперь — чаще.
-          for (let ждём = 0; ждём < 85; ждём += 1) {
-            await new Promise((r) => setTimeout(r, 700));
-            try { seqno = await открытый.getSeqno(); } catch { /* узел моргнул — спросим снова */ }
-            if (seqno > было) break;
+      try {
+        for (let i = 0; i < пакеты.length; i += 1) {
+          if (i > 0) {
+            const было = seqno;
+            // Блок в TON — доли секунды, а спрашивали раз в две секунды:
+            // покупка после запуска ждала лишнее. Теперь — чаще.
+            for (let ждём = 0; ждём < 85; ждём += 1) {
+              await new Promise((r) => setTimeout(r, 700));
+              try { seqno = await открытый.getSeqno(); } catch { /* узел моргнул — спросим снова */ }
+              if (seqno > было) break;
+            }
+            if (seqno <= было) break; // покупку не шлём вслепую: её можно сделать со страницы токена
           }
-          if (seqno <= было) break; // покупку не шлём вслепую: её можно сделать со страницы токена
+          await открытый.sendTransfer({
+            seqno,
+            secretKey: пара.secretKey,
+            sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+            messages: пакеты[i].map((m) => internal({ to: m.to, value: m.value, body: m.body, init: m.init, bounce: m.bounce })),
+          });
+          подписи.push(`seqno:${seqno}`);
         }
-        await открытый.sendTransfer({
-          seqno,
-          secretKey: пара.secretKey,
-          sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
-          messages: пакеты[i].map((m) => internal({ to: m.to, value: m.value, body: m.body, init: m.init, bounce: m.bounce })),
-        });
-        подписи.push(`seqno:${seqno}`);
+      } catch (e) {
+        // Ушёл хотя бы первый пакет — запуск в сети есть, строку оставляем.
+        if (!подписи.length) { await отменить(db, оп.id); throw e; }
       }
 
       занятьНомер(номерКошелька(user), seqno);
@@ -781,17 +794,22 @@ export default async function handler(req, res) {
         .storeCoins(0n)   // без ограничения проскальзывания: цену считает контракт
         .endCell();
 
-      await отправитьПеревод(подпис, {
-        seqno,
-        secretKey: пара.secretKey,
-        sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
-        messages: [наБирже || internal({
-          to: Address.parse(адресРынка),
-          value: toNano(сумма.toFixed(9)) + ГАЗ_ПОКУПКИ,
-          body: тело_,
-          bounce: true,
-        }), ...(надбавка > 0 ? [internal({ to: Address.parse(КОШЕЛЁК_КОМИССИИ), value: toNano(надбавка.toFixed(9)), bounce: false })] : [])],
-      }, скорость);
+      try {
+        await отправитьПеревод(подпис, {
+          seqno,
+          secretKey: пара.secretKey,
+          sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+          messages: [наБирже || internal({
+            to: Address.parse(адресРынка),
+            value: toNano(сумма.toFixed(9)) + ГАЗ_ПОКУПКИ,
+            body: тело_,
+            bounce: true,
+          }), ...(надбавка > 0 ? [internal({ to: Address.parse(КОШЕЛЁК_КОМИССИИ), value: toNano(надбавка.toFixed(9)), bounce: false })] : [])],
+        }, скорость);
+      } catch (e) {
+        await отменить(db, оп.id);
+        throw e;
+      }
 
       занятьНомер(номерКошелька(user), seqno);
       await завершить(db, оп.id, `seqno:${seqno}`);
@@ -867,7 +885,9 @@ export default async function handler(req, res) {
       });
       if (опПродажи.повтор) return res.status(200).json({ ok: true, repeat: true });
 
-      const { beginCell, internal, Address, SendMode } = await библиотеки();
+      // toNano — для наценки Pro/Turbo: без него продажа с наценкой падала
+      // ReferenceError уже после записи операции и не уходила в сеть.
+      const { beginCell, internal, toNano, Address, SendMode } = await библиотеки();
 
       const пометка = beginCell().storeBit(false).storeUint(SELL_OP, 32).storeCoins(0n).endCell();
       const тело_ = beginCell()
@@ -882,17 +902,22 @@ export default async function handler(req, res) {
         .storeRef(пометка)
         .endCell();
 
-      await отправитьПеревод(подпис, {
-        seqno,
-        secretKey: пара.secretKey,
-        sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
-        messages: [наБирже || internal({
-          to: Address.parse(мой.address),
-          value: ГАЗ_ПРОДАЖИ,
-          body: тело_,
-          bounce: true,
-        }), ...(надбавка > 0 ? [internal({ to: Address.parse(КОШЕЛЁК_КОМИССИИ), value: toNano(надбавка.toFixed(9)), bounce: false })] : [])],
-      }, скорость);
+      try {
+        await отправитьПеревод(подпис, {
+          seqno,
+          secretKey: пара.secretKey,
+          sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+          messages: [наБирже || internal({
+            to: Address.parse(мой.address),
+            value: ГАЗ_ПРОДАЖИ,
+            body: тело_,
+            bounce: true,
+          }), ...(надбавка > 0 ? [internal({ to: Address.parse(КОШЕЛЁК_КОМИССИИ), value: toNano(надбавка.toFixed(9)), bounce: false })] : [])],
+        }, скорость);
+      } catch (e) {
+        await отменить(db, опПродажи.id);
+        throw e;
+      }
 
       занятьНомер(номерКошелька(user), seqno);
       await завершить(db, опПродажи.id, `seqno:${seqno}`);
@@ -980,16 +1005,21 @@ export default async function handler(req, res) {
       const { internal, toNano, Address, SendMode } = await библиотеки();
       const { пара, кошелёк: открытый } = await подписант(строка, набор, user);
       const seqno = await свободныйНомер(открытый, номерКошелька(user));
-      await открытый.sendTransfer({
-        seqno,
-        secretKey: пара.secretKey,
-        sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
-        messages: [internal({
-          to: Address.parse(куда),
-          value: toNano(сумма.toFixed(9)),
-          bounce: false,
-        })],
-      });
+      try {
+        await открытый.sendTransfer({
+          seqno,
+          secretKey: пара.secretKey,
+          sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+          messages: [internal({
+            to: Address.parse(куда),
+            value: toNano(сумма.toFixed(9)),
+            bounce: false,
+          })],
+        });
+      } catch (e) {
+        await отменить(db, оп.id);
+        throw e;
+      }
 
       занятьНомер(номерКошелька(user), seqno);
       await завершить(db, оп.id, `seqno:${seqno}`);

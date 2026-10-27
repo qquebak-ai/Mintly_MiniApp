@@ -905,6 +905,8 @@ const STR = {
     errNoJettonWallet: "Этих токенов на кошельке нет",
     errNoCurve: "У токена пока нет рынка",
     errTokenNotFound: "Токен не найден",
+    errMainnetOnly: "Этот токен торгуется только в основной сети Solana",
+    errNoRoute: "Сейчас сделку не собрать — попробуйте через пару секунд",
     errTooOften: "Слишком часто — подожди минуту",
     rateLoadingRetry: "Курс GRAM ещё загружается, попробуй через секунду",
     insufficientTon: "Не хватает GRAM: на кошельке {have}, нужно {need} с газом",
@@ -1648,6 +1650,8 @@ const STR = {
     errNoJettonWallet: "You hold none of this token",
     errNoCurve: "This token has no market yet",
     errTokenNotFound: "Token not found",
+    errMainnetOnly: "This token trades only on Solana mainnet",
+    errNoRoute: "Can't route this trade right now — try again in a few seconds",
     errTooOften: "Too often — wait a minute",
     rateLoadingRetry: "TON rate is still loading, try again in a second",
     insufficientTon: "Not enough TON: wallet has {have}, need {need} incl. gas",
@@ -15719,6 +15723,25 @@ async function запросРынков(путь, тело) {
   if (!r.ok) throw new Error((j && (j.detail || j.error)) || `ошибка ${r.status}`);
   return j;
 }
+/* Ответы биржи и сервера — словами: раньше человек видел «min_10_usd»
+   или английское «Insufficient margin to place order». */
+function текстОшибкиБиржи(e, иначе) {
+  const м = String((e && e.message) || "");
+  if (м === "pending") return "Прошлая сделка ещё ждёт денег с карты";
+  if (м === "not_enough") return "Не хватает SOL на карте";
+  if (м === "network_mismatch") return "Сеть карты и биржи не совпадает";
+  if (м === "wallet_busy" || м === "busy") return "Подождите — идёт прошлая операция";
+  if (м === "too_fast") return "Слишком быстро — нажмите ещё раз";
+  if (м === "min_10_usd") return "Минимум $10";
+  if (м === "min_sol") return "Слишком маленькая сумма для моста — минимум ~0.13 SOL";
+  if (м === "no_position") return "Позиция уже закрыта";
+  if (м === "no_session" || м === "unauthorized") return "Войдите в аккаунт";
+  if (/insufficient margin|not enough margin/i.test(м)) return "Не хватает залога — уменьшите сумму или плечо";
+  if (/could not immediately match|no liquidity/i.test(м)) return "Нет встречных заявок по этой цене — попробуйте ещё раз";
+  if (/reduce only/i.test(м)) return "Позиция уже закрыта";
+  if (/leverage/i.test(м)) return "Такое плечо на этом рынке недоступно";
+  return (м || иначе).slice(0, 120);
+}
 function ценаРынка(p) {
   const n = Number(p) || 0;
   if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 1 });
@@ -15733,7 +15756,8 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
     let живо = true;
     const читать = () => запросРынков(`candles&coin=${encodeURIComponent(coin)}&interval=${шаг}`).then((j) => { if (живо) setСвечи(j.candles || []); }).catch(() => {});
     setСвечи(null); читать();
-    const id = setInterval(читать, 5000);
+    // Последнюю свечу двигает живая цена из списка рынков — свечи целиком реже.
+    const id = setInterval(читать, шаг === "1m" ? 10000 : 20000);
     return () => { живо = false; clearInterval(id); };
   }, [coin, шаг]);
   const Ш = 360, В = 240;
@@ -15851,13 +15875,7 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
       showToast && showToast(j && j.pending ? "Берём с карты — позиция откроется через минуту" : сторона === "long" ? "Лонг открыт" : "Шорт открыт");
       onОбновить();
     } catch (e) {
-      const м = String((e && e.message) || "");
-      const текст = м === "pending" ? "Прошлая сделка ещё ждёт денег с карты"
-        : м === "not_enough" ? "Не хватает SOL на карте"
-        : м === "network_mismatch" ? "Сеть карты и биржи не совпадает"
-        : м === "wallet_busy" ? "Карта занята другой операцией"
-        : м || "Сделка не прошла";
-      haptic("error"); showToast && showToast(текст.slice(0, 120));
+      haptic("error"); showToast && showToast(текстОшибкиБиржи(e, "Сделка не прошла"));
     } finally { setШлём(false); }
   }
   async function закрыть() {
@@ -15866,7 +15884,7 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
       await запросРынков("close", { asset: рынок.asset });
       haptic("success"); showToast && showToast("Позиция закрыта"); onОбновить();
     } catch (e) {
-      haptic("error"); showToast && showToast(String((e && e.message) || "Не закрылась").slice(0, 120));
+      haptic("error"); showToast && showToast(текстОшибкиБиржи(e, "Не закрылась"));
     } finally { setШлём(false); }
   }
   return (
@@ -15969,7 +15987,19 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
   const [раздел, setРаздел] = useState("crypto");
   const [выбран, setВыбран] = useState(null);
   const [счёт, setСчёт] = useState(null);
-  const обновитьСчёт = useCallback(() => { запросРынков("account").then(setСчёт).catch(() => {}); }, []);
+  const тостРеф = useRef(showToast);
+  тостРеф.current = showToast;
+  const обновитьСчёт = useCallback(() => {
+    запросРынков("account").then((j) => {
+      setСчёт(j);
+      // Сделка, ждавшая денег с карты, открылась или нет — скажем один раз.
+      const и = j && j.pendingResult;
+      if (и && тостРеф.current) {
+        тостРеф.current(и.ok ? `${и.isBuy ? "Лонг" : "Шорт"} ${и.name || ""} открыт · $${Number(и.usd || 0).toFixed(2)}`
+          : `Позиция не открылась: ${текстОшибкиБиржи({ message: и.error === "timeout" ? "Деньги с карты не дошли за 10 минут — они на бирже" : и.error }, "ошибка")}`);
+      }
+    }).catch(() => {});
+  }, []);
   useEffect(() => {
     if (!открыт) return undefined;
     let живо = true;
@@ -35747,6 +35777,8 @@ function mapTokenRow(row) {
       no_jetton_wallet: "errNoJettonWallet",
       no_curve: "errNoCurve",
       token_not_found: "errTokenNotFound",
+      mainnet_only: "errMainnetOnly",
+      "маршрут не найден": "errNoRoute",
       "слишком часто": "errTooOften",
     };
     const ключ = словарь[сырое];
@@ -35875,7 +35907,11 @@ function mapTokenRow(row) {
     const сумма = продажа
       ? String(Math.round(количество * 10 ** десятичные))
       : String(Math.round(amountSol * 1e9));
-    return await свопВнутренним({ вход, выход, сумма });
+    /* Свежий мемкоин с pump.fun или letsbonk за секунды уходит на
+       проценты: с допуском 1,5% сделка почти всегда отбивалась сетью
+       (и комиссия сгорала). Для них — 10%, как у самих площадок. */
+    const свежийЗапуск = String(token.id || "").startsWith("pump-");
+    return await свопВнутренним({ вход, выход, сумма, ...(свежийЗапуск ? { проскальзывание: 1000 } : {}) });
   }
 
   /* Сделки в пути — брони денег и токенов.

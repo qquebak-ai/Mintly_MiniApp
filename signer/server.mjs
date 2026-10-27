@@ -26,7 +26,7 @@
 import http from "node:http";
 import crypto from "node:crypto";
 import { Keypair, Transaction, VersionedTransaction } from "@solana/web3.js";
-import { проверитьТранзакцию } from "../api/_txguard.js";
+import { проверитьТранзакцию, ДЕЛА } from "../api/_txguard.js";
 
 const ПОРТ = Number(process.env.PORT || 8899);
 const ХОСТ = process.env.HOST || "127.0.0.1";
@@ -93,7 +93,9 @@ async function подписать(тело) {
   // вызывающий его не назвал, берём самый узкий — вывод.
   await проверитьТранзакцию(transaction, {
     владелец: owner,
-    дело: ["launch", "trade", "swap", "withdraw"].includes(kind) ? kind : "withdraw",
+    // Список дел — общий со стражем: раньше он был свой и без «dex»,
+    // «graduate» и «pumpportal», и такие сделки проверялись как вывод.
+    дело: ДЕЛА.includes(kind) ? kind : "withdraw",
     максПеревода: потолок,
     кривая: КРИВАЯ,
   });

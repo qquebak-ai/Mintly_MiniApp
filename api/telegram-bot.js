@@ -1476,10 +1476,12 @@ async function handleTop(message) {
     console.warn("[bot] топ картинкой не ушёл:", err && err.message);
   }
 
+  // Запасной путь — текстом (переменной text тут нет: был ReferenceError,
+  // и без картинки бот не отвечал на «топ» вовсе).
   await tg("sendMessage", {
     chat_id: chat.id,
     reply_to_message_id: message.message_id,
-    text,
+    text: текст,
     parse_mode: "HTML",
     link_preview_options: { is_disabled: true },
     reply_markup: кнопки,

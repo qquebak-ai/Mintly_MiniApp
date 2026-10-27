@@ -301,6 +301,16 @@ async function завершить(db, id, signature) {
   if (id) await db.from("wallet_ops").update({ signature: signature || null }).eq("id", id);
 }
 
+/* Транзакция так и не ушла в сеть (нет газа, узел отказал) — строки в
+   журнале быть не должно: иначе в истории висела операция, которой не
+   было, она съедала предел за сутки, а ключ запроса на честный повтор
+   отвечал «уже сделано». Ушедшую в сеть, даже неудачную, не трогаем —
+   за неё списан газ, и в истории ей место. */
+async function отменить(db, id) {
+  if (!id) return;
+  try { await db.from("wallet_ops").delete().eq("id", id); } catch { /* журнал не главнее самой ошибки */ }
+}
+
 /* Состояние кривой в виде, который понимает приложение: собрано, продано,
    цена одного токена в монете сети и доля пути до биржи. */
 export async function состояниеКривой(сеть, токен) {
@@ -631,6 +641,9 @@ export default async function handler(req, res) {
       try {
         tx = await к.create(имя, тикер, метаданные, 0, { value, ...(await платаЗаСкорость(сеть, скорость)), nonce: await номерEVM(await провайдер(сеть), сеть, строка.address) });
         занятьНомерEVM(сеть, строка.address, tx.nonce);
+      } catch (e) {
+        await отменить(db, оп.id);
+        throw e;
       } finally {
         отпуститьЗапуск();
       }
@@ -665,11 +678,17 @@ export default async function handler(req, res) {
         ? await Promise.all([начать(db, user, { дело: действие, сеть, сумма, ключЗапроса, ip }), к.curves(токен)])
         : [await начать(db, user, { дело: действие, сеть, сумма, ключЗапроса, ip }), null];
       if (оп.повтор) return res.status(200).json({ ok: true, repeat: true, tx: оп.signature });
-      const [, , , вышел] = кривая || await к.curves(токен);
       // Отправка — под очередью кошелька и со своим номером (см. номерEVM).
       const ключОчереди = `evm:${user.id}:${сеть}`;
-      const п = await провайдер(сеть);
-      const отпустить = await занятьПоОчереди(ключОчереди, { ждать: 30_000, предел: 4 });
+      let вышел, п, отпустить;
+      try {
+        [, , , вышел] = кривая || await к.curves(токен);
+        п = await провайдер(сеть);
+        отпустить = await занятьПоОчереди(ключОчереди, { ждать: 30_000, предел: 4 });
+      } catch (e) {
+        await отменить(db, оп.id);
+        throw e;
+      }
       let tx;
       try {
       if (вышел) {
@@ -721,6 +740,10 @@ export default async function handler(req, res) {
         tx = await к.sell(токен, tokensIn, (ожидаем * (10000n - проск)) / 10000n, { ...газ, nonce, gasLimit });
       }
       занятьНомерEVM(сеть, строка.address, tx.nonce);
+      } catch (e) {
+        // Не ушла даже сделка (одобрение роутеру могло уйти — оно не трата).
+        if (!tx) await отменить(db, оп.id);
+        throw e;
       } finally {
         отпустить();
       }
@@ -789,6 +812,9 @@ export default async function handler(req, res) {
       try {
         tx = await w.sendTransaction({ to: кому, value: сумма, gasLimit: 21000n, ...плата, nonce: await номерEVM(п, сеть, строка.address) });
         занятьНомерEVM(сеть, строка.address, tx.nonce);
+      } catch (e) {
+        await отменить(db, оп.id);
+        throw e;
       } finally {
         отпуститьВывод();
       }

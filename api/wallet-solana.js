@@ -456,7 +456,7 @@ async function подписатьТут(строка, base64, набор, user_i
   }
 }
 
-async function подписатьСлужбой(строка, base64, максПеревода) {
+async function подписатьСлужбой(строка, base64, максПеревода, дело) {
   const res = await fetch(`${SIGNER_URL.replace(/\/$/, "")}/sign`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${SIGNER_TOKEN}` },
@@ -467,6 +467,9 @@ async function подписатьСлужбой(строка, base64, максП
       user_id: строка.user_id,
       transaction: base64,
       maxTransfer: максПеревода,
+      // Без вида дела служба проверяла всё правилами вывода и отбивала
+      // любую сделку, обмен и запуск.
+      kind: дело,
     }),
   });
   const json = await res.json().catch(() => null);
@@ -504,7 +507,7 @@ async function подписатьИОтправить({ db, user, строка, 
     кривая: КРИВАЯ_ПРОГРАММА,
   });
   const подписанная = SIGNER_URL
-    ? await подписатьСлужбой(строка, base64, Math.round(максПеревода))
+    ? await подписатьСлужбой(строка, base64, Math.round(максПеревода), дело)
     : await подписатьТут(строка, base64, набор, user.id, db);
   /* Без предварительной прогонки. Узел по умолчанию сначала проигрывает
      транзакцию у себя и только потом пускает в сеть — это лишний круг
@@ -970,6 +973,48 @@ async function котировкаКривой(db, { вход, выход, сум
   return { out: String(Math.floor(out)), impact: null, curve: true };
 }
 
+/* Свежие токены pump.fun и letsbonk. Лента показывает их с первой
+   секунды, а маршрутизатор Jupiter узнаёт о токене не сразу — покупка
+   отвечала «маршрут не найден». Для таких токенов сделку собирает
+   PumpPortal: его программа сама зовёт кривую pump.fun, LaunchLab или
+   пул PumpSwap. Чужой программе на слово не верим — см. проверитьСимуляцией. */
+async function сделкаPumpPortal({ wallet, mint, продажа, количество, slippageBps }) {
+  const r = await fetch("https://pumpportal.fun/api/trade-local", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(8000),
+    body: JSON.stringify({
+      publicKey: wallet, action: продажа ? "sell" : "buy", mint,
+      amount: количество, denominatedInSol: продажа ? "false" : "true",
+      // Мемкоин на кривой за секунды уходит на проценты: 1,5% там не хватает.
+      slippage: Math.max(1, Math.min(30, Math.round((Number(slippageBps) || 1000) / 100))),
+      priorityFee: 0.0001, pool: "auto",
+    }),
+  });
+  if (!r.ok) throw new Error("маршрут не найден");
+  return Buffer.from(await r.arrayBuffer()).toString("base64");
+}
+
+/* Проигрыш сделки на узле до подписи: если кошелёк по итогу теряет
+   больше, чем человек отдаёт (плюс комиссии и аренда счёта), — отказ.
+   Это предохранитель от чужой программы, которая могла бы увести деньги
+   подписанта: страж смотрит на список программ, а это — на итог. */
+async function проверитьСимуляцией(base64, { адрес, можноSol }) {
+  const [до, сим] = await Promise.all([
+    rpc("getBalance", [адрес, { commitment: "processed" }]).then((x) => Number(x && x.value)),
+    rpc("simulateTransaction", [base64, {
+      encoding: "base64", sigVerify: false, replaceRecentBlockhash: true, commitment: "processed",
+      accounts: { encoding: "base64", addresses: [адрес] },
+    }]),
+  ]);
+  const з = сим && сим.value;
+  if (!з) throw new Error("проверка сделки не ответила");
+  if (з.err) throw new Error(`сделка не пройдёт: ${JSON.stringify(з.err).slice(0, 100)}`);
+  const после = з.accounts && з.accounts[0] ? Number(з.accounts[0].lamports) : NaN;
+  if (!Number.isFinite(после) || !Number.isFinite(до)) throw new Error("проверка сделки без остатка");
+  if (до - после > Math.round(можноSol * LAMPORTS)) throw new Error("сделка тратит больше заявленного — отказ");
+}
+
 /* Пул биржи, в который можно вести сделку.
  *
  * Адрес пула лежит в строке токена, а строку правит её владелец — значит,
@@ -1424,50 +1469,77 @@ export default async function handler(req, res) {
       const оп = await начать(db, user, { дело: "swap", сумма: вSol, ключЗапроса, ip });
       if (оп.повтор) return res.status(200).json({ signature: оп.signature, repeat: true });
 
-      /* Свой токен — своя дорога: сделка идёт по кривой того же токена,
-         той же инструкцией, что и покупка на его странице. Маршрутизатор
-         биржи о таких токенах не знает, а в тестовой сети не знает ни о
-         каких вовсе. */
-      const свой = вход === SOL_MINT ? выход : выход === SOL_MINT ? вход : null;
+      /* Сборка — под той же отменой, что и отправка: «маршрут не найден»
+         или отказ кривой раньше бросались после записи в журнал, и в
+         истории оставался обмен, которого не было, а ключ запроса на
+         честный повтор отвечал «уже сделано». */
       let собранная = null;
-      // Сделка по своей кривой — это не своп биржи, и проверять её нужно
-      // правилами сделки: программы кривой в списке свопа нет и быть не
-      // должно. Без этого обмен своего токена отбивался стражем
-      // («запрещённая программа»), хотя транзакцию собрали мы сами.
       let поКривой = false;
-      if (свой) {
-        const { data: есть } = await db.from("tokens").select("id").eq("address", свой).maybeSingle();
-        if (есть) {
-          const покупкаКривой = вход === SOL_MINT;
-          const собрано = await собратьСделку({
-            wallet: строка.address,
-            mint: свой,
-            продажа: !покупкаКривой,
-            amount: покупкаКривой ? Number(сумма) / LAMPORTS : Number(сумма) / 1e6,
-            // Нижнюю границу выхода сборщик считает сам, по кривой.
-            slippageBps: Number(тело.slippage) || 500,
-          });
-          собранная = собрано && собрано.transaction;
-          поКривой = !!собранная;
+      let черезPumpPortal = false;
+      try {
+        /* Свой токен — своя дорога: сделка идёт по кривой того же токена,
+           той же инструкцией, что и покупка на его странице. Маршрутизатор
+           биржи о таких токенах не знает, а в тестовой сети не знает ни о
+           каких вовсе. */
+        const свой = вход === SOL_MINT ? выход : выход === SOL_MINT ? вход : null;
+        // Сделка по своей кривой — это не своп биржи, и проверять её нужно
+        // правилами сделки: программы кривой в списке свопа нет и быть не
+        // должно. Без этого обмен своего токена отбивался стражем
+        // («запрещённая программа»), хотя транзакцию собрали мы сами.
+        if (свой) {
+          const { data: есть } = await db.from("tokens").select("id").eq("address", свой).maybeSingle();
+          if (есть) {
+            const покупкаКривой = вход === SOL_MINT;
+            const собрано = await собратьСделку({
+              wallet: строка.address,
+              mint: свой,
+              продажа: !покупкаКривой,
+              amount: покупкаКривой ? Number(сумма) / LAMPORTS : Number(сумма) / 1e6,
+              // Нижнюю границу выхода сборщик считает сам, по кривой.
+              slippageBps: Number(тело.slippage) || 500,
+            });
+            собранная = собрано && собрано.transaction;
+            поКривой = !!собранная;
+          }
         }
-      }
 
-      if (!собранная) {
-        const кот = await котировка({
-          input: вход, output: выход, amount: сумма,
-          // Допуск от 0,5% до 30%: больше — это уже подарок ботам.
-          slippageBps: Math.max(50, Math.min(3000, Number(тело.slippage) || 150)),
-        });
-        if (!кот) throw new Error("маршрут не найден");
-        собранная = await свопJupiter({ quote: кот, wallet: строка.address });
+        if (!собранная) {
+          const кот = await котировка({
+            input: вход, output: выход, amount: сумма,
+            // Допуск от 0,5% до 30%: больше — это уже подарок ботам.
+            slippageBps: Math.max(50, Math.min(3000, Number(тело.slippage) || 150)),
+          }).catch(() => null);
+          if (кот) собранная = await свопJupiter({ quote: кот, wallet: строка.address });
+          else if (свой && ОСНОВНАЯ_СЕТЬ) {
+            // У маршрутизатора токена ещё нет — свежий запуск: PumpPortal.
+            const покупкаPP = вход === SOL_MINT;
+            let количество = Number(сумма) / LAMPORTS;
+            if (!покупкаPP) {
+              const выпуск = await rpc("getTokenSupply", [свой]).catch(() => null);
+              const знаков = Number(выпуск && выпуск.value && выпуск.value.decimals);
+              if (!Number.isFinite(знаков)) throw new Error("маршрут не найден");
+              количество = Number(сумма) / 10 ** знаков;
+            }
+            собранная = await сделкаPumpPortal({ wallet: строка.address, mint: свой, продажа: !покупкаPP, количество, slippageBps: тело.slippage });
+            черезPumpPortal = true;
+          } else if (свой && !ОСНОВНАЯ_СЕТЬ) {
+            // В тестовой сети нет ни Jupiter, ни pump.fun: торговать нечем.
+            throw Object.assign(new Error("mainnet_only"), { код: 400 });
+          }
+          if (!собранная) throw new Error("маршрут не найден");
+        }
+        if (черезPumpPortal) await проверитьСимуляцией(собранная, { адрес: строка.address, можноSol: вSol + 0.025 });
+        if (!собранная) throw new Error("сделка не собралась");
+      } catch (e) {
+        await отменить(db, оп.id);
+        throw e;
       }
-      if (!собранная) throw new Error("сделка не собралась");
 
       let подпись;
       try {
         подпись = await подписатьИОтправить({
           db, user, строка, набор,
-          base64: собранная, дело: поКривой ? "trade" : "swap",
+          base64: собранная, дело: поКривой ? "trade" : черезPumpPortal ? "pumpportal" : "swap",
           // При покупке уходит сама сумма (она же обёртывается в wSOL) и
           // аренда счетов; при продаже — только аренда с комиссией.
           максПеревода: (вSol + 0.02) * LAMPORTS,

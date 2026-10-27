@@ -38,6 +38,15 @@ const JUPITER = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
 // Пулы Raydium CPMM — куда токены площадки выходят после кривой.
 const RAYDIUM_CPMM = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C";
 const RAYDIUM_CPMM_DEVNET = "DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb";
+/* Свежие токены pump.fun и letsbonk: сделку собирает PumpPortal, его
+   программа зовёт кривую pump.fun, LaunchLab (letsbonk) или пул PumpSwap.
+   Программа чужая и может двигать деньги подписанта, поэтому такие
+   сделки дополнительно проигрываются на узле перед подписью
+   (api/wallet-solana.js, проверитьСимуляцией). */
+const PUMPPORTAL = "FAdo9NCw1ssek6Z6yeWzWjhLVsr8uiCwcWNUnKgzTnHe";
+const PUMP = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
+const PUMP_AMM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
+const LAUNCHLAB = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj";
 
 // Номера инструкций системной программы (первые четыре байта данных).
 const СИС = { СОЗДАТЬ: 0, НАЗНАЧИТЬ: 1, ПЕРЕВОД: 2, ВЫДЕЛИТЬ: 8, ПЕРЕВОД_С_СЕМЕНЕМ: 11 };
@@ -71,6 +80,12 @@ const ПРАВИЛА = {
   // разворот обратно. Других программ тут быть не может.
   dex: {
     программы: [СИСТЕМНАЯ, ТОКЕНЫ, АТА, ВЫЧИСЛЕНИЯ, RAYDIUM_CPMM, RAYDIUM_CPMM_DEVNET],
+    системные: [СИС.ПЕРЕВОД],
+    токенные: [ТОК.СИНХРОН, ТОК.ЗАКРЫТЬ],
+    кривая: false,
+  },
+  pumpportal: {
+    программы: [СИСТЕМНАЯ, ТОКЕНЫ, ТОКЕНЫ_2022, АТА, ВЫЧИСЛЕНИЯ, PUMPPORTAL, PUMP, PUMP_AMM, LAUNCHLAB],
     системные: [СИС.ПЕРЕВОД],
     токенные: [ТОК.СИНХРОН, ТОК.ЗАКРЫТЬ],
     кривая: false,
@@ -199,6 +214,9 @@ export async function проверитьТранзакцию(base64, { влад�
 
   return { плательщик: t.плательщик, инструкций: t.инструкции.length, переведено: ушло };
 }
+
+// Какие дела бывают — служба подписи (signer/server.mjs) берёт список отсюда.
+export const ДЕЛА = Object.keys(ПРАВИЛА);
 
 export const ПРОГРАММЫ = {
   СИСТЕМНАЯ, ТОКЕНЫ, ТОКЕНЫ_2022, АТА, ВЫЧИСЛЕНИЯ, ЗАМЕТКА, МЕТАДАННЫЕ, JUPITER,
