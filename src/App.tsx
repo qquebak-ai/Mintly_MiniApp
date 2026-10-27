@@ -2199,8 +2199,12 @@ function GlobalStyle() {
       /* Знак-загрузчик: «прорисовка» — контур бежит линией и заливается;
          «раскрытие» — плавно распускается из точки с поворотом и так же
          плавно сворачивается: без отдачи, она читалась рывком. */
-      @keyframes знакЗаливка { 0% { transform: translateY(100%); opacity: 1; } 70% { transform: translateY(0); opacity: 1; } 88% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(0); opacity: 0; } }
-      @keyframes знакЗаливкаВнутри { 0% { transform: translateY(-100%); } 70%, 100% { transform: translateY(0); } }
+      /* Знак заливается снизу, держится и уходит вверх — и цикл замыкается
+         на пустом знаке, с которого начинается снова. Раньше заливка в
+         конце гасла прозрачностью и начиналась заново с пустого — на
+         стыке был заметный скачок. */
+      @keyframes знакЗаливка { 0% { transform: translate3d(0, 100%, 0); } 50%, 62% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(0, -100%, 0); } }
+      @keyframes знакЗаливкаВнутри { 0% { transform: translate3d(0, -100%, 0); } 50%, 62% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(0, 100%, 0); } }
       @keyframes знакКонтур { 0% { stroke-dashoffset: 1; fill-opacity: 0; } 55% { stroke-dashoffset: 0; fill-opacity: 0; } 75%, 90% { stroke-dashoffset: 0; fill-opacity: 1; } 100% { stroke-dashoffset: -1; fill-opacity: 0; } }
       @keyframes знакРаскрытие { 0% { transform: scale(0.2) rotate(-60deg); opacity: 0; } 42%, 72% { transform: scale(1) rotate(0deg); opacity: 1; } 100% { transform: scale(0.2) rotate(50deg); opacity: 0; } }
       @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
@@ -2941,20 +2945,25 @@ function GlobalStyle() {
       /* Появление страницы: 200 мс вместо 320. Полсекунды на переход
          между вкладками читаются задержкой, а не плавностью — особенно
          теперь, когда отклик на нажатие приходит сразу. */
-      .fx-view { animation: viewIn 260ms cubic-bezier(0.22,1,0.36,1) backwards; }
+      .fx-view { animation: viewIn 340ms cubic-bezier(0.32,0.72,0,1) backwards; }
       .fx-tab-in { animation: вкладкаВход 240ms cubic-bezier(0.22,1,0.36,1) backwards; }
       .fx-tab-in2 { animation: вкладкаВход2 240ms cubic-bezier(0.22,1,0.36,1) backwards; }
       @keyframes вкладкаВход { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
       @keyframes вкладкаВход2 { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
       .fx-step-in { animation: шагВход 280ms cubic-bezier(0.22,1,0.36,1) backwards; }
       @keyframes шагВход { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
-      .fx-sheet-in { animation: листВход 300ms cubic-bezier(0.22,1,0.36,1) backwards; }
-      .fx-sheet-out { animation: листУход 220ms cubic-bezier(0.4,0,1,1) forwards; pointer-events: none; }
-      @keyframes листВход { from { opacity: 0; transform: translateY(28px) scale(0.985); } to { opacity: 1; transform: none; } }
-      @keyframes листУход { to { opacity: 0; transform: translateY(24px) scale(0.985); } }
+      /* Страница въезжает плавно, как в iOS: одно движение с мягким
+         торможением, без масштаба — масштаб большого слоя заставлял
+         браузер перерисовывать его, и вход шёл рывками. Одноимённая
+         анимация окна была переопределена в другом месте и иногда
+         подменяла эту — теперь у того окна своё имя. */
+      .fx-sheet-in { animation: листВход 380ms cubic-bezier(0.32,0.72,0,1) backwards; will-change: transform, opacity; backface-visibility: hidden; }
+      .fx-sheet-out { animation: листУход 260ms cubic-bezier(0.32,0,0.67,0) forwards; pointer-events: none; will-change: transform, opacity; }
+      @keyframes листВход { from { opacity: 0; transform: translate3d(0, 36px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+      @keyframes листУход { from { opacity: 1; transform: translate3d(0, 0, 0); } to { opacity: 0; transform: translate3d(0, 30px, 0); } }
       @keyframes viewIn {
-        from { opacity: 0; transform: translateY(16px); }
-        to   { opacity: 1; transform: none; }
+        from { opacity: 0; transform: translate3d(0, 14px, 0); }
+        to   { opacity: 1; transform: translate3d(0, 0, 0); }
       }
       /* Строка набирается по букве: каждая проступает чуть позже
          предыдущей, и текст читается слева направо, как его пишут. */
@@ -9963,7 +9972,7 @@ function ЛистДоЛистинга({ данные: данныеProp, onClose 
     }}>
       <style>{`
         @keyframes листСтрока { from { opacity: 0; transform: translateY(14px) scale(0.98); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
-        @keyframes листВход { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+        @keyframes листВходОкна { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
         @keyframes листИскра { 0% { opacity: 0; transform: translate(0, 0) scale(0.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.2); } }
         @keyframes листДыхание { 0%, 100% { opacity: 0.35; transform: scale(0.96); } 50% { opacity: 0.7; transform: scale(1.04); } }
         @media (prefers-reduced-motion: reduce) { .лист-анимация * { animation: none !important; transition: none !important; } }
@@ -9971,7 +9980,7 @@ function ЛистДоЛистинга({ данные: данныеProp, onClose 
       <div className="лист-анимация" style={{
         maxWidth: 520, margin: "0 auto", position: "relative",
         padding: "calc(var(--tg-inset-top, 0px) + 18px) 20px calc(var(--tg-inset-bottom, 0px) + 28px)",
-        animation: "листВход 380ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        animation: "листВходОкна 380ms cubic-bezier(0.22, 1, 0.36, 1) both",
       }}>
         {!hasTelegramBack() && (
           <button onClick={onClose} className="fx-tap flex items-center justify-center" aria-label="Назад"
@@ -28889,8 +28898,8 @@ function ЗнакЗагрузки({ size: размер = 40, вид = "конт�
   return (
     <div aria-hidden style={{ position: "relative", width: size, height: size, flex: "none" }}>
       <div style={{ position: "absolute", inset: 0, opacity: 0.16 }}>{знак}</div>
-      <div style={{ position: "absolute", inset: 0, overflow: "hidden", willChange: "transform", animation: остановлен ? "none" : "знакЗаливка 1.8s cubic-bezier(0.45,0,0.25,1) infinite" }}>
-        <div style={{ willChange: "transform", animation: остановлен ? "none" : "знакЗаливкаВнутри 1.8s cubic-bezier(0.45,0,0.25,1) infinite" }}>{знак}</div>
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden", willChange: "transform", animation: остановлен ? "none" : "знакЗаливка 2.2s cubic-bezier(0.65,0,0.35,1) infinite" }}>
+        <div style={{ willChange: "transform", animation: остановлен ? "none" : "знакЗаливкаВнутри 2.2s cubic-bezier(0.65,0,0.35,1) infinite" }}>{знак}</div>
       </div>
     </div>
   );
