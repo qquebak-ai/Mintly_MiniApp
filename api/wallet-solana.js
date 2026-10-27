@@ -47,7 +47,7 @@ import { котировка, сделка as свопJupiter, SOL_MINT } from ".
 import { собратьОбменБиржи } from "./_dexSolana.js";
 import { нуженВторойКлюч } from "./_second.js";
 import { занять } from "./_walletLock.js";
-import { темп, скоростьИз, наценка } from "./_speed.js";
+import { темп, скоростьИз, наценка, монетыЗаСкорость, списатьМонетыЗаСкорость } from "./_speed.js";
 import { быстрыйОстаток } from "./_остаток.js";
 import { ВНУТРЕННИЙ_ВХОД } from "./_внутри.js";
 
@@ -1313,6 +1313,9 @@ export default async function handler(req, res) {
          наценка площадке и сам путь сделки на сервере. */
       const скорость = скоростьИз(тело.speed);
       const турбо = скорость === "turbo";
+      // Наценку можно оплатить монетами приложения — тогда в сделке её нет.
+      const монет = await монетыЗаСкорость(db, user.id, скорость, тело.payCoins);
+      const наценкаСделки = монет > 0 ? 0 : наценка("solana", скорость);
 
       /* Сборка сделки. Вышел на биржу — сделка идёт в пуле: кривая
          закрыта, и её инструкция отбилась бы. Адрес пула пишет сервер,
@@ -1336,7 +1339,7 @@ export default async function handler(req, res) {
             minOut: тело.minOut,
             slippageBps: тело.slippageBps,
             скорость,
-            наценка: наценка("solana", скорость),
+            наценка: наценкаСделки,
             готоваяКривая,
           });
         return { запись, пул, собрано };
@@ -1381,6 +1384,7 @@ export default async function handler(req, res) {
           throw e;
         }
         await завершить(db, оп.id, подпись);
+        списатьМонетыЗаСкорость(db, user.id, монет);
         // Сеть подтвердила — сделавшему сразу «прошла», с настоящими числами.
         if (вести) {
           вести.сообщитьОСвоейСделке(user.id, {
@@ -1398,6 +1402,7 @@ export default async function handler(req, res) {
           tokens: собрано.tokens,
           bought: собрано.bought != null ? собрано.bought : null,
           solOut: собрано.solOut,
+          coinsPaid: монет,
         });
       } catch (e) {
         // Сделки не было — значит и записи о ней быть не должно.

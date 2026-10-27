@@ -15,7 +15,7 @@ import { useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { Address, beginCell, toNano } from "@ton/core";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { supabase } from "./supabaseClient";
-import { ФонШёлк, подготовитьШёлк } from "./шёлк";
+import { ФонШёлк, подготовитьШёлк, ЦВЕТА_РАДУГИ, ПЕРИОД_РАДУГИ, фазаРадуги } from "./шёлк";
 import { апи, запрос } from "./апи";
 import { остаток as остатокКошелька, сыройОстаток as сыройОстатокКошелька, следитьЗаОстатками, записатьОстатки } from "./остатки";
 import { ДЕМО_ТОКЕНЫ, логоДемо } from "../api/_demoTokens.js";
@@ -2918,6 +2918,8 @@ function GlobalStyle() {
       }
       .fx-tap { transition: transform ${SPRING}; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
       .fx-tap:active { transform: scale(0.96); transition: transform ${PRESS}; }
+      .fx-tap-тихо { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; transition: filter 160ms ease; }
+      .fx-tap-тихо:active { filter: brightness(0.82); }
       /* Нажатие внутри виджета не должно вдавливать виджет целиком.
          Браузер считает нажатым не только то, на что нажали, но и всё,
          что вокруг: карточку, её обёртку, экран. Поэтому у внешнего
@@ -7353,18 +7355,14 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
         </span>
         </>
         )}
-        {/* Вместо «только что» — сила сделки, как полоски связи: чем
-            крупнее покупка, тем больше столбиков горит. Время в живой
-            ленте и так «сейчас», а размер сделки — то, на что смотрят. */}
-        <span aria-hidden className="flex items-end" style={{ gap: 2, height: 14, flexShrink: 0 }}>
-          {(() => {
-            const usd = Number(b.volUsd) || 0;
-            const сила = usd >= 1000 ? 5 : usd >= 200 ? 4 : usd >= 50 ? 3 : usd >= 10 ? 2 : 1;
-            return [0, 1, 2, 3, 4].map((н) => (
-              <span key={н} style={{ width: 3, height: 5 + н * 2.25, borderRadius: 1.5, background: н < сила ? цветСобытия : T.lineHi }} />
-            ));
-          })()}
-        </span>
+        {/* Справа — как токен идёт за сутки. Полоски «силы сделки» читались
+            как значок сети в телефоне, а время в живой ленте и так «сейчас». */}
+        {Number.isFinite(Number(b.token.change)) && (
+          <span style={{ fontFamily: monoFont, fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0,
+            color: Math.abs(Number(b.token.change)) < 0.05 ? T.muted : Number(b.token.change) > 0 ? T.up : T.down }}>
+            {Number(b.token.change) > 0 ? "+" : ""}{Number(b.token.change).toFixed(1)}%
+          </span>
+        )}
       </div>
     </button>
     </div>
@@ -24000,12 +23998,14 @@ const СКОРОСТИ_СДЕЛКИ = [
 ];
 const ТАБЛИЦА_СКОРОСТИ = {
   markup: {
-    solana: { normal: 0, fast: 0.0002, turbo: 0.001 },
-    ton: { normal: 0, fast: 0.01, turbo: 0.05 },
-    bsc: { normal: 0, fast: 0.00005, turbo: 0.0002 },
-    base: { normal: 0, fast: 0.00001, turbo: 0.00005 },
-    eth: { normal: 0, fast: 0.00001, turbo: 0.00005 },
+    solana: { normal: 0, fast: 0.0004, turbo: 0.002 },
+    ton: { normal: 0, fast: 0.02, turbo: 0.1 },
+    bsc: { normal: 0, fast: 0.0001, turbo: 0.0004 },
+    base: { normal: 0, fast: 0.00002, turbo: 0.00008 },
+    eth: { normal: 0, fast: 0.00002, turbo: 0.00008 },
   },
+  // Та же наценка монетами приложения (api/_speed.js, НАЦЕНКА_МОНЕТАМИ).
+  markupCoins: { normal: 0, fast: 3, turbo: 12 },
   network: { solana: { normal: 0, fast: 0.00019, turbo: 0.0014 }, ton: { normal: 0, fast: 0, turbo: 0 } },
   evmTip: { normal: 1, fast: 2, turbo: 4 },
 };
@@ -24017,7 +24017,7 @@ function useТаблицаСкорости() {
     let живо = true;
     fetch(апи("/api/speed")).then((r) => r.json()).then((j) => {
       if (!j || !j.markup) return;
-      Object.assign(ТАБЛИЦА_СКОРОСТИ, { markup: j.markup, network: j.network || ТАБЛИЦА_СКОРОСТИ.network, evmTip: j.evmTip || ТАБЛИЦА_СКОРОСТИ.evmTip });
+      Object.assign(ТАБЛИЦА_СКОРОСТИ, { markup: j.markup, markupCoins: j.markupCoins || ТАБЛИЦА_СКОРОСТИ.markupCoins, network: j.network || ТАБЛИЦА_СКОРОСТИ.network, evmTip: j.evmTip || ТАБЛИЦА_СКОРОСТИ.evmTip });
       таблицаСкоростиПришла = true;
       if (живо) setТаблица({ ...ТАБЛИЦА_СКОРОСТИ });
     }).catch(() => {});
@@ -25756,7 +25756,10 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         <button
           type="button"
           onClick={() => bannerInputRef.current && bannerInputRef.current.click()}
-          className="fx-tap w-full"
+          // Без сжатия под пальцем: баннер лежит в обрезанной карточке, и
+          // уменьшаясь он отходил от краёв — по бокам появлялись щели, а
+          // долгое нажатие оставляло его сжатым. Нажатие — лёгким затемнением.
+          className="fx-tap-тихо w-full"
           aria-label={t("bannerOptional")}
           style={{
             display: "block", height: 124, border: "none", padding: 0,
@@ -26320,12 +26323,11 @@ function ПолосаТарифов({ активный }) {
           ...заливкаТарифа(активный),
           transition: "width 600ms cubic-bezier(0.34, 1.2, 0.64, 1), background-color 400ms ease",
         }} />
-        {ТАРИФЫ_ЭКРАНА.map((т) => (
+        {/* Границы тарифов — тонкие прорези цвета фона, а не белые кружки:
+            полоса читается одной лентой, поделённой на ступени. */}
+        {ТАРИФЫ_ЭКРАНА.filter((т) => т.шкала < 1).map((т) => (
           <span key={т.key} aria-hidden style={{
-            position: "absolute", top: "50%", left: `${т.шкала * 100}%`, width: 16, height: 16, borderRadius: "50%",
-            transform: `translate(${т.шкала >= 1 ? -100 : -50}%, -50%)`,
-            background: т.шкала <= активный.шкала ? "#FFFFFF" : T.lineHi, border: `3px solid ${T.bg}`,
-            transition: "background 300ms ease",
+            position: "absolute", top: 0, bottom: 0, left: `${т.шкала * 100}%`, width: 3, transform: "translateX(-50%)", background: T.bg,
           }} />
         ))}
       </div>
@@ -26347,15 +26349,19 @@ function ПолосаТарифов({ активный }) {
    переливается теми же цветами и с той же скоростью, что фон. Полоса,
    цифры, галочки и кнопка красятся одной краской — страница читается
    одним цветом с фоном. */
-const РАДУГА_ТАРИФА = "linear-gradient(115deg, #B79CFF, #5BE0C8, #FFB86B, #FF6FB5, #6C7CFF, #B79CFF)";
-const переливТарифа = { background: РАДУГА_ТАРИФА, backgroundSize: "300% 300%", animation: "шёлкПереливается 8s linear infinite" };
+const РАДУГА_ТАРИФА = `linear-gradient(115deg, ${ЦВЕТА_РАДУГИ.join(", ")})`;
+/* Те же цвета, что запечены в шёлк, и тот же поворот оттенка с той же
+   фазой (фазаРадуги): фон и всё, что на странице, переливаются в такт. */
+function переливТарифа() {
+  return { background: РАДУГА_ТАРИФА, animation: `шёлкОттенок ${ПЕРИОД_РАДУГИ}s linear ${фазаРадуги()} infinite` };
+}
 function заливкаТарифа(т) {
-  return т.key === "turbo" ? переливТарифа : { background: т.цвет };
+  return т.key === "turbo" ? переливТарифа() : { background: т.цвет };
 }
 function текстТарифа(т) {
   return т.key === "turbo"
-    ? { ...переливТарифа, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }
-    : { color: т.цвет };
+    ? { ...переливТарифа(), WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }
+    : { color: T.ice };
 }
 function ГалочкаТарифа({ т, size = 26 }) {
   return (
@@ -26365,7 +26371,6 @@ function ГалочкаТарифа({ т, size = 26 }) {
   );
 }
 
-const СЕТИ_ТАРИФА = [["solana", "Solana"], ["ton", "TON"], ["bsc", "BNB Chain"], ["base", "Base"], ["eth", "Ethereum"]];
 
 function ДоплатаТарифа(таблица, сеть, скорость, ru) {
   const сумма = доплатаСкорости(таблица, сеть, скорость);
@@ -26377,21 +26382,26 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
   const ru = lang !== "EN";
   const [скорость, выбратьСкорость] = useСкорость();
   const таблица = useТаблицаСкорости();
-  const [открыт, setОткрыт] = useState(null);
-  const [уходит, setУходит] = useState(false);
   const свой = ТАРИФЫ_ЭКРАНА.find((т) => т.скорость === скорость) || ТАРИФЫ_ЭКРАНА[1];
-
-  function открыть(т) { haptic("light"); setУходит(false); setОткрыт(т); }
-  // «Назад» Telegram закрывает подробности, а не весь раздел.
-  useНазадТелеграм(!!открыт, () => закрыть());
-  function закрыть() {
-    setУходит(true);
-    setTimeout(() => { setОткрыт(null); setУходит(false); }, 240);
-  }
-  function выбрать(т) {
-    haptic("success");
-    выбратьСкорость(т.скорость);
-    закрыть();
+  /* Наценку можно платить монетами приложения — их дают за друзей по
+     приглашению. Выбор живёт в памяти телефона и уходит с каждой сделкой
+     (appWallet.js, платитьМонетами); не хватит монет — сервер возьмёт
+     наценку как обычно. */
+  const [монетами, setМонетами] = useState(() => { try { return localStorage.getItem("mintly_pay_coins") === "1"; } catch { return false; } });
+  const [монет, setМонет] = useState(null);
+  useEffect(() => {
+    let живо = true;
+    supabase.auth.getSession().then(({ data }) => {
+      const uid = data && data.session && data.session.user && data.session.user.id;
+      if (!uid) return;
+      supabase.rpc("coins_balance", { uid }).then(({ data: н }) => { if (живо && typeof н === "number") setМонет(н); });
+    });
+    return () => { живо = false; };
+  }, []);
+  function переключитьМонеты(v) {
+    haptic("light");
+    setМонетами(v);
+    try { localStorage.setItem("mintly_pay_coins", v ? "1" : "0"); } catch { /* приватный режим */ }
   }
 
   // Тарифы листаются шагами, как форма запуска: один тариф на экран.
@@ -26432,14 +26442,21 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
       <div ref={лента} onScroll={прокрутка} className="no-scrollbar flex"
         style={{ overflowX: "auto", scrollSnapType: "x mandatory", margin: "0 -16px", overscrollBehaviorX: "contain" }}>
         {ТАРИФЫ_ЭКРАНА.map((т) => (
-          <button key={т.key} onClick={() => открыть(т)} className="fx-tap flex flex-col text-left"
-            style={{ flex: "0 0 100%", scrollSnapAlign: "center", padding: "0 16px", gap: 10, border: "none", background: "transparent", boxSizing: "border-box" }}>
+          <div key={т.key} className="flex flex-col text-left"
+            style={{ flex: "0 0 100%", scrollSnapAlign: "center", padding: "0 16px", gap: 10, boxSizing: "border-box" }}>
             <span className="flex items-center" style={{ gap: 10, fontFamily: displayFont, fontSize: 56, fontWeight: 800, color: T.ice, letterSpacing: "-0.03em", lineHeight: 1 }}>
               {т.имя}
               {т.key === "turbo" && <Zap size={38} color="#FFFFFF" fill="#FFFFFF" />}
-              <ChevronRight size={26} color={T.muted} style={{ marginLeft: "auto" }} />
             </span>
-            <span style={{ fontFamily: monoFont, fontSize: 22, fontWeight: 700, alignSelf: "flex-start", ...текстТарифа(т) }}>{ДоплатаТарифа(таблица, "solana", т.скорость, ru)}</span>
+            {/* Наценка в монете сети, а справа — она же в монетах приложения. */}
+            <span className="flex items-center justify-between" style={{ gap: 12 }}>
+              <span style={{ fontFamily: monoFont, fontSize: 22, fontWeight: 700, ...текстТарифа(т) }}>{ДоплатаТарифа(таблица, "solana", т.скорость, ru)}</span>
+              {(таблица.markupCoins || {})[т.скорость] > 0 && (
+                <span className="flex items-center" style={{ gap: 6, fontFamily: monoFont, fontSize: 20, fontWeight: 700, color: T.ice, opacity: монетами ? 1 : 0.6, transition: "opacity 200ms ease" }}>
+                  <CoinIcon size={20} tone={T.ice} /> {таблица.markupCoins[т.скорость]}
+                </span>
+              )}
+            </span>
             <span className="flex flex-col" style={{ gap: 12, marginTop: 14 }}>
               {(ru ? т.ru : т.en).плюсы.map((п) => (
                 <span key={п} className="flex items-center" style={{ gap: 12, fontFamily: bodyFont, fontSize: 17, fontWeight: 600, color: T.ice }}>
@@ -26448,13 +26465,22 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
                 </span>
               ))}
             </span>
-          </button>
+          </div>
         ))}
+      </div>
+      {/* Оплата наценки монетами приложения. */}
+      <div className="flex items-center" style={{ gap: 12 }}>
+        <CoinIcon size={26} tone={T.ice} />
+        <span className="flex-1" style={{ fontFamily: displayFont, fontSize: 17, fontWeight: 800, color: T.ice }}>
+          {ru ? "Платить монетами" : "Pay with coins"}
+          {монет != null && <span style={{ fontFamily: monoFont, fontWeight: 700, marginLeft: 8 }}>{монет}</span>}
+        </span>
+        <ToggleSwitch on={монетами} onChange={переключитьМонеты} />
       </div>
       <div aria-hidden style={{ height: 90 }} />
       {/* Кнопка — внутри страницы, а не порталом: так она въезжает и
           уезжает вместе со страницей, а не висит на месте. */}
-      {!открыт && (
+      {(
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 461, padding: `12px 16px ${insetBottom + 14}px` }}>
           <button
             disabled={свой.key === шаг.key}
@@ -26472,67 +26498,6 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
         </div>
       )}
 
-      {открыт && createPortal(
-        <div
-          className={уходит ? "fx-sheet-out" : "fx-sheet-in"}
-          style={{ position: "fixed", inset: 0, zIndex: 470, background: T.bg, display: "flex", flexDirection: "column", isolation: "isolate" }}
-        >
-          <ФонШёлк вОкне тон={открыт.key === "free" ? null : открыт.key} />
-          <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: `calc(${insetTop}px + 10px) 16px 24px` }}>
-            <div className="flex flex-col" style={{ gap: 26, maxWidth: 520, margin: "0 auto" }}>
-              {!hasTelegramBack() && (
-                <button onClick={закрыть} className="fx-tap flex items-center gap-1 self-start" style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.muted, background: "none", border: "none" }}>
-                  <ChevronLeft size={16} /> {t("back")}
-                </button>
-              )}
-              <div className="flex flex-col" style={{ gap: 6 }}>
-                <span className="flex items-center" style={{ gap: 10, fontFamily: displayFont, color: T.ice, fontSize: 40, fontWeight: 800, letterSpacing: "-0.02em" }}>
-                  {открыт.имя}
-                  {открыт.key === "turbo" && <Zap size={28} color="#FFFFFF" fill="#FFFFFF" />}
-                </span>
-              </div>
-              <ПолосаТарифов активный={открыт} />
-
-              <div className="flex flex-col" style={{ gap: 14 }}>
-                <span style={{ fontFamily: displayFont, fontSize: 17, fontWeight: 800, color: T.ice }}>{ru ? "Что ты получаешь" : "What you get"}</span>
-                {(ru ? открыт.ru : открыт.en).пункты.map((строка, i) => (
-                  <span key={строка} className="fx-card flex items-start" style={{ gap: 12, fontFamily: bodyFont, fontSize: 16, lineHeight: 1.4, color: T.ice, animationDelay: `${i * 50}ms` }}>
-                    <ГалочкаТарифа т={открыт} size={24} />
-                    {строка}
-                  </span>
-                ))}
-              </div>
-
-              <div className="flex flex-col">
-                <span style={{ fontFamily: displayFont, fontSize: 17, fontWeight: 800, color: T.ice, marginBottom: 4 }}>{ru ? "Доплата за одну сделку" : "Extra per trade"}</span>
-                {СЕТИ_ТАРИФА.map(([сеть, имя], i) => (
-                  <div key={сеть} className="flex items-center justify-between" style={{ padding: "13px 0", borderBottom: i < СЕТИ_ТАРИФА.length - 1 ? `1px solid ${T.line}` : "none" }}>
-                    <span style={{ fontFamily: bodyFont, fontSize: 15.5, color: T.ice }}>{имя}</span>
-                    <span style={{ fontFamily: monoFont, fontSize: 15, fontVariantNumeric: "tabular-nums", ...текстТарифа(открыт) }}>{ДоплатаТарифа(таблица, сеть, открыт.скорость, ru)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          {/* Кнопка отдельно, внизу экрана: выбрать тариф — последнее действие. */}
-          <div style={{ flexShrink: 0, padding: `12px 16px ${insetBottom + 14}px`, background: T.bg }}>
-            <button
-              disabled={свой.key === открыт.key}
-              onClick={() => выбрать(открыт)}
-              className="fx-tap w-full"
-              style={{
-                display: "block", maxWidth: 520, margin: "0 auto", height: 56, borderRadius: 999, border: "none",
-                fontFamily: displayFont, fontSize: 17, fontWeight: 800,
-                ...(свой.key === открыт.key ? { background: T.surface } : заливкаТарифа(открыт)),
-                color: свой.key === открыт.key ? T.muted : "#000000",
-              }}
-            >
-              {свой.key === открыт.key ? (ru ? "Этот тариф уже выбран" : "Already selected") : (ru ? `Выбрать ${открыт.имя}` : `Choose ${открыт.имя}`)}
-            </button>
-          </div>
-        </div>,
-        document.body,
-      )}
     </div>
   );
 }

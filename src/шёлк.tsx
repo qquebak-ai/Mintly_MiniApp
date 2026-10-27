@@ -4,18 +4,52 @@ import React, { useEffect, useRef } from "react";
 
 const СВЕТЛАЯ = (() => { try { return localStorage.getItem("mintly_theme") === "White"; } catch { return false; } })();
 
-// Окраска шёлка в приложении. Free — родной серый шёлк, без слоя.
-const ТОНА_ШЁЛКА: Record<string, React.CSSProperties> = {
-  pro: { background: "#2ED47A" },
-  turbo: {
-    background: "linear-gradient(115deg, #B79CFF, #5BE0C8, #FFB86B, #FF6FB5, #6C7CFF, #B79CFF)",
-    backgroundSize: "300% 300%", animation: "шёлкПереливается 8s linear infinite",
-  },
+/* Окраска шёлка в приложении — запекается в сам холст. Слой поверх в
+   режиме «цвет» на iPhone резался на плитки: шёлк шёл полосами с ровными
+   вертикальными швами. Free — родной серый, Pro — зелёный, Turbo —
+   радуга, которая переливается поворотом оттенка. */
+export const ЦВЕТА_РАДУГИ = ["#B79CFF", "#5BE0C8", "#FFB86B", "#FF6FB5", "#6C7CFF"];
+export const ПЕРИОД_РАДУГИ = 9;
+/* Фаза перелива от общих часов: у каждого элемента анимация стартует в
+   свой момент, а отрицательная задержка по текущему времени ставит их
+   всех в одну точку цикла — фон и надписи меняют оттенок в такт. */
+export function фазаРадуги() {
+  return `-${((Date.now() / 1000) % ПЕРИОД_РАДУГИ).toFixed(3)}s`;
+}
+const ТОНА_ШЁЛКА: Record<string, string[]> = {
+  pro: ["#2ED47A"],
+  turbo: ЦВЕТА_РАДУГИ,
 };
+const цветныеШёлка: Record<string, Promise<HTMLCanvasElement>> = {};
+function шёлкВЦвете(тон: string): Promise<HTMLCanvasElement> {
+  if (!цветныеШёлка[тон]) {
+    цветныеШёлка[тон] = подготовитьШёлк().then((серый) => {
+      const к = document.createElement("canvas");
+      к.width = серый.width; к.height = серый.height;
+      const г = к.getContext("2d")!;
+      г.drawImage(серый, 0, 0);
+      // «Цвет» берёт у шёлка яркость, а оттенок — свой; потом прозрачность
+      // возвращаем по исходнику, чтобы края лент остались мягкими.
+      г.globalCompositeOperation = "color";
+      const ц = ТОНА_ШЁЛКА[тон];
+      if (ц.length === 1) г.fillStyle = ц[0];
+      else {
+        const гр = г.createLinearGradient(0, к.height, к.width, 0);
+        ц.forEach((c, i) => гр.addColorStop(i / (ц.length - 1), c));
+        г.fillStyle = гр;
+      }
+      г.fillRect(0, 0, к.width, к.height);
+      г.globalCompositeOperation = "destination-in";
+      г.drawImage(серый, 0, 0);
+      return к;
+    });
+  }
+  return цветныеШёлка[тон];
+}
 if (typeof document !== "undefined" && !document.getElementById("шёлк-стиль")) {
   const с = document.createElement("style");
   с.id = "шёлк-стиль";
-  с.textContent = "@keyframes шёлкПереливается { from { background-position: 0% 50% } to { background-position: 300% 50% } }";
+  с.textContent = "@keyframes шёлкПереливается { from { background-position: 0% 50% } to { background-position: 300% 50% } } @keyframes шёлкОттенок { from { filter: hue-rotate(0deg) } to { filter: hue-rotate(360deg) } }";
   document.head.appendChild(с);
 }
 
@@ -142,7 +176,7 @@ export function ФонШёлк({ тон = null, вОкне = false }: { тон?:
       }
       кадр = requestAnimationFrame(шаг);
     };
-    подготовитьШёлк().then((готовый) => {
+    (тон && ТОНА_ШЁЛКА[тон] ? шёлкВЦвете(тон) : подготовитьШёлк()).then((готовый) => {
       if (!жив || !место.current) return;
       /* Готовый холст переносим в страницу целиком, без копирования
          четырёх миллионов точек. Если он уже стоит в другом месте —
@@ -156,6 +190,7 @@ export function ФонШёлк({ тон = null, вОкне = false }: { тон?:
         position: "absolute", willChange: "transform, opacity",
         WebkitMaskImage: "radial-gradient(closest-side, #000 78%, transparent 100%)", maskImage: "radial-gradient(closest-side, #000 78%, transparent 100%)",
         filter: СВЕТЛАЯ ? "invert(1)" : "none",
+        animation: тон === "turbo" ? `шёлкОттенок ${ПЕРИОД_РАДУГИ}s linear ${фазаРадуги()} infinite` : "none",
       });
       разместить();
       место.current.appendChild(к);
@@ -173,17 +208,12 @@ export function ФонШёлк({ тон = null, вОкне = false }: { тон?:
       window.removeEventListener("resize", разместить);
       if (к && к.parentNode) к.parentNode.removeChild(к);
     };
-  }, []);
+  }, [тон]);
   return (
     <div ref={обёртка} aria-hidden style={{ position: "fixed", inset: 0, zIndex: -1, overflow: "hidden", pointerEvents: "none", isolation: "isolate",
       opacity: 0, transition: "opacity 600ms ease",
-      // Слой «цвет» смешивается только с тем, что под ним внутри обёртки: без
-      // своей заливки он красил пустоту целиком, и экран становился сплошным цветом.
-      ...(тон ? { background: СВЕТЛАЯ ? "#FFFFFF" : "#000000" } : null) }}>
+      }}>
       <div ref={место} style={{ position: "absolute", inset: 0 }} />
-      {тон && ТОНА_ШЁЛКА[тон] && (
-        <div style={{ position: "absolute", inset: 0, mixBlendMode: "color", ...ТОНА_ШЁЛКА[тон] }} />
-      )}
     </div>
   );
 }

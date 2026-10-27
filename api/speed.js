@@ -8,7 +8,7 @@
  * Solana); в EVM сетевая часть — множитель чаевых, её размер решает сеть.
  */
 
-import { НАЦЕНКА, СКОРОСТИ } from "./_speed.js";
+import { НАЦЕНКА, НАЦЕНКА_МОНЕТАМИ, СКОРОСТИ } from "./_speed.js";
 
 export default async function handler(req, res) {
   let sol = { jito: false, сети: { normal: 0, fast: 0, turbo: 0 } };
@@ -28,6 +28,8 @@ export default async function handler(req, res) {
   return res.status(200).json({
     speeds: СКОРОСТИ,
     markup: НАЦЕНКА,
+    // Та же наценка в монетах приложения — если платить ими.
+    markupCoins: НАЦЕНКА_МОНЕТАМИ,
     network: сети,
     // Множитель чаевых валидатору в EVM: сумму решает сеть в момент сделки.
     evmTip: { normal: 1, fast: 2, turbo: 4 },

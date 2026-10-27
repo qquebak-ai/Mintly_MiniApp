@@ -27,7 +27,7 @@ import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { нуженВторойКлюч } from "./_second.js";
 import { занятьПоОчереди } from "./_walletLock.js";
-import { скоростьИз, наценка } from "./_speed.js";
+import { скоростьИз, наценка, монетыЗаСкорость, списатьМонетыЗаСкорость } from "./_speed.js";
 import { быстрыйОстаток } from "./_остаток.js";
 import { ВНУТРЕННИЙ_ВХОД } from "./_внутри.js";
 
@@ -713,8 +713,11 @@ export default async function handler(req, res) {
       const r = await чекEVM(с, tx.hash, скорость);
       if (!r || r.status !== 1) throw new Error("сделка не прошла");
       await завершить(db, оп.id, tx.hash);
-      // Наценка за скорость — после того, как сделка прошла.
-      взятьНаценку(сеть, с, w, ключОчереди, скорость);
+      // Наценка за скорость — после того, как сделка прошла: монетами
+      // приложения, если человек так выбрал и их хватает, иначе переводом.
+      const монет = await монетыЗаСкорость(db, user.id, скорость, тело.payCoins);
+      if (монет > 0) списатьМонетыЗаСкорость(db, user.id, монет);
+      else взятьНаценку(сеть, с, w, ключОчереди, скорость);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ ok: true, tx: tx.hash });
     }

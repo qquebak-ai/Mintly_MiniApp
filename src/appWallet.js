@@ -222,7 +222,7 @@ export async function купитьВнутреннимTON({ tokenId, сумма,
   // Ключ запроса — от повторов: двойное нажатие не должно превращаться
   // во вторую покупку, сервер по нему вернёт исход первой. Скорость — как
   // в Solana и EVM: от неё наценка и путь сделки на сервере.
-  const j = await запрос("/api/wallet-ton?action=buy", { tokenId, amount: сумма, speed: скорость, requestKey: ключЗапроса() });
+  const j = await запрос("/api/wallet-ton?action=buy", { tokenId, amount: сумма, speed: скорость, payCoins: платитьМонетами(), requestKey: ключЗапроса() });
   послеТраты("ton", сумма);
   return j;
 }
@@ -236,7 +236,7 @@ export async function запуститьВнутреннимTON({ metadataUrl, b
 }
 
 export async function продатьВнутреннимTON({ tokenId, количество, скорость = скоростьСделки() }) {
-  const j = await запрос("/api/wallet-ton?action=sell", { tokenId, amount: количество, speed: скорость, requestKey: ключЗапроса() });
+  const j = await запрос("/api/wallet-ton?action=sell", { tokenId, amount: количество, speed: скорость, payCoins: платитьМонетами(), requestKey: ключЗапроса() });
   послеТраты("ton");
   return j;
 }
@@ -255,12 +255,17 @@ export async function запуститьВнутренним({ имя, тике�
 /* Скорость сделки — выбор человека в окне сделки и в «Быстрой покупке»
    (см. App.tsx): от неё чаевые сети, наценка площадке и путь сделки на
    сервере (api/_speed.js). */
+/* Платить наценку за скорость монетами приложения (раздел «Тариф»).
+   Хватит ли монет, решает сервер: не хватит — наценка уйдёт как обычно. */
+export function платитьМонетами() {
+  try { return localStorage.getItem("mintly_pay_coins") === "1"; } catch { return false; }
+}
 export function скоростьСделки() {
   try { const v = localStorage.getItem("mintly_trade_speed"); return ["normal", "fast", "turbo"].includes(v) ? v : "fast"; } catch { return "fast"; }
 }
 export async function сделкаВнутренним({ mint, продажа = false, amount, minOut = 0, скорость = скоростьСделки() }) {
   const j = await запрос("/api/wallet-solana?action=trade", {
-    mint, sell: продажа, amount, minOut, speed: скорость, requestKey: ключЗапроса(),
+    mint, sell: продажа, amount, minOut, speed: скорость, payCoins: платитьМонетами(), requestKey: ключЗапроса(),
   });
   // Без подписи сделки не было. Молчать об этом нельзя: приложение
   // запишет её в историю и уменьшит позицию, а в цепочке ничего не
@@ -498,7 +503,7 @@ export async function запуститьEVM({ сеть, имя, тикер, meta
 
 export async function сделкаEVM({ сеть, токен: адрес, продажа = false, сумма, raw = null }) {
   const j = await запрос(апи(`/api/wallet-evm?action=${продажа ? "sell" : "buy"}`), {
-    chain: сеть, token: адрес, amount: сумма, raw, speed: скоростьСделки(), requestKey: ключЗапроса(),
+    chain: сеть, token: адрес, amount: сумма, raw, speed: скоростьСделки(), payCoins: платитьМонетами(), requestKey: ключЗапроса(),
   });
   послеТраты(сеть, продажа ? 0 : сумма);
   return j;

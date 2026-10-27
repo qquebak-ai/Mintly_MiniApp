@@ -30,7 +30,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 import { нуженВторойКлюч } from "./_second.js";
 import { занятьПоОчереди, свободныйНомер, занятьНомер, номерЖдёт } from "./_walletLock.js";
-import { скоростьИз, наценка } from "./_speed.js";
+import { скоростьИз, наценка, монетыЗаСкорость, списатьМонетыЗаСкорость } from "./_speed.js";
 import { быстрыйОстаток } from "./_остаток.js";
 import { ВНУТРЕННИЙ_ВХОД } from "./_внутри.js";
 
@@ -747,7 +747,9 @@ export default async function handler(req, res) {
          а «Быстро» и «Молния» читают номер и остаток разом, если прошлый
          перевод кошелька уже принят. */
       const скорость = скоростьИз(тело.speed);
-      const надбавка = наценка("ton", скорость);
+      // Наценку можно оплатить монетами приложения — тогда в переводе её нет.
+      const монет = await монетыЗаСкорость(db, user.id, скорость, тело.payCoins);
+      const надбавка = монет > 0 ? 0 : наценка("ton", скорость);
       const подпис = await подписант(строка, набор, user);
       const { пара, контракт, client, кошелёк: открытый } = подпис;
       const остаток = () => client.getBalance(контракт.address).then((б) => Number(б) / 1e9).catch(() => баланс(строка.address));
@@ -793,6 +795,7 @@ export default async function handler(req, res) {
 
       занятьНомер(номерКошелька(user), seqno);
       await завершить(db, оп.id, `seqno:${seqno}`);
+      списатьМонетыЗаСкорость(db, user.id, монет);
       res.setHeader("Cache-Control", "no-store");
       // Только пока сделка идёт по самой кривой: адрес рынка — это пул
       // биржи, если токен уже закрылся, а состояние() умеет читать
@@ -833,7 +836,9 @@ export default async function handler(req, res) {
       // Как у покупки: остатки читаем после того, как прошлая сделка
       // этого кошелька принята сетью.
       const скорость = скоростьИз(тело.speed);
-      const надбавка = наценка("ton", скорость);
+      // Наценку можно оплатить монетами приложения — тогда в переводе её нет.
+      const монет = await монетыЗаСкорость(db, user.id, скорость, тело.payCoins);
+      const надбавка = монет > 0 ? 0 : наценка("ton", скорость);
       const подпис = await подписант(строка, набор, user);
       const { пара, контракт, client, кошелёк: открытый } = подпис;
       const разом = скорость !== "normal" && !номерЖдёт(номерКошелька(user));
@@ -891,6 +896,7 @@ export default async function handler(req, res) {
 
       занятьНомер(номерКошелька(user), seqno);
       await завершить(db, опПродажи.id, `seqno:${seqno}`);
+      списатьМонетыЗаСкорость(db, user.id, монет);
       res.setHeader("Cache-Control", "no-store");
       if (!(кеш && кеш.graduated)) {
         подтолкнутьЦену(tokenId, токен.curve_address).catch(() => {});
