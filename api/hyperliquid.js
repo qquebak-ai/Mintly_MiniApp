@@ -346,6 +346,124 @@ async function usdcВArbitrum(адрес) {
   return { usdc: Number(formatUnits(usdc, 6)), eth: Number(formatUnits(газ, 18)) };
 }
 
+/* Позиция «по рынку» — заявка IOC с запасом цены: исполнится сразу или
+   не исполнится. */
+async function заявкаПозиции(w, рынок, isBuy, размер, reduceOnly) {
+  const s = размерБиржи(размер, рынок.szDecimals);
+  if (!(Number(s) > 0)) throw new Error("too_small");
+  const p = ценаБиржи(рынок.price * (isBuy ? 1 + ПРОСКАЛЬЗЫВАНИЕ : 1 - ПРОСКАЛЬЗЫВАНИЕ), рынок.szDecimals);
+  return отправитьДействие(w, {
+    type: "order",
+    orders: [{ a: рынок.asset, b: isBuy, p, s, r: reduceOnly, t: { limit: { tif: "Ioc" } } }],
+    grouping: "na",
+  });
+}
+async function открытьПозицию(w, рынок, isBuy, usd, плечо) {
+  // Плечо задаётся до заявки: биржа помнит его по рынку.
+  await отправитьДействие(w, { type: "updateLeverage", asset: рынок.asset, isCross: true, leverage: плечо });
+  return заявкаПозиции(w, рынок, isBuy, (usd * плечо) / рынок.price, false);
+}
+async function свободноНаБирже(w) {
+  const с = await инфо({ type: "clearinghouseState", user: w.address });
+  return Number(с && с.withdrawable) || 0;
+}
+
+/* Плата моста за пополнение в SOL — у Unit (раз в 10 минут). */
+let платаМоста = { at: 0, sol: 0.02 };
+async function платаЗаМост() {
+  if (Date.now() - платаМоста.at > 600e3) {
+    try {
+      const j = await (await fetch(`${UNIT_API}/v2/estimate-fees`, { signal: AbortSignal.timeout(5000) })).json();
+      const п = Number(j && j.solana && j.solana["deposit-fee-in-units"]);
+      if (п > 0 && п < 1) платаМоста = { at: Date.now(), sol: п };
+    } catch { /* остаётся прошлая */ }
+  }
+  return платаМоста.sol;
+}
+
+/* Сколько SOL с карты нужно, чтобы на бирже стало ещё usd долларов:
+   по цене продажи с запасом 3% плюс плата моста. Меньше минимума моста
+   и меньше $11 (на споте не продать дешевле $10) не шлём. */
+async function пополнитьСКарты(user, w, usd) {
+  if (SOLANA_ТЕСТОВАЯ === БОЕВАЯ) throw Object.assign(new Error("network_mismatch"), { код: 400 });
+  const sol = await спотSOL();
+  if (!(sol.цена > 0)) throw new Error("нет цены SOL");
+  const плата = await платаЗаМост();
+  const нужно = Math.max(МИН_SOL, (Math.max(usd, 11) / (sol.цена * 0.97)) + плата);
+  const сумма = Math.ceil(нужно * 1e4) / 1e4;
+  const куда = await адресUnit({ откуда: "solana", куда: "hyperliquid", кому: w.address, вид: "solana" });
+  await отправитьНаБиржу({ user_id: user.id, сумма, куда });
+  return сумма;
+}
+
+/* С биржи на карту: доллары фьючерсов → спот → купить USOL → отправить
+   на адрес моста, выданный под Solana-кошелёк приложения. */
+async function вывестиНаКарту(w, user, usd) {
+  const кош = await кошелёкДляБота(user.id);
+  if (!кош) throw new Error("no_wallet");
+  if (SOLANA_ТЕСТОВАЯ === БОЕВАЯ) throw Object.assign(new Error("network_mismatch"), { код: 400 });
+  const sol = await спотSOL();
+  // Запас 3% — на цену заявки «по рынку»: биржа держит под неё доллары.
+  const размер = размерБиржи(usd / (sol.цена * 1.03), sol.szDecimals);
+  if (!(Number(размер) >= МИН_SOL + 0.01) || Number(размер) * sol.цена < 10.5) throw Object.assign(new Error("min_sol"), { код: 400 });
+  const куда = await адресUnit({ откуда: "hyperliquid", куда: "solana", кому: кош.address, вид: "ethereum" });
+  await междуСчетами(w, usd, false);
+  await заявкаСпота(w, sol, true, размер);
+  const usol = (await спотБалансы(w.address)).get("USOL") || 0;
+  if (!(usol >= МИН_SOL)) throw new Error("SOL не купился, деньги остались на бирже");
+  await действиеВладельца(w, "HyperliquidTransaction:SpotSend", [
+    { name: "hyperliquidChain", type: "string" }, { name: "destination", type: "string" },
+    { name: "token", type: "string" }, { name: "amount", type: "string" }, { name: "time", type: "uint64" },
+  ], { type: "spotSend", destination: куда, token: sol.токен, amount: безХвоста(usol), time: Date.now() });
+  // Сдача от покупки — обратно на фьючерсы.
+  await свести(w).catch(() => {});
+  return usol;
+}
+// После закрытия: позиций не осталось — всё свободное уходит на карту.
+async function вернутьНаКарту(w, user) {
+  const р = await собратьРынки();
+  const состояния = await Promise.all((р.площадки || [""]).map((dex) => инфо(dex ? { type: "clearinghouseState", user: w.address, dex } : { type: "clearinghouseState", user: w.address }).catch(() => null)));
+  const открыты = состояния.some((с) => с && (с.assetPositions || []).some((ап) => Math.abs(Number(ап.position && ап.position.szi)) > 0));
+  if (открыты || ждут.has(user.id)) return null;
+  const свободно = Math.floor((Number(состояния[0] && состояния[0].withdrawable) || 0) * 100) / 100;
+  // Остаток меньше минимума моста ждёт на бирже и уйдёт в следующую сделку.
+  try { return await вывестиНаКарту(w, user, свободно); } catch (e) { if (e && e.message === "min_sol") return null; throw e; }
+}
+
+/* Сделки, ждущие пополнения с карты. Раз в 5 секунд: пришедший SOL —
+   в доллары на фьючерсы, и как только их прибавилось — открываем
+   позицию на то, что дошло (плата моста и цена могли съесть чуть-чуть).
+   Живёт в памяти процесса: после перезапуска деньги не теряются — они
+   на бирже и уйдут в следующую сделку или вернутся на карту. */
+const ждут = new Map();
+let таймерОжидания = null;
+function запуститьОжидание() {
+  if (таймерОжидания) return;
+  таймерОжидания = setInterval(async () => {
+    if (!ждут.size) { clearInterval(таймерОжидания); таймерОжидания = null; return; }
+    for (const [id, з] of ждут) {
+      if (з.идёт) continue;
+      з.идёт = true;
+      try {
+        await свести(з.w);
+        const есть = await свободноНаБирже(з.w);
+        if (есть > з.было + 1) {
+          const usd = Math.floor(Math.min(з.usd, есть * 0.995) * 100) / 100;
+          ждут.delete(id);
+          if (usd >= 10) {
+            const рынок = (await собратьРынки()).поНомеру.get(з.asset);
+            if (рынок) await открытьПозицию(з.w, рынок, з.isBuy, usd, Math.min(з.плечо, рынок.maxLeverage));
+          }
+        } else if (Date.now() > з.до) ждут.delete(id);
+      } catch (e) {
+        console.warn("[hyperliquid] ожидание пополнения", e && e.message);
+        if (Date.now() > з.до) ждут.delete(id);
+      } finally { з.идёт = false; }
+    }
+  }, 5000);
+  if (таймерОжидания.unref) таймерОжидания.unref();
+}
+
 // Не чаще раза в 700 мс на человека: подписи и заявки не для очереди кликов.
 const последний = new Map();
 
@@ -419,6 +537,9 @@ export default async function handler(req, res) {
         spot: { sol: б.get("USOL") || 0, usdc: б.get("USDC") || 0 },
         wallet: кош ? { address: кош.address, sol: кош.sol } : null,
         solPrice: sol ? sol.цена : 0, minSol: МИН_SOL,
+        // Сколько долларов дала бы карта на бирже — по цене SOL на споте.
+        walletUsd: кош && sol ? Math.max(0, кош.sol - 0.01 - платаМоста.sol) * sol.цена * 0.97 : 0,
+        pending: ждут.has(user.id) ? { usd: ждут.get(user.id).usd, asset: ждут.get(user.id).asset } : null,
       });
     }
 
@@ -428,34 +549,39 @@ export default async function handler(req, res) {
     if (сейчас - (последний.get(user.id) || 0) < 700) return res.status(429).json({ error: "too_fast" });
     последний.set(user.id, сейчас);
 
-    if (действие === "order" || действие === "close") {
+    if (действие === "order") {
       const р = await собратьРынки();
       const рынок = р.поНомеру.get(Number(тело.asset));
       if (!рынок) return res.status(400).json({ error: "no_market" });
-      let isBuy = !!тело.isBuy, размер, reduceOnly = false;
-      if (действие === "close") {
-        const с = await инфо(рынок.dex ? { type: "clearinghouseState", user: w.address, dex: рынок.dex } : { type: "clearinghouseState", user: w.address });
-        const п = ((с && с.assetPositions) || []).map((x) => x.position).find((x) => x && x.coin === рынок.coin);
-        const szi = п ? Number(п.szi) : 0;
-        if (!szi) return res.status(400).json({ error: "no_position" });
-        isBuy = szi < 0; размер = Math.abs(szi); reduceOnly = true;
-      } else {
-        const usd = Number(тело.usd) || 0;
-        const плечо = Math.max(1, Math.min(рынок.maxLeverage, Math.round(Number(тело.leverage) || 1)));
-        if (!(usd >= 10)) return res.status(400).json({ error: "min_10_usd" });
-        // Плечо задаётся до заявки: биржа помнит его по рынку.
-        await отправитьДействие(w, { type: "updateLeverage", asset: рынок.asset, isCross: true, leverage: плечо });
-        размер = (usd * плечо) / рынок.price;
+      const usd = Math.floor((Number(тело.usd) || 0) * 100) / 100;
+      const плечо = Math.max(1, Math.min(рынок.maxLeverage, Math.round(Number(тело.leverage) || 1)));
+      if (!(usd >= 10)) return res.status(400).json({ error: "min_10_usd" });
+      const свободно = await свободноНаБирже(w);
+      if (свободно >= usd) {
+        const ответ = await открытьПозицию(w, рынок, !!тело.isBuy, usd, плечо);
+        return res.status(200).json({ ok: true, response: ответ.response });
       }
-      const s = размерБиржи(размер, рынок.szDecimals);
-      if (!(Number(s) > 0)) return res.status(400).json({ error: "too_small" });
-      // «По рынку» — заявка IOC с запасом цены: исполнится сразу или не исполнится.
-      const p = ценаБиржи(рынок.price * (isBuy ? 1 + ПРОСКАЛЬЗЫВАНИЕ : 1 - ПРОСКАЛЬЗЫВАНИЕ), рынок.szDecimals);
-      const ответ = await отправитьДействие(w, {
-        type: "order",
-        orders: [{ a: рынок.asset, b: isBuy, p, s, r: reduceOnly, t: { limit: { tif: "Ioc" } } }],
-        grouping: "na",
-      });
+      /* Не хватает на бирже — добираем с карты приложения: SOL уходит по
+         мосту, а позиция откроется сама, как только он дойдёт. */
+      if (ждут.has(user.id)) return res.status(409).json({ error: "pending" });
+      const sol = await пополнитьСКарты(user, w, usd - свободно);
+      ждут.set(user.id, { w, user, asset: рынок.asset, isBuy: !!тело.isBuy, usd, плечо, было: свободно, до: Date.now() + 10 * 60e3 });
+      запуститьОжидание();
+      return res.status(200).json({ ok: true, pending: true, sol });
+    }
+
+    if (действие === "close") {
+      const р = await собратьРынки();
+      const рынок = р.поНомеру.get(Number(тело.asset));
+      if (!рынок) return res.status(400).json({ error: "no_market" });
+      const с = await инфо(рынок.dex ? { type: "clearinghouseState", user: w.address, dex: рынок.dex } : { type: "clearinghouseState", user: w.address });
+      const п = ((с && с.assetPositions) || []).map((x) => x.position).find((x) => x && x.coin === рынок.coin);
+      const szi = п ? Number(п.szi) : 0;
+      if (!szi) return res.status(400).json({ error: "no_position" });
+      const ответ = await заявкаПозиции(w, рынок, szi < 0, Math.abs(szi), true);
+      /* Последняя позиция закрыта — деньги возвращаются на карту, чтобы
+         весь баланс жил в одном месте. Без ожидания ответа: мост — минуты. */
+      setTimeout(() => { вернутьНаКарту(w, user).catch((e) => console.warn("[hyperliquid] возврат на карту", e && e.message)); }, 1500);
       return res.status(200).json({ ok: true, response: ответ.response });
     }
 
@@ -475,25 +601,7 @@ export default async function handler(req, res) {
 
     if (действие === "withdraw-sol") {
       const usd = Math.floor((Number(тело.usd) || 0) * 100) / 100;
-      const кош = await кошелёкДляБота(user.id);
-      if (!кош) return res.status(503).json({ error: "no_wallet" });
-      if (SOLANA_ТЕСТОВАЯ === БОЕВАЯ) return res.status(400).json({ error: "network_mismatch" });
-      const sol = await спотSOL();
-      // Запас 3% — на цену заявки «по рынку»: биржа держит под неё доллары.
-      const размер = размерБиржи(usd / (sol.цена * 1.03), sol.szDecimals);
-      if (!(Number(размер) >= МИН_SOL + 0.01)) return res.status(400).json({ error: "min_sol", minUsd: Math.ceil((МИН_SOL + 0.01) * sol.цена * 1.03) });
-      const куда = await адресUnit({ откуда: "hyperliquid", куда: "solana", кому: кош.address, вид: "ethereum" });
-      await междуСчетами(w, usd, false);
-      await заявкаСпота(w, sol, true, размер);
-      const usol = (await спотБалансы(w.address)).get("USOL") || 0;
-      if (!(usol >= МИН_SOL)) throw new Error("SOL не купился, деньги остались на бирже");
-      await действиеВладельца(w, "HyperliquidTransaction:SpotSend", [
-        { name: "hyperliquidChain", type: "string" }, { name: "destination", type: "string" },
-        { name: "token", type: "string" }, { name: "amount", type: "string" }, { name: "time", type: "uint64" },
-      ], { type: "spotSend", destination: куда, token: sol.токен, amount: безХвоста(usol), time: Date.now() });
-      // Сдача от покупки — обратно на фьючерсы.
-      await свести(w).catch(() => {});
-      return res.status(200).json({ ok: true, sol: usol });
+      return res.status(200).json({ ok: true, sol: await вывестиНаКарту(w, user, usd) });
     }
 
     if (действие === "deposit") {

@@ -15766,18 +15766,25 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
   const [шлём, setШлём] = useState(false);
   const позиция = (счёт && счёт.positions || []).find((п) => п.coin === рынок.coin) || null;
   const usd = parseAmount(сумма);
-  const свободно = счёт ? счёт.withdrawable : null;
+  // Доступно — биржа плюс карта приложения: недостающее сделка добирает с карты.
+  const свободно = счёт ? счёт.withdrawable + (счёт.walletUsd || 0) : null;
   const можно = usd >= 10 && (свободно == null || usd <= свободно + 1e-9) && !шлём;
   async function открыть() {
     if (!можно) return;
     setШлём(true); haptic("medium");
     try {
-      await запросРынков("order", { asset: рынок.asset, isBuy: сторона === "long", usd, leverage: плечо });
+      const j = await запросРынков("order", { asset: рынок.asset, isBuy: сторона === "long", usd, leverage: плечо });
       haptic("success"); setСумма("");
-      showToast && showToast(сторона === "long" ? "Лонг открыт" : "Шорт открыт");
+      showToast && showToast(j && j.pending ? "Берём с карты — позиция откроется через минуту" : сторона === "long" ? "Лонг открыт" : "Шорт открыт");
       onОбновить();
     } catch (e) {
-      haptic("error"); showToast && showToast(String((e && e.message) || "Сделка не прошла").slice(0, 120));
+      const м = String((e && e.message) || "");
+      const текст = м === "pending" ? "Прошлая сделка ещё ждёт денег с карты"
+        : м === "not_enough" ? "Не хватает SOL на карте"
+        : м === "network_mismatch" ? "Сеть карты и биржи не совпадает"
+        : м === "wallet_busy" ? "Карта занята другой операцией"
+        : м || "Сделка не прошла";
+      haptic("error"); showToast && showToast(текст.slice(0, 120));
     } finally { setШлём(false); }
   }
   async function закрыть() {
@@ -15867,10 +15874,6 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
   const [раздел, setРаздел] = useState("crypto");
   const [выбран, setВыбран] = useState(null);
   const [счёт, setСчёт] = useState(null);
-  const [пополнение, setПополнение] = useState(false);
-  const [куда, setКуда] = useState("in");
-  const [сколько, setСколько] = useState("");
-  const [идёт, setИдёт] = useState(false);
   const обновитьСчёт = useCallback(() => { запросРынков("account").then(setСчёт).catch(() => {}); }, []);
   useEffect(() => {
     if (!открыт) return undefined;
@@ -15889,36 +15892,14 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
   /* SOL, пришедший с моста, сам становится долларами на счёте: как только
      он виден на споте биржи, просим сервер продать его и перевести. */
   const спот = счёт && счёт.spot;
-  const зачисляется = !!(спот && (спот.sol * (счёт.solPrice || 0) >= 10.5 || спот.usdc >= 1));
+  const зачисляется = !!(спот && !счёт.pending && (спот.sol * (счёт.solPrice || 0) >= 10.5 || спот.usdc >= 1));
   const свожу = useRef(0);
   useEffect(() => {
     if (!зачисляется || Date.now() - свожу.current < 10000) return;
     свожу.current = Date.now();
     запросРынков("settle", {}).then(обновитьСчёт).catch(() => {});
   }, [зачисляется, счёт, обновитьСчёт]);
-  async function перевести() {
-    const n = parseAmount(сколько);
-    if (!(n > 0) || идёт) return;
-    setИдёт(true);
-    try {
-      if (куда === "in") await запросРынков("deposit-sol", { amount: n, requestKey: `hl-in-${Date.now()}` });
-      else await запросРынков("withdraw-sol", { usd: n });
-      haptic("success"); setСколько("");
-      showToast && showToast(куда === "in" ? "SOL отправлен — на бирже через минуту" : "SOL придёт в кошелёк через несколько минут");
-      обновитьСчёт();
-    } catch (e) {
-      const м = String((e && e.message) || "");
-      // Коды сервера — человеческими словами.
-      const текст = м === "min_sol" ? (куда === "in" ? `Минимум ${(счёт && счёт.minSol) || 0.12} SOL` : `Минимум $${Math.ceil(0.13 * ((счёт && счёт.solPrice) || 0) * 1.03)}`)
-        : м === "not_enough" ? "Не хватает SOL в кошельке"
-        : м === "network_mismatch" ? "Сеть кошелька и биржи не совпадает"
-        : м === "wallet_busy" ? "Кошелёк занят другой операцией"
-        : м || "Не прошло";
-      haptic("error"); showToast && showToast(текст.slice(0, 120));
-    } finally { setИдёт(false); }
-  }
-  const кош = счёт && счёт.wallet;
-  const максSOL = кош ? Math.max(0, Math.floor((кош.sol - 0.003) * 1e4) / 1e4) : 0;
+
   const тело = (
     <div className={вкладка ? "fx-view" : "fx-sheet-in no-scrollbar"} style={вкладка ? { padding: "8px 16px 40px" } : { position: "fixed", inset: 0, zIndex: 455, background: T.bg, overflowY: "auto", overscrollBehavior: "contain",
       padding: `calc(${insetTop}px + 10px) 16px calc(${insetBottom}px + 40px)` }}>
@@ -15933,43 +15914,13 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
         ) : (
           <>
             <ЗаголовокРаздела>Биржа</ЗаголовокРаздела>
-            {/* Торговый счёт: деньги на бирже и перевод туда-обратно. */}
-            <div className="flex flex-col" style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface }}>
-              <div className="flex items-center justify-between">
-                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800 }}>Торговый счёт{сеть === "testnet" ? " · тест" : ""}</span>
-                <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 20, fontWeight: 700 }}>{счёт ? `$${счёт.equity.toFixed(2)}` : "—"}</span>
-              </div>
-              <button onClick={() => { haptic("light"); setПополнение((v) => !v); }} className="fx-tap w-full" style={{ height: 46, borderRadius: 14, border: "none", background: T.ice, color: T.bg, fontFamily: displayFont, fontSize: 15, fontWeight: 800 }}>
-                Пополнить или вывести
-              </button>
-              {зачисляется && (
-                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 800 }}>Зачисляем пополнение…</span>
-              )}
-              {пополнение && счёт && (
-                <div className="fx-step-in flex flex-col" style={{ gap: 10 }}>
-                  {/* Деньги ходят через SOL кошелька приложения: туда — SOL
-                      становится долларами на бирже, обратно — наоборот. */}
-                  <div className="flex" style={{ gap: 4, padding: 4, borderRadius: 14, background: T.bg }}>
-                    {[["in", "Пополнить"], ["out", "Вывести"]].map(([к, подпись]) => (
-                      <button key={к} onClick={() => { haptic("light"); setКуда(к); setСколько(""); }} className="fx-tap flex-1"
-                        style={{ height: 38, borderRadius: 11, border: "none", fontFamily: displayFont, fontSize: 14.5, fontWeight: 800,
-                          background: куда === к ? T.ice : "transparent", color: куда === к ? T.bg : T.muted }}>{подпись}</button>
-                    ))}
-                  </div>
-                  <div className="flex items-center" style={{ gap: 8, padding: "12px 14px", borderRadius: 14, background: T.bg }}>
-                    {куда === "out" && <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 20, fontWeight: 800 }}>$</span>}
-                    <input value={сколько} onChange={(e) => setСколько(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" placeholder="0"
-                      style={{ fontFamily: displayFont, fontWeight: 800, color: T.ice, fontSize: 20, background: "transparent", border: "none", outline: "none", flex: 1, minWidth: 0 }} />
-                    <button onClick={() => { haptic("light"); setСколько(String(куда === "in" ? максSOL : Math.floor(счёт.withdrawable * 100) / 100)); }} className="fx-tap"
-                      style={{ border: "none", background: "transparent", fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 700 }}>
-                      {куда === "in" ? `${максSOL} SOL` : `$${счёт.withdrawable.toFixed(2)}`}
-                    </button>
-                  </div>
-                  <button onClick={перевести} disabled={идёт || !кош} className="fx-tap w-full" style={{ height: 46, borderRadius: 14, border: "none", background: T.ice, color: T.bg, fontFamily: displayFont, fontSize: 15, fontWeight: 800, opacity: идёт ? 0.6 : 1 }}>
-                    {идёт ? "…" : куда === "in" ? `Пополнить${parseAmount(сколько) > 0 && счёт.solPrice ? ` ≈ $${(parseAmount(сколько) * счёт.solPrice).toFixed(2)}` : ""}` : "Вывести в кошелёк"}
-                  </button>
-                </div>
-              )}
+            {/* Отдельного счёта у человека нет: сделки берут деньги с карты
+                приложения, закрытие последней позиции возвращает их туда же. */}
+            <div className="flex items-center justify-between" style={{ padding: "14px 16px", borderRadius: 16, background: T.surface }}>
+              <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800 }}>
+                {счёт && счёт.pending ? "Пополняем с карты…" : `Доступно${сеть === "testnet" ? " · тест" : ""}`}
+              </span>
+              <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 20, fontWeight: 700 }}>{счёт ? `$${(счёт.withdrawable + (счёт.walletUsd || 0)).toFixed(2)}` : "—"}</span>
             </div>
             <div className="flex" style={{ gap: 8, flexWrap: "wrap" }}>
               {есть.map(([к, подпись]) => (
