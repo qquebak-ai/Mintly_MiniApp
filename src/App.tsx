@@ -5703,7 +5703,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
   /* Текущее состояние живой свечи: куда дошло тело и как далеко успели
      уйти тени. Держим в ref, а не в состоянии: это кадры, а не данные,
      и перерисовка идёт через canvas. */
-  const живаяСвеча = useRef({ time: null, cur: null, hi: null, lo: null });
+  const живаяСвеча = useRef({ time: null, cur: null, hi: null, lo: null, новая: false });
   // Где нарисованы стрелки своих сделок и какая из них открыта нажатием.
   const стрелкиRef = useRef([]);
   const [открытаяСтрелка, setОткрытаяСтрелка] = useState(null);
@@ -5982,10 +5982,16 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     const ж = живаяСвеча.current;
     if (посл && Number.isFinite(посл.close)) {
       if (ж.time !== посл.time || ж.cur == null) {
+        /* Новая свеча посреди просмотра (сделка открыла следующий
+           период) растёт из своего открытия, а не встаёт целиком в один
+           кадр: так она и появлялась — резко, когда соседние тянулись
+           плавно. При первом показе графика анимировать нечего. */
+        const растёт = ж.time != null && Number.isFinite(посл.open) && посл.open !== посл.close;
         ж.time = посл.time;
-        ж.cur = посл.close;
-        ж.hi = посл.high;
-        ж.lo = посл.low;
+        ж.новая = растёт;
+        ж.cur = растёт ? посл.open : посл.close;
+        ж.hi = растёт ? посл.open : посл.high;
+        ж.lo = растёт ? посл.open : посл.low;
       } else {
         const цель = посл.close;
         const шаг = (цель - ж.cur) * 0.22;
@@ -5997,8 +6003,15 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
         // Тени — только настоящие: их ставят сделки, а не то, где
         // пробегало тело по дороге к новой цене. Дорисованный фитиль —
         // это выдуманное движение, которого не было.
-        ж.hi = посл.high;
-        ж.lo = посл.low;
+        if (ж.новая && ж.cur !== цель) {
+          // Пока новая свеча растёт, тени идут за телом.
+          ж.hi = Math.max(посл.open, ж.cur);
+          ж.lo = Math.min(посл.open, ж.cur);
+        } else {
+          ж.новая = false;
+          ж.hi = посл.high;
+          ж.lo = посл.low;
+        }
       }
     }
     clampView();
@@ -24108,6 +24121,36 @@ function useПулБиржи(token, активно = true) {
   return пул;
 }
 
+/* Остатки кошелька во всех сетях строкой фишек — для окна сделки. Сеть
+   сделки выделена; числа из общей памяти (useОстаток), без своих
+   запросов: их и так держит кошелёк. */
+function БалансыСетей({ текущая }) {
+  const ряд = [
+    ["sol", "SOL", "/coins/sol.png", useОстаток("sol", false)],
+    ["ton", ТИКЕР_TON, "/coins/gram.png", useОстаток("ton", false)],
+    ["bsc", "BNB", "/coins/bnb.svg", useОстаток("bsc", false)],
+    ["base", "ETH", "/coins/base.svg", useОстаток("base", false)],
+    ["eth", "ETH", "/coins/eth.svg", useОстаток("eth", false)],
+  ].filter(([к, , , v]) => к === текущая || (v != null && v > 0));
+  return (
+    <div className="no-scrollbar flex" style={{ gap: 6, overflowX: "auto" }}>
+      {ряд.map(([к, монета, лого, v]) => (
+        <span key={к} className="flex items-center flex-shrink-0" style={{
+          gap: 6, padding: "6px 10px 6px 6px", borderRadius: 999,
+          background: к === текущая ? hexA(T.ice, 0.1) : "transparent",
+          boxShadow: к === текущая ? "none" : `inset 0 0 0 1px ${T.line}`,
+        }}>
+          <img src={лого} alt="" width={18} height={18} style={{ borderRadius: "50%" }} />
+          <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 12.5, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+            {v == null ? <РазмытаяСумма образец="0,00" /> : v.toLocaleString("ru-RU", { maximumFractionDigits: v >= 100 ? 1 : 3 })}
+          </span>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12 }}>{монета}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, tonPriceUsd = 0, heldAmount = null, curveState = null }) {
   // Курс SOL нужен только окну сделки по токену Solana — там он один раз
   // пересчитывает введённую сумму в примерное количество токенов.
@@ -24504,24 +24547,47 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           </div>
         </div>
 
-        <div className="flex rounded-[20px] p-1" style={{ background: T.bg, border: "none" }}>
+        {/* Балансы кошелька во всех сетях — рядом с окном: видно, чем
+            платить здесь и что лежит в других сетях. */}
+        <БалансыСетей текущая={соло ? "sol" : "ton"} />
+
+        {/* Покупка и продажа — один ползунок: светлая плашка переезжает
+           на выбранную сторону. Без зелёного и красного: окно спокойное,
+           сторону и так видно по плашке и по кнопке внизу. */}
+        <div className="flex rounded-[20px] p-1" style={{ position: "relative", background: T.bg, border: "none", marginTop: 12 }}>
+          <span aria-hidden style={{
+            position: "absolute", top: 4, bottom: 4, left: 4, width: "calc(50% - 4px)", borderRadius: 16,
+            background: T.ice, transform: mode === "sell" ? "translateX(100%)" : "none",
+            transition: "transform 320ms cubic-bezier(0.34, 1.3, 0.64, 1)",
+          }} />
           {[{ id: "buy", label: t("buy") }, { id: "sell", label: t("sell") }].map(o => {
             const active = mode === o.id;
             return (
               <button key={o.id}
-                onClick={() => { setMode(o.id); setAmountStr(""); setВспышка(o.id); }}
-                onAnimationEnd={() => setВспышка(null)}
-                className={`fx-tap flex-1 rounded-[16px] py-2${вспышка === o.id ? (o.id === "buy" ? " fx-flash-up" : " fx-flash-down") : ""}`}
+                onClick={() => { haptic("light"); setMode(o.id); setAmountStr(""); }}
+                className="fx-tap flex-1 rounded-[16px] py-2"
                 style={{
+                  position: "relative", zIndex: 1, background: "transparent", border: "none",
                   fontFamily: displayFont, fontWeight: 700, fontSize: 14.5,
-                  /* Выбранная сторона носит свой цвет: покупка — зелёный
-                     свечи, продажа — красный. Фиолетовый с серым читались
-                     как «кнопка и выключенная кнопка», а не как два
-                     противоположных действия. */
-                  background: active ? (o.id === "buy" ? T.up : T.down) : "transparent",
-                  color: active ? (o.id === "buy" ? "#06210F" : "#FFFFFF") : T.muted,
+                  color: active ? T.bg : T.muted, transition: "color 220ms ease",
                 }}>
                 {o.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Как исполнить: мгновенно — самой быстрой дорогой, по рынку —
+           с выбранной ниже скоростью. */}
+        <div className="flex" style={{ gap: 6, marginTop: 10 }}>
+          {[["instant", "Мгновенно", Zap], ["market", "По рынку", null]].map(([к, подпись, Иконка]) => {
+            const вкл = (к === "instant") === (скорость === "turbo");
+            return (
+              <button key={к} type="button"
+                onClick={() => { haptic("light"); const v = к === "instant" ? "turbo" : "fast"; setСкорость(v); запомнитьСкорость(v); }}
+                className="fx-tap flex items-center"
+                style={{ gap: 5, padding: "7px 12px", borderRadius: 999, border: "none", background: вкл ? hexA(T.ice, 0.12) : "transparent", color: вкл ? T.ice : T.muted, fontFamily: bodyFont, fontSize: 13, fontWeight: 700 }}>
+                {Иконка && <Иконка size={13} />}{подпись}
               </button>
             );
           })}
@@ -24666,12 +24732,11 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
              движением, что и карточка баланса. Покупка греется зелёным,
              продажа красным: ещё до прочтения надписи видно, что сейчас
              произойдёт. */
-          background: canConfirm ? (isBuy ? ГРАДИЕНТ_РОСТА : ГРАДИЕНТ_ПАДЕНИЯ) : T.surfaceHi,
-          backgroundSize: canConfirm ? "220% 220%" : undefined,
-          animation: canConfirm ? "кнопкаПереливается 5.5s ease-in-out infinite" : undefined,
-          color: canConfirm ? (isBuy ? "#06210F" : "#FFFFFF") : T.muted,
+          // Спокойная светлая кнопка вместо зелёно-красных переливов.
+          background: canConfirm ? T.ice : T.surfaceHi,
+          color: canConfirm ? T.bg : T.muted,
           opacity: canConfirm ? 1 : 0.6,
-          boxShadow: canConfirm ? `0 10px 26px ${isBuy ? hexA(T.up, 0.32) : hexA(T.down, 0.28)}` : "none",
+          transition: "background 220ms ease, color 220ms ease",
         }}>
           {amount > 0
             ? (isBuy
