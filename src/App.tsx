@@ -15,6 +15,7 @@ import { useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { Address, beginCell, toNano } from "@ton/core";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { supabase } from "./supabaseClient";
+import { ФонШёлк } from "./шёлк";
 import { апи, запрос } from "./апи";
 import { остаток as остатокКошелька, сыройОстаток as сыройОстатокКошелька, следитьЗаОстатками, записатьОстатки } from "./остатки";
 import { ДЕМО_ТОКЕНЫ, логоДемо } from "../api/_demoTokens.js";
@@ -2384,10 +2385,6 @@ function GlobalStyle() {
       }
       /* Шкала скорости тарифа наливается слева направо. */
       @keyframes тарифНаливается { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-      /* Шёлк за тарифами: ленты света покачиваются, у Turbo ещё и
-         перебирают оттенки. */
-      @keyframes шёлкКачается { 0%,100% { transform: translate(-6%, 0) rotate(-16deg); } 50% { transform: translate(6%, 4%) rotate(-10deg); } }
-      @keyframes шёлкРадуга { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
       @keyframes кнопкаПереливается {
         0%   { background-position: 0% 50%; }
         50%  { background-position: 100% 50%; }
@@ -26348,41 +26345,6 @@ function ПолосаТарифов({ активный }) {
   );
 }
 
-/* Фон тарифа — тот же шёлк, что на приветствии сайта: мягкие ленты света
-   медленно качаются за текстом. Цвет — тариф: Free серый, Pro зелёный,
-   Turbo переливается всеми цветами. Три слоя лежат друг на друге и
-   сменяются прозрачностью, поэтому при листании цвет перетекает, а не
-   щёлкает. Лёгкий CSS вместо холста сайта: на телефоне он не греет. */
-const ШЁЛК_ТАРИФА = {
-  free: ["#3A3A3A", "#9A9A9A", "#DADADA"],
-  pro: ["#0B5A2C", "#2ED47A", "#B7F5CF"],
-  turbo: ["#B79CFF", "#5BE0C8", "#FFB86B", "#FF6FB5", "#6C7CFF"],
-};
-function ШёлкТарифа({ ключ }) {
-  return (
-    <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: -1, overflow: "hidden", pointerEvents: "none" }}>
-      {Object.entries(ШЁЛК_ТАРИФА).map(([к, ц]) => (
-        <div key={к} style={{
-          position: "absolute", inset: 0, opacity: к === ключ ? 1 : 0, transition: "opacity 700ms ease",
-          ...(к === "turbo" ? { animation: "шёлкРадуга 9s linear infinite" } : null),
-        }}>
-          {[0, 1, 2].map((н) => (
-            <div key={н} style={{
-              position: "absolute", left: "-40%", width: "180%", height: н === 1 ? "26%" : "18%", top: `${18 + н * 17}%`,
-              borderRadius: "50%",
-              background: `linear-gradient(90deg, transparent 5%, ${ц[н % ц.length]} 30%, ${ц[(н + 1) % ц.length]} 55%, ${ц[(н + 2) % ц.length]} 75%, transparent 95%)`,
-              opacity: н === 1 ? 0.55 : 0.35, filter: "blur(38px)",
-              animation: `шёлкКачается ${13 + н * 4}s ease-in-out ${-н * 3}s infinite`,
-            }} />
-          ))}
-        </div>
-      ))}
-      {/* К низу шёлк уходит в фон: там кнопка, и текст на ней должен читаться. */}
-      <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${hexA(T.bg, 0.15)} 0%, ${hexA(T.bg, 0)} 35%, ${hexA(T.bg, 0.55)} 72%, ${T.bg} 92%)` }} />
-    </div>
-  );
-}
-
 const СЕТИ_ТАРИФА = [["solana", "Solana"], ["ton", "TON"], ["bsc", "BNB Chain"], ["base", "Base"], ["eth", "Ethereum"]];
 
 function ДоплатаТарифа(таблица, сеть, скорость, ru) {
@@ -26432,7 +26394,9 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
 
   return (
     <div className="flex flex-col" style={{ gap: 26 }}>
-      <ШёлкТарифа ключ={шаг.key} />
+      {/* За тарифом — шёлк с приветствия сайта, один в один, только в
+          цвете тарифа: Free серый, Pro зелёный, Turbo переливается. */}
+      <ФонШёлк вОкне тон={шаг.key === "free" ? null : шаг.key} />
       <ПолосаТарифов активный={шаг} />
       <div className="flex items-center" style={{ gap: 6 }}>
         {ТАРИФЫ_ЭКРАНА.map((т, i) => (
