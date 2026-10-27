@@ -9121,17 +9121,10 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index, вЦе�
       // Задержка появления копится только на первых строках: при сорока
       // элементах список иначе разворачивался бы полторы секунды.
       style={{
-        padding: вЦентре ? "13px 12px" : "13px 2px",
-        /* Токен из «В центре внимания» светится в ленте тем же
-           фирменным переливом, что и главная кнопка: его видно сразу,
-           не листая к витрине. */
-        ...(вЦентре ? {
-          backgroundImage: `linear-gradient(110deg, ${hexA("#B79CFF", 0.18)}, ${hexA("#5BE0C8", 0.12)} 55%, ${hexA("#FFB86B", 0.14)})`,
-          backgroundSize: "220% 220%",
-          animation: "кнопкаПереливается 7s ease-in-out infinite",
-          borderRadius: 20, margin: "4px 0",
-          boxShadow: `inset 0 0 0 1px ${hexA("#B79CFF", 0.32)}`,
-        } : { background: "transparent", borderBottom: `1px solid ${T.line}`, animationDelay: `${Math.min(index, 6) * 22}ms` }),
+        /* Без плашек и свечений: строка прямо на чёрном. Перелив под
+           токенами «В центре внимания» превращал ленту в стопку карточек
+           и спорил с текстом. */
+        padding: "13px 2px", background: "transparent", borderBottom: `1px solid ${T.line}`, animationDelay: `${Math.min(index, 6) * 22}ms`,
       }}
     >
       <div className="flex items-center" style={{ gap: 14 }}>
@@ -9978,8 +9971,6 @@ function ЛистДоЛистинга({ данные: данныеProp, onClose 
         <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, textAlign: "center", marginTop: 2 }}>${д.тикер} · {д.биржа}</div>
 
         <div style={{ position: "relative", width: 2 * (R + ТОЛЩ), height: 2 * (R + ТОЛЩ), margin: "18px auto 10px" }}>
-          {/* Свечение под кольцом дышит — так видно, что цифры живые. */}
-          <span aria-hidden style={{ position: "absolute", inset: 18, borderRadius: "50%", background: `radial-gradient(circle, ${hexA(T.electric, 0.35)} 0%, transparent 70%)`, animation: "листДыхание 3.2s ease-in-out infinite" }} />
           <svg width={2 * (R + ТОЛЩ)} height={2 * (R + ТОЛЩ)} style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)", overflow: "visible" }} aria-hidden>
             <defs>
               <linearGradient id="листДуга" x1="0" y1="0" x2="1" y2="1">
@@ -12861,10 +12852,9 @@ function КартаКурсаМонеты({ title, монета, onOpen = null }
       style={{
         cursor: onOpen ? "pointer" : undefined,
         position: "relative", overflow: "hidden", height: 132, padding: 14, display: "flex", flexDirection: "column",
-        // Фон в стиле кошелька: графитовая плитка с тонкой кромкой и
-        // мягким отсветом цвета рынка снизу — вместо цветных клеток,
-        // которые спорили с балансом над ними.
-        background: `radial-gradient(120% 80% at 50% 120%, ${hexA(цвет, 0.16)} 0%, ${hexA(цвет, 0)} 70%), ${T.surface}`,
+        // Графитовая плитка с тонкой кромкой, без отсвета: свечение под
+        // цифрами спорило с ними.
+        background: T.surface,
         border: "1px solid rgba(255,255,255,0.07)",
       }}
     >
@@ -15609,23 +15599,17 @@ function useУведомленияПодключены() {
    одной, с небольшим сдвигом: экран собирается, а не выпрыгивает. */
 function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} }) {
   const уведомления = useУведомленияПодключены();
-  /* Не серые плашки, а подсвеченные изнутри карточки: у каждой свой
-     цвет (Telegram, X, бот), он светится от значка и тает к краю по
-     чёрному, а край — тонкая линия того же цвета. Подписей серым нет:
-     название и кнопка говорят всё сами. */
-  const широкий = (ключ, i, { заголовок, кнопка, Значок, цвет, onClick, скоро = false }) => (
+  /* Строки прямо на чёрном, без плашек и свечений за текстом: цвет
+     несёт только значок, а действие — кнопка справа. Плашки со
+     свечением спорили с текстом и делали главную пёстрой. */
+  const строка = (ключ, i, { заголовок, кнопка, Значок, цвет, onClick, скоро = false }) => (
     <button
       key={ключ}
       onClick={скоро ? undefined : () => { haptic("light"); onClick(); }}
       className="fx-tap fx-card w-full flex items-center text-left"
-      style={{
-        gap: 14, padding: "18px 16px", borderRadius: 24, border: "none",
-        background: `radial-gradient(130% 160% at 0% 50%, ${hexA(цвет, 0.2)}, ${hexA(цвет, 0)} 58%), ${T.bg}`,
-        boxShadow: `inset 0 0 0 1px ${hexA(цвет, 0.22)}`,
-        animationDelay: `${i * 60}ms`,
-      }}
+      style={{ gap: 14, padding: "12px 0", border: "none", background: "transparent", animationDelay: `${i * 50}ms` }}
     >
-      <span className="flex items-center justify-center flex-shrink-0" style={{ width: 48, height: 48, borderRadius: 999, background: hexA(цвет, 0.16), boxShadow: `0 0 24px ${hexA(цвет, 0.35)}` }}>
+      <span className="flex items-center justify-center flex-shrink-0" style={{ width: 48, height: 48, borderRadius: 16, background: hexA(цвет, 0.14) }}>
         <Значок size={22} color={цвет} />
       </span>
       <span style={{ flex: 1, minWidth: 0, fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800, letterSpacing: "-0.01em" }}>{заголовок}</span>
@@ -15636,37 +15620,17 @@ function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} })
       }}>{скоро ? "Скоро" : кнопка}</span>
     </button>
   );
-  const плитка = (ключ, i, { заголовок, Значок, цвет, onClick }) => (
-    <button
-      key={ключ}
-      onClick={() => { haptic("light"); onClick(); }}
-      className="fx-tap fx-card flex flex-col justify-between text-left"
-      style={{
-        flex: 1, minWidth: 0, minHeight: 132, padding: 18, borderRadius: 24, border: "none",
-        background: `radial-gradient(120% 120% at 0% 0%, ${hexA(цвет, 0.24)}, ${hexA(цвет, 0)} 62%), ${T.bg}`,
-        boxShadow: `inset 0 0 0 1px ${hexA(цвет, 0.22)}`,
-        animationDelay: `${i * 60}ms`,
-      }}
-    >
-      <span className="flex items-center justify-center" style={{ width: 46, height: 46, borderRadius: 16, background: hexA(цвет, 0.16) }}>
-        <Значок size={24} color={цвет} />
-      </span>
-      <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 19, fontWeight: 800, letterSpacing: "-0.01em" }}>{заголовок}</span>
-    </button>
-  );
   return (
-    <section className="flex flex-col" style={{ gap: 12 }}>
-      {широкий("канал", 0, { заголовок: "Канал Mintly", кнопка: "Открыть", Значок: Send, цвет: "#2AABEE", onClick: () => открытьТелеграм(КАНАЛ_MINTLY), скоро: !КАНАЛ_MINTLY })}
-      {широкий("x", 1, { заголовок: "Mintly в X", кнопка: "Открыть", Значок: ЗнакX, цвет: "#FFFFFF", onClick: () => {
+    <section className="flex flex-col" style={{ gap: 2 }}>
+      {строка("запуск", 0, { заголовок: "Запустить токен", кнопка: "Создать", Значок: Rocket, цвет: "#B79CFF", onClick: onGoCreate })}
+      {строка("мемпад", 1, { заголовок: "Мемпад", кнопка: "Открыть", Значок: ЗначокОбмен, цвет: T.up, onClick: () => onGoTab("mempad") })}
+      {строка("канал", 2, { заголовок: "Канал Mintly", кнопка: "Открыть", Значок: Send, цвет: "#2AABEE", onClick: () => открытьТелеграм(КАНАЛ_MINTLY), скоро: !КАНАЛ_MINTLY })}
+      {строка("x", 3, { заголовок: "Mintly в X", кнопка: "Открыть", Значок: ЗнакX, цвет: "#FFFFFF", onClick: () => {
         try { const tg = window.Telegram && window.Telegram.WebApp; if (tg && tg.openLink) tg.openLink(X_MINTLY); else window.open(X_MINTLY, "_blank"); } catch { /* ссылка не открылась */ }
       } })}
-      {широкий("бот", 2, уведомления
+      {строка("бот", 4, уведомления
         ? { заголовок: "Уведомления", кнопка: "Настроить", Значок: Bell, цвет: "#F5C04E", onClick: () => открытьТелеграм(БОТ_MINTLY.replace("?start=app", "")) }
         : { заголовок: "Уведомления", кнопка: "Подключить", Значок: Bell, цвет: "#F5C04E", onClick: подключитьУведомления })}
-      <div className="flex" style={{ gap: 12 }}>
-        {плитка("запуск", 3, { заголовок: "Запустить", Значок: Rocket, цвет: "#B79CFF", onClick: onGoCreate })}
-        {плитка("мемпад", 4, { заголовок: "Мемпад", Значок: ЗначокОбмен, цвет: T.up, onClick: () => onGoTab("mempad") })}
-      </div>
     </section>
   );
 }
@@ -21388,7 +21352,6 @@ function ЭкранПереезда({ token, пулЕсть, готово, onBac
           <ChevronLeft size={18} />
         </button>
       )}
-      <span aria-hidden style={{ position: "absolute", width: 420, height: 420, borderRadius: "50%", background: `radial-gradient(circle, ${hexA("#B79CFF", 0.28)}, ${hexA("#5BE0C8", 0.1)} 45%, transparent 70%)`, animation: "переездСвет 4s ease-in-out infinite" }} />
       <div style={{ position: "relative", width: 236, height: 236, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {[236, 184].map((d, i) => (
           <span key={d} aria-hidden style={{
@@ -26359,31 +26322,33 @@ const ГРУППЫ_НАСТРОЕК = [
 /* Настройка быстрой сделки: выключатель «в 1 клик» и три суммы на
    покупку в каждой монете, три доли на продажу. Те же кнопки с
    карандашом, что и в окне сделки: правка здесь видна и там. */
-/* Тарифы — как подписки у нейросетей: три карточки листаются вбок, а
- * над ними те же три полоски, что у шагов запуска, — широкая там, где
- * ты сейчас. Шкала скорости в карточке наливается при каждом показе:
- * разница между тарифами — это и есть скорость, её и показываем. Цены
- * в долларах, платится SOL с кошелька приложения по курсу на миг
- * оплаты; что даёт тариф, решает сервер (api/_speed.js), а не экран. */
+/* Тарифы — как подписки у нейросетей. Сверху переключатель на три
+ * тарифа с ползущей плашкой, под ним цена и три шкалы скорости разом:
+ * выбранная наливается, остальные приглушены — разницу видно сравнением,
+ * а не словами. Без карточек и свечений за текстом: всё прямо на чёрном.
+ * Кнопка оплаты стоит отдельно, внизу экрана, как у магазинов
+ * приложений. Платится SOL с кошелька приложения по курсу на миг оплаты;
+ * что даёт тариф, решает сервер (api/_speed.js), а не экран. */
 const ТАРИФЫ_ЭКРАНА = [
-  { key: "free", имя: "Free", цена: 0, скорость: 0.34, цвет: "#8E8E93",
-    ru: ["Обычная скорость бесплатно", "Наценка за «Быстро» и «Молнию»", "Все сети и запуск токенов"],
-    en: ["Standard speed for free", "Markup on Fast and Lightning", "All chains and token launches"] },
-  { key: "pro", имя: "Pro", цена: 9, скорость: 0.68, цвет: "#6C7CFF",
-    ru: ["«Быстро» без наценки", "«Молния» за полцены", "Лимитные заявки первыми в очереди"],
-    en: ["Fast with no markup", "Lightning at half price", "Limit orders first in line"] },
-  { key: "turbo", имя: "Turbo", цена: 29, скорость: 1, цвет: "#B79CFF",
-    ru: ["«Молния» без наценки", "Самая короткая дорога в сеть", "Самая быстрая скорость Mintly"],
-    en: ["Lightning with no markup", "Shortest route to the chain", "The fastest speed on Mintly"] },
+  { key: "free", имя: "Free", цена: 0, скорость: 0.34, цвет: "#C7C7CC",
+    ru: { слоган: "Всё, чтобы начать.", пункты: ["Обычная скорость сделок", "Все сети и запуск токенов", "Наценка за «Быстро» и «Молнию»"] },
+    en: { слоган: "Everything to get started.", пункты: ["Standard trade speed", "All chains and token launches", "Markup on Fast and Lightning"] } },
+  { key: "pro", имя: "Pro", цена: 9, скорость: 0.68, цвет: "#8F9CFF",
+    ru: { слоган: "Для тех, кто торгует каждый день.", пункты: ["«Быстро» без наценки", "«Молния» за полцены", "Лимитные заявки первыми в очереди"] },
+    en: { слоган: "For people who trade every day.", пункты: ["Fast with no markup", "Lightning at half price", "Limit orders first in line"] } },
+  { key: "turbo", имя: "Turbo", цена: 29, скорость: 1, цвет: "#B79CFF", метка: true,
+    ru: { слоган: "Первым в каждом запуске.", пункты: ["«Молния» без наценки", "Самая короткая дорога в сеть", "Всё, что есть в Pro"] },
+    en: { слоган: "First into every launch.", пункты: ["Lightning with no markup", "The shortest route to the chain", "Everything in Pro"] } },
 ];
 
-function СтраницаТарифа({ showToast }) {
+function СтраницаТарифа({ showToast, insetBottom = 0 }) {
   const ru = lang !== "EN";
   const [план, setПлан] = useState(null);
   const [до, setДо] = useState(null);
-  const [индекс, setИндекс] = useState(0);
+  // Открываем сразу на Turbo: его и показываем первым, как витрину.
+  const [индекс, setИндекс] = useState(2);
   const [платим, setПлатим] = useState(null);
-  const лента = useRef(null);
+  const жест = useRef(null);
 
   async function ключ() {
     const { data } = await supabase.auth.getSession();
@@ -26401,28 +26366,31 @@ function СтраницаТарифа({ showToast }) {
         const п = (j && j.plan) || "free";
         setПлан(п);
         setДо(j && j.until);
-        // Открываем на своём тарифе, а не на первом.
-        const i = Math.max(0, ТАРИФЫ_ЭКРАНА.findIndex((т) => т.key === п));
-        if (i && лента.current) лента.current.scrollTo({ left: i * лента.current.clientWidth, behavior: "auto" });
-        setИндекс(i);
+        // Уже платит — показываем его тариф, а не витрину.
+        if (п !== "free") setИндекс(Math.max(0, ТАРИФЫ_ЭКРАНА.findIndex((т) => т.key === п)));
       } catch { if (живо) setПлан("free"); }
     })();
     return () => { живо = false; };
   }, []);
 
-  function прокрутка() {
-    const el = лента.current;
-    if (!el) return;
-    const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
-    if (i !== индекс) { setИндекс(i); haptic("light"); }
+  function выбрать(i) {
+    const и = Math.max(0, Math.min(ТАРИФЫ_ЭКРАНА.length - 1, i));
+    if (и === индекс) return;
+    haptic("light");
+    setИндекс(и);
   }
-  function к(i) {
-    const el = лента.current;
-    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
-  }
+  // Смах вбок по экрану листает тарифы — тем же движением, что и карусель.
+  const началоЖеста = (e) => { const т = e.touches && e.touches[0]; if (т) жест.current = { x: т.clientX, y: т.clientY }; };
+  const конецЖеста = (e) => {
+    const ж = жест.current; жест.current = null;
+    const т = e.changedTouches && e.changedTouches[0];
+    if (!ж || !т) return;
+    const dx = т.clientX - ж.x, dy = т.clientY - ж.y;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) выбрать(индекс + (dx < 0 ? 1 : -1));
+  };
 
   async function купить(т) {
-    if (платим) return;
+    if (платим || т.key === "free") return;
     haptic("medium");
     setПлатим(т.key);
     try {
@@ -26450,98 +26418,121 @@ function СтраницаТарифа({ showToast }) {
     }
   }
 
+  const т = ТАРИФЫ_ЭКРАНА[индекс];
+  const текст = ru ? т.ru : т.en;
+  const свой = план === т.key;
   const срок = до ? new Date(до).toLocaleDateString(ru ? "ru-RU" : "en-US", { day: "numeric", month: "long" }) : null;
+  const кнопка = платим === т.key ? null
+    : т.key === "free" ? (свой ? (ru ? "Это твой тариф" : "Your current plan") : (ru ? "Бесплатно" : "Free"))
+      : свой ? (ru ? "Продлить на 30 дней" : "Extend 30 days")
+        : (ru ? `Перейти на ${т.имя} — $${т.цена}` : `Get ${т.имя} — $${т.цена}`);
+  const подпись = свой && срок && т.key !== "free"
+    ? (ru ? `Действует до ${срок}` : `Active until ${срок}`)
+    : т.key === "free" ? (ru ? "Навсегда, без оплаты" : "Forever, no payment")
+      : (ru ? "Оплата в SOL · 30 дней · без автосписания" : "Paid in SOL · 30 days · no auto-renewal");
 
   return (
-    <div className="flex flex-col" style={{ gap: 16 }}>
-      <div className="flex items-center justify-center" style={{ gap: 6 }}>
-        {ТАРИФЫ_ЭКРАНА.map((т, i) => (
-          <button key={т.key} aria-label={т.имя} onClick={() => к(i)} style={{
-            height: 4, borderRadius: 2, width: i === индекс ? 22 : 8, padding: 0, border: "none",
-            background: i <= индекс ? T.ice : T.lineHi,
-            transition: "width 420ms cubic-bezier(0.34, 1.4, 0.64, 1), background 300ms ease",
-          }} />
+    <div className="flex flex-col" style={{ gap: 28 }} onTouchStart={началоЖеста} onTouchEnd={конецЖеста}>
+      {/* Переключатель: светлая плашка переезжает под выбранный тариф —
+          та же пружина, что у шагов запуска. */}
+      <div style={{ position: "relative", display: "flex", padding: 4, borderRadius: 999, background: T.surface }}>
+        <span aria-hidden style={{
+          position: "absolute", top: 4, bottom: 4, left: 4, width: `calc((100% - 8px) / 3)`, borderRadius: 999, background: T.ice,
+          transform: `translateX(${индекс * 100}%)`, transition: "transform 420ms cubic-bezier(0.34, 1.3, 0.64, 1)",
+        }} />
+        {ТАРИФЫ_ЭКРАНА.map((в, i) => (
+          <button key={в.key} onClick={() => выбрать(i)} className="fx-tap" style={{
+            position: "relative", flex: 1, height: 42, border: "none", background: "transparent",
+            fontFamily: displayFont, fontSize: 15, fontWeight: 800,
+            color: i === индекс ? T.bg : T.muted, transition: "color 240ms ease",
+          }}>
+            {в.имя}
+            {план === в.key && <span aria-hidden style={{ position: "absolute", top: 9, marginLeft: 4, width: 6, height: 6, borderRadius: "50%", background: i === индекс ? T.bg : T.up }} />}
+          </button>
         ))}
       </div>
-      <div
-        ref={лента}
-        onScroll={прокрутка}
-        className="no-scrollbar flex"
-        style={{ overflowX: "auto", scrollSnapType: "x mandatory", margin: "0 -16px", overscrollBehaviorX: "contain" }}
-      >
-        {ТАРИФЫ_ЭКРАНА.map((т, i) => {
-          const свой = план === т.key;
-          const виден = i === индекс;
+
+      {/* Имя и цена меняются с коротким въездом — key перезапускает его. */}
+      <div key={т.key} className="fx-step-in flex flex-col" style={{ gap: 6 }}>
+        <div className="flex items-center" style={{ gap: 10 }}>
+          <span style={{ fontFamily: displayFont, fontSize: 20, fontWeight: 800, color: т.цвет }}>{т.имя}</span>
+          {т.метка && (
+            <span style={{ fontFamily: bodyFont, fontSize: 12, fontWeight: 800, color: "#000", background: т.цвет, borderRadius: 999, padding: "3px 9px", letterSpacing: "0.02em" }}>
+              {ru ? "Самый быстрый" : "Fastest"}
+            </span>
+          )}
+        </div>
+        <div className="flex items-baseline" style={{ gap: 8 }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 64, fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>${т.цена}</span>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 16 }}>{ru ? "в месяц" : "/ month"}</span>
+        </div>
+        <span style={{ fontFamily: bodyFont, color: T.ice, fontSize: 16, marginTop: 4 }}>{текст.слоган}</span>
+      </div>
+
+      {/* Три шкалы скорости разом: своя наливается, чужие приглушены. */}
+      <div className="flex flex-col" style={{ gap: 12 }}>
+        <span className="flex items-center" style={{ gap: 6, fontFamily: displayFont, fontSize: 15, fontWeight: 800, color: T.ice }}>
+          <Zap size={15} color={т.цвет} /> {ru ? "Скорость сделки" : "Trade speed"}
+        </span>
+        {ТАРИФЫ_ЭКРАНА.map((в, i) => {
+          const выбран = i === индекс;
           return (
-            <div key={т.key} style={{ flex: "0 0 100%", scrollSnapAlign: "center", padding: "0 16px", boxSizing: "border-box" }}>
-              <div style={{
-                position: "relative", overflow: "hidden", borderRadius: 26, padding: "22px 20px 20px",
-                background: `radial-gradient(120% 80% at 100% 0%, ${hexA(т.цвет, 0.26)} 0%, transparent 60%), ${T.surface}`,
-                boxShadow: `inset 0 0 0 1px ${hexA(т.цвет, свой ? 0.7 : 0.22)}`,
-                transform: виден ? "scale(1)" : "scale(0.96)", transition: "transform 380ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 300ms ease",
-              }}>
-                <div className="flex items-center justify-between">
-                  <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 26, fontWeight: 800 }}>{т.имя}</span>
-                  {свой && (
-                    <span style={{ fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700, color: "#000", background: т.цвет, borderRadius: 999, padding: "4px 10px" }}>
-                      {ru ? "Твой тариф" : "Current"}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-baseline" style={{ gap: 6, marginTop: 10 }}>
-                  <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 44, fontWeight: 800, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>${т.цена}</span>
-                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 15 }}>{ru ? "в месяц" : "/ month"}</span>
-                </div>
-                {/* Шкала наливается заново, когда карточку показывают: key
-                    меняется вместе с видимостью и перезапускает анимацию. */}
-                <div style={{ marginTop: 18 }}>
-                  <div className="flex items-center justify-between" style={{ fontFamily: bodyFont, fontSize: 13.5, color: T.ice, fontWeight: 700 }}>
-                    <span className="flex items-center" style={{ gap: 6 }}><Zap size={14} color={т.цвет} />{ru ? "Скорость" : "Speed"}</span>
-                    <span style={{ fontFamily: monoFont, color: т.цвет }}>{Math.round(т.скорость * 100)}%</span>
-                  </div>
-                  <div style={{ height: 8, borderRadius: 4, background: T.lineHi, marginTop: 8, overflow: "hidden" }}>
-                    <div key={виден ? "в" : "н"} style={{
-                      height: "100%", borderRadius: 4, width: `${т.скорость * 100}%`,
-                      ...ВОЛНА(`linear-gradient(90deg, ${hexA(т.цвет, 0.55)}, ${т.цвет}, #FFFFFF, ${т.цвет})`),
-                      transformOrigin: "left center",
-                      animation: виден ? "тарифНаливается 900ms cubic-bezier(0.22, 1, 0.36, 1) both, кнопкаПереливается 5.5s ease-in-out infinite" : "none",
-                    }} />
-                  </div>
-                </div>
-                <div className="flex flex-col" style={{ gap: 11, marginTop: 20 }}>
-                  {(ru ? т.ru : т.en).map((строка) => (
-                    <span key={строка} className="flex items-center" style={{ gap: 10, fontFamily: bodyFont, fontSize: 15, color: T.ice }}>
-                      <Check size={16} color={т.цвет} strokeWidth={3} />{строка}
-                    </span>
-                  ))}
-                </div>
-                <button
-                  disabled={свой && т.key === "free" || !!платим || план == null}
-                  onClick={() => (т.key === "free" ? null : купить(т))}
-                  className="fx-tap w-full"
-                  style={{
-                    marginTop: 22, height: 52, borderRadius: 999, border: "none",
-                    fontFamily: displayFont, fontSize: 16, fontWeight: 800,
-                    background: т.key === "free" ? T.surfaceHi : "#FFFFFF",
-                    color: т.key === "free" ? T.muted : "#000000",
-                    opacity: платим && платим !== т.key ? 0.5 : 1,
-                  }}
-                >
-                  {платим === т.key ? <ЗнакЗагрузки size={20} всегда />
-                    : т.key === "free" ? (свой ? (ru ? "Включён" : "Active") : (ru ? "Бесплатно" : "Free"))
-                      : свой ? (ru ? "Продлить на 30 дней" : "Extend 30 days")
-                        : (ru ? `Перейти на ${т.имя}` : `Get ${т.имя}`)}
-                </button>
-                {свой && срок && т.key !== "free" && (
-                  <div style={{ fontFamily: bodyFont, fontSize: 13, color: T.muted, textAlign: "center", marginTop: 10 }}>
-                    {ru ? `Действует до ${срок}` : `Active until ${срок}`}
-                  </div>
-                )}
+            <div key={в.key} className="flex items-center" style={{ gap: 12 }}>
+              <span style={{ width: 46, fontFamily: bodyFont, fontSize: 13.5, fontWeight: 700, color: выбран ? T.ice : T.faint, transition: "color 240ms ease" }}>{в.имя}</span>
+              <div style={{ flex: 1, height: 10, borderRadius: 5, background: T.surface, overflow: "hidden" }}>
+                <div key={выбран ? `в${индекс}` : "н"} style={{
+                  height: "100%", borderRadius: 5, width: `${в.скорость * 100}%`, transformOrigin: "left center",
+                  ...(выбран
+                    ? { ...ВОЛНА(`linear-gradient(90deg, ${в.цвет}, #FFFFFF, ${в.цвет})`), animation: "тарифНаливается 800ms cubic-bezier(0.22, 1, 0.36, 1) both, кнопкаПереливается 4s ease-in-out infinite" }
+                    : { background: T.lineHi }),
+                }} />
               </div>
             </div>
           );
         })}
       </div>
+
+      <div key={`п${т.key}`} className="flex flex-col" style={{ gap: 14 }}>
+        {текст.пункты.map((строка, i) => (
+          <span key={строка} className="fx-card flex items-center" style={{ gap: 12, fontFamily: bodyFont, fontSize: 16, color: T.ice, animationDelay: `${i * 50}ms` }}>
+            <span className="flex items-center justify-center flex-shrink-0" style={{ width: 24, height: 24, borderRadius: "50%", background: hexA(т.цвет, 0.18) }}>
+              <Check size={14} color={т.цвет} strokeWidth={3} />
+            </span>
+            {строка}
+          </span>
+        ))}
+      </div>
+
+      {/* Место под кнопку внизу: иначе последний пункт уходил бы под неё. */}
+      <div aria-hidden style={{ height: 96 }} />
+
+      {createPortal(
+        <div style={{
+          position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 461,
+          padding: `16px 16px ${insetBottom + 14}px`,
+          // Растворение в фон, а не свечение: список уходит под кнопку.
+          background: `linear-gradient(to bottom, ${hexA(T.bg, 0)}, ${T.bg} 28%)`,
+        }}>
+          <div className="flex flex-col" style={{ gap: 10, maxWidth: 520, margin: "0 auto" }}>
+            <button
+              disabled={т.key === "free" || !!платим || план == null}
+              onClick={() => купить(т)}
+              className="fx-tap w-full flex items-center justify-center"
+              style={{
+                height: 56, borderRadius: 999, border: "none",
+                fontFamily: displayFont, fontSize: 17, fontWeight: 800,
+                background: т.key === "free" ? T.surface : "#FFFFFF",
+                color: т.key === "free" ? T.muted : "#000000",
+                transition: "background 240ms ease, color 240ms ease",
+              }}
+            >
+              {платим === т.key ? <ЗнакЗагрузки size={22} всегда цвет="#000000" /> : кнопка}
+            </button>
+            <span style={{ fontFamily: bodyFont, fontSize: 13, color: T.muted, textAlign: "center" }}>{подпись}</span>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -27727,7 +27718,7 @@ function SettingsPanel({
       body = <НастройкаБыстрых />;
       break;
     case "tariff":
-      body = <СтраницаТарифа showToast={showToast} />;
+      body = <СтраницаТарифа showToast={showToast} insetBottom={insetBottom} />;
       break;
     case "theme":
       body = (
