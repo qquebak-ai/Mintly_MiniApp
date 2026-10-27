@@ -2384,6 +2384,10 @@ function GlobalStyle() {
       }
       /* Шкала скорости тарифа наливается слева направо. */
       @keyframes тарифНаливается { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+      /* Шёлк за тарифами: ленты света покачиваются, у Turbo ещё и
+         перебирают оттенки. */
+      @keyframes шёлкКачается { 0%,100% { transform: translate(-6%, 0) rotate(-16deg); } 50% { transform: translate(6%, 4%) rotate(-10deg); } }
+      @keyframes шёлкРадуга { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
       @keyframes кнопкаПереливается {
         0%   { background-position: 0% 50%; }
         50%  { background-position: 100% 50%; }
@@ -12307,7 +12311,6 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
                 ? (монетНаКошельке != null ? `На кошельке ${дробь(монетНаКошельке)} ${с.монета}` : "")
                 : (мои.токенов != null ? `На кошельке ${дробь(мои.токенов, 0)} $${токен.ticker}` : "")}
           </div>
-          <ВыборСкорости сеть={сеть} style={{ marginTop: 12 }} />
           <button
             onClick={сделка}
             disabled={идёт || !(числоСуммы > 0)}
@@ -24051,33 +24054,7 @@ function useСкорость() {
   }, []);
   return [скорость, (id) => { setСкорость(id); запомнитьСкорость(id); }];
 }
-function ценаСкорости(таблица, сеть, id) {
-  const ru = lang !== "EN";
-  if (id === "normal") return ru ? "без доплаты" : "no extra fee";
-  const чаевые = этоEVM(сеть) ? ` · ${ru ? "чаевые" : "tip"} ×${(таблица.evmTip || {})[id] || 1}` : "";
-  return `+${fmtСумма(доплатаСкорости(таблица, сеть, id))} ${монетаСкорости(сеть)}${чаевые}`;
-}
 
-/* Выбор скорости в окне сделки — во всех сетях, с ценой в монете сети. */
-function ВыборСкорости({ сеть, style, onChange = null }) {
-  const [скорость, выбрать] = useСкорость();
-  const таблица = useТаблицаСкорости();
-  const ru = lang !== "EN";
-  const выбранная = СКОРОСТИ_СДЕЛКИ.find((с) => с.id === скорость) || СКОРОСТИ_СДЕЛКИ[1];
-  return (
-    <div style={style}>
-      <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{ru ? "Скорость" : "Speed"}</span>
-      <div className="flex gap-1.5 mt-1.5">
-        {СКОРОСТИ_СДЕЛКИ.map((с) => (
-          <button key={с.id} type="button" aria-pressed={скорость === с.id} onClick={() => { haptic("light"); выбрать(с.id); if (onChange) onChange(с.id); }} className="fx-tap rounded-[16px] px-3 py-1.5 flex flex-col items-start" style={{ flex: 1, minWidth: 0, background: скорость === с.id ? T.ice : T.surfaceHi, color: скорость === с.id ? T.bg : T.muted, border: `1px solid ${скорость === с.id ? T.ice : T.line}`, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
-            <span className="flex items-center" style={{ gap: 4 }}>{с.id === "turbo" && <Zap size={12} strokeWidth={2.6} />}{ru ? с.имя : с.имяEN}</span>
-            <span className="truncate" style={{ maxWidth: "100%", fontFamily: monoFont, fontSize: 10.5, fontWeight: 500, opacity: 0.75 }}>{ценаСкорости(таблица, сеть, с.id)}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 /* Пул биржи токена площадки после выхода с кривой — резервы и цена
    (api/dex-pool.js). Спрашиваем только у тех, кто вышел: у Solana и TON
    адрес пула пишет сервер, у EVM пару заводит сама фабрика, и сервер
@@ -24785,7 +24762,6 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           </div>
         </div>
 
-        <ВыборСкорости сеть={соло ? "sol" : "ton"} style={{ marginTop: 14 }} onChange={setСкорость} />
 
         <div className="flex flex-col gap-1.5" style={{ marginTop: 14, fontFamily: monoFont, fontSize: 12, color: T.muted }}>
           <div className="flex justify-between"><span>{t("rate")}</span><span style={{ color: T.ice }}><ТекстСЧислами text={fmtPrice(token.price)} /> / ${token.ticker}</span></div>
@@ -26372,6 +26348,41 @@ function ПолосаТарифов({ активный }) {
   );
 }
 
+/* Фон тарифа — тот же шёлк, что на приветствии сайта: мягкие ленты света
+   медленно качаются за текстом. Цвет — тариф: Free серый, Pro зелёный,
+   Turbo переливается всеми цветами. Три слоя лежат друг на друге и
+   сменяются прозрачностью, поэтому при листании цвет перетекает, а не
+   щёлкает. Лёгкий CSS вместо холста сайта: на телефоне он не греет. */
+const ШЁЛК_ТАРИФА = {
+  free: ["#3A3A3A", "#9A9A9A", "#DADADA"],
+  pro: ["#0B5A2C", "#2ED47A", "#B7F5CF"],
+  turbo: ["#B79CFF", "#5BE0C8", "#FFB86B", "#FF6FB5", "#6C7CFF"],
+};
+function ШёлкТарифа({ ключ }) {
+  return (
+    <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: -1, overflow: "hidden", pointerEvents: "none" }}>
+      {Object.entries(ШЁЛК_ТАРИФА).map(([к, ц]) => (
+        <div key={к} style={{
+          position: "absolute", inset: 0, opacity: к === ключ ? 1 : 0, transition: "opacity 700ms ease",
+          ...(к === "turbo" ? { animation: "шёлкРадуга 9s linear infinite" } : null),
+        }}>
+          {[0, 1, 2].map((н) => (
+            <div key={н} style={{
+              position: "absolute", left: "-40%", width: "180%", height: н === 1 ? "26%" : "18%", top: `${18 + н * 17}%`,
+              borderRadius: "50%",
+              background: `linear-gradient(90deg, transparent 5%, ${ц[н % ц.length]} 30%, ${ц[(н + 1) % ц.length]} 55%, ${ц[(н + 2) % ц.length]} 75%, transparent 95%)`,
+              opacity: н === 1 ? 0.55 : 0.35, filter: "blur(38px)",
+              animation: `шёлкКачается ${13 + н * 4}s ease-in-out ${-н * 3}s infinite`,
+            }} />
+          ))}
+        </div>
+      ))}
+      {/* К низу шёлк уходит в фон: там кнопка, и текст на ней должен читаться. */}
+      <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${hexA(T.bg, 0.15)} 0%, ${hexA(T.bg, 0)} 35%, ${hexA(T.bg, 0.55)} 72%, ${T.bg} 92%)` }} />
+    </div>
+  );
+}
+
 const СЕТИ_ТАРИФА = [["solana", "Solana"], ["ton", "TON"], ["bsc", "BNB Chain"], ["base", "Base"], ["eth", "Ethereum"]];
 
 function ДоплатаТарифа(таблица, сеть, скорость, ru) {
@@ -26421,6 +26432,7 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
 
   return (
     <div className="flex flex-col" style={{ gap: 26 }}>
+      <ШёлкТарифа ключ={шаг.key} />
       <ПолосаТарифов активный={шаг} />
       <div className="flex items-center" style={{ gap: 6 }}>
         {ТАРИФЫ_ЭКРАНА.map((т, i) => (
@@ -26447,7 +26459,7 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
       </div>
       <div aria-hidden style={{ height: 90 }} />
       {!открыт && createPortal(
-        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 461, padding: `12px 16px ${insetBottom + 14}px`, background: T.bg }}>
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 461, padding: `12px 16px ${insetBottom + 14}px` }}>
           <button
             disabled={свой.key === шаг.key}
             onClick={() => { haptic("success"); выбратьСкорость(шаг.скорость); }}
@@ -26548,7 +26560,6 @@ function НастройкаБыстрых() {
         <ToggleSwitch on={н.oneClick} onChange={(v) => { haptic("light"); сохранить({ oneClick: v }); }} />
       </div>
 
-      <НастройкаСкорости />
 
       <div className="fx-card" style={{ animationDelay: "100ms" }}>
         <SectionTitle>{ru ? "Суммы покупки" : "Buy amounts"}</SectionTitle>
@@ -26571,51 +26582,6 @@ function НастройкаБыстрых() {
       </div>
 
     </>
-  );
-}
-
-/* Скорость в «Быстрой покупке» — одна на все сети, та же, что в окне
-   сделки. Под каждой — что она делает и сколько стоит в каждой монете:
-   без этой строки «Молния» выглядела бы бесплатной. */
-function НастройкаСкорости() {
-  const [скорость, выбрать] = useСкорость();
-  const таблица = useТаблицаСкорости();
-  const ru = lang !== "EN";
-  const монеты = [["sol", "SOL"], ["ton", ТИКЕР_TON], ["bsc", "BNB"], ["base", "ETH"]];
-  return (
-    <div className="fx-card" style={{ animationDelay: "70ms" }}>
-      <SectionTitle>{ru ? "Скорость сделки" : "Trade speed"}</SectionTitle>
-      <div className="flex flex-col" style={{ gap: 8 }}>
-        {СКОРОСТИ_СДЕЛКИ.map((с) => {
-          const выбрана = скорость === с.id;
-          return (
-            <button
-              key={с.id}
-              type="button"
-              aria-pressed={выбрана}
-              onClick={() => { if (!выбрана) { haptic("light"); выбрать(с.id); } }}
-              className="fx-tap flex flex-col text-left"
-              style={{
-                gap: 4, padding: "13px 16px", borderRadius: 20, background: T.surface,
-                border: `1px solid ${выбрана ? T.ice : "transparent"}`, transition: "border-color 160ms ease",
-              }}
-            >
-              <span className="flex items-center justify-between" style={{ gap: 10 }}>
-                <span className="flex items-center" style={{ gap: 6, fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>
-                  {с.id === "turbo" && <Zap size={15} strokeWidth={2.4} />}{ru ? с.имя : с.имяEN}
-                </span>
-                {выбрана && <CheckCircle2 size={17} color={T.ice} />}
-              </span>
-              <span style={{ fontFamily: monoFont, color: с.id === "normal" ? T.faint : T.ice, fontSize: 11.5, lineHeight: 1.5 }}>
-                <ТекстСЧислами text={с.id === "normal"
-                  ? (ru ? "без доплаты" : "no extra fee")
-                  : монеты.map(([к, м]) => `+${fmtСумма(доплатаСкорости(таблица, к, с.id))} ${м}`).join(" · ")} />
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -27445,6 +27411,8 @@ function SettingsPanel({
 }) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Уведомления приходят ботом — из раздела о них в бота и ведём.
+  const ботПодключён = useУведомленияПодключены();
   // Почта для второго ключа: открывается из раздела «Безопасность».
   const [почтаОткрыта, setПочтаОткрыта] = useState(false);
   /* Пока открыт экран почты, лист «Безопасность» уезжает вниз и ждёт:
@@ -27684,6 +27652,13 @@ function SettingsPanel({
             </div>
           )}
 
+          <button
+            onClick={() => { haptic("light"); if (ботПодключён) открытьТелеграм(БОТ_MINTLY.replace("?start=app", "")); else подключитьУведомления(); }}
+            className="fx-tap w-full flex items-center justify-center"
+            style={{ gap: 10, height: 56, marginTop: 26, borderRadius: 999, border: "none", background: T.ice, color: T.bg, fontFamily: displayFont, fontSize: 17, fontWeight: 800 }}
+          >
+            <Send size={18} /> {ботПодключён ? (lang === "EN" ? "Open the bot" : "Открыть бота") : (lang === "EN" ? "Connect the bot" : "Подключить бота")}
+          </button>
         </>
       );
       break;
