@@ -198,7 +198,11 @@ function нарисовать() {
       </React.StrictMode>
     );
   } catch (err) {
-    showFatalError(err);
+    /* Функции showFatalError больше нет (красный экран убран), и её вызов
+       сам падал ReferenceError. Ошибку отдаём наверх: её ловит и сообщает
+       серверу обработчик в index.html. */
+    console.error("[mintly] не удалось нарисовать приложение", err);
+    throw err;
   }
 }
 

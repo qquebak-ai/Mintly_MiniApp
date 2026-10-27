@@ -92,5 +92,18 @@ await случай("создание счёта сверх потолка", "о�
   })]),
   { ...общее, дело: "launch", максПеревода: 0.03e9 });
 
+// Сделки свежих токенов через PumpPortal: его программа — да, чужая — нет,
+// и сверху никаких прямых переводов больше потолка.
+const ПОРТАЛ = new PublicKey("FAdo9NCw1ssek6Z6yeWzWjhLVsr8uiCwcWNUnKgzTnHe");
+await случай("покупка свежего токена через PumpPortal", "прошло",
+  собрать([new TransactionInstruction({ programId: ПОРТАЛ, keys: [{ pubkey: хозяин.publicKey, isSigner: true, isWritable: true }], data: Buffer.from([1, 2, 3]) })]),
+  { ...общее, дело: "pumpportal", максПеревода: 0.03e9 });
+await случай("PumpPortal: чужая программа рядом", "отказ",
+  собрать([new TransactionInstruction({ programId: Keypair.generate().publicKey, keys: [{ pubkey: хозяин.publicKey, isSigner: true, isWritable: true }], data: Buffer.from([0]) })]),
+  { ...общее, дело: "pumpportal", максПеревода: 0.03e9 });
+await случай("PumpPortal: перевод сверх потолка", "отказ",
+  собрать([перевод(чужой.publicKey, 1)]),
+  { ...общее, дело: "pumpportal", максПеревода: 0.03e9 });
+
 console.log(провалов ? `\nПРОВАЛОВ: ${провалов}` : "\nвсе проверки прошли");
 process.exit(провалов ? 1 : 0);

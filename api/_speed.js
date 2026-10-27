@@ -52,9 +52,27 @@ export const НАЦЕНКА_МОНЕТАМИ = { normal: 0, fast: 10, turbo: 40 
    сети (не просил монетами, скорость обычная или монет не хватает).
    Списываются они после того, как сделка прошла (списатьМонетыЗаСкорость),
    а здесь только проверка остатка: неудавшаяся сделка монет не стоит. */
+/* Есть ли в базе функция списания (supabase_speed_coins.sql). Без неё
+   сделка шла без наценки, а монеты не списывались — скорость выходила
+   бесплатной. Проверяем пустым вызовом (сумма 0 ничего не меняет и
+   отвечает bad_request), ответ помним на 10 минут. */
+let списаниеЕсть = { at: 0, есть: false };
+async function естьСписание(db, userId) {
+  if (Date.now() - списаниеЕсть.at < 600_000) return списаниеЕсть.есть;
+  let есть = false;
+  try {
+    const { error } = await db.rpc("speed_coins_charge", { p_user: userId, p_amount: 0 });
+    есть = !error;
+    if (error) console.warn("[speed] нет speed_coins_charge — оплата монетами выключена:", error.message);
+  } catch { есть = false; }
+  списаниеЕсть = { at: Date.now(), есть };
+  return есть;
+}
+
 export async function монетыЗаСкорость(db, userId, скорость, хочет) {
   const цена = НАЦЕНКА_МОНЕТАМИ[скоростьИз(скорость)] || 0;
   if (!хочет || !цена || !db || !userId) return 0;
+  if (!(await естьСписание(db, userId))) return 0;
   try {
     const { data, error } = await db.rpc("coins_balance", { uid: userId });
     return !error && Number(data) >= цена ? цена : 0;
