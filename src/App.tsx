@@ -15868,6 +15868,7 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
   const [выбран, setВыбран] = useState(null);
   const [счёт, setСчёт] = useState(null);
   const [пополнение, setПополнение] = useState(false);
+  const [куда, setКуда] = useState("in");
   const [сколько, setСколько] = useState("");
   const [идёт, setИдёт] = useState(false);
   const обновитьСчёт = useCallback(() => { запросРынков("account").then(setСчёт).catch(() => {}); }, []);
@@ -15885,18 +15886,39 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
   const есть = РАЗДЕЛЫ_РЫНКОВ.filter(([к]) => (рынки || []).some((р) => р.section === к));
   const список = (рынки || []).filter((р) => р.section === раздел);
   const рынок = выбран ? (рынки || []).find((р) => р.asset === выбран) : null;
-  async function перевести(куда) {
+  /* SOL, пришедший с моста, сам становится долларами на счёте: как только
+     он виден на споте биржи, просим сервер продать его и перевести. */
+  const спот = счёт && счёт.spot;
+  const зачисляется = !!(спот && (спот.sol * (счёт.solPrice || 0) >= 10.5 || спот.usdc >= 1));
+  const свожу = useRef(0);
+  useEffect(() => {
+    if (!зачисляется || Date.now() - свожу.current < 10000) return;
+    свожу.current = Date.now();
+    запросРынков("settle", {}).then(обновитьСчёт).catch(() => {});
+  }, [зачисляется, счёт, обновитьСчёт]);
+  async function перевести() {
     const n = parseAmount(сколько);
     if (!(n > 0) || идёт) return;
     setИдёт(true);
     try {
-      await запросРынков(куда, { amount: n });
-      haptic("success"); setСколько(""); showToast && showToast(куда === "deposit" ? "Перевод на биржу отправлен" : "Вывод отправлен");
+      if (куда === "in") await запросРынков("deposit-sol", { amount: n, requestKey: `hl-in-${Date.now()}` });
+      else await запросРынков("withdraw-sol", { usd: n });
+      haptic("success"); setСколько("");
+      showToast && showToast(куда === "in" ? "SOL отправлен — на бирже через минуту" : "SOL придёт в кошелёк через несколько минут");
       обновитьСчёт();
     } catch (e) {
-      haptic("error"); showToast && showToast(String((e && e.message) || "Не прошло").slice(0, 120));
+      const м = String((e && e.message) || "");
+      // Коды сервера — человеческими словами.
+      const текст = м === "min_sol" ? (куда === "in" ? `Минимум ${(счёт && счёт.minSol) || 0.12} SOL` : `Минимум $${Math.ceil(0.13 * ((счёт && счёт.solPrice) || 0) * 1.03)}`)
+        : м === "not_enough" ? "Не хватает SOL в кошельке"
+        : м === "network_mismatch" ? "Сеть кошелька и биржи не совпадает"
+        : м === "wallet_busy" ? "Кошелёк занят другой операцией"
+        : м || "Не прошло";
+      haptic("error"); showToast && showToast(текст.slice(0, 120));
     } finally { setИдёт(false); }
   }
+  const кош = счёт && счёт.wallet;
+  const максSOL = кош ? Math.max(0, Math.floor((кош.sol - 0.003) * 1e4) / 1e4) : 0;
   const тело = (
     <div className={вкладка ? "fx-view" : "fx-sheet-in no-scrollbar"} style={вкладка ? { padding: "8px 16px 40px" } : { position: "fixed", inset: 0, zIndex: 455, background: T.bg, overflowY: "auto", overscrollBehavior: "contain",
       padding: `calc(${insetTop}px + 10px) 16px calc(${insetBottom}px + 40px)` }}>
@@ -15920,27 +15942,32 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
               <button onClick={() => { haptic("light"); setПополнение((v) => !v); }} className="fx-tap w-full" style={{ height: 46, borderRadius: 14, border: "none", background: T.ice, color: T.bg, fontFamily: displayFont, fontSize: 15, fontWeight: 800 }}>
                 Пополнить или вывести
               </button>
+              {зачисляется && (
+                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 800 }}>Зачисляем пополнение…</span>
+              )}
               {пополнение && счёт && (
                 <div className="fx-step-in flex flex-col" style={{ gap: 10 }}>
-                  <span style={{ fontFamily: bodyFont, color: T.ice, fontSize: 14.5, fontWeight: 600, lineHeight: 1.45 }}>
-                    Отправь USDC в сети Arbitrum на свой адрес — и немного ETH Arbitrum на газ. Потом переведи их на биржу.
-                  </span>
-                  <button onClick={() => { try { navigator.clipboard.writeText(счёт.address); showToast && showToast("Адрес скопирован"); } catch { /* нет буфера */ } }} className="fx-tap w-full text-left"
-                    style={{ padding: "12px 14px", borderRadius: 14, border: "none", background: T.bg, color: T.ice, fontFamily: monoFont, fontSize: 13, fontWeight: 600, wordBreak: "break-all" }}>
-                    {счёт.address}
-                  </button>
-                  <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 700 }}>
-                    В Arbitrum: {счёт.arbitrum && счёт.arbitrum.usdc != null ? `${счёт.arbitrum.usdc.toFixed(2)} USDC` : "—"} · на бирже можно вывести ${счёт.withdrawable.toFixed(2)}
-                  </span>
+                  {/* Деньги ходят через SOL кошелька приложения: туда — SOL
+                      становится долларами на бирже, обратно — наоборот. */}
+                  <div className="flex" style={{ gap: 4, padding: 4, borderRadius: 14, background: T.bg }}>
+                    {[["in", "Пополнить"], ["out", "Вывести"]].map(([к, подпись]) => (
+                      <button key={к} onClick={() => { haptic("light"); setКуда(к); setСколько(""); }} className="fx-tap flex-1"
+                        style={{ height: 38, borderRadius: 11, border: "none", fontFamily: displayFont, fontSize: 14.5, fontWeight: 800,
+                          background: куда === к ? T.ice : "transparent", color: куда === к ? T.bg : T.muted }}>{подпись}</button>
+                    ))}
+                  </div>
                   <div className="flex items-center" style={{ gap: 8, padding: "12px 14px", borderRadius: 14, background: T.bg }}>
+                    {куда === "out" && <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 20, fontWeight: 800 }}>$</span>}
                     <input value={сколько} onChange={(e) => setСколько(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" placeholder="0"
                       style={{ fontFamily: displayFont, fontWeight: 800, color: T.ice, fontSize: 20, background: "transparent", border: "none", outline: "none", flex: 1, minWidth: 0 }} />
-                    <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 800 }}>USDC</span>
+                    <button onClick={() => { haptic("light"); setСколько(String(куда === "in" ? максSOL : Math.floor(счёт.withdrawable * 100) / 100)); }} className="fx-tap"
+                      style={{ border: "none", background: "transparent", fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 700 }}>
+                      {куда === "in" ? `${максSOL} SOL` : `$${счёт.withdrawable.toFixed(2)}`}
+                    </button>
                   </div>
-                  <div className="flex" style={{ gap: 8 }}>
-                    <button onClick={() => перевести("deposit")} disabled={идёт} className="fx-tap flex-1" style={{ height: 46, borderRadius: 14, border: "none", background: T.ice, color: T.bg, fontFamily: displayFont, fontSize: 15, fontWeight: 800 }}>На биржу</button>
-                    <button onClick={() => перевести("withdraw")} disabled={идёт} className="fx-tap flex-1" style={{ height: 46, borderRadius: 14, border: "none", background: T.bg, color: T.ice, fontFamily: displayFont, fontSize: 15, fontWeight: 800 }}>Вывести</button>
-                  </div>
+                  <button onClick={перевести} disabled={идёт || !кош} className="fx-tap w-full" style={{ height: 46, borderRadius: 14, border: "none", background: T.ice, color: T.bg, fontFamily: displayFont, fontSize: 15, fontWeight: 800, opacity: идёт ? 0.6 : 1 }}>
+                    {идёт ? "…" : куда === "in" ? `Пополнить${parseAmount(сколько) > 0 && счёт.solPrice ? ` ≈ $${(parseAmount(сколько) * счёт.solPrice).toFixed(2)}` : ""}` : "Вывести в кошелёк"}
+                  </button>
                 </div>
               )}
             </div>

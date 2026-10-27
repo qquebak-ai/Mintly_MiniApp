@@ -1569,5 +1569,43 @@ export default async function handler(req, res) {
   }
 }
 
+/* Пополнение биржи (api/hyperliquid.js): SOL уходит на адрес моста Unit,
+   выданный под EVM-счёт самого человека на Hyperliquid. Это не вывод
+   «на сторону» — деньги остаются у него же, только на бирже, поэтому
+   привязанный адрес вывода и второй ключ тут не спрашиваются. Адрес
+   моста проверяет вызывающий — подписями хранителей Unit. */
+export async function отправитьНаБиржу({ user_id, сумма, куда, ключЗапроса = null }) {
+  const db = admin();
+  const набор = ключи();
+  if (!db || !набор) throw new Error("not_configured");
+  if (!адресОк(куда)) throw new Error("bad_address");
+  const user = { id: user_id };
+  const отпустить = занять(`solana:${user_id}`);
+  try {
+    const строка = await освежитьПривязку(db, await кошелёк(db, user, набор));
+    const есть = await баланс(строка.address);
+    if (!(сумма > 0) || сумма > есть - ЗАПАС_НА_КОМИССИЮ) throw Object.assign(new Error("not_enough"), { код: 400, есть });
+    // В журнале — как вывод: для истории кошелька это «Отправлено».
+    const оп = await начать(db, user, { дело: "withdraw", сумма, адрес: куда, ключЗапроса });
+    if (оп.повтор) return { signature: оп.signature, repeat: true };
+    const лямпорты = Math.floor(сумма * LAMPORTS);
+    const base64 = await собратьВывод({ откуда: строка.address, куда, лямпорты });
+    let подпись;
+    try {
+      подпись = await подписатьИОтправить({ db, user, строка, набор, base64, дело: "withdraw", максПеревода: лямпорты });
+    } catch (e) {
+      await отменить(db, оп.id);
+      throw e;
+    }
+    await завершить(db, оп.id, подпись);
+    return { signature: подпись };
+  } finally {
+    отпустить();
+  }
+}
+
+// Сеть Solana кошелька приложения: мост Unit должен смотреть в ту же.
+export const SOLANA_ТЕСТОВАЯ = /devnet|testnet/i.test(RPC);
+
 // Для проверки без сети (как заменитьБазуДляПроверки в api/wallet-evm.js).
 export const дляПроверки = { дождаться, подписьИзТранзакции };
