@@ -15592,38 +15592,55 @@ function useУведомленияПодключены() {
    одной, с небольшим сдвигом: экран собирается, а не выпрыгивает. */
 function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} }) {
   const уведомления = useУведомленияПодключены();
-  /* Строки прямо на чёрном, без плашек и свечений за текстом: цвет
-     несёт только значок, а действие — кнопка справа. Плашки со
-     свечением спорили с текстом и делали главную пёстрой. */
-  const строка = (ключ, i, { заголовок, кнопка, Значок, цвет, onClick, скоро = false }) => (
+  /* Расклад прежний — три широких входа и две плитки, — но без плашек и
+     свечений за текстом: цвет несёт только значок. Плитки отделены от
+     широких строк тонкой линией, иначе всё сливалось в одну ленту. */
+  const широкий = (ключ, i, { заголовок, кнопка, Значок, цвет, onClick, скоро = false }) => (
     <button
       key={ключ}
       onClick={скоро ? undefined : () => { haptic("light"); onClick(); }}
       className="fx-tap fx-card w-full flex items-center text-left"
-      style={{ gap: 14, padding: "12px 0", border: "none", background: "transparent", animationDelay: `${i * 50}ms` }}
+      style={{ gap: 14, padding: "10px 0", border: "none", background: "transparent", animationDelay: `${i * 60}ms` }}
     >
-      <span className="flex items-center justify-center flex-shrink-0" style={{ width: 48, height: 48, borderRadius: 16, background: hexA(цвет, 0.14) }}>
-        <Значок size={22} color={цвет} />
+      <span className="flex items-center justify-center flex-shrink-0" style={{ width: 52, height: 52, borderRadius: 999, background: hexA(цвет, 0.16) }}>
+        <Значок size={23} color={цвет} />
       </span>
-      <span style={{ flex: 1, minWidth: 0, fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800, letterSpacing: "-0.01em" }}>{заголовок}</span>
+      <span style={{ flex: 1, minWidth: 0, fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800, letterSpacing: "-0.01em" }}>{заголовок}</span>
       <span style={{
-        flexShrink: 0, padding: "9px 16px", borderRadius: 999, fontFamily: displayFont, fontSize: 13, fontWeight: 800,
+        flexShrink: 0, padding: "10px 18px", borderRadius: 999, fontFamily: displayFont, fontSize: 14, fontWeight: 800,
         background: скоро ? "transparent" : T.ice, color: скоро ? T.faint : T.bg,
         boxShadow: скоро ? `inset 0 0 0 1px ${T.lineHi}` : "none",
       }}>{скоро ? "Скоро" : кнопка}</span>
     </button>
   );
+  const плитка = (ключ, i, { заголовок, Значок, цвет, onClick }) => (
+    <button
+      key={ключ}
+      onClick={() => { haptic("light"); onClick(); }}
+      className="fx-tap fx-card flex flex-col text-left"
+      style={{ flex: 1, minWidth: 0, gap: 16, padding: "6px 0", border: "none", background: "transparent", animationDelay: `${i * 60}ms` }}
+    >
+      <span className="flex items-center justify-center" style={{ width: 64, height: 64, borderRadius: 22, background: hexA(цвет, 0.16) }}>
+        <Значок size={30} color={цвет} />
+      </span>
+      <span className="flex items-center" style={{ gap: 4, fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, letterSpacing: "-0.01em" }}>
+        {заголовок}<ChevronRight size={20} color={T.muted} />
+      </span>
+    </button>
+  );
   return (
-    <section className="flex flex-col" style={{ gap: 2 }}>
-      {строка("запуск", 0, { заголовок: "Запустить токен", кнопка: "Создать", Значок: Rocket, цвет: "#B79CFF", onClick: onGoCreate })}
-      {строка("мемпад", 1, { заголовок: "Мемпад", кнопка: "Открыть", Значок: ЗначокОбмен, цвет: T.up, onClick: () => onGoTab("mempad") })}
-      {строка("канал", 2, { заголовок: "Канал Mintly", кнопка: "Открыть", Значок: Send, цвет: "#2AABEE", onClick: () => открытьТелеграм(КАНАЛ_MINTLY), скоро: !КАНАЛ_MINTLY })}
-      {строка("x", 3, { заголовок: "Mintly в X", кнопка: "Открыть", Значок: ЗнакX, цвет: "#FFFFFF", onClick: () => {
+    <section className="flex flex-col" style={{ gap: 8 }}>
+      {широкий("канал", 0, { заголовок: "Канал Mintly", кнопка: "Открыть", Значок: Send, цвет: "#2AABEE", onClick: () => открытьТелеграм(КАНАЛ_MINTLY), скоро: !КАНАЛ_MINTLY })}
+      {широкий("x", 1, { заголовок: "Mintly в X", кнопка: "Открыть", Значок: ЗнакX, цвет: "#FFFFFF", onClick: () => {
         try { const tg = window.Telegram && window.Telegram.WebApp; if (tg && tg.openLink) tg.openLink(X_MINTLY); else window.open(X_MINTLY, "_blank"); } catch { /* ссылка не открылась */ }
       } })}
-      {строка("бот", 4, уведомления
+      {широкий("бот", 2, уведомления
         ? { заголовок: "Уведомления", кнопка: "Настроить", Значок: Bell, цвет: "#F5C04E", onClick: () => открытьТелеграм(БОТ_MINTLY.replace("?start=app", "")) }
         : { заголовок: "Уведомления", кнопка: "Подключить", Значок: Bell, цвет: "#F5C04E", onClick: подключитьУведомления })}
+      <div className="flex" style={{ gap: 16, marginTop: 14, paddingTop: 22, borderTop: `1px solid ${T.line}` }}>
+        {плитка("запуск", 3, { заголовок: "Запустить", Значок: Rocket, цвет: "#B79CFF", onClick: onGoCreate })}
+        {плитка("мемпад", 4, { заголовок: "Мемпад", Значок: ЗначокОбмен, цвет: T.up, onClick: () => onGoTab("mempad") })}
+      </div>
     </section>
   );
 }
@@ -27353,7 +27370,29 @@ const ДЛИННЫЕ_РАЗДЕЛЫ = new Set(["support", "architecture", "priva
 /* Эти разделы — страницы, а не листы: в них листают, заполняют анкету и
    переписываются, и большая карточка поверх приложения только съедала
    место по краям. Выглядят как «Достижения» — заголовок слева и списки. */
-const ПОЛНОЭКРАННЫЕ = new Set(["referral", "x", "support", "quick", "tariff"]);
+/* Все разделы — страницы. Листы снизу с двумя строками посередине
+   выглядели пустыми: крупный заголовок и строки на весь экран читаются
+   как раздел, а не как всплывашка. */
+const ПОЛНОЭКРАННЫЕ = new Set(["referral", "x", "support", "quick", "tariff", "security", "notify", "language", "theme", "architecture", "privacy"]);
+
+/* Строка выбора одного из вариантов — крупно, прямо на чёрном, кружок
+   справа. Без плашек: выбранное видно по кружку, а не по рамке. */
+function СтрокаВыбора({ выбран, onClick, слева = null, children, последняя = false }) {
+  return (
+    <button onClick={() => { haptic("light"); onClick(); }} className="fx-tap w-full flex items-center text-left"
+      style={{ gap: 14, padding: "18px 0", background: "transparent", border: "none", borderBottom: последняя ? "none" : `1px solid ${T.line}` }}>
+      {слева}
+      <span style={{ flex: 1, minWidth: 0, fontFamily: displayFont, fontSize: 20, fontWeight: 800, color: T.ice }}>{children}</span>
+      <span aria-hidden style={{
+        width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+        background: выбран ? T.ice : "transparent", boxShadow: выбран ? "none" : `inset 0 0 0 2px ${T.lineHi}`,
+        transition: "background 200ms ease",
+      }}>
+        {выбран && <Check size={15} color={T.bg} strokeWidth={3.2} />}
+      </span>
+    </button>
+  );
+}
 
 /* Группа строк одной плашкой с тонкими разделителями — как списки на
    главной и в кошельке, вместо отдельной пилюли на каждую строку. */
@@ -27527,10 +27566,12 @@ function SettingsPanel({
           </SettingsRow>
           <button
             onClick={() => { if (appSettings.pinEnabled) onChangePin(); else showToast(t("enablePinFirst")); }}
-            className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3 mt-3"
-            style={{ background: T.surfaceHi, border: "none", fontFamily: bodyFont, fontSize: 14.5, color: appSettings.pinEnabled ? T.ice : T.muted, opacity: appSettings.pinEnabled ? 1 : 0.55 }}
+            className="fx-tap w-full flex items-center gap-3 py-4"
+            style={{ background: "transparent", border: "none", borderBottom: `1px solid ${T.line}`, fontFamily: bodyFont, fontSize: 16, color: T.ice, opacity: appSettings.pinEnabled ? 1 : 0.45 }}
           >
-            <Lock size={14} color={T.muted} /> {t("changePinCta")}
+            <Lock size={18} color={T.ice} />
+            <span className="flex-1 text-left">{t("changePinCta")}</span>
+            <ChevronRight size={18} color={T.muted} />
           </button>
           </>}
           {/* Почта — второй ключ. Аккаунт держится на Telegram, и это
@@ -27538,14 +27579,14 @@ function SettingsPanel({
           {accountCreated && !этоПК() && (
             <button
               onClick={открытьПочту}
-              className="fx-tap w-full flex items-center gap-2 rounded-[20px] px-3.5 py-3 mt-3"
-              style={{ background: T.surfaceHi, border: "none" }}
+              className="fx-tap w-full flex items-center gap-3 py-4"
+              style={{ background: "transparent", border: "none", borderBottom: `1px solid ${T.line}` }}
             >
-              <Mail size={15} color={T.muted} />
-              <span className="flex-1 text-left truncate" style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>
+              <Mail size={18} color={T.ice} />
+              <span className="flex-1 text-left truncate" style={{ fontFamily: bodyFont, fontSize: 16, color: T.ice }}>
                 {t("mail2faRow")}
               </span>
-              <ChevronRight size={16} color={T.faint} />
+              <ChevronRight size={18} color={T.muted} />
             </button>
           )}
           <ЭкранПочты открыт={почтаОткрыта} onClose={закрытьПочту} insetTop={insetTop} insetBottom={insetBottom} />
@@ -27556,10 +27597,10 @@ function SettingsPanel({
           {accountCreated && (
             <button
               onClick={() => setDeleteConfirmOpen(true)}
-              className="fx-tap w-full flex items-center justify-center gap-2 rounded-[20px] py-3 mt-3"
-              style={{ background: "transparent", border: `1px solid rgba(255,77,77,0.35)`, fontFamily: displayFont, fontWeight: 700, fontSize: 14.5, color: T.down }}
+              className="fx-tap w-full flex items-center gap-3 py-4"
+              style={{ background: "transparent", border: "none", fontFamily: bodyFont, fontWeight: 700, fontSize: 16, color: T.down }}
             >
-              <ShieldAlert size={15} /> {t("deleteAccountForever")}
+              <ShieldAlert size={18} /> {t("deleteAccountForever")}
             </button>
           )}
           {deleteConfirmOpen && (
@@ -27589,9 +27630,6 @@ function SettingsPanel({
     case "notify":
       body = (
         <>
-          <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, textAlign: "center" }}>
-            {t("notifyDesc")}
-          </p>
           <div className="mt-2">
             <SettingsRow label={t("notifyBuys")} sub={t("notifyBuysSub")}>
               <ToggleSwitch on={notifyPrefs.buys} onChange={(v) => onUpdateNotify && onUpdateNotify({ buys: v })} />
@@ -27640,12 +27678,12 @@ function SettingsPanel({
       break;
     case "language":
       body = (
-        <div className="flex flex-col gap-2 mt-2">
-          {["RU", "EN"].map((lng) => (
-            <button key={lng} onClick={() => onUpdateSetting("language", lng)} className="fx-tap w-full flex items-center justify-between rounded-[20px] py-3 px-3.5" style={{ background: T.surfaceHi, border: `1px solid ${appSettings.language === lng ? T.turquoise : T.line}` }}>
-              <span style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>{lng === "RU" ? "Русский" : "English"}</span>
-              {appSettings.language === lng && <CheckCircle2 size={16} color={T.turquoise} />}
-            </button>
+        <div className="flex flex-col">
+          {["RU", "EN"].map((lng, i) => (
+            <СтрокаВыбора key={lng} выбран={appSettings.language === lng} onClick={() => onUpdateSetting("language", lng)} последняя={i === 1}
+              слева={<span style={{ width: 44, height: 44, borderRadius: 14, background: T.surface, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: displayFont, fontSize: 15, fontWeight: 800, color: T.ice }}>{lng}</span>}>
+              {lng === "RU" ? "Русский" : "English"}
+            </СтрокаВыбора>
           ))}
         </div>
       );
@@ -27658,16 +27696,36 @@ function SettingsPanel({
       break;
     case "theme":
       body = (
-        <div className="flex flex-col gap-2 mt-2">
-          {[["Dark", lang === "EN" ? "Dark" : "Тёмная"], ["White", lang === "EN" ? "Light" : "Светлая"]].map(([к, имя]) => (
-            <button key={к} onClick={() => { haptic("light"); onUpdateSetting("theme", к); }} className="fx-tap w-full flex items-center justify-between rounded-[20px] py-3 px-3.5" style={{ background: T.surfaceHi, border: `1px solid ${appSettings.theme === к ? T.ice : T.line}` }}>
-              <span className="flex items-center" style={{ gap: 12, fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>
-                <span aria-hidden style={{ width: 22, height: 22, borderRadius: "50%", background: к === "White" ? "#FFFFFF" : "#000000", border: "1px solid #8E8E93" }} />
-                {имя}
-              </span>
-              {appSettings.theme === к && <CheckCircle2 size={16} color={T.ice} />}
-            </button>
-          ))}
+        /* Тема выбирается по виду: два маленьких экрана приложения,
+           а не две строки с кружком цвета. */
+        <div className="flex" style={{ gap: 14 }}>
+          {[["Dark", lang === "EN" ? "Dark" : "Тёмная"], ["White", lang === "EN" ? "Light" : "Светлая"]].map(([к, имя]) => {
+            const выбрана = appSettings.theme === к;
+            const фон = к === "White" ? "#FFFFFF" : "#000000";
+            const чернила = к === "White" ? "#111111" : "#F2F0EB";
+            const линия = к === "White" ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.12)";
+            return (
+              <button key={к} onClick={() => { haptic("light"); onUpdateSetting("theme", к); }} className="fx-tap flex flex-col items-center" style={{ flex: 1, minWidth: 0, gap: 14, background: "transparent", border: "none", padding: 0 }}>
+                <span aria-hidden style={{
+                  width: "100%", aspectRatio: "9 / 16", borderRadius: 26, background: фон, padding: "18px 14px",
+                  display: "flex", flexDirection: "column", gap: 10,
+                  boxShadow: выбрана ? `0 0 0 3px ${T.ice}` : `inset 0 0 0 1px ${линия}`, transition: "box-shadow 200ms ease",
+                }}>
+                  <span style={{ width: "55%", height: 12, borderRadius: 6, background: чернила }} />
+                  {[0, 1, 2, 3].map((н) => (
+                    <span key={н} className="flex items-center" style={{ gap: 8, marginTop: н ? 0 : 6 }}>
+                      <span style={{ width: 22, height: 22, borderRadius: "50%", background: [ "#B79CFF", "#2ED47A", "#2AABEE", "#F5C04E" ][н] }} />
+                      <span style={{ flex: 1, height: 8, borderRadius: 4, background: линия }} />
+                    </span>
+                  ))}
+                  <span style={{ marginTop: "auto", alignSelf: "center", width: "60%", height: 22, borderRadius: 999, background: чернила }} />
+                </span>
+                <span className="flex items-center" style={{ gap: 8, fontFamily: displayFont, fontSize: 18, fontWeight: 800, color: T.ice }}>
+                  {выбрана && <Check size={17} color={T.ice} strokeWidth={3} />}{имя}
+                </span>
+              </button>
+            );
+          })}
         </div>
       );
       break;
@@ -27738,7 +27796,7 @@ function SettingsPanel({
          в абзаце на страницу. */
       body = (
         <div className="flex flex-col" style={{ gap: 10, marginTop: 4 }}>
-          <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.6 }}>{t("archLead")}</p>
+          <p style={{ fontFamily: bodyFont, color: T.ice, fontSize: 16, lineHeight: 1.55, marginBottom: 6 }}>{t("archLead")}</p>
           {[
             ["archCurveTitle", "archCurveBody"],
             ["archSupplyTitle", "archSupplyBody"],
@@ -27749,18 +27807,18 @@ function SettingsPanel({
           ].map(([заголовок, текст], i) => (
             <div
               key={заголовок}
-              className="fx-card rounded-[18px]"
-              style={{ background: T.surfaceHi, border: "none", padding: "13px 15px", animationDelay: `${i * 45}ms` }}
+              className="fx-card"
+              style={{ padding: "16px 0", borderTop: `1px solid ${T.line}`, animationDelay: `${i * 45}ms` }}
             >
-              <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{t(заголовок)}</div>
-              <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, lineHeight: 1.6, marginTop: 6 }}>{t(текст)}</p>
+              <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800 }}>{t(заголовок)}</div>
+              <p style={{ fontFamily: bodyFont, color: T.ice, opacity: 0.82, fontSize: 15.5, lineHeight: 1.55, marginTop: 8 }}>{t(текст)}</p>
             </div>
           ))}
         </div>
       );
       break;
     case "privacy":
-      body = <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.6, marginTop: 4 }}>{t("privacyText")}</p>;
+      body = <p style={{ fontFamily: bodyFont, color: T.ice, opacity: 0.82, fontSize: 16, lineHeight: 1.6 }}>{t("privacyText")}</p>;
       break;
     default:
       body = null;
@@ -27777,6 +27835,8 @@ function SettingsPanel({
         className={`no-scrollbar ${уходит || closing ? "fx-sheet-out" : "fx-sheet-in"}`}
         style={{
           position: "fixed", inset: 0, zIndex: 460, background: T.bg, overflowY: чат ? "hidden" : "auto", overscrollBehavior: "contain",
+          // Экран почты лежит ниже по слою — страница прячется, пока он открыт.
+          visibility: спрятан ? "hidden" : "visible",
           padding: чат ? `calc(${insetTop}px + 10px) 16px 0` : `calc(${insetTop}px + 10px) 16px calc(${insetBottom}px + 40px)`,
           ...(чат ? { display: "flex", flexDirection: "column" } : null),
         }}
