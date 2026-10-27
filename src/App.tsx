@@ -12430,7 +12430,7 @@ function useЧужиеЗапуски(активно) {
       poolAddress: з.curve,
       name: з.name || з.symbol,
       ticker: з.symbol,
-      logoUrl: з.logo || null,
+      logoUrl: з.logo ? (з.logo.startsWith("/api/") ? апи(з.logo) : з.logo) : null,
       emoji: emojiForTicker(з.symbol),
       mcapNum: курс > 0 ? (Number(з.mcapSol) || 0) * курс : 0,
       change: 0,
