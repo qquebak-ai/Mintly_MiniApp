@@ -15846,6 +15846,21 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
   );
 }
 
+/* Картинка рынка — значки самой Hyperliquid по имени монеты (для HIP-3
+   с префиксом площадки, «xyz:GOLD»), чтобы не держать свой набор на
+   сотни рынков; если значка нет — круг с первой буквой. */
+function ЗначокРынка({ рынок, size = 40 }) {
+  const [нет, setНет] = useState(false);
+  const круг = { width: size, height: size, borderRadius: "50%", flex: "none" };
+  if (нет || !рынок.coin) return (
+    <span className="flex items-center justify-center" style={{ ...круг, background: T.surface, fontFamily: displayFont, fontWeight: 800, fontSize: size * 0.42, color: T.ice }}>
+      {String(рынок.name || "?").slice(0, 1)}
+    </span>
+  );
+  return <img src={`https://app.hyperliquid.xyz/coins/${encodeURIComponent(рынок.coin).replace("%3A", ":")}.svg`} alt="" width={size} height={size}
+    loading="lazy" onError={() => setНет(true)} style={{ ...круг, display: "block", background: T.surface, objectFit: "cover" }} />;
+}
+
 function СтраницаРынков({ открыт, onClose = () => {}, showToast, insetTop = 0, insetBottom = 0, вкладка = false }) {
   const [рынки, setРынки] = useState(null);
   const [сеть, setСеть] = useState(null);
@@ -15943,6 +15958,7 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
                 {список.map((р) => (
                   <button key={р.asset} onClick={() => { haptic("light"); setВыбран(р.asset); }} className="fx-tap w-full flex items-center text-left"
                     style={{ gap: 12, padding: "14px 2px", border: "none", background: "transparent", borderBottom: `1px solid ${T.line}` }}>
+                    <ЗначокРынка рынок={р} size={40} />
                     <span className="flex-1 min-w-0 flex flex-col" style={{ gap: 2 }}>
                       <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800 }}>{р.name}</span>
                       <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 13, fontWeight: 600, opacity: 0.7 }}>до {р.maxLeverage}×</span>
