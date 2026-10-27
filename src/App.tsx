@@ -20781,7 +20781,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             карты (210 на ~358 точек). */}
         {/* Знак приложения — в углу, где у карт стоит логотип банка. */}
         {/* Знак приложения — крупно в углу, белым, как на карточке PnL. */}
-        <svg aria-hidden width={72} height={72} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: 14, right: 14, pointerEvents: "none" }}>
+        <svg aria-hidden width={52} height={52} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: 16, right: 16, pointerEvents: "none" }}>
           <path d={ПУТЬ_ЗВЕЗДЫ} fill="#FFFFFF" />
         </svg>
         {/* Имя держателя, как на дебетовой карте: ник заглавными, с
