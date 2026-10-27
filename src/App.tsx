@@ -9903,6 +9903,8 @@ function TrustPanel({ token, testnet = false, holders = null }) {
  * проявляются одна за другой, а по налитой дуге идёт блик. Всё — на
  * живых цифрах страницы: сделка, пришедшая при открытом окне, сразу
  * двигает и кольцо, и строки. */
+const ПАМЯТЬ_СОБРАННОГО = new Map(); // id токена -> сколько монет собрала кривая
+
 function ЛистДоЛистинга({ данные: данныеProp, onClose }) {
   useНазадТелеграм(!!данныеProp, onClose);
   const [д, closing] = useClosing(данныеProp);
@@ -9914,8 +9916,9 @@ function ЛистДоЛистинга({ данные: данныеProp, onClose 
     return () => cancelAnimationFrame(id);
   }, [!!данныеProp]);
   const доля = д && д.цель > 0 ? Math.max(0, Math.min(1, д.собрано / д.цель)) : 0;
-  const процент = useCountUp(доля * 100, 1100, !!д && налито);
-  const собраноСчёт = useCountUp(д ? д.собрано : 0, 1100, !!д && налито);
+  // Набег короткий: число должно стоять почти сразу, а не догонять.
+  const процент = useCountUp(доля * 100, 450, !!д && налито);
+  const собраноСчёт = useCountUp(д ? д.собрано : 0, 450, !!д && налито);
   if (!д) return null;
   const R = 74, ТОЛЩ = 12, ДЛИНА = 2 * Math.PI * R;
   const осталось = Math.max(0, д.цель - д.собрано);
@@ -21299,6 +21302,85 @@ function КарточкаСтрок({ заголовок, строки }) {
   );
 }
 
+/* Экран переезда токена на биржу.
+ *
+ * Между «кривая закрылась» и «пул торгует» проходят минуты — в тестовых
+ * сетях заметно дольше. Раньше карточка в это время выглядела обычной, а
+ * кнопки сделок просто пропадали, и было непонятно, что происходит. Теперь
+ * поверх карточки встаёт отдельная страница: токен на орбите, три шага
+ * переезда с бегущими полосами, а торговать нельзя ничем — кнопок под
+ * экраном не достать. Когда пул открылся, шаги дозаполняются, летит
+ * конфетти, и экран уходит сам. */
+function ЭкранПереезда({ token, пулЕсть, готово, onBack }) {
+  const биржа = token.chain === "solana" ? "Raydium" : token.chain === "bsc" ? "PancakeSwap" : этоEVM(token.chain) ? "Uniswap" : "STON.fi";
+  const шаги = [
+    { текст: "Кривая закрыта", готов: true },
+    { текст: `Пул на ${биржа}`, готов: пулЕсть || готово },
+    { текст: "Ликвидность в пуле", готов: готово },
+  ];
+  const активный = шаги.findIndex((ш) => !ш.готов);
+  const экран = (
+    <div role="dialog" aria-label="Токен выходит на биржу" style={{
+      position: "fixed", inset: 0, zIndex: 90, background: T.bg, overflow: "hidden",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      padding: "calc(var(--tg-inset-top, 0px) + 24px) 24px calc(var(--tg-inset-bottom, 0px) + 32px)",
+      animation: готово ? "переездУход 600ms ease 2000ms both" : "переездВход 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
+    }}>
+      <style>{`
+        @keyframes переездВход { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
+        @keyframes переездУход { to { opacity: 0; transform: scale(0.98); } }
+        @keyframes переездОрбита { to { transform: rotate(360deg); } }
+        @keyframes переездСвет { 0%, 100% { opacity: 0.45; transform: scale(0.92); } 50% { opacity: 0.9; transform: scale(1.06); } }
+        @keyframes переездПолоса { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+        @keyframes переездКомета { 0% { transform: rotate(0deg) translateX(118px) rotate(0deg); } 100% { transform: rotate(360deg) translateX(118px) rotate(-360deg); } }
+        @media (prefers-reduced-motion: reduce) { [role=dialog] * { animation: none !important; } }
+      `}</style>
+      {готово && <Конфетти количество={40} />}
+      {/* На сайте кнопки «Назад» Telegram нет — своя, чтобы не запереть. */}
+      {!hasTelegramBack() && onBack && (
+        <button onClick={onBack} className="fx-tap flex items-center justify-center" aria-label="Назад"
+          style={{ position: "absolute", top: "calc(var(--tg-inset-top, 0px) + 16px)", left: 16, width: 40, height: 40, borderRadius: 999, background: T.surface, border: "none", color: T.ice }}>
+          <ChevronLeft size={18} />
+        </button>
+      )}
+      <span aria-hidden style={{ position: "absolute", width: 420, height: 420, borderRadius: "50%", background: `radial-gradient(circle, ${hexA("#B79CFF", 0.28)}, ${hexA("#5BE0C8", 0.1)} 45%, transparent 70%)`, animation: "переездСвет 4s ease-in-out infinite" }} />
+      <div style={{ position: "relative", width: 236, height: 236, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {[236, 184].map((d, i) => (
+          <span key={d} aria-hidden style={{
+            position: "absolute", width: d, height: d, borderRadius: "50%",
+            border: `1.5px dashed ${hexA(T.ice, i ? 0.22 : 0.14)}`,
+            animation: `переездОрбита ${i ? 14 : 22}s linear infinite${i ? " reverse" : ""}`,
+          }} />
+        ))}
+        <span aria-hidden style={{ position: "absolute", left: "50%", top: "50%", width: 12, height: 12, margin: -6, borderRadius: "50%", background: T.ice, boxShadow: `0 0 18px ${T.ice}`, animation: "переездКомета 3.2s linear infinite" }} />
+        <span style={{ borderRadius: "50%", boxShadow: `0 0 60px ${hexA("#B79CFF", 0.45)}` }}>
+          <TokenAvatar size={120} src={token.logoUrl} />
+        </span>
+      </div>
+      <div style={{ position: "relative", fontFamily: displayFont, color: T.ice, fontSize: 30, fontWeight: 800, letterSpacing: "-0.02em", textAlign: "center", marginTop: 26, textWrap: "balance" }}>
+        {готово ? `$${token.ticker} на ${биржа}` : `$${token.ticker} выходит на биржу`}
+      </div>
+      <div className="flex flex-col" style={{ position: "relative", width: "100%", maxWidth: 360, gap: 12, marginTop: 30 }}>
+        {шаги.map((ш, i) => (
+          <div key={ш.текст} className="flex items-center" style={{ gap: 12 }}>
+            <span className="flex items-center justify-center" style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: ш.готов ? T.up : hexA(T.ice, 0.08), transition: "background 400ms ease" }}>
+              {ш.готов ? <Check size={15} strokeWidth={3} color="#000" /> : <span style={{ width: 8, height: 8, borderRadius: "50%", background: i === активный ? T.ice : hexA(T.ice, 0.3) }} />}
+            </span>
+            <span className="flex flex-col" style={{ flex: 1, gap: 7 }}>
+              <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15.5, fontWeight: 700 }}>{ш.текст}</span>
+              <span style={{ position: "relative", height: 4, borderRadius: 2, overflow: "hidden", background: hexA(T.ice, 0.08) }}>
+                <span style={{ position: "absolute", inset: 0, borderRadius: 2, background: T.up, transform: `scaleX(${ш.готов ? 1 : 0})`, transformOrigin: "left", transition: "transform 700ms cubic-bezier(0.22, 1, 0.36, 1)" }} />
+                {i === активный && <span style={{ position: "absolute", top: 0, bottom: 0, width: "40%", borderRadius: 2, background: `linear-gradient(90deg, transparent, ${T.ice}, transparent)`, animation: "переездПолоса 1.4s ease-in-out infinite" }} />}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+  return typeof document !== "undefined" ? createPortal(экран, document.body) : экран;
+}
+
 function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = null, unlocked = true, connected = true, themeKey, currentUserId = null, onNeedAuth, onOpenProfile, tonPriceUsd = 0, walletAddress = null, onManage = null, изменение24 = null }) {
   // График вынесен из вкладок наверх, поэтому здесь остались только
   // разделы под ним: держатели, лента, о токене.
@@ -21627,6 +21709,27 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   }, [token.id, token.chain, token.tokenAddress, token.curveAddress, token.mcapNum, token.price]);
 
   const ценаТокена = token.price > 0 ? token.price : ((своя && своя.priceUsd) || 0);
+  /* Токен переезжает на биржу: кривая закрыта, пула ещё нет. Экран
+     встаёт не сразу, а через полторы секунды: у давно вышедшего токена
+     пул находится чуть позже открытия страницы, и без паузы экран
+     переезда мигал бы и у него. */
+  const кривЗакрыта = !!((curve && curve.graduated) || (своя && своя.graduated));
+  const [переезд, setПереезд] = useState(false);
+  const [переехал, setПереехал] = useState(false);
+  useEffect(() => {
+    if (кривЗакрыта && !рынокОткрыт) {
+      const id = setTimeout(() => setПереезд(true), 1500);
+      return () => clearTimeout(id);
+    }
+    // Пул появился, пока экран стоял, — показываем финал и убираем экран.
+    if (переезд && рынокОткрыт) {
+      setПереехал(true);
+      const id = setTimeout(() => { setПереезд(false); setПереехал(false); }, 2600);
+      return () => clearTimeout(id);
+    }
+    return undefined;
+  }, [кривЗакрыта, рынокОткрыт]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setПереезд(false); setПереехал(false); }, [token.id]);
   /* Показываем капитализацию, а не цену за штуку. У мемкоина цена —
      это шесть нулей после запятой, по которым ничего не понять, а
      капитализация сразу говорит, насколько токен большой. Множитель —
@@ -22424,7 +22527,12 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
      кривой, которое приходит каждые 0,3 с, объём и сделки — база обхода
      плюс сделки, увиденные после открытия. Раньше вся статистика стояла
      на копии строки с момента открытия карточки. */
-  const собраноЖиво = своя && своя.raised != null ? Number(своя.raised) : Number(token.raisedTon) || 0;
+  /* Собранное помним по токену между открытиями: пока кривая и поток не
+     ответили, «до листинга» показывало ноль и потом долго набегало к
+     настоящему числу. Теперь при повторном открытии число на месте сразу. */
+  const собраноСети = своя && своя.raised != null ? Number(своя.raised) : Number(token.raisedTon) || 0;
+  if (собраноСети > 0) ПАМЯТЬ_СОБРАННОГО.set(token.id, собраноСети);
+  const собраноЖиво = собраноСети > 0 ? собраноСети : (ПАМЯТЬ_СОБРАННОГО.get(token.id) || 0);
   const курсЖивой = token.chain === "solana" ? solUsd() : этоEVM(token.chain) ? курсМонетыEVM(token.chain, КЕШ_КУРСОВ_EVM) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
   const базаОбъёма = Number(token.vol24hNum) > 0 ? Number(token.vol24hNum) : (Number(token.vol24Ton) || 0) * курсЖивой;
   const цифрыЖивые = цифрыДемо || (своя_кривая ? {
@@ -22697,6 +22805,14 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
 
   return (
     <div className="fx-view flex flex-col pb-4" style={{ position: "relative", gap: 18 }}>
+      {переезд && (
+        <ЭкранПереезда
+          token={token}
+          пулЕсть={!!(token.dexPoolAddress || пулБиржи)}
+          готово={переехал}
+          onBack={onBack}
+        />
+      )}
       {/* Полоса у кромки — всегда на месте и всегда с аватаркой.
           Аватарка, кнопки и размытие не уезжают вместе со страницей:
           они и есть постоянная шапка экрана. Имя с ценой появляются
