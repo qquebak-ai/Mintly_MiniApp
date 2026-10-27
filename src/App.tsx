@@ -21413,6 +21413,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   // Карточка токена Solana открыта — сделка, скорее всего, близко.
   useEffect(() => { if (token && token.chain === "solana") прогретьSolana(); }, [token && token.chain]);
   // Какая из кнопок сделки сейчас отыгрывает цветовой отклик.
+  // Карточка PnL: открыта ли и последние цифры позиции для неё.
+  const [pnlОткрыт, setPnlОткрыт] = useState(false);
+  const pnlДанные = useRef({ итог: 0, вложено: 0, стоимость: 0 });
   // Сторона сделки в карточке позиции: ползунок «Купить / Продать».
   const [сторонаКарточки, setСторонаКарточки] = useState("buy");
   const [скоростьКарточки, выбратьСкоростьКарточки] = useСкорость();
@@ -22956,6 +22959,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
         })() : null}
         onClose={() => setЛистВыхода(false)}
       />
+      <КарточкаPnL открыт={pnlОткрыт} onClose={() => setPnlОткрыт(false)} token={token} showToast={showToast}
+        итог={pnlДанные.current.итог} вложено={pnlДанные.current.вложено} стоимость={pnlДанные.current.стоимость} />
       <TokenShareSheet
         token={shareOpen ? {
           ...token, logoUrl: логотип,
@@ -23165,10 +23170,14 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
             if (!сходится || ждёмИсторию) итог = прошлыйИтог.current;
             else прошлыйИтог.current = итог;
             const плюс = итог >= 0;
+            pnlДанные.current = { итог, вложено: вложеноUSD, стоимость: стоимостьПозиции };
+            // Итог — кнопка: нажал и поделился карточкой PnL.
             return (
-              <span style={{ fontFamily: monoFont, fontSize: 12.5, color: итог === 0 ? T.faint : плюс ? T.up : T.down }}>
+              <button onClick={() => { haptic("light"); setPnlОткрыт(true); }} className="fx-tap flex items-center"
+                style={{ gap: 6, padding: "5px 10px", borderRadius: 999, border: "none", background: hexA(T.ice, 0.08), fontFamily: monoFont, fontSize: 13, fontWeight: 700, color: итог === 0 ? T.ice : плюс ? T.up : T.down }}>
                 {плюс ? "+" : "−"}<ТекстСЧислами text={fmtUSD(Math.abs(итог))} />
-              </span>
+                <Share2 size={13} color={T.ice} />
+              </button>
             );
           })()}
         </div>
@@ -23814,6 +23823,157 @@ async function ссылкаНаТокен(token) {
    действия. Отправка идёт системным окном «поделиться» — оно кладёт
    картинку прямо в чат Telegram; там, где такого окна нет, файл просто
    сохраняется, и переслать его человек может сам. */
+/* Карточка PnL — чтобы похвастаться сделкой, как делают трейдеры в X.
+ * Фон по умолчанию — шёлк с приветствия сайта; можно поставить своё фото
+ * или видео (лучше горизонтальное 16:9 — карточка 1280×720, лишнее
+ * обрезается по центру). Цвет итога: белый — ровно ноль, зелёный —
+ * плюс, красный — минус. Картинку отдаём сразу; с видео или шёлком
+ * можно сохранить и ролик — шесть секунд, записанных прямо с холста. */
+const PNL_Ш = 1280, PNL_В = 720;
+function отступТелеграма(имя) {
+  try { return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(имя)) || 0; } catch { return 0; }
+}
+function КарточкаPnL({ открыт, onClose, token, итог = 0, вложено = 0, стоимость = 0, insetTop = 0, insetBottom = 0, showToast }) {
+  const холст = useRef(null);
+  const ввод = useRef(null);
+  const [фон, setФон] = useState(null); // { вид: "фото" | "видео", url, эл }
+  const [пишем, setПишем] = useState(false);
+  const процент = вложено > 0 ? (итог / вложено) * 100 : 0;
+  const ноль = Math.abs(итог) < 0.005;
+  const цвет = ноль ? "#F2F0EB" : итог > 0 ? "#2ED47A" : "#FF4D5E";
+
+  useEffect(() => {
+    if (!открыт) return undefined;
+    const к = холст.current;
+    if (!к) return undefined;
+    const г = к.getContext("2d");
+    let шёлк = null, кадр = 0, жив = true;
+    подготовитьШёлк().then((ш) => { if (жив) шёлк = ш; }).catch(() => {});
+    const начало = performance.now();
+    const вписать = (эл, w, h) => {
+      // «С обрезкой» по центру: фон заполняет карточку целиком.
+      const м = Math.max(PNL_Ш / w, PNL_В / h);
+      г.drawImage(эл, (PNL_Ш - w * м) / 2, (PNL_В - h * м) / 2, w * м, h * м);
+    };
+    const рисовать = () => {
+      const t = (performance.now() - начало) / 1000;
+      г.fillStyle = "#000"; г.fillRect(0, 0, PNL_Ш, PNL_В);
+      if (фон && фон.эл) {
+        const э = фон.эл;
+        const w = э.videoWidth || э.naturalWidth || э.width, h = э.videoHeight || э.naturalHeight || э.height;
+        if (w && h) вписать(э, w, h);
+        // Своё фото или видео приглушаем, чтобы цифры читались на любом.
+        г.fillStyle = "rgba(0,0,0,0.38)"; г.fillRect(0, 0, PNL_Ш, PNL_В);
+      } else if (шёлк) {
+        // Шёлк с медленным «дыханием», как на приветствии сайта.
+        г.save();
+        г.translate(PNL_Ш / 2, PNL_В / 2);
+        г.rotate(((Math.sin(t * 0.5) * 3) * Math.PI) / 180);
+        const м = (PNL_Ш / 1920) * 0.95 * (1 + 0.03 * Math.sin(t * 0.8));
+        г.drawImage(шёлк, -шёлк.width * м, -шёлк.height * м, шёлк.width * 2 * м, шёлк.height * 2 * м);
+        г.restore();
+        const тень = г.createLinearGradient(0, 0, PNL_Ш, 0);
+        тень.addColorStop(0, "rgba(0,0,0,0.85)"); тень.addColorStop(0.6, "rgba(0,0,0,0.35)"); тень.addColorStop(1, "rgba(0,0,0,0.1)");
+        г.fillStyle = тень; г.fillRect(0, 0, PNL_Ш, PNL_В);
+      }
+      const шрифт = "'MintlyUI', 'Nunito', sans-serif";
+      г.textBaseline = "alphabetic";
+      г.fillStyle = "#F2F0EB";
+      г.font = `800 40px ${шрифт}`;
+      г.fillText("Mintly", 72, 104);
+      г.font = `800 64px ${шрифт}`;
+      г.fillText(`$${token ? token.ticker : ""}`, 72, 290);
+      г.fillStyle = цвет;
+      г.font = `800 150px ${шрифт}`;
+      г.fillText(`${итог >= 0 || ноль ? "+" : "−"}$${Math.abs(итог).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 66, 450);
+      г.font = `800 56px ${шрифт}`;
+      г.fillText(`${процент >= 0 || ноль ? "+" : "−"}${Math.abs(процент).toFixed(2)}%`, 72, 530);
+      г.fillStyle = "rgba(242,240,235,0.75)";
+      г.font = `700 30px ${шрифт}`;
+      г.fillText(`Вложено $${вложено.toFixed(2)}  ·  Сейчас $${стоимость.toFixed(2)}`, 72, 640);
+      кадр = requestAnimationFrame(рисовать);
+    };
+    кадр = requestAnimationFrame(рисовать);
+    return () => { жив = false; cancelAnimationFrame(кадр); };
+  }, [открыт, фон, итог, вложено, стоимость, token, цвет, процент, ноль]);
+
+  function выбратьФон(e) {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    if (f.type.startsWith("video/")) {
+      const в = document.createElement("video");
+      в.src = url; в.muted = true; в.loop = true; в.playsInline = true; в.setAttribute("playsinline", "");
+      в.play().catch(() => {});
+      setФон({ вид: "видео", url, эл: в });
+    } else {
+      const и = new Image();
+      и.onload = () => setФон({ вид: "фото", url, эл: и });
+      и.src = url;
+    }
+  }
+  useEffect(() => () => { if (фон && фон.url) URL.revokeObjectURL(фон.url); }, [фон]);
+
+  async function отдать(blob, имя, тип) {
+    const файл = new File([blob], имя, { type: тип });
+    if (navigator.canShare && navigator.canShare({ files: [файл] })) {
+      try { await navigator.share({ files: [файл] }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = имя;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  async function сохранитьКартинку() {
+    haptic("light");
+    const blob = await new Promise((г) => холст.current.toBlob(г, "image/png"));
+    if (blob) отдать(blob, `mintly-pnl-${token ? token.ticker : ""}.png`, "image/png");
+  }
+  async function сохранитьВидео() {
+    if (пишем) return;
+    const поток = холст.current.captureStream ? холст.current.captureStream(30) : null;
+    if (!поток || typeof MediaRecorder === "undefined") { showToast && showToast("Видео здесь не записать — сохрани картинку"); return; }
+    haptic("light");
+    const тип = ["video/mp4", "video/webm;codecs=vp9", "video/webm"].find((т) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(т)) || "";
+    const куски = [];
+    const запись = new MediaRecorder(поток, тип ? { mimeType: тип, videoBitsPerSecond: 6_000_000 } : undefined);
+    запись.ondataavailable = (e) => { if (e.data && e.data.size) куски.push(e.data); };
+    setПишем(true);
+    await new Promise((готово) => { запись.onstop = готово; запись.start(); setTimeout(() => запись.stop(), 6000); });
+    setПишем(false);
+    const mp4 = (запись.mimeType || тип).includes("mp4");
+    отдать(new Blob(куски, { type: mp4 ? "video/mp4" : "video/webm" }), `mintly-pnl-${token ? token.ticker : ""}.${mp4 ? "mp4" : "webm"}`, mp4 ? "video/mp4" : "video/webm");
+  }
+
+  return (
+    <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок="PnL"
+      // Отступы Telegram — из тех же переменных, что у остальных шторок.
+      insetTop={insetTop || отступТелеграма("--tg-inset-top")} insetBottom={insetBottom || отступТелеграма("--tg-inset-bottom")}>
+      <div className="flex flex-col" style={{ gap: 16, padding: "0 16px" }}>
+        <canvas ref={холст} width={PNL_Ш} height={PNL_В} style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 18, background: "#000" }} />
+        <input ref={ввод} type="file" accept="image/*,video/*" onChange={выбратьФон} style={{ display: "none" }} />
+        <div className="flex" style={{ gap: 10 }}>
+          <button onClick={() => ввод.current && ввод.current.click()} className="fx-tap flex-1 flex items-center justify-center" style={{ gap: 8, height: 50, borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: displayFont, fontSize: 15, fontWeight: 800 }}>
+            <Upload size={17} /> {фон ? "Другой фон" : "Свой фон"}
+          </button>
+          {фон && (
+            <button onClick={() => setФон(null)} className="fx-tap flex items-center justify-center" style={{ width: 50, height: 50, borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice }} aria-label="Шёлк">
+              <Sparkles size={18} />
+            </button>
+          )}
+        </div>
+        <button onClick={сохранитьКартинку} className="fx-tap w-full" style={{ height: 54, borderRadius: 999, border: "none", background: "#FFFFFF", color: "#000", fontFamily: displayFont, fontSize: 16, fontWeight: 800 }}>
+          Сохранить картинку
+        </button>
+        <button onClick={сохранитьВидео} disabled={пишем} className="fx-tap w-full flex items-center justify-center" style={{ gap: 8, height: 54, borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: displayFont, fontSize: 16, fontWeight: 800, opacity: пишем ? 0.6 : 1 }}>
+          {пишем ? <ЗнакЗагрузки size={20} всегда /> : "Сохранить видео"}
+        </button>
+      </div>
+    </ЭкранСнизу>
+  );
+}
+
 function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, showToast }) {
   // Крестика нет — закрывает кнопка «Назад» Telegram.
   useНазадТелеграм(!!tokenProp, onClose);
