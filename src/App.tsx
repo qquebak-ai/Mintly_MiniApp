@@ -581,6 +581,7 @@ const STR = {
     gradListedBody: "Токен на бирже: цена идёт по пулу, ликвидность закреплена в контракте.",
     tabChart: "График", tabInfo: "Инфо", tabTx: "Транзакции", chartModePrice: "Цена", chartModeMcap: "Капитализация",
     tabHolders: "Держатели", tabFeed: "Лента", tabAbout: "О токене", tabStats: "Статистика", statMcap: "Капитализация", statLiq: "Ликвидность", statVol24: "Объём за сутки", statTrades24: "Сделок за сутки", statAge: "Возраст", statCurve: "Собрано", statDex: "Биржа",
+    orderInstant: "Мгновенно", orderMarket: "По рынку", orderLimit: "Лимит",
     positionTitle: "Ваша позиция", positionValue: "Стоимость", positionAmount: "Количество",
     positionChange24: "За 24 часа", positionEmpty: "Токенов пока нет",
     positionSinceBuy: "с покупки",
@@ -1325,6 +1326,7 @@ const STR = {
     gradListedBody: "The curve is done: the price now moves both ways with the pool's reserves. The liquidity is locked in the contract and nobody can pull it out, so you can always sell.",
     tabChart: "Chart", tabInfo: "Info", tabTx: "Transactions", chartModePrice: "Price", chartModeMcap: "Market cap",
     tabHolders: "Holders", tabFeed: "Feed", tabAbout: "About",
+    orderInstant: "Instant", orderMarket: "Market", orderLimit: "Limit",
     positionTitle: "Your position", positionValue: "Value", positionAmount: "Amount",
     positionSinceBuy: "since your buy",
     positionChange24: "24h change", positionEmpty: "No tokens yet",
@@ -21411,7 +21413,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   // Карточка токена Solana открыта — сделка, скорее всего, близко.
   useEffect(() => { if (token && token.chain === "solana") прогретьSolana(); }, [token && token.chain]);
   // Какая из кнопок сделки сейчас отыгрывает цветовой отклик.
-  const [вспышка, setВспышка] = useState(null);
+  // Сторона сделки в карточке позиции: ползунок «Купить / Продать».
+  const [сторонаКарточки, setСторонаКарточки] = useState("buy");
+  const [скоростьКарточки, выбратьСкоростьКарточки] = useСкорость();
   /* Что рисует график: цену или капитализацию.
      По умолчанию — цена: то же число, что крупно стоит в шапке, и то,
      на что смотрят в первую очередь. Капитализация остаётся рядом, но
@@ -23185,65 +23189,79 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{tr("positionEmpty")}</span>
         )}
 
-        {/* Кнопки сделки живут здесь же: решение принимается по позиции,
-            а не по отдельному блоку внизу страницы. */}
-        {curve && curve.graduated && !рынокОткрыт ? null : быстрые.oneClick && onQuick ? (
-          /* Покупка в 1 клик: вместо двух кнопок — свои суммы покупки и
-             доли продажи из настроек. Нажатие сразу отправляет сделку. */
-          <div className="flex flex-col" style={{ gap: 8 }}>
-            {[["buy", быстрые.buy[монетаБыстрых(token)] || [], ГРАДИЕНТ_РОСТА, "#06210F"], ["sell", быстрые.sell, ГРАДИЕНТ_ПАДЕНИЯ, "#FFFFFF"]].map(([вид, суммы, фон, цвет]) => (
-              <div key={вид} className="flex" style={{ gap: 8 }}>
-                {суммы.map((v) => (
-                  <button
-                    key={v}
-                    disabled={вид === "sell" && !(позиция > 0)}
+        {/* Сделка — прямо здесь, спокойно и в цветах приложения: без
+            зелёных и красных плашек. Ползунок «Купить / Продать», рядом —
+            балансы кошелька во всех сетях, ниже — как исполнить:
+            мгновенно, по рынку или лимитной заявкой. В режиме «в 1 клик»
+            вместо одной кнопки — свои три суммы (на продаже — доли). */}
+        {curve && curve.graduated && !рынокОткрыт ? null : (
+          <div className="flex flex-col" style={{ gap: 12 }}>
+            <БалансыСетей текущая={token.chain === "solana" ? "sol" : этоEVM(token.chain) ? token.chain : "ton"} />
+            <div className="flex rounded-[20px] p-1" style={{ position: "relative", background: T.bg }}>
+              <span aria-hidden style={{
+                position: "absolute", top: 4, bottom: 4, left: 4, width: "calc(50% - 4px)", borderRadius: 16,
+                background: T.ice, transform: сторонаКарточки === "sell" ? "translateX(100%)" : "none",
+                transition: "transform 320ms cubic-bezier(0.34, 1.3, 0.64, 1)",
+              }} />
+              {[["buy", tr("buy")], ["sell", tr("sell")]].map(([к, подпись]) => (
+                <button key={к} onClick={() => { haptic("light"); setСторонаКарточки(к); }} className="fx-tap flex-1 rounded-[16px] py-2"
+                  style={{ position: "relative", zIndex: 1, background: "transparent", border: "none", fontFamily: displayFont, fontWeight: 800, fontSize: 15,
+                    color: сторонаКарточки === к ? T.bg : T.muted, transition: "color 220ms ease" }}>
+                  {подпись}
+                </button>
+              ))}
+            </div>
+            <div className="flex" style={{ gap: 6 }}>
+              {[["instant", tr("orderInstant"), Zap], ["market", tr("orderMarket"), null], ["limit", tr("orderLimit"), null]].map(([к, подпись, Иконка]) => {
+                const вкл = к !== "limit" && (к === "instant") === (скоростьКарточки === "turbo");
+                return (
+                  <button key={к} type="button"
                     onClick={() => {
-                      haptic("medium");
-                      if (вид === "buy") onQuick("buy", v);
-                      // Доля позиции — от того, что лежит на кошельке сейчас;
-                      // «всё» без хвоста округления, который сеть отбила бы.
-                      else onQuick("sell", v >= 100 ? позиция : Math.floor(позиция * v / 100 * 1e6) / 1e6, позиция);
+                      haptic("light");
+                      // Лимит ставится в окне сделки — там цель и список заявок.
+                      if (к === "limit") { (сторонаКарточки === "sell" ? onSell : onBuy)({ limit: true }); return; }
+                      выбратьСкоростьКарточки(к === "instant" ? "turbo" : "fast");
                     }}
-                    className="fx-tap flex-1 rounded-[14px] py-2.5"
-                    style={{
-                      fontFamily: displayFont, fontWeight: 700, fontSize: 14, border: "none",
-                      background: фон, backgroundSize: "220% 220%", animation: "кнопкаПереливается 5.5s ease-in-out infinite",
-                      color: цвет, opacity: вид === "sell" && !(позиция > 0) ? 0.4 : 1, fontVariantNumeric: "tabular-nums",
-                    }}>
-                    {вид === "buy" ? `${v} ${монетаБыстрых(token) === "TON" ? ТИКЕР_TON : монетаБыстрых(token)}` : `${v}%`}
+                    className="fx-tap flex items-center"
+                    style={{ gap: 5, padding: "7px 12px", borderRadius: 999, border: "none", background: вкл ? hexA(T.ice, 0.12) : "transparent", color: вкл ? T.ice : T.muted, fontFamily: bodyFont, fontSize: 13.5, fontWeight: 700 }}>
+                    {Иконка && <Иконка size={13} />}{подпись}
                   </button>
-                ))}
+                );
+              })}
+            </div>
+            {быстрые.oneClick && onQuick ? (
+              <div className="flex" style={{ gap: 8 }}>
+                {(сторонаКарточки === "buy" ? (быстрые.buy[монетаБыстрых(token)] || []) : быстрые.sell).map((v) => {
+                  const нельзя = сторонаКарточки === "sell" && !(позиция > 0);
+                  return (
+                    <button
+                      key={v}
+                      disabled={нельзя}
+                      onClick={() => {
+                        haptic("medium");
+                        if (сторонаКарточки === "buy") onQuick("buy", v);
+                        // Доля позиции — от того, что лежит на кошельке сейчас;
+                        // «всё» без хвоста округления, который сеть отбила бы.
+                        else onQuick("sell", v >= 100 ? позиция : Math.floor(позиция * v / 100 * 1e6) / 1e6, позиция);
+                      }}
+                      className="fx-tap flex-1 rounded-[16px]"
+                      style={{
+                        height: 48, fontFamily: monoFont, fontWeight: 700, fontSize: 15, border: "none",
+                        background: T.ice, color: T.bg, opacity: нельзя ? 0.35 : 1, fontVariantNumeric: "tabular-nums",
+                      }}>
+                      {сторонаКарточки === "buy" ? `${v} ${монетаБыстрых(token) === "TON" ? ТИКЕР_TON : монетаБыстрых(token)}` : `${v}%`}
+                    </button>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex gap-2">
-            <button
-              onClick={() => { setВспышка("buy"); onBuy(); }}
-              onAnimationEnd={() => setВспышка(null)}
-              className={`fx-tap flex-1 rounded-[14px] py-2.5 flex items-center justify-center gap-1.5${вспышка === "buy" ? " fx-flash-up" : ""}`}
-              /* Те же два цвета, что и в окне сделки: покупка зелёная,
-                 продажа красная, и обе с тем же медленным переливом. */
-              style={{
-                fontFamily: displayFont, fontWeight: 600, fontSize: 14.5,
-                background: ГРАДИЕНТ_РОСТА, backgroundSize: "220% 220%",
-                animation: "кнопкаПереливается 5.5s ease-in-out infinite",
-                color: "#06210F", opacity: unlocked ? 1 : 0.55,
-              }}>
-              {!unlocked && <Lock size={13} />}{tr("buy")}
-            </button>
-            <button
-              onClick={() => { setВспышка("sell"); onSell(); }}
-              onAnimationEnd={() => setВспышка(null)}
-              className={`fx-tap flex-1 rounded-[14px] py-2.5 flex items-center justify-center gap-1.5${вспышка === "sell" ? " fx-flash-down" : ""}`}
-              style={{
-                fontFamily: displayFont, fontWeight: 600, fontSize: 14.5,
-                background: ГРАДИЕНТ_ПАДЕНИЯ, backgroundSize: "220% 220%",
-                animation: "кнопкаПереливается 5.5s ease-in-out infinite",
-                color: "#FFFFFF", opacity: unlocked ? 1 : 0.55,
-              }}>
-              {!unlocked && <Lock size={13} />}{tr("sell")}
-            </button>
+            ) : (
+              <button
+                onClick={() => (сторонаКарточки === "sell" ? onSell() : onBuy())}
+                className="fx-tap w-full rounded-[16px] flex items-center justify-center gap-1.5"
+                style={{ height: 50, border: "none", background: T.ice, color: T.bg, fontFamily: displayFont, fontWeight: 800, fontSize: 16, opacity: unlocked ? 1 : 0.55 }}>
+                {!unlocked && <Lock size={14} />}{сторонаКарточки === "sell" ? tr("sell") : tr("buy")}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -24137,7 +24155,9 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   const [slippage, setSlippage] = useState(1);
   const [скорость, setСкорость] = useState(читатьСкорость);
   // Как исполнить: сейчас по рынку или лимитной заявкой по цене.
-  const [типЗаявки, setТипЗаявки] = useState("market");
+  const [типЗаявки, setТипЗаявки] = useState(tradeModal && tradeModal.limit ? "limit" : "market");
+  // Окно открыли кнопкой «Лимит» со страницы токена — сразу на лимите.
+  useEffect(() => { if (tradeModal) setТипЗаявки(tradeModal.limit ? "limit" : "market"); }, [tradeModal]);
   const [цельКап, setЦельКап] = useState("");
   const [заявки, setЗаявки] = useState(null);
   const [ставим, setСтавим] = useState(false);
@@ -24622,7 +24642,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
         <div style={{ marginTop: 16 }} />
             <БыстрыеСуммы
               крупно
-              цвет={isBuy ? T.up : T.down}
+              цвет={T.ice}
               значения={isBuy ? быстрые.buy[ключМонеты] : быстрые.sell}
               подпись={(v) => (isBuy ? `${v} ${монета}` : `${v}%`)}
               итог={(v) => {
@@ -34908,7 +34928,7 @@ function mapTokenRow(row) {
     // кошельком приложения, он заводится вместе с аккаунтом.
     return true;
   }
-  function handleBuy() { if (token && token.демо) { showToast("Это демо-токен — его нельзя купить"); return; } if (нуженКошелёкНаСайте()) return; if (requireUnlockRoot()) setTradeModal({ mode: "buy" }); }
+  function handleBuy(опц) { if (token && token.демо) { showToast("Это демо-токен — его нельзя купить"); return; } if (нуженКошелёкНаСайте()) return; if (requireUnlockRoot()) setTradeModal({ mode: "buy", limit: !!(опц && опц.limit === true) }); }
   /* Сделка в 1 клик со страницы токена: сумма (или количество при
      продаже) приходит готовой, окно сделки не открывается. Проверки те
      же, что у кнопок «Купить» и «Продать». */
@@ -34921,7 +34941,7 @@ function mapTokenRow(row) {
     const pay = mode === "buy" ? `${сумма.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}` : сумма.toLocaleString("ru-RU");
     confirmTrade(mode, pay, "", "", сумма, 0, mode === "sell" ? позиция : null);
   }
-  function handleSell() { if (token && token.демо) { showToast("Это демо-токен — его нельзя продать"); return; } if (нуженКошелёкНаСайте()) return; if (requireUnlockRoot()) setTradeModal({ mode: "sell" }); }
+  function handleSell(опц) { if (token && token.демо) { showToast("Это демо-токен — его нельзя продать"); return; } if (нуженКошелёкНаСайте()) return; if (requireUnlockRoot()) setTradeModal({ mode: "sell", limit: !!(опц && опц.limit === true) }); }
   // Своя запись о сделке. Цепочка знает о переводе, но не знает, кто
   // его сделал из приложения и по какому курсу — а без этого не
   // посчитать ни портфель, ни прибыль. Пишем после того, как кошелёк
