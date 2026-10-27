@@ -144,7 +144,11 @@ export const ЗНАК_ПУТЬ = "M40.12 101.31 L41.10 101.94 L42.79 102.74 L44.
 
 /* вРамке — шёлк внутри карточки (карта баланса): меряется по своей
    обёртке, а не по окну, и лежит в ней, а не поверх страницы. */
-export function ФонШёлк({ тон = null, вОкне = false, вРамке = false }: { тон?: string | null; вОкне?: boolean; вРамке?: boolean }) {
+/* пауза — шёлк замирает на месте (карта баланса во время переворота:
+   двигать большой холст внутри поворачивающегося 3D-слоя — это рывки). */
+export function ФонШёлк({ тон = null, вОкне = false, вРамке = false, пауза = false }: { тон?: string | null; вОкне?: boolean; вРамке?: boolean; пауза?: boolean }) {
+  const паузаРеф = useRef(пауза);
+  паузаРеф.current = пауза;
   const место = useRef<HTMLDivElement | null>(null);
   const обёртка = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -171,7 +175,7 @@ export function ФонШёлк({ тон = null, вОкне = false, вРамке
     };
     const начало = performance.now();
     const шаг = () => {
-      if (к) {
+      if (к && !паузаРеф.current) {
         const вв = window.innerHeight;
         const всего = Math.max(1, document.documentElement.scrollHeight - вв);
         const [я, dx, dy, sc, поворот] = поКлючам(вОкне ? 0 : Math.min(1, window.scrollY / всего), ШЁЛК_КЛЮЧИ);

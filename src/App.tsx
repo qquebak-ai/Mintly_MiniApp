@@ -20214,7 +20214,9 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
   const ПЕРЕВОРОТ_КАРТЫ_МС = 640;
   // Толщина нарочно больше настоящей (≈3px на 210px высоты): на
   // телефоне трёхпиксельный торец на наклоне просто не разглядеть.
-  const ТОЛЩИНА_КАРТЫ = 9, СЛОИ_ТОРЦА = 12;
+  // Слоёв торца меньше: каждый — отдельный 3D-слой, и двенадцать штук
+  // перерисовывались на каждом кадре переворота.
+  const ТОЛЩИНА_КАРТЫ = 9, СЛОИ_ТОРЦА = 5;
   const наклонКарты = useRef(null);
   useEffect(() => {
     const обёртка = наклонКарты.current, корень = кореньКарты.current;
@@ -20248,6 +20250,15 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
     return () => { window.removeEventListener("scroll", приПрокрутке, { capture: true }); if (кадр) cancelAnimationFrame(кадр); };
   }, []);
   const [переворотКарты, setПереворотКарты] = useState(false);
+  // Пока карта переворачивается, шёлк на ней стоит (см. ФонШёлк, пауза).
+  const [картаКрутится, setКартаКрутится] = useState(false);
+  const первыйПереворот = useRef(true);
+  useEffect(() => {
+    if (первыйПереворот.current) { первыйПереворот.current = false; return undefined; }
+    setКартаКрутится(true);
+    const id = setTimeout(() => setКартаКрутится(false), ПЕРЕВОРОТ_КАРТЫ_МС + 60);
+    return () => clearTimeout(id);
+  }, [переворотКарты]);
   const [согласенНаОбороте, setСогласенНаОбороте] = useState(false);
   // Слова — прямо на обороте карты, никакого перехода на другой экран:
   // карта сама вырастает под них.
@@ -20714,8 +20725,9 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
         <span key={i} aria-hidden style={{
           position: "absolute", inset: 0, borderRadius: 24, pointerEvents: "none",
           transform: `translateZ(${(-ТОЛЩИНА_КАРТЫ / 2 + (ТОЛЩИНА_КАРТЫ * (i + 0.5)) / СЛОИ_ТОРЦА).toFixed(2)}px)`,
-          background: `linear-gradient(${hexA("#000000", 0.28)}, ${hexA("#000000", 0.28)}), ${видКарты.fill}`,
-          backgroundSize: `100% 100%, ${видКарты.size || "320% 320%"}`,
+          // Торец — тёмный, как сама карта на шёлке: серая заливка вида
+          // карты на середине переворота выглядела пустой серой плашкой.
+          background: "#111113",
         }} />
       ))}
       <section
@@ -20759,7 +20771,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             элементах друг другу не мешают. */}
         {/* Фон карты — шёлк с приветствия на чёрном, в цвет тарифа, как у
             карточки PnL: Free серый, Pro зелёный, Turbo переливается. */}
-        <ФонШёлк вРамке тон={{ fast: "pro", turbo: "turbo" }[скоростьКарты] || null} />
+        <ФонШёлк вРамке пауза={картаКрутится} тон={{ fast: "pro", turbo: "turbo" }[скоростьКарты] || null} />
         {/* Еле заметная кромка: на чёрном фоне страницы иначе не видно,
             где кончается карта. Поверх шёлка, под текстом. */}
         <span aria-hidden style={{ position: "absolute", inset: 0, borderRadius: "inherit", boxShadow: `inset 0 0 0 1px ${hexA("#FFFFFF", 0.1)}`, pointerEvents: "none", zIndex: 1 }} />
@@ -20784,7 +20796,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             карты (210 на ~358 точек). */}
         {/* Знак приложения — в углу, где у карт стоит логотип банка. */}
         {/* Знак приложения — крупно в углу, белым, как на карточке PnL. */}
-        <svg aria-hidden width={52} height={52} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: 16, right: 16, pointerEvents: "none" }}>
+        <svg aria-hidden width={70} height={70} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: 14, right: 14, pointerEvents: "none" }}>
           <path d={ПУТЬ_ЗВЕЗДЫ} fill="#FFFFFF" />
         </svg>
         {/* Имя держателя, как на дебетовой карте: ник заглавными, с
@@ -20876,15 +20888,13 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
           // вылезали прямоугольным краем за пределы карты.
           isolation: "isolate",
           WebkitMaskImage: "-webkit-radial-gradient(white, black)",
-          // Тот же градиент, что на лицевой стороне, только без бликов и
-          // волн — ровный медленный перелив, без рамки и без серой
-          // подложки поверх.
-          background: видКарты.fill,
-          backgroundSize: видКарты.size || "320% 320%",
-          animation: "картаПереливается 16s ease-in-out infinite",
+          // Тот же фон, что на лицевой стороне: шёлк в цвет тарифа на чёрном.
+          background: "#000000",
           display: "flex", flexDirection: "column", gap: 6, padding: "14px 15px",
         }}
       >
+        <ФонШёлк вРамке пауза={картаКрутится || !переворотКарты} тон={{ fast: "pro", turbo: "turbo" }[скоростьКарты] || null} />
+        <span aria-hidden style={{ position: "absolute", inset: 0, background: hexA("#000000", 0.45), pointerEvents: "none", zIndex: 0 }} />
         {словаНаОбороте ? (
           <>
             <span style={{ fontFamily: displayFont, color: "#FFFFFF", fontSize: 13, fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.2 }}>
