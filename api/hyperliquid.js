@@ -131,6 +131,32 @@ async function собратьРынки() {
   return идёт;
 }
 
+/* Значки рынков — те же, что у самой Hyperliquid (app.hyperliquid.xyz/
+   coins/<монета>.svg). Отдаём их через свой сервер: из Telegram сайт
+   биржи открывается не у всех, а свой адрес грузится всегда. Для монет
+   без своего значка пробуем родственное имя: «kPEPE» (тысяча PEPE) —
+   значок PEPE, акция с одной площадки — та же акция с другой. Нет
+   значка — сайт биржи отвечает HTML-страницей, это не картинка. */
+const значки = new Map();
+async function значокМонеты(coin) {
+  const было = значки.get(coin);
+  if (было && Date.now() - было.at < (было.svg ? 7 * 86400e3 : 3600e3)) return было.svg;
+  const имя = coin.replace(/^[a-z0-9]+:/i, "");
+  const голое = /^k[A-Z]/.test(имя) ? имя.slice(1) : имя;
+  const кандидаты = [...new Set([coin, имя, голое, `xyz:${голое}`, `flx:${голое}`, `felix:${голое}`])];
+  let svg = null;
+  for (const к of кандидаты) {
+    try {
+      const r = await fetch(`https://app.hyperliquid.xyz/coins/${к}.svg`, { signal: AbortSignal.timeout(5000) });
+      const т = r.ok ? await r.text() : "";
+      if (/^\s*(<\?xml[^>]*>\s*)?<svg[\s>]/i.test(т) && т.length < 200_000) { svg = т; break; }
+    } catch { /* следующий кандидат */ }
+  }
+  if (значки.size > 3000) значки.clear();
+  значки.set(coin, { svg, at: Date.now() });
+  return svg;
+}
+
 /* Цена и размер в том виде, какой примет биржа: не больше пяти значащих
    цифр и не больше (6 − szDecimals) знаков после запятой у цены; размер —
    вниз до szDecimals. */
@@ -331,6 +357,19 @@ export default async function handler(req, res) {
       const р = await собратьРынки();
       res.setHeader("Cache-Control", "public, max-age=2");
       return res.status(200).json({ network: БОЕВАЯ ? "mainnet" : "testnet", markets: р.список.slice(0, 300) });
+    }
+    if (действие === "icon") {
+      const coin = String(req.query.coin || "");
+      if (!/^[A-Za-z0-9:]{1,40}$/.test(coin)) return res.status(400).json({ error: "bad_request" });
+      const svg = await значокМонеты(coin);
+      if (!svg) { res.setHeader("Cache-Control", "public, max-age=3600"); return res.status(404).json({ error: "no_icon" }); }
+      res.setHeader("Content-Type", "image/svg+xml");
+      // Чужой SVG с нашего адреса: скрипты в нём не должны исполниться,
+      // даже если файл откроют напрямую, а не через <img>.
+      res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src data:");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      return res.status(200).send(svg);
     }
     if (действие === "candles") {
       const coin = String(req.query.coin || "").slice(0, 40);

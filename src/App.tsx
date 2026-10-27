@@ -15846,9 +15846,9 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
   );
 }
 
-/* Картинка рынка — значки самой Hyperliquid по имени монеты (для HIP-3
-   с префиксом площадки, «xyz:GOLD»), чтобы не держать свой набор на
-   сотни рынков; если значка нет — круг с первой буквой. */
+/* Картинка рынка — настоящий значок монеты, тот же, что на самой
+   Hyperliquid (сервер берёт его у биржи и отдаёт со своего адреса);
+   если значка нет — круг с первой буквой. */
 function ЗначокРынка({ рынок, size = 40 }) {
   const [нет, setНет] = useState(false);
   const круг = { width: size, height: size, borderRadius: "50%", flex: "none" };
@@ -15857,7 +15857,7 @@ function ЗначокРынка({ рынок, size = 40 }) {
       {String(рынок.name || "?").slice(0, 1)}
     </span>
   );
-  return <img src={`https://app.hyperliquid.xyz/coins/${encodeURIComponent(рынок.coin).replace("%3A", ":")}.svg`} alt="" width={size} height={size}
+  return <img src={апи(`/api/hyperliquid?action=icon&coin=${encodeURIComponent(рынок.coin)}`)} alt="" width={size} height={size}
     loading="lazy" onError={() => setНет(true)} style={{ ...круг, display: "block", background: T.surface, objectFit: "cover" }} />;
 }
 
@@ -20848,7 +20848,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             карты (210 на ~358 точек). */}
         {/* Знак приложения — в углу, где у карт стоит логотип банка. */}
         {/* Знак приложения — крупно в углу, белым, как на карточке PnL. */}
-        <svg aria-hidden width={70} height={70} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: 14, right: 14, pointerEvents: "none" }}>
+        <svg aria-hidden width={44} height={44} viewBox={ВИД_ЗВЕЗДЫ} style={{ position: "absolute", top: 16, right: 16, pointerEvents: "none" }}>
           <path d={ПУТЬ_ЗВЕЗДЫ} fill="#FFFFFF" />
         </svg>
         {/* Имя держателя, как на дебетовой карте: ник заглавными, с
