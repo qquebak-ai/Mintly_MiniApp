@@ -7261,10 +7261,9 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
     if (!loaded) {
       return (
         <div
-          className="flex items-center gap-2 rounded-[16px] px-3 py-2 overflow-hidden"
-          style={{ background: hexA(T.up, 0.05), border: `1px solid ${hexA(T.up, 0.14)}` }}
+          className="flex items-center gap-2 px-1 py-2 overflow-hidden"
         >
-          <ЗагрузкаБлока высота={22} size={22} />
+          <ЗагрузкаБлока высота={26} size={22} />
         </div>
       );
     }
@@ -7284,14 +7283,17 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
     <div style={{ maxHeight: 44, overflow: "hidden" }}>
     <button
       onClick={() => onOpen && onOpen(b.token)}
-      className="fx-tap w-full flex items-center gap-2 rounded-[16px] px-3 py-2 overflow-hidden"
-      style={{ background: hexA(цветСобытия, 0.07), border: `1px solid ${hexA(цветСобытия, 0.22)}`, textAlign: "left" }}
+      // Без цветной рамки и подложки: подсвеченная капсула выглядела
+      // уведомлением об ошибке и спорила со всем экраном. Цвет события —
+      // только у стрелки, остальное — обычная строка.
+      className="fx-tap w-full flex items-center gap-2 px-1 py-2 overflow-hidden"
+      style={{ background: "transparent", border: "none", textAlign: "left" }}
     >
       {/* Ключ по сделке: React заменяет блок целиком, и появление
           проигрывается заново. Время лежит здесь же — оно относится к
           сделке, а не к рамке, и снаружи оставалось от прошлой строки. */}
       <div key={b.id} className="flex items-center gap-2 min-w-0 w-full" style={{ animation: "tickerSwap 380ms ease-out both" }}>
-        <TokenAvatar size={20} tone={b.kind === "sell" ? "down" : "up"} src={b.token.logoUrl} />
+        <TokenAvatar size={26} tone={b.kind === "sell" ? "down" : "up"} src={b.token.logoUrl} />
         {/* У запуска нет ни кошелька, ни суммы: событие о самом токене, а
             не о том, кто его завёл, — «$BURN запущен». Стартовая покупка
             приедет следом обычной строкой. */}
@@ -7305,12 +7307,15 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
         {/* Строка о токене, а не о кошельке: «$BURN купили на 2 SOL».
             Адрес покупателя тут ничего не сообщал — ни имени, ни
             истории, только шум перед тикером. */}
-        <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>${b.token.ticker}</span>
-        <span style={{ fontFamily: bodyFont, color: цветСобытия, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", flex: 1 }}>
+        <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 800 }}>${b.token.ticker}</span>
+        {b.kind === "sell"
+          ? <ArrowDownRight size={15} strokeWidth={2.6} color={цветСобытия} style={{ flexShrink: 0 }} />
+          : <ArrowUpRight size={15} strokeWidth={2.6} color={цветСобытия} style={{ flexShrink: 0 }} />}
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", flex: 1 }}>
           <>
           {/* Сумма в монете той сети, где прошла сделка: в разделе
               Solana цифры в TON были просто неправдой. */}
-          {b.kind === "sell" ? t("tickerSoldFor") : t("tickerBoughtFor")} {(() => {
+          {(() => {
             const соло = b.token && b.token.chain === "solana";
             const evm = b.token && этоEVM(b.token.chain);
             const курс = evm ? курсМонетыEVM(b.token.chain, КЕШ_КУРСОВ_EVM) : соло ? solUsd() : tonUsd();
@@ -7330,7 +7335,7 @@ function RecentBuysTicker({ tokens, curveTokens, onOpen, onReady, сеть = "to
         </span>
         </>
         )}
-        <span style={{ fontFamily: monoFont, color: T.muted, fontSize: 11.5, whiteSpace: "nowrap" }}>{fmtSince(b.at)}</span>
+        <span style={{ fontFamily: monoFont, color: T.faint, fontSize: 12, whiteSpace: "nowrap" }}>{fmtSince(b.at)}</span>
       </div>
     </button>
     </div>
@@ -8552,11 +8557,8 @@ const MEMPAD_FILTERS = [
   { id: "soon", labelKey: "mempadFilterSoon" },
   // «На DEX» — как Migrated у Axiom: кривая закрылась, токен торгуется в пуле.
   { id: "dex", labelKey: "mempadFilterMigrated" },
-  { id: "trend", labelKey: "mempadFilterTrend" },
-  { id: "vol", labelKey: "mempadFilterVol" },
-  // Вкладки «DEX» здесь больше нет: она отбирала пары с биржи, а мемпад
-  // теперь показывает только запуски площадки.
-  { id: "hot", labelKey: "mempadFilterHot" },
+  // Больше трёх не нужно: «тренд», «оборот» и «горячие» показывали почти
+  // один и тот же список в разном порядке и только путали выбор.
 ];
 
 /* Состоялся ли запуск.
@@ -9075,7 +9077,7 @@ function СсылкаXАвтора({ handle, size = 12.5, style = {} }) {
   );
 }
 
-const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
+const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index, вЦентре = false }) {
   // У демо-токена автора нет — его X (официальный X площадки) приходит с сервера.
   const xHandle = useXАвтора(tok.ownerId) || tok.xHandle || null;
   const картинкаГотова = useКартинкаГотова(tok.logoUrl ? превьюКартинки(tok.logoUrl, 48) : null);
@@ -9101,9 +9103,17 @@ const MempadRow = React.memo(function MempadRow({ t: tok, onOpen, index }) {
       // Задержка появления копится только на первых строках: при сорока
       // элементах список иначе разворачивался бы полторы секунды.
       style={{
-        padding: "13px 2px", background: "transparent",
-        borderBottom: `1px solid ${T.line}`,
-        animationDelay: `${Math.min(index, 6) * 22}ms`,
+        padding: вЦентре ? "13px 12px" : "13px 2px",
+        /* Токен из «В центре внимания» светится в ленте тем же
+           фирменным переливом, что и главная кнопка: его видно сразу,
+           не листая к витрине. */
+        ...(вЦентре ? {
+          backgroundImage: `linear-gradient(110deg, ${hexA("#B79CFF", 0.18)}, ${hexA("#5BE0C8", 0.12)} 55%, ${hexA("#FFB86B", 0.14)})`,
+          backgroundSize: "220% 220%",
+          animation: "кнопкаПереливается 7s ease-in-out infinite",
+          borderRadius: 20, margin: "4px 0",
+          boxShadow: `inset 0 0 0 1px ${hexA("#B79CFF", 0.32)}`,
+        } : { background: "transparent", borderBottom: `1px solid ${T.line}`, animationDelay: `${Math.min(index, 6) * 22}ms` }),
       }}
     >
       <div className="flex items-center" style={{ gap: 14 }}>
@@ -11970,9 +11980,6 @@ function МемпадEVM({ сеть, onOpen, myTokens = [] }) {
           капитализации, по кругу раз в восемь секунд. */}
       {витрина.length > 0 && (
         <div>
-          <div style={{ fontFamily: displayFont, color: T.muted, fontSize: 13, fontWeight: 500, letterSpacing: "0.02em", textTransform: "uppercase", marginBottom: 10 }}>
-            {t("mempadSpotlight")}
-          </div>
           <ВитринаСпотлайта
             key={витрина[номерВитрины % витрина.length].id}
             token={витрина[номерВитрины % витрина.length]}
@@ -11981,11 +11988,14 @@ function МемпадEVM({ сеть, onOpen, myTokens = [] }) {
             onТочка={setНомерВитрины}
             onOpen={onOpen}
           />
+          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700, marginTop: 10, textAlign: "center" }}>
+            {t("mempadSpotlight")}
+          </div>
         </div>
       )}
       {свои.length > 0 ? (
         <div className="flex flex-col">
-          {своиСЦифрами.slice(0, 30).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)}
+          {своиСЦифрами.slice(0, 30).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} вЦентре={витрина.some((в) => в.id === tok.id)} />)}
         </div>
       ) : (
         <div className="flex items-center justify-center" style={{ padding: "80px 0", fontFamily: bodyFont, color: T.muted, fontSize: 14.5 }}>
@@ -12385,6 +12395,7 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
   // Индекс намеренно растёт без ограничения, а по кругу гоняем здесь:
   // так смена ленты не сбрасывает позицию на первый токен.
   const spotlight = spotlightTop.length ? spotlightTop[spotIdx % spotlightTop.length] : null;
+  const idsВЦентре = useMemo(() => new Set(spotlightTop.map((т) => т.id)), [spotlightTop]);
 
   /* Весь список — запуски площадки, и только они. Биржевая лента отсюда
      убрана целиком: мемпад — это витрина того, что запустили здесь, а
@@ -12483,9 +12494,6 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
 
       {spotlight && (
         <div>
-          <div style={{ fontFamily: displayFont, color: T.muted, fontSize: 13, fontWeight: 500, letterSpacing: "0.02em", textTransform: "uppercase", marginBottom: 10 }}>
-            {t("mempadSpotlight")}
-          </div>
           <ВитринаСпотлайта
             key={spotlight.id}
             token={spotlight}
@@ -12494,6 +12502,11 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
             onТочка={setSpotIdx}
             onOpen={onOpen}
           />
+          {/* Подпись — под витриной: сверху она стояла серой надписью над
+              самым ярким местом экрана и спорила с ним. */}
+          <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700, marginTop: 10, textAlign: "center" }}>
+            {t("mempadSpotlight")}
+          </div>
         </div>
       )}
 
@@ -12532,7 +12545,7 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
             переключении вкладки это заметная задержка. */}
         {идётЗагрузка
           ? <div className="flex items-center justify-center" style={{ height: 260 }}><ЗнакЗагрузки size={112} /></div>
-          : list.slice(0, 60).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} />)}
+          : list.slice(0, 60).map((tok, i) => <MempadRow key={tok.id} t={tok} onOpen={onOpen} index={i} вЦентре={idsВЦентре.has(tok.id)} />)}
         {/* Пустой фильтр — просто пусто: ни знака, ни надписи. */}
       </div>
       </div>
@@ -23678,25 +23691,33 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
   // самими числами.
   const curveRef = useRef(curve);
   curveRef.current = curve;
+  /* Держатели и showToast тоже не повод перерисовывать: держателей
+     страница переспрашивает раз в несколько секунд, а showToast — новая
+     функция на каждой перерисовке. Каждый такой раз картинка гасла до
+     прозрачности и кнопки становились полупрозрачными — окно мерцало
+     само по себе. Рисуем один раз на токен и ссылку. */
+  const holdersRef = useRef(holders);
+  if (holders != null && holdersRef.current == null) holdersRef.current = holders;
+  const тостRef = useRef(showToast);
+  тостRef.current = showToast;
 
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    setReady(false);
     (async () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
       try {
-        await drawTokenShareCard(canvas, { token, curve: curveRef.current, link, holders });
+        await drawTokenShareCard(canvas, { token, curve: curveRef.current, link, holders: holdersRef.current });
         if (cancelled) return;
         await new Promise((resolve) => canvas.toBlob((b) => { blobRef.current = b; resolve(); }, "image/png"));
         if (!cancelled) setReady(!!blobRef.current);
       } catch (e) {
-        if (!cancelled) showToast(t("shareCardFail"));
+        if (!cancelled) тостRef.current(t("shareCardFail"));
       }
     })();
     return () => { cancelled = true; };
-  }, [token, holders, link, showToast]);
+  }, [token && token.id, link]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!token) return null;
 
@@ -23795,14 +23816,11 @@ function TokenShareSheet({ token: tokenProp, curve, holders, userId, onClose, sh
           ref={canvasRef}
           style={{ display: "block", width: "100%", borderRadius: 20, background: T.surfaceHi, aspectRatio: "1080 / 1350", opacity: ready ? 1 : 0.4, transition: "opacity 220ms ease" }}
         />
-        <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, margin: "10px 2px 0" }}>
-          {t("shareCardNote")}
-        </p>
         <button
           onClick={send}
           disabled={!ready}
           className="fx-tap w-full flex items-center justify-center gap-2 rounded-[18px] py-3 mt-3"
-          style={{ background: T.electric, color: "#0D1117", fontFamily: displayFont, fontWeight: 700, fontSize: 14.5, opacity: ready ? 1 : 0.5 }}
+          style={{ background: T.ice, color: T.bg, fontFamily: displayFont, fontWeight: 700, fontSize: 15, opacity: ready ? 1 : 0.5, transition: "opacity 220ms ease" }}
         >
           <Send size={15} /> {t("shareCardSend")}
         </button>
@@ -24545,8 +24563,9 @@ function Field({ label, placeholder, area, value, onChange, type = "text", icon:
   const isPassword = type === "password";
   const realType = isPassword ? (reveal ? "text" : "password") : type;
   return (
-    <label className="flex flex-col gap-1.5">
-      <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{label}</span>
+    <label className="flex flex-col gap-2">
+      {/* Подпись поля — белая и плотная: серая мелочь над полем терялась. */}
+      <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{label}</span>
       <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
         {Icon && (
           <Icon size={14} color={T.muted} style={{ position: "absolute", left: 11, pointerEvents: "none" }} />
@@ -25466,20 +25485,59 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
         </div>
       )}
 
-      <div>
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("logoLabel")}</span>
-        <div className="flex gap-3 mt-1.5">
-          <input ref={logoInputRef} type="file" accept="image/*" onChange={onPickLogo} style={{ display: "none" }} />
-          <input ref={bannerInputRef} type="file" accept="image/*" onChange={onPickBanner} style={{ display: "none" }} />
-          <button onClick={() => logoInputRef.current && logoInputRef.current.click()} className="fx-tap flex flex-col items-center justify-center gap-1 flex-shrink-0 overflow-hidden" style={{ width: 76, height: 76, borderRadius: "50%", background: logoUrl ? `center/cover no-repeat url(${logoUrl})` : T.surface, border: logoUrl ? `1.5px solid ${T.lineHi}` : `1px dashed ${touched && !logoUrl ? T.down : T.line}` }}>
-            {!logoUrl && (<><ImageIcon size={18} color={touched ? T.down : T.muted} /><span style={{ fontFamily: bodyFont, color: touched ? T.down : T.muted, fontSize: 10 }}>{t("logoShort")}</span></>)}
+      {/* Живая карточка будущего токена вместо двух пунктирных рамок:
+          логотип, баннер, тикер и имя видно так, как их увидят в ленте, —
+          и меняются они прямо под пальцем, пока заполняешь поля. */}
+      <input ref={logoInputRef} type="file" accept="image/*" onChange={onPickLogo} style={{ display: "none" }} />
+      <input ref={bannerInputRef} type="file" accept="image/*" onChange={onPickBanner} style={{ display: "none" }} />
+      <div style={{ position: "relative", borderRadius: 28, overflow: "hidden", isolation: "isolate", boxShadow: `inset 0 0 0 1px ${touched && !logoUrl ? hexA(T.down, 0.5) : hexA(T.ice, 0.1)}` }}>
+        <button
+          type="button"
+          onClick={() => bannerInputRef.current && bannerInputRef.current.click()}
+          className="fx-tap w-full"
+          aria-label={t("bannerOptional")}
+          style={{
+            display: "block", height: 124, border: "none", padding: 0,
+            background: bannerUrl
+              ? `center/cover no-repeat url(${bannerUrl})`
+              : `radial-gradient(120% 140% at 15% 0%, ${hexA("#B79CFF", 0.32)}, transparent 55%), radial-gradient(120% 140% at 100% 100%, ${hexA("#5BE0C8", 0.22)}, transparent 55%), ${T.surface}`,
+          }}
+        >
+          {!bannerUrl && (
+            <span className="flex items-center" style={{ position: "absolute", top: 12, right: 12, gap: 6, padding: "7px 11px", borderRadius: 999, background: hexA("#000000", 0.45), color: T.ice, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 600, backdropFilter: "blur(8px)" }}>
+              <Upload size={13} /> Баннер
+            </span>
+          )}
+        </button>
+        <div className="flex items-end" style={{ gap: 14, padding: "0 18px 18px", marginTop: -40, background: `linear-gradient(180deg, transparent 0, ${T.surface} 40px)` }}>
+          <button
+            type="button"
+            onClick={() => logoInputRef.current && logoInputRef.current.click()}
+            className="fx-tap flex items-center justify-center flex-shrink-0"
+            aria-label={t("logoShort")}
+            style={{
+              position: "relative", width: 88, height: 88, borderRadius: "50%", padding: 0,
+              background: logoUrl ? `center/cover no-repeat url(${logoUrl})` : T.bg,
+              border: `4px solid ${T.surface}`,
+              boxShadow: logoUrl ? "none" : `inset 0 0 0 1.5px ${touched ? hexA(T.down, 0.7) : hexA(T.ice, 0.22)}`,
+            }}
+          >
+            {!logoUrl && <ImageIcon size={26} color={touched ? T.down : T.ice} />}
+            <span className="flex items-center justify-center" style={{ position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: "50%", background: T.ice, border: `3px solid ${T.surface}` }}>
+              <Plus size={14} color={T.bg} strokeWidth={3} />
+            </span>
           </button>
-          <button onClick={() => bannerInputRef.current && bannerInputRef.current.click()} className="fx-tap flex-1 flex flex-col items-center justify-center gap-1 rounded-[22px] overflow-hidden" style={{ background: bannerUrl ? `center/cover no-repeat url(${bannerUrl})` : T.surface, border: bannerUrl ? `1.5px solid ${T.lineHi}` : `1px dashed ${T.line}` }}>
-            {!bannerUrl && (<><Upload size={18} color={T.muted} /><span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 11 }}>{t("bannerOptional")}</span></>)}
-          </button>
+          <div className="min-w-0" style={{ flex: 1, paddingBottom: 6 }}>
+            <div className="truncate" style={{ fontFamily: displayFont, color: form.ticker ? T.ice : hexA(T.ice, 0.28), fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
+              ${form.ticker || "TICKER"}
+            </div>
+            <div className="truncate" style={{ fontFamily: bodyFont, color: form.name ? T.ice : hexA(T.ice, 0.28), fontSize: 15, marginTop: 3 }}>
+              {form.name || "Название токена"}
+            </div>
+          </div>
         </div>
-        {touched && !logoUrl && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12, marginTop: 4, display: "block" }}>{t("logoRequiredShort")}</span>}
       </div>
+      {touched && !logoUrl && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5, marginTop: -18 }}>{t("logoRequiredShort")}</span>}
 
       <Field label={t("nameLabel")} placeholder="Prism Cat" value={form.name} onChange={set("name")} />
       <Field label={t("tickerLabel")} placeholder="PRSM" value={form.ticker} onChange={set("ticker")} />
