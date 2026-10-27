@@ -15,7 +15,7 @@ import { useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { Address, beginCell, toNano } from "@ton/core";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { supabase } from "./supabaseClient";
-import { ФонШёлк } from "./шёлк";
+import { ФонШёлк, подготовитьШёлк } from "./шёлк";
 import { апи, запрос } from "./апи";
 import { остаток as остатокКошелька, сыройОстаток as сыройОстатокКошелька, следитьЗаОстатками, записатьОстатки } from "./остатки";
 import { ДЕМО_ТОКЕНЫ, логоДемо } from "../api/_demoTokens.js";
@@ -26297,14 +26297,14 @@ const ГРУППЫ_НАСТРОЕК = [
  * Цифры доплаты — из той же таблицы, что у сервера (/api/speed). */
 const ТАРИФЫ_ЭКРАНА = [
   { key: "free", скорость: "normal", имя: "Free", шкала: 0.2, раз: 1, цвет: "#C7C7CC",
-    ru: { коротко: "Обычная скорость", пункты: ["Сделка проходит после полного подтверждения сети", "Самый надёжный режим, но самый медленный", "Платишь только комиссию сети — Mintly сверху не берёт"] },
-    en: { коротко: "Standard speed", пункты: ["The trade goes through after full network confirmation", "The safest mode, but the slowest", "You pay only the network fee — Mintly adds nothing"] } },
+    ru: { коротко: "Обычная скорость", плюсы: ["Без доплаты за сделку", "Самый надёжный режим", "Все сети и запуск токенов"], пункты: ["Сделка проходит после полного подтверждения сети", "Самый надёжный режим, но самый медленный", "Платишь только комиссию сети — Mintly сверху не берёт"] },
+    en: { коротко: "Standard speed", плюсы: ["No extra fee per trade", "The safest mode", "All chains and launches"], пункты: ["The trade goes through after full network confirmation", "The safest mode, but the slowest", "You pay only the network fee — Mintly adds nothing"] } },
   { key: "pro", скорость: "fast", имя: "Pro", шкала: 1 / 3, раз: 1.7, цвет: "#8F9CFF",
-    ru: { коротко: "Быстрее", пункты: ["Сделка засчитывается, как только попала в блок", "Доплата сети за место в ближайшем блоке", "Сервер переотправляет сделку каждые 0,6 с, пока она не пройдёт"] },
-    en: { коротко: "Faster", пункты: ["The trade counts as soon as it lands in a block", "A network tip for a spot in the next block", "The server resends the trade every 0.6 s until it lands"] } },
+    ru: { коротко: "Быстрее", плюсы: ["В 1,7 раза быстрее Free", "Сделка в ближайшем блоке", "Переотправка каждые 0,6 с"], пункты: ["Сделка засчитывается, как только попала в блок", "Доплата сети за место в ближайшем блоке", "Сервер переотправляет сделку каждые 0,6 с, пока она не пройдёт"] },
+    en: { коротко: "Faster", плюсы: ["1.7× faster than Free", "Lands in the next block", "Resent every 0.6 s"], пункты: ["The trade counts as soon as it lands in a block", "A network tip for a spot in the next block", "The server resends the trade every 0.6 s until it lands"] } },
   { key: "turbo", скорость: "turbo", имя: "Turbo", шкала: 1, раз: 5, цвет: "#B79CFF",
-    ru: { коротко: "Самый быстрый", пункты: ["Сделка уходит сразу во все узлы сети", "Переотправка каждые 0,2 с, проверка каждые 0,15 с", "Самая большая доплата сети за место в блоке"] },
-    en: { коротко: "The fastest", пункты: ["The trade goes to every network node at once", "Resent every 0.2 s, checked every 0.15 s", "The highest network tip for a spot in the block"] } },
+    ru: { коротко: "Самый быстрый", плюсы: ["В 5 раз быстрее Free", "Сразу во все узлы сети", "Самая короткая дорога в сеть"], пункты: ["Сделка уходит сразу во все узлы сети", "Переотправка каждые 0,2 с, проверка каждые 0,15 с", "Самая большая доплата сети за место в блоке"] },
+    en: { коротко: "The fastest", плюсы: ["5× faster than Free", "Straight to every node", "The shortest route to the chain"], пункты: ["The trade goes to every network node at once", "Resent every 0.2 s, checked every 0.15 s", "The highest network tip for a spot in the block"] } },
 ];
 /* Одна полоса на все три тарифа: метки стоят по скорости, заливка доходит
    до выбранного — сразу видно, насколько каждый быстрее другого. Скорость
@@ -26312,7 +26312,6 @@ const ТАРИФЫ_ЭКРАНА = [
    0,6 с, 0,2 с), поэтому Pro ×1,7 к Free, а Turbo ×5. */
 function ПолосаТарифов({ активный }) {
   const ru = lang !== "EN";
-  const раз = (v) => (ru ? String(v).replace(".", ",") : String(v));
   return (
     <div className="flex flex-col" style={{ gap: 10 }}>
       <div style={{ position: "relative", height: 12, borderRadius: 6, background: T.surface }}>
@@ -26330,14 +26329,13 @@ function ПолосаТарифов({ активный }) {
           }} />
         ))}
       </div>
-      <div style={{ position: "relative", height: 38 }}>
+      <div style={{ position: "relative", height: 20 }}>
         {ТАРИФЫ_ЭКРАНА.map((т) => (
           <span key={т.key} className="flex flex-col" style={{
             position: "absolute", top: 0, left: `${т.шкала * 100}%`, alignItems: т.шкала >= 1 ? "flex-end" : "center",
             transform: `translateX(${т.шкала >= 1 ? -100 : -50}%)`, gap: 1,
           }}>
             <span style={{ fontFamily: displayFont, fontSize: 13.5, fontWeight: 800, color: т.key === активный.key ? T.ice : T.muted }}>{т.имя}</span>
-            <span style={{ fontFamily: monoFont, fontSize: 12.5, color: т.key === активный.key ? т.цвет : T.faint }}>×{раз(т.раз)}</span>
           </span>
         ))}
       </div>
@@ -26362,6 +26360,8 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
   const свой = ТАРИФЫ_ЭКРАНА.find((т) => т.скорость === скорость) || ТАРИФЫ_ЭКРАНА[1];
 
   function открыть(т) { haptic("light"); setУходит(false); setОткрыт(т); }
+  // «Назад» Telegram закрывает подробности, а не весь раздел.
+  useНазадТелеграм(!!открыт, () => закрыть());
   function закрыть() {
     setУходит(true);
     setTimeout(() => { setОткрыт(null); setУходит(false); }, 240);
@@ -26418,6 +26418,16 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
               <ChevronRight size={26} color={T.muted} style={{ marginLeft: "auto" }} />
             </span>
             <span style={{ fontFamily: monoFont, fontSize: 22, fontWeight: 700, color: т.цвет }}>{ДоплатаТарифа(таблица, "solana", т.скорость, ru)}</span>
+            <span className="flex flex-col" style={{ gap: 12, marginTop: 14 }}>
+              {(ru ? т.ru : т.en).плюсы.map((п) => (
+                <span key={п} className="flex items-center" style={{ gap: 12, fontFamily: bodyFont, fontSize: 17, fontWeight: 600, color: T.ice }}>
+                  <span className="flex items-center justify-center flex-shrink-0" style={{ width: 26, height: 26, borderRadius: "50%", background: hexA(т.key === "free" ? "#FFFFFF" : т.цвет, 0.2) }}>
+                    <Check size={15} color={т.key === "free" ? T.ice : т.цвет} strokeWidth={3} />
+                  </span>
+                  {п}
+                </span>
+              ))}
+            </span>
           </button>
         ))}
       </div>
@@ -26448,9 +26458,11 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
         >
           <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: `calc(${insetTop}px + 10px) 16px 24px` }}>
             <div className="flex flex-col" style={{ gap: 26, maxWidth: 520, margin: "0 auto" }}>
-              <button onClick={закрыть} className="fx-tap flex items-center gap-1 self-start" style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.muted, background: "none", border: "none" }}>
-                <ChevronLeft size={16} /> {t("back")}
-              </button>
+              {!hasTelegramBack() && (
+                <button onClick={закрыть} className="fx-tap flex items-center gap-1 self-start" style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.muted, background: "none", border: "none" }}>
+                  <ChevronLeft size={16} /> {t("back")}
+                </button>
+              )}
               <div className="flex flex-col" style={{ gap: 6 }}>
                 <span className="flex items-center" style={{ gap: 10, fontFamily: displayFont, color: T.ice, fontSize: 40, fontWeight: 800, letterSpacing: "-0.02em" }}>
                   {открыт.имя}
@@ -34714,6 +34726,15 @@ function mapTokenRow(row) {
   }, [pinLocked, pinModal, launchRequest, profileModalOpen, profileModalMode, settingsItem, tradeModal, manageToken_, назадФразы, view, tab, token, откудаДостижения]);
 
   const [стекНазад, setСтекНазад] = useState(0);
+  /* Шёлк за тарифами готовим заранее, когда приложение уже загрузилось и
+     затихло: тогда раздел открывается сразу с фоном. */
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const ric = window.requestIdleCallback || ((f) => setTimeout(f, 0));
+      ric(() => { подготовитьШёлк().catch(() => {}); });
+    }, 2500);
+    return () => clearTimeout(id);
+  }, []);
   useEffect(() => {
     const н = () => setСтекНазад((x) => x + 1);
     window.addEventListener("mintly:назад", н);

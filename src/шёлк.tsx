@@ -74,15 +74,18 @@ function поКлючам(т, К) {
    берёт у шёлка яркость, а свой оттенок — так форма и свет остаются
    один в один, меняется только цвет. На чёрном слой ничего не красит.
    вОкне — шёлк внутри страницы приложения, без привязки к прокрутке. */
-export function ФонШёлк({ тон = null, вОкне = false }: { тон?: string | null; вОкне?: boolean }) {
-  const холст = useRef(null);
-  useEffect(() => {
-    const к = холст.current;
-    if (!к) return;
-    let жив = true, кадр = 0;
+/* Шёлк рисуется один раз на всё приложение и хранится готовым холстом.
+   Раньше каждое открытие тарифа заново собирало SVG, размывало его и
+   сыпало шум по четырём миллионам точек — фон не успевал появиться.
+   Теперь приложение готовит его заранее, в простое, а экран только
+   копирует готовую картинку. */
+let ждёмШёлк: Promise<HTMLCanvasElement> | null = null;
+export function подготовитьШёлк(): Promise<HTMLCanvasElement> {
+  if (ждёмШёлк) return ждёмШёлк;
+  ждёмШёлк = new Promise((готово, отказ) => {
     const и = new Image();
     и.onload = () => {
-      if (!жив) return;
+      const к = document.createElement("canvas");
       к.width = и.width; к.height = и.height;
       const г = к.getContext("2d");
       г.drawImage(и, 0, 0);
@@ -93,9 +96,26 @@ export function ФонШёлк({ тон = null, вОкне = false }: { тон?:
         п[i] = Math.max(0, Math.min(255, п[i] + н)); п[i + 1] = Math.max(0, Math.min(255, п[i + 1] + н)); п[i + 2] = Math.max(0, Math.min(255, п[i + 2] + н));
       }
       г.putImageData(д, 0, 0);
-      к.style.visibility = "visible";
+      готово(к);
     };
+    и.onerror = () => { ждёмШёлк = null; отказ(new Error("шёлк")); };
     и.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(ШЁЛК_SVG);
+  });
+  return ждёмШёлк;
+}
+
+export function ФонШёлк({ тон = null, вОкне = false }: { тон?: string | null; вОкне?: boolean }) {
+  const холст = useRef(null);
+  useEffect(() => {
+    const к = холст.current;
+    if (!к) return;
+    let жив = true, кадр = 0;
+    подготовитьШёлк().then((готовый) => {
+      if (!жив) return;
+      к.width = готовый.width; к.height = готовый.height;
+      к.getContext("2d").drawImage(готовый, 0, 0);
+      к.style.visibility = "visible";
+    });
     const начало = performance.now();
     const шаг = () => {
       // Кадр ролика 1920×1080 вписывается в окно «с обрезкой», как фон.
