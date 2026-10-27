@@ -24005,7 +24005,7 @@ const ТАБЛИЦА_СКОРОСТИ = {
     eth: { normal: 0, fast: 0.00002, turbo: 0.00008 },
   },
   // Та же наценка монетами приложения (api/_speed.js, НАЦЕНКА_МОНЕТАМИ).
-  markupCoins: { normal: 0, fast: 3, turbo: 12 },
+  markupCoins: { normal: 0, fast: 10, turbo: 40 },
   network: { solana: { normal: 0, fast: 0.00019, turbo: 0.0014 }, ton: { normal: 0, fast: 0, turbo: 0 } },
   evmTip: { normal: 1, fast: 2, turbo: 4 },
 };
@@ -26372,8 +26372,10 @@ function ГалочкаТарифа({ т, size = 26 }) {
 }
 
 
-function ДоплатаТарифа(таблица, сеть, скорость, ru) {
-  const сумма = доплатаСкорости(таблица, сеть, скорость);
+/* безНаценки — когда наценку площадки платят монетами: в монете сети
+   остаются только чаевые сети, их монетами приложения не оплатить. */
+function ДоплатаТарифа(таблица, сеть, скорость, ru, безНаценки = false) {
+  const сумма = доплатаСкорости(таблица, сеть, скорость) - (безНаценки ? Number((таблица.markup[сетьСкорости(сеть)] || {})[скорость]) || 0 : 0);
   if (!(сумма > 0)) return ru ? "без доплаты" : "no extra fee";
   return `+${fmtСумма(сумма)} ${монетаСкорости(сеть)}`;
 }
@@ -26450,7 +26452,7 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
             </span>
             {/* Наценка в монете сети, а справа — она же в монетах приложения. */}
             <span className="flex items-center justify-between" style={{ gap: 12 }}>
-              <span style={{ fontFamily: monoFont, fontSize: 22, fontWeight: 700, ...текстТарифа(т) }}>{ДоплатаТарифа(таблица, "solana", т.скорость, ru)}</span>
+              <span style={{ fontFamily: monoFont, fontSize: 22, fontWeight: 700, ...текстТарифа(т) }}>{ДоплатаТарифа(таблица, "solana", т.скорость, ru, монетами && монет != null && монет >= ((таблица.markupCoins || {})[т.скорость] || 0))}</span>
               {(таблица.markupCoins || {})[т.скорость] > 0 && (
                 <span className="flex items-center" style={{ gap: 6, fontFamily: monoFont, fontSize: 20, fontWeight: 700, color: T.ice, opacity: монетами ? 1 : 0.6, transition: "opacity 200ms ease" }}>
                   <CoinIcon size={20} tone={T.ice} /> {таблица.markupCoins[т.скорость]}
