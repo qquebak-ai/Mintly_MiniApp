@@ -20760,6 +20760,9 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
         {/* Фон карты — шёлк с приветствия на чёрном, в цвет тарифа, как у
             карточки PnL: Free серый, Pro зелёный, Turbo переливается. */}
         <ФонШёлк вРамке тон={{ fast: "pro", turbo: "turbo" }[скоростьКарты] || null} />
+        {/* Еле заметная кромка: на чёрном фоне страницы иначе не видно,
+            где кончается карта. Поверх шёлка, под текстом. */}
+        <span aria-hidden style={{ position: "absolute", inset: 0, borderRadius: "inherit", boxShadow: `inset 0 0 0 1px ${hexA("#FFFFFF", 0.1)}`, pointerEvents: "none", zIndex: 1 }} />
         {/* Подпись вида — мелко, в правом нижнем углу карты. */}
         {видКарты.подпись && (
           <span aria-hidden style={{
