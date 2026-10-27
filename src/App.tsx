@@ -15,7 +15,7 @@ import { useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { Address, beginCell, toNano } from "@ton/core";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { supabase } from "./supabaseClient";
-import { ФонШёлк, подготовитьШёлк, ЦВЕТА_РАДУГИ, ПЕРИОД_РАДУГИ, фазаРадуги } from "./шёлк";
+import { ФонШёлк, подготовитьШёлк, шёлкВЦвете, ЗНАК_ПУТЬ, ЦВЕТА_РАДУГИ, ПЕРИОД_РАДУГИ, фазаРадуги } from "./шёлк";
 import { апи, запрос } from "./апи";
 import { остаток as остатокКошелька, сыройОстаток as сыройОстатокКошелька, следитьЗаОстатками, записатьОстатки } from "./остатки";
 import { ДЕМО_ТОКЕНЫ, логоДемо } from "../api/_demoTokens.js";
@@ -23921,7 +23921,11 @@ function КарточкаPnL({ открыт, onClose, token, итог = 0, вл�
     if (!к) return undefined;
     const г = к.getContext("2d");
     let шёлк = null, кадр = 0, жив = true;
-    подготовитьШёлк().then((ш) => { if (жив) шёлк = ш; }).catch(() => {});
+    /* Шёлк — в цвет тарифа, как на странице «Тариф»: Free серый, Pro
+       зелёный, Turbo переливается. Тариф — это выбранная скорость. */
+    const тариф = (() => { try { return { fast: "pro", turbo: "turbo" }[localStorage.getItem("mintly_trade_speed")] || null; } catch { return null; } })();
+    (тариф ? шёлкВЦвете(тариф) : подготовитьШёлк()).then((ш) => { if (жив) шёлк = ш; }).catch(() => {});
+    const знак = new Path2D(ЗНАК_ПУТЬ);
     const начало = performance.now();
     const вписать = (эл, w, h) => {
       // «С обрезкой» по центру: фон заполняет карточку целиком.
@@ -23940,6 +23944,7 @@ function КарточкаPnL({ открыт, onClose, token, итог = 0, вл�
       } else if (шёлк) {
         // Шёлк с медленным «дыханием», как на приветствии сайта.
         г.save();
+        if (тариф === "turbo") г.filter = `hue-rotate(${((Date.now() / 1000) % ПЕРИОД_РАДУГИ) / ПЕРИОД_РАДУГИ * 360}deg)`;
         г.translate(PNL_Ш / 2, PNL_В / 2);
         г.rotate(((Math.sin(t * 0.5) * 3) * Math.PI) / 180);
         const м = (PNL_Ш / 1920) * 0.95 * (1 + 0.03 * Math.sin(t * 0.8));
@@ -23951,9 +23956,14 @@ function КарточкаPnL({ открыт, onClose, token, итог = 0, вл�
       }
       const шрифт = "'MintlyUI', 'Nunito', sans-serif";
       г.textBaseline = "alphabetic";
+      // Белый знак Mintly в углу, как на прежней карточке.
+      г.save();
+      г.translate(PNL_Ш - 72 - 64, 48);
+      г.scale(64 / 200, 64 / 200);
+      г.fillStyle = "#FFFFFF";
+      г.fill(знак);
+      г.restore();
       г.fillStyle = "#F2F0EB";
-      г.font = `800 40px ${шрифт}`;
-      г.fillText("Mintly", 72, 104);
       г.font = `800 64px ${шрифт}`;
       г.fillText(`$${token ? token.ticker : ""}`, 72, 290);
       г.fillStyle = цвет;
