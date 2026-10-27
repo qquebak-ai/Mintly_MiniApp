@@ -12392,6 +12392,8 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
    капитализация считается по курсу SOL у себя. */
 function useЧужиеЗапуски(активно) {
   const [запуски, setЗапуски] = useState([]);
+  // Курс SOL с сервера — пока свой у приложения не приехал.
+  const [курсСервера, setКурсСервера] = useState(0);
   useEffect(() => {
     if (!активно) return undefined;
     let живо = true, после = 0, таймер = 0;
@@ -12402,6 +12404,7 @@ function useЧужиеЗапуски(активно) {
         const j = await r.json();
         if (!живо || !j) return;
         после = Number(j.now) || после;
+        if (Number(j.solUsd) > 0) setКурсСервера((б) => (Math.abs(б - j.solUsd) > 0.01 ? Number(j.solUsd) : б));
         let сдвиг = false;
         for (const з of j.items || []) {
           if (!з || !з.mint || !з.symbol) continue;
@@ -12421,7 +12424,7 @@ function useЧужиеЗапуски(активно) {
     return () => { живо = false; clearTimeout(таймер); };
   }, [активно]);
   return useMemo(() => {
-    const курс = solUsd();
+    const курс = solUsd() || курсСервера;
     return запуски.map((з) => ({
       id: `pump-${з.mint}`,
       chain: "solana",
@@ -12442,7 +12445,7 @@ function useЧужиеЗапуски(активно) {
       cat: "Мемы",
       liq: "0", vol: "0", vol24hNum: 0, tx1h: 0, tx6h: 0, tx24h: 0,
     }));
-  }, [запуски]);
+  }, [запуски, курсСервера]);
 }
 
 function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpen, onLaunch, solДоступен = false, currentUserId = null, сеть = "ton" }) {
@@ -22106,6 +22109,33 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     return undefined;
   }, [кривЗакрыта, рынокОткрыт]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setПереезд(false); setПереехал(false); }, [token.id]);
+  /* Токен, только что созданный на pump.fun или letsbonk: у бирж его ещё
+     нет, свечей ждать неоткуда. Сервер видит каждую его сделку в потоке
+     площадки (api/_launchStream.js) — из них график и строится, раз в
+     полторы секунды, с первой сделки автора. */
+  const запускСоСтороны = String(token.id || "").startsWith("pump-");
+  const [сделкиСтороны, setСделкиСтороны] = useState(null);
+  const [курсСерверСтороны, setКурсСтороны] = useState(0);
+  const курсСтороны = solUsd() || курсСерверСтороны;
+  // Цена сейчас — по последней сделке из потока площадки.
+  const ценаСтороны = (() => {
+    const посл = сделкиСтороны && сделкиСтороны[сделкиСтороны.length - 1];
+    return посл && курсСтороны > 0 ? посл[1] * курсСтороны : 0;
+  })();
+  useEffect(() => {
+    setСделкиСтороны(null);
+    if (!запускСоСтороны) return undefined;
+    let живо = true;
+    const читать = () => fetch(апи(`/api/new-launches?trades=${encodeURIComponent(token.tokenAddress || token.address)}`))
+      .then((r) => (r.ok ? r.json() : null)).then((j) => {
+        if (!живо || !j || !Array.isArray(j.trades)) return;
+        setСделкиСтороны(j.trades);
+        if (Number(j.solUsd) > 0) setКурсСтороны(Number(j.solUsd));
+      }).catch(() => {});
+    читать();
+    const id = setInterval(читать, 1500);
+    return () => { живо = false; clearInterval(id); };
+  }, [запускСоСтороны, token.tokenAddress, token.address]);
   /* Показываем капитализацию, а не цену за штуку. У мемкоина цена —
      это шесть нулей после запятой, по которым ничего не понять, а
      капитализация сразу говорит, насколько токен большой. Множитель —
@@ -22129,7 +22159,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   // На бирже цену даёт пул: закрытая кривая показала бы последнюю цену
   // перед выходом и стояла бы на ней.
   const курсПула = token.chain === "solana" ? solUsd() : этоEVM(token.chain) ? курсМонетыEVM(token.chain, КЕШ_КУРСОВ_EVM) : (tonPriceUsd > 0 ? tonPriceUsd : tonUsd());
-  const живаяЦена = пулБиржи && пулБиржи.price > 0 && курсПула > 0
+  const живаяЦена = ценаСтороны > 0 ? ценаСтороны
+    : пулБиржи && пулБиржи.price > 0 && курсПула > 0
     ? пулБиржи.price * курсПула
     : (своя && своя.priceUsd > 0) ? своя.priceUsd : ценаТокена;
   const капОкна = своя_кривая
@@ -22643,25 +22674,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     const id = setInterval(читать, 30000);
     return () => { живо = false; clearInterval(id); };
   }, [!!пулБиржи, token.tokenAddress, token.address]); // eslint-disable-line react-hooks/exhaustive-deps
-  /* Токен, только что созданный на pump.fun или letsbonk: у бирж его ещё
-     нет, свечей ждать неоткуда. Сервер видит каждую его сделку в потоке
-     площадки (api/_launchStream.js) — из них график и строится, раз в
-     полторы секунды, с первой сделки автора. */
-  const запускСоСтороны = String(token.id || "").startsWith("pump-");
-  const [сделкиСтороны, setСделкиСтороны] = useState(null);
-  useEffect(() => {
-    setСделкиСтороны(null);
-    if (!запускСоСтороны) return undefined;
-    let живо = true;
-    const читать = () => fetch(апи(`/api/new-launches?trades=${encodeURIComponent(token.tokenAddress || token.address)}`))
-      .then((r) => (r.ok ? r.json() : null)).then((j) => { if (живо && j && Array.isArray(j.trades)) setСделкиСтороны(j.trades); }).catch(() => {});
-    читать();
-    const id = setInterval(читать, 1500);
-    return () => { живо = false; clearInterval(id); };
-  }, [запускСоСтороны, token.tokenAddress, token.address]);
   const графДанные = useMemo(() => {
     if (запускСоСтороны) {
-      const курс = solUsd();
+      const курс = курсСтороны;
       const шаг = TF_SECONDS[tf] || 60;
       const свечи = [], объём = [];
       for (const [мс, ценаSol, суммаSol, вид] of сделкиСтороны || []) {
@@ -22682,6 +22697,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
       // Сделок ещё не пришло — ровная линия по капитализации из ленты
       // (у pump.fun и letsbonk выпуск — миллиард).
       const ряд = token.mcapNum > 0 ? flatCandles(token.mcapNum / 1e9, tf) : null;
+      // (если сделок нет, а курс уже есть — та же линия по цене кривой)
       return ряд ? { ...ряд, tf, isLive: false } : null;
     }
     const основа = (chartData && chartData.candles && chartData.candles.length) ? chartData : null;
@@ -22715,7 +22731,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     if (!(цена > 0)) return null;
     const ряд = flatCandles(цена, tf);
     return ряд ? { ...ряд, tf, isLive: false } : null;
-  }, [chartData, своя, tf, запущенВ, пулБиржи, точкиПула, курсПула, chartLoading, запускСоСтороны, сделкиСтороны, token.mcapNum]);
+  }, [chartData, своя, tf, запущенВ, пулБиржи, точкиПула, курсПула, chartLoading, запускСоСтороны, сделкиСтороны, курсСтороны, token.mcapNum]);
   const scaledCandles = useMemo(() => {
     if (!графДанные?.candles) return null;
     // Без множителя рисовать нечего: раньше в этот момент график молча
@@ -23212,7 +23228,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
      правда не прийти, и держать человека перед плашками бесконечно
      нельзя — тогда показываем страницу как есть, с честным сообщением
      вместо графика. */
-  const числаЕсть = token.mcapNum > 0 || ценаТокена > 0;
+  const числаЕсть = token.mcapNum > 0 || ценаТокена > 0 || ценаСтороны > 0 || запускСоСтороны;
   // Запуск с pump.fun/letsbonk открывается сразу: всё нужное уже есть в ленте.
   const страницаГотова = ждёмДольше || (числаЕсть && chartReady) || (запускСоСтороны && числаЕсть);
 

@@ -215,4 +215,21 @@ export function сделкиЗапуска(mint) {
   return з ? { createdAt: з.at, mcapSol: з.mcapSol, trades: з.сделки || [] } : null;
 }
 
+/* Курс SOL в долларах — отдаём вместе с лентой: у телефона свой курс
+   приезжает не сразу, и пока его нет, капитализация в ленте была $0.
+   Берём середину рынка SOL на Hyperliquid, раз в полминуты. */
+let курс = { at: 0, usd: 0 };
+export async function курсSOL() {
+  if (Date.now() - курс.at > 30_000) {
+    курс.at = Date.now();
+    try {
+      const r = await fetch("https://api.hyperliquid.xyz/info", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "allMids" }), signal: AbortSignal.timeout(4000) });
+      const j = await r.json();
+      const usd = Number(j && j.SOL);
+      if (usd > 0) курс.usd = usd;
+    } catch { /* остаётся прошлый */ }
+  }
+  return курс.usd;
+}
+
 export function лентаЖива() { return !!(сокет && сокет.readyState === 1); }
