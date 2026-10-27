@@ -8868,6 +8868,7 @@ function БоковаяПанельПК({ view, tab, profile, accountCreated, с
     { id: "home", подпись: t("navHome"), Значок: ЗначокДом },
     { id: "mempad", подпись: t("navMempad"), Значок: ЗначокОбмен },
     { id: "create", подпись: t("navCreate"), Значок: ЗначокРакета },
+    { id: "markets", подпись: lang === "EN" ? "Markets" : "Биржа", Значок: ЗначокБиржа },
     { id: "wallet", подпись: t("navWallet"), Значок: ЗначокСтолбики },
     { id: "profile", подпись: t("navProfileItem"), Значок: User },
   ];
@@ -9249,6 +9250,18 @@ function ЗначокРакета({ size = 22, color = "#FFFFFF", strokeWidth = 
     <span style={{ display: "inline-flex", transform: "rotate(-45deg)" }}>
       <Rocket size={size} color={color} strokeWidth={strokeWidth} />
     </span>
+  );
+}
+
+/* Значок биржи — свечи графика: две свечи с фитилями, как на любом
+   торговом экране, — читается «рынок» с одного взгляда. */
+function ЗначокБиржа({ size = 22, color = "#FFFFFF", strokeWidth = 1.8 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 3.5v3" /><rect x="5.5" y="6.5" width="5" height="9" rx="1.2" /><path d="M8 15.5v4.5" />
+      <path d="M16 6v4" /><rect x="13.5" y="10" width="5" height="6" rx="1.2" /><path d="M16 16v3" />
+    </svg>
   );
 }
 
@@ -13701,8 +13714,6 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
     { key: "x", icon: ЗнакX, label: t("xTitle") },
     // Тариф — рядом с аккаунтом: это то, на каких условиях ты торгуешь.
     { key: "tariff", icon: Crown, label: t("tariffTitle") },
-    // Рынки — фьючерсы на крипту, золото и индексы через Hyperliquid.
-    { key: "markets", icon: TrendingUp, label: lang === "EN" ? "Markets" : "Рынки" },
     // Приглашения идут через бота в Telegram — на сайте им не место.
     ...(этоПК() ? [] : [{ key: "referral", icon: Gift, label: t("referral") }]),
     /* Кошелька и секретной фразы в меню больше нет: кошелёк — своя
@@ -15835,7 +15846,7 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
   );
 }
 
-function СтраницаРынков({ открыт, onClose, showToast, insetTop = 0, insetBottom = 0 }) {
+function СтраницаРынков({ открыт, onClose = () => {}, showToast, insetTop = 0, insetBottom = 0, вкладка = false }) {
   const [рынки, setРынки] = useState(null);
   const [сеть, setСеть] = useState(null);
   const [раздел, setРаздел] = useState("crypto");
@@ -15854,8 +15865,8 @@ function СтраницаРынков({ открыт, onClose, showToast, insetT
     return () => { живо = false; clearInterval(a); clearInterval(b); };
   }, [открыт, обновитьСчёт]);
   useНазадТелеграм(открыт && !!выбран, () => setВыбран(null));
-  useНазадТелеграм(открыт && !выбран, onClose);
-  if (!открыт) return null;
+  useНазадТелеграм(открыт && !выбран && !вкладка, onClose);
+  if (!открыт && !вкладка) return null;
   const есть = РАЗДЕЛЫ_РЫНКОВ.filter(([к]) => (рынки || []).some((р) => р.section === к));
   const список = (рынки || []).filter((р) => р.section === раздел);
   const рынок = выбран ? (рынки || []).find((р) => р.asset === выбран) : null;
@@ -15871,11 +15882,11 @@ function СтраницаРынков({ открыт, onClose, showToast, insetT
       haptic("error"); showToast && showToast(String((e && e.message) || "Не прошло").slice(0, 120));
     } finally { setИдёт(false); }
   }
-  return createPortal(
-    <div className="fx-sheet-in no-scrollbar" style={{ position: "fixed", inset: 0, zIndex: 455, background: T.bg, overflowY: "auto", overscrollBehavior: "contain",
+  const тело = (
+    <div className={вкладка ? "fx-view" : "fx-sheet-in no-scrollbar"} style={вкладка ? { padding: "8px 16px 40px" } : { position: "fixed", inset: 0, zIndex: 455, background: T.bg, overflowY: "auto", overscrollBehavior: "contain",
       padding: `calc(${insetTop}px + 10px) 16px calc(${insetBottom}px + 40px)` }}>
       <div className="flex flex-col" style={{ gap: 22, maxWidth: 560, margin: "0 auto" }}>
-        {!hasTelegramBack() && (
+        {!hasTelegramBack() && (!вкладка || выбран) && (
           <button onClick={() => (выбран ? setВыбран(null) : onClose())} className="fx-tap flex items-center gap-1 self-start" style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.muted, background: "none", border: "none" }}>
             <ChevronLeft size={16} /> {t("back")}
           </button>
@@ -15884,7 +15895,7 @@ function СтраницаРынков({ открыт, onClose, showToast, insetT
           <СтраницаРынка key={рынок.asset} рынок={рынок} счёт={счёт} onОбновить={обновитьСчёт} showToast={showToast} />
         ) : (
           <>
-            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em" }}>Рынки</span>
+            <ЗаголовокРаздела>Биржа</ЗаголовокРаздела>
             {/* Торговый счёт: деньги на бирже и перевод туда-обратно. */}
             <div className="flex flex-col" style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface }}>
               <div className="flex items-center justify-between">
@@ -15947,9 +15958,9 @@ function СтраницаРынков({ открыт, onClose, showToast, insetT
           </>
         )}
       </div>
-    </div>,
-    document.body,
+    </div>
   );
+  return вкладка ? тело : createPortal(тело, document.body);
 }
 
 function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} }) {
@@ -15996,9 +16007,7 @@ function ДвериГлавной({ onGoCreate = () => {}, onGoTab = () => {} })
       {широкий("x", 1, { заголовок: "Mintly в X", кнопка: "Открыть", Значок: ЗнакX, цвет: "#FFFFFF", onClick: () => {
         try { const tg = window.Telegram && window.Telegram.WebApp; if (tg && tg.openLink) tg.openLink(X_MINTLY); else window.open(X_MINTLY, "_blank"); } catch { /* ссылка не открылась */ }
       } })}
-      {/* Рынки — фьючерсы, золото, индексы (СтраницаРынков открывает корень по событию). */}
-      {широкий("рынки", 2, { заголовок: "Рынки", кнопка: "Открыть", Значок: TrendingUp, цвет: "#E8C46A", onClick: () => window.dispatchEvent(new Event("mintly:открыть-рынки")) })}
-      {широкий("бот", 3, уведомления
+      {широкий("бот", 2, уведомления
         ? { заголовок: "Уведомления", кнопка: "Настроить", Значок: Bell, цвет: "#F5C04E", onClick: () => открытьТелеграм(БОТ_MINTLY.replace("?start=app", "")) }
         : { заголовок: "Уведомления", кнопка: "Подключить", Значок: Bell, цвет: "#F5C04E", onClick: подключитьУведомления })}
       <div className="flex" style={{ gap: 16, marginTop: 14, paddingTop: 22, borderTop: `1px solid ${T.line}` }}>
@@ -35342,13 +35351,7 @@ function mapTokenRow(row) {
   }, [pinLocked, pinModal, launchRequest, profileModalOpen, profileModalMode, settingsItem, tradeModal, manageToken_, назадФразы, view, tab, token, откудаДостижения]);
 
   const [стекНазад, setСтекНазад] = useState(0);
-  // Страница «Рынки» (биржа): открывается из меню и с главной.
-  const [рынкиОткрыты, setРынкиОткрыты] = useState(false);
-  useEffect(() => {
-    const открыть = () => setРынкиОткрыты(true);
-    window.addEventListener("mintly:открыть-рынки", открыть);
-    return () => window.removeEventListener("mintly:открыть-рынки", открыть);
-  }, []);
+
   /* Шёлк за тарифами готовим заранее, когда приложение уже загрузилось и
      затихло: тогда раздел открывается сразу с фоном. */
   useEffect(() => {
@@ -36194,6 +36197,9 @@ function mapTokenRow(row) {
           </KeepAlive>
           </div>
           <div style={этоПК() ? { ...колонкаПК(view === "wallet"), padding: "0 16px" } : undefined}>
+          <KeepAlive show={view === "markets"}>
+            <СтраницаРынков вкладка открыт={view === "markets"} showToast={showToast} />
+          </KeepAlive>
           <KeepAlive show={view === "wallet"}>
             {/* Ключ по хозяину: со сменой аккаунта раздел пересоздаётся
                 начисто. Без него в нём оставались адреса и остатки
@@ -36301,15 +36307,12 @@ function mapTokenRow(row) {
             if (ключ === "secret") { goTab("wallet"); setЗапросФразы((н) => н + 1); return; }
             if (ключ === "settings") { setНастройкиОткрыты(true); return; }
             if (ключ === "support") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "support")); return; }
-            if (ключ === "markets") { setРынкиОткрыты(true); return; }
             if (ключ === "x" || ключ === "referral" || ключ === "tariff") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === ключ)); return; }
           }}
         />
 
         {/* Профиль — отдельная страница поверх главной. Уйти с неё можно
             панелью разделов: она остаётся выше по слою. */}
-        <СтраницаРынков открыт={рынкиОткрыты} onClose={() => setРынкиОткрыты(false)} showToast={showToast} insetTop={insetTop} insetBottom={insetBottom} />
-
         <СтраницаПрофиля открыт={view === "profile"} уходит={уходСтраницы} insetTop={insetTop}>
             <ProfileView
               connected={connected}
@@ -36359,6 +36362,8 @@ function mapTokenRow(row) {
             { id: "home", label: t("navHome"), icon: ЗначокДом },
             { id: "mempad", label: t("navMempad"), icon: ЗначокОбмен },
             { id: "create", label: t("navCreate"), icon: ЗначокРакета },
+            // Биржа — фьючерсы, металлы, индексы через Hyperliquid.
+            { id: "markets", label: lang === "EN" ? "Markets" : "Биржа", icon: ЗначокБиржа },
             { id: "wallet", label: t("navWallet"), icon: ЗначокСтолбики },
           ];
           const ШИР = ПОЛЕ * 2 + ПУНКТЫ.length * КРУГ + (ПУНКТЫ.length - 1) * ЗАЗОР;
