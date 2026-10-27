@@ -16,6 +16,7 @@ import { Address, beginCell, toNano } from "@ton/core";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { supabase } from "./supabaseClient";
 import { апи, запрос } from "./апи";
+import { остаток as остатокКошелька, сыройОстаток as сыройОстатокКошелька, следитьЗаОстатками, записатьОстатки } from "./остатки";
 import { ДЕМО_ТОКЕНЫ, логоДемо } from "../api/_demoTokens.js";
 import {
   CURVE_PARAMS,
@@ -10765,6 +10766,31 @@ function РазмытаяСумма({ образец = "0,0000", style = null })
   );
 }
 
+/* Остаток монеты сети на кошельке приложения (sol, ton, bsc, base, eth)
+   — из общей памяти (src/остатки.js). В первом же кадре окна —
+   последнее известное число, свежее приходит следом; своя трата уже
+   вычтена. null — не знаем вовсе: окно показывает, что число грузится,
+   и не подставляет вместо него ни ноль, ни потолок кривой. Пока окно
+   открыто, переспрашиваем раз в десять секунд: пополнение приходит мимо
+   приложения. сырой — число сети без своих поправок. */
+function useОстаток(сеть, открыто = true, { сырой = false } = {}) {
+  const [, перерисовать] = useState(0);
+  useEffect(() => следитьЗаОстатками(() => перерисовать((n) => n + 1)), []);
+  useEffect(() => {
+    if (!открыто || !сеть) return undefined;
+    const спросить = () => {
+      import("./appWallet")
+        .then((m) => (сеть === "sol" ? m.состояниеВнутреннего() : сеть === "ton" ? m.состояниеВнутреннегоTON() : m.состояниеEVM()))
+        .catch(() => {});
+    };
+    спросить();
+    const id = setInterval(спросить, 10_000);
+    return () => clearInterval(id);
+  }, [сеть, открыто]);
+  if (!сеть) return null;
+  return сырой ? сыройОстатокКошелька(сеть) : остатокКошелька(сеть);
+}
+
 function ПлашкаЧисла({ width = 90, height = 22, radius = 8, style = null }) {
   return (
     <span
@@ -11986,6 +12012,9 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
   const своя = !!(токен && токен.curveAddress);
   const курсы = useКурсыEVM();
   const курс = курсМонетыEVM(сеть, курсы);
+  // Монета сети на кошельке — из общей памяти остатков: в первом кадре
+  // уже число, а не пустая строка, пока узлы трёх сетей думают.
+  const монетНаКошельке = useОстаток(сеть, !!токен && своя && !!userId);
 
   const [свечи, setСвечи] = useState(null);
   const [инфо, setИнфо] = useState(null);
@@ -12108,7 +12137,7 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
   async function сделка() {
     if (идёт || !(числоСуммы > 0)) return;
     if (!userId) { showToast(t("needAccountShort")); return; }
-    if (режим === "buy" && мои.монеты != null && числоСуммы > мои.монеты) { showToast(`На кошельке ${дробь(мои.монеты)} ${с.монета}`); return; }
+    if (режим === "buy" && монетНаКошельке != null && числоСуммы > монетНаКошельке) { showToast(`На кошельке ${дробь(монетНаКошельке)} ${с.монета}`); return; }
     if (режим === "sell" && мои.токенов != null && числоСуммы > мои.токенов + 1e-9) { showToast(`На кошельке ${дробь(мои.токенов, 0)} ${токен.ticker}`); return; }
     setИдёт(true);
     haptic("light");
@@ -12249,7 +12278,7 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
             {котировка && котировка.out > 0
               ? (режим === "buy" ? `≈ ${дробь(котировка.out, 0)} $${токен.ticker}` : `≈ ${дробь(котировка.out, 6)} ${с.монета}`)
               : режим === "buy"
-                ? (мои.монеты != null ? `На кошельке ${дробь(мои.монеты)} ${с.монета}` : "")
+                ? (монетНаКошельке != null ? `На кошельке ${дробь(монетНаКошельке)} ${с.монета}` : "")
                 : (мои.токенов != null ? `На кошельке ${дробь(мои.токенов, 0)} $${токен.ticker}` : "")}
           </div>
           <ВыборСкорости сеть={сеть} style={{ marginTop: 12 }} />
@@ -16507,7 +16536,7 @@ function адресTonОк(строка) {
 
 function ЭкранВывода({
   открыт, onClose, сеть: сетьПоУмолчанию = "sol", остаток = 0, курс = 0, единица = "SOL", свой = "",
-  остатки = null, курсы = null, пределЗаСутки = null, userId = null,
+  остатки = null, курсы = null, пределЗаСутки: пределСнаружи = null, пределы = null, userId = null,
   showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0,
 }) {
   // Три шага: «кому», «сколько» и код с почты. Один экран с обоими полями
@@ -16574,6 +16603,12 @@ function ЭкранВывода({
      Снаружи приходят обе, иначе при смене сети на лету экран показывал
      бы чужие деньги. */
   const остатокСети = остатки ? Number(остатки[сеть]) || 0 : остаток;
+  /* Суточный предел — той сети, что выбрана здесь, а не той, что открыта
+     на карте кошелька: у SOL и GRAM пределы свои, и вывод GRAM с карты
+     Solana резался чужим пределом. У EVM предела нет вовсе. */
+  const пределЗаСутки = пределы
+    ? (пределы[сеть] != null ? Number(пределы[сеть]) : null)
+    : пределСнаружи;
   const курсСети2 = курсы ? Number(курсы[сеть]) || 0 : курс;
   const единицаСети = вEVM ? СЕТИ_EVM[сеть].монета : сеть === "ton" ? ТИКЕР_TON : "SOL";
   // В EVM запас — на газ простого перевода; точную сумму досчитает сервер.
@@ -19930,8 +19965,17 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
     if (!с || Date.now() >= с.до || !(сырой > с.было - с.сумма / 2)) return сырой;
     return Math.max(0, сырой - с.сумма);
   };
-  const солНаКошельке = сПоправкой("sol", внутр && !внутр.нуженВход && !внутр.ошибка ? Number(внутр.sol) || 0 : 0);
-  const тонНаКошельке = сПоправкой("ton", внутрTON && !внутрTON.нуженВход && !внутрTON.ошибка ? Number(внутрTON.ton) || 0 : 0);
+  /* Пока опрос раздела не вернулся (или узел промолчал), остаток — из
+     общей памяти (src/остатки.js), а не ноль: открыл кошелёк и сразу
+     нажал «Вывести» — «Доступно» уже настоящее. Сырое число сети: свои
+     выводы здесь вычитает своя поправка выше. */
+  const solПамять = useОстаток("sol", false, { сырой: true });
+  const tonПамять = useОстаток("ton", false, { сырой: true });
+  const изОпроса = (св, поле, память) => (св && !св.нуженВход && !св.ошибка && св[поле] != null
+    ? Number(св[поле]) || 0
+    : (память != null ? память : 0));
+  const солНаКошельке = сПоправкой("sol", изОпроса(внутр, "sol", solПамять));
+  const тонНаКошельке = сПоправкой("ton", изОпроса(внутрTON, "ton", tonПамять));
   /* Кошелёк EVM: один адрес на BNB Chain, Base и Ethereum, остатки по
      каждой сети отдельно. Спрашиваем реже, чем свои сети: здесь три узла
      за один ответ. */
@@ -19953,7 +19997,9 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
   const сетиEVMКошелька = useСетиEVM();
   const тестовыеEVM = !!(сетиEVMКошелька && сетиEVMКошелька.тестовые);
   const остатокEVM = (сеть) => {
-    const о = (внутрEVM && внутрEVM.chains && внутрEVM.chains[сеть]) || null;
+    let о = (внутрEVM && внутрEVM.chains && внутрEVM.chains[сеть]) || null;
+    // Опрос раздела ещё не вернулся — число из общей памяти, а не пусто.
+    if ((!о || о.native == null) && сыройОстатокКошелька(сеть) != null) о = { ...(о || { tokens: {} }), native: сыройОстатокКошелька(сеть) };
     return о && списания[сеть] ? { ...о, native: сПоправкой(сеть, Number(о.native) || 0) } : о;
   };
   const вДолларахEVM = Object.keys(СЕТИ_EVM).reduce((сумма, к) => {
@@ -20743,6 +20789,10 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
         курсы={{ sol: курсSol, ton: tonPriceUsd, ...Object.fromEntries(Object.keys(СЕТИ_EVM).map((к) => [к, курсМонетыEVM(к, курсыEVM)])) }}
         остаток={наКошельке}
         пределЗаСутки={пределЗаСутки}
+        пределы={{
+          sol: внутр && !внутр.нуженВход && !внутр.ошибка && внутр.dailyLeft != null ? Number(внутр.dailyLeft) : null,
+          ton: внутрTON && !внутрTON.нуженВход && !внутрTON.ошибка && внутрTON.dailyLeft != null ? Number(внутрTON.dailyLeft) : null,
+        }}
         курс={курсСети}
         единица={единица}
         showToast={showToast}
@@ -20964,7 +21014,8 @@ function useПозиция(token, walletAddress) {
           if (!св || !св.address) { if (жив) setКоличество(0); return; }
           const r = await fetch(апи(`/api/solana?action=balances&wallet=${св.address}&mint=${адрес}`))
             .then((x) => x.json());
-          if (жив) setКоличество(Number(r && r.token) || 0);
+          // Узел промолчал (token: null) — прежнее число, а не ноль.
+          if (жив && r && r.token != null) setКоличество(Number(r.token) || 0);
           return;
         }
         if (!walletAddress) { if (жив) setКоличество(0); return; }
@@ -23821,14 +23872,19 @@ function useПулБиржи(token, активно = true) {
   return пул;
 }
 
-function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, walletTonBalance = 0, tonPriceUsd = 0, heldAmount = null, curveState = null }) {
+function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, tonPriceUsd = 0, heldAmount = null, curveState = null }) {
   // Курс SOL нужен только окну сделки по токену Solana — там он один раз
   // пересчитывает введённую сумму в примерное количество токенов.
   const [solPriceUsd, setSolPriceUsd] = useState(0);
-  // Сколько на кошельке Solana: монет — чтобы знать предел покупки,
-  // токенов — чтобы было что продавать. Оба числа живут в сети, и без
-  // них поле «Доступно» показывало прочерк.
-  const [solБаланс, setSolБаланс] = useState(null);
+  /* Монета на кошельке — предел покупки — из общей памяти остатков: в
+     первом кадре окна уже стоит последнее известное число, а не прочерк,
+     пока окно спрашивает сеть. Своя только что ушедшая покупка в нём уже
+     вычтена. Раньше TON-окно до первого опроса показывало «Доступно: 0»,
+     а Solana — ждало адрес кошелька и остаток двумя запросами подряд. */
+  const монетНаКошельке = useОстаток(token && token.chain === "solana" ? "sol" : "ton", !!tradeModalProp);
+  // Сколько токена на кошельке Solana — чтобы было что продавать.
+  // null — ещё не знаем: узел не ответил, и ноль здесь был бы враньём.
+  const [solТокенов, setSolТокенов] = useState(null);
   /* Состояние своей кривой в Solana. По нему считается, сколько штук
      придёт: у молодого токена цены в ленте ещё нет, а курс монеты может
      не приехать вовсе — и тогда в окне стояло «≈ 0», хотя покупка
@@ -23937,7 +23993,7 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   }, [tradeModal, token && token.chain, token && token.tokenAddress, token && token.curveAddress]);
 
   useEffect(() => {
-    if (!tradeModal || !token || token.chain !== "solana") { setSolБаланс(null); return; }
+    if (!tradeModal || !token || token.chain !== "solana") { setSolТокенов(null); return; }
     let cancelled = false;
     let адресКошелька = null;
 
@@ -23956,7 +24012,11 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
       const параметры = new URLSearchParams({ wallet: адресКошелька });
       if (token.tokenAddress) параметры.set("mint", token.tokenAddress);
       const b = await fetch(апи(`/api/solana?action=balances&${параметры}`)).then((r) => r.json()).catch(() => null);
-      if (!cancelled && b && !b.error) setSolБаланс({ sol: Number(b.sol) || 0, token: Number(b.token) || 0 });
+      if (cancelled || !b || b.error) return;
+      // SOL из того же ответа — в общую память: окна запуска и вывода
+      // увидят то же число. Узел промолчал — null, прежнее остаётся.
+      if (b.sol != null) записатьОстатки(null, { sol: Number(b.sol) });
+      if (b.token != null) setSolТокенов(Number(b.token) || 0);
     }
 
     прочитать();
@@ -24010,7 +24070,8 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // Leave one network fee's worth of TON unspent so the buy transaction
   // itself doesn't fail for insufficient gas, and don't let anyone "buy"
   // before the real wallet balance/price have actually loaded.
-  const spendableTon = Math.max(0, walletTonBalance - NETWORK_FEE_TON);
+  // null — остаток ещё едет: предела нет, а вместо числа — размытие.
+  const spendableTon = монетНаКошельке != null ? Math.max(0, монетНаКошельке - NETWORK_FEE_TON) : null;
   const amount = parseAmount(amountStr);
   const isBuy = mode === "buy";
   // Чем платят за этот токен. У ленты Solana это SOL, у всего
@@ -24029,10 +24090,10 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
   // У Solana предел свой: монеты на её кошельке, а при продаже — сколько
   // токена там лежит. Немного оставляем на комиссию сети, иначе сделка
   // не пройдёт из-за нехватки на газ.
-  const solДоступно = solБаланс ? Math.max(0, solБаланс.sol - 0.005) : null;
+  const solДоступно = монетНаКошельке != null ? Math.max(0, монетНаКошельке - 0.005) : null;
   const maxAmount = соло
-    ? (isBuy ? (solДоступно == null ? Infinity : solДоступно) : (solБаланс ? solБаланс.token : holdingTokens))
-    : (isBuy ? spendableTon : holdingTokens);
+    ? (isBuy ? (solДоступно == null ? Infinity : solДоступно) : (solТокенов != null ? solТокенов : holdingTokens))
+    : (isBuy ? (spendableTon == null ? Infinity : spendableTon) : holdingTokens);
   /* Небольшой допуск: остаток приходит из сети с точностью до
      мельчайшей единицы, а в поле стоит округлённое число. Без допуска
      «продать всё» иногда упиралось в собственную же сумму. */
@@ -24260,15 +24321,18 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{isBuy ? t("youPay") : t("youSell")}</span>
           {/* «Доступно» — это и есть «МАКС»: нажатие ставит весь остаток. */}
           <span role="button" onClick={() => { haptic("light"); setPct(1); }} className="fx-tap" style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, cursor: "pointer" }}>
-            {t("available")}: {соло
-              // Пока баланс кошелька приложения не приехал, предела нет.
-              ? (solБаланс == null
-                ? <РазмытаяСумма образец={isBuy ? "0,0000 SOL" : `0 000 ${token.ticker}`} />
-                : isBuy
-                  ? `${(solДоступно || 0).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} SOL`
-                  : `${solБаланс.token.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${token.ticker}`)
-              : isBuy
-                ? `${spendableTon.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${ТИКЕР_TON}`
+            {t("available")}: {isBuy
+              // Пока остаток кошелька не приехал, предела нет — число
+              // размыто, а не ноль: ноль читался как «покупать не на что».
+              ? ((соло ? solДоступно : spendableTon) == null
+                ? <РазмытаяСумма образец={`0,0000 ${монета}`} />
+                : `${(соло ? solДоступно : spendableTon).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${монета}`)
+              : соло
+                ? (solТокенов != null
+                  ? `${solТокенов.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${token.ticker}`
+                  : balanceKnown
+                    ? `${holdingTokens.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} ${token.ticker}`
+                    : <РазмытаяСумма образец={`0 000 ${token.ticker}`} />)
                 : balanceKnown
                   ? `${holdingTokens.toLocaleString("ru-RU")} ${token.ticker}`
                   : <РазмытаяСумма образец={`0 000 ${token.ticker}`} />}
@@ -25043,31 +25107,21 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
     return { цена, кап: цена * TOKEN_FIXED_SUPPLY, закроется: вошло >= Number(CURVE_PARAMS.graduationTon) / 1e9 };
   };
 
-  const [остатокСети, setОстатокСети] = useState(null);
-  // Переспрашиваем остаток на каждом шаге: форма живёт открытой, и
-  // пополнение, пришедшее после её открытия, иначе не было бы видно.
+  /* Остаток — из общей памяти (useОстаток): на шаге «Покупка» в первом
+     же кадре стоит последнее известное число, сеть его только уточняет.
+     Раньше форма на каждом шаге стирала остаток и спрашивала заново, и
+     пока ответа не было, «Макс» показывал потолок кривой — 31,5 SOL при
+     пяти на кошельке. Без входа кошелька нет — тогда и спрашивать нечего. */
+  const остатокСети = useОстаток(сетьЗапуска, !!accountCreated);
+  // На каждом шаге — ещё и внеочередной опрос: пополнение, пришедшее
+  // после открытия формы, иначе ждало бы круга опроса.
   const [ключОстатка, setКлючОстатка] = useState(0);
   useEffect(() => {
-    let брошено = false;
-    setОстатокСети(null);
-    (async () => {
-      try {
-        const кошелёк = await import("./appWallet");
-        if (вEVM) {
-          const е = await кошелёк.состояниеEVM();
-          const о = е && е.chains && е.chains[сетьЗапуска];
-          if (!брошено && о && о.native != null) setОстатокСети(Number(о.native) || 0);
-          return;
-        }
-        const св = вSolana
-          ? await кошелёк.состояниеВнутреннего()
-          : await кошелёк.состояниеВнутреннегоTON();
-        if (брошено || !св || св.нуженВход || св.ошибка) return;
-        setОстатокСети(Number(вSolana ? св.sol : св.ton) || 0);
-      } catch { /* без входа кошелька нет — тогда и проверять нечего */ }
-    })();
-    return () => { брошено = true; };
-  }, [вSolana, вEVM, сетьЗапуска, accountCreated, ключОстатка]);
+    if (!ключОстатка || !accountCreated) return;
+    import("./appWallet")
+      .then((m) => (вEVM ? m.состояниеEVM() : вSolana ? m.состояниеВнутреннего() : m.состояниеВнутреннегоTON()))
+      .catch(() => {});
+  }, [ключОстатка]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Запас на комиссию сети и аренду счёта токена. В Solana запуск платит
      за создание счёта и метаданные, в TON — за газ контракта. */
@@ -25388,10 +25442,9 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
       {шаг === 2 && (<div key="ш=" className="fx-step-in flex flex-col gap-7">
 
       <div className="flex flex-col gap-1.5">
-        {/* Сумму задают ползунком, а не клавиатурой: верх шкалы — весь
-            кошелёк за вычетом запаса на комиссию, поэтому выставить
-            больше, чем есть, нельзя. Пока остатка не знаем — шкала по
-            умолчанию, и нехватку подскажет строка ниже. */}
+        {/* Предел суммы — весь кошелёк за вычетом запаса на комиссию, но
+            не больше, чем примет кривая. Пока остатка не знаем, предел
+            стоит размытым числом, а нехватку подскажет строка ниже. */}
         {(() => {
           const единица = единицаЗапуска;
           const шаг = вEVM ? 0.001 : вSolana ? 0.01 : 0.1;
@@ -25427,10 +25480,14 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
             const порог = Number(CURVE_PARAMS.graduationTon) / 1e9;
             return ДО_ПОРОГА * Math.min(потолок, порог) / (1 - Number(CURVE_PARAMS.feeBps) / 10000);
           })();
+          /* Кривая Solana ещё не приехала — потолка не знаем, и выдумывать
+             его нельзя: прежние «2 SOL по умолчанию» резали «Макс» до двух
+             при пяти на кошельке. Тогда предел — один кошелёк, а лишнее
+             сверх кривой отвергнет сам контракт. */
           const верх = верхПоКривой > 0
             ? Number((Math.floor(верхПоКривой / шаг + 1e-9) * шаг).toFixed(вEVM ? 3 : 2))
-            : (вEVM ? 1 : вSolana ? 2 : 50);
-          const сейчас = Math.min(верх, Number.isFinite(суммаПокупки) ? суммаПокупки : 0);
+            : null;
+          const сейчас = Math.min(верх != null ? верх : Infinity, Number.isFinite(суммаПокупки) ? суммаПокупки : 0);
           const число = (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: вEVM ? 3 : вSolana ? 2 : 1 });
           const плохо = touched && ((вEVM ? false : вSolana ? МИНИМУМ_В_SOLANA : MIN_LAUNCH_ENFORCED)) && (курсЗапуска()) > 0
             && !(сейчас * (курсЗапуска()) >= MIN_LAUNCH_USD);
@@ -25438,14 +25495,19 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
              за вычетом запаса на комиссию, но не больше, чем примет кривая.
              Это число и на кнопке «Макс», и в подсказке: «до 85 SOL» при
              пяти на кошельке обещало то, чего не купить. Вниз до шага —
-             вверх запуску не хватит на газ. */
-          const можноКупить = Number((Math.floor(Math.min(верх, остатокСети != null ? Math.max(0, остатокСети - ЗАПАС_ЗАПУСКА) : верх) / шаг + 1e-9) * шаг).toFixed(вEVM ? 3 : 2));
+             вверх запуску не хватит на газ. Остатка не знаем — числа нет
+             вовсе, а не потолок кривой: «Макс 31,5» при пяти SOL читался
+             как остаток кошелька. */
+          const поКошельку = остатокСети != null ? Math.max(0, остатокСети - ЗАПАС_ЗАПУСКА) : null;
+          const предел = поКошельку == null ? null : Math.min(поКошельку, верх != null ? верх : Infinity);
+          const можноКупить = предел == null ? null : Number((Math.floor(предел / шаг + 1e-9) * шаг).toFixed(вEVM ? 3 : 2));
           // Обычное поле вместо ползунка: сумму печатают точно, а не
           // ловят пальцем. Больше верха кривой не пускаем — сделку сверх
           // запаса контракт всё равно отвергнет.
           const поправить = () => {
             const v = parseFloat(String(form.buyAmount).replace(",", "."));
-            if (Number.isFinite(v) && v > можноКупить) setForm((f) => ({ ...f, buyAmount: можноКупить > 0 ? String(можноКупить) : "" }));
+            const край = можноКупить != null ? можноКупить : верх;
+            if (край != null && Number.isFinite(v) && v > край) setForm((f) => ({ ...f, buyAmount: край > 0 ? String(край) : "" }));
           };
           return (
             <>
@@ -25468,6 +25530,8 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
                 />
                 <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 15, fontWeight: 700 }}>{единица}</span>
                 <button type="button" onClick={() => {
+                  // Остаток ещё едет — ставить нечего, число придёт само.
+                  if (можноКупить == null) { haptic("error"); return; }
                   haptic("light");
                   // «Макс» — всё, что есть на кошельке, за вычетом запаса на
                   // комиссию сети, но не больше, чем примет кривая. Округляем
@@ -25475,11 +25539,13 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
                   setForm((f) => ({ ...f, buyAmount: можноКупить > 0 ? String(можноКупить) : "" }));
                 }} className="fx-tap"
                   style={{ padding: "6px 10px", borderRadius: 999, border: `1px solid ${T.line}`, background: "transparent", color: T.ice, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
-                  Макс {число(можноКупить)}
+                  Макс {можноКупить != null ? число(можноКупить) : <РазмытаяСумма образец="0,00" />}
                 </button>
               </div>
               <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 4 }}>
-                <ТекстСЧислами text={`0 — без покупки, до ${число(можноКупить)} ${единица}`} />
+                {можноКупить != null
+                  ? <ТекстСЧислами text={`0 — без покупки, до ${число(можноКупить)} ${единица}`} />
+                  : <>0 — без покупки, до <РазмытаяСумма образец="0,00" /> {единица}</>}
               </span>
             </>
           );
@@ -31358,14 +31424,15 @@ const FEE_PERCENT = 0; // комиссии площадки нет
   const connected = !!walletAddress;
   const walletAddressShort = walletAddress ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` : "";
 
-  // Реальный баланс TON — подтягиваем с публичного API tonapi.io по
-  // адресу подключённого кошелька (не требует ключа для базовых запросов,
-  // но без ключа лимит очень низкий — см. TONAPI_KEY выше).
-  const [tonBalance, setTonBalance] = useState(0);
-  /* Остаток SOL на кошельке приложения — для проверки до сделки: без него
-     покупка на пустом кошельке сперва рисовалась на графике и только
-     потом откатывалась отказом сервера. null — ещё не знаем. */
-  const [solВнутр, setSolВнутр] = useState(null);
+  /* Остатки кошелька приложения для проверки до сделки — сырое число
+     сети из общей памяти (src/остатки.js; опросы ниже её и пишут). Сырое,
+     а не с поправкой на свои траты: сделки в пути здесь учитывают брони
+     (см. confirmTrade), и вычесть одну покупку дважды значило бы отказать
+     в следующей. null — ещё не знаем: без числа покупка на пустом
+     кошельке сперва рисовалась на графике и потом откатывалась. */
+  const tonСырой = useОстаток("ton", false, { сырой: true });
+  const tonBalance = tonСырой != null ? tonСырой : 0;
+  const solВнутр = useОстаток("sol", false, { сырой: true });
   const [tonPriceUsd, setTonPriceUsd] = useState(0);
   /* Курс SOL как состояние приложения: сам solUsd() живёт в переменной
      модуля, и React о его появлении не узнаёт. Нужен здесь, чтобы числа
@@ -31409,10 +31476,11 @@ const FEE_PERCENT = 0; // комиссии площадки нет
     let жив = true;
     const шаг = async () => {
       const { состояниеВнутреннегоTON } = await import("./appWallet");
+      // Остаток опрос сам кладёт в общую память — tonBalance выше.
       const с = await состояниеВнутреннегоTON().catch(() => null);
       if (!жив) return;
-      if (с && с.address) { setВнутрTON(с); setTonBalance(Number(с.ton) || 0); }
-      else if (с && с.нуженВход) { setВнутрTON(null); setTonBalance(0); }
+      if (с && с.address) setВнутрTON(с);
+      else if (с && с.нуженВход) setВнутрTON(null);
     };
     шаг();
     const id = setInterval(шаг, 15000);
@@ -31423,10 +31491,11 @@ const FEE_PERCENT = 0; // комиссии площадки нет
   useEffect(() => {
     if (!открытSolana) return undefined;
     let жив = true;
+    // Остаток опрос сам кладёт в общую память — solВнутр выше.
     const шаг = async () => {
+      if (!жив) return;
       const { состояниеВнутреннего } = await import("./appWallet");
-      const с = await состояниеВнутреннего().catch(() => null);
-      if (жив && с && с.address && с.sol != null) setSolВнутр(Number(с.sol) || 0);
+      await состояниеВнутреннего().catch(() => null);
     };
     шаг();
     const id = setInterval(шаг, 8000);
@@ -32453,7 +32522,11 @@ function mapTokenRow(row) {
           if (!адрес || cancelled) return;
           const п = new URLSearchParams({ wallet: адрес, mint: jetton });
           const b = await fetch(апи(`/api/solana?action=balances&${п}`)).then((r) => r.json());
-          if (!cancelled && b && !b.error) setChainHolding(Number(b.token) || 0);
+          if (cancelled || !b || b.error) return;
+          if (b.sol != null) записатьОстатки(null, { sol: Number(b.sol) });
+          // Узел промолчал (token: null) — остаётся прежнее, а не ноль:
+          // «нечего продавать» при токенах на кошельке хуже ожидания.
+          if (b.token != null) setChainHolding(Number(b.token) || 0);
         } catch { /* сеть промолчала — останется запасной счётчик */ }
       })();
       return () => { cancelled = true; };
@@ -34488,7 +34561,8 @@ function mapTokenRow(row) {
        api/wallet-solana.js): иначе отказ приходил уже после свечи. */
     const запас = сеть === "solana" ? ЗАПАС_SOL_СДЕЛКИ : (token.graduated ? ЗАПАС_TON_БИРЖИ : ЗАПАС_TON_КРИВОЙ);
     if (покупка) {
-      const есть = сеть === "solana" ? solВнутр : tonBalance;
+      // null — остаток ещё едет: проверит сервер, а не ноль отсюда.
+      const есть = сеть === "solana" ? solВнутр : tonСырой;
       if (сеть === "ton" && !(tonPriceUsd > 0)) { showToast(t("rateLoadingRetry")); return; }
       if (есть != null && сумма + запас + занято.монет > есть + 1e-9) {
         haptic("error");
@@ -34503,9 +34577,9 @@ function mapTokenRow(row) {
       const есть = доступноТокенов != null ? доступноТокенов : chainHolding;
       if (сеть === "ton" && есть == null) { showToast(t("balanceLoading")); return; }
       if (есть != null && сумма > (есть - занято.токенов) * 1.000001 + 1e-9) { haptic("error"); showToast(t("insufficientSellAmount")); return; }
-      if (сеть === "ton" && tonBalance < ЗАПАС_TON_ПРОДАЖИ + занято.монет) {
+      if (сеть === "ton" && tonСырой != null && tonСырой < ЗАПАС_TON_ПРОДАЖИ + занято.монет) {
         haptic("error");
-        showToast(tf("insufficientTon", { have: `${tonBalance.toFixed(3)} ${ТИКЕР_TON}`, need: `${ЗАПАС_TON_ПРОДАЖИ.toFixed(2)} ${ТИКЕР_TON}` }));
+        showToast(tf("insufficientTon", { have: `${tonСырой.toFixed(3)} ${ТИКЕР_TON}`, need: `${ЗАПАС_TON_ПРОДАЖИ.toFixed(2)} ${ТИКЕР_TON}` }));
         return;
       }
     }
@@ -34795,7 +34869,7 @@ function mapTokenRow(row) {
           setManageToken_((prev) => (prev && prev.id === id ? { ...prev, logoUrl: url } : prev));
         }}
       />
-      <TradeModal t={token} tradeModal={tradeModal} onClose={() => setTradeModal(null)} onConfirm={confirmTrade} walletTonBalance={tonBalance} tonPriceUsd={tonPriceUsd} heldAmount={chainHolding} curveState={tradeCurveState} />
+      <TradeModal t={token} tradeModal={tradeModal} onClose={() => setTradeModal(null)} onConfirm={confirmTrade} tonPriceUsd={tonPriceUsd} heldAmount={chainHolding} curveState={tradeCurveState} />
       <TokenLaunchOverlay
         open={!!launchRequest}
         form={launchRequest ? launchRequest.form : EMPTY_LAUNCH_FORM}

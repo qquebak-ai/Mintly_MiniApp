@@ -31,6 +31,7 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 import { нуженВторойКлюч } from "./_second.js";
 import { занятьПоОчереди, свободныйНомер, занятьНомер, номерЖдёт } from "./_walletLock.js";
 import { скоростьИз, наценка } from "./_speed.js";
+import { быстрыйОстаток } from "./_остаток.js";
 
 const TESTNET = process.env.TON_TESTNET === "1";
 const TONAPI = TESTNET ? "https://testnet.tonapi.io" : "https://tonapi.io";
@@ -614,7 +615,12 @@ export default async function handler(req, res) {
 
     if (действие === "state") {
       res.setHeader("Cache-Control", "no-store");
-      const [есть, выведено] = await Promise.all([балансИзСети(строка.address), выведеноЗаСутки(db, user)]);
+      // Остаток — быстрым путём, как в Solana (api/_остаток.js).
+      const свежее = String((req.query && req.query.fresh) || "") === "1";
+      const [есть, выведено] = await Promise.all([
+        быстрыйОстаток(`ton:${строка.address}`, () => балансИзСети(строка.address), { свежее }),
+        выведеноЗаСутки(db, user),
+      ]);
       return res.status(200).json({
         address: строка.address,
         ton: есть,

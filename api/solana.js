@@ -20,6 +20,8 @@
  *                        нужен свой (Helius, QuickNode).
  */
 
+import { быстрыйОстаток } from "./_остаток.js";
+
 const JUP = "https://lite-api.jup.ag/swap/v1";
 /* Узел сети — обязательно боевой.
  *
@@ -122,6 +124,9 @@ async function rpc(method, params, узлы = [RPC]) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+        // Без срока задумавшийся узел держал окно сделки без остатка
+        // столько, сколько думал, — иногда до обрыва соединения.
+        signal: AbortSignal.timeout(5000),
       });
       // Отказ по лимиту — повод спросить у соседнего узла, а не сдаться:
       // у публичных он наступает быстро и проходит так же быстро.
@@ -137,30 +142,42 @@ async function rpc(method, params, узлы = [RPC]) {
   throw последняя || new Error("rpc недоступен");
 }
 
+/* Узел не ответил — null, а не ноль: «Доступно: 0» при деньгах на
+   кошельке ставило кнопке «Макс» ноль, и окно сделки уверяло, что
+   покупать не на что. Пустой счёт токена — честный ноль: узел ответил,
+   что счетов нет. SOL — тем же быстрым путём, что у опроса кошелька
+   (api/_остаток.js), и с той же памятью: оба спрашивают один адрес. */
 export async function балансы({ wallet, mint }) {
   if (!адресОк(wallet)) return null;
-  const итог = { sol: 0, token: 0, decimals: 0 };
-  try {
-    const b = await rpc("getBalance", [wallet]);
-    итог.sol = Number((b && b.value) || 0) / 1e9;
-  } catch { /* узел не ответил — покажем нули, это лучше пустого экрана */ }
-
-  if (адресОк(mint)) {
+  const итог = { sol: null, token: адресОк(mint) ? null : 0, decimals: 0 };
+  const читатьSol = async () => {
+    try {
+      // «confirmed» — как у опроса кошелька: окончательный отстаёт от
+      // сделки на десяток секунд.
+      const b = await rpc("getBalance", [wallet, { commitment: "confirmed" }]);
+      return Number((b && b.value) || 0) / 1e9;
+    } catch { return null; }
+  };
+  const читатьТокен = async () => {
+    if (!адресОк(mint)) return;
     try {
       const r = await rpc("getTokenAccountsByOwner", [
         wallet,
         { mint },
-        { encoding: "jsonParsed" },
+        { encoding: "jsonParsed", commitment: "confirmed" },
       ]);
-      const счета = (r && r.value) || [];
-      for (const счёт of счета) {
+      let всего = 0;
+      for (const счёт of (r && r.value) || []) {
         const сумма = счёт?.account?.data?.parsed?.info?.tokenAmount;
         if (!сумма) continue;
-        итог.token += Number(сумма.uiAmount) || 0;
+        всего += Number(сумма.uiAmount) || 0;
         итог.decimals = Number(сумма.decimals) || итог.decimals;
       }
-    } catch { /* токенового счёта может не быть вовсе — это ноль */ }
-  }
+      итог.token = всего;
+    } catch { /* узел молчит — остаток токена неизвестен */ }
+  };
+  const [sol] = await Promise.all([быстрыйОстаток(`sol:${wallet}`, читатьSol), читатьТокен()]);
+  итог.sol = sol;
   return итог;
 }
 

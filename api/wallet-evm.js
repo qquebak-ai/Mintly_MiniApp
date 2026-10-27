@@ -28,6 +28,7 @@ import { createClient } from "@supabase/supabase-js";
 import { нуженВторойКлюч } from "./_second.js";
 import { занятьПоОчереди } from "./_walletLock.js";
 import { скоростьИз, наценка } from "./_speed.js";
+import { быстрыйОстаток } from "./_остаток.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -234,25 +235,31 @@ async function подписант(строка, набор, user, сеть) {
 }
 
 /* Остатки по всем трём сетям разом. Сеть, которая не ответила, — null,
-   а не ноль: ноль при деньгах на кошельке хуже честного «не знаем». */
-async function остатки(адрес) {
+   а не ноль: ноль при деньгах на кошельке хуже честного «не знаем».
+   Каждая сеть — быстрым путём (api/_остаток.js) и сама по себе: раньше
+   ответ ждал самую медленную из трёх, и задумавшийся узел Ethereum на
+   пятнадцать секунд оставлял без остатка окна BNB Chain и Base. */
+async function остатки(адрес, { свежее = false } = {}) {
   const { Contract, formatUnits } = await ethersLib();
   const итог = {};
   await Promise.all(Object.entries(СЕТИ).map(async ([ключ, с]) => {
-    try {
-      const п = await провайдер(ключ);
-      const [родная, ...стейблы] = await Promise.all([
-        п.getBalance(адрес),
-        ...с.стейблы.map((т) => new Contract(т.адрес, ABI_ТОКЕНА, п).balanceOf(адрес).catch(() => null)),
-      ]);
-      итог[ключ] = {
-        native: Number(formatUnits(родная, 18)),
-        coin: с.монета,
-        tokens: Object.fromEntries(с.стейблы.map((т, i) => [т.тикер, стейблы[i] == null ? null : Number(formatUnits(стейблы[i], т.знаков))])),
-      };
-    } catch {
-      итог[ключ] = { native: null, coin: с.монета, tokens: {} };
-    }
+    const прочитать = async () => {
+      try {
+        const п = await провайдер(ключ);
+        const [родная, ...стейблы] = await Promise.all([
+          п.getBalance(адрес),
+          ...с.стейблы.map((т) => new Contract(т.адрес, ABI_ТОКЕНА, п).balanceOf(адрес).catch(() => null)),
+        ]);
+        return {
+          native: Number(formatUnits(родная, 18)),
+          coin: с.монета,
+          tokens: Object.fromEntries(с.стейблы.map((т, i) => [т.тикер, стейблы[i] == null ? null : Number(formatUnits(стейблы[i], т.знаков))])),
+        };
+      } catch {
+        return null;
+      }
+    };
+    итог[ключ] = (await быстрыйОстаток(`evm:${ключ}:${адрес}`, прочитать, { свежее })) || { native: null, coin: с.монета, tokens: {} };
   }));
   return итог;
 }
@@ -556,7 +563,8 @@ export default async function handler(req, res) {
 
     if (действие === "state") {
       res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ address: строка.address, chains: await остатки(строка.address) });
+      const свежее = String((req.query && req.query.fresh) || "") === "1";
+      return res.status(200).json({ address: строка.address, chains: await остатки(строка.address, { свежее }) });
     }
 
     if (действие === "token-balance") {

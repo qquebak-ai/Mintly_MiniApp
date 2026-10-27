@@ -48,6 +48,7 @@ import { собратьОбменБиржи } from "./_dexSolana.js";
 import { нуженВторойКлюч } from "./_second.js";
 import { занять } from "./_walletLock.js";
 import { темп, скоростьИз, наценка } from "./_speed.js";
+import { быстрыйОстаток } from "./_остаток.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -331,7 +332,10 @@ async function rpc(method, params) {
 const последнийБаланс = new Map();
 async function балансИзСети(адрес) {
   try {
-    const b = await rpc("getBalance", [адрес]);
+    /* «confirmed», а не окончательный по умолчанию: окончательный
+       отстаёт от сделки секунд на тринадцать, и всё это время «Макс»
+       предлагал потратить уже потраченное. */
+    const b = await rpc("getBalance", [адрес, { commitment: "confirmed" }]);
     const v = Number((b && b.value) || 0) / LAMPORTS;
     последнийБаланс.set(адрес, v);
     return v;
@@ -1097,7 +1101,13 @@ export default async function handler(req, res) {
 
     if (действие === "state") {
       res.setHeader("Cache-Control", "no-store");
-      const [есть, выведено] = await Promise.all([балансИзСети(строка.address), выведеноЗаСутки(db, user)]);
+      // Остаток — быстрым путём (api/_остаток.js): окна с «Макс» ждут
+      // этот ответ, и узел, задумавшийся на секунды, держал их пустыми.
+      const свежее = String((req.query && req.query.fresh) || "") === "1";
+      const [есть, выведено] = await Promise.all([
+        быстрыйОстаток(`sol:${строка.address}`, () => балансИзСети(строка.address), { свежее }),
+        выведеноЗаСутки(db, user),
+      ]);
       return res.status(200).json({
         address: строка.address,
         // null — сеть не ответила и прежнего числа нет: интерфейс тогда

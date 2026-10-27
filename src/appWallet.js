@@ -21,10 +21,47 @@
 
 import { supabase } from "./supabaseClient";
 import { апи } from "./апи";
+import { записатьОстатки, списатьОстаток } from "./остатки";
 
+// Чей вход — по нему общая память остатков (src/остатки.js) не путает
+// числа двух аккаунтов на одном телефоне.
+let последнийВход = null;
 async function токен() {
   const { data } = await supabase.auth.getSession();
-  return (data && data.session && data.session.access_token) || null;
+  const сессия = data && data.session;
+  последнийВход = (сессия && сессия.user && сессия.user.id) || null;
+  return (сессия && сессия.access_token) || null;
+}
+
+/* Один опрос на всех. Кошелёк спрашивают сразу многие — карточка
+   кошелька, окно сделки, форма запуска, позиция, список своих токенов, —
+   и каждое раньше шло полным опросом с походом сервера в узел сети:
+   пять одинаковых запросов разом, и все ждут самого медленного.
+   Теперь одновременные просьбы ждут один ответ, а ответ моложе двух
+   секунд отдаётся сразу. «Свежее» — после своей траты: сервер тогда
+   идёт в сеть, а не в свою память (api/_остаток.js). */
+const СВЕЖО_МС = 2000;
+function одинОпрос(сходить) {
+  let путь = null;
+  let свежийПуть = null;
+  let ответ = null;
+  let когда = 0;
+  const запомнить = (о) => {
+    if (о && !о.ошибка) { ответ = о; когда = Date.now(); }
+    return о;
+  };
+  const опрос = ({ свежее = false } = {}) => {
+    if (свежее) {
+      if (!свежийПуть) свежийПуть = сходить(true).then(запомнить).finally(() => { свежийПуть = null; });
+      return свежийПуть;
+    }
+    if (ответ && Date.now() - когда < СВЕЖО_МС) return Promise.resolve(ответ);
+    if (свежийПуть) return свежийПуть;
+    if (!путь) путь = сходить(false).then(запомнить).finally(() => { путь = null; });
+    return путь;
+  };
+  опрос.забыть = () => { ответ = null; когда = 0; };
+  return опрос;
 }
 
 /* Билет второго ключа: его выдаёт сервер, проверив код с почты
@@ -92,18 +129,20 @@ export async function внутреннийДоступен() {
    вызывающий код тогда просто идёт прежним путём. */
 let прежнееSol = null;
 let прежнееСостояние = null;
-export async function состояниеВнутреннего() {
+const опросSol = одинОпрос(async (свежее) => {
   if (!(await внутреннийДоступен())) return null;
   // Кошелёк привязан к аккаунту: без входа его нет и быть не может.
   // Раньше карточка в этом случае просто исчезала, и понять, почему её
   // нет, было нельзя ни человеку, ни нам.
   if (!(await токен())) return { нуженВход: true };
+  const кто = последнийВход;
   try {
-    const св = await запрос("/api/wallet-solana?action=state");
+    const св = await запрос(`/api/wallet-solana?action=state${свежее ? "&fresh=1" : ""}`);
     // Сеть не ответила (sol: null) — держим прежнее число, а не ноль.
     if (св && св.sol == null) св.sol = прежнееSol != null ? прежнееSol : null;
     if (св && св.sol != null) прежнееSol = св.sol;
     if (св) прежнееСостояние = св;
+    if (св && св.sol != null) записатьОстатки(кто, { sol: св.sol });
     return св;
   } catch (e) {
     // Сбой запроса — отдаём прежнее состояние, если оно было: карточка
@@ -111,6 +150,9 @@ export async function состояниеВнутреннего() {
     if (прежнееСостояние) return прежнееСостояние;
     return { ошибка: String((e && e.message) || e).slice(0, 120) };
   }
+});
+export function состояниеВнутреннего(опции) {
+  return опросSol(опции);
 }
 
 /* Адрес кошелька Solana без похода в сеть, если он уже известен. Адрес
@@ -141,18 +183,35 @@ export async function внутреннийTONДоступен() {
 }
 
 let прежнееTON = null;
-export async function состояниеВнутреннегоTON() {
+const опросTON = одинОпрос(async (свежее) => {
   if (!(await внутреннийTONДоступен())) return null;
   if (!(await токен())) return { нуженВход: true };
+  const кто = последнийВход;
   try {
-    const св = await запрос("/api/wallet-ton?action=state");
+    const св = await запрос(`/api/wallet-ton?action=state${свежее ? "&fresh=1" : ""}`);
     // Сеть не ответила (ton: null) — держим прежнее число, а не ноль.
     if (св && св.ton == null && прежнееTON && прежнееTON.ton != null) св.ton = прежнееTON.ton;
     if (св) прежнееTON = св;
+    if (св && св.ton != null) записатьОстатки(кто, { ton: св.ton });
     return св;
   } catch (e) {
     if (прежнееTON) return прежнееTON;
     return { ошибка: String((e && e.message) || e).slice(0, 120) };
+  }
+});
+export function состояниеВнутреннегоTON(опции) {
+  return опросTON(опции);
+}
+
+/* После своей траты — переспросить сеть, не дожидаясь круга опроса, а
+   потраченное сразу вычесть из общей памяти: «Макс» и «Доступно» должны
+   показать новый остаток в ту же секунду, а не когда узел увидит сделку.
+   Узлы видят её не сразу — спрашиваем трижды. */
+function послеТраты(сеть, потрачено = 0) {
+  if (Number(потрачено) > 0) списатьОстаток(сеть, Number(потрачено));
+  const опрос = сеть === "sol" ? опросSol : сеть === "ton" ? опросTON : опросEVM;
+  for (const мс of [1200, 3500, 8000]) {
+    setTimeout(() => { опрос({ свежее: true }).catch(() => {}); }, мс);
   }
 }
 
@@ -163,26 +222,34 @@ export async function купитьВнутреннимTON({ tokenId, сумма,
   // Ключ запроса — от повторов: двойное нажатие не должно превращаться
   // во вторую покупку, сервер по нему вернёт исход первой. Скорость — как
   // в Solana и EVM: от неё наценка и путь сделки на сервере.
-  return await запрос("/api/wallet-ton?action=buy", { tokenId, amount: сумма, speed: скорость, requestKey: ключЗапроса() });
+  const j = await запрос("/api/wallet-ton?action=buy", { tokenId, amount: сумма, speed: скорость, requestKey: ключЗапроса() });
+  послеТраты("ton", сумма);
+  return j;
 }
 
 /* Запуск токена в TON кошельком приложения: сервер получает адрес уже
    загруженных метаданных и сумму покупки, остальное собирает сам. */
 export async function запуститьВнутреннимTON({ metadataUrl, buyAmount }) {
-  return await запрос("/api/wallet-ton?action=launch", { metadataUrl, buyAmount, requestKey: ключЗапроса() });
+  const j = await запрос("/api/wallet-ton?action=launch", { metadataUrl, buyAmount, requestKey: ключЗапроса() });
+  послеТраты("ton", buyAmount);
+  return j;
 }
 
 export async function продатьВнутреннимTON({ tokenId, количество, скорость = скоростьСделки() }) {
-  return await запрос("/api/wallet-ton?action=sell", { tokenId, amount: количество, speed: скорость, requestKey: ключЗапроса() });
+  const j = await запрос("/api/wallet-ton?action=sell", { tokenId, amount: количество, speed: скорость, requestKey: ключЗапроса() });
+  послеТраты("ton");
+  return j;
 }
 
 /* --- Действия, которые тратят монеты ---------------------------------
    Все они называют серверу намерение, а не транзакцию. */
 
 export async function запуститьВнутренним({ имя, тикер, взносSol = 0 }) {
-  return await запрос("/api/wallet-solana?action=launch", {
+  const j = await запрос("/api/wallet-solana?action=launch", {
     name: имя, ticker: тикер, buySol: взносSol, requestKey: ключЗапроса(),
   });
+  послеТраты("sol", взносSol);
+  return j;
 }
 
 /* Скорость сделки — выбор человека в окне сделки и в «Быстрой покупке»
@@ -199,6 +266,7 @@ export async function сделкаВнутренним({ mint, продажа = 
   // запишет её в историю и уменьшит позицию, а в цепочке ничего не
   // произошло — ровно то, на что человек и жаловался.
   if (!j || !j.signature) throw new Error("сделка не прошла");
+  послеТраты("sol", продажа ? 0 : amount);
   // Вместе с подписью приходят настоящие числа сделки: сколько токенов
   // ушло и сколько монет пришло. История пишется по ним.
   return { signature: j.signature, tokens: j.tokens, bought: j.bought, solOut: j.solOut };
@@ -215,12 +283,17 @@ export async function курсОбмена({ вход, выход, сумма, �
   return j || null;
 }
 
+// Обёрнутый SOL — так обмен называет саму монету сети.
+const SOL_МИНТ = "So11111111111111111111111111111111111111112";
+
 export async function свопВнутренним({ вход, выход, сумма, проскальзывание = 150 }) {
   const j = await запрос("/api/wallet-solana?action=swap", {
     input: вход, output: выход, amount: String(сумма),
     slippage: проскальзывание, requestKey: ключЗапроса(),
   });
   if (!j || !j.signature) throw new Error("обмен не прошёл");
+  // Отдали SOL — сумма в лямпортах; отдали токен — SOL только придёт.
+  послеТраты("sol", вход === SOL_МИНТ ? Number(сумма) / 1e9 : 0);
   // Тот же вид ответа, что и у сделки на кривой: у биржи точных чисел
   // сделки нет, поэтому здесь только подпись.
   return { signature: j.signature };
@@ -254,26 +327,35 @@ export async function курсМеждуСетями({ откуда, сумма 
 }
 
 export async function обменМеждуСетями({ откуда, сумма }) {
-  return await запрос(апи("/api/treasury-swap?action=swap"), {
+  const j = await запрос(апи("/api/treasury-swap?action=swap"), {
     from: откуда, amount: сумма, requestKey: ключЗапроса(),
   });
+  // Меняются обе сети: одна монета ушла, другая придёт.
+  послеТраты(откуда === "GRAM" ? "ton" : "sol", сумма);
+  послеТраты(откуда === "GRAM" ? "sol" : "ton");
+  return j;
 }
 
 /* Вывод. Адрес не передаётся: сервер отправит только на привязанный —
    тот, владение которым доказано подписью. all — «всё, что есть»:
    сервер оставит запас на комиссию, иначе перевод не пройдёт вовсе. */
 export async function вывестиСВнутреннего({ amount, all = false, адрес = "", кому = null }) {
-  return await запрос("/api/wallet-solana?action=withdraw", {
+  const j = await запрос("/api/wallet-solana?action=withdraw", {
     amount, all, address: адрес || undefined, toUser: кому || undefined, requestKey: ключЗапроса(),
   });
+  // «Всё» — сколько именно ушло, знает сервер; дождёмся сети.
+  послеТраты("sol", all ? 0 : amount);
+  return j;
 }
 
 /* Вывод в TON — та же дорога, только другая ручка. Адрес, как и в
    Solana, нужен лишь пока не привязан постоянный. */
 export async function вывестиСВнутреннегоTON({ amount, all = false, адрес = "", кому = null }) {
-  return await запрос("/api/wallet-ton?action=withdraw", {
+  const j = await запрос("/api/wallet-ton?action=withdraw", {
     amount, all, address: адрес || undefined, toUser: кому || undefined, requestKey: ключЗапроса(),
   });
+  послеТраты("ton", all ? 0 : amount);
+  return j;
 }
 
 /* Перевод человеку Mintly — по нику. Сервер отдаёт ник, аватар и id;
@@ -382,10 +464,11 @@ export async function сетиEVMВключены() {
 }
 
 let прежнееEVM = null;
-export async function состояниеEVM() {
+const опросEVM = одинОпрос(async (свежее) => {
   if (!(await токен())) return null;
+  const кто = последнийВход;
   try {
-    const св = await запрос(апи("/api/wallet-evm?action=state"));
+    const св = await запрос(апи(`/api/wallet-evm?action=state${свежее ? "&fresh=1" : ""}`));
     // Сеть, которая не ответила, держит прежнее число, а не ноль.
     if (св && св.chains && прежнееEVM && прежнееEVM.chains) {
       for (const [к, v] of Object.entries(св.chains)) {
@@ -393,22 +476,32 @@ export async function состояниеEVM() {
       }
     }
     if (св) прежнееEVM = св;
+    if (св && св.chains) {
+      записатьОстатки(кто, Object.fromEntries(Object.entries(св.chains).map(([к, v]) => [к, v ? v.native : null])));
+    }
     return св;
   } catch {
     return прежнееEVM;
   }
+});
+export function состояниеEVM(опции) {
+  return опросEVM(опции);
 }
 
 export async function запуститьEVM({ сеть, имя, тикер, metadataUrl, взнос = 0 }) {
-  return await запрос(апи("/api/wallet-evm?action=launch"), {
+  const j = await запрос(апи("/api/wallet-evm?action=launch"), {
     chain: сеть, name: имя, ticker: тикер, metadataUrl, buyAmount: взнос, speed: "normal", requestKey: ключЗапроса(),
   });
+  послеТраты(сеть, взнос);
+  return j;
 }
 
 export async function сделкаEVM({ сеть, токен: адрес, продажа = false, сумма, raw = null }) {
-  return await запрос(апи(`/api/wallet-evm?action=${продажа ? "sell" : "buy"}`), {
+  const j = await запрос(апи(`/api/wallet-evm?action=${продажа ? "sell" : "buy"}`), {
     chain: сеть, token: адрес, amount: сумма, raw, speed: скоростьСделки(), requestKey: ключЗапроса(),
   });
+  послеТраты(сеть, продажа ? 0 : сумма);
+  return j;
 }
 
 export async function остатокТокенаEVM({ сеть, токен: адрес }) {
@@ -430,7 +523,21 @@ export async function котировкаEVM({ сеть, токен: адрес, 
 /* Вывод монеты сети EVM на чужой адрес. Адрес и сумму сервер проверяет
    сам (контрольная сумма, запас на газ). */
 export async function вывестиEVM({ сеть, amount, all = false, адрес = "", кому = null }) {
-  return await запрос(апи("/api/wallet-evm?action=withdraw"), {
+  const j = await запрос(апи("/api/wallet-evm?action=withdraw"), {
     chain: сеть, amount, all, address: адрес || undefined, toUser: кому || undefined, requestKey: ключЗапроса(),
   });
+  послеТраты(сеть, all ? 0 : amount);
+  return j;
 }
+
+/* Сменился аккаунт — прежние ответы не его: иначе после выхода и входа
+   под другим именем первые две секунды показывали бы чужой кошелёк. */
+try {
+  supabase.auth.onAuthStateChange((событие, сессия) => {
+    const кто = (сессия && сессия.user && сессия.user.id) || null;
+    if (событие !== "SIGNED_OUT" && (!кто || кто === последнийВход || !последнийВход)) return;
+    опросSol.забыть(); опросTON.забыть(); опросEVM.забыть();
+    прежнееSol = null; прежнееСостояние = null; прежнееTON = null; прежнееEVM = null;
+    последнийВход = кто;
+  });
+} catch { /* без подписки ответы просто доживут свои две секунды */ }
