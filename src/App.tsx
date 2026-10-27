@@ -21035,6 +21035,9 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
       >
         <ШёлкКарты пауза={картаКрутится || !переворотКарты} тон={{ fast: "pro", turbo: "turbo" }[скоростьКарты] || null} />
         <span aria-hidden style={{ position: "absolute", inset: 0, background: hexA("#000000", 0.45), pointerEvents: "none", zIndex: 0 }} />
+        {/* Та же еле заметная кромка, что у лицевой стороны: без неё
+            перевёрнутая карта сливалась с чёрным фоном страницы. */}
+        <span aria-hidden style={{ position: "absolute", inset: 0, borderRadius: "inherit", boxShadow: `inset 0 0 0 1px ${hexA("#FFFFFF", 0.1)}`, pointerEvents: "none", zIndex: 1 }} />
         {/* Содержимое — отдельным слоем поверх: шёлк и затемнение лежат
             абсолютно и иначе закрывали бы обычные (непозиционированные)
             строки — оборот выглядел пустым. */}
