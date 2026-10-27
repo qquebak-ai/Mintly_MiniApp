@@ -11067,7 +11067,6 @@ function AchievementsView({ achievements = [], onGoShop, onBack }) {
                     <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>{a.label}</span>
                     {a.done && <CheckCircle2 size={13} color={a.color} />}
                   </div>
-                  <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.35, marginTop: 2 }}>{a.hint}</div>
                   {!a.done && a.target > 1 && (
                     <div className="flex items-center gap-2" style={{ marginTop: 7 }}>
                       <div style={{ flex: 1, height: 4, borderRadius: 2, background: T.surfaceHi, overflow: "hidden" }}>
@@ -11176,9 +11175,6 @@ function BuySheet({ item, kind, coins, cosmetics, onBuy, onClose }) {
         </div>
 
         <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 19.5, fontWeight: 700, marginTop: 14 }}>{pickLabel(item.label)}</span>
-        <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginTop: 2 }}>
-          {kind === "frame" ? t("shopTabFrames") : kind === "card" ? t("shopTabCards") : kind === "mintie" ? (lang === "EN" ? "Mintie skin" : "Окрас Минти") : t("shopTabWallet")}
-        </span>
 
         <div className="flex items-center justify-between w-full rounded-[18px] px-4 py-3" style={{ marginTop: 14, background: T.bg, border: "none" }}>
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>{t("shopLeftAfter")}</span>
@@ -12222,9 +12218,6 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
           </div>
           <div style={{ height: 8, borderRadius: 999, background: T.surfaceHi, overflow: "hidden" }}>
             <div style={{ width: `${Math.max(2, Math.min(100, (кривая.progress || 0) * 100))}%`, height: "100%", borderRadius: 999, background: T.up, transition: "width 600ms ease" }} />
-          </div>
-          <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5, marginTop: 8 }}>
-            Собрано {дробь(кривая.realNative)} из {дробь(кривая.graduationNative, 2)} {с.монета} — потом токен уходит в пул {сеть === "bsc" ? "PancakeSwap" : "Uniswap"}
           </div>
         </div>
       )}
@@ -15840,7 +15833,6 @@ function ПульсПК({ curveTokens = [], onOpenToken, onGoCreate, сеть = 
               <div className="flex items-center justify-between" style={{ padding: "14px 16px", borderBottom: `1px solid ${T.line}`, flexShrink: 0 }}>
                 <div>
                   <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 800 }}>{к.заголовок}</div>
-                  <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 2 }}>{к.подпись}</div>
                 </div>
                 <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, fontWeight: 700, padding: "4px 10px", borderRadius: 999, border: `1px solid ${T.line}` }}>{ждём ? "·" : список.length}</span>
               </div>
@@ -17909,7 +17901,6 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
               <ChevronDown size={14} color={T.muted} />
             </button>
           </div>
-          <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 6 }}>{t("swapRouteNote")}</div>
         </div>
 
         {/* Доли — только когда отдаём SOL: чем владеет кошелёк в токенах,
@@ -21260,7 +21251,6 @@ function ОбещанияТокена({ механики, замок, tokenId })
                   <span style={{ fontFamily: monoFont, color: "#E4E1DA", fontSize: 13, fontWeight: 700 }}> · {фонд.toFixed(3)}</span>
                 )}
               </span>
-              <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 2 }}>{t(м.описание)}</span>
             </span>
           </div>
         ))}
@@ -21270,9 +21260,6 @@ function ОбещанияТокена({ механики, замок, tokenId })
             <span className="flex-1 min-w-0">
               <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>
                 {t("lockOnToken")}
-              </span>
-              <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 2 }}>
-                {t(замок === "graduation" ? "lockGraduationBody" : "lockMilestonesBody")}
               </span>
             </span>
           </div>
@@ -23244,11 +23231,6 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
             <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 14, fontWeight: 600 }}>
               {tr(рынокОткрыт ? "gradListedTitle" : "gradClosedTitle")}
             </div>
-            <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5, marginTop: 3 }}>
-              <ТекстСЧислами text={рынокОткрыт
-                ? tr("gradListedBody")
-                : trf("gradClosedBody", { target: fmtTon(Number(curve.graduationTon) / 1e9) })} />
-            </p>
           </div>
         </div>
       ) : Number((своя && своя.цель) || token.graduationTon || (curve && Number(curve.graduationTon) / 1e9)) > 0 ? (
@@ -24065,7 +24047,6 @@ function ВыборСкорости({ сеть, style, onChange = null }) {
           </button>
         ))}
       </div>
-      <span style={{ display: "block", marginTop: 6, fontFamily: bodyFont, color: T.faint, fontSize: 11.5, lineHeight: 1.4 }}>{ru ? выбранная.суть : выбранная.сутьEN}</span>
     </div>
   );
 }
@@ -24828,13 +24809,6 @@ function TradeModal({ t: token, tradeModal: tradeModalProp, onClose, onConfirm, 
               : `${t("sellFor")} ${amount.toLocaleString("ru-RU")} ${token.ticker}`)
             : (isBuy && tonPriceUsd <= 0 ? t("rateLoading") : !isBuy && holdingTokens <= 0 ? t("nothingToSell") : t("enterAmount"))}
         </button>
-        {/* Предупреждение о риске — у самой кнопки покупки: это место,
-            где решение и принимается. */}
-        {isBuy && (
-          <div style={{ marginTop: 10, textAlign: "center", fontFamily: bodyFont, color: T.faint, fontSize: 11.5, lineHeight: 1.4 }}>
-            {lang === "EN" ? "Memecoins are risky — you can lose what you put in." : "Мемкоины — рискованный актив: можно потерять вложенное."}
-          </div>
-        )}
           </>
         )}
       </div>
@@ -25350,9 +25324,6 @@ function ПереключательМеханики({ item, включено, on
       <span className="flex-1 min-w-0">
         <span style={{ display: "block", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 700 }}>
           {t(item.tKey)}
-        </span>
-        <span style={{ display: "block", fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 3 }}>
-          {t(item.описание)}
         </span>
       </span>
       {/* Переключатель, а не галочка: видно и то, что выключено. */}
@@ -25967,11 +25938,6 @@ function CreateView({ showToast, unlocked, accountCreated, connected, onOpenCrea
                   Макс {можноКупить != null ? число(можноКупить) : <РазмытаяСумма образец="0,00" />}
                 </button>
               </div>
-              <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, marginTop: 4 }}>
-                {можноКупить != null
-                  ? <ТекстСЧислами text={`0 — без покупки, до ${число(можноКупить)} ${единица}`} />
-                  : <>0 — без покупки, до <РазмытаяСумма образец="0,00" /> {единица}</>}
-              </span>
             </>
           );
         })()}
@@ -26377,12 +26343,6 @@ function ПолосаТарифов({ активный }) {
     </div>
   );
 }
-function сравнениеТарифа(т, ru) {
-  const раз = (v) => (ru ? String(v).replace(".", ",") : String(v));
-  if (т.key === "free") return ru ? "Базовая скорость — от неё считаются остальные" : "Base speed — the others are measured from it";
-  if (т.key === "pro") return ru ? `В ${раз(1.7)} раза быстрее Free` : "1.7× faster than Free";
-  return ru ? "В 3 раза быстрее Pro и в 5 раз быстрее Free" : "3× faster than Pro and 5× faster than Free";
-}
 
 const СЕТИ_ТАРИФА = [["solana", "Solana"], ["ton", "TON"], ["bsc", "BNB Chain"], ["base", "Base"], ["eth", "Ethereum"]];
 
@@ -26411,37 +26371,71 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
     закрыть();
   }
 
+  // Тарифы листаются шагами, как форма запуска: один тариф на экран.
+  const [индекс, setИндекс] = useState(() => Math.max(0, ТАРИФЫ_ЭКРАНА.indexOf(свой)));
+  const лента = useRef(null);
+  useEffect(() => {
+    const el = лента.current;
+    if (el) el.scrollTo({ left: индекс * el.clientWidth, behavior: "auto" });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function прокрутка() {
+    const el = лента.current;
+    if (!el) return;
+    const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+    if (i !== индекс) { setИндекс(i); haptic("light"); }
+  }
+  function кШагу(i) {
+    const el = лента.current;
+    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+  }
+  const шаг = ТАРИФЫ_ЭКРАНА[индекс];
+
   return (
-    <div className="flex flex-col">
-      <div style={{ marginBottom: 6 }}><ПолосаТарифов активный={свой} /></div>
-      {ТАРИФЫ_ЭКРАНА.map((т, i) => {
-        const выбран = свой.key === т.key;
-        return (
-          <button
-            key={т.key}
-            onClick={() => открыть(т)}
-            className="fx-tap fx-card w-full flex flex-col text-left"
-            style={{ gap: 12, padding: "18px 0", border: "none", background: "transparent", borderBottom: i < ТАРИФЫ_ЭКРАНА.length - 1 ? `1px solid ${T.line}` : "none", animationDelay: `${i * 60}ms` }}
-          >
-            <div className="flex items-center w-full" style={{ gap: 12 }}>
-              <div className="flex flex-col flex-1 min-w-0" style={{ gap: 3 }}>
-                <span className="flex items-center" style={{ gap: 8, fontFamily: displayFont, fontSize: 24, fontWeight: 800, color: T.ice }}>
-                  {т.имя}
-                  {т.key === "turbo" && <Zap size={18} color={т.цвет} fill={т.цвет} />}
-                </span>
-                <span style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>
-                  {(ru ? т.ru : т.en).коротко} · <span style={{ fontFamily: monoFont, color: т.цвет }}>{ДоплатаТарифа(таблица, "solana", т.скорость, ru)}</span>
-                </span>
-              </div>
-              {выбран ? (
-                <span style={{ fontFamily: bodyFont, fontSize: 13, fontWeight: 800, color: "#000", background: T.ice, borderRadius: 999, padding: "6px 12px" }}>{ru ? "Выбран" : "Selected"}</span>
-              ) : (
-                <ChevronRight size={20} color={T.muted} />
-              )}
-            </div>
+    <div className="flex flex-col" style={{ gap: 26 }}>
+      <ПолосаТарифов активный={шаг} />
+      <div className="flex items-center" style={{ gap: 6 }}>
+        {ТАРИФЫ_ЭКРАНА.map((т, i) => (
+          <button key={т.key} aria-label={т.имя} onClick={() => кШагу(i)} style={{
+            height: 4, borderRadius: 2, width: i === индекс ? 22 : 8, padding: 0, border: "none",
+            background: i <= индекс ? T.ice : T.lineHi,
+            transition: "width 420ms cubic-bezier(0.34, 1.4, 0.64, 1), background 300ms ease",
+          }} />
+        ))}
+      </div>
+      <div ref={лента} onScroll={прокрутка} className="no-scrollbar flex"
+        style={{ overflowX: "auto", scrollSnapType: "x mandatory", margin: "0 -16px", overscrollBehaviorX: "contain" }}>
+        {ТАРИФЫ_ЭКРАНА.map((т) => (
+          <button key={т.key} onClick={() => открыть(т)} className="fx-tap flex flex-col text-left"
+            style={{ flex: "0 0 100%", scrollSnapAlign: "center", padding: "0 16px", gap: 10, border: "none", background: "transparent", boxSizing: "border-box" }}>
+            <span className="flex items-center" style={{ gap: 10, fontFamily: displayFont, fontSize: 56, fontWeight: 800, color: T.ice, letterSpacing: "-0.03em", lineHeight: 1 }}>
+              {т.имя}
+              {т.key === "turbo" && <Zap size={38} color={т.цвет} fill={т.цвет} />}
+              <ChevronRight size={26} color={T.muted} style={{ marginLeft: "auto" }} />
+            </span>
+            <span style={{ fontFamily: monoFont, fontSize: 22, fontWeight: 700, color: т.цвет }}>{ДоплатаТарифа(таблица, "solana", т.скорость, ru)}</span>
           </button>
-        );
-      })}
+        ))}
+      </div>
+      <div aria-hidden style={{ height: 90 }} />
+      {!открыт && createPortal(
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 461, padding: `12px 16px ${insetBottom + 14}px`, background: T.bg }}>
+          <button
+            disabled={свой.key === шаг.key}
+            onClick={() => { haptic("success"); выбратьСкорость(шаг.скорость); }}
+            className="fx-tap w-full"
+            style={{
+              display: "block", maxWidth: 520, margin: "0 auto", height: 56, borderRadius: 999, border: "none",
+              fontFamily: displayFont, fontSize: 17, fontWeight: 800,
+              background: свой.key === шаг.key ? T.surface : "#FFFFFF",
+              color: свой.key === шаг.key ? T.muted : "#000000",
+            }}
+          >
+            {свой.key === шаг.key ? (ru ? "Выбран" : "Selected") : (ru ? `Выбрать ${шаг.имя}` : `Choose ${шаг.имя}`)}
+          </button>
+        </div>,
+        document.body,
+      )}
 
       {открыт && createPortal(
         <div
@@ -26458,7 +26452,6 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
                   {открыт.имя}
                   {открыт.key === "turbo" && <Zap size={28} color={открыт.цвет} fill={открыт.цвет} />}
                 </span>
-                <span style={{ fontFamily: bodyFont, color: открыт.цвет, fontSize: 16, fontWeight: 700 }}>{сравнениеТарифа(открыт, ru)}</span>
               </div>
               <ПолосаТарифов активный={открыт} />
 
@@ -26523,11 +26516,6 @@ function НастройкаБыстрых() {
       <div className="fx-card flex items-center justify-between" style={{ animationDelay: "40ms", gap: 12, padding: "14px 16px", borderRadius: 22, background: T.surface }}>
         <span className="flex flex-col" style={{ minWidth: 0 }}>
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>{ru ? "Покупка в 1 клик" : "One-tap trading"}</span>
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 3, lineHeight: 1.4 }}>
-            {н.oneClick
-              ? (ru ? "Включено: нажатие на сумму сразу отправляет сделку" : "On: tapping an amount sends the trade right away")
-              : (ru ? "Выключено: на странице токена обычные «Купить» и «Продать»" : "Off: the token page shows the usual Buy and Sell")}
-          </span>
         </span>
         <ToggleSwitch on={н.oneClick} onChange={(v) => { haptic("light"); сохранить({ oneClick: v }); }} />
       </div>
@@ -26554,9 +26542,6 @@ function НастройкаБыстрых() {
         </div>
       </div>
 
-      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.5 }}>
-        {ru ? "Нажми на карандаш, чтобы поменять суммы. Сеть сама берёт свою монету: в Solana — SOL, в TON — GRAM." : "Tap the pencil to change amounts. Each network uses its own coin."}
-      </p>
     </>
   );
 }
@@ -26593,7 +26578,6 @@ function НастройкаСкорости() {
                 </span>
                 {выбрана && <CheckCircle2 size={17} color={T.ice} />}
               </span>
-              <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.4 }}>{ru ? с.суть : с.сутьEN}</span>
               <span style={{ fontFamily: monoFont, color: с.id === "normal" ? T.faint : T.ice, fontSize: 11.5, lineHeight: 1.5 }}>
                 <ТекстСЧислами text={с.id === "normal"
                   ? (ru ? "без доплаты" : "no extra fee")
@@ -26603,11 +26587,6 @@ function НастройкаСкорости() {
           );
         })}
       </div>
-      <p style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, lineHeight: 1.5, marginTop: 8 }}>
-        {ru
-          ? "Доплата — чаевые сети за ближайший блок и наценка площадке за быстрый путь сделки. В TON аукциона за блок нет: там «Молния» ускоряет отправку и проверку."
-          : "The extra fee is the network tip for the next block plus a platform markup for the fast lane. TON has no block auction: there Turbo speeds up sending and checking."}
-      </p>
     </div>
   );
 }
@@ -26638,7 +26617,6 @@ function SettingsRow({ label, sub, children }) {
     <div className="flex items-center gap-3 py-3" style={{ borderBottom: `1px solid ${T.line}` }}>
       <div className="flex-1">
         <div style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>{label}</div>
-        {sub && <div style={{ fontFamily: bodyFont, fontSize: 12, color: T.muted, marginTop: 2 }}>{sub}</div>}
       </div>
       {children}
     </div>
@@ -26966,9 +26944,6 @@ function ReferralShare({ showToast }) {
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14 }}>{t("refVolume")}</span>
           <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 15, fontWeight: 700 }}><ТекстСЧислами text={fmtTon(оборот)} /> TON</span>
         </div>
-        <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, lineHeight: 1.45, marginTop: 6 }}>
-          {t("refShareNote")}
-        </p>
         <button
           onClick={claim}
           disabled={busy}
@@ -27160,9 +27135,6 @@ function ЗаявкаНаГалочку({ запросX, handle }) {
         <ГалочкаЛица size={22} />
         <div className="flex-1 min-w-0">
           <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>Галочка проверенного лица</div>
-          <div style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, marginTop: 2 }}>
-            {сост.request && сост.request.status === "rejected" ? "Прошлую заявку отклонили — можно подать снова" : "По желанию: подтверди, что X — твой"}
-          </div>
         </div>
         <ChevronRight size={16} color={T.faint} style={{ transform: открыта ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
       </button>
@@ -27346,7 +27318,6 @@ function ПодключениеX({ showToast }) {
         <СтрокаГруппы иконка={ЗнакX} label={lang === "EN" ? "X badge next to your name" : "Значок X рядом с ником"} sub={lang === "EN" ? "On your tokens, trades and profile" : "На твоих токенах, сделках и в профиле"} />
         <СтрокаГруппы иконка={BadgeCheck} label={lang === "EN" ? "Verified person badge" : "Галочка проверенного лица"} sub={lang === "EN" ? "Optional, after a short form" : "По желанию, после короткой анкеты"} />
       </ГруппаСтрок>
-      <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, lineHeight: 1.5 }}>{t("xHint")}</p>
 
       <button
         onClick={подключить}
@@ -27409,7 +27380,6 @@ function СтрокаГруппы({ иконка: Иконка, label, sub, valu
       )}
       <span className="min-w-0" style={{ flex: 1 }}>
         <span style={{ display: "block", fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>{label}</span>
-        {sub && <span style={{ display: "block", fontFamily: bodyFont, fontSize: 12.5, color: T.muted, lineHeight: 1.4, marginTop: 2 }}>{sub}</span>}
       </span>
       {value}
     </Тег>
@@ -27642,7 +27612,6 @@ function SettingsPanel({
           {notifyPrefs.buys && (
             <div className="mt-3">
               <div style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.ice }}>{t("notifyMin")}</div>
-              <div style={{ fontFamily: bodyFont, fontSize: 12, color: T.muted, marginTop: 2 }}>{t("notifyMinSub")}</div>
               <div className="flex flex-wrap gap-2 mt-2.5">
                 {NOTIFY_THRESHOLDS.map((v) => {
                   const active = Math.abs(Number(notifyPrefs.minTon) - v) < 0.0005;
@@ -27666,9 +27635,6 @@ function SettingsPanel({
             </div>
           )}
 
-          <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.5, marginTop: 14, textAlign: "center" }}>
-            {t("notifyNeedBot")}
-          </p>
         </>
       );
       break;
@@ -27681,7 +27647,6 @@ function SettingsPanel({
               {appSettings.language === lng && <CheckCircle2 size={16} color={T.turquoise} />}
             </button>
           ))}
-          <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12, lineHeight: 1.5, marginTop: 2 }}>{t("langFullNote")}</p>
         </div>
       );
       break;
@@ -27802,14 +27767,8 @@ function SettingsPanel({
   }
 
   if (ПОЛНОЭКРАННЫЕ.has(item.key)) {
-    /* Под заголовком — одна короткая строка, не больше. У поддержки её
-       нет вовсе: там сразу переписка, и подводка над подводкой была
-       лишь текстом поверх текста. */
-    const подводка = item.key === "referral" ? t("referralDesc")
-      : item.key === "support" ? ""
-        : item.key === "quick" ? (lang === "EN" ? "Your amounts — one tap trades." : "Свои суммы — одно нажатие и сделка.")
-        : item.key === "tariff" ? (lang === "EN" ? "Paid per trade, no subscription." : "Доплата за каждую сделку, без подписки.")
-        : lang === "EN" ? "Your X profile across Mintly." : "Твой профиль X везде в Mintly.";
+    /* Под заголовком ничего: мелкая серая подводка была текстом под
+       текстом, который никто не читал. */
     // Чат держит высоту экрана сам: переписка прокручивается, поле внизу.
     const чат = item.key === "support";
     return createPortal(
@@ -27830,7 +27789,6 @@ function SettingsPanel({
           )}
           <div className="fx-card">
             <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.1, textWrap: "balance" }}>{t(item.tKey)}</span>
-            {подводка && <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.5, marginTop: 6 }}>{подводка}</p>}
           </div>
           {body}
         </div>
@@ -31070,9 +31028,6 @@ async function uploadAvatarIfNeeded(userId) {
           </div>
         )}
 
-        <p style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, marginBottom: 16 }}>
-          {isEdit ? t("editHint") : isLogin ? t("loginHint") : t("createHint")}
-        </p>
 
         {!isLogin && (
           // При редактировании аватарка стоит в надетой рамке и на
