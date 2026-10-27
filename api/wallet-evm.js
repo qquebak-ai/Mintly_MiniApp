@@ -30,7 +30,6 @@ import { занятьПоОчереди } from "./_walletLock.js";
 import { скоростьИз, наценка } from "./_speed.js";
 import { быстрыйОстаток } from "./_остаток.js";
 import { ВНУТРЕННИЙ_ВХОД } from "./_внутри.js";
-import { тарифЧеловека } from "./_tariff.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -450,8 +449,8 @@ async function разослатьEVM(сеть, tx) {
    фабрика шлёт комиссию (feeRecipient), или EVM_FEE_ADDRESS. Перевод
    ждать не нужно: номер за ним закреплён, следующая сделка пойдёт после. */
 const получателиНаценки = new Map();
-async function взятьНаценку(сеть, с, w, ключОчереди, скорость, план = "free") {
-  const сколько = наценка(сеть, скорость, план);
+async function взятьНаценку(сеть, с, w, ключОчереди, скорость) {
+  const сколько = наценка(сеть, скорость);
   if (!(сколько > 0) || !с.фабрика) return;
   try {
     const { Contract, parseUnits } = await ethersLib();
@@ -715,7 +714,7 @@ export default async function handler(req, res) {
       if (!r || r.status !== 1) throw new Error("сделка не прошла");
       await завершить(db, оп.id, tx.hash);
       // Наценка за скорость — после того, как сделка прошла.
-      тарифЧеловека(db, user.id).then((план) => взятьНаценку(сеть, с, w, ключОчереди, скорость, план));
+      взятьНаценку(сеть, с, w, ключОчереди, скорость);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ ok: true, tx: tx.hash });
     }
