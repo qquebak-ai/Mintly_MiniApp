@@ -26329,16 +26329,61 @@ const ГРУППЫ_НАСТРОЕК = [
  * целиком: что он даёт и сколько стоит одна сделка в каждой сети.
  * Цифры доплаты — из той же таблицы, что у сервера (/api/speed). */
 const ТАРИФЫ_ЭКРАНА = [
-  { key: "free", скорость: "normal", имя: "Free", шкала: 0.34, цвет: "#C7C7CC",
+  { key: "free", скорость: "normal", имя: "Free", шкала: 0.2, раз: 1, цвет: "#C7C7CC",
     ru: { коротко: "Обычная скорость", пункты: ["Сделка проходит после полного подтверждения сети", "Самый надёжный режим, но самый медленный", "Платишь только комиссию сети — Mintly сверху не берёт"] },
     en: { коротко: "Standard speed", пункты: ["The trade goes through after full network confirmation", "The safest mode, but the slowest", "You pay only the network fee — Mintly adds nothing"] } },
-  { key: "pro", скорость: "fast", имя: "Pro", шкала: 0.68, цвет: "#8F9CFF",
+  { key: "pro", скорость: "fast", имя: "Pro", шкала: 1 / 3, раз: 1.7, цвет: "#8F9CFF",
     ru: { коротко: "Быстрее", пункты: ["Сделка засчитывается, как только попала в блок", "Доплата сети за место в ближайшем блоке", "Сервер переотправляет сделку каждые 0,6 с, пока она не пройдёт"] },
     en: { коротко: "Faster", пункты: ["The trade counts as soon as it lands in a block", "A network tip for a spot in the next block", "The server resends the trade every 0.6 s until it lands"] } },
-  { key: "turbo", скорость: "turbo", имя: "Turbo", шкала: 1, цвет: "#B79CFF",
+  { key: "turbo", скорость: "turbo", имя: "Turbo", шкала: 1, раз: 5, цвет: "#B79CFF",
     ru: { коротко: "Самый быстрый", пункты: ["Сделка уходит сразу во все узлы сети", "Переотправка каждые 0,2 с, проверка каждые 0,15 с", "Самая большая доплата сети за место в блоке"] },
     en: { коротко: "The fastest", пункты: ["The trade goes to every network node at once", "Resent every 0.2 s, checked every 0.15 s", "The highest network tip for a spot in the block"] } },
 ];
+/* Одна полоса на все три тарифа: метки стоят по скорости, заливка доходит
+   до выбранного — сразу видно, насколько каждый быстрее другого. Скорость
+   меряем частотой переотправки сделки на сервере (api/_speed.js: 1 с,
+   0,6 с, 0,2 с), поэтому Pro ×1,7 к Free, а Turbo ×5. */
+function ПолосаТарифов({ активный }) {
+  const ru = lang !== "EN";
+  const раз = (v) => (ru ? String(v).replace(".", ",") : String(v));
+  return (
+    <div className="flex flex-col" style={{ gap: 10 }}>
+      <div style={{ position: "relative", height: 12, borderRadius: 6, background: T.surface }}>
+        <div style={{
+          position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 6, width: `${активный.шкала * 100}%`,
+          ...ВОЛНА(`linear-gradient(90deg, ${активный.цвет}, #FFFFFF, ${активный.цвет})`),
+          transition: "width 600ms cubic-bezier(0.34, 1.2, 0.64, 1)",
+        }} />
+        {ТАРИФЫ_ЭКРАНА.map((т) => (
+          <span key={т.key} aria-hidden style={{
+            position: "absolute", top: "50%", left: `${т.шкала * 100}%`, width: 16, height: 16, borderRadius: "50%",
+            transform: `translate(${т.шкала >= 1 ? -100 : -50}%, -50%)`,
+            background: т.шкала <= активный.шкала ? "#FFFFFF" : T.lineHi, border: `3px solid ${T.bg}`,
+            transition: "background 300ms ease",
+          }} />
+        ))}
+      </div>
+      <div style={{ position: "relative", height: 38 }}>
+        {ТАРИФЫ_ЭКРАНА.map((т) => (
+          <span key={т.key} className="flex flex-col" style={{
+            position: "absolute", top: 0, left: `${т.шкала * 100}%`, alignItems: т.шкала >= 1 ? "flex-end" : "center",
+            transform: `translateX(${т.шкала >= 1 ? -100 : -50}%)`, gap: 1,
+          }}>
+            <span style={{ fontFamily: displayFont, fontSize: 13.5, fontWeight: 800, color: т.key === активный.key ? T.ice : T.muted }}>{т.имя}</span>
+            <span style={{ fontFamily: monoFont, fontSize: 12.5, color: т.key === активный.key ? т.цвет : T.faint }}>×{раз(т.раз)}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+function сравнениеТарифа(т, ru) {
+  const раз = (v) => (ru ? String(v).replace(".", ",") : String(v));
+  if (т.key === "free") return ru ? "Базовая скорость — от неё считаются остальные" : "Base speed — the others are measured from it";
+  if (т.key === "pro") return ru ? `В ${раз(1.7)} раза быстрее Free` : "1.7× faster than Free";
+  return ru ? "В 3 раза быстрее Pro и в 5 раз быстрее Free" : "3× faster than Pro and 5× faster than Free";
+}
+
 const СЕТИ_ТАРИФА = [["solana", "Solana"], ["ton", "TON"], ["bsc", "BNB Chain"], ["base", "Base"], ["eth", "Ethereum"]];
 
 function ДоплатаТарифа(таблица, сеть, скорость, ru) {
@@ -26368,6 +26413,7 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
 
   return (
     <div className="flex flex-col">
+      <div style={{ marginBottom: 6 }}><ПолосаТарифов активный={свой} /></div>
       {ТАРИФЫ_ЭКРАНА.map((т, i) => {
         const выбран = свой.key === т.key;
         return (
@@ -26393,15 +26439,6 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
                 <ChevronRight size={20} color={T.muted} />
               )}
             </div>
-            {/* Шкала скорости наливается на входе — три шкалы одна под
-                другой и есть сравнение тарифов. */}
-            <div style={{ width: "100%", height: 8, borderRadius: 4, background: T.surface, overflow: "hidden" }}>
-              <div style={{
-                height: "100%", borderRadius: 4, width: `${т.шкала * 100}%`, transformOrigin: "left center",
-                ...ВОЛНА(`linear-gradient(90deg, ${т.цвет}, #FFFFFF, ${т.цвет})`),
-                animation: `тарифНаливается 900ms cubic-bezier(0.22, 1, 0.36, 1) ${i * 120}ms both, кнопкаПереливается 4s ease-in-out infinite`,
-              }} />
-            </div>
           </button>
         );
       })}
@@ -26421,8 +26458,9 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
                   {открыт.имя}
                   {открыт.key === "turbo" && <Zap size={28} color={открыт.цвет} fill={открыт.цвет} />}
                 </span>
-                <span style={{ fontFamily: bodyFont, color: открыт.цвет, fontSize: 16, fontWeight: 700 }}>{(ru ? открыт.ru : открыт.en).коротко}</span>
+                <span style={{ fontFamily: bodyFont, color: открыт.цвет, fontSize: 16, fontWeight: 700 }}>{сравнениеТарифа(открыт, ru)}</span>
               </div>
+              <ПолосаТарифов активный={открыт} />
 
               <div className="flex flex-col" style={{ gap: 14 }}>
                 <span style={{ fontFamily: displayFont, fontSize: 17, fontWeight: 800, color: T.ice }}>{ru ? "Что ты получаешь" : "What you get"}</span>
