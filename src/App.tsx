@@ -285,6 +285,7 @@ const STR = {
     cosmeticApplied: "Применено", cosmeticRemoved: "Снято",
     settingsSaved: "Настройки сохранены",
     quickTradeTitle: "Быстрая покупка",
+    tariffTitle: "Тариф",
     langTitle: "Язык", themeTitle: "Оформление", themeWhite: "Светлая",
     notifyTitle: "Уведомления",
     notifyDesc: "Бот пишет о том, что происходит с твоими токенами. Что именно присылать — выбираешь здесь.",
@@ -1032,6 +1033,7 @@ const STR = {
     cosmeticApplied: "Applied", cosmeticRemoved: "Removed",
     settingsSaved: "Settings saved",
     quickTradeTitle: "Quick buy",
+    tariffTitle: "Plan",
     langTitle: "Language", themeTitle: "Appearance", themeWhite: "White",
     notifyTitle: "Notifications",
     notifyDesc: "The bot tells you what happens to your tokens. Pick what it should send.",
@@ -2380,6 +2382,8 @@ function GlobalStyle() {
         from { background-position: 100% 50%; }
         to   { background-position: 0% 50%; }
       }
+      /* Шкала скорости тарифа наливается слева направо. */
+      @keyframes тарифНаливается { from { transform: scaleX(0); } to { transform: scaleX(1); } }
       @keyframes кнопкаПереливается {
         0%   { background-position: 0% 50%; }
         50%  { background-position: 100% 50%; }
@@ -8411,6 +8415,7 @@ const SETTINGS_ITEMS = [
   { key: "security", icon: Lock, tKey: "security" },
   { key: "notify", icon: Bell, tKey: "notifyTitle" },
   { key: "quick", icon: Zap, tKey: "quickTradeTitle" },
+  { key: "tariff", icon: Crown, tKey: "tariffTitle" },
   { key: "language", icon: Globe2, tKey: "langTitle" },
   { key: "theme", icon: Sparkles, tKey: "themeTitle" },
   { key: "referral", icon: Gift, tKey: "referral" },
@@ -13630,6 +13635,8 @@ function БоковоеМеню({ открыто, onClose, profile, accountCreat
     // Аккаунт X — здесь, рядом с профилем: это часть того, кто ты, а не
     // настройка приложения.
     { key: "x", icon: ЗнакX, label: t("xTitle") },
+    // Тариф — рядом с аккаунтом: это то, на каких условиях ты торгуешь.
+    { key: "tariff", icon: Crown, label: t("tariffTitle") },
     // Приглашения идут через бота в Telegram — на сайте им не место.
     ...(этоПК() ? [] : [{ key: "referral", icon: Gift, label: t("referral") }]),
     /* Кошелька и секретной фразы в меню больше нет: кошелёк — своя
@@ -26352,6 +26359,193 @@ const ГРУППЫ_НАСТРОЕК = [
 /* Настройка быстрой сделки: выключатель «в 1 клик» и три суммы на
    покупку в каждой монете, три доли на продажу. Те же кнопки с
    карандашом, что и в окне сделки: правка здесь видна и там. */
+/* Тарифы — как подписки у нейросетей: три карточки листаются вбок, а
+ * над ними те же три полоски, что у шагов запуска, — широкая там, где
+ * ты сейчас. Шкала скорости в карточке наливается при каждом показе:
+ * разница между тарифами — это и есть скорость, её и показываем. Цены
+ * в долларах, платится SOL с кошелька приложения по курсу на миг
+ * оплаты; что даёт тариф, решает сервер (api/_speed.js), а не экран. */
+const ТАРИФЫ_ЭКРАНА = [
+  { key: "free", имя: "Free", цена: 0, скорость: 0.34, цвет: "#8E8E93",
+    ru: ["Обычная скорость бесплатно", "Наценка за «Быстро» и «Молнию»", "Все сети и запуск токенов"],
+    en: ["Standard speed for free", "Markup on Fast and Lightning", "All chains and token launches"] },
+  { key: "pro", имя: "Pro", цена: 9, скорость: 0.68, цвет: "#6C7CFF",
+    ru: ["«Быстро» без наценки", "«Молния» за полцены", "Лимитные заявки первыми в очереди"],
+    en: ["Fast with no markup", "Lightning at half price", "Limit orders first in line"] },
+  { key: "turbo", имя: "Turbo", цена: 29, скорость: 1, цвет: "#B79CFF",
+    ru: ["«Молния» без наценки", "Самая короткая дорога в сеть", "Самая быстрая скорость Mintly"],
+    en: ["Lightning with no markup", "Shortest route to the chain", "The fastest speed on Mintly"] },
+];
+
+function СтраницаТарифа({ showToast }) {
+  const ru = lang !== "EN";
+  const [план, setПлан] = useState(null);
+  const [до, setДо] = useState(null);
+  const [индекс, setИндекс] = useState(0);
+  const [платим, setПлатим] = useState(null);
+  const лента = useRef(null);
+
+  async function ключ() {
+    const { data } = await supabase.auth.getSession();
+    return data && data.session && data.session.access_token;
+  }
+  useEffect(() => {
+    let живо = true;
+    (async () => {
+      try {
+        const к = await ключ();
+        if (!к) { if (живо) setПлан("free"); return; }
+        const r = await fetch(апи("/api/tariff?action=state"), { headers: { Authorization: `Bearer ${к}` } });
+        const j = await r.json().catch(() => null);
+        if (!живо) return;
+        const п = (j && j.plan) || "free";
+        setПлан(п);
+        setДо(j && j.until);
+        // Открываем на своём тарифе, а не на первом.
+        const i = Math.max(0, ТАРИФЫ_ЭКРАНА.findIndex((т) => т.key === п));
+        if (i && лента.current) лента.current.scrollTo({ left: i * лента.current.clientWidth, behavior: "auto" });
+        setИндекс(i);
+      } catch { if (живо) setПлан("free"); }
+    })();
+    return () => { живо = false; };
+  }, []);
+
+  function прокрутка() {
+    const el = лента.current;
+    if (!el) return;
+    const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+    if (i !== индекс) { setИндекс(i); haptic("light"); }
+  }
+  function к(i) {
+    const el = лента.current;
+    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+  }
+
+  async function купить(т) {
+    if (платим) return;
+    haptic("medium");
+    setПлатим(т.key);
+    try {
+      const к2 = await ключ();
+      if (!к2) throw new Error("auth");
+      const r = await fetch(апи("/api/tariff?action=buy"), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${к2}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: т.key, requestKey: `tariff-${т.key}-${Date.now()}` }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j || !j.ok) {
+        const нет = j && j.error === "not_enough";
+        throw new Error(нет ? (ru ? "Не хватает SOL на кошельке" : "Not enough SOL in the wallet") : (ru ? "Оплата не прошла" : "Payment failed"));
+      }
+      setПлан(j.plan);
+      setДо(j.until);
+      haptic("success");
+      showToast && showToast(ru ? `Тариф ${т.имя} включён` : `${т.имя} is on`);
+    } catch (e) {
+      haptic("error");
+      showToast && showToast(e && e.message && e.message !== "auth" ? e.message : (ru ? "Войди, чтобы оплатить" : "Sign in to pay"));
+    } finally {
+      setПлатим(null);
+    }
+  }
+
+  const срок = до ? new Date(до).toLocaleDateString(ru ? "ru-RU" : "en-US", { day: "numeric", month: "long" }) : null;
+
+  return (
+    <div className="flex flex-col" style={{ gap: 16 }}>
+      <div className="flex items-center justify-center" style={{ gap: 6 }}>
+        {ТАРИФЫ_ЭКРАНА.map((т, i) => (
+          <button key={т.key} aria-label={т.имя} onClick={() => к(i)} style={{
+            height: 4, borderRadius: 2, width: i === индекс ? 22 : 8, padding: 0, border: "none",
+            background: i <= индекс ? T.ice : T.lineHi,
+            transition: "width 420ms cubic-bezier(0.34, 1.4, 0.64, 1), background 300ms ease",
+          }} />
+        ))}
+      </div>
+      <div
+        ref={лента}
+        onScroll={прокрутка}
+        className="no-scrollbar flex"
+        style={{ overflowX: "auto", scrollSnapType: "x mandatory", margin: "0 -16px", overscrollBehaviorX: "contain" }}
+      >
+        {ТАРИФЫ_ЭКРАНА.map((т, i) => {
+          const свой = план === т.key;
+          const виден = i === индекс;
+          return (
+            <div key={т.key} style={{ flex: "0 0 100%", scrollSnapAlign: "center", padding: "0 16px", boxSizing: "border-box" }}>
+              <div style={{
+                position: "relative", overflow: "hidden", borderRadius: 26, padding: "22px 20px 20px",
+                background: `radial-gradient(120% 80% at 100% 0%, ${hexA(т.цвет, 0.26)} 0%, transparent 60%), ${T.surface}`,
+                boxShadow: `inset 0 0 0 1px ${hexA(т.цвет, свой ? 0.7 : 0.22)}`,
+                transform: виден ? "scale(1)" : "scale(0.96)", transition: "transform 380ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 300ms ease",
+              }}>
+                <div className="flex items-center justify-between">
+                  <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 26, fontWeight: 800 }}>{т.имя}</span>
+                  {свой && (
+                    <span style={{ fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700, color: "#000", background: т.цвет, borderRadius: 999, padding: "4px 10px" }}>
+                      {ru ? "Твой тариф" : "Current"}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-baseline" style={{ gap: 6, marginTop: 10 }}>
+                  <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 44, fontWeight: 800, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>${т.цена}</span>
+                  <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 15 }}>{ru ? "в месяц" : "/ month"}</span>
+                </div>
+                {/* Шкала наливается заново, когда карточку показывают: key
+                    меняется вместе с видимостью и перезапускает анимацию. */}
+                <div style={{ marginTop: 18 }}>
+                  <div className="flex items-center justify-between" style={{ fontFamily: bodyFont, fontSize: 13.5, color: T.ice, fontWeight: 700 }}>
+                    <span className="flex items-center" style={{ gap: 6 }}><Zap size={14} color={т.цвет} />{ru ? "Скорость" : "Speed"}</span>
+                    <span style={{ fontFamily: monoFont, color: т.цвет }}>{Math.round(т.скорость * 100)}%</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 4, background: T.lineHi, marginTop: 8, overflow: "hidden" }}>
+                    <div key={виден ? "в" : "н"} style={{
+                      height: "100%", borderRadius: 4, width: `${т.скорость * 100}%`,
+                      ...ВОЛНА(`linear-gradient(90deg, ${hexA(т.цвет, 0.55)}, ${т.цвет}, #FFFFFF, ${т.цвет})`),
+                      transformOrigin: "left center",
+                      animation: виден ? "тарифНаливается 900ms cubic-bezier(0.22, 1, 0.36, 1) both, кнопкаПереливается 5.5s ease-in-out infinite" : "none",
+                    }} />
+                  </div>
+                </div>
+                <div className="flex flex-col" style={{ gap: 11, marginTop: 20 }}>
+                  {(ru ? т.ru : т.en).map((строка) => (
+                    <span key={строка} className="flex items-center" style={{ gap: 10, fontFamily: bodyFont, fontSize: 15, color: T.ice }}>
+                      <Check size={16} color={т.цвет} strokeWidth={3} />{строка}
+                    </span>
+                  ))}
+                </div>
+                <button
+                  disabled={свой && т.key === "free" || !!платим || план == null}
+                  onClick={() => (т.key === "free" ? null : купить(т))}
+                  className="fx-tap w-full"
+                  style={{
+                    marginTop: 22, height: 52, borderRadius: 999, border: "none",
+                    fontFamily: displayFont, fontSize: 16, fontWeight: 800,
+                    background: т.key === "free" ? T.surfaceHi : "#FFFFFF",
+                    color: т.key === "free" ? T.muted : "#000000",
+                    opacity: платим && платим !== т.key ? 0.5 : 1,
+                  }}
+                >
+                  {платим === т.key ? <ЗнакЗагрузки size={20} всегда />
+                    : т.key === "free" ? (свой ? (ru ? "Включён" : "Active") : (ru ? "Бесплатно" : "Free"))
+                      : свой ? (ru ? "Продлить на 30 дней" : "Extend 30 days")
+                        : (ru ? `Перейти на ${т.имя}` : `Get ${т.имя}`)}
+                </button>
+                {свой && срок && т.key !== "free" && (
+                  <div style={{ fontFamily: bodyFont, fontSize: 13, color: T.muted, textAlign: "center", marginTop: 10 }}>
+                    {ru ? `Действует до ${срок}` : `Active until ${срок}`}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function НастройкаБыстрых() {
   const [н, сохранить] = useБыстрые();
   const ru = lang !== "EN";
@@ -27226,7 +27420,7 @@ const ДЛИННЫЕ_РАЗДЕЛЫ = new Set(["support", "architecture", "priva
 /* Эти разделы — страницы, а не листы: в них листают, заполняют анкету и
    переписываются, и большая карточка поверх приложения только съедала
    место по краям. Выглядят как «Достижения» — заголовок слева и списки. */
-const ПОЛНОЭКРАННЫЕ = new Set(["referral", "x", "support", "quick"]);
+const ПОЛНОЭКРАННЫЕ = new Set(["referral", "x", "support", "quick", "tariff"]);
 
 /* Группа строк одной плашкой с тонкими разделителями — как списки на
    главной и в кошельке, вместо отдельной пилюли на каждую строку. */
@@ -27531,6 +27725,9 @@ function SettingsPanel({
       break;
     case "quick":
       body = <НастройкаБыстрых />;
+      break;
+    case "tariff":
+      body = <СтраницаТарифа showToast={showToast} />;
       break;
     case "theme":
       body = (
@@ -35533,7 +35730,7 @@ function mapTokenRow(row) {
             if (ключ === "secret") { goTab("wallet"); setЗапросФразы((н) => н + 1); return; }
             if (ключ === "settings") { setНастройкиОткрыты(true); return; }
             if (ключ === "support") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === "support")); return; }
-            if (ключ === "x" || ключ === "referral") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === ключ)); return; }
+            if (ключ === "x" || ключ === "referral" || ключ === "tariff") { setSettingsItem(SETTINGS_ITEMS.find((s) => s.key === ключ)); return; }
           }}
         />
 

@@ -20,3 +20,14 @@ create index if not exists limit_orders_user on public.limit_orders (user_id, cr
 alter table public.limit_orders enable row level security;
 drop policy if exists "limit_orders_own_read" on public.limit_orders;
 create policy "limit_orders_own_read" on public.limit_orders for select using (auth.uid() = user_id);
+
+-- Тарифы (api/tariff.js, api/_tariff.js). Пишет только сервер.
+create table if not exists public.user_tariffs (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  plan text not null default 'free' check (plan in ('free', 'pro', 'turbo')),
+  until timestamptz,
+  updated_at timestamptz not null default now()
+);
+alter table public.user_tariffs enable row level security;
+drop policy if exists "user_tariffs_own_read" on public.user_tariffs;
+create policy "user_tariffs_own_read" on public.user_tariffs for select using (auth.uid() = user_id);

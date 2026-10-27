@@ -33,6 +33,7 @@ import { занятьПоОчереди, свободныйНомер, заня�
 import { скоростьИз, наценка } from "./_speed.js";
 import { быстрыйОстаток } from "./_остаток.js";
 import { ВНУТРЕННИЙ_ВХОД } from "./_внутри.js";
+import { тарифЧеловека } from "./_tariff.js";
 
 const TESTNET = process.env.TON_TESTNET === "1";
 const TONAPI = TESTNET ? "https://testnet.tonapi.io" : "https://tonapi.io";
@@ -747,7 +748,7 @@ export default async function handler(req, res) {
          а «Быстро» и «Молния» читают номер и остаток разом, если прошлый
          перевод кошелька уже принят. */
       const скорость = скоростьИз(тело.speed);
-      const надбавка = наценка("ton", скорость);
+      const надбавка = наценка("ton", скорость, await тарифЧеловека(db, user.id));
       const подпис = await подписант(строка, набор, user);
       const { пара, контракт, client, кошелёк: открытый } = подпис;
       const остаток = () => client.getBalance(контракт.address).then((б) => Number(б) / 1e9).catch(() => баланс(строка.address));
@@ -833,7 +834,7 @@ export default async function handler(req, res) {
       // Как у покупки: остатки читаем после того, как прошлая сделка
       // этого кошелька принята сетью.
       const скорость = скоростьИз(тело.speed);
-      const надбавка = наценка("ton", скорость);
+      const надбавка = наценка("ton", скорость, await тарифЧеловека(db, user.id));
       const подпис = await подписант(строка, набор, user);
       const { пара, контракт, client, кошелёк: открытый } = подпис;
       const разом = скорость !== "normal" && !номерЖдёт(номерКошелька(user));

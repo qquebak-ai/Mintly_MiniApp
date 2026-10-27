@@ -50,6 +50,7 @@ import { занять } from "./_walletLock.js";
 import { темп, скоростьИз, наценка } from "./_speed.js";
 import { быстрыйОстаток } from "./_остаток.js";
 import { ВНУТРЕННИЙ_ВХОД } from "./_внутри.js";
+import { тарифЧеловека } from "./_tariff.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1273,6 +1274,8 @@ export default async function handler(req, res) {
     }
 
     if (действие === "trade") {
+      // Тариф снимает наценку за скорость (api/_speed.js, api/tariff.js).
+      const план = await тарифЧеловека(db, user.id);
       const продажа = !!тело.sell;
       let сумма = Math.max(0, Number(тело.amount) || 0);
       if (!адресОк(String(тело.mint || "")) || !(сумма > 0)) return res.status(400).json({ error: "bad_request" });
@@ -1336,7 +1339,7 @@ export default async function handler(req, res) {
             minOut: тело.minOut,
             slippageBps: тело.slippageBps,
             скорость,
-            наценка: наценка("solana", скорость),
+            наценка: наценка("solana", скорость, план),
             готоваяКривая,
           });
         return { запись, пул, собрано };
@@ -1474,6 +1477,31 @@ export default async function handler(req, res) {
       await завершить(db, оп.id, подпись);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({ signature: подпись });
+    }
+
+    /* Оплата тарифа — перевод с кошелька приложения на кошелёк комиссии
+       площадки. Только изнутри сервера (api/tariff.js считает сумму по
+       курсу и сам продлевает тариф): прямой вызов снаружи отбивается. */
+    if (действие === "tariff-pay") {
+      if (!req[ВНУТРЕННИЙ_ВХОД]) return res.status(403).json({ error: "forbidden" });
+      const кому = (process.env.SOLANA_FEE_ACCOUNT || "").trim();
+      const сумма = Number(тело.amount) || 0;
+      if (!кому || !адресОк(кому) || !(сумма > 0) || сумма > 50) return res.status(400).json({ error: "bad_request" });
+      const есть = await баланс(строка.address);
+      if (есть < сумма + ЗАПАС_НА_КОМИССИЮ) return res.status(400).json({ error: "not_enough", have: есть, need: сумма + ЗАПАС_НА_КОМИССИЮ });
+      const оп = await начать(db, user, { дело: "tariff", сумма, адрес: кому, ключЗапроса, ip });
+      if (оп.повтор) return res.status(200).json({ signature: оп.signature, repeat: true });
+      const лямпорты = Math.floor(сумма * LAMPORTS);
+      const base64 = await собратьВывод({ откуда: строка.address, куда: кому, лямпорты });
+      let подпись;
+      try {
+        подпись = await подписатьИОтправить({ db, user, строка, набор, base64, дело: "withdraw", максПеревода: лямпорты });
+      } catch (e) {
+        await отменить(db, оп.id);
+        throw e;
+      }
+      await завершить(db, оп.id, подпись);
+      return res.status(200).json({ signature: подпись, amount: сумма });
     }
 
     if (действие === "withdraw") {

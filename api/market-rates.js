@@ -116,6 +116,12 @@ async function получитьЦену() {
   await ценаЗапрос;
 }
 
+// Цена монеты в долларах для своих расчётов сервера (оплата тарифа).
+export async function ценаМонеты(ключ) {
+  await получитьЦену();
+  return кешЦены.get(ключ) || 0;
+}
+
 export default async function handler(req, res) {
   const [sol, gram, bnb, eth] = await Promise.all([МОНЕТЫ.sol, МОНЕТЫ.gram, МОНЕТЫ.bnb, МОНЕТЫ.eth].map(получитьКривую));
   await получитьЦену();
