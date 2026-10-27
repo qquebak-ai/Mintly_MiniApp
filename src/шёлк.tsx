@@ -105,51 +105,82 @@ export function подготовитьШёлк(): Promise<HTMLCanvasElement> {
 }
 
 export function ФонШёлк({ тон = null, вОкне = false }: { тон?: string | null; вОкне?: boolean }) {
-  const холст = useRef(null);
+  const место = useRef<HTMLDivElement | null>(null);
+  const обёртка = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const к = холст.current;
-    if (!к) return;
-    let жив = true, кадр = 0;
-    подготовитьШёлк().then((готовый) => {
-      if (!жив) return;
-      к.width = готовый.width; к.height = готовый.height;
-      к.getContext("2d").drawImage(готовый, 0, 0);
-      к.style.visibility = "visible";
-    });
-    const начало = performance.now();
-    const шаг = () => {
-      // Кадр ролика 1920×1080 вписывается в окно «с обрезкой», как фон.
+    let жив = true, кадр = 0, к: HTMLCanvasElement | null = null, м = 1;
+    /* Размер и место холста зависят только от окна — их пишем при смене
+       размера, а не в каждом кадре. Раньше ширина, высота и отступы
+       огромного холста менялись шестьдесят раз в секунду, и браузер
+       каждый раз пересчитывал раскладку — страница открывалась рывком. */
+    const разместить = () => {
+      if (!к) return;
       const вш = window.innerWidth, вв = window.innerHeight;
       /* В приложении экран узкий и высокий: «с обрезкой» кадр раздувался
          по высоте, и на экране оставался кусок одной ленты. Там шёлк
          отодвинут — кадр вписан по высоте вполовину, ленты видны целиком
-         на чёрном. */
-      const м = вОкне ? (вв / КАДР_В) * 0.55 : Math.max(вш / КАДР_Ш, вв / КАДР_В);
+         на чёрном. На сайте кадр 1920×1080 вписан «с обрезкой», как фон. */
+      м = вОкне ? (вв / КАДР_В) * 0.55 : Math.max(вш / КАДР_Ш, вв / КАДР_В);
       const ох = (вш - КАДР_Ш * м) / 2, оу = (вв - КАДР_В * м) / 2;
-      const всего = Math.max(1, document.documentElement.scrollHeight - вв);
-      const [я, dx, dy, sc, поворот] = поКлючам(вОкне ? 0 : Math.min(1, window.scrollY / всего), ШЁЛК_КЛЮЧИ);
-      const t = (performance.now() - начало) / 1000;
-      // «Дыхание» из ролика — медленное покачивание поверх положения.
-      const а = Math.sin(t * 0.5) * 3 + поворот, bx = Math.sin(t * 0.35) * 40 + dx, by = Math.cos(t * 0.42) * 26 + dy;
       к.style.width = `${(КАДР_Ш + 2 * ЗАПАС) * м}px`;
       к.style.height = `${(КАДР_В + 2 * ЗАПАС) * м}px`;
       к.style.left = `${ох - ЗАПАС * м}px`;
       к.style.top = `${оу - ЗАПАС * м}px`;
       к.style.transformOrigin = `${(ЗАПАС + КАДР_Ш / 2) * м}px ${(ЗАПАС + КАДР_В / 2) * м}px`;
-      к.style.transform = `translate3d(${bx * м * ДАЛЬ}px, ${by * м * ДАЛЬ}px, 0) rotate(${а}deg) scale(${ДАЛЬ * sc * (1 + 0.03 * Math.sin(t * 0.8))})`;
-      к.style.opacity = String((СВЕТЛАЯ ? я * 0.35 : я) * 0.85);
+    };
+    const начало = performance.now();
+    const шаг = () => {
+      if (к) {
+        const вв = window.innerHeight;
+        const всего = Math.max(1, document.documentElement.scrollHeight - вв);
+        const [я, dx, dy, sc, поворот] = поКлючам(вОкне ? 0 : Math.min(1, window.scrollY / всего), ШЁЛК_КЛЮЧИ);
+        const t = (performance.now() - начало) / 1000;
+        // «Дыхание» из ролика — медленное покачивание поверх положения.
+        const а = Math.sin(t * 0.5) * 3 + поворот, bx = Math.sin(t * 0.35) * 40 + dx, by = Math.cos(t * 0.42) * 26 + dy;
+        к.style.transform = `translate3d(${bx * м * ДАЛЬ}px, ${by * м * ДАЛЬ}px, 0) rotate(${а}deg) scale(${ДАЛЬ * sc * (1 + 0.03 * Math.sin(t * 0.8))})`;
+        к.style.opacity = String((СВЕТЛАЯ ? я * 0.35 : я) * 0.85);
+      }
       кадр = requestAnimationFrame(шаг);
     };
-    кадр = requestAnimationFrame(шаг);
-    return () => { жив = false; cancelAnimationFrame(кадр); };
+    подготовитьШёлк().then((готовый) => {
+      if (!жив || !место.current) return;
+      /* Готовый холст переносим в страницу целиком, без копирования
+         четырёх миллионов точек. Если он уже стоит в другом месте —
+         тогда копия. */
+      if (готовый.isConnected) {
+        к = document.createElement("canvas");
+        к.width = готовый.width; к.height = готовый.height;
+        к.getContext("2d")!.drawImage(готовый, 0, 0);
+      } else к = готовый;
+      Object.assign(к.style, {
+        position: "absolute", willChange: "transform, opacity",
+        WebkitMaskImage: "radial-gradient(closest-side, #000 78%, transparent 100%)", maskImage: "radial-gradient(closest-side, #000 78%, transparent 100%)",
+        filter: СВЕТЛАЯ ? "invert(1)" : "none",
+      });
+      разместить();
+      место.current.appendChild(к);
+      кадр = requestAnimationFrame(шаг);
+      // В приложении шёлк проявляется, когда страница уже въехала: иначе
+      // его первый кадр совпадал с анимацией входа и сбивал её.
+      if (обёртка.current) {
+        const о = обёртка.current;
+        setTimeout(() => { if (жив) о.style.opacity = "1"; }, вОкне ? 280 : 0);
+      }
+    }).catch(() => {});
+    window.addEventListener("resize", разместить);
+    return () => {
+      жив = false; cancelAnimationFrame(кадр);
+      window.removeEventListener("resize", разместить);
+      if (к && к.parentNode) к.parentNode.removeChild(к);
+    };
   }, []);
   return (
-    <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: -1, overflow: "hidden", pointerEvents: "none", isolation: "isolate",
+    <div ref={обёртка} aria-hidden style={{ position: "fixed", inset: 0, zIndex: -1, overflow: "hidden", pointerEvents: "none", isolation: "isolate",
+      opacity: 0, transition: "opacity 600ms ease",
       // Слой «цвет» смешивается только с тем, что под ним внутри обёртки: без
       // своей заливки он красил пустоту целиком, и экран становился сплошным цветом.
       ...(тон ? { background: СВЕТЛАЯ ? "#FFFFFF" : "#000000" } : null) }}>
-      <canvas ref={холст} style={{ position: "absolute", visibility: "hidden", willChange: "transform, opacity",
-        WebkitMaskImage: "radial-gradient(closest-side, #000 78%, transparent 100%)", maskImage: "radial-gradient(closest-side, #000 78%, transparent 100%)", ...(СВЕТЛАЯ ? { filter: "invert(1)" } : null) }} />
+      <div ref={место} style={{ position: "absolute", inset: 0 }} />
       {тон && ТОНА_ШЁЛКА[тон] && (
         <div style={{ position: "absolute", inset: 0, mixBlendMode: "color", ...ТОНА_ШЁЛКА[тон] }} />
       )}

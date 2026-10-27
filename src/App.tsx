@@ -26299,7 +26299,7 @@ const ТАРИФЫ_ЭКРАНА = [
   { key: "free", скорость: "normal", имя: "Free", шкала: 0.2, раз: 1, цвет: "#C7C7CC",
     ru: { коротко: "Обычная скорость", плюсы: ["Без доплаты за сделку", "Самый надёжный режим", "Все сети и запуск токенов"], пункты: ["Сделка проходит после полного подтверждения сети", "Самый надёжный режим, но самый медленный", "Платишь только комиссию сети — Mintly сверху не берёт"] },
     en: { коротко: "Standard speed", плюсы: ["No extra fee per trade", "The safest mode", "All chains and launches"], пункты: ["The trade goes through after full network confirmation", "The safest mode, but the slowest", "You pay only the network fee — Mintly adds nothing"] } },
-  { key: "pro", скорость: "fast", имя: "Pro", шкала: 1 / 3, раз: 1.7, цвет: "#8F9CFF",
+  { key: "pro", скорость: "fast", имя: "Pro", шкала: 1 / 3, раз: 1.7, цвет: "#2ED47A",
     ru: { коротко: "Быстрее", плюсы: ["В 1,7 раза быстрее Free", "Сделка в ближайшем блоке", "Переотправка каждые 0,6 с"], пункты: ["Сделка засчитывается, как только попала в блок", "Доплата сети за место в ближайшем блоке", "Сервер переотправляет сделку каждые 0,6 с, пока она не пройдёт"] },
     en: { коротко: "Faster", плюсы: ["1.7× faster than Free", "Lands in the next block", "Resent every 0.6 s"], пункты: ["The trade counts as soon as it lands in a block", "A network tip for a spot in the next block", "The server resends the trade every 0.6 s until it lands"] } },
   { key: "turbo", скорость: "turbo", имя: "Turbo", шкала: 1, раз: 5, цвет: "#B79CFF",
@@ -26317,8 +26317,8 @@ function ПолосаТарифов({ активный }) {
       <div style={{ position: "relative", height: 12, borderRadius: 6, background: T.surface }}>
         <div style={{
           position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 6, width: `${активный.шкала * 100}%`,
-          ...ВОЛНА(`linear-gradient(90deg, ${активный.цвет}, #FFFFFF, ${активный.цвет})`),
-          transition: "width 600ms cubic-bezier(0.34, 1.2, 0.64, 1)",
+          ...заливкаТарифа(активный),
+          transition: "width 600ms cubic-bezier(0.34, 1.2, 0.64, 1), background-color 400ms ease",
         }} />
         {ТАРИФЫ_ЭКРАНА.map((т) => (
           <span key={т.key} aria-hidden style={{
@@ -26340,6 +26340,28 @@ function ПолосаТарифов({ активный }) {
         ))}
       </div>
     </div>
+  );
+}
+
+/* Цвет тарифа — тот же, что у шёлка за ним: Free серый, Pro зелёный, Turbo
+   переливается теми же цветами и с той же скоростью, что фон. Полоса,
+   цифры, галочки и кнопка красятся одной краской — страница читается
+   одним цветом с фоном. */
+const РАДУГА_ТАРИФА = "linear-gradient(115deg, #B79CFF, #5BE0C8, #FFB86B, #FF6FB5, #6C7CFF, #B79CFF)";
+const переливТарифа = { background: РАДУГА_ТАРИФА, backgroundSize: "300% 300%", animation: "шёлкПереливается 8s linear infinite" };
+function заливкаТарифа(т) {
+  return т.key === "turbo" ? переливТарифа : { background: т.цвет };
+}
+function текстТарифа(т) {
+  return т.key === "turbo"
+    ? { ...переливТарифа, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }
+    : { color: т.цвет };
+}
+function ГалочкаТарифа({ т, size = 26 }) {
+  return (
+    <span className="flex items-center justify-center flex-shrink-0" style={{ width: size, height: size, borderRadius: "50%", ...заливкаТарифа(т) }}>
+      <Check size={Math.round(size * 0.58)} color="#000000" strokeWidth={3.2} />
+    </span>
   );
 }
 
@@ -26402,8 +26424,8 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
         {ТАРИФЫ_ЭКРАНА.map((т, i) => (
           <button key={т.key} aria-label={т.имя} onClick={() => кШагу(i)} style={{
             height: 4, borderRadius: 2, width: i === индекс ? 22 : 8, padding: 0, border: "none",
-            background: i <= индекс ? T.ice : T.lineHi,
-            transition: "width 420ms cubic-bezier(0.34, 1.4, 0.64, 1), background 300ms ease",
+            ...(i <= индекс ? заливкаТарифа(шаг) : { background: T.lineHi }),
+            transition: "width 420ms cubic-bezier(0.34, 1.4, 0.64, 1)",
           }} />
         ))}
       </div>
@@ -26414,16 +26436,14 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
             style={{ flex: "0 0 100%", scrollSnapAlign: "center", padding: "0 16px", gap: 10, border: "none", background: "transparent", boxSizing: "border-box" }}>
             <span className="flex items-center" style={{ gap: 10, fontFamily: displayFont, fontSize: 56, fontWeight: 800, color: T.ice, letterSpacing: "-0.03em", lineHeight: 1 }}>
               {т.имя}
-              {т.key === "turbo" && <Zap size={38} color={т.цвет} fill={т.цвет} />}
+              {т.key === "turbo" && <Zap size={38} color="#FFFFFF" fill="#FFFFFF" />}
               <ChevronRight size={26} color={T.muted} style={{ marginLeft: "auto" }} />
             </span>
-            <span style={{ fontFamily: monoFont, fontSize: 22, fontWeight: 700, color: т.цвет }}>{ДоплатаТарифа(таблица, "solana", т.скорость, ru)}</span>
+            <span style={{ fontFamily: monoFont, fontSize: 22, fontWeight: 700, alignSelf: "flex-start", ...текстТарифа(т) }}>{ДоплатаТарифа(таблица, "solana", т.скорость, ru)}</span>
             <span className="flex flex-col" style={{ gap: 12, marginTop: 14 }}>
               {(ru ? т.ru : т.en).плюсы.map((п) => (
                 <span key={п} className="flex items-center" style={{ gap: 12, fontFamily: bodyFont, fontSize: 17, fontWeight: 600, color: T.ice }}>
-                  <span className="flex items-center justify-center flex-shrink-0" style={{ width: 26, height: 26, borderRadius: "50%", background: hexA(т.key === "free" ? "#FFFFFF" : т.цвет, 0.2) }}>
-                    <Check size={15} color={т.key === "free" ? T.ice : т.цвет} strokeWidth={3} />
-                  </span>
+                  <ГалочкаТарифа т={т} />
                   {п}
                 </span>
               ))}
@@ -26432,7 +26452,9 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
         ))}
       </div>
       <div aria-hidden style={{ height: 90 }} />
-      {!открыт && createPortal(
+      {/* Кнопка — внутри страницы, а не порталом: так она въезжает и
+          уезжает вместе со страницей, а не висит на месте. */}
+      {!открыт && (
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 461, padding: `12px 16px ${insetBottom + 14}px` }}>
           <button
             disabled={свой.key === шаг.key}
@@ -26441,21 +26463,21 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
             style={{
               display: "block", maxWidth: 520, margin: "0 auto", height: 56, borderRadius: 999, border: "none",
               fontFamily: displayFont, fontSize: 17, fontWeight: 800,
-              background: свой.key === шаг.key ? T.surface : "#FFFFFF",
+              ...(свой.key === шаг.key ? { background: T.surface } : заливкаТарифа(шаг)),
               color: свой.key === шаг.key ? T.muted : "#000000",
             }}
           >
             {свой.key === шаг.key ? (ru ? "Выбран" : "Selected") : (ru ? `Выбрать ${шаг.имя}` : `Choose ${шаг.имя}`)}
           </button>
-        </div>,
-        document.body,
+        </div>
       )}
 
       {открыт && createPortal(
         <div
           className={уходит ? "fx-sheet-out" : "fx-sheet-in"}
-          style={{ position: "fixed", inset: 0, zIndex: 470, background: T.bg, display: "flex", flexDirection: "column" }}
+          style={{ position: "fixed", inset: 0, zIndex: 470, background: T.bg, display: "flex", flexDirection: "column", isolation: "isolate" }}
         >
+          <ФонШёлк вОкне тон={открыт.key === "free" ? null : открыт.key} />
           <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: `calc(${insetTop}px + 10px) 16px 24px` }}>
             <div className="flex flex-col" style={{ gap: 26, maxWidth: 520, margin: "0 auto" }}>
               {!hasTelegramBack() && (
@@ -26466,7 +26488,7 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
               <div className="flex flex-col" style={{ gap: 6 }}>
                 <span className="flex items-center" style={{ gap: 10, fontFamily: displayFont, color: T.ice, fontSize: 40, fontWeight: 800, letterSpacing: "-0.02em" }}>
                   {открыт.имя}
-                  {открыт.key === "turbo" && <Zap size={28} color={открыт.цвет} fill={открыт.цвет} />}
+                  {открыт.key === "turbo" && <Zap size={28} color="#FFFFFF" fill="#FFFFFF" />}
                 </span>
               </div>
               <ПолосаТарифов активный={открыт} />
@@ -26475,9 +26497,7 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
                 <span style={{ fontFamily: displayFont, fontSize: 17, fontWeight: 800, color: T.ice }}>{ru ? "Что ты получаешь" : "What you get"}</span>
                 {(ru ? открыт.ru : открыт.en).пункты.map((строка, i) => (
                   <span key={строка} className="fx-card flex items-start" style={{ gap: 12, fontFamily: bodyFont, fontSize: 16, lineHeight: 1.4, color: T.ice, animationDelay: `${i * 50}ms` }}>
-                    <span className="flex items-center justify-center flex-shrink-0" style={{ width: 24, height: 24, borderRadius: "50%", background: hexA(открыт.цвет, 0.18), marginTop: -1 }}>
-                      <Check size={14} color={открыт.цвет} strokeWidth={3} />
-                    </span>
+                    <ГалочкаТарифа т={открыт} size={24} />
                     {строка}
                   </span>
                 ))}
@@ -26488,7 +26508,7 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
                 {СЕТИ_ТАРИФА.map(([сеть, имя], i) => (
                   <div key={сеть} className="flex items-center justify-between" style={{ padding: "13px 0", borderBottom: i < СЕТИ_ТАРИФА.length - 1 ? `1px solid ${T.line}` : "none" }}>
                     <span style={{ fontFamily: bodyFont, fontSize: 15.5, color: T.ice }}>{имя}</span>
-                    <span style={{ fontFamily: monoFont, fontSize: 15, color: T.ice, fontVariantNumeric: "tabular-nums" }}>{ДоплатаТарифа(таблица, сеть, открыт.скорость, ru)}</span>
+                    <span style={{ fontFamily: monoFont, fontSize: 15, fontVariantNumeric: "tabular-nums", ...текстТарифа(открыт) }}>{ДоплатаТарифа(таблица, сеть, открыт.скорость, ru)}</span>
                   </div>
                 ))}
               </div>
@@ -26503,7 +26523,7 @@ function СтраницаТарифа({ insetTop = 0, insetBottom = 0 }) {
               style={{
                 display: "block", maxWidth: 520, margin: "0 auto", height: 56, borderRadius: 999, border: "none",
                 fontFamily: displayFont, fontSize: 17, fontWeight: 800,
-                background: свой.key === открыт.key ? T.surface : "#FFFFFF",
+                ...(свой.key === открыт.key ? { background: T.surface } : заливкаТарифа(открыт)),
                 color: свой.key === открыт.key ? T.muted : "#000000",
               }}
             >
