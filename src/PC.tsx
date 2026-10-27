@@ -822,9 +822,15 @@ const ВОЗВРАТ_X = typeof window !== "undefined" ? разобратьВо�
    рисуется сразу по сохранённой сессии, а проверка идёт следом. */
 function сессияВПамяти() {
   try {
+    /* Вышел сам или сессия давно истекла — это гость: иначе на миг
+       рисовалось приложение, а следом его сменяло приветствие. */
+    if (localStorage.getItem("mintly_signed_out")) return false;
     for (let i = 0; i < localStorage.length; i++) {
       const к = localStorage.key(i);
-      if (к && /^sb-.+-auth-token$/.test(к) && localStorage.getItem(к)) return true;
+      if (!к || !/^sb-.+-auth-token$/.test(к)) continue;
+      const j = JSON.parse(localStorage.getItem(к) || "null");
+      // Истекла больше суток назад — обновить её уже нечем.
+      if (j && j.refresh_token && !(j.expires_at && j.expires_at * 1000 < Date.now() - 86400000)) return true;
     }
   } catch (e) { /* хранилище закрыто */ }
   return false;

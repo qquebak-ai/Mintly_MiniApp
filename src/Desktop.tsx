@@ -208,8 +208,12 @@ export default function Desktop() {
         setОбновлено(свежесть || Date.now());
         оживить(Date.now() - (свежесть || Date.now()));
       })
-      .catch((e) => setОшибка(String((e && e.message) || e)));
+      // Сбой — не надпись об ошибке, а тихий повтор: таблица стоит
+      // заглушкой, пока рынок не придёт.
+      .catch(() => { setОшибка(null); setTimeout(() => обновитьRef.current && обновитьRef.current(), 3000); });
   }, [сеть, оживить]);
+  const обновитьRef = useRef(обновить);
+  обновитьRef.current = обновить;
 
   useEffect(() => {
     setСтроки(null);

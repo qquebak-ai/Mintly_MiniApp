@@ -20130,17 +20130,38 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
         .eq("user_id", userId).order("created_at", { ascending: true }).limit(1000);
       if (!живо || !data) return;
       const полночь = new Date(); полночь.setHours(0, 0, 0, 0);
-      const купли = new Map(); // токен -> { монет, токенов }
-      const продажи = new Map(); // токен -> [{ монет, токенов, курс }] за сегодня
+      const купли = new Map(); // токен -> { монет, токенов, продано, испорчено }
+      const продажи = new Map(); // токен -> [{ монет, токенов, курс, средняя, вслепую }] за сегодня
+      /* Курс на момент сделки — только правдоподобный для своей монеты (как
+         в истории): у части сделок Solana в колонке лежал курс GRAM, и
+         продажа на 0,8 SOL считалась в долларах втрое неверно. Иначе —
+         сегодняшний курс монеты. */
+      const монетаАдреса = (а) => (адресSolanaОк(а) ? "SOL" : /^0x/i.test(String(а || "")) ? "ETH" : ТИКЕР_TON);
+      const курсСейчас = (м) => (м === "SOL" ? курсSol : м === ТИКЕР_TON ? tonPriceUsd : курсМонетыEVM("eth", курсыEVM));
       for (const с of data) {
-        const к = купли.get(с.token_address) || { монет: 0, токенов: 0 };
-        const монет = Number(с.ton_amount) || 0, токенов = Number(с.token_amount) || 0, курс = Number(с.ton_price_usd) || 0;
+        const к = купли.get(с.token_address) || { монет: 0, токенов: 0, продано: 0, испорчено: false };
+        купли.set(с.token_address, к);
+        const монет = Number(с.ton_amount) || 0, токенов = Number(с.token_amount) || 0;
+        const м = монетаАдреса(с.token_address);
+        const коридор = КОРИДОР_КУРСА[м];
+        const записан = Number(с.ton_price_usd) || 0;
+        const курс = коридор && записан >= коридор[0] && записан <= коридор[1] ? записан : курсСейчас(м);
         /* Записи с ценой дороже тысячной монеты за токен — испорченные:
            так писались покупки, где вместо количества токенов стояла сумма. */
-        if (с.side === "buy") { if (токенов > 0 && монет > 0 && монет / токенов < 0.001) { к.монет += монет; к.токенов += токенов; купли.set(с.token_address, к); } continue; }
-        if (с.side !== "sell" || new Date(с.created_at) < полночь) continue;
+        if (с.side === "buy") {
+          if (токенов > 0 && монет > 0 && монет / токенов < 0.001) { к.монет += монет; к.токенов += токенов; } else к.испорчено = true;
+          continue;
+        }
+        if (с.side !== "sell") continue;
+        /* Продано больше, чем известно купленного (или покупки испорчены) —
+           себестоимость неизвестна. Раньше её считали по неполной средней,
+           и закрытая в ноль сделка давала плюс, которого не было. */
+        const вслепую = к.испорчено || к.продано + токенов > к.токенов * 1.02;
+        const средняя = к.токенов > 0 ? к.монет / к.токенов : 0;
+        к.продано += токенов;
+        if (new Date(с.created_at) < полночь) continue;
         const список = продажи.get(с.token_address) || [];
-        список.push({ монет, токенов, курс, средняя: к.токенов > 0 ? к.монет / к.токенов : 0 });
+        список.push({ монет, токенов, курс, средняя, вслепую });
         продажи.set(с.token_address, список);
       }
       /* Средняя цена покупки токенов Solana — по самой сети: таблица
@@ -20160,7 +20181,10 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
       let итог = 0, вложено = 0;
       for (const [адрес, список] of продажи) {
         for (const п of список) {
-          const средняя = сети.get(адрес) || п.средняя || (п.токенов > 0 ? п.монет / п.токенов : 0);
+          // Себестоимость не знаем ни по сети, ни по записям — сделку в
+          // итог не берём вовсе, а не выдумываем ей плюс.
+          if (!сети.has(адрес) && (п.вслепую || !(п.средняя > 0))) continue;
+          const средняя = сети.get(адрес) || п.средняя;
           const себестоимость = п.токенов * средняя;
           итог += (п.монет - себестоимость) * п.курс;
           вложено += себестоимость * п.курс;
@@ -20173,7 +20197,8 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
     window.addEventListener("mintly:сделка", поСделке);
     const id = setInterval(читать, 60000);
     return () => { живо = false; clearInterval(id); window.removeEventListener("mintly:сделка", поСделке); };
-  }, [userId, внутр && внутр.address]);
+    // Курсы — в зависимостях: без них первый подсчёт шёл при нулевом курсе.
+  }, [userId, внутр && внутр.address, курсSol > 0, tonPriceUsd > 0]); // eslint-disable-line react-hooks/exhaustive-deps
   const заДень = заДеньСделки.итог;
   const заДеньПроцент = заДеньСделки.вложено > 0 ? (заДень / заДеньСделки.вложено) * 100 : 0;
 
@@ -28365,56 +28390,44 @@ function ОнбКнопка({ onClick, disabled = false, занята = false, �
   );
 }
 
-/* Пока аккаунт проверяется (или связь пропала): колёсико, а через шесть
-   секунд — кнопка «Повторить». Без неё человек, у которого не ответил
-   сервер, остался бы смотреть на колёсико без конца. */
-function ЗагрузкаВхода({ onВойти = null, проверено = false }) {
-  const [долго, setДолго] = useState(false);
+/* Пока аккаунт проверяется (или связь пропала) — только знак загрузки,
+   без кнопок «Повторить» и «Обновить»: просить человека нажать ещё раз —
+   значит перекладывать на него сбой сети. Приложение пробует само: не
+   решилось за пятнадцать секунд — тихо перечитывает страницу, и так до
+   тех пор, пока вход не состоится (между попытками пауза растёт, чтобы
+   не долбить упавший сервер). */
+// Вход состоялся — счётчик тихих перезагрузок начинается заново.
+function СбросПопытокВхода({ закрыт }) {
+  useEffect(() => {
+    if (!закрыт) { try { sessionStorage.removeItem("mintly:попытка-входа"); } catch { /* приватный режим */ } }
+  }, [закрыт]);
+  return null;
+}
+
+function ЗагрузкаВхода({ проверено = false }) {
   const пк = этоПК();
   useEffect(() => {
-    // На сайте страница под этим слоем уже стоит (см. visibility ниже):
-    // ждать нечего, а карточка — только если вход правда не решился.
-    // Проверка закончилась без аккаунта — три секунды; ещё идёт — даём
-    // ей двенадцать, медленная связь не повод пугать человека.
-    const id = setTimeout(() => setДолго(true), пк ? (проверено ? 3000 : 12000) : 6000);
+    let попытка = 0;
+    try { попытка = Number(sessionStorage.getItem("mintly:попытка-входа") || 0); } catch { /* приватный режим */ }
+    const ждать = Math.min(60000, 15000 * Math.pow(1.6, попытка));
+    const id = setTimeout(() => {
+      try { sessionStorage.setItem("mintly:попытка-входа", String(попытка + 1)); } catch { /* приватный режим */ }
+      window.location.reload();
+    }, ждать);
     return () => clearTimeout(id);
-  }, [пк, проверено]);
-  if (пк) {
-    if (!долго) return null;
-    return (
-      <div style={{ position: "absolute", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: hexA(T.bg, 0.6) }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18, padding: "34px 40px", borderRadius: 26, background: T.surface, border: `1px solid ${T.line}` }}>
-          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 24, fontWeight: 800 }}>Аккаунт не открылся</span>
-          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 15, textAlign: "center", maxWidth: 340, lineHeight: 1.45 }}>Сервер не ответил вовремя. Обнови страницу или войди заново.</span>
-          <div style={{ display: "flex", gap: 12 }}>
-            <button onClick={() => window.location.reload()} className="fx-tap" style={{ height: 46, padding: "0 26px", borderRadius: 999, border: "none", background: T.ice, color: T.bg, fontFamily: bodyFont, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>Обновить</button>
-            {onВойти && <button onClick={onВойти} className="fx-tap" style={{ height: 46, padding: "0 26px", borderRadius: 999, border: `1px solid ${T.line}`, background: "transparent", color: T.ice, fontFamily: bodyFont, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>Войти</button>}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  }, []);
+  // На сайте страница под этим слоем уже стоит: проверка закончилась —
+  // слою нечего закрывать.
+  if (пк) return null;
   return (
     <div
-      aria-hidden={!долго}
+      aria-busy
       style={{
         position: "absolute", inset: 0, zIndex: 200, visibility: "visible",
         background: ОНБ.фон, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22,
       }}
     >
       <ЗнакЗагрузки size={88} вид="раскрытие" />
-      {долго && (
-        <button
-          onClick={() => window.location.reload()}
-          className="fx-tap"
-          style={{
-            height: 44, padding: "0 28px", borderRadius: ОНБ.радиус, border: "none",
-            background: ОНБ.текст, color: ОНБ.текстКнопки, fontFamily: bodyFont, fontSize: 15, fontWeight: 600,
-          }}
-        >
-          {t("onbRetry")}
-        </button>
-      )}
     </div>
   );
 }
@@ -34995,7 +35008,8 @@ function mapTokenRow(row) {
       {/* Окна входа ещё нет (проверяем аккаунт или связь пропала), а
           приложение закрыто: вместо пустого экрана — колёсико. Потомок
           с visibility: visible остаётся видимым внутри скрытого корня. */}
-      {доступЗакрыт && !profileModalOpen && <ЗагрузкаВхода onВойти={openLoginProfile} проверено={authChecked} />}
+      {доступЗакрыт && !profileModalOpen && <ЗагрузкаВхода проверено={authChecked} />}
+      <СбросПопытокВхода закрыт={доступЗакрыт} />
       {/* Запуск токена показывает ракету — и только её. Обводки
           «Динамического острова» и контура экрана, которые она
           поджигала, убраны: на разных телефонах они ложились по-разному,

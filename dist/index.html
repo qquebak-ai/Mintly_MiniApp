@@ -93,23 +93,26 @@
         var т = String(текст || "");
         return /не является допустимым MIME|is not a valid JavaScript MIME|Failed to fetch dynamically imported|error loading dynamically imported|Importing a module script failed/i.test(т);
       }
+      /* Сбой загрузки — не повод показывать ошибку: страница
+         перечитывается сама, с растущей паузой (сеть могла моргнуть,
+         сервер — перезапускаться), пока не загрузится целиком. Красного
+         экрана с текстом ошибки больше нет. */
       function перечитать() {
-        try {
-          if (sessionStorage.getItem("mintly:перечитано")) return false;
-          sessionStorage.setItem("mintly:перечитано", "1");
-        } catch (e) { /* приватный режим — пробуем один раз без метки */ }
-        location.reload();
+        var n = 0;
+        try { n = Number(sessionStorage.getItem("mintly:перечитано") || 0); sessionStorage.setItem("mintly:перечитано", String(n + 1)); } catch (e) { /* приватный режим */ }
+        setTimeout(function () { location.reload(); }, n ? Math.min(30000, 1500 * Math.pow(2, n)) : 0);
         return true;
       }
+      // Загрузилось и прожило десять секунд — счёт попыток заново.
+      setTimeout(function () { try { sessionStorage.removeItem("mintly:перечитано"); } catch (e) { /* приватный режим */ } }, 10000);
 
       window.addEventListener("error", function (e) {
         var msg = (e.error && (e.error.stack || e.error.message)) || e.message || "неизвестная ошибка";
         if (этоСтарыйКеш(msg) && перечитать()) return;
         сообщить("browser", msg);
-        var el = document.createElement("pre");
-        el.style.cssText = "background:#1a0000;color:#ff8080;padding:16px;font-size:12px;white-space:pre-wrap;word-break:break-word;position:fixed;inset:0;overflow:auto;z-index:99999;margin:0;";
-        el.textContent = "ОШИБКА ЗАГРУЗКИ ПРИЛОЖЕНИЯ:\n\n" + msg;
-        document.body.appendChild(el);
+        // Приложение так и не нарисовалось — перечитываем, а не стоим пустыми.
+        var корень = document.getElementById("root");
+        if (корень && !корень.children.length) перечитать();
       });
 
       // Оборванное обещание экран не гасит, но ломает ровно то место,
@@ -120,7 +123,7 @@
         сообщить("promise", (r && (r.stack || r.message)) || String(r || "отказ без причины"));
       });
     </script>
-    <script type="module" crossorigin src="/assets/index-Dysdnd8U.js"></script>
+    <script type="module" crossorigin src="/assets/index-tHzPuAjK.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/react-DS-kCp2g.js">
     <link rel="modulepreload" crossorigin href="/assets/supabase-QBHRJHLH.js">
     <link rel="modulepreload" crossorigin href="/assets/icons-BNcfeTD8.js">
