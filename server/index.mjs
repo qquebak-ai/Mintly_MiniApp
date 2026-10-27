@@ -519,6 +519,14 @@ if (process.env.LIMIT_ORDERS !== "0") {
     .catch((err) => console.warn("[лимиты]", err && err.message));
 }
 
+/* Чужие запуски (pump.fun, letsbonk) — поток в том же процессе: лента
+   «Новые» берёт их из памяти (api/_launchStream.js, api/new-launches.js). */
+if (process.env.LAUNCH_STREAM !== "0") {
+  import("../api/_launchStream.js")
+    .then(({ запуститьЛентуЗапусков }) => { if (запуститьЛентуЗапусков()) console.log("[запуски] поток новых токенов подключён"); })
+    .catch((err) => console.warn("[запуски]", err && err.message));
+}
+
 /* Выход на биржу — тем же способом.
  *
  * Кривая Solana, набравшая порог, сама не закрывается: закрыть её зовёт

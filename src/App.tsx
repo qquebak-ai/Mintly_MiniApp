@@ -12364,6 +12364,65 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
   return typeof document !== "undefined" ? createPortal(лист, document.body) : лист;
 }
 
+/* Чужие запуски Solana — pump.fun и letsbonk — в «Новые» прямо в момент
+   создания (api/_launchStream.js на сервере). Пока раздел открыт, раз в
+   секунду спрашиваем только новое и изменившееся после прошлого ответа;
+   капитализация считается по курсу SOL у себя. */
+function useЧужиеЗапуски(активно) {
+  const [запуски, setЗапуски] = useState([]);
+  useEffect(() => {
+    if (!активно) return undefined;
+    let живо = true, после = 0, таймер = 0;
+    const карта = new Map();
+    const спросить = async () => {
+      try {
+        const r = await fetch(апи(`/api/new-launches?after=${после}`));
+        const j = await r.json();
+        if (!живо || !j) return;
+        после = Number(j.now) || после;
+        let сдвиг = false;
+        for (const з of j.items || []) {
+          if (!з || !з.mint || !з.symbol) continue;
+          карта.set(з.mint, з);
+          сдвиг = true;
+        }
+        if (сдвиг) {
+          // Держим сотню самых свежих — лента не разрастается без конца.
+          const все = [...карта.values()].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 100);
+          карта.clear(); все.forEach((з) => карта.set(з.mint, з));
+          setЗапуски(все);
+        }
+      } catch { /* сеть моргнула — спросим через секунду */ }
+      if (живо) таймер = setTimeout(спросить, 1000);
+    };
+    спросить();
+    return () => { живо = false; clearTimeout(таймер); };
+  }, [активно]);
+  return useMemo(() => {
+    const курс = solUsd();
+    return запуски.map((з) => ({
+      id: `pump-${з.mint}`,
+      chain: "solana",
+      address: з.mint,
+      tokenAddress: з.mint,
+      poolAddress: з.curve,
+      name: з.name || з.symbol,
+      ticker: з.symbol,
+      logoUrl: з.logo || null,
+      emoji: emojiForTicker(з.symbol),
+      mcapNum: курс > 0 ? (Number(з.mcapSol) || 0) * курс : 0,
+      change: 0,
+      createdAt: з.createdAt,
+      live: true,
+      dexName: з.platform,
+      площадка: з.platform,
+      seed: hashSeed(з.mint),
+      cat: "Мемы",
+      liq: "0", vol: "0", vol24hNum: 0, tx1h: 0, tx6h: 0, tx24h: 0,
+    }));
+  }, [запуски]);
+}
+
 function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpen, onLaunch, solДоступен = false, currentUserId = null, сеть = "ton" }) {
   const [filter, setFilter] = useState("new");
   // Сеть выбирается кружком рядом со свёрнутой панелью разделов: это не
@@ -12377,6 +12436,8 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
   // окно расширяется до 6 часов, потом до суток — так карточка никогда не
   // остаётся пустой.
   const localTokens = useMemo(() => (myTokens || []).map(localTokenToFeedShape), [myTokens]);
+  // Чужие запуски Solana — только в «Новых»: там они и нужны сразу.
+  const чужие = useЧужиеЗапуски(сеть === "sol" && filter === "new");
 
   // Свои запуски делятся по сетям: в разделе Solana нечего показывать
   // токенам TON и наоборот.
@@ -12420,8 +12481,8 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
     /* «Новые» — те, кто ещё идёт по кривой и на биржу не вышел. Здесь
        токен ещё можно взять по цене кривой, и раздел ровно об этом. */
     if (filter === "new") {
-      return свои
-        .filter((tok) => !tok.graduated)
+      // Свои и чужие запуски — одной хроникой: кто создан позже, тот выше.
+      return [...свои.filter((tok) => !tok.graduated), ...чужие.filter((tok) => !похожеНаПодделку(tok))]
         .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     }
     /* «На DEX» — вышедшие: самые свежие выходы сверху. */
@@ -12446,7 +12507,7 @@ function МемпадПлощадки({ myTokensLoading = false, myTokens, onOpe
       default: break;
     }
     return arr;
-  }, [filter, spotlightTop, свои]);
+  }, [filter, spotlightTop, свои, чужие]);
 
   // Ждать теперь нечего, кроме своих токенов из базы: биржевой ленты в
   // разделе больше нет.
