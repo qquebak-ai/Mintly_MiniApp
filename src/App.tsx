@@ -15,7 +15,7 @@ import { useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { Address, beginCell, toNano } from "@ton/core";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { supabase } from "./supabaseClient";
-import { ФонШёлк, подготовитьШёлк, шёлкВЦвете, ЗНАК_ПУТЬ, ЦВЕТА_РАДУГИ, ПЕРИОД_РАДУГИ, фазаРадуги } from "./шёлк";
+import { ФонШёлк, ШёлкКарты, подготовитьШёлк, шёлкВЦвете, ЗНАК_ПУТЬ, ЦВЕТА_РАДУГИ, ПЕРИОД_РАДУГИ, фазаРадуги } from "./шёлк";
 import { апи, запрос } from "./апи";
 import { остаток as остатокКошелька, сыройОстаток as сыройОстатокКошелька, следитьЗаОстатками, записатьОстатки } from "./остатки";
 import { ДЕМО_ТОКЕНЫ, логоДемо } from "../api/_demoTokens.js";
@@ -20215,6 +20215,10 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
      «Показать» здесь ведёт в тот же проверенный мастер, только сразу
      к экрану предупреждения, минуя вступление. */
   const ПЕРЕВОРОТ_КАРТЫ_МС = 640;
+  /* Когда карта встаёт ребром. Кривая переворота с перелётом проходит
+     90° уже на ~15% времени, а стороны менялись на середине — 220 мс обе
+     были спрятаны, и в переворот мелькала пустая серая плита торца. */
+  const РЕБРО_КАРТЫ_МС = Math.round(ПЕРЕВОРОТ_КАРТЫ_МС * 0.146);
   // Толщина нарочно больше настоящей (≈3px на 210px высоты): на
   // телефоне трёхпиксельный торец на наклоне просто не разглядеть.
   // Слоёв торца меньше: каждый — отдельный 3D-слой, и двенадцать штук
@@ -20755,7 +20759,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
              прячется сама — ровно на середине поворота, когда карта
              стоит ребром. */
           visibility: переворотКарты ? "hidden" : "visible",
-          transition: `visibility 0s linear ${ПЕРЕВОРОТ_КАРТЫ_МС / 2}ms`,
+          transition: `visibility 0s linear ${РЕБРО_КАРТЫ_МС}ms`,
           transform: `translateZ(${ТОЛЩИНА_КАРТЫ / 2}px)`,
           /* Обрезка по скруглению у iOS не держится, если внутри что-то
              ходит (блик, волны, ткань): дети вылезают за угол квадратом.
@@ -20774,7 +20778,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             элементах друг другу не мешают. */}
         {/* Фон карты — шёлк с приветствия на чёрном, в цвет тарифа, как у
             карточки PnL: Free серый, Pro зелёный, Turbo переливается. */}
-        <ФонШёлк вРамке пауза={картаКрутится} тон={{ fast: "pro", turbo: "turbo" }[скоростьКарты] || null} />
+        <ШёлкКарты пауза={картаКрутится} тон={{ fast: "pro", turbo: "turbo" }[скоростьКарты] || null} />
         {/* Еле заметная кромка: на чёрном фоне страницы иначе не видно,
             где кончается карта. Поверх шёлка, под текстом. */}
         <span aria-hidden style={{ position: "absolute", inset: 0, borderRadius: "inherit", boxShadow: `inset 0 0 0 1px ${hexA("#FFFFFF", 0.1)}`, pointerEvents: "none", zIndex: 1 }} />
@@ -20884,7 +20888,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
           position: "absolute", inset: 0, borderRadius: 24, overflow: "hidden",
           backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
           visibility: переворотКарты ? "visible" : "hidden",
-          transition: `visibility 0s linear ${ПЕРЕВОРОТ_КАРТЫ_МС / 2}ms`,
+          transition: `visibility 0s linear ${РЕБРО_КАРТЫ_МС}ms`,
           transform: `rotateY(180deg) translateZ(${ТОЛЩИНА_КАРТЫ / 2}px)`,
           // Та же маска, что у лицевой стороны: без неё скругление на iOS
           // не держит анимированную заливку внутри, и кнопки снизу
@@ -20896,8 +20900,12 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
           display: "flex", flexDirection: "column", gap: 6, padding: "14px 15px",
         }}
       >
-        <ФонШёлк вРамке пауза={картаКрутится || !переворотКарты} тон={{ fast: "pro", turbo: "turbo" }[скоростьКарты] || null} />
+        <ШёлкКарты пауза={картаКрутится || !переворотКарты} тон={{ fast: "pro", turbo: "turbo" }[скоростьКарты] || null} />
         <span aria-hidden style={{ position: "absolute", inset: 0, background: hexA("#000000", 0.45), pointerEvents: "none", zIndex: 0 }} />
+        {/* Содержимое — отдельным слоем поверх: шёлк и затемнение лежат
+            абсолютно и иначе закрывали бы обычные (непозиционированные)
+            строки — оборот выглядел пустым. */}
+        <div style={{ position: "relative", zIndex: 1, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 6 }}>
         {словаНаОбороте ? (
           <>
             <span style={{ fontFamily: displayFont, color: "#FFFFFF", fontSize: 13, fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.2 }}>
@@ -20992,6 +21000,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
             </div>
           </>
         )}
+        </div>
       </div>
       </div>
       </div>

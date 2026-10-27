@@ -231,3 +231,76 @@ export function ФонШёлк({ тон = null, вОкне = false, вРамке
     </div>
   );
 }
+
+/* Шёлк карты баланса — неподвижной картинкой. Живой холст внутри
+   поворачивающейся 3D-карты iOS перерисовывает в каждом кадре вместе с
+   маской скругления: переворот шёл рывками, а оборот, пока не
+   растеризуется, мелькал пустым серым. Картинка рисуется один раз под
+   размер карты (тот же кадр, что у живого шёлка в начале), и переворот
+   двигает уже готовый слой. Turbo переливается фильтром по картинке —
+   на время переворота он замирает. */
+const снимкиКарты: Record<string, string> = {};
+async function снимокКарты(тон: string | null, ш: number, в: number): Promise<string> {
+  const плотность = Math.min(2, window.devicePixelRatio || 1);
+  const ключ = `${тон || ""}:${Math.round(ш)}x${Math.round(в)}@${плотность}`;
+  if (снимкиКарты[ключ]) return снимкиКарты[ключ];
+  const исходник = await (тон && ТОНА_ШЁЛКА[тон] ? шёлкВЦвете(тон) : подготовитьШёлк());
+  const м = Math.max(ш / КАДР_Ш, в / КАДР_В) * 1.1;
+  const эш = (КАДР_Ш + 2 * ЗАПАС) * м, эв = (КАДР_В + 2 * ЗАПАС) * м;
+  // Мягкие края лент — как маска radial-gradient у живого холста.
+  const слой = document.createElement("canvas");
+  слой.width = Math.ceil(эш * плотность); слой.height = Math.ceil(эв * плотность);
+  const с = слой.getContext("2d")!;
+  с.drawImage(исходник, 0, 0, слой.width, слой.height);
+  с.globalCompositeOperation = "destination-in";
+  с.setTransform(слой.width / 2, 0, 0, слой.height / 2, слой.width / 2, слой.height / 2);
+  const маска = с.createRadialGradient(0, 0, 0, 0, 0, 1);
+  маска.addColorStop(0.78, "#000"); маска.addColorStop(1, "rgba(0,0,0,0)");
+  с.fillStyle = маска; с.fillRect(-1, -1, 2, 2);
+  const [я, dx, dy, sc, поворот] = поКлючам(0, ШЁЛК_КЛЮЧИ);
+  const итог = document.createElement("canvas");
+  итог.width = Math.round(ш * плотность); итог.height = Math.round(в * плотность);
+  const г = итог.getContext("2d")!;
+  г.fillStyle = "#000000"; г.fillRect(0, 0, итог.width, итог.height);
+  г.scale(плотность, плотность);
+  const ох = (ш - КАДР_Ш * м) / 2 - ЗАПАС * м, оу = (в - КАДР_В * м) / 2 - ЗАПАС * м;
+  const цх = (ЗАПАС + КАДР_Ш / 2) * м, цу = (ЗАПАС + КАДР_В / 2) * м;
+  г.globalAlpha = я * 0.85;
+  г.translate(ох + цх + dx * м * ДАЛЬ, оу + цу + dy * м * ДАЛЬ);
+  г.rotate((поворот * Math.PI) / 180);
+  г.scale(ДАЛЬ * sc, ДАЛЬ * sc);
+  г.drawImage(слой, -цх, -цу, эш, эв);
+  снимкиКарты[ключ] = итог.toDataURL("image/jpeg", 0.9);
+  return снимкиКарты[ключ];
+}
+export function ШёлкКарты({ тон = null, пауза = false }: { тон?: string | null; пауза?: boolean }) {
+  const обёртка = useRef<HTMLDivElement | null>(null);
+  const [снимок, setСнимок] = React.useState<string | null>(null);
+  useEffect(() => {
+    const о = обёртка.current;
+    if (!о) return undefined;
+    let жив = true, таймер: ReturnType<typeof setTimeout> | null = null;
+    const нарисовать = () => {
+      if (!о.clientWidth || !о.clientHeight) return;
+      снимокКарты(тон, о.clientWidth, о.clientHeight).then((s) => { if (жив) setСнимок(s); }).catch(() => {});
+    };
+    нарисовать();
+    const наблюдатель = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => {
+      if (таймер) clearTimeout(таймер);
+      таймер = setTimeout(нарисовать, 150);
+    }) : null;
+    if (наблюдатель) наблюдатель.observe(о);
+    return () => { жив = false; if (таймер) clearTimeout(таймер); if (наблюдатель) наблюдатель.disconnect(); };
+  }, [тон]);
+  return (
+    <div ref={обёртка} aria-hidden style={{ position: "absolute", inset: 0, zIndex: 0, background: "#000000", pointerEvents: "none" }}>
+      {снимок && (
+        <img src={снимок} alt="" draggable={false} style={{
+          position: "absolute", inset: 0, width: "100%", height: "100%", display: "block",
+          animation: тон === "turbo" ? `шёлкОттенок ${ПЕРИОД_РАДУГИ}s linear ${фазаРадуги()} infinite` : "none",
+          animationPlayState: пауза ? "paused" : "running",
+        }} />
+      )}
+    </div>
+  );
+}
