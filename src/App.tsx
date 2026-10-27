@@ -581,7 +581,7 @@ const STR = {
     gradListedBody: "Токен на бирже: цена идёт по пулу, ликвидность закреплена в контракте.",
     tabChart: "График", tabInfo: "Инфо", tabTx: "Транзакции", chartModePrice: "Цена", chartModeMcap: "Капитализация",
     tabHolders: "Держатели", tabFeed: "Лента", tabAbout: "О токене", tabStats: "Статистика", statMcap: "Капитализация", statLiq: "Ликвидность", statVol24: "Объём за сутки", statTrades24: "Сделок за сутки", statAge: "Возраст", statCurve: "Собрано", statDex: "Биржа",
-    orderInstant: "Мгновенно", orderMarket: "По рынку", orderLimit: "Лимит",
+    orderInstant: "Мгновенно", orderTariff: "По тарифу", orderMarket: "По рынку", orderLimit: "Лимит",
     positionTitle: "Ваша позиция", positionValue: "Стоимость", positionAmount: "Количество",
     positionChange24: "За 24 часа", positionEmpty: "Токенов пока нет",
     positionSinceBuy: "с покупки",
@@ -1326,7 +1326,7 @@ const STR = {
     gradListedBody: "The curve is done: the price now moves both ways with the pool's reserves. The liquidity is locked in the contract and nobody can pull it out, so you can always sell.",
     tabChart: "Chart", tabInfo: "Info", tabTx: "Transactions", chartModePrice: "Price", chartModeMcap: "Market cap",
     tabHolders: "Holders", tabFeed: "Feed", tabAbout: "About",
-    orderInstant: "Instant", orderMarket: "Market", orderLimit: "Limit",
+    orderInstant: "Instant", orderTariff: "By plan", orderMarket: "Market", orderLimit: "Limit",
     positionTitle: "Your position", positionValue: "Value", positionAmount: "Amount",
     positionSinceBuy: "since your buy",
     positionChange24: "24h change", positionEmpty: "No tokens yet",
@@ -21479,7 +21479,15 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   const pnlДанные = useRef({ итог: 0, вложено: 0, стоимость: 0 });
   // Сторона сделки в карточке позиции: ползунок «Купить / Продать».
   const [сторонаКарточки, setСторонаКарточки] = useState("buy");
-  const [скоростьКарточки, выбратьСкоростьКарточки] = useСкорость();
+  /* Как исполнить из карточки: «По тарифу» — скоростью выбранного тарифа,
+     «По рынку» — обычной скоростью без наценки, «Лимит» — заявкой по цене
+     прямо в этом меню. Разовая скорость кладётся туда, откуда её берёт
+     appWallet.js (скоростьСделки), и снимается при уходе со страницы. */
+  const [типКарточки, setТипКарточки] = useState("tariff");
+  useEffect(() => {
+    window.__mintlyРазоваяСкорость = типКарточки === "market" ? "normal" : null;
+    return () => { window.__mintlyРазоваяСкорость = null; };
+  }, [типКарточки]);
   /* Что рисует график: цену или капитализацию.
      По умолчанию — цена: то же число, что крупно стоит в шапке, и то,
      на что смотрят в первую очередь. Капитализация остаётся рядом, но
@@ -23259,6 +23267,11 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5 }}>{tr("positionEmpty")}</span>
         )}
 
+      </div>
+
+      {/* Меню сделки — отдельной карточкой под позицией: позиция — что у
+          тебя есть, меню — что с этим сделать. */}
+      <div className="flex flex-col" style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface }}>
         {/* Сделка — прямо здесь, спокойно и в цветах приложения: без
             зелёных и красных плашек. Ползунок «Купить / Продать», рядом —
             балансы кошелька во всех сетях, ниже — как исполнить:
@@ -23282,16 +23295,13 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
               ))}
             </div>
             <div className="flex" style={{ gap: 6 }}>
-              {[["instant", tr("orderInstant"), Zap], ["market", tr("orderMarket"), null], ["limit", tr("orderLimit"), null]].map(([к, подпись, Иконка]) => {
-                const вкл = к !== "limit" && (к === "instant") === (скоростьКарточки === "turbo");
+              {/* Лимитные заявки исполняет сервер по потоку кривых TON и Solana —
+                  у EVM такого потока нет, и «Лимита» там нет. */}
+              {[["tariff", tr("orderTariff"), Zap], ["market", tr("orderMarket"), null], ...(этоEVM(token.chain) ? [] : [["limit", tr("orderLimit"), null]])].map(([к, подпись, Иконка]) => {
+                const вкл = типКарточки === к;
                 return (
                   <button key={к} type="button"
-                    onClick={() => {
-                      haptic("light");
-                      // Лимит ставится в окне сделки — там цель и список заявок.
-                      if (к === "limit") { (сторонаКарточки === "sell" ? onSell : onBuy)({ limit: true }); return; }
-                      выбратьСкоростьКарточки(к === "instant" ? "turbo" : "fast");
-                    }}
+                    onClick={() => { haptic("light"); setТипКарточки(к); }}
                     className="fx-tap flex items-center"
                     style={{ gap: 5, padding: "7px 12px", borderRadius: 999, border: "none", background: вкл ? hexA(T.ice, 0.12) : "transparent", color: вкл ? T.ice : T.muted, fontFamily: bodyFont, fontSize: 13.5, fontWeight: 700 }}>
                     {Иконка && <Иконка size={13} />}{подпись}
@@ -23299,7 +23309,9 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
                 );
               })}
             </div>
-            {быстрые.oneClick && onQuick ? (
+            {типКарточки === "limit" ? (
+              <ЛимитВМеню token={token} сторона={сторонаКарточки} позиция={позиция} />
+            ) : быстрые.oneClick && onQuick ? (
               <div className="flex" style={{ gap: 8 }}>
                 {(сторонаКарточки === "buy" ? (быстрые.buy[монетаБыстрых(token)] || []) : быстрые.sell).map((v) => {
                   const нельзя = сторонаКарточки === "sell" && !(позиция > 0);
@@ -24032,6 +24044,118 @@ function КарточкаPnL({ открыт, onClose, token, итог = 0, вл�
         </button>
       </div>
     </ЭкранСнизу>
+  );
+}
+
+/* Лимитная заявка прямо в меню сделки на странице токена: цель —
+   капитализация в долларах, сумма — в монете сети (покупка) или доля
+   позиции (продажа). Сервер хранит цену одного токена в монете сети и
+   исполняет заявку сам (api/_limitWorker.js). Ниже — свои заявки по
+   этому токену с отменой. */
+function ЛимитВМеню({ token, сторона = "buy", позиция = 0 }) {
+  const соло = token.chain === "solana";
+  const монета = соло ? "SOL" : ТИКЕР_TON;
+  const курс = соло ? solUsd() : tonUsd();
+  const [цель, setЦель] = useState("");
+  const [сумма, setСумма] = useState("");
+  const [доля, setДоля] = useState(100);
+  const [ставим, setСтавим] = useState(false);
+  const [заявки, setЗаявки] = useState(null);
+  const покупка = сторона === "buy";
+  async function запрос(путь, тело) {
+    const { data } = await supabase.auth.getSession();
+    const ключ = data && data.session && data.session.access_token;
+    if (!ключ) throw new Error("no_session");
+    const r = await fetch(апи(`/api/limit-orders?action=${путь}`), {
+      method: тело ? "POST" : "GET",
+      headers: { Authorization: `Bearer ${ключ}`, ...(тело ? { "Content-Type": "application/json" } : {}) },
+      body: тело ? JSON.stringify(тело) : undefined,
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((j && j.error) || `ошибка ${r.status}`);
+    return j;
+  }
+  const обновить = () => запрос("list").then((j) => setЗаявки((j.orders || []).filter((з) => String(з.token_id) === String(token.id)))).catch(() => setЗаявки([]));
+  useEffect(() => { обновить(); const id = setInterval(обновить, 8000); return () => clearInterval(id); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token.id]);
+  const цельЧисло = parseAmount(цель);
+  const цена = цельЧисло > 0 && курс > 0 ? цельЧисло / TOKEN_FIXED_SUPPLY / курс : 0;
+  const количество = покупка ? parseAmount(сумма) : (позиция > 0 ? Math.floor(позиция * доля / 100 * 1e6) / 1e6 : 0);
+  const можно = цена > 0 && количество > 0 && !ставим;
+  async function поставить() {
+    if (!можно) return;
+    setСтавим(true);
+    try {
+      // Покупка — на откате вниз до цели, продажа — на росте до неё.
+      await запрос("create", { tokenId: token.id, side: покупка ? "buy" : "sell", amount: количество, price: цена, direction: покупка ? "below" : "above" });
+      haptic("success");
+      setЦель(""); setСумма("");
+      обновить();
+    } catch {
+      haptic("error");
+    } finally {
+      setСтавим(false);
+    }
+  }
+  const поле = { display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", borderRadius: 16, background: T.bg };
+  const ввод = { fontFamily: displayFont, fontWeight: 800, color: T.ice, fontSize: 20, background: "transparent", border: "none", outline: "none", flex: 1, minWidth: 0 };
+  return (
+    <div className="fx-step-in flex flex-col" style={{ gap: 10 }}>
+      <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 800 }}>
+        {покупка ? "Купить, когда капитализация опустится до" : "Продать, когда капитализация вырастет до"}
+      </span>
+      <div style={поле}>
+        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 20, fontWeight: 800 }}>$</span>
+        <input value={цель} onChange={(e) => setЦель(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal"
+          placeholder={fmtCompact((token.mcapNum || 0) * (покупка ? 0.7 : 2)).replace("$", "")} style={ввод} />
+      </div>
+      {покупка ? (
+        <div style={поле}>
+          <input value={сумма} onChange={(e) => setСумма(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" placeholder="0" style={ввод} />
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 16, fontWeight: 800 }}>{монета}</span>
+        </div>
+      ) : (
+        <div className="flex" style={{ gap: 8 }}>
+          {[25, 50, 100].map((v) => (
+            <button key={v} type="button" onClick={() => { haptic("light"); setДоля(v); }} className="fx-tap flex-1"
+              style={{ height: 44, borderRadius: 14, border: "none", fontFamily: monoFont, fontSize: 15, fontWeight: 700,
+                background: доля === v ? T.ice : T.bg, color: доля === v ? T.bg : T.ice }}>
+              {v}%
+            </button>
+          ))}
+        </div>
+      )}
+      <button type="button" onClick={поставить} disabled={!можно} className="fx-tap w-full"
+        style={{ height: 50, borderRadius: 16, border: "none", background: можно ? T.ice : T.surfaceHi, color: можно ? T.bg : T.muted, fontFamily: displayFont, fontSize: 16, fontWeight: 800 }}>
+        {ставим ? <ЗнакЗагрузки size={20} всегда /> : "Поставить заявку"}
+      </button>
+      {заявки && заявки.length > 0 && (
+        <div className="flex flex-col" style={{ gap: 6 }}>
+          {заявки.slice(0, 6).map((з) => {
+            const кап = Number(з.price) * TOKEN_FIXED_SUPPLY * курс;
+            const открыта = з.status === "open";
+            return (
+              <div key={з.id} className="flex items-center" style={{ gap: 10, padding: "10px 12px", borderRadius: 14, background: T.bg }}>
+                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 13.5, fontWeight: 800 }}>{з.side === "buy" ? "Купить" : "Продать"}</span>
+                <span style={{ flex: 1, minWidth: 0, fontFamily: monoFont, color: T.ice, fontSize: 13, fontWeight: 700 }}>
+                  {Number(з.amount).toLocaleString("ru-RU", { maximumFractionDigits: 4 })} {з.side === "buy" ? монета : token.ticker} · {кап > 0 ? fmtUSD(кап) : "—"}
+                </span>
+                {открыта ? (
+                  <button type="button" onClick={() => { haptic("light"); запрос("cancel", { id: з.id }).then(обновить, () => {}); }} className="fx-tap"
+                    style={{ padding: "5px 10px", borderRadius: 999, border: `1px solid ${T.lineHi}`, background: "transparent", color: T.ice, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
+                    Отменить
+                  </button>
+                ) : (
+                  <span style={{ fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700, color: T.ice }}>
+                    {з.status === "filled" ? "Исполнена" : з.status === "failed" ? "Не прошла" : з.status === "executing" ? "Исполняется" : "Отменена"}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -261,6 +261,8 @@ export function платитьМонетами() {
   try { return localStorage.getItem("mintly_pay_coins") === "1"; } catch { return false; }
 }
 export function скоростьСделки() {
+  // Разовая скорость из меню сделки («По рынку» — без ускорения тарифа).
+  if (typeof window !== "undefined" && window.__mintlyРазоваяСкорость) return window.__mintlyРазоваяСкорость;
   try { const v = localStorage.getItem("mintly_trade_speed"); return ["normal", "fast", "turbo"].includes(v) ? v : "fast"; } catch { return "fast"; }
 }
 export async function сделкаВнутренним({ mint, продажа = false, amount, minOut = 0, скорость = скоростьСделки() }) {
