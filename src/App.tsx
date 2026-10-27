@@ -15689,6 +15689,16 @@ function useУведомленияПодключены() {
    а счёт — тот же EVM-кошелёк приложения. Страница во весь экран: список
    с фильтрами, страница рынка с графиком, позицией и сделкой. */
 const РАЗДЕЛЫ_РЫНКОВ = [["crypto", "Крипта"], ["metals", "Металлы"], ["indices", "Индексы"], ["stocks", "Акции"]];
+/* Сколько на карте для биржи — по тому же курсу SOL, что и на самой
+   карте, чтобы суммы совпадали. Сервер считал по цене SOL на споте
+   биржи, а у тестовой биржи она своя (~$41 вместо ~$100) — карта
+   показывала одно, биржа втрое меньше. */
+function наКарте(счёт) {
+  const кош = счёт && счёт.wallet;
+  const курс = solUsd();
+  if (кош && курс > 0) return Math.max(0, кош.sol - 0.01) * курс;
+  return (счёт && счёт.walletUsd) || 0;
+}
 async function запросРынков(путь, тело) {
   const заголовки = {};
   if (тело || путь === "account") {
@@ -15767,7 +15777,7 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
   const позиция = (счёт && счёт.positions || []).find((п) => п.coin === рынок.coin) || null;
   const usd = parseAmount(сумма);
   // Доступно — биржа плюс карта приложения: недостающее сделка добирает с карты.
-  const свободно = счёт ? счёт.withdrawable + (счёт.walletUsd || 0) : null;
+  const свободно = счёт ? счёт.withdrawable + наКарте(счёт) : null;
   const можно = usd >= 10 && (свободно == null || usd <= свободно + 1e-9) && !шлём;
   async function открыть() {
     if (!можно) return;
@@ -15920,7 +15930,7 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
               <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800 }}>
                 {счёт && счёт.pending ? "Пополняем с карты…" : `Доступно${сеть === "testnet" ? " · тест" : ""}`}
               </span>
-              <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 20, fontWeight: 700 }}>{счёт ? `$${(счёт.withdrawable + (счёт.walletUsd || 0)).toFixed(2)}` : "—"}</span>
+              <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 20, fontWeight: 700 }}>{счёт ? `$${(счёт.withdrawable + наКарте(счёт)).toFixed(2)}` : "—"}</span>
             </div>
             <div className="flex" style={{ gap: 8, flexWrap: "wrap" }}>
               {есть.map(([к, подпись]) => (
