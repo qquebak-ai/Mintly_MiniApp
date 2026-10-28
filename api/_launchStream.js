@@ -6,8 +6,8 @@
  * кривой, — для «только что созданных» это поздно. Источников два:
  *
  *   • поток PumpPortal — pump.fun и letsbonk.fun: событие о создании
- *     приходит через доли секунды, и дальше по каждому токену идут его
- *     сделки (живая капитализация и график);
+ *     приходит через доли секунды (сделки по токену — только с ключом,
+ *     см. КЛЮЧ_PUMPPORTAL; без него цену ведёт Jupiter);
  *   • список свежих токенов Jupiter — все площадки сразу: Meteora DBC (на
  *     ней Bags, Believe, Jupiter Studio, Moonshot), Raydium LaunchLab,
  *     Boop, Heaven и тот же pump.fun. Токен там появляется через 5–20
@@ -18,7 +18,16 @@
  * Всё держит один процесс сервера (server/index.mjs), приложение
  * спрашивает готовое у api/new-launches.js. */
 
-const АДРЕС = "wss://pumpportal.fun/api/data";
+/* Сделки по токенам PumpPortal теперь отдаёт только с ключом, на котором
+   лежит не меньше 0,02 SOL: без ключа каждая подписка возвращается
+   отказом. Слать их впустую — сотни отказов в час в том же сокете, по
+   которому идут новые токены, и повод площадке нас отключить. Свечи
+   страницы токена берутся у Jupiter, поэтому без ключа сделки не просим
+   вовсе; с ключом (PUMPPORTAL_API_KEY) всё работает как раньше. */
+const КЛЮЧ_PUMPPORTAL = process.env.PUMPPORTAL_API_KEY || "";
+const АДРЕС = КЛЮЧ_PUMPPORTAL
+  ? `wss://pumpportal.fun/api/data?api-key=${encodeURIComponent(КЛЮЧ_PUMPPORTAL)}`
+  : "wss://pumpportal.fun/api/data";
 const JUP_НОВЫЕ = "https://lite-api.jup.ag/tokens/v2/recent";
 const JUP_ЦЕНЫ = "https://lite-api.jup.ag/price/v3?ids=";
 const ДЕРЖИМ = 300;               // столько последних запусков помним
@@ -307,7 +316,7 @@ function принять(событие) {
     // Первая покупка автора идёт в том же событии — это первая точка графика.
     записатьСделку(з, j, true);
     вставить(з);
-    послать({ method: "subscribeTokenTrade", keys: [з.mint] });
+    if (КЛЮЧ_PUMPPORTAL) послать({ method: "subscribeTokenTrade", keys: [з.mint] });
     дочитатьМетаданные(з);
     return;
   }
@@ -322,6 +331,7 @@ function принять(событие) {
 
 // Раз в минуту отпускаем сделки токенов старше десяти минут.
 function отпуститьСтарые() {
+  if (!КЛЮЧ_PUMPPORTAL) return;
   const граница = Date.now() - СЛЕДИМ_МС;
   const ключи = лента.filter((з) => з.источник === "pumpportal" && з.at < граница && !з.отпущен).map((з) => { з.отпущен = true; return з.mint; });
   if (ключи.length) послать({ method: "unsubscribeTokenTrade", keys: ключи });
@@ -356,7 +366,7 @@ function подключить() {
     последнееСообщение = Date.now();
     послать({ method: "subscribeNewToken" });
     // После переподключения — снова сделки тех, кого ещё сопровождаем.
-    const свежие = лента.filter((з) => з.источник === "pumpportal" && !з.отпущен).map((з) => з.mint);
+    const свежие = КЛЮЧ_PUMPPORTAL ? лента.filter((з) => з.источник === "pumpportal" && !з.отпущен).map((з) => з.mint) : [];
     if (свежие.length) послать({ method: "subscribeTokenTrade", keys: свежие });
   };
   с.onmessage = (e) => { if (сокет !== с) return; последнееСообщение = Date.now(); принять(e); };
