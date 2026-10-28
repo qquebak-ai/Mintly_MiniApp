@@ -12390,8 +12390,10 @@ function КарточкаТокенаEVM({ токен: вход, onClose, userId
   return typeof document !== "undefined" ? createPortal(лист, document.body) : лист;
 }
 
-/* Чужие запуски Solana — pump.fun и letsbonk — в «Новые» прямо в момент
-   создания (api/_launchStream.js на сервере). Пока раздел открыт, раз в
+/* Чужие запуски Solana со всех площадок — pump.fun, letsbonk, Meteora
+   (Bags, Believe, Jupiter Studio, Moonshot), LaunchLab и других — в
+   «Новые» прямо в момент создания (api/_launchStream.js на сервере:
+   поток PumpPortal и список свежих токенов Jupiter). Пока раздел открыт, раз в
    секунду спрашиваем только новое и изменившееся после прошлого ответа;
    капитализация считается по курсу SOL у себя. */
 function useЧужиеЗапуски(активно) {
@@ -12440,7 +12442,9 @@ function useЧужиеЗапуски(активно) {
       logoUrl: з.logo ? (з.logo.startsWith("/api/") ? апи(з.logo) : з.logo) : null,
       emoji: emojiForTicker(з.symbol),
       mcapNum: курс > 0 ? (Number(з.mcapSol) || 0) * курс : 0,
-      change: 0,
+      // С момента создания (сервер считает по первой и последней сделке):
+      // раньше здесь стоял ноль, и у всех новых было «+0.0%».
+      change: Number(з.change) || 0,
       createdAt: з.createdAt,
       live: true,
       dexName: з.platform,

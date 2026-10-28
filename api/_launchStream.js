@@ -3,17 +3,25 @@
  * Mintly показывает не только свои токены, а все свежие мемкоины с
  * площадок запуска. Обход биржевых лент (api/refresh-feed.js) ходит раз
  * в минуту, а пул на бирже у мемкоина появляется только после выхода с
- * кривой, — для «только что созданных» это поздно. Поэтому новые токены
- * pump.fun и letsbonk.fun берём из открытого потока PumpPortal: событие
- * о создании приходит через доли секунды после сделки в сети.
+ * кривой, — для «только что созданных» это поздно. Источников два:
  *
- * Поток держит один процесс сервера (server/index.mjs), приложение
- * спрашивает готовое у api/new-launches.js. Каждый новый токен минут
- * десять сопровождаем его же сделками — капитализация в ленте живая, а
- * не та, что была в момент создания. */
+ *   • поток PumpPortal — pump.fun и letsbonk.fun: событие о создании
+ *     приходит через доли секунды, и дальше по каждому токену идут его
+ *     сделки (живая капитализация и график);
+ *   • список свежих токенов Jupiter — все площадки сразу: Meteora DBC (на
+ *     ней Bags, Believe, Jupiter Studio, Moonshot), Raydium LaunchLab,
+ *     Boop, Heaven и тот же pump.fun. Токен там появляется через 5–20
+ *     секунд после создания, сразу с картинкой и капитализацией; цену
+ *     таких токенов дальше берём у Jupiter же. Он же — запасной путь,
+ *     если поток PumpPortal оборвался: лента не застывает.
+ *
+ * Всё держит один процесс сервера (server/index.mjs), приложение
+ * спрашивает готовое у api/new-launches.js. */
 
 const АДРЕС = "wss://pumpportal.fun/api/data";
-const ДЕРЖИМ = 200;               // столько последних запусков помним
+const JUP_НОВЫЕ = "https://lite-api.jup.ag/tokens/v2/recent";
+const JUP_ЦЕНЫ = "https://lite-api.jup.ag/price/v3?ids=";
+const ДЕРЖИМ = 300;               // столько последних запусков помним
 const СЛЕДИМ_МС = 10 * 60 * 1000; // столько ведём сделки нового токена
 const МЕТАДАННЫЕ_МС = 4000;
 // Повторы чтения метаданных: IPFS в первые секунды часто ещё не раздаёт файл.
@@ -63,6 +71,144 @@ const поАдресу = new Map();
 let сокет = null;
 let пауза = 1000;
 let запущен = false;
+let таймерПодключения = null;
+let последнееСообщение = 0;       // поток PumpPortal: когда было последнее событие
+let попыткаПри = 0;               // когда открывали сокет
+let jupiterПри = 0;               // когда список Jupiter последний раз ответил
+
+/* Площадка по токену из списка Jupiter. У площадок свои «красивые»
+   окончания адреса (…pump, …bonk, …BAGS, …moon), по ним понятнее всего;
+   дальше — сайт площадки в ссылке токена (uselaunch.fun/c/<адрес>), и в
+   конце — программа, на которой стоит кривая. */
+const ПРОГРАММЫ_JUPITER = {
+  "pump.fun": "pump.fun", "raydium-launchlab": "LaunchLab", "met-dbc": "Meteora",
+  moonshot: "Moonshot", boop: "Boop", heaven: "Heaven", "bags.fm": "Bags", bags: "Bags",
+  believe: "Believe", "jup-studio": "Jupiter", "letsbonk.fun": "letsbonk",
+};
+function площадкаJupiter(т) {
+  const mint = String(т.id || "");
+  if (/pump$/.test(mint)) return "pump.fun";
+  if (/bonk$/.test(mint)) return "letsbonk";
+  if (/BAGS$/.test(mint)) return "Bags";
+  if (/moon$/.test(mint)) return "Moonshot";
+  if (/jups?$/.test(mint)) return "Jupiter";
+  if (/boop$/.test(mint)) return "Boop";
+  const сайт = String(т.website || "");
+  const м = сайт.match(/^https?:\/\/(?:www\.)?([a-z0-9-]{3,24})\.[a-z]{2,5}\//i);
+  if (м && сайт.includes(mint)) return м[1].toLowerCase();
+  // Без площадки — пул заведён сразу на бирже (PumpSwap, Raydium, Meteora).
+  return ПРОГРАММЫ_JUPITER[т.launchpad] || (т.launchpad ? String(т.launchpad).slice(0, 20) : "DEX");
+}
+
+/* Клоны: один и тот же токен (имя и тикер) запускают пачками — по
+   десятку копий за минуту, и лента целиком забивалась одинаковыми
+   строками. Повтор в пределах десяти минут не показываем: остаётся
+   первый запуск. */
+const ключКлона = (з) => `${String(з.symbol || "").trim()}|${String(з.name || "").trim()}`.toLowerCase();
+function клон(з) {
+  const к = ключКлона(з);
+  const граница = Date.now() - СЛЕДИМ_МС;
+  return лента.some((x) => x.at > граница && x.mint !== з.mint && ключКлона(x) === к);
+}
+
+/* Свежий токен — на своё место по времени создания: из Jupiter он
+   приходит на секунды позже, чем из потока, и не должен встать выше
+   тех, что созданы после него. */
+function вставить(з) {
+  let i = 0;
+  while (i < лента.length && лента[i].at > з.at) i += 1;
+  лента.splice(i, 0, з);
+  поАдресу.set(з.mint, з);
+  // Старые уходят — и их сделки и картинки больше не нужны.
+  while (лента.length > ДЕРЖИМ) {
+    const старый = лента.pop();
+    поАдресу.delete(старый.mint);
+    убратьКартинку(старый.mint);
+  }
+}
+
+/* Цена от Jupiter — точка графика и капитализация. Одинаковую цену
+   подряд не пишем: опрос раз в несколько секунд, а сделок может и не
+   быть — график не должен набиваться одинаковыми точками. */
+function ценаJupiter(з, usd, сол, mcapUsd = 0) {
+  if (!(usd > 0) || !(сол > 0)) return;
+  const ценаSol = usd / сол;
+  if (!з.сделки) з.сделки = [];
+  const посл = з.сделки[з.сделки.length - 1];
+  if (!посл || Math.abs(посл[1] - ценаSol) / посл[1] > 1e-7) {
+    з.сделки.push([Date.now(), ценаSol, 0, з.сделки.length ? 1 : 2]);
+    if (з.сделки.length > СДЕЛОК_НА_ТОКЕН) з.сделки.splice(0, з.сделки.length - СДЕЛОК_НА_ТОКЕН);
+  }
+  з.mcapSol = mcapUsd > 0 ? mcapUsd / сол : ценаSol * (з.выпуск || 1e9);
+  з.изменён = Date.now();
+}
+
+async function опросJupiter() {
+  let список;
+  try {
+    const r = await fetch(JUP_НОВЫЕ, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return;
+    список = await r.json();
+  } catch { return; }
+  if (!Array.isArray(список)) return;
+  jupiterПри = Date.now();
+  const сол = await курсSOL();
+  const граница = Date.now() - СЛЕДИМ_МС;
+  for (const т of список) {
+    const mint = т && typeof т.id === "string" ? т.id : "";
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) continue;
+    const при = Date.parse((т.firstPool && т.firstPool.createdAt) || т.createdAt) || Date.now();
+    if (при < граница) continue;
+    const значок = typeof т.icon === "string" && /^(https?|ipfs):\/\//.test(т.icon) ? черезШлюз(т.icon) : null;
+    const было = поАдресу.get(mint);
+    if (было) {
+      // Уже знаем из потока pump.fun — добираем то, чего там не нашлось.
+      if (!было.картинка && значок) { было.картинка = значок; было.logo = true; было.изменён = Date.now(); забратьКартинку(было).catch(() => {}); }
+      if (было.источник === "jupiter") ценаJupiter(было, Number(т.usdPrice), сол, Number(т.mcap));
+      continue;
+    }
+    const з = {
+      mint,
+      name: String(т.name || т.symbol || "").slice(0, 64),
+      symbol: String(т.symbol || "").slice(0, 16),
+      uri: null,
+      площадка: площадкаJupiter(т),
+      curve: (т.firstPool && т.firstPool.id) || null,
+      creator: typeof т.dev === "string" ? т.dev : null,
+      mcapSol: 0,
+      выпуск: Number(т.totalSupply) || 1e9,
+      at: при,
+      изменён: Date.now(),
+      logo: !!значок,
+      картинка: значок,
+      источник: "jupiter",
+      twitter: typeof т.twitter === "string" ? т.twitter : undefined,
+      website: typeof т.website === "string" ? т.website : undefined,
+    };
+    if (!з.symbol || клон(з)) continue;
+    ценаJupiter(з, Number(т.usdPrice), сол, Number(т.mcap));
+    вставить(з);
+    if (значок) забратьКартинку(з).catch(() => {});
+  }
+}
+
+// Цены токенов из Jupiter — пачкой, пока токен свежий.
+async function опросЦенJupiter() {
+  const граница = Date.now() - СЛЕДИМ_МС;
+  const свои = лента.filter((з) => з.источник === "jupiter" && з.at > граница).slice(0, 50);
+  if (!свои.length) return;
+  const сол = await курсSOL();
+  if (!(сол > 0)) return;
+  try {
+    const r = await fetch(JUP_ЦЕНЫ + свои.map((з) => з.mint).join(","), { headers: { accept: "application/json" }, signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return;
+    const j = await r.json();
+    for (const з of свои) {
+      const ц = j && j[з.mint];
+      if (ц && Number(ц.usdPrice) > 0) ценаJupiter(з, Number(ц.usdPrice), сол);
+    }
+  } catch { /* спросим в следующий раз */ }
+}
 
 // Любая ссылка на IPFS (ipfs://…, …/ipfs/<cid>…) — через быстрый шлюз.
 function черезШлюз(адрес) {
@@ -155,17 +301,12 @@ function принять(событие) {
       at: Date.now(),
       изменён: Date.now(),
       logo: null,
+      источник: "pumpportal",
     };
+    if (клон(з)) return;
     // Первая покупка автора идёт в том же событии — это первая точка графика.
     записатьСделку(з, j, true);
-    лента.unshift(з);
-    поАдресу.set(з.mint, з);
-    // Старые уходят — и их сделки больше не нужны.
-    while (лента.length > ДЕРЖИМ) {
-      const старый = лента.pop();
-      поАдресу.delete(старый.mint);
-      убратьКартинку(старый.mint);
-    }
+    вставить(з);
     послать({ method: "subscribeTokenTrade", keys: [з.mint] });
     дочитатьМетаданные(з);
     return;
@@ -182,27 +323,55 @@ function принять(событие) {
 // Раз в минуту отпускаем сделки токенов старше десяти минут.
 function отпуститьСтарые() {
   const граница = Date.now() - СЛЕДИМ_МС;
-  const ключи = лента.filter((з) => з.at < граница && !з.отпущен).map((з) => { з.отпущен = true; return з.mint; });
+  const ключи = лента.filter((з) => з.источник === "pumpportal" && з.at < граница && !з.отпущен).map((з) => { з.отпущен = true; return з.mint; });
   if (ключи.length) послать({ method: "unsubscribeTokenTrade", keys: ключи });
+}
+
+/* Переподключение. Раньше сокет пересоздавался только по событию
+   «закрыт»: повисшее подключение (вечное «соединяюсь» или открытый, но
+   замолчавший поток) его не присылало, и лента на сервере застывала на
+   часы — в приложении стояли токены четырёхчасовой давности. */
+function переподключить(причина) {
+  const с = сокет;
+  сокет = null;
+  if (с) {
+    с.onopen = с.onmessage = с.onclose = с.onerror = null;
+    try { с.close(); } catch { /* уже закрыт */ }
+  }
+  if (причина) console.warn(`[запуски] PumpPortal: ${причина} — заново через ${Math.round(пауза / 1000)} с`);
+  clearTimeout(таймерПодключения);
+  таймерПодключения = setTimeout(подключить, пауза);
+  пауза = Math.min(30_000, пауза * 2);
 }
 
 function подключить() {
   if (typeof WebSocket === "undefined") { console.warn("[запуски] в этом Node нет WebSocket"); return; }
-  сокет = new WebSocket(АДРЕС);
-  сокет.onopen = () => {
+  let с;
+  try { с = new WebSocket(АДРЕС); } catch (e) { return переподключить(`сокет не создан (${e && e.message})`); }
+  сокет = с;
+  попыткаПри = Date.now();
+  с.onopen = () => {
+    if (сокет !== с) return;
     пауза = 1000;
+    последнееСообщение = Date.now();
     послать({ method: "subscribeNewToken" });
     // После переподключения — снова сделки тех, кого ещё сопровождаем.
-    const свежие = лента.filter((з) => !з.отпущен).map((з) => з.mint);
+    const свежие = лента.filter((з) => з.источник === "pumpportal" && !з.отпущен).map((з) => з.mint);
     if (свежие.length) послать({ method: "subscribeTokenTrade", keys: свежие });
   };
-  сокет.onmessage = принять;
-  сокет.onclose = () => {
-    сокет = null;
-    setTimeout(подключить, пауза);
-    пауза = Math.min(30_000, пауза * 2);
-  };
-  сокет.onerror = () => { try { сокет && сокет.close(); } catch { /* уже закрыт */ } };
+  с.onmessage = (e) => { if (сокет !== с) return; последнееСообщение = Date.now(); принять(e); };
+  с.onclose = (e) => { if (сокет === с) переподключить(`закрыт (${e && e.code})`); };
+  с.onerror = () => { if (сокет === с) переподключить("ошибка сокета"); };
+}
+
+// Сторож потока: не открылся за 20 секунд или молчит полторы минуты —
+// пересоздаём (новый токен на pump.fun появляется каждые несколько секунд).
+function сторож() {
+  const с = сокет;
+  if (!с) return;
+  if (с.readyState === 0 && Date.now() - попыткаПри > 20_000) return переподключить("не открылся за 20 с");
+  if (с.readyState === 1 && Date.now() - последнееСообщение > 90_000) return переподключить("молчит 90 с");
+  if (с.readyState > 1) return переподключить("закрыт без события");
 }
 
 export function запуститьЛентуЗапусков() {
@@ -210,6 +379,11 @@ export function запуститьЛентуЗапусков() {
   запущен = true;
   подключить();
   setInterval(отпуститьСтарые, 60_000).unref?.();
+  setInterval(сторож, 15_000).unref?.();
+  // Jupiter: свежие токены всех площадок раз в 5 секунд, их цены — раз в 6.
+  опросJupiter();
+  setInterval(опросJupiter, 5_000).unref?.();
+  setInterval(опросЦенJupiter, 6_000).unref?.();
   return true;
 }
 
@@ -220,13 +394,20 @@ export function свежиеЗапуски(после = 0) {
   return лента
     .filter((з) => з.изменён > после)
     .slice(0, 80)
-    .map((з) => ({
-      mint: з.mint, name: з.name, symbol: з.symbol, platform: з.площадка,
-      // Картинка — со своего сервера (см. забратьКартинку).
-      logo: з.logo ? `/api/new-launches?logo=${з.mint}` : null,
-      curve: з.curve, creator: з.creator, mcapSol: з.mcapSol, createdAt: new Date(з.at).toISOString(),
-      twitter: з.twitter || null, telegram: з.telegram || null, website: з.website || null,
-    }));
+    .map((з) => {
+      // Изменение с момента создания: первая точка графика против последней.
+      const первая = з.сделки && з.сделки[0];
+      const последняя = з.сделки && з.сделки[з.сделки.length - 1];
+      const change = первая && последняя && первая[1] > 0 && последняя !== первая ? (последняя[1] / первая[1] - 1) * 100 : 0;
+      return {
+        mint: з.mint, name: з.name, symbol: з.symbol, platform: з.площадка,
+        // Картинка — со своего сервера (см. забратьКартинку).
+        logo: з.logo ? `/api/new-launches?logo=${з.mint}` : null,
+        curve: з.curve, creator: з.creator, mcapSol: з.mcapSol, createdAt: new Date(з.at).toISOString(),
+        change: Number.isFinite(change) ? Math.round(change * 10) / 10 : 0,
+        twitter: з.twitter || null, telegram: з.telegram || null, website: з.website || null,
+      };
+    });
 }
 
 /* Сделки токена с момента создания — для графика на его странице.
@@ -253,4 +434,5 @@ export async function курсSOL() {
   return курс.usd;
 }
 
-export function лентаЖива() { return !!(сокет && сокет.readyState === 1); }
+// Жива, если идёт хотя бы один источник: поток pump.fun или список Jupiter.
+export function лентаЖива() { return !!(сокет && сокет.readyState === 1) || Date.now() - jupiterПри < 30_000; }
