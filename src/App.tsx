@@ -27983,7 +27983,7 @@ function ЗнакX({ size = 24, color = "currentColor", style }) {
 /* Профиль X целиком: баннер, аватар, имя, юзернейм, описание и цифры —
    как карточка аккаунта в самом X. Данные открытые, их отдаёт сервер
    вместе с состоянием подключения. */
-function ПрофильX({ открыт, onClose, handle, профиль, своя = false }) {
+function ПрофильX({ открыт, onClose, handle, профиль }) {
   const [видно, уходит] = useClosing(открыт ? true : null, 220);
   useНазадТелеграм(!!открыт, onClose);
   // Свайп вниз не сворачивает и само мини-приложение, пока карточка открыта.
@@ -28044,9 +28044,6 @@ function ПрофильX({ открыт, onClose, handle, профиль, сво
           <span><b style={{ color: T.ice }}>{число(п.followers)}</b> <span style={{ color: T.muted }}>читателей</span></span>
           <span><b style={{ color: T.ice }}>{число(п.tweets)}</b> <span style={{ color: T.muted }}>постов</span></span>
         </div>
-        {/* Свой X открывается из профиля этой карточкой, мимо настроек, —
-            поэтому анкета на галочку живёт и здесь, иначе её не найти. */}
-        {своя && <div style={{ marginTop: 22 }}><ЗаявкаНаГалочку запросX={запросКX} handle={handle} /></div>}
       </div>
     </div>
   );
@@ -28088,6 +28085,21 @@ function ЗаявкаНаГалочку({ запросX, handle }) {
     запросX("verify-state").then((о) => { if (жив) setСост(о || {}); }).catch(() => { if (жив) setСост({}); });
     return () => { жив = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  /* Отозвать заявку — и сразу открыть анкету заново: заявка, ушедшая
+     туда, где её никто не прочтёт, иначе висела бы «на проверке» вечно. */
+  async function отозвать() {
+    setИдёт(true);
+    try {
+      await запросX("verify-cancel", {});
+      haptic("light");
+      setСост({ ...сост, request: null });
+      setОткрыта(true);
+    } catch {
+      haptic("error");
+    } finally {
+      setИдёт(false);
+    }
+  }
   if (!сост) return null;
   const поле = { width: "100%", boxSizing: "border-box", padding: "13px 14px", borderRadius: 14, border: `1px solid ${T.line}`, background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 15, outline: "none" };
   if (сост.person) {
@@ -28102,7 +28114,10 @@ function ЗаявкаНаГалочку({ запросX, handle }) {
     return (
       <div className="flex items-center" style={{ gap: 12, padding: "14px 16px", borderRadius: 22, background: T.surface }}>
         <ЗнакЗагрузки size={22} />
-        <div style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>Галочка на проверке</div>
+        <div className="flex-1 min-w-0" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700 }}>Галочка на проверке</div>
+        <button onClick={отозвать} disabled={идёт} className="fx-tap flex-shrink-0" style={{ background: "none", border: "none", padding: "6px 0 6px 10px", fontFamily: bodyFont, fontSize: 14, color: T.muted, opacity: идёт ? 0.5 : 1 }}>
+          {идёт ? "Отзываем…" : "Отозвать"}
+        </button>
       </div>
     );
   }
@@ -28164,7 +28179,6 @@ function ЗаявкаНаГалочку({ запросX, handle }) {
 }
 
 function ПодключениеX({ showToast }) {
-  const [профильОткрыт, setПрофильОткрыт] = useState(false);
   const [состояние, setСостояние] = useState(null); // { handle } | null
   const [грузится, setГрузится] = useState(true);
   const [подключаю, setПодключаю] = useState(false);
@@ -28249,10 +28263,10 @@ function ПодключениеX({ showToast }) {
       <>
         {/* Профиль X — крупно и по центру, как витрина: баннер растворяется
             светом за аватаркой, статус — значком на её краю, а не строкой
-            «аккаунт подтверждён» сбоку. Нажатие открывает карточку целиком. */}
-        <button
-          onClick={() => { haptic("light"); setПрофильОткрыт(true); }}
-          className="fx-tap fx-card w-full flex flex-col items-center text-center"
+            «аккаунт подтверждён» сбоку. Это последний экран X: нажатие
+            никуда не ведёт, всё нужное — галочка и отключение — здесь же. */}
+        <div
+          className="fx-card w-full flex flex-col items-center text-center"
           style={{ animationDelay: "40ms", position: "relative", padding: "30px 16px 24px", borderRadius: 28, overflow: "hidden", background: T.surface, border: "none", isolation: "isolate" }}
         >
           {п.banner && (
@@ -28283,8 +28297,7 @@ function ПодключениеX({ showToast }) {
               ))}
             </span>
           )}
-        </button>
-        <ПрофильX открыт={профильОткрыт} onClose={() => setПрофильОткрыт(false)} handle={состояние.handle} профиль={состояние.profile} />
+        </div>
 
         <div className="fx-card" style={{ animationDelay: "100ms" }}>
           <SectionTitle>{ru ? "Галочка" : "Badge"}</SectionTitle>
@@ -32206,10 +32219,12 @@ function ProfileView({
   const cosmetics = accountCreated ? cosmeticsProp : { frame: "none", card: "none" };
 
   /* Аккаунт X — строкой под описанием: подключён — @handle с логотипом,
-     нажатие открывает его карточку; нет — кнопка «Подключить X».
+     нет — кнопка «Подключить X». Оба ведут в раздел «Аккаунт в X»: это
+     единственное меню X, глубже из него идти некуда. Раньше свой X
+     открывался ещё и отдельной карточкой со второй анкетой на галочку —
+     два входа в одно и то же только путали.
      Перечитываем при возврате в приложение: могли только что подключить. */
   const [xСостояние, setXСостояние] = useState(null);
-  const [xПрофильОткрыт, setXПрофильОткрыт] = useState(false);
   useEffect(() => {
     if (!accountCreated || !userId) { setXСостояние(null); return undefined; }
     let живо = true;
@@ -32354,7 +32369,7 @@ function ProfileView({
               )}
               {xСостояние && (xСостояние.handle ? (
                 <button
-                  onClick={() => { haptic("light"); setXПрофильОткрыт(true); }}
+                  onClick={() => { haptic("light"); onOpenSetting(SETTINGS_ITEMS.find((s) => s.key === "x")); }}
                   className="fx-tap flex items-center"
                   style={{ gap: 7, padding: "7px 12px", borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: displayFont, fontSize: 13.5, fontWeight: 700 }}
                 >
@@ -32369,9 +32384,6 @@ function ProfileView({
                   <ЗнакX size={13} color={T.ice} /> Подключить X
                 </button>
               ))}
-              {xСостояние && xСостояние.handle && (
-                <ПрофильX открыт={xПрофильОткрыт} onClose={() => setXПрофильОткрыт(false)} handle={xСостояние.handle} профиль={xСостояние.profile} своя />
-              )}
             </>
           ) : (
             <>

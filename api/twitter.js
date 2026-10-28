@@ -602,6 +602,15 @@ export default async function handler(req, res) {
     await разослатьЗаявку(заявка);
     return res.status(200).json({ ok: true });
   }
+  /* Отозвать свою заявку, пока её не рассмотрели. Без этого заявка,
+     ушедшая в никуда (чат поддержки не подключён, бота в нём нет),
+     навсегда держала «на проверке», и подать новую было нельзя. */
+  if (действие === "verify-cancel") {
+    if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
+    const { error } = await db.from("x_verification_requests").delete().eq("user_id", user.id).eq("status", "pending");
+    if (error) return res.status(500).json({ error: "db", detail: error.message });
+    return res.status(200).json({ ok: true });
+  }
 
   try {
     if (действие === "start") {
