@@ -297,7 +297,7 @@ const LF = 150, LBASE = 520 + 0.705 * LF;
 const LTXT = "background:linear-gradient(95deg,#FFFFFF,#E9ECF1 50%,#A7AFBA);-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:.14em;margin-bottom:-.14em";
 const logo = mLogo(CT, { F: LF, base: LBASE, fill: "#FFFFFF,#E3E7ED,#A7AFBA", text: LTXT, glow: "drop-shadow(0 10px 44px rgba(120,165,255,.35))" });
 const bot = $(`<div class="abs" style="left:0;right:0;top:${Math.round(LBASE + 70)}px;text-align:center"><div style="display:inline-flex;align-items:center;gap:16px;padding:24px 48px;border-radius:999px;background:#2F6BFF;font:700 48px/1 'Onest';color:#fff;box-shadow:0 18px 50px rgba(47,107,255,.4)">
-  <svg width="46" height="46" viewBox="0 0 24 24"><path d="M3 11.5 20 4.5l-3 15-5-4-3 3 .4-4.6L17 7.5 8 13z" fill="#fff"/></svg>@MintlyAppbot</div></div>`);
+  <svg width="46" height="46" viewBox="0 0 24 24"><path d="M3 11.5 20 4.5l-3 15-5-4-3 3 .4-4.6L17 7.5 8 13z" fill="#fff"/></svg>@MintlyCobot</div></div>`);
 CT.appendChild(bot);
 function drawCT(t) {
   words(ct1, t, 58.0); words(ct2, t, 58.6, { stag: 0.16 });

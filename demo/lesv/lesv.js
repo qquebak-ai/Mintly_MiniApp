@@ -217,7 +217,7 @@ const icon = $(`<div class="abs" style="left:430px;top:690px;width:220px;height:
   <svg width="128" height="109" viewBox="173 218 907 770"><defs><linearGradient id="mi" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#B9C2D2"/></linearGradient></defs><path d="${M_PATH}" fill="url(#mi)"/></svg></div>`);
 const brk = $(`<svg class="abs" style="left:0;top:0;overflow:visible" width="1080" height="1920" viewBox="0 0 1080 1920" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><path id="bk" d=""/></svg>`);
 const at1 = $(`<div class="abs" style="left:0;right:0;top:996px;text-align:center;font:400 58px/1 'Onest';color:#fff;letter-spacing:-.01em">Приложение в Telegram</div>`);
-const at2 = $(`<div class="abs" style="left:0;right:0;top:1086px;text-align:center;font:700 52px/1 'Onest';color:#4F86FF">@MintlyAppbot</div>`);
+const at2 = $(`<div class="abs" style="left:0;right:0;top:1086px;text-align:center;font:700 52px/1 'Onest';color:#4F86FF">@MintlyCobot</div>`);
 AP.append(icon, brk, at1, at2);
 function drawAP(t) {
   // уголки рамки сжимаются к иконке и «защёлкиваются», иконка выплывает изнутри

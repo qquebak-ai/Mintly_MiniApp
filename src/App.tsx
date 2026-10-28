@@ -912,6 +912,9 @@ const STR = {
     insufficientTon: "Не хватает GRAM: на кошельке {have}, нужно {need} с газом",
     tokenSaveFailed: "Токен создан в сети, но не сохранился: {reason}. Попробуем ещё раз при следующем запуске.",
     tokenSaveRecovered: "Токен ${ticker} дописан в приложение",
+    movedTitle: "Mintly переехал",
+    movedHint: "Теперь мы в боте {bot} — аккаунт, кошелёк и токены уже там. Этот бот больше не работает.",
+    movedCta: "Открыть {bot}",
     openingWallet: "Покупаем…",
     openingWalletHint: "Сделка идёт кошельком приложения — подтверждать ничего не нужно.",
     openWalletCta: "Купить сейчас",
@@ -1657,6 +1660,9 @@ const STR = {
     insufficientTon: "Not enough GRAM: wallet has {have}, need {need} incl. gas",
     tokenSaveFailed: "Token is live on-chain but wasn't saved: {reason}. We'll retry on next launch.",
     tokenSaveRecovered: "Token ${ticker} added to the app",
+    movedTitle: "Mintly has moved",
+    movedHint: "We now live in {bot} — your account, wallet and tokens are already there. This bot no longer works.",
+    movedCta: "Open {bot}",
     openingWallet: "Buying…",
     openingWalletHint: "The trade goes through your Mintly wallet — nothing to confirm.",
     openWalletCta: "Buy now",
@@ -33196,6 +33202,11 @@ const FEE_PERCENT = 0; // комиссии площадки нет
   const [accountCreated, setAccountCreated] = useState(false);
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [authChecked, setAuthChecked] = useState(false);
+  /* Открыли из чужого бота. Подпись Telegram сервер проверяет токеном
+     нынешнего бота, и мини-приложение, запущенное из прежнего
+     (@MintlyAppbot), отбивается как «invalid_init_data»: войти там нельзя
+     ничем. Вместо пустой главной показываем, куда переехали. */
+  const [чужойБот, setЧужойБот] = useState(false);
   /* Экран создания открывается только когда известно твёрдо: аккаунта
      нет. «Не смогли проверить» (связь, сервер) аккаунтом-которого-нет не
      считается — иначе у человека с аккаунтом при любой заминке всплывала
@@ -33949,6 +33960,7 @@ function mapTokenRow(row) {
         // пройдёт, а новому сервер ответит «нужен ник», и мы откроем
         // экран создания.
         let есть = null;
+        let подписьЧужая = false;
         /* Разведку повторяем: один потерянный ответ раньше вёл к входу
            вслепую, и тот, кто аккаунт так и не создал, оказывался на
            главной с «Аккаунт не создан» вместо экрана создания. */
@@ -33958,10 +33970,15 @@ function mapTokenRow(row) {
             есть = (await probeTelegramAccount()).exists;
           } catch (err) {
             console.warn("[mintly] telegram probe failed:", err && err.message);
+            // Подпись не сошлась — это не сбой сети, повторять бессмысленно.
+            if ((err && err.message) === "invalid_init_data") { подписьЧужая = true; setЧужойБот(true); break; }
           }
           if (!active) return;
         }
-        if (есть === false) {
+        // Чужая подпись — вход не пройдёт ничем, и звать его незачем.
+        if (подписьЧужая) {
+          /* экран «Mintly переехал» уже показан */
+        } else if (есть === false) {
           нуженАккаунт = true;
         } else {
           try {
@@ -33969,6 +33986,7 @@ function mapTokenRow(row) {
             session = (await supabase.auth.getSession()).data.session;
           } catch (err) {
             if ((err && err.message) === "nickname_required") нуженАккаунт = true;
+            else if ((err && err.message) === "invalid_init_data") setЧужойБот(true);
             else console.warn("[mintly] telegram auto sign-in failed:", err && err.message);
           }
         }
@@ -35474,6 +35492,9 @@ function mapTokenRow(row) {
   /* Заставка лежит в разметке и начинается раньше приложения. Окно
      входа открылось — снимаем её сразу, у окна своя такая же; аккаунт
      нашёлся — даём доиграть до ухода букв. */
+  // Открыли из чужого бота — заставку снимаем сразу: ждать больше нечего,
+  // а под ней экран «Mintly переехал» никто бы не увидел.
+  useEffect(() => { if (чужойБот) снятьШирму(); }, [чужойБот]);
   useEffect(() => {
     if (!authChecked) return;
     if (profileModalOpen || сразуВКошелёк) снятьШирму();
@@ -36404,7 +36425,7 @@ function mapTokenRow(row) {
       {/* Окна входа ещё нет (проверяем аккаунт или связь пропала), а
           приложение закрыто: вместо пустого экрана — колёсико. Потомок
           с visibility: visible остаётся видимым внутри скрытого корня. */}
-      {доступЗакрыт && !profileModalOpen && <ЗагрузкаВхода проверено={authChecked} />}
+      {доступЗакрыт && !profileModalOpen && !чужойБот && <ЗагрузкаВхода проверено={authChecked} />}
       <СбросПопытокВхода закрыт={доступЗакрыт} />
       {/* Запуск токена показывает ракету — и только её. Обводки
           «Динамического острова» и контура экрана, которые она
@@ -36420,6 +36441,40 @@ function mapTokenRow(row) {
       {/* Конфетти после создания аккаунта больше нет — по просьбе: аккаунт
           создан, и человек просто оказывается на главной. */}
       <Toast toasts={toasts} insetTop={insetTop} onClose={снятьТост} />
+
+      {/* Открыли из прежнего бота: войти там нельзя, и вместо пустой
+          главной — куда переехали, с кнопкой прямо в новое приложение.
+          Поверх всего, даже экрана входа: регистрироваться здесь нечем. */}
+      {чужойБот && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 950, background: T.bg,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          gap: 12, padding: "0 28px", textAlign: "center",
+          // Корень без аккаунта скрыт (visibility: hidden) — потомок с
+          // visible остаётся видимым, иначе экран так и не показался бы.
+          visibility: "visible",
+        }}>
+          <ЗнакЗагрузки size={88} вид="контур" />
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 22, fontWeight: 800, marginTop: 6 }}>
+            {t("movedTitle")}
+          </span>
+          <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 14, lineHeight: 1.45, maxWidth: 320 }}>
+            {tf("movedHint", { bot: `@${TG_BOT}` })}
+          </span>
+          <button
+            onClick={() => {
+              const ссылка = `https://t.me/${TG_BOT}?startapp`;
+              const wa = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
+              if (wa && wa.openTelegramLink) wa.openTelegramLink(ссылка);
+              else window.open(ссылка, "_blank");
+            }}
+            className="fx-tap w-full rounded-[12px] min-h-[52px] py-3 mt-3"
+            style={{ maxWidth: 320, ...ПЕРЕЛИВ_КНОПКИ, color: PRISM_TEXT, fontFamily: displayFont, fontWeight: 700, fontSize: 15 }}
+          >
+            {tf("movedCta", { bot: `@${TG_BOT}` })}
+          </button>
+        </div>
+      )}
 
       {/* Проход в кошелёк из чата. Приложение здесь — только мостик к
           TonConnect: показывать за эту секунду ленту и графики незачем,
