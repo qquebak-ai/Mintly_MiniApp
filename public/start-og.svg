@@ -42,7 +42,7 @@
     font-size="116" font-weight="800" letter-spacing="-0.02em">intly</text>
 
   <text x="600" y="380" text-anchor="middle" fill="#9AA0B4" font-family="Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
-    font-size="34" font-weight="500">Запуск мемкоинов на TON и Solana — прямо в Telegram</text>
+    font-size="34" font-weight="500">Запуск мемкоинов в TON, Solana и сетях EVM — прямо в Telegram</text>
 
   <g transform="translate(364.5, 440)">
     <rect width="471" height="62" rx="31" fill="#12141A" stroke="#6C7CFF" stroke-opacity="0.55"/>

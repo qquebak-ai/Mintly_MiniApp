@@ -215,7 +215,7 @@ export default function DesktopAuth({ наВход }) {
       <Обёртка>
         <div style={{ fontFamily: шрифт, fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Придумайте ник</div>
         <p style={{ fontFamily: шрифт, fontSize: 13, color: Ц.тусклый, lineHeight: 1.5, margin: "0 0 14px" }}>
-          Под ним вас увидят остальные. Он выбирается один раз и потом не меняется.
+          Под ним вас увидят остальные. Первый ник бесплатный, сменить его потом можно за монеты.
         </p>
         <input value={ник} onChange={(e) => setНик(e.target.value)} placeholder="Ник" style={поле} maxLength={20} />
         <div style={{ marginTop: 12 }}>

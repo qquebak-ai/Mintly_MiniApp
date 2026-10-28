@@ -37,7 +37,7 @@ const кадры = [
       ${знак(210)}
       <div style="height:34px"></div>${слово(64)}
       <div style="height:30px"></div>
-      <div class="текст" style="font-size:27px">Запуск мемкоинов на TON и Solana — прямо в Telegram</div>
+      <div class="текст" style="font-size:27px">Запуск мемкоинов в TON, Solana и сетях EVM — прямо в Telegram</div>
       <div style="height:42px"></div>
       <div style="display:flex;gap:14px">
         <span class="чип" style="font-size:21px;padding:13px 26px">Свой токен за пару секунд</span>
@@ -50,7 +50,7 @@ const кадры = [
       ${знак(190)}
       <div style="height:30px"></div>${слово(60)}
       <div style="height:26px"></div>
-      <div class="текст" style="font-size:26px">Запуск мемкоинов на TON и Solana — прямо в Telegram</div>
+      <div class="текст" style="font-size:26px">Запуск мемкоинов в TON, Solana и сетях EVM — прямо в Telegram</div>
       <div style="height:22px"></div>
       <div class="текст" style="font-size:19px;color:#5E5D59;letter-spacing:0.08em">mintly.company</div>
     </div>` },
@@ -62,7 +62,7 @@ const кадры = [
       <div style="height:26px"></div>
       <div style="font-family:Onest,sans-serif;font-weight:700;font-size:34px;color:#F4F3EF;letter-spacing:-0.01em">Твой крипто-кошелёк</div>
       <div style="height:10px"></div>
-      <div class="текст" style="font-size:19px">TON и Solana — всё в одном месте</div>
+      <div class="текст" style="font-size:19px">TON, Solana и EVM — всё в одном месте</div>
     </div>` },
   { имя: "top-header", ш: 595, в: 226, тело: `
     <div style="position:relative;width:595px;height:226px;display:flex;align-items:center;gap:26px;padding:0 34px">

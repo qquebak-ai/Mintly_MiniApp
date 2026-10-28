@@ -6,8 +6,8 @@
     <link rel="preload" href="/fonts/nunito-800-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
-    <title>Mintly — запуск мемкоинов на TON и Solana</title>
-    <meta name="description" content="Свой токен за пару секунд: бондинг-кривая, выход на биржу при 1500 GRAM или 85 SOL, без комиссии площадки. TON и Solana в одном приложении." />
+    <title>Mintly — запуск мемкоинов в TON, Solana и сетях EVM</title>
+    <meta name="description" content="Свой токен за пару секунд: бондинг-кривая, выход на биржу при 1500 GRAM, 35 SOL, 4 BNB или 1,2 ETH, без процента со сделок. TON, Solana, BNB Chain, Base и Ethereum в одном приложении." />
     <meta name="theme-color" content="#000000" />
     <!-- Иконка вкладки — маскот: он же встречает на заставке и в пустых
          экранах, поэтому приложение узнаётся ещё до открытия. -->
@@ -31,17 +31,17 @@
          не достали из кеша, который живёт неделями. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Mintly" />
-    <meta property="og:title" content="Mintly — запуск мемкоинов на TON и Solana" />
-    <meta property="og:description" content="Свой токен за пару секунд: бондинг-кривая, выход на биржу при 1500 GRAM или 85 SOL, без комиссии площадки." />
+    <meta property="og:title" content="Mintly — запуск мемкоинов в TON, Solana и сетях EVM" />
+    <meta property="og:description" content="Свой токен за пару секунд: бондинг-кривая, выход на биржу при 1500 GRAM, 35 SOL, 4 BNB или 1,2 ETH, без процента со сделок." />
     <meta property="og:url" content="https://mintly.company/" />
-    <meta property="og:image" content="https://mintly.company/start-og.png?v=2" />
+    <meta property="og:image" content="https://mintly.company/start-og.png?v=3" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Mintly — запуск мемкоинов на TON и Solana" />
+    <meta property="og:image:alt" content="Mintly — запуск мемкоинов в TON, Solana и сетях EVM" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Mintly — запуск мемкоинов на TON и Solana" />
-    <meta name="twitter:description" content="Свой токен за пару секунд: бондинг-кривая, выход на биржу при 1500 GRAM или 85 SOL, без комиссии площадки." />
-    <meta name="twitter:image" content="https://mintly.company/start-og.png?v=2" />
+    <meta name="twitter:title" content="Mintly — запуск мемкоинов в TON, Solana и сетях EVM" />
+    <meta name="twitter:description" content="Свой токен за пару секунд: бондинг-кривая, выход на биржу при 1500 GRAM, 35 SOL, 4 BNB или 1,2 ETH, без процента со сделок." />
+    <meta name="twitter:image" content="https://mintly.company/start-og.png?v=3" />
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Ловушка ошибок стоит до самого приложения. Обработчик внутри
@@ -289,7 +289,7 @@
       try {
         if (localStorage.getItem("mintly_language") === "EN") {
           var подпись = document.querySelector("#ширма .подпись");
-          if (подпись) подпись.textContent = "Memecoins on TON and Solana";
+          if (подпись) подпись.textContent = "Memecoins on TON, Solana and EVM";
         }
       } catch (e) { /* хранилище закрыто — остаётся русская */ }
 

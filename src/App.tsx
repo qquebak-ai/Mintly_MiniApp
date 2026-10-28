@@ -222,7 +222,7 @@ const STR = {
     draftFromChat: "Монета из сообщения — проверь и запускай",
     mechTitle: "Механики запуска",
     mechFairStart: "Честный старт",
-    mechFairStartBody: "Первую минуту токен открыт только людям из Telegram — снайперы-боты не успевают.",
+    mechFairStartBody: "Первую минуту купить токен можно только через Mintly — снайперы-боты не успевают.",
     mechLiveChart: "Живой график в чате",
     mechLiveChartBody: "Бот держит в чате одно сообщение и сам обновляет в нём свечу и цену.",
     lockTitle: "Защита от слива",
@@ -575,7 +575,7 @@ const STR = {
     gradLeft: "осталось {left} GRAM",
     gradDone: "Кривая закрыта — токен уходит на биржу",
     gradNote: "Когда соберётся {target} GRAM, токен выйдет на биржу: собранное и остаток выпуска уйдут в пул.",
-    gradClosedTitle: "Токен закрыта",
+    gradClosedTitle: "Кривая закрыта",
     gradClosedBody: "Собрано {target} GRAM. Токен переезжает на биржу — торговля скоро откроется снова.",
     gradListedTitle: "Свободный рынок",
     gradListedBody: "Токен на бирже: цена идёт по пулу, ликвидность закреплена в контракте.",
@@ -667,7 +667,7 @@ const STR = {
     deleteFailedToast: "Не удалось удалить — попробуйте ещё раз",
     tokenCreatedToast: "Токен {name} (${ticker}) создан ✅",
     padClosedTitle: "Мемпад закрыт",
-    padClosedBody: "Чтобы запускать токены, сначала создай аккаунт и подключи TON-кошелёк — эмиссия подтверждается им напрямую.",
+    padClosedBody: "Чтобы запускать токены, сначала создай аккаунт — кошелёк для запуска приложение заведёт само.",
     createAccount: "Создать аккаунт",
     connectWalletCta: "Подключить кошелёк",
     launchTokenTitle: "Запусти токен",
@@ -704,7 +704,7 @@ const STR = {
     refCodeCopied: "Ссылка приглашения скопирована",
     refInvited: "Приглашено",
     refShare: "Поделиться ссылкой",
-    refShareText: "Запускай мемкоины на TON вместе со мной в Mintly",
+    refShareText: "Запускай и покупай мемкоины вместе со мной в Mintly",
     editProfileDesc: "Никнейм, аватар, почта и описание профиля.",
     pinRow: "PIN-код",
     pinRowSub: "Запрашивать код при каждом открытии Mintly",
@@ -757,18 +757,18 @@ const STR = {
     privacyText: "Храним только ник, адрес кошелька и историю сделок в Mintly — чтобы считать портфель. Данные не продаём и не передаём рекламе. Аккаунт можно удалить в любой момент.",
     archTitle: "Как устроено",
     archLead: "Как работают токены, комиссии и кошелёк.",
-    archCurveTitle: "Токен",
+    archCurveTitle: "Бондинг-кривая",
     archCurveBody: "Рынок токена — это контракт. Цена считается по формуле от выкупленного объёма, поэтому торговать можно с первой секунды.",
     archSupplyTitle: "Эмиссия и листинг",
     archSupplyBody: "Выпуск — миллиард токенов, кривая формы pump.fun: на ней продаётся 793 млн, и к этому моменту собирается порог — 35 SOL, 1500 GRAM, 4 BNB или 1,2 ETH. Тогда торговля здесь закрывается, а собранное и остальные 207 млн токенов сами уходят в пул на бирже — по той же цене, без скачка.",
     archFeeTitle: "Комиссия",
-    archFeeBody: "Комиссии площадки нет. Платится только комиссия сети. Запуск бесплатный — нужна лишь первая покупка.",
+    archFeeBody: "Процента с покупок и продаж нет. На скорости Free платится только комиссия сети, на Pro и Turbo — ещё небольшая доплата за скорость, её можно оплатить монетами. Запуск бесплатный — нужна лишь первая покупка.",
     archKeysTitle: "Ключи и подпись",
-    archKeysBody: "Ключ кошелька хранится зашифрованным и подписывает отдельная служба. Вывод — только на подтверждённый адрес, с суточным лимитом.",
+    archKeysBody: "Ключ кошелька хранится зашифрованным и подписывает отдельная служба. Вывод подтверждается кодом из почты и ограничен суточным лимитом, а по желанию закрепляется за одним адресом.",
     archRiskTitle: "Риски",
     archRiskBody: "Мемкоины — очень рискованный актив: цена может упасть до нуля. Mintly не даёт инвестиционных советов и не отвечает за цену токенов. Вкладывай только то, что готов потерять.",
     archDataTitle: "Данные рынка",
-    archDataBody: "Цены и сделки собирает наш сервер и отдаёт готовыми. Подделки под известные монеты отсеиваются.",
+    archDataBody: "Цены и сделки собирает наш сервер и отдаёт готовыми, свечи токенов с других площадок приходят от Jupiter. Подделки под известные монеты отсеиваются.",
     accountLabel: "Аккаунт",
     loginTab: "Войти", createTab: "Создать аккаунт",
     changeAvatarHint: "Нажми, чтобы заменить",
@@ -810,7 +810,7 @@ const STR = {
     homeHello: "Твоя площадка",
     achievementsTitle: "Достижения",
     achUnlockedOf: "{done} из {total}",
-    achievementsIntro: "За достижения дают монеты. На них в магазине берут вид карты баланса — любой, какой нравится.",
+    achievementsIntro: "За достижения дают монеты. Ими платят доплату за скорость на тарифах Pro и Turbo и меняют ник.",
     achProgress: "Прогресс",
     achGoShop: "Открыть магазин",
     achAll: "Все",
@@ -823,9 +823,9 @@ const STR = {
     achMcap1k: "Первая тысяча", achMcap1kHint: "Довести свой токен до $1K капитализации",
     achMcap10k: "Десять тысяч", achMcap10kHint: "Довести свой токен до $10K капитализации",
     achMcap100k: "Сто тысяч", achMcap100kHint: "Довести свой токен до $100K капитализации",
-    achWallet: "Кошелёк на месте", achWalletHint: "Подключить кошелёк TON",
+    achWallet: "Кошелёк на месте", achWalletHint: "Завести кошелёк в приложении",
     achFace: "Лицо профиля", achFaceHint: "Поставить аватарку и написать о себе",
-    achStyle: "Со вкусом", achStyleHint: "Надеть вид карты баланса из магазина",
+    achStyle: "Со вкусом", achStyleHint: "Надеть вид карты баланса",
     achInvite1: "Первый приглашённый", achInvite1Hint: "Пригласить друга по своей ссылке",
     achInvite5: "Свой круг", achInvite5Hint: "Пригласить пятерых",
     achInvite10: "Десятка", achInvite10Hint: "Пригласить десятерых",
@@ -973,7 +973,7 @@ const STR = {
     draftFromChat: "Coin from the message — check and launch",
     mechTitle: "Launch mechanics",
     mechFairStart: "Fair start",
-    mechFairStartBody: "For the first minute the curve is open to Telegram people only — sniper bots miss it.",
+    mechFairStartBody: "For the first minute the token can be bought only through Mintly — sniper bots miss it.",
     mechLiveChart: "Live chart in chat",
     mechLiveChartBody: "The bot keeps one message in the chat and updates the candle and price inside it.",
     lockTitle: "Rug protection",
@@ -1327,7 +1327,7 @@ const STR = {
     gradListedTitle: "Free market",
     gradListedBody: "The curve is done: the price now moves both ways with the pool's reserves. The liquidity is locked in the contract and nobody can pull it out, so you can always sell.",
     tabChart: "Chart", tabInfo: "Info", tabTx: "Transactions", chartModePrice: "Price", chartModeMcap: "Market cap",
-    tabHolders: "Holders", tabFeed: "Feed", tabAbout: "About",
+    tabHolders: "Holders", tabFeed: "Feed", tabAbout: "About", tabStats: "Stats", statMcap: "Market cap", statLiq: "Liquidity", statVol24: "24h volume", statTrades24: "24h trades", statAge: "Age", statCurve: "Raised", statDex: "Exchange",
     orderInstant: "Instant", orderTariff: "By plan", orderMarket: "Market", orderLimit: "Limit",
     positionTitle: "Your position", positionValue: "Value", positionAmount: "Amount",
     positionSinceBuy: "since your buy",
@@ -1414,7 +1414,7 @@ const STR = {
     deleteFailedToast: "Couldn't delete — try again",
     tokenCreatedToast: "Token {name} (${ticker}) created ✅",
     padClosedTitle: "Memepad closed",
-    padClosedBody: "To launch tokens, first create an account and connect a TON wallet — the mint is confirmed directly through it.",
+    padClosedBody: "To launch tokens, create an account first — the app sets up the wallet for the launch itself.",
     createAccount: "Create account",
     connectWalletCta: "Connect wallet",
     launchTokenTitle: "Launch a token",
@@ -1451,7 +1451,7 @@ const STR = {
     refCodeCopied: "Invite link copied",
     refInvited: "Invited",
     refShare: "Share the link",
-    refShareText: "Launch memecoins on TON with me on Mintly",
+    refShareText: "Launch and trade memecoins with me on Mintly",
     editProfileDesc: "Nickname, avatar, email and profile bio.",
     pinRow: "PIN code",
     pinRowSub: "Require a code every time Mintly opens",
@@ -1505,17 +1505,17 @@ const STR = {
     archTitle: "How it works",
     archLead: "What sits behind the buttons: where the money lives, who computes the price, and what happens to a token after launch.",
     archCurveTitle: "Bonding curve",
-    archCurveBody: "A token's market is a contract, not an order book — the contract itself is the counterparty. Price comes from a formula over how much has been bought, so trading works from the first second without waiting for anyone to seed liquidity. On TON it is a Tact contract, on Solana a Rust program; the math is the same.",
+    archCurveBody: "A token's market is a contract, not an order book — the contract itself is the counterparty. Price comes from a formula over how much has been bought, so trading works from the first second without waiting for anyone to seed liquidity. On TON it is a Tact contract, on Solana a Rust program, on BNB Chain, Base and Ethereum a Solidity contract; the math is the same.",
     archSupplyTitle: "Supply and listing",
     archSupplyBody: "Supply is one billion, on a pump.fun-shaped curve: 793 million are sold on it, and by then the threshold is collected — 35 SOL, 1500 GRAM, 4 BNB or 1.2 ETH. The curve then closes, and the collected coin plus the remaining 207 million tokens move into a DEX pool on their own — at the same price, no jump.",
     archFeeTitle: "Fees",
-    archFeeBody: "There is no platform fee — zero percent on buys and on sells alike. The rate is baked into the curve at creation and never changes retroactively, so tokens launched earlier under a different rate keep their own. You only pay the network fee, which goes to validators, not to us. Launching is free: just your first buy and that same network fee.",
+    archFeeBody: "There is no percentage fee — zero on buys and on sells alike. On the Free speed you only pay the network fee, which goes to validators, not to us. Pro and Turbo add a small fixed fee per trade for the faster route: it is shown before you confirm and can be paid in coins. Launching is free: just your first buy and the network fee.",
     archKeysTitle: "Keys and signing",
-    archKeysBody: "The in-app wallet key is stored encrypted (AES-256-GCM, bound to its owner) and signed by a separate service outside the main server — the web app never sees it. Every transaction is parsed instruction by instruction before signing: foreign programs and transfers around the curve are rejected. Withdrawals go only to an address you proved by signing with your own wallet; changing that address takes effect after 24 hours, and daily withdrawals are capped.",
+    archKeysBody: "The in-app wallet key is stored encrypted (AES-256-GCM, bound to its owner) and signed by a separate service outside the main server — the web app never sees it. Every transaction is parsed instruction by instruction before signing: foreign programs and transfers around the curve are rejected. Withdrawals are confirmed with a code from your email and capped per day; optionally you can lock them to one address proved by your own signature, and changing it takes effect after 24 hours.",
     archRiskTitle: "Risks",
     archRiskBody: "Memecoins are extremely risky: the price can drop to zero. Mintly gives no investment advice and is not responsible for token prices. Only put in what you can afford to lose.",
     archDataTitle: "Market data",
-    archDataBody: "Prices, candles and trades are collected by our own crawler once a minute and cached — the app reads what is ready instead of polling the market source from every phone. Impostors of well-known coins and tokens with no name or symbol are filtered out before they reach the list.",
+    archDataBody: "Prices and trades are collected by our own server and served ready-made, so phones don't poll the market sources themselves; candles of tokens from other launchpads come straight from Jupiter. Impostors of well-known coins and tokens with no name or symbol are filtered out before they reach the list.",
     accountLabel: "Account",
     loginTab: "Log in", createTab: "Create account",
     changeAvatarHint: "Tap to replace",
@@ -1557,7 +1557,7 @@ const STR = {
     homeHello: "Your launchpad",
     achievementsTitle: "Achievements",
     achUnlockedOf: "{done} of {total}",
-    achievementsIntro: "Achievements pay in coins. Spend them in the shop on the look of your balance card.",
+    achievementsIntro: "Achievements pay in coins. Use them for the speed fee on the Pro and Turbo plans or to change your nickname.",
     achProgress: "Progress",
     achGoShop: "Open shop",
     achAll: "All",
@@ -1570,9 +1570,9 @@ const STR = {
     achMcap1k: "First thousand", achMcap1kHint: "Take one of your tokens to a $1K market cap",
     achMcap10k: "Ten thousand", achMcap10kHint: "Take one of your tokens to a $10K market cap",
     achMcap100k: "Hundred thousand", achMcap100kHint: "Take one of your tokens to a $100K market cap",
-    achWallet: "Wallet ready", achWalletHint: "Connect a TON wallet",
+    achWallet: "Wallet ready", achWalletHint: "Set up the in-app wallet",
     achFace: "A face to the name", achFaceHint: "Add an avatar and a bio",
-    achStyle: "Good taste", achStyleHint: "Equip a balance card look from the shop",
+    achStyle: "Good taste", achStyleHint: "Equip a balance card look",
     achInvite1: "First invite", achInvite1Hint: "Invite a friend with your link",
     achInvite5: "Your crowd", achInvite5Hint: "Invite five people",
     achInvite10: "Ten strong", achInvite10Hint: "Invite ten people",
@@ -1653,8 +1653,8 @@ const STR = {
     errMainnetOnly: "This token trades only on Solana mainnet",
     errNoRoute: "Can't route this trade right now — try again in a few seconds",
     errTooOften: "Too often — wait a minute",
-    rateLoadingRetry: "TON rate is still loading, try again in a second",
-    insufficientTon: "Not enough TON: wallet has {have}, need {need} incl. gas",
+    rateLoadingRetry: "GRAM rate is still loading, try again in a second",
+    insufficientTon: "Not enough GRAM: wallet has {have}, need {need} incl. gas",
     tokenSaveFailed: "Token is live on-chain but wasn't saved: {reason}. We'll retry on next launch.",
     tokenSaveRecovered: "Token ${ticker} added to the app",
     openingWallet: "Opening your wallet…",
@@ -8512,7 +8512,12 @@ function buildAchievements({ tokensCount = 0, bestMcapUsd = 0, invites = 0, conn
     { id: "invite5", icon: Gift, color: T.violet, value: invites, target: 5 },
     { id: "invite10", icon: Star, color: T.violet, value: invites, target: 10 },
     { id: "invite25", icon: ShieldCheck, color: T.violet, value: invites, target: 25 },
-  ].map((a) => ({
+  ]
+    /* Видов карты баланса в приложении больше нет — надеть нечего, и
+       «Со вкусом» висело бы в списке целью, которую не закрыть. Кто
+       успел его получить, сохраняет и его, и монеты за него. */
+    .filter((a) => a.id !== "style" || a.value >= a.target)
+    .map((a) => ({
     ...a,
     done: a.value >= a.target,
     label: t(`ach${a.id.charAt(0).toUpperCase()}${a.id.slice(1)}`),
@@ -14442,7 +14447,7 @@ const БАННЕРЫ = [
   },
   {
     id: "trade",
-    строки: { RU: ["Торгуй мемкоинами", "Gram и Solana"], EN: ["Trade memecoins", "Gram and Solana"] },
+    строки: { RU: ["Торгуй мемкоинами", "в пяти сетях"], EN: ["Trade memecoins", "on five chains"] },
     кнопка: { RU: "Открыть мемпад", EN: "Open mempad" },
     цвет: "#2ED47A",
     действие: "mempad",
@@ -14454,10 +14459,7 @@ const БАННЕРЫ = [
     // под старую цветную сцену. На чёрном фоне с фиолетовыми свечами
     // обе идут одним и тем же оттенком, что и кнопка, — сцена и текст
     // читаются одним цветовым решением, а не двумя случайными.
-    выделения: [
-      { RU: "Gram", EN: "Gram", стиль: "сирень" },
-      { RU: "Solana", EN: "Solana", стиль: "сирень" },
-    ],
+    выделения: [{ RU: "в пяти сетях", EN: "on five chains", стиль: "сирень" }],
   },
   {
     id: "wallet",
@@ -27339,11 +27341,11 @@ const ТАРИФЫ_ЭКРАНА = [
     ru: { коротко: "Обычная скорость", плюсы: ["Без доплаты за сделку", "Самый надёжный режим", "Все сети и запуск токенов"], пункты: ["Сделка проходит после полного подтверждения сети", "Самый надёжный режим, но самый медленный", "Платишь только комиссию сети — Mintly сверху не берёт"] },
     en: { коротко: "Standard speed", плюсы: ["No extra fee per trade", "The safest mode", "All chains and launches"], пункты: ["The trade goes through after full network confirmation", "The safest mode, but the slowest", "You pay only the network fee — Mintly adds nothing"] } },
   { key: "pro", скорость: "fast", имя: "Pro", шкала: 1 / 3, раз: 1.7, цвет: "#2ED47A",
-    ru: { коротко: "Быстрее", плюсы: ["В 1,7 раза быстрее Free", "Сделка в ближайшем блоке", "Переотправка каждые 0,6 с"], пункты: ["Сделка засчитывается, как только попала в блок", "Доплата сети за место в ближайшем блоке", "Сервер переотправляет сделку каждые 0,6 с, пока она не пройдёт"] },
-    en: { коротко: "Faster", плюсы: ["1.7× faster than Free", "Lands in the next block", "Resent every 0.6 s"], пункты: ["The trade counts as soon as it lands in a block", "A network tip for a spot in the next block", "The server resends the trade every 0.6 s until it lands"] } },
+    ru: { коротко: "Быстрее", плюсы: ["В 1,7 раза быстрее Free", "Сделка в ближайшем блоке", "Переотправка каждые 0,6 с"], пункты: ["Сделка засчитывается, как только попала в блок", "Доплата за сделку: чаевые сети за ближайший блок и наценка Mintly — её можно платить монетами", "Сервер переотправляет сделку каждые 0,6 с, пока она не пройдёт"] },
+    en: { коротко: "Faster", плюсы: ["1.7× faster than Free", "Lands in the next block", "Resent every 0.6 s"], пункты: ["The trade counts as soon as it lands in a block", "A per-trade fee: a network tip for the next block plus a Mintly markup — payable in coins", "The server resends the trade every 0.6 s until it lands"] } },
   { key: "turbo", скорость: "turbo", имя: "Turbo", шкала: 1, раз: 5, цвет: "#B79CFF",
-    ru: { коротко: "Самый быстрый", плюсы: ["В 5 раз быстрее Free", "Сразу во все узлы сети", "Самая короткая дорога в сеть"], пункты: ["Сделка уходит сразу во все узлы сети", "Переотправка каждые 0,2 с, проверка каждые 0,15 с", "Самая большая доплата сети за место в блоке"] },
-    en: { коротко: "The fastest", плюсы: ["5× faster than Free", "Straight to every node", "The shortest route to the chain"], пункты: ["The trade goes to every network node at once", "Resent every 0.2 s, checked every 0.15 s", "The highest network tip for a spot in the block"] } },
+    ru: { коротко: "Самый быстрый", плюсы: ["В 5 раз быстрее Free", "Сразу во все узлы сети", "Самая короткая дорога в сеть"], пункты: ["Сделка уходит сразу во все узлы сети", "Переотправка каждые 0,2 с, проверка каждые 0,15 с", "Самая большая доплата: чаевые сети и наценка Mintly за отдельную дорогу — её можно платить монетами"] },
+    en: { коротко: "The fastest", плюсы: ["5× faster than Free", "Straight to every node", "The shortest route to the chain"], пункты: ["The trade goes to every network node at once", "Resent every 0.2 s, checked every 0.15 s", "The highest fee: the network tip plus a Mintly markup for the separate route — payable in coins"] } },
 ];
 /* Одна полоса на все три тарифа: метки стоят по скорости, заливка доходит
    до выбранного — сразу видно, насколько каждый быстрее другого. Скорость
@@ -27635,32 +27637,33 @@ function SettingsRow({ label, sub, children }) {
    не с пустого поля, а со списка: живой ответ остаётся для того, что
    сюда не уложилось.
 
-   Числа здесь не выдуманы, а взяты из кода: цена сундука и смены ника —
-   из магазина, порог запуска — из проверки формы, потолок кривой — из
-   параметров контракта. Расходиться им нельзя: человек, которому в
-   поддержке сказали «1500 TON», будет считать по этому числу. */
+   Числа здесь не выдуманы, а взяты из кода: цена смены ника и монеты
+   за друга — из тех же постоянных, что у профиля, порог запуска — из
+   проверки формы, потолок кривой — из параметров контракта. Расходиться
+   им нельзя: человек, которому в поддержке сказали «1500 GRAM», будет
+   считать по этому числу. */
 const SUPPORT_FAQ = [
   {
     id: "launch",
     q: { RU: "Как запустить свой токен?", EN: "How do I launch a token?" },
     a: {
-      RU: `Мемпад → «Запустить токен». Нужен аккаунт и подключённый кошелёк TON. В форме — логотип, название, тикер, описание и сумма первой покупки: минимум $${MIN_LAUNCH_USD} в TON, плюс около ${NETWORK_FEE_TON} TON уйдёт на комиссию сети. Токен появляется в сети сразу после подписи в кошельке.`,
-      EN: `Mempad → "Launch token". You need an account and a connected TON wallet. Fill in the logo, name, ticker, description and your first buy: at least $${MIN_LAUNCH_USD} worth of TON, plus about ${NETWORK_FEE_TON} TON for the network fee. The token goes on-chain right after you sign in the wallet.`,
+      RU: `Вкладка «Создать» внизу экрана. Нужен только аккаунт: кошелёк приложение заводит само, подключать ничего не надо. Выбери сеть — TON, Solana или одну из сетей EVM (где запуск ещё не открыт, стоит «скоро»), загрузи логотип, впиши название, тикер, описание и сумму первой покупки: минимум $${MIN_LAUNCH_USD} в монете сети и немного сверху на комиссию сети. Токен появляется в сети через несколько секунд.`,
+      EN: `The "Create" tab at the bottom. All you need is an account: the app sets up the wallet itself, there is nothing to connect. Pick a network — TON, Solana or one of the EVM chains (those not open yet say "soon"), add the logo, name, ticker, description and your first buy: at least $${MIN_LAUNCH_USD} in the network's coin plus a little for the network fee. The token goes on-chain within seconds.`,
     },
   },
   {
     id: "fees",
     q: { RU: "Какие комиссии?", EN: "What are the fees?" },
     a: {
-      RU: "Площадка не берёт комиссию — 0% с покупки и продажи. Платится только комиссия сети TON, она идёт валидаторам, а не нам. Запуск токена бесплатный: платишь только за первую покупку и сеть.",
-      EN: "The platform takes no fee — 0% on every buy and sell. You only pay the TON network fee, which goes to validators, not us. Launching is free: you only pay for your first buy and the network.",
+      RU: "Процента с покупок и продаж площадка не берёт. На скорости Free платится только комиссия сети — она идёт валидаторам, а не нам. На Pro и Turbo к сделке добавляется небольшая доплата за скорость: её видно до нажатия «Купить», и её можно оплатить монетами. Запуск токена бесплатный: платишь только за первую покупку и сеть.",
+      EN: "The platform takes no percentage on buys and sells. On the Free speed you only pay the network fee, which goes to validators, not us. Pro and Turbo add a small speed fee per trade: you see it before tapping Buy, and you can pay it in coins. Launching is free: you only pay for your first buy and the network.",
     },
   },
   {
     id: "curve",
     q: { RU: "Почему цена растёт сама?", EN: "Why does the price move on its own?" },
     a: {
-      RU: "У каждого токена своя токен — контракт, который сам является второй стороной сделки. Чем больше токенов выкуплено, тем дороже следующий; при продаже — наоборот. Поэтому торговать можно с первой секунды, не дожидаясь, пока кто-то заведёт ликвидность.",
+      RU: "У каждого токена своя бондинг-кривая — контракт, который сам является второй стороной сделки. Чем больше токенов выкуплено, тем дороже следующий; при продаже — наоборот. Поэтому торговать можно с первой секунды, не дожидаясь, пока кто-то заведёт ликвидность.",
       EN: "Every token gets its own bonding curve — a contract that is itself the counterparty. The more tokens bought, the pricier the next one; selling moves it back. That's why trading works from the first second, with nobody needing to seed liquidity.",
     },
   },
@@ -27684,16 +27687,16 @@ const SUPPORT_FAQ = [
     id: "coins",
     q: { RU: "Что за монеты и где их тратить?", EN: "What are coins for?" },
     a: {
-      RU: `Монеты дают за достижения и приглашения. Тратятся в магазине: рамки, карточки профиля и вид карты кошелька, а также смена ника за ${NICKNAME_PRICE}. На токены и TON они не меняются.`,
-      EN: `Coins come from achievements and invites. Spend them in the shop: profile frames, profile cards and wallet card skins, plus a nickname change for ${NICKNAME_PRICE}. They don't convert to tokens or TON.`,
+      RU: `Монеты дают за достижения, приглашённых друзей и долю с их сделок. Ими платят доплату за скорость на тарифах Pro и Turbo (включается в разделе «Тариф») и меняют ник за ${NICKNAME_PRICE}. На токены и криптовалюту они не меняются.`,
+      EN: `Coins come from achievements, invited friends and a share of their trades. Use them for the speed fee on the Pro and Turbo plans (switch it on in "Plan") or to change your nickname for ${NICKNAME_PRICE}. They don't convert to tokens or crypto.`,
     },
   },
   {
     id: "wallet",
-    q: { RU: "Кошелёк не подключается", EN: "The wallet won't connect" },
+    q: { RU: "Где мой кошелёк и как его пополнить?", EN: "Where is my wallet and how do I top it up?" },
     a: {
-      RU: "Проверь, что кошелёк работает в основной сети TON, а не в тестовой — при несовпадении приложение скажет об этом перед подписью. Помогает и обычное: обновить кошелёк, переоткрыть приложение, отключить и подключить заново в разделе «Кошелёк».",
-      EN: "Make sure the wallet is on TON mainnet, not testnet — the app warns about a mismatch before signing. The usual steps help too: update the wallet, reopen the app, disconnect and connect again in \"Wallet\".",
+      RU: "Кошелёк — вкладка «Кошелёк» внизу экрана: он создаётся внутри приложения, и один кошелёк держит адреса во всех сетях — TON, Solana, BNB Chain, Base и Ethereum. «Получить» показывает адрес нужной сети: отправляй на него монеты только этой сети. Секретная фраза открывается с оборота карты — запиши её, без неё кошелёк не вернуть.",
+      EN: "Your wallet is the \"Wallet\" tab at the bottom: it lives inside the app, and one wallet holds addresses on every network — TON, Solana, BNB Chain, Base and Ethereum. \"Receive\" shows the address for the network you pick: send only that network's coins to it. The secret phrase opens from the back of the card — write it down, without it the wallet can't be restored.",
     },
   },
 ];
@@ -34950,7 +34953,7 @@ function mapTokenRow(row) {
       setLaunchProgress({
         stepIndex: 0,
         done: false,
-        error: `Кошелёк подключён в сети ${actualNet}, а запуск токена настроен на ${expectedNet}. Переключите сеть в кошельке на ${expectedNet} (или поменяйте TON_TESTNET в коде на противоположное значение) и попробуйте снова — иначе деплой никогда не подтвердится на той сети, которую опрашивает приложение, и упадёт с той же "Exceeded number of retries".`,
+        error: `Кошелёк подключён к ${actualNet === "mainnet" ? "основной" : "тестовой"} сети TON, а запуск идёт в ${expectedNet === "mainnet" ? "основной" : "тестовой"}. Переключи сеть в кошельке и попробуй снова.`,
         result: null,
       });
       return;
@@ -36393,7 +36396,7 @@ function mapTokenRow(row) {
         }}>
           <ЗнакЗагрузки size={88} вид="контур" />
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 700 }}>
-            {ждётПокупкиТокен ? `${ждётПокупкиСумма} TON · ${ждётПокупкиТокен}` : t("openingWallet")}
+            {ждётПокупкиТокен ? `${ждётПокупкиСумма} ${ТИКЕР_TON} · ${ждётПокупкиТокен}` : t("openingWallet")}
           </span>
           <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, textAlign: "center", lineHeight: 1.45 }}>
             {t("openingWalletHint")}
