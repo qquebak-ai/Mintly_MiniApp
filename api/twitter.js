@@ -226,7 +226,7 @@ async function колбэкX(req, res, db) {
     // Причина — мелко внизу: по ней видно, на каком шаге сорвалось,
     // без доступа к журналу сервера.
     const подробно = String(причина || "").replace(/[<>&"]/g, "").slice(0, 160);
-    const бот = String(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "").replace(/[^A-Za-z0-9_]/g, "");
+    const бот = String(process.env.TG_BOT || "MintlyCobot").replace(/^@/, "").replace(/[^A-Za-z0-9_]/g, "");
     const заголовок = удача ? "Аккаунт X подключён" : "Не получилось подключить X";
     const текст = удача
       ? (запись ? "Вернитесь в Telegram — ник, фото и описание уже подставлены в анкету." : "Вернитесь в Telegram — аккаунт уже виден в Mintly.")

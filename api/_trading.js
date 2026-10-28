@@ -18,9 +18,15 @@ import { createClient } from "@supabase/supabase-js";
 export const ТОКЕН_ТОРГОВОГО = (process.env.TRADING_BOT_TOKEN || "").trim();
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const ОСНОВНОЙ_БОТ = String(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "").trim();
-const ПРИЛОЖЕНИЕ = String(process.env.TG_APP || "Mintly").trim();
-export const ССЫЛКА_ПРИЛОЖЕНИЯ = `https://t.me/${ОСНОВНОЙ_БОТ}/${ПРИЛОЖЕНИЕ}`;
+const ОСНОВНОЙ_БОТ = String(process.env.TG_BOT || "MintlyCobot").replace(/^@/, "").trim();
+const ПРИЛОЖЕНИЕ = String(process.env.TG_APP || "").trim();
+/* «Открыть Mintly» — главное мини-приложение основного бота (?startapp).
+   Если его ещё не включили в BotFather, ссылка откроет чат с ботом, а там
+   кнопка меню «Mintly» ведёт в приложение одним касанием. Короткое имя
+   (TG_APP) — только если приложение заведено через /newapp. */
+export const ССЫЛКА_ПРИЛОЖЕНИЯ = ПРИЛОЖЕНИЕ
+  ? `https://t.me/${ОСНОВНОЙ_БОТ}/${ПРИЛОЖЕНИЕ}`
+  : `https://t.me/${ОСНОВНОЙ_БОТ}?startapp`;
 /* У бота уведомлений своё приложение — страница уведомлений (notify.html):
    журнал писем и переключатели. Основное приложение открывается только
    из основного бота. */

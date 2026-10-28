@@ -23,7 +23,7 @@ import { DesktopWallet, DesktopProfile } from "./DesktopWallet";
 import { Ц, шрифт, цифры, ПОЛОСА, СТИЛИ, ЦВЕТА_СЕРВИСОВ, ЗнакTelegram, ЗнакTON, ЗнакSolana, деньги, цена, возраст, число, Логотип, Линия, Движение, изКеша, Скелет } from "./desktopUI";
 import { апи } from "./апи";
 
-const БОТ = import.meta.env.VITE_TG_BOT || "MintlyAppBot";
+const БОТ = import.meta.env.VITE_TG_BOT || "MintlyCobot";
 
 /* Цвет с прозрачностью: подсветка кнопки должна быть тем же цветом, что
    и её текст, иначе на чёрном они расходятся в оттенках. */

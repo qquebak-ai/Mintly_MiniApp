@@ -128,8 +128,7 @@ Certbot сам допишет блок 443 и продление.
 sudo -u mintly tee /srv/mintly/.env >/dev/null <<'КОНЕЦ'
 VITE_SUPABASE_URL=https://rinxzaakkhxdbhjghtwa.supabase.co
 VITE_SUPABASE_ANON_KEY=<anon из Supabase → Project Settings → API>
-VITE_TG_BOT=MintlyAppbot
-VITE_TG_APP=app
+VITE_TG_BOT=MintlyCobot
 КОНЕЦ
 ```
 

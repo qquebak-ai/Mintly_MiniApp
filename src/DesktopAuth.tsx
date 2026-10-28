@@ -21,7 +21,7 @@ import { ошибкаВозврата, запомнитьСтраницу } from
 import { Ц, шрифт, цифры, ЗнакGoogle, ЗнакPhantom, ЗнакTelegram, ЦВЕТА_СЕРВИСОВ } from "./desktopUI";
 import { апи } from "./апи";
 
-const БОТ = import.meta.env.VITE_TG_BOT || "MintlyAppBot";
+const БОТ = import.meta.env.VITE_TG_BOT || "MintlyCobot";
 
 async function токенСессии() {
   const { data } = await supabase.auth.getSession();

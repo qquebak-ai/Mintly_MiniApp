@@ -13,7 +13,7 @@ import { Ц, шрифт, цифры, деньги, возраст, число, �
 import { состояниеВнутреннего, вывестиСВнутреннего } from "./appWallet";
 import DesktopAuth from "./DesktopAuth";
 
-const БОТ = import.meta.env.VITE_TG_BOT || "MintlyAppBot";
+const БОТ = import.meta.env.VITE_TG_BOT || "MintlyCobot";
 
 function Карточка({ children, style }) {
   return (

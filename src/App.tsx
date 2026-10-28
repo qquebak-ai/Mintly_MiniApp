@@ -912,9 +912,9 @@ const STR = {
     insufficientTon: "Не хватает GRAM: на кошельке {have}, нужно {need} с газом",
     tokenSaveFailed: "Токен создан в сети, но не сохранился: {reason}. Попробуем ещё раз при следующем запуске.",
     tokenSaveRecovered: "Токен ${ticker} дописан в приложение",
-    openingWallet: "Открываем кошелёк…",
-    openingWalletHint: "Кошелёк покажет готовую сделку — останется подтвердить.",
-    openWalletCta: "Открыть кошелёк",
+    openingWallet: "Покупаем…",
+    openingWalletHint: "Сделка идёт кошельком приложения — подтверждать ничего не нужно.",
+    openWalletCta: "Купить сейчас",
     changeAmountCta: "Изменить сумму",
     boughtToast: "Куплено ≈ {receive} ${ticker} за {pay} {unit}",
     boughtToastShort: "Куплено ${ticker} за {pay} {unit}",
@@ -1657,9 +1657,9 @@ const STR = {
     insufficientTon: "Not enough GRAM: wallet has {have}, need {need} incl. gas",
     tokenSaveFailed: "Token is live on-chain but wasn't saved: {reason}. We'll retry on next launch.",
     tokenSaveRecovered: "Token ${ticker} added to the app",
-    openingWallet: "Opening your wallet…",
-    openingWalletHint: "Your wallet will show the prepared transaction — just confirm it.",
-    openWalletCta: "Open wallet",
+    openingWallet: "Buying…",
+    openingWalletHint: "The trade goes through your Mintly wallet — nothing to confirm.",
+    openWalletCta: "Buy now",
     changeAmountCta: "Change amount",
     boughtToast: "Bought ≈ {receive} ${ticker} for {pay} {unit}",
     boughtToastShort: "Bought ${ticker} for {pay} {unit}",
@@ -29059,8 +29059,7 @@ function забытьПотерянный(address) {
 // Ссылка приглашения. Имя бота и мини-приложения знает только тот, кто
 // заводил бота, поэтому берём их из переменных окружения сборки. Если их
 // не задали — показываем хотя бы сам код, чтобы экран не был пустым.
-const TG_BOT = String(import.meta.env.VITE_TG_BOT || "MintlyAppbot").replace(/^@/, "").trim();
-const TG_APP = String(import.meta.env.VITE_TG_APP || "Mintly").trim();
+const TG_BOT = String(import.meta.env.VITE_TG_BOT || "MintlyCobot").replace(/^@/, "").trim();
 function referralCode(userId) { return userId ? "ref_" + userId : ""; }
 /* Ссылка приглашения ведёт в чат с ботом, а не сразу в приложение.
    Прямая ссылка (t.me/бот/приложение?startapp=…) короче и красивее, но
@@ -35617,7 +35616,10 @@ function mapTokenRow(row) {
         } else if (продажа) setTimeout(() => setTradeModal({ mode: "sell" }), 400);
         return;
       }
-      const карточка = await fetchPoolByAddress(пул);
+      // Сеть пула — по виду адреса: бот шлёт сюда и пулы Solana из ленты,
+      // а искать их в TON значило открыть пустоту (base58 без 0, O, I, l).
+      const пулSolana = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(пул);
+      const карточка = await fetchPoolByAddress(пул, пулSolana ? GT_NETWORK_SOL : GT_NETWORK);
       if (карточка) openToken(карточка);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -35664,12 +35666,34 @@ function mapTokenRow(row) {
     else if (р && р !== "home") goTab(р);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Черновик из чата. Бот кладёт его в базу и приводит человека сюда
-     ссылкой t.me/<бот>/<приложение>?startapp=draft_<id>. Открываем
-     форму сразу: он пришёл запускать монету, а не смотреть ленту. */
+  /* Вход из бота: кнопки «Кошелёк», «Создать токен», «Поддержка» ведут
+     сразу на свой экран — бот дописывает к адресу ?open=… (api/
+     telegram-bot.js). Ссылка t.me/<бот>?startapp=<то же слово> работает
+     так же. Раньше любая кнопка открывала главную, и нужный раздел
+     человек искал сам. */
+  useEffect(() => {
+    let куда = "";
+    try { куда = new URLSearchParams(window.location.search).get("open") || ""; } catch (e) { /* адрес без параметров */ }
+    if (!куда) куда = telegramStartParam();
+    if (куда === "create") openCreate();
+    else if (["wallet", "markets", "mempad", "profile"].includes(куда)) goTab(куда);
+    else if (куда === "support" || куда === "referral") {
+      const пункт = SETTINGS_ITEMS.find((s) => s.key === куда);
+      if (пункт) setSettingsItem(пункт);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Черновик из чата. Бот кладёт его в базу и приводит человека сюда —
+     кнопкой с ?draft=<id> из лички или ссылкой ?startapp=draft_<id>.
+     Открываем форму сразу: он пришёл запускать монету, а не смотреть
+     ленту. */
   const [черновикЗапуска, setЧерновикЗапуска] = useState(null);
   useEffect(() => {
-    const параметр = telegramStartParam();
+    let параметр = telegramStartParam();
+    try {
+      const изАдреса = new URLSearchParams(window.location.search).get("draft");
+      if (изАдреса) параметр = `draft_${изАдреса}`;
+    } catch (e) { /* адрес без параметров */ }
     if (!параметр.startsWith("draft_")) return;
     const id = параметр.slice(6);
     if (!UUID_RE_APP.test(id)) return;

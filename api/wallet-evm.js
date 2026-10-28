@@ -332,6 +332,10 @@ export async function состояниеКривой(сеть, токен) {
     progress: Number((c.sold * 10000n) / ПРОДАЁТСЯ) / 10000,
     // Сколько будет собрано к выходу на биржу: вирт·(1073/273 − 1).
     graduationNative: Number(formatUnits((вирт * ВИРТ_ТОКЕНОВ) / (ВИРТ_ТОКЕНОВ - ПРОДАЁТСЯ) - вирт, 18)),
+    // Виртуальные запасы — для картинки в чате (api/chart.js): по ним
+    // рисуется сама кривая, пока по токену не прошло ни одной сделки.
+    virtualNative: Number(formatUnits(вирт, 18)),
+    virtualTokens: Number(formatUnits(ВИРТ_ТОКЕНОВ, 18)),
     coin: с.монета,
   };
 }

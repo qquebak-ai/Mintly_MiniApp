@@ -17,7 +17,7 @@ import TonLaunchApp, { текстУстройства } from "./App";
 import { апи } from "./апи";
 import { ФонШёлк } from "./шёлк";
 
-const БОТ = import.meta.env.VITE_TG_BOT || "MintlyAppbot";
+const БОТ = import.meta.env.VITE_TG_BOT || "MintlyCobot";
 // Те же цвета и шрифты, что у приложения (App.tsx, тема T).
 // Светлая тема выбирается в настройках приложения; вход должен совпадать
 // с ней, иначе после входа экран вспыхивает из чёрного в белый.

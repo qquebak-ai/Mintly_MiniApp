@@ -14,24 +14,41 @@
 import { adminClient } from "./_support.js";
 import { gtЗапрос } from "./_gt.js";
 
-// Сеть задаётся одним переключателем на всё приложение (см.
-// TON_TESTNET_NETWORK в src/App.tsx). Здесь по умолчанию тестовая —
-// вернуть боевую можно переменной окружения TON_TESTNET=0.
-// Боевая сеть по умолчанию. Тестовая включается явно: TON_TESTNET=1.
+// Сеть TON задаётся одним переключателем на всё приложение (см.
+// TON_TESTNET_NETWORK в src/App.tsx). Боевая по умолчанию, тестовая
+// включается явно: TON_TESTNET=1.
 const TESTNET = process.env.TON_TESTNET === "1";
 const TONAPI = TESTNET ? "https://testnet.tonapi.io" : "https://tonapi.io";
 export const NETWORK = TESTNET ? "testnet" : "mainnet";
 
-/* Сеть Solana — своя. Кривая TON давно в боевой сети, а программа Solana
-   ещё в devnet, и токены оттуда лежат в базе с network = "devnet".
-   Искать их надо: человек, спросивший бота про свой токен, должен его
-   найти, — а вот в витрину «самые собравшие» они не попадают: там
-   сравниваются деньги, а в пробной сети их нет. */
+/* Сеть Solana — своя: программа кривой живёт в той сети, на которую
+   смотрит SOLANA_RPC, и токены оттуда лежат в базе с network = "devnet". */
 export const SOL_NETWORK = /devnet/.test(process.env.SOLANA_RPC || "") ? "devnet"
   : /testnet/.test(process.env.SOLANA_RPC || "") ? "testnet" : "mainnet";
-export const СЕТИ = [...new Set([NETWORK, SOL_NETWORK])];
+
+/* Сети EVM тестовые, пока боевые не включены явно (EVM_MAINNET=1, см.
+   api/wallet-evm.js). Токены оттуда приложение пишет с network =
+   "testnet" — как TON в тестовой сети. */
+export const EVM_NETWORK = process.env.EVM_MAINNET === "1" ? "mainnet" : "testnet";
+export const ЦЕПИ_EVM = ["bsc", "base", "eth"];
+
+// Все сети, в которых сейчас живёт приложение: поиск бота видит ровно их.
+export const СЕТИ = [...new Set([NETWORK, SOL_NETWORK, EVM_NETWORK])];
+// Ни одной боевой — бот честно говорит, что монеты здесь ничего не стоят.
+export const ВСЁ_ПРОБНОЕ = СЕТИ.every((с) => с !== "mainnet");
 
 export const APP_URL = process.env.APP_URL || "https://mintly.company";
+
+// Имя основного бота — для ссылок «открыть у бота» из чужих чатов.
+const TG_BOT = String(process.env.TG_BOT || "MintlyCobot").replace(/^@/, "").trim();
+export const ссылкаБота = (метка) => `https://t.me/${TG_BOT}?start=${метка}`;
+
+// Монета и имя каждой сети — как их пишет приложение. Монета TON с лета
+// 2026 называется GRAM (см. ТИКЕР_TON в src/App.tsx), сама сеть — TON.
+export const МОНЕТА = { ton: "GRAM", solana: "SOL", bsc: "BNB", base: "ETH", eth: "ETH" };
+export const ИМЯ_СЕТИ = { ton: "TON", solana: "Solana", bsc: "BNB Chain", base: "Base", eth: "Ethereum" };
+// Куда кривая отдаёт ликвидность после выхода — так и пишем в карточке.
+const БИРЖА_СЕТИ = { ton: "STON.fi", solana: "Raydium", bsc: "PancakeSwap", base: "Uniswap", eth: "Uniswap" };
 
 /* Метка свежести для ссылки на картинку. Telegram кэширует превью по
    адресу надолго: без неё в чате неделю висел бы график недельной
@@ -42,19 +59,29 @@ function свежесть() {
 }
 
 // Витрина приложения показывает не только запущенное здесь: лента
-// «Мемпада» приходит из GeckoTerminal, и в чате бот обязан находить то
-// же самое. Ключа этот источник не требует, но и щедрым не бывает —
-// поэтому на один ответ уходит не больше пары запросов.
+// «Мемпада» приходит с рынка, и в чате бот обязан находить то же самое.
 const GT = "https://api.geckoterminal.com/api/v2";
 const GT_NETWORK = "ton";
 
-// Адрес TON в любом из принятых написаний: EQ/UQ/kQ/0Q и 46 знаков
-// base64url. Годится, чтобы отличить адрес от тикера, а разбирать его
-// по-настоящему тут незачем — сверка идёт по строке в базе.
-const ADDR_RE = /^[EUkK0][QqPp][A-Za-z0-9_-]{46}$/;
+/* Адрес в любой из сетей приложения. Годится, чтобы отличить адрес от
+   тикера, а разбирать его по-настоящему тут незачем — сверка идёт по
+   строке в базе. Спутать сети нельзя: адрес TON — 48 знаков base64url с
+   приставкой EQ/UQ/kQ/0Q, mint Solana — 32–44 знака base58 (без нуля,
+   заглавной O, I и l), адрес EVM — 0x и сорок шестнадцатеричных. */
+const АДРЕС_TON = /^[EUkK0][QqPp][A-Za-z0-9_-]{46}$/;
+const АДРЕС_SOL = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const АДРЕС_EVM = /^0x[0-9a-fA-F]{40}$/;
+
+export function видАдреса(s) {
+  const a = String(s || "").trim();
+  if (АДРЕС_TON.test(a)) return "ton";
+  if (АДРЕС_EVM.test(a)) return "evm";
+  if (АДРЕС_SOL.test(a)) return "solana";
+  return null;
+}
 
 export function looksLikeAddress(s) {
-  return ADDR_RE.test(String(s || "").trim());
+  return !!видАдреса(s);
 }
 
 const nano = (v) => Number(v) / 1e9;
@@ -64,14 +91,23 @@ const nano = (v) => Number(v) / 1e9;
  * Колонка chain появилась не сразу, и у токенов постарше она пустая: бот
  * показывал мемкоин Solana как TON-овский — цену в TON, шкалу до 85 TON
  * и оборот, которого в этой сети нет. Поэтому колонке верим, а когда её
- * нет — смотрим на сам адрес. Спутать их нельзя: адрес TON это 48
- * символов base64url с приставкой EQ/UQ/kQ/0Q, а mint Solana — 32-44
- * символа base58, где нет ни нуля, ни заглавной O, ни I с l. */
+ * нет — смотрим на сам адрес. У токенов EVM колонка есть всегда: они
+ * появились позже неё. */
 export function цепочкаТокена(token) {
-  if (token && token.chain) return token.chain === "solana" ? "solana" : "ton";
-  const адрес = String((token && token.address) || "").trim();
-  const похожНаSolana = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(адрес) && !/^(EQ|UQ|kQ|0Q)/.test(адрес);
-  return похожНаSolana ? "solana" : "ton";
+  const цепь = token && token.chain;
+  if (цепь === "solana" || цепь === "ton" || ЦЕПИ_EVM.includes(цепь)) return цепь;
+  return видАдреса(token && token.address) === "solana" ? "solana" : "ton";
+}
+
+/* Токен из той ли сети, в которой сейчас работает приложение. В базе
+   рядом лежат и боевые, и пробные: показывать в чате пробный TON рядом
+   с боевым — значит путать людей ценами, которых нет. */
+function видимВСети(token) {
+  const цепь = цепочкаТокена(token);
+  const сеть = (token && token.network) || "mainnet";
+  if (цепь === "solana") return сеть === SOL_NETWORK;
+  if (цепь === "ton") return сеть === NETWORK;
+  return сеть === EVM_NETWORK;
 }
 
 /* Состояние кривой прямо из контракта. Порядок полей — из структуры
@@ -166,8 +202,8 @@ export async function логотипЖетона(address) {
  */
 let курсКеш = { значение: 0, ts: 0 };
 /* Курс SOL. Нужен там же, где и курс TON: капитализация показывается в
-   долларах, а токены площадки живут в двух сетях. Источника два — если
-   первый молчит, второй обычно отвечает; протухшее значение лучше
+   долларах, а токены площадки живут в нескольких сетях. Источника два —
+   если первый молчит, второй обычно отвечает; протухшее значение лучше
    прочерка, поэтому кеш возвращается даже устаревшим. */
 let курсSolКеш = { значение: 0, ts: 0 };
 
@@ -224,8 +260,38 @@ export async function курсTon(свежесть = 300000) {
         return v;
       }
     }
-  } catch (err) { /* курса нет — покажем в TON */ }
+  } catch (err) { /* курса нет — покажем в монете сети */ }
   return курсКеш.значение;
+}
+
+/* Курс BNB и ETH — для капитализации токенов EVM. Тот же порядок, что у
+   SOL: пять минут из памяти, протухшее лучше прочерка. */
+const курсыEvm = new Map(); // монета -> { значение, ts }
+const ID_МОНЕТ = { BNB: "binancecoin", ETH: "ethereum" };
+async function курсEvm(монета, свежесть = 300000) {
+  const было = курсыEvm.get(монета);
+  if (было && было.значение > 0 && Date.now() - было.ts < свежесть) return было.значение;
+  const id = ID_МОНЕТ[монета];
+  if (!id) return 0;
+  try {
+    const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`);
+    if (res.ok) {
+      const json = await res.json();
+      const v = Number(json && json[id] && json[id].usd) || 0;
+      if (v > 0) {
+        курсыEvm.set(монета, { значение: v, ts: Date.now() });
+        return v;
+      }
+    }
+  } catch (err) { /* вернём то, что помним */ }
+  return (было && было.значение) || 0;
+}
+
+// Курс монеты любой сети приложения — в долларах.
+export async function курсМонеты(цепь) {
+  if (цепь === "solana") return курсSol();
+  if (цепь === "ton") return курсTon();
+  return курсEvm(МОНЕТА[цепь]);
 }
 
 /* Цена одного токена в TON по состоянию кривой. Та же формула, что и в
@@ -265,7 +331,7 @@ async function gt(path) {
 const БЕЗЫМЯННОЕ_ИМЯ = /^unknown\s*token/i;
 const БЕЗЫМЯННЫЙ_ТИКЕР = /^ukwn/i;
 
-function poolToToken(row, tokensById, dexById) {
+function poolToToken(row, tokensById, dexById, цепь = "ton") {
   const a = row.attributes || {};
   const bt = (row.relationships && row.relationships.base_token && row.relationships.base_token.data && tokensById.get(row.relationships.base_token.data.id)) || {};
   const dex = (row.relationships && row.relationships.dex && row.relationships.dex.data && dexById.get(row.relationships.dex.data.id)) || {};
@@ -276,6 +342,7 @@ function poolToToken(row, tokensById, dexById) {
   if (БЕЗЫМЯННОЕ_ИМЯ.test(имя.trim()) || БЕЗЫМЯННЫЙ_ТИКЕР.test(тикер)) return null;
   return {
     external: true,
+    chain: цепь,
     id: row.id,
     pool_address: a.address,
     token_address: bt.address || null,
@@ -300,6 +367,67 @@ function поCatalog(json) {
   return { tokensById, dexById };
 }
 
+/* Строка ленты (feed_cache) к тому же виду. Ленту сервер собирает сам и
+   держит свежей (api/refresh-feed.js) — это ровно то, что человек видит
+   на главной и в «Мемпаде», поэтому бот ищет прежде всего в ней: и
+   быстро, и без похода к источнику с его лимитами. */
+const КОЛОНКИ_ЛЕНТЫ = "chain, pool_address, token_address, name, ticker, logo_url, price, change24, mcap, liq, vol24, dex_name, pool_created_at";
+function изЛенты(r) {
+  if (!r || !r.pool_address || !r.ticker) return null;
+  const цена = Number(r.price) || 0;
+  if (!(цена > 0)) return null;
+  return {
+    external: true,
+    chain: r.chain === "solana" ? "solana" : "ton",
+    id: `${r.chain}_${r.pool_address}`,
+    pool_address: r.pool_address,
+    token_address: r.token_address || null,
+    name: String(r.name || r.ticker),
+    ticker: String(r.ticker).toUpperCase().slice(0, 12),
+    logo_url: r.logo_url || null,
+    emoji: "🪙",
+    priceUsd: цена,
+    mcapUsd: Number(r.mcap) || 0,
+    change24: Number(r.change24) || 0,
+    volUsd: Number(r.vol24) || 0,
+    liqUsd: Number(r.liq) || 0,
+    dex: r.dex_name || null,
+    created_at: r.pool_created_at || null,
+  };
+}
+
+async function найтиВЛенте(q, limit) {
+  const admin = adminClient();
+  if (!admin) return [];
+  let запрос = admin.from("feed_cache").select(КОЛОНКИ_ЛЕНТЫ);
+  if (looksLikeAddress(q)) {
+    запрос = запрос.or(`token_address.eq.${q},pool_address.eq.${q}`);
+  } else {
+    const чисто = q.replace(/[,()%*\\]/g, " ").trim();
+    if (!чисто) return [];
+    запрос = запрос.or(`ticker.ilike.%${чисто}%,name.ilike.%${чисто}%`);
+  }
+  const { data } = await запрос.order("vol24", { ascending: false }).limit(limit * 3);
+  // У токена бывает несколько пулов: оставляем самый оборотистый — список
+  // уже отсортирован по обороту, так что первый и есть он.
+  const видели = new Set();
+  const итог = [];
+  for (const r of data || []) {
+    const t = изЛенты(r);
+    if (!t) continue;
+    const ключ = t.token_address || t.ticker;
+    if (видели.has(ключ)) continue;
+    видели.add(ключ);
+    итог.push(t);
+  }
+  // Точное совпадение тикера — вперёд: по запросу «NOT» человек ждёт
+  // Notcoin, а не «Not Meme» с чуть большим оборотом.
+  const точно = q.toLowerCase();
+  return итог
+    .sort((a, b) => (a.ticker.toLowerCase() === точно ? 0 : 1) - (b.ticker.toLowerCase() === точно ? 0 : 1))
+    .slice(0, limit);
+}
+
 /* Есть ли в базе колонка с парой на бирже. Ответ не меняется в течение
    жизни процесса, поэтому спрашиваем один раз. */
 let колонкаПула = null;
@@ -310,17 +438,20 @@ async function естьКолонкаПула(admin) {
   return колонкаПула;
 }
 
-/* Поиск по бирже: тикер, название или адрес. GeckoTerminal ищет по
-   пулам, поэтому один и тот же токен приходит несколько раз — оставляем
-   пул с самой большой ликвидностью, он и есть настоящий рынок. */
+/* Поиск по рынку: тикер, название или адрес. Сперва лента приложения,
+   потом — в боевой сети — поиск GeckoTerminal по TON: в ленте лежит не
+   всё, что торгуется на биржах. GeckoTerminal ищет по пулам, поэтому
+   один и тот же токен приходит несколько раз — оставляем пул с самой
+   большой ликвидностью, он и есть настоящий рынок. */
 export async function findExternal(query, limit = 5) {
-  // В тестовой сети бирж нет: их токены здесь не купить, и показывать
-  // чужие графики вперемешку со своими значит путать сети.
-  if (TESTNET) return [];
   const q = String(query || "").trim().replace(/^\$/, "");
   if (!q) return [];
+  const лента = await найтиВЛенте(q, limit).catch(() => []);
+  // В тестовой сети TON чужих бирж нет: искать там по GeckoTerminal —
+  // значит показывать боевые пулы, которые здесь не купить.
+  if (лента.length >= limit || TESTNET) return лента.slice(0, limit);
   const json = await gt(`/search/pools?query=${encodeURIComponent(q)}&network=${GT_NETWORK}&include=base_token,dex`);
-  if (!json || !Array.isArray(json.data)) return [];
+  if (!json || !Array.isArray(json.data)) return лента;
   const { tokensById, dexById } = поCatalog(json);
   const лучшие = new Map();
   for (const row of json.data) {
@@ -330,45 +461,60 @@ export async function findExternal(query, limit = 5) {
     const было = лучшие.get(ключ);
     if (!было || t.liqUsd > было.liqUsd) лучшие.set(ключ, t);
   }
-  // Точное совпадение тикера — вперёд: по запросу «NOT» человек ждёт
-  // Notcoin, а не «Not Meme» с чуть большей ликвидностью.
   const точно = q.toLowerCase();
-  return [...лучшие.values()]
+  const сБиржи = [...лучшие.values()]
     .sort((a, b) => {
       const ta = a.ticker.toLowerCase() === точно ? 0 : 1;
       const tb = b.ticker.toLowerCase() === точно ? 0 : 1;
       return ta - tb || b.liqUsd - a.liqUsd;
-    })
-    .slice(0, limit);
+    });
+  const адреса = new Set(лента.map((t) => t.token_address).filter(Boolean));
+  return [...лента, ...сБиржи.filter((t) => !t.token_address || !адреса.has(t.token_address))].slice(0, limit);
 }
 
-/* То, что торгуют прямо сейчас, — та же лента, что на главной. */
+/* То, что торгуют прямо сейчас, — та же лента, что на главной: самые
+   оборотистые за сутки, по одному пулу на тикер. */
 export async function trendingExternal(limit = 5) {
-  if (TESTNET) return [];
-  const json = await gt(`/networks/${GT_NETWORK}/trending_pools?include=base_token,dex`);
-  if (!json || !Array.isArray(json.data)) return [];
-  const { tokensById, dexById } = поCatalog(json);
-  const лучшие = new Map();
-  for (const row of json.data) {
-    const t = poolToToken(row, tokensById, dexById);
-    if (!t) continue;
-    const ключ = t.token_address || t.ticker;
-    if (!лучшие.has(ключ)) лучшие.set(ключ, t);
+  const admin = adminClient();
+  if (!admin) return [];
+  const { data } = await admin
+    .from("feed_cache")
+    .select(КОЛОНКИ_ЛЕНТЫ)
+    .order("vol24", { ascending: false })
+    .limit(limit * 4);
+  const видели = new Set();
+  const итог = [];
+  for (const r of data || []) {
+    const t = изЛенты(r);
+    if (!t || видели.has(t.ticker)) continue;
+    видели.add(t.ticker);
+    итог.push(t);
+    if (итог.length >= limit) break;
   }
-  return [...лучшие.values()].slice(0, limit);
+  return итог;
 }
 
-/* Один пул по адресу — для ссылок вида «?pool=…». */
+/* Один пул по адресу — для ссылок вида «?pool=…» и кнопки «Обновить».
+   Сперва лента (там свежие цифры без похода к источнику), потом
+   GeckoTerminal — в той сети, на которую похож адрес пула. */
 export async function poolByAddress(address) {
-  const json = await gt(`/networks/${GT_NETWORK}/pools/${address}?include=base_token,dex`);
+  const admin = adminClient();
+  if (admin) {
+    const { data } = await admin.from("feed_cache").select(КОЛОНКИ_ЛЕНТЫ).eq("pool_address", address).limit(1);
+    const t = data && data[0] ? изЛенты(data[0]) : null;
+    if (t) return t;
+  }
+  const цепь = видАдреса(address) === "solana" ? "solana" : "ton";
+  const json = await gt(`/networks/${цепь}/pools/${address}?include=base_token,dex`);
   if (!json || !json.data) return null;
   const { tokensById, dexById } = поCatalog(json);
-  return poolToToken(json.data, tokensById, dexById);
+  return poolToToken(json.data, tokensById, dexById, цепь);
 }
 
-/* Поиск. Адрес ищем точным совпадением, всё остальное — по тикеру и
-   названию. Порядок: сперва точное совпадение тикера, потом остальные,
-   свежие выше. */
+/* Поиск своих токенов. Адрес ищем точным совпадением, всё остальное — по
+   тикеру и названию. Порядок: сперва точное совпадение тикера, потом
+   остальные, свежие выше. Пустой запрос — свежие запуски во всех сетях
+   приложения: это и есть «что нового в Mintly». */
 export async function findTokens(query, limit = 8) {
   const admin = adminClient();
   if (!admin) return [];
@@ -381,19 +527,29 @@ export async function findTokens(query, limit = 8) {
   // отбивается целиком — поэтому один раз проверяем и дальше помним.
   const колонки = `id, name, ticker, logo_url, address, curve_address, chain, network, created_at, owner_id${await естьКолонкаПула(admin) ? ", dex_pool_address" : ""}`;
 
+  // Берём с запасом: часть строк отсеется сверкой «своя ли сеть», а
+  // обрезать выдачу до неё значило бы терять найденное.
+  const запас = limit * 3;
   let ряд;
-  if (looksLikeAddress(q)) {
+  const вид = видАдреса(q);
+  if (вид) {
+    /* Адрес EVM в базе может лежать в любом регистре — сравниваем без
+       него. Адрес кривой у EVM — это фабрика, одна на все токены сети,
+       поэтому по нему не ищем: нашлись бы все токены разом. */
+    const условие = вид === "evm"
+      ? `address.ilike.${q}`
+      : `address.eq.${q},curve_address.eq.${q}`;
     const { data } = await admin
       .from("tokens")
       .select(колонки)
       .in("network", СЕТИ)
-      .or(`address.eq.${q},curve_address.eq.${q}`)
-      .limit(limit);
+      .or(условие)
+      .limit(запас);
     ряд = data || [];
   } else if (q) {
     // Экранируем запятую и скобки: строка уходит в or() как выражение
     // PostgREST, и запятая в ней разделяет условия.
-    const чисто = q.replace(/[,()]/g, " ").trim();
+    const чисто = q.replace(/[,()%*\\]/g, " ").trim();
     if (!чисто) return [];
     const { data } = await admin
       .from("tokens")
@@ -401,7 +557,7 @@ export async function findTokens(query, limit = 8) {
       .in("network", СЕТИ)
       .or(`ticker.ilike.%${чисто}%,name.ilike.%${чисто}%`)
       .order("created_at", { ascending: false })
-      .limit(limit);
+      .limit(запас);
     ряд = data || [];
     const точно = чисто.toLowerCase();
     ряд.sort((a, b) => {
@@ -410,20 +566,19 @@ export async function findTokens(query, limit = 8) {
       return ta - tb;
     });
   } else {
-    // Пустой запрос — витрина: самые собравшие. Собранное лежит в
-    // token_notify, её обходит расписание уведомлений.
+    /* Пустой запрос — свежие запуски. Раньше здесь была витрина «самые
+       собравшие», но только по TON: собранное в разных сетях считается в
+       разных монетах и напрямую не сравнивается, а в тестовой сети денег
+       нет вовсе — и бот отвечал пустым списком, хотя токены были. */
     const { data } = await admin
       .from("tokens")
-      .select(`${колонки}, token_notify (last_real_ton)`)
-      .eq("network", NETWORK)
+      .select(колонки)
+      .in("network", СЕТИ)
       .order("created_at", { ascending: false })
-      .limit(30);
-    ряд = (data || [])
-      .map((t) => ({ ...t, _собрано: Number((t.token_notify && t.token_notify[0] && t.token_notify[0].last_real_ton) || 0) }))
-      .sort((a, b) => b._собрано - a._собрано)
-      .slice(0, limit);
+      .limit(запас);
+    ряд = data || [];
   }
-  return ряд;
+  return ряд.filter(видимВСети).slice(0, limit);
 }
 
 /* Сделки токена из своей базы: по ним считаются движение цены и
@@ -457,26 +612,14 @@ export function fmtTon(n) {
   return "0";
 }
 
-function fmtPrice(ton) {
-  const v = Number(ton) || 0;
-  if (v <= 0) return "—";
-  if (v >= 0.001) return `${v.toFixed(5)} TON`;
-  // Экспонента вида 8.96e−7 в чате читается как ошибка, а не как цена.
-  // Показываем десятичной дробью, сколько бы нулей ни было.
-  return `${v.toFixed(11).replace(/0+$/, "")} TON`;
-}
-
-/* Количество токенов: их миллионы и миллиарды, и мерка от TON тут не
-   годится — «400000.0K» не число, а шум. */
-function fmtCount(n) {
-  const v = Number(n) || 0;
-  // Хвостовые нули срезаем только после точки: иначе «400» превращалось
-  // в «4», и проданное падало в сто раз.
-  const без = (s) => s.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
-  if (v >= 1e9) return `${без((v / 1e9).toFixed(v >= 1e10 ? 0 : 2))}B`;
-  if (v >= 1e6) return `${без((v / 1e6).toFixed(v >= 1e8 ? 0 : 1))}M`;
-  if (v >= 1e3) return `${(v / 1e3).toFixed(0)}K`;
-  return v.toFixed(0);
+/* Цена одного токена в монете сети. Экспонента вида 8.96e−7 в чате
+   читается как ошибка, а не как цена, — показываем десятичной дробью,
+   сколько бы нулей ни было. */
+function fmtЦены(v, монета) {
+  const n = Number(v) || 0;
+  if (n <= 0) return "—";
+  if (n >= 0.001) return `${n.toFixed(5)} ${монета}`;
+  return `${n.toFixed(12).replace(/0+$/, "")} ${монета}`;
 }
 
 function fmtAge(iso) {
@@ -492,8 +635,13 @@ function fmtAge(iso) {
 
 const escape = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/* Полная сводка по одному токену: и текст сообщения, и короткая строка
-   для списка в inline-подсказке. */
+/* Строка о пробной сети — сразу под названием: в чате карточка живёт
+   сама по себе, и без неё монету из тестовой сети покупают всерьёз. */
+function строкаПробнойСети(token, цепь) {
+  if (!token.network || token.network === "mainnet") return null;
+  return `⚠️ Тестовая сеть ${ИМЯ_СЕТИ[цепь]} — монеты здесь ничего не стоят`;
+}
+
 /* Состояние кривой из готового кеша.
  *
  * Обход (api/refresh-curves.js) ходит по кривым раз в минуту и
@@ -532,6 +680,29 @@ async function состояниеИзКеша(tokenId) {
   };
 }
 
+/* Общая часть карточки своего токена: то, что нужно боту для сделки в
+   чате, одинаково во всех сетях. Сделка идёт кошельком приложения через
+   его же обработчик (api/_botTrade.js), поэтому карточке достаточно
+   знать сеть, адрес токена и его номер в базе. */
+function основаКарточки(token, цепь, { цена = 0, торгуется = false, лого = null } = {}) {
+  const тикер = escape(String(token.ticker || "").toUpperCase());
+  return {
+    title: `$${тикер} — ${escape(token.name || token.ticker || "?")}`,
+    link: `${APP_URL}?token=${token.id}`,
+    chart: `${APP_URL}/api/chart?token=${token.id}&t=${свежесть()}`,
+    ref: `t:${token.id}`,
+    chain: цепь,
+    монета: МОНЕТА[цепь],
+    tokenId: token.id,
+    address: token.address || null,
+    ticker: тикер,
+    цена,
+    торгуется,
+    botLink: ссылкаБота(`tok_${token.id}`),
+    thumb: лого || token.logo_url || null,
+  };
+}
+
 /* Карточка своего токена в Solana.
  *
  * Отдельно от TON не по прихоти: там другая цепочка, своя программа
@@ -557,52 +728,82 @@ async function карточкаSolana(token) {
   const строки = [
     `${token.logo_url ? "🪙" : "🚀"} <b>${имя}</b> · $${тикер}`,
     "",
-    `💰 Цена: ${s ? `${s.ценаSol.toFixed(9).replace(/0+$/, "")} SOL` : "—"}`,
+    `💰 Цена: ${s ? fmtЦены(s.ценаSol, "SOL") : "—"}`,
     `📊 Капа: ${капа > 0 ? fmtUsd(капа) : "—"}`,
   ];
   if (s) {
     строки.push("");
     строки.push(s.закрыта
-      ? `🎉 Кривая закрыта, собрано ${s.solСобрано.toFixed(2)} SOL`
+      ? `🎉 Кривая закрыта, собрано ${s.solСобрано.toFixed(2)} SOL — торгуется на ${БИРЖА_СЕТИ.solana}`
       : `🚀 Собрано для выхода на биржу: ${(доля * 100).toFixed(0)}%\n${s.solСобрано.toFixed(2)} / ${s.solЦель.toFixed(0)} SOL`);
   }
-  // Пробная сеть — первым делом после названия: в чате карточка живёт
-  // сама по себе, и без этой строки монету из devnet покупают всерьёз.
-  if (token.network && token.network !== "mainnet") {
-    строки.splice(2, 0, `⚠️ Пробная сеть (${escape(token.network)}) — монеты здесь ничего не стоят`);
-  }
+  const пробная = строкаПробнойСети(token, "solana");
+  if (пробная) строки.splice(2, 0, пробная);
   строки.push(`\n⛓ Solana · <code>${escape(token.address || "")}</code>`);
 
   return {
+    ...основаКарточки(token, "solana", { цена: s ? s.ценаSol : 0, торгуется: !!(s && token.address) }),
     text: строки.join("\n"),
-    title: `$${тикер} — ${имя}`,
     description: s
-      ? `${капа > 0 ? fmtUsd(капа) : "—"} · ${s.solСобрано.toFixed(2)}/${s.solЦель.toFixed(0)} SOL`
-      : "Кривая ещё не отвечает — открой в приложении",
-    link: `${APP_URL}?token=${token.id}`,
-    chart: `${APP_URL}/api/chart?token=${token.id}&t=${свежесть()}`,
-    ref: `t:${token.id}`,
-    // Признак цепочки для бота: сделка по такому токену идёт внутренним
-    // кошельком площадки, а не TonConnect'ом, и суммы в ней — в SOL.
-    sol: true,
-    mint: token.address || null,
-    ценаSol: s ? s.ценаSol : 0,
-    закрыта: !!(s && s.закрыта),
-    curve: null,
-    pool: null,
-    jetton: token.address || null,
-    ticker: тикер,
-    botLink: `https://t.me/${(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "")}?start=tok_${token.id}`,
-    thumb: token.logo_url || null,
+      ? `Solana · ${капа > 0 ? fmtUsd(капа) : "—"} · ${s.solСобрано.toFixed(2)}/${s.solЦель.toFixed(0)} SOL`
+      : "Solana · кривая ещё не отвечает — открой в приложении",
   };
 }
 
+/* Карточка своего токена в EVM (BNB Chain, Base, Ethereum).
+ *
+ * Кривая у всех токенов сети одна — фабрика, и состояние токена она
+ * отдаёт по его адресу (api/wallet-evm.js). После выхода на биржу сделки
+ * идут роутером той биржи, куда кривая сама завела пару, — тем же
+ * обработчиком, поэтому торговать из чата можно и тогда. */
+async function карточкаEVM(token, цепь) {
+  const evm = await import("./wallet-evm.js").catch(() => null);
+  const сеть = (evm && evm.СЕТИ && evm.СЕТИ[цепь]) || null;
+  const [s, курс] = await Promise.all([
+    evm && сеть && сеть.фабрика && token.address ? evm.состояниеКривой(цепь, token.address).catch(() => null) : Promise.resolve(null),
+    курсМонеты(цепь).catch(() => 0),
+  ]);
+  const монета = МОНЕТА[цепь];
+  const имя = escape(token.name || token.ticker || "?");
+  const тикер = escape(String(token.ticker || "").toUpperCase());
+  const капа = s && курс > 0 ? s.price * 1e9 * курс : 0;
+  const доля = s && s.graduationNative > 0 ? Math.max(0, Math.min(1, s.realNative / s.graduationNative)) : 0;
+
+  const строки = [
+    `${token.logo_url ? "🪙" : "🚀"} <b>${имя}</b> · $${тикер}`,
+    "",
+    `💰 Цена: ${s ? fmtЦены(s.price, монета) : "—"}`,
+    `📊 Капа: ${капа > 0 ? fmtUsd(капа) : "—"}`,
+  ];
+  if (s) {
+    строки.push("");
+    строки.push(s.graduated
+      ? `🎉 Кривая закрыта — торгуется на ${БИРЖА_СЕТИ[цепь]}`
+      : `🚀 Собрано для выхода на биржу: ${(доля * 100).toFixed(0)}%\n${fmtTon(s.realNative)} / ${fmtTon(s.graduationNative)} ${монета}`);
+  }
+  const пробная = строкаПробнойСети(token, цепь);
+  if (пробная) строки.splice(2, 0, пробная);
+  строки.push(`\n⛓ ${ИМЯ_СЕТИ[цепь]} · <code>${escape(token.address || "")}</code>`);
+
+  return {
+    ...основаКарточки(token, цепь, { цена: s ? s.price : 0, торгуется: !!s }),
+    text: строки.join("\n"),
+    description: s
+      ? `${ИМЯ_СЕТИ[цепь]} · ${капа > 0 ? fmtUsd(капа) : "—"} · ${fmtTon(s.realNative)}/${fmtTon(s.graduationNative)} ${монета}`
+      : `${ИМЯ_СЕТИ[цепь]} · кривая ещё не отвечает — открой в приложении`,
+  };
+}
+
+/* Полная сводка по одному токену: и текст сообщения, и короткая строка
+   для списка в inline-подсказке. */
 export async function tokenCard(token) {
-  if (цепочкаТокена(token) === "solana") return await карточкаSolana(token);
+  const цепь = цепочкаТокена(token);
+  if (цепь === "solana") return await карточкаSolana(token);
+  if (ЦЕПИ_EVM.includes(цепь)) return await карточкаEVM(token, цепь);
 
   const [state, история, логотип, курс] = await Promise.all([
     // Сначала кеш, и только если он пуст или протух — цепочка.
-    состояниеИзКеша(token.id).then((к) => к || curveState(token.curve_address)),
+    состояниеИзКеша(token.id).then((к) => к || curveState(token.curve_address, token.network)),
     tradeHistory(token.id),
     token.logo_url ? Promise.resolve(token.logo_url) : логотипЖетона(token.address),
     курсTon(),
@@ -611,11 +812,9 @@ export async function tokenCard(token) {
   const цена = state && state.ценаГотовая > 0 ? state.ценаГотовая : priceFromState(state);
   const собрано = state ? nano(state.realTon) : 0;
   const цель = state ? nano(state.graduationTon) : 0;
-  const выпуск = state ? nano(state.tokensSold) : 0;
   // Капитализация — цена за весь выпуск (миллиард) и сразу в долларах:
-  // в TON её приходилось пересчитывать в уме, а привыкли к доллару.
-  const капаTon = цена > 0 ? цена * 1000000000 : 0;
-  const капа = курс > 0 ? капаTon * курс : 0;
+  // в монете сети её приходилось пересчитывать в уме, а привыкли к доллару.
+  const капа = цена > 0 && курс > 0 ? цена * 1000000000 * курс : 0;
 
   // Движение за сутки считаем по своим сделкам: первая за 24 часа против
   // текущей цены кривой. Сделок нет — движения тоже нет, и рисовать
@@ -627,25 +826,20 @@ export async function tokenCard(token) {
   const оборот = заСутки.reduce((s, p) => s + p.ton, 0);
 
   const доля = цель > 0 ? Math.max(0, Math.min(1, собрано / цель)) : 0;
-  const делений = 12;
-  const полоса = "█".repeat(Math.round(доля * делений)) + "░".repeat(делений - Math.round(доля * делений));
 
   const имя = escape(token.name || token.ticker || "?");
   // Своего эмодзи у токенов нет — в приложении им рисуется ракета.
   const значок = логотип ? "🪙" : "🚀";
   const тикер = escape(String(token.ticker || "").toUpperCase());
   const знак = движение >= 0 ? "+" : "";
-  const стрелка = движение > 0 ? "▲" : движение < 0 ? "▼" : "•";
-
   const стрелкаЭмодзи = движение > 0 ? "🔺" : движение < 0 ? "🔻" : "▪️";
 
   const строки = [
     `${значок} <b>${имя}</b> · $${тикер}`,
     "",
-    `💰 Цена: ${fmtPrice(цена)}`,
-    // Капитализация всегда в долларах: в TON её приходилось
-    // пересчитывать в уме, а рядом в ленте и на бирже она в долларах.
-    // Курс не пришёл — честный прочерк, а не другая единица.
+    `💰 Цена: ${fmtЦены(цена, "GRAM")}`,
+    // Капитализация всегда в долларах: рядом в ленте и на бирже она в
+    // долларах. Курс не пришёл — честный прочерк, а не другая единица.
     `📊 Капа: ${капа > 0 ? fmtUsd(капа) : "—"} · ${стрелкаЭмодзи} ${знак}${движение.toFixed(2)}% за 24ч`,
   ];
   if (цель > 0) {
@@ -655,41 +849,32 @@ export async function tokenCard(token) {
     // отдельным действием, и до неё торговать негде.
     строки.push(state && state.graduated
       ? (token.dex_pool_address
-        ? `🎉 Кривая закрыта, собрано ${fmtTon(собрано)} TON — торгуется на бирже`
-        : `🎉 Кривая закрыта, собрано ${fmtTon(собрано)} TON — пара на бирже готовится`)
-      : `🚀 Собрано для выхода на биржу: ${(доля * 100).toFixed(0)}%\n${fmtTon(собрано)} / ${fmtTon(цель)} TON`);
+        ? `🎉 Кривая закрыта, собрано ${fmtTon(собрано)} GRAM — торгуется на ${БИРЖА_СЕТИ.ton}`
+        : `🎉 Кривая закрыта, собрано ${fmtTon(собрано)} GRAM — пара на бирже готовится`)
+      : `🚀 Собрано для выхода на биржу: ${(доля * 100).toFixed(0)}%\n${fmtTon(собрано)} / ${fmtTon(цель)} GRAM`);
   }
   строки.push("");
-  строки.push(`📈 Оборот 24ч: ${fmtTon(оборот)} TON`);
-  строки.push(`🔄 Сделок: ${история.length} · ⏱ С момента листинга: ${fmtAge(token.created_at)}`);
-  if (token.address) строки.push(`\n<code>${escape(token.address)}</code>`);
+  строки.push(`📈 Оборот 24ч: ${fmtTon(оборот)} GRAM`);
+  строки.push(`🔄 Сделок: ${история.length} · ⏱ С запуска: ${fmtAge(token.created_at)}`);
+  const пробная = строкаПробнойСети(token, "ton");
+  if (пробная) строки.splice(2, 0, пробная);
+  if (token.address) строки.push(`\n⛓ TON · <code>${escape(token.address)}</code>`);
 
   // В строке подсказки — то же, что и в карточке: капитализация в
-  // долларах первой, потом движение и путь до листинга. Раньше здесь
-  // стояла цена, по которой мемкоин ни с чем не сравнить: у одного она
-  // в миллионных долях, у другого в тысячных, а капа сопоставима.
+  // долларах первой, потом движение и путь до листинга. Цена мемкоина ни
+  // с чем не сравнима: у одного она в миллионных долях, у другого в
+  // тысячных, а капа сопоставима.
   const описание = state
-    ? `${капа > 0 ? fmtUsd(капа) : fmtPrice(цена)} · ${знак}${движение.toFixed(1)}% · ${fmtTon(собрано)}/${fmtTon(цель)} TON`
-    : "Кривая ещё не отвечает — открой в приложении";
+    ? `TON · ${капа > 0 ? fmtUsd(капа) : fmtЦены(цена, "GRAM")} · ${знак}${движение.toFixed(1)}% · ${fmtTon(собрано)}/${fmtTon(цель)} GRAM`
+    : "TON · кривая ещё не отвечает — открой в приложении";
 
+  // Закрытая кривая без пары на бирже не принимает ни покупок, ни
+  // продаж: показывать кнопку, которую контракт отобьёт, — врать.
+  const торгуется = !!(state && (state.graduated ? token.dex_pool_address : token.curve_address));
   return {
+    ...основаКарточки(token, "ton", { цена, торгуется, лого: логотип }),
     text: строки.join("\n"),
-    title: `$${тикер} — ${имя}`,
     description: описание,
-    link: `${APP_URL}?token=${token.id}`,
-    chart: `${APP_URL}/api/chart?token=${token.id}&t=${свежесть()}`,
-    ref: `t:${token.id}`,
-    // Закрытая кривая не принимает ни покупок, ни продаж: показывать
-    // кнопку, которую контракт отобьёт, — врать. Такой токен торгуется
-    // дальше в приложении, оттуда и идёт сделка.
-    curve: state && !state.graduated ? token.curve_address || null : null,
-    // После закрытия кривой рынок переезжает в собственный пул токена.
-    // Сделка там собирается так же, только другим телом сообщения.
-    pool: state && state.graduated ? token.dex_pool_address || null : null,
-    jetton: token.address || null,
-    ticker: тикер,
-    botLink: `https://t.me/${(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "")}?start=tok_${token.id}`,
-    thumb: логотип || null,
   };
 }
 
@@ -704,43 +889,44 @@ function fmtUsd(n) {
   return "—";
 }
 
-/* Карточка токена, который в приложении просто показывается: своей
-   кривой у него нет, все цифры — с биржи, поэтому и путь до листинга
-   тут не при чём, он уже там. */
+/* Карточка токена с рынка: своей кривой у него нет, все цифры — из ленты
+   или с биржи, поэтому и путь до листинга тут ни при чём, он уже там.
+   Торгуется он в приложении: туда и ведёт кнопка. */
 export async function externalCard(token) {
+  const цепь = token.chain === "solana" ? "solana" : "ton";
   const знак = token.change24 >= 0 ? "+" : "";
-  const стрелка = token.change24 > 0 ? "▲" : token.change24 < 0 ? "▼" : "•";
+  const стрелка = token.change24 > 0 ? "🔺" : token.change24 < 0 ? "🔻" : "▪️";
   const строки = [
-    `${token.emoji || "🪙"} <b>${escape(token.name)}</b>  $${escape(token.ticker)}`,
+    `${token.emoji || "🪙"} <b>${escape(token.name)}</b> · $${escape(token.ticker)}`,
     "",
-    `Цена   <code>${fmtUsd(token.priceUsd)}</code>`,
-    `Капа   <code>${fmtUsd(token.mcapUsd)}</code>   ${стрелка} ${знак}${token.change24.toFixed(2)}% за 24ч`,
+    `💰 Цена: ${fmtUsd(token.priceUsd)}`,
+    `📊 Капа: ${fmtUsd(token.mcapUsd)} · ${стрелка} ${знак}${token.change24.toFixed(2)}% за 24ч`,
+    "",
+    `📈 Оборот 24ч: ${fmtUsd(token.volUsd)} · 💧 Ликвидность: ${fmtUsd(token.liqUsd)}`,
   ];
-  строки.push("");
-  строки.push(`Объём 24ч ${fmtUsd(token.volUsd)} · Ликвидность ${fmtUsd(token.liqUsd)}${token.dex ? ` · ${escape(token.dex)}` : ""}`);
-  if (token.address) строки.push(`\n<code>${escape(token.address)}</code>`);
+  строки.push(`\n⛓ ${ИМЯ_СЕТИ[цепь]}${token.dex ? ` · ${escape(token.dex)}` : ""}${token.token_address ? ` · <code>${escape(token.token_address)}</code>` : ""}`);
 
   return {
     text: строки.join("\n"),
     title: `$${token.ticker} — ${token.name}`,
-    description: `${fmtUsd(token.priceUsd)} · ${знак}${token.change24.toFixed(1)}% · ликвидность ${fmtUsd(token.liqUsd)}`,
+    description: `${ИМЯ_СЕТИ[цепь]} · ${fmtUsd(token.mcapUsd)} · ${знак}${token.change24.toFixed(1)}% · оборот ${fmtUsd(token.volUsd)}`,
     ticker: token.ticker,
-    // Адрес самого жетона нужен для покупки: своп собирается по нему.
-    // В тестовой сети его не отдаём — покупать нечем, и кнопка торговли
-    // просто не появится.
-    jetton: TESTNET ? null : token.token_address || null,
+    chain: цепь,
+    монета: МОНЕТА[цепь],
+    external: true,
+    торгуется: false,
     link: `${APP_URL}?pool=${token.pool_address}`,
     chart: `${APP_URL}/api/chart?pool=${token.pool_address}&t=${свежесть()}`,
     ref: `p:${token.pool_address}`,
-    botLink: `https://t.me/${(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "")}?start=pool_${token.pool_address}`,
+    botLink: ссылкаБота(`pool_${token.pool_address}`),
     thumb: token.logo_url || null,
   };
 }
 
-/* Общий вход: сперва своё, потом биржа. Свои токены впереди намеренно —
+/* Общий вход: сперва своё, потом рынок. Свои токены впереди намеренно —
    бот всё-таки про Mintly, и запущенное здесь должно находиться первым. */
 export async function searchAll(query, limit = 8) {
-  // Свои токены и биржевые ищем одновременно. По очереди это стоило двух
+  // Свои токены и рыночные ищем одновременно. По очереди это стоило двух
   // ожиданий подряд, а подсказке в чате Telegram отводит доли секунды:
   // лишний поход в сеть — и она исчезает, не дождавшись ответа.
   const строка = String(query || "").trim();
@@ -771,9 +957,11 @@ export async function cardByRef(вид, ключ) {
   }
   const admin = adminClient();
   if (!admin) return null;
+  // Сеть и цепочка нужны карточке: без них токен Solana или EVM
+  // собирался как TON-овский, и цифры брались не из той сети.
   const { data } = await admin
     .from("tokens")
-    .select(`id, name, ticker, logo_url, address, curve_address, created_at, owner_id${await естьКолонкаПула(admin) ? ", dex_pool_address" : ""}`)
+    .select(`id, name, ticker, logo_url, address, curve_address, chain, network, created_at, owner_id${await естьКолонкаПула(admin) ? ", dex_pool_address" : ""}`)
     .eq("id", ключ)
     .maybeSingle();
   return data ? tokenCard(data) : null;

@@ -232,7 +232,7 @@
           экран('<h1>' + Т.title + '</h1><p class="подзаголовок">' + Т.noAccount + '</p>' +
             '<button class="кнопка" id="вМинтли">' + Т.openMain + '</button>');
           document.getElementById("вМинтли").onclick = function () {
-            var ссылка = "https://t.me/MintlyAppbot";
+            var ссылка = "https://t.me/MintlyCobot?startapp";
             if (tg && tg.openTelegramLink) tg.openTelegramLink(ссылка); else window.open(ссылка, "_blank");
           };
           return;

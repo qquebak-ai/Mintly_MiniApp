@@ -12,8 +12,7 @@
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const APP_URL = process.env.APP_URL || "https://mintly.company";
-const TG_BOT = String(process.env.TG_BOT || "MintlyAppbot").replace(/^@/, "").trim();
-const TG_APP = String(process.env.TG_APP || "Mintly").trim();
+const TG_BOT = String(process.env.TG_BOT || "MintlyCobot").replace(/^@/, "").trim();
 
 async function tg(метод, тело) {
   if (!BOT_TOKEN) return null;
@@ -98,7 +97,9 @@ export async function обновитьЖивойГрафик(db, { токен, �
   });
   const кнопки = {
     inline_keyboard: [[
-      { text: "Открыть в Mintly", url: `https://t.me/${TG_BOT}/${TG_APP}?startapp=tok_${токен.id}` },
+      // Через бота, а не прямой ссылкой на мини-приложение: метку tok_ бот
+      // получает всегда и сам открывает карточку с кнопкой приложения.
+      { text: "Открыть в Mintly", url: `https://t.me/${TG_BOT}?start=tok_${токен.id}` },
     ]],
   };
 

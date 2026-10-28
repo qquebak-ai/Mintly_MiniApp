@@ -16,7 +16,7 @@
 import { createCanvas, downscale, encodePNG, fillRect, line, px, text, textWidth } from "./_png.js";
 import { gtЗапрос, gtСостояние } from "./_gt.js";
 import { adminClient } from "./_support.js";
-import { curveState, priceFromState, looksLikeAddress, poolByAddress, курсTon, курсSol, цепочкаТокена } from "./_market.js";
+import { curveState, priceFromState, looksLikeAddress, видАдреса, poolByAddress, курсTon, курсSol, курсМонеты, цепочкаТокена, ЦЕПИ_EVM, МОНЕТА } from "./_market.js";
 import { свопТонВЖетон, свопЖетонВТон } from "./_swap.js";
 
 // Макет считается в этих единицах, а рисуется во столько раз крупнее и
@@ -42,7 +42,10 @@ const GT = "https://api.geckoterminal.com/api/v2";
 
 async function свечиБиржи(pool) {
   try {
-    const res = await fetch(`${GT}/networks/ton/pools/${pool}/ohlcv/hour?aggregate=1&limit=24&currency=usd&token=base`);
+    // Сеть пула — по виду адреса: в ленте рядом лежат и пулы TON, и пулы
+    // Solana, а свечи одной сети у другой не найдутся.
+    const сеть = видАдреса(pool) === "solana" ? "solana" : "ton";
+    const res = await fetch(`${GT}/networks/${сеть}/pools/${pool}/ohlcv/hour?aggregate=1&limit=24&currency=usd&token=base`);
     if (!res.ok) return [];
     const json = await res.json();
     const list = json && json.data && json.data.attributes && json.data.attributes.ohlcv_list;
@@ -195,9 +198,10 @@ function рядПоКривой({ виртМонет, виртТокенов, с
   return { точки, отметка: доля };
 }
 
+// Монета TON в приложении называется GRAM — и на картинке так же.
 function fmtЦена(v, вTon) {
   if (!(v > 0)) return "-";
-  const хвост = вTon ? " TON" : "";
+  const хвост = вTon ? " GRAM" : "";
   if (v >= 1) return `${вTon ? "" : "$"}${v.toFixed(4)}${хвост}`;
   if (v >= 0.0001) return `${вTon ? "" : "$"}${v.toFixed(6)}${хвост}`;
   return `${вTon ? "" : "$"}${v.toFixed(9).replace(/(\.\d*?)0+$/, "$1")}${хвост}`;
@@ -206,7 +210,7 @@ function fmtЦена(v, вTon) {
 function fmtБольшое(v, вTon) {
   const n = Number(v) || 0;
   const знак = вTon ? "" : "$";
-  const хвост = вTon ? " TON" : "";
+  const хвост = вTon ? " GRAM" : "";
   if (n >= 1e9) return `${знак}${(n / 1e9).toFixed(2)}B${хвост}`;
   if (n >= 1e6) return `${знак}${(n / 1e6).toFixed(2)}M${хвост}`;
   if (n >= 1e3) return `${знак}${(n / 1e3).toFixed(1)}K${хвост}`;
@@ -580,6 +584,38 @@ export default async function handler(req, res) {
           точки: кривая ? кривая.точки : [],
           отметка: кривая ? кривая.отметка : null,
           подпись: "MINTLY CURVE · SOL",
+          вTon: false,
+        });
+        res.setHeader("Content-Type", "image/png");
+        res.setHeader("Cache-Control", свежо ? "no-store" : "public, max-age=60, s-maxage=60");
+        return res.status(200).send(png);
+      }
+
+      // Токен EVM: состояние отдаёт фабрика сети по адресу токена. Раньше
+      // он уходил в ветку TON и картинка выходила пустой.
+      const цепь = цепочкаТокена(строка);
+      if (ЦЕПИ_EVM.includes(цепь)) {
+        const { состояниеКривой } = await import("./wallet-evm.js");
+        const [s, курс] = await Promise.all([
+          состояниеКривой(цепь, строка.address).catch(() => null),
+          курсМонеты(цепь).catch(() => 0),
+        ]);
+        const монета = МОНЕТА[цепь];
+        const кривая = s ? рядПоКривой({
+          виртМонет: s.virtualNative,
+          виртТокенов: s.virtualTokens,
+          собрано: s.realNative,
+          цель: s.graduationNative,
+        }) : null;
+        const png = нарисовать({
+          ticker: String(строка.ticker || "").toUpperCase(),
+          name: строка.name,
+          priceText: s ? `${fmtЦена(s.price, false).replace("$", "")} ${монета}` : "-",
+          capText: s && курс > 0 ? fmtБольшое(s.price * 1e9 * курс, false) : "",
+          change: null,
+          точки: кривая ? кривая.точки : [],
+          отметка: кривая ? кривая.отметка : null,
+          подпись: `MINTLY CURVE · ${монета}`,
           вTon: false,
         });
         res.setHeader("Content-Type", "image/png");
