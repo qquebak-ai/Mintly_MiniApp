@@ -1970,6 +1970,9 @@ function fmtPrice(p) {
 function подписьВремени(sec, tf) {
   const д = new Date(sec * 1000);
   const дв = (v) => String(v).padStart(2, "0");
+  // На секундах соседние свечи — одна и та же минута: без секунд все
+  // подписи под ними были бы одинаковыми.
+  if (tf === "S1" || tf === "S15") return `${дв(д.getHours())}:${дв(д.getMinutes())}:${дв(д.getSeconds())}`;
   if (tf === "D1" || tf === "W1" || tf === "MN1") return `${дв(д.getDate())}.${дв(д.getMonth() + 1)}`;
   if (tf === "H4" || tf === "H1") return `${дв(д.getDate())}.${дв(д.getMonth() + 1)} ${дв(д.getHours())}:00`;
   return `${дв(д.getHours())}:${дв(д.getMinutes())}`;
@@ -3408,7 +3411,35 @@ const ПЕРИОДЫ = [
   { tf: "D1", ru: "1д", en: "1D" },
   { tf: "W1", ru: "7д", en: "7D" },
 ];
-const TF_SECONDS = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400, D1: 86400, W1: 604800, MN1: 2592000 };
+const TF_SECONDS = { S1: 1, S15: 15, M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400, D1: 86400, W1: 604800, MN1: 2592000 };
+/* Секунды — только у чужих токенов Solana: их свечи отдаёт Jupiter, а у
+   него они есть с точностью до секунды. Своя кривая и биржи TON так
+   мелко не умеют, поэтому в TIMEFRAMES секунд нет: сохранённый выбор
+   «1с» не должен открыть токен TON на интервале, которого у него нет. */
+const ПЕРИОДЫ_СЕКУНДЫ = [
+  { tf: "S1", ru: "1с", en: "1s" },
+  { tf: "S15", ru: "15с", en: "15s" },
+];
+/* С какого интервала открывать чужой токен — по его возрасту. Токен с
+   pump.fun живёт минутами: на минутном графике у пятиминутного токена
+   пять свечей, а на секундном — по свече на каждую секунду со сделками. */
+function интервалСтороны(tok) {
+  const создан = tok && tok.createdAt ? new Date(tok.createdAt).getTime() : 0;
+  const возраст = создан > 0 ? Date.now() - создан : Infinity;
+  if (возраст < 5 * 60 * 1000) return "S1";
+  if (возраст < 60 * 60 * 1000) return "S15";
+  return "M1";
+}
+function начальныйИнтервал(tok) {
+  // Выбор человека, сохранённый на своих токенах, чужому свежему токену
+  // не подходит: на часе вся его жизнь — одна свеча.
+  if (String((tok && tok.id) || "").startsWith("pump-")) return интервалСтороны(tok);
+  try {
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem("mintly_chart_tf") : null;
+    if (saved && TIMEFRAMES.includes(saved)) return saved;
+  } catch (e) { /* localStorage unavailable */ }
+  return "H1";
+}
 
 /* Часы сервера. Живые события помечены его временем (ms), а свечи и
    своя сделка, нарисованная в миг нажатия, считались по часам телефона.
@@ -4679,6 +4710,107 @@ async function fetchTonapiChart(jettonAddress, tf, testnet = false) {
 // интервалу рисуется мгновенно и не тратит запрос.
 const OHLCV_TTL_MS = 30_000;
 const ohlcvInflight = new Map();
+
+/* Свечи чужого токена Solana — у Jupiter.
+ *
+ * pump.fun и другие площадки свои свечи прячут за защитой от ботов, а
+ * биржевой справочник узнаёт о новом токене через минуты. Jupiter видит
+ * сделки всех площадок сразу, отдаёт готовые свечи за четверть секунды,
+ * вплоть до посекундных, и пускает к себе прямо из приложения. Без него
+ * у свежего токена на графике стояла одна черта: сервер ещё не успевал
+ * насобирать сделок.
+ *
+ * Свечи в ответе только там, где были сделки: пустых секунд нет — так же
+ * рисуется и своя кривая. */
+const ИНТЕРВАЛ_JUPITER = { S1: "1_SECOND", S15: "15_SECOND", M1: "1_MINUTE", M5: "5_MINUTE", M15: "15_MINUTE", M30: "30_MINUTE", H1: "1_HOUR", H4: "4_HOUR", D1: "1_DAY", W1: "1_WEEK", MN1: "1_MONTH" };
+const свечиJupiterКеш = new Map(); // `${mint}:${tf}` → { value, весьПри }
+const свечиJupiterВПути = new Map();
+function свечиJupiterИзКеша(mint, tf) {
+  const hit = mint ? свечиJupiterКеш.get(`${mint}:${tf}`) : null;
+  return hit ? { ...hit.value, tf } : null;
+}
+function тотЖеРяд(a, b) {
+  if (!a || !b || !a.length || a.length !== b.length) return false;
+  const x = a[a.length - 1], y = b[b.length - 1];
+  return a[0].time === b[0].time && x.time === y.time && x.close === y.close && x.high === y.high && x.low === y.low;
+}
+async function загрузитьJupiter(mint, интервал, сколько) {
+  try {
+    const r = await fetch(`https://datapi.jup.ag/v2/charts/${encodeURIComponent(mint)}?interval=${интервал}&to=${Date.now()}&candles=${сколько}&type=price&quote=usd`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    const ряд = (j && Array.isArray(j.candles) ? j.candles : [])
+      .map((c) => {
+        const open = Number(c.open), close = Number(c.close);
+        /* Тени — по крайним из всех четырёх чисел. У первой свечи токена
+           Jupiter порой путает поля (стартовая цена кривой лежит в high
+           ниже открытия) или отдаёт тень нулём: без поправки свеча падала
+           бы до нуля и сплющивала шкалу, а стартовая цена пропадала. */
+        const все = [open, close, Number(c.high), Number(c.low)].filter((v) => v > 0);
+        const high = все.length ? Math.max(...все) : NaN;
+        const low = все.length ? Math.min(...все) : NaN;
+        return { time: Number(c.time), open, high, low, close, volume: Number(c.volume) || 0 };
+      })
+      .filter((c) => Number.isFinite(c.time) && c.open > 0 && c.close > 0 && Number.isFinite(c.high) && Number.isFinite(c.low))
+      .sort((a, b) => a.time - b.time);
+    if (!ряд.length) return null;
+    return {
+      candles: ряд.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })),
+      volume: ряд.map((c) => ({ time: c.time, value: c.volume, color: hexA(c.close >= c.open ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ, 0.32) })),
+    };
+  } catch {
+    return null;
+  }
+}
+const ХВОСТ_JUPITER = 12;
+function свечиJupiter(mint, tf) {
+  const интервал = ИНТЕРВАЛ_JUPITER[tf];
+  if (!mint || !интервал) return Promise.resolve(null);
+  const ключ = `${mint}:${tf}`;
+  // Тот же запрос уже идёт — например, начатый ещё нажатием на карточку
+  // в ленте: ждём его, а не шлём второй.
+  if (свечиJupiterВПути.has(ключ)) return свечиJupiterВПути.get(ключ);
+  const run = (async () => {
+    const было = свечиJupiterКеш.get(ключ);
+    /* Весь ряд — при открытии и раз в полминуты, а между ними только хвост
+       из дюжины последних свечей, пришитый к ряду. График опрашивается раз
+       в полторы секунды, и триста свечей на каждом круге — это десятки
+       килобайт: на телефоне за час набегали бы мегабайты. */
+    const хвост = !!(было && Date.now() - было.весьПри < 30000);
+    const свежие = await загрузитьJupiter(mint, интервал, хвост ? ХВОСТ_JUPITER : 300);
+    if (!свежие) return было ? было.value : null;
+    let value = свежие, весьПри = Date.now();
+    if (хвост) {
+      const ст = было.value.candles;
+      const первая = свежие.candles[0].time;
+      if (свежие.candles.length >= ХВОСТ_JUPITER && первая > ст[ст.length - 1].time) {
+        // Хвост не сошёлся с рядом (приложение было свёрнуто, опрос
+        // стоял) — между ними могли пропасть свечи: берём ряд целиком.
+        const весь = await загрузитьJupiter(mint, интервал, 300);
+        if (!весь) return было.value;
+        value = весь;
+      } else {
+        let до = ст.length;
+        while (до > 0 && ст[до - 1].time >= первая) до -= 1;
+        const с = Math.max(0, до - 400);
+        value = {
+          candles: ст.slice(с, до).concat(свежие.candles),
+          volume: было.value.volume.slice(с, до).concat(свежие.volume),
+        };
+        весьПри = было.весьПри;
+      }
+    }
+    свечиJupiterКеш.delete(ключ);
+    свечиJupiterКеш.set(ключ, { value, весьПри });
+    // Память — о последних полусотне графиков: повторно открытый токен
+    // рисуется сразу, а память не растёт без конца.
+    while (свечиJupiterКеш.size > 50) свечиJupiterКеш.delete(свечиJupiterКеш.keys().next().value);
+    return value;
+  })();
+  свечиJupiterВПути.set(ключ, run);
+  run.finally(() => свечиJupiterВПути.delete(ключ));
+  return run;
+}
 
 async function fetchPoolOHLCV(poolAddress, tf, priority = GT_PRIORITY.chart, signal = undefined, network = GT_NETWORK) {
   const cacheKey = `${network}:${poolAddress}:${tf}`;
@@ -21904,23 +22036,28 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   // Как у pump.fun: график — в капитализации. Цена мемкоина — это
   // семь нулей после запятой, а капитализацию читают одним взглядом.
   const [chartMode, setChartMode] = useState("mcap");
-  const [tf, setTf] = useState(() => {
-    /* Токен с pump.fun/letsbonk живёт минуты: на часовом графике вся его
-       жизнь — одна свеча. Открываем минутный, выбор человека не трогаем. */
-    if (String((token && token.id) || "").startsWith("pump-") && TIMEFRAMES.includes("M1")) return "M1";
-    try {
-      if (typeof window !== "undefined") {
-        const saved = window.localStorage.getItem("mintly_chart_tf");
-        if (saved && TIMEFRAMES.includes(saved)) return saved;
-      }
-    } catch (e) { /* localStorage unavailable */ }
-    return "H1";
-  });
+  /* Токен с pump.fun/letsbonk живёт минуты: на часовом графике вся его
+     жизнь — одна свеча. Открываем секунды или минуты по возрасту, выбор
+     человека для своих токенов не трогаем. */
+  const [tf, setTf] = useState(() => начальныйИнтервал(token));
+  /* Экран остаётся тем же, когда из одного токена переходят в другой, —
+     и интервал оставался от прошлого. С чужого токена на «1с» токен TON
+     открывался на секундах, которых у него нет, и график пустовал.
+     Меняем интервал прямо в отрисовке, а не эффектом: иначе один кадр
+     успевал уйти со старым интервалом и запросом за ним. */
+  const [tfДляТокена, setTfДляТокена] = useState(token.id);
+  if (tfДляТокена !== token.id) {
+    setTfДляТокена(token.id);
+    setTf(начальныйИнтервал(token));
+  }
   // Ряд интервалов прокручивается вбок; выбранный подводим в поле
   // зрения, иначе после открытия экрана он мог оказаться за краем.
   const tfRowRef = useRef(null);
   function changeTf(next) {
     setTf(next);
+    // Чужой токен открывается по своему возрасту, а секунд у токенов TON
+    // нет вовсе — такой выбор в общую память не кладём.
+    if (String(token.id || "").startsWith("pump-") || !TIMEFRAMES.includes(next)) return;
     try { if (typeof window !== "undefined") window.localStorage.setItem("mintly_chart_tf", next); } catch (e) { /* localStorage unavailable */ }
   }
   useEffect(() => {
@@ -22236,24 +22373,75 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     return undefined;
   }, [кривЗакрыта, рынокОткрыт]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setПереезд(false); setПереехал(false); }, [token.id]);
-  /* Токен, только что созданный на pump.fun или letsbonk: у бирж его ещё
-     нет, свечей ждать неоткуда. Сервер видит каждую его сделку в потоке
-     площадки (api/_launchStream.js) — из них график и строится, раз в
-     полторы секунды, с первой сделки автора. */
+  /* Токен, только что созданный на pump.fun, letsbonk или другой площадке
+     Solana. Свечи даёт Jupiter (свечиJupiter): у него все сделки токена с
+     первой, на любом интервале вплоть до секунды, и от блока до свечи
+     проходит секунды две-три. Раньше график строился из сделок потока
+     сервера, а тот застаёт не все: первые покупки в секунду создания
+     уходят до подписки, часть сделок теряется, а между ними сервер
+     вписывает точки цены, которых в сети не было. Отсюда и одна черта
+     вместо графика. Сделки потока остались запасом — пока Jupiter о
+     токене ещё не знает. */
   const запускСоСтороны = String(token.id || "").startsWith("pump-");
+  const адресСтороны = запускСоСтороны ? (token.tokenAddress || token.address || "") : "";
   const [сделкиСтороны, setСделкиСтороны] = useState(null);
   const [курсСерверСтороны, setКурсСтороны] = useState(0);
   const курсСтороны = solUsd() || курсСерверСтороны;
-  // Цена сейчас — по последней сделке из потока площадки.
-  const ценаСтороны = (() => {
-    const посл = сделкиСтороны && сделкиСтороны[сделкиСтороны.length - 1];
-    return посл && курсСтороны > 0 ? посл[1] * курсСтороны : 0;
-  })();
+  const [свечиСтороны, setСвечиСтороны] = useState(() => {
+    const к = свечиJupiterИзКеша(адресСтороны, tf);
+    return к ? { ...к, mint: адресСтороны } : null;
+  });
+  // Jupiter не ответил за полторы секунды — рисуем по тому, что есть.
+  const [молчитJupiter, setМолчитJupiter] = useState(false);
   useEffect(() => {
-    setСделкиСтороны(null);
-    if (!запускСоСтороны) return undefined;
+    if (!адресСтороны) { setСвечиСтороны(null); return undefined; }
+    const reqTf = tf;
+    const кеш = свечиJupiterИзКеша(адресСтороны, reqTf);
+    // Сменили интервал — прежние свечи держим, пока не придут новые: по
+    // ним стоит цена в шапке, и она не должна мигать.
+    setСвечиСтороны((prev) => (кеш ? { ...кеш, mint: адресСтороны } : prev && prev.mint === адресСтороны ? prev : null));
+    setМолчитJupiter(false);
+    let живо = true, таймер = 0;
+    const молчание = setTimeout(() => { if (живо) setМолчитJupiter(true); }, 1500);
+    const читать = async () => {
+      // Свёрнутое приложение не спрашивает: график всё равно никто не видит.
+      if (typeof document === "undefined" || !document.hidden) {
+        const ряд = await свечиJupiter(адресСтороны, reqTf);
+        if (!живо) return;
+        setСвечиСтороны((prev) => {
+          const было = prev && prev.mint === адресСтороны && prev.tf === reqTf ? prev : null;
+          // Сеть моргнула — нарисованное остаётся. Не было ничего —
+          // помечаем, что у Jupiter пусто, и график строится по сделкам.
+          if (!ряд) return было || { tf: reqTf, mint: адресСтороны, candles: [], volume: [] };
+          if (было && тотЖеРяд(было.candles, ряд.candles)) return было;
+          return { ...ряд, tf: reqTf, mint: адресСтороны };
+        });
+      }
+      // Каждые полторы секунды спрашивается лишь хвост ряда (см.
+      // свечиJupiter), поэтому частый опрос ничего не стоит.
+      if (живо) таймер = setTimeout(читать, 1500);
+    };
+    читать();
+    return () => { живо = false; clearTimeout(таймер); clearTimeout(молчание); };
+  }, [адресСтороны, tf]);
+  const свечиJupiterЕсть = !!(свечиСтороны && свечиСтороны.mint === адресСтороны && свечиСтороны.candles.length);
+  /* Цена сейчас — закрытие последней свечи Jupiter: на любом интервале это
+     цена последней сделки. Пока свечей нет — последняя точка потока, а до
+     неё капитализация из ленты (у pump.fun и letsbonk выпуск — миллиард):
+     раньше шапка в это время показывала «$0». */
+  const ценаСтороны = (() => {
+    if (свечиJupiterЕсть) return свечиСтороны.candles[свечиСтороны.candles.length - 1].close;
+    const посл = сделкиСтороны && сделкиСтороны[сделкиСтороны.length - 1];
+    if (посл && курсСтороны > 0) return посл[1] * курсСтороны;
+    return запускСоСтороны && token.mcapNum > 0 ? token.mcapNum / 1e9 : 0;
+  })();
+  useEffect(() => { setСделкиСтороны(null); }, [адресСтороны]);
+  useEffect(() => {
+    // Свечи Jupiter пришли — поток сервера больше не нужен: он и неполный,
+    // и весит десятки килобайт на каждом круге.
+    if (!запускСоСтороны || свечиJupiterЕсть) return undefined;
     let живо = true;
-    const читать = () => fetch(апи(`/api/new-launches?trades=${encodeURIComponent(token.tokenAddress || token.address)}`))
+    const читать = () => fetch(апи(`/api/new-launches?trades=${encodeURIComponent(адресСтороны)}`))
       .then((r) => (r.ok ? r.json() : null)).then((j) => {
         if (!живо || !j || !Array.isArray(j.trades)) return;
         setСделкиСтороны(j.trades);
@@ -22262,7 +22450,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     читать();
     const id = setInterval(читать, 1500);
     return () => { живо = false; clearInterval(id); };
-  }, [запускСоСтороны, token.tokenAddress, token.address]);
+  }, [запускСоСтороны, адресСтороны, свечиJupiterЕсть]);
   /* Показываем капитализацию, а не цену за штуку. У мемкоина цена —
      это шесть нулей после запятой, по которым ничего не понять, а
      капитализация сразу говорит, насколько токен большой. Множитель —
@@ -22520,7 +22708,10 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     const abort = typeof AbortController !== "undefined" ? new AbortController() : null;
     // Демо-токен рисует свечи сам, из живых цен (см. ниже): запросы к
     // сети ему не нужны, а их «ничего не нашлось» стирало его график.
-    if (token.демо) { setChartLoading(false); return undefined; }
+    // Чужой токен Solana рисуется из свечей Jupiter и сделок потока
+    // (графДанные): биржевой справочник о свежем токене не знает, а его
+    // лимит запросов общий на всё приложение — тратить его незачем.
+    if (token.демо || запускСоСтороны) { setChartLoading(false); return undefined; }
     setChartLoading(true);
     async function attempt(allowFlat) {
       let result = null;
@@ -22613,7 +22804,8 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
   // дрожание последней свече, как раньше, больше не нужно — выдуманных
   // движений на графике нет вовсе.
   useEffect(() => {
-    if (!token.poolAddress && !curveChart) return;
+    // Чужой токен обновляет свои свечи сам (опрос Jupiter выше).
+    if (запускСоСтороны || (!token.poolAddress && !curveChart)) return;
     let cancelled = false;
     const reqTf = tf;
     const abort = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -22805,6 +22997,12 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     if (запускСоСтороны) {
       const курс = курсСтороны;
       const шаг = TF_SECONDS[tf] || 60;
+      const jup = свечиСтороны && свечиСтороны.mint === адресСтороны && свечиСтороны.tf === tf ? свечиСтороны : null;
+      // Jupiter ещё не ответил — полсекунды загрузки честнее черты,
+      // которую через миг сменят настоящие свечи.
+      if (!jup && !молчитJupiter) return null;
+      if (jup && jup.candles.length) return { candles: jup.candles, volume: jup.volume, tf, isLive: true };
+      // У Jupiter токена пока нет — свечи из сделок потока, как раньше.
       const свечи = [], объём = [];
       for (const [мс, ценаSol, суммаSol, вид] of сделкиСтороны || []) {
         const usd = ценаSol * курс;
@@ -22858,7 +23056,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
     if (!(цена > 0)) return null;
     const ряд = flatCandles(цена, tf);
     return ряд ? { ...ряд, tf, isLive: false } : null;
-  }, [chartData, своя, tf, запущенВ, пулБиржи, точкиПула, курсПула, chartLoading, запускСоСтороны, сделкиСтороны, курсСтороны, token.mcapNum]);
+  }, [chartData, своя, tf, запущенВ, пулБиржи, точкиПула, курсПула, chartLoading, запускСоСтороны, сделкиСтороны, курсСтороны, token.mcapNum, свечиСтороны, молчитJupiter, адресСтороны]);
   const scaledCandles = useMemo(() => {
     if (!графДанные?.candles) return null;
     // Без множителя рисовать нечего: раньше в этот момент график молча
@@ -23610,7 +23808,7 @@ function TokenDetail({ t: token, onBack, showToast, onBuy, onSell, onQuick = nul
             смотрят, а не работают с ним: сначала картинка, потом выбор
             отрезка. Выбранный лежит в тёмной капсуле. */}
         <div className="no-scrollbar flex items-center overflow-x-auto" ref={tfRowRef} style={{ gap: 2, paddingBottom: 2 }}>
-          {ПЕРИОДЫ.map((п) => (
+          {(запускСоСтороны ? [...ПЕРИОДЫ_СЕКУНДЫ, ...ПЕРИОДЫ] : ПЕРИОДЫ).map((п) => (
             <button
               key={п.tf}
               data-tf={п.tf}
@@ -35152,6 +35350,9 @@ function mapTokenRow(row) {
 
   async function openToken(t) {
     if (!t) return;
+    // Свечи чужого токена просим уже сейчас, пока экран только
+    // открывается: к первому кадру графика они чаще всего уже здесь.
+    if (String(t.id || "").startsWith("pump-")) свечиJupiter(t.tokenAddress || t.address, интервалСтороны(t));
     // Топ приходит из RPC leaderboard: там только тикер, логотип и
     // собранное — ни адреса жетона, ни кривой. Открытый по такой
     // строке экран токена оставался пустым: читать цену, график и
