@@ -13,7 +13,7 @@
 
 import {
   BOT_TOKEN, SUPABASE_URL, SERVICE_ROLE_KEY, SUPPORT_CHAT_ID, MAX_LEN,
-  adminClient, acceptQuestion, tgCall,
+  adminClient, acceptQuestion, tgCall, чатКоманды,
 } from "./_support.js";
 
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
@@ -26,6 +26,8 @@ const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
  * какое из них подвело, а лазить по журналам Vercel ради этого — долго.
  * Здесь каждое звено дёргается по очереди и отвечает за себя. */
 async function check(res) {
+  // Чат команды — подключённый командой /support, а без него — из окружения.
+  const чат = чатКоманды();
   const итог = {
     переменные: {
       TELEGRAM_BOT_TOKEN: !!BOT_TOKEN,
@@ -33,6 +35,7 @@ async function check(res) {
       SUPABASE_SERVICE_ROLE_KEY: !!SERVICE_ROLE_KEY,
       SUPPORT_CHAT_ID: SUPPORT_CHAT_ID || false,
     },
+    чатКоманды: чат ? (чат === SUPPORT_CHAT_ID ? `${чат} (из SUPPORT_CHAT_ID)` : `${чат} (подключён командой /support)`) : false,
   };
   // Если знак пришлось вернуть — говорим об этом: работать будет и так,
   // но в переменной лучше починить, иначе то же самое всплывёт в других
@@ -56,18 +59,18 @@ async function check(res) {
     }
   }
 
-  if (BOT_TOKEN && SUPPORT_CHAT_ID) {
-    const чат = await tgCall("getChat", { chat_id: SUPPORT_CHAT_ID });
-    итог.чат = чат.ok
-      ? `${чат.result.title || чат.result.username || чат.result.id} (${чат.result.type})`
-      : `не виден боту: ${чат.description || "?"}`;
+  if (BOT_TOKEN && чат) {
+    const сведения = await tgCall("getChat", { chat_id: чат });
+    итог.чат = сведения.ok
+      ? `${сведения.result.title || сведения.result.username || сведения.result.id} (${сведения.result.type})`
+      : `не виден боту: ${сведения.description || "?"}`;
     const проба = await tgCall("sendMessage", {
-      chat_id: SUPPORT_CHAT_ID,
+      chat_id: чат,
       text: "Проверка связи: поддержка настроена, вопросы будут приходить сюда.",
     });
     итог.проверочное_сообщение = проба.ok ? "доставлено" : `не доставлено: ${проба.description || "?"}`;
-  } else if (!SUPPORT_CHAT_ID) {
-    итог.чат = "SUPPORT_CHAT_ID не задан — вопросы отправлять некуда";
+  } else if (!чат) {
+    итог.чат = "чат команды не подключён — отправь /support в группе с ботом";
   }
 
   итог.готово = итог.проверочное_сообщение === "доставлено"

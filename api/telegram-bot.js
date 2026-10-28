@@ -36,17 +36,18 @@
  *   /mybots → бот → Bot Settings → Configure Mini App → адрес приложения —
  *     главное мини-приложение, по нему открываются ссылки ?startapp.
  *
- * Чтобы заработала поддержка, нужен ещё служебный чат:
- *   1. Завести группу и добавить туда бота.
- *   2. Сделать бота администратором группы — иначе Telegram не покажет
- *      ему обычные сообщения, и ответы команды до людей не дойдут.
- *      (Второй способ: @BotFather → /setprivacy → Disable.)
- *   3. Отправить в группе «/id» — бот ответит числом.
- *   4. Положить это число в переменную окружения SUPPORT_CHAT_ID.
+ * Чтобы заработала поддержка и заявки на галочку, нужен ещё чат команды:
+ *   1. Завести группу и добавить туда бота (лучше администратором — тогда
+ *      он видит в ней всё, а не только команды и реплаи на себя).
+ *   2. Отправить в группе «/support» от админа (Telegram id из
+ *      ADMIN_TG_IDS) — бот запомнит чат сам (api/_support.js, чатКоманды)
+ *      и пришлёт туда заявки, что ждут решения. Удалили группу — то же
+ *      самое в новой, сервер трогать не нужно.
+ *   Запасной путь — «/id» в группе и это число в SUPPORT_CHAT_ID.
  */
 
 import crypto from "node:crypto";
-import { SUPPORT_CHAT_ID, adminClient, deliverAnswer } from "./_support.js";
+import { чатКоманды, подключитьЧатКоманды, adminClient, deliverAnswer } from "./_support.js";
 import { searchAll, cardFor, cardByRef, свежийГрафик, findTokens, trendingExternal, looksLikeAddress, ВСЁ_ПРОБНОЕ, ИМЯ_СЕТИ, цепочкаТокена } from "./_market.js";
 import { кошелёкПоTelegram } from "./_wallet.js";
 import { СУММЫ, сделкаИзЧата, кошелькиЧеловека, кошелёкСети, остатокТокена, запасНаГаз, токеныЧеловека } from "./_botTrade.js";
@@ -879,6 +880,46 @@ async function handleInline(query) {
   });
 }
 
+/* «/support» в группе — подключить её как чат команды: сюда пойдут
+   вопросы из «Поддержки» и заявки на галочку. Только админ: в этот чат
+   приходят чужие вопросы с никами, и подключить свою группу постороннему
+   нельзя. Заявки, что ждут решения, сразу досылаются сюда — прежний чат
+   мог исчезнуть вместе с ними. */
+async function handleSupportBind(message) {
+  const chat = message.chat || {};
+  const { этоАдмин, админы, разослатьОжидающие } = await import("./_xverify.js");
+  const ответить = (text) => tg("sendMessage", { chat_id: chat.id, reply_to_message_id: message.message_id, text, parse_mode: "HTML" });
+  if (chat.type === "private") {
+    await ответить("Эту команду отправляют в группе команды: заведи группу, добавь туда бота и отправь там /support. Туда будут приходить вопросы из «Поддержки» и заявки на галочку.");
+    return;
+  }
+  const кто = Number(message.from && message.from.id) || 0;
+  if (!этоАдмин(кто)) {
+    /* Админов знает только сервер (ADMIN_TG_IDS). Чтобы не искать свой
+       id по чужим ботам, говорим его сразу — вместе с готовой командой
+       для сервера: id не секрет, а сработает команда только у того, у
+       кого есть доступ к серверу. */
+    await ответить(админы().size
+      ? `Подключить чат команды может только админ Mintly. Если это ты — добавь свой id на сервере и отправь /support ещё раз:\n<code>sudo sed -i 's/^ADMIN_TG_IDS=.*/&amp;,${кто}/' /srv/mintly/.env.server &amp;&amp; sudo systemctl restart mintly-api</code>`
+      : `Админы Mintly ещё не заданы. Твой Telegram id — <code>${кто}</code>; выполни на сервере и отправь /support ещё раз:\n<code>echo "ADMIN_TG_IDS=${кто}" | sudo tee -a /srv/mintly/.env.server &gt;/dev/null &amp;&amp; sudo systemctl restart mintly-api</code>`);
+    return;
+  }
+  if (!подключитьЧатКоманды(chat.id, { кто: message.from.id, название: chat.title || null })) {
+    await ответить(`Не получилось запомнить чат — сервер не записал файл. Запасной путь: <code>SUPPORT_CHAT_ID=${chat.id}</code> в окружении.`);
+    return;
+  }
+  const db = adminClient();
+  const { data: ждут } = await db.from("x_verification_requests").select("id").eq("status", "pending").limit(20);
+  const count = (ждут || []).length;
+  await ответить([
+    "✅ Чат подключён: сюда приходят вопросы из «Поддержки» и заявки на галочку.",
+    "",
+    "Ответить человеку — реплаем на пересланный вопрос, решить заявку — кнопками под ней.",
+    count ? `Ждут решения: ${count} — присылаю ниже.` : "Заявок, что ждут решения, сейчас нет.",
+  ].join("\n"));
+  if (count) await разослатьОжидающие().catch((e) => console.warn("[bot] заявки не дослались:", e && e.message));
+}
+
 /* Монета из сообщения.
  *
  * Реплай на любой мем в чате командой /mint — и бот собирает из него
@@ -1558,9 +1599,8 @@ export default async function handler(req, res) {
   const chat = (message && message.chat) || {};
   if (!from || !message) return res.status(200).json({ ok: true });
 
-  // Узнать id чата. Нужно ровно один раз — чтобы задать SUPPORT_CHAT_ID,
-  // — но работать должно в любом чате, в том числе до того, как эта
-  // переменная задана.
+  // Узнать id чата — для запасного пути через SUPPORT_CHAT_ID. Работать
+  // должно в любом чате, в том числе до того, как чат команды подключён.
   if (text === "/id" || text.startsWith("/id@")) {
     await tg("sendMessage", { chat_id: chat.id, text: `id этого чата: ${chat.id}` });
     return res.status(200).json({ ok: true });
@@ -1613,6 +1653,10 @@ export default async function handler(req, res) {
         await handleTop(message);
         return res.status(200).json({ ok: true });
       }
+      if (имя === "support") {
+        await handleSupportBind(message);
+        return res.status(200).json({ ok: true });
+      }
       // Галочка проверенного лица — выдать или снять по нику X (админы).
       if (имя === "verify" || имя === "unverify") {
         const { командаАдмина } = await import("./_xverify.js");
@@ -1626,8 +1670,20 @@ export default async function handler(req, res) {
     }
   }
 
+  // Бота добавили в группу — подсказываем, как сделать её чатом команды:
+  // без этого /support некому подсказать, а старый путь через /id и
+  // окружение сервера с телефона неудобен.
+  if (Array.isArray(message.new_chat_members) && message.new_chat_members.some((u) => u && u.is_bot && String(u.username || "").toLowerCase() === TG_BOT.toLowerCase())) {
+    await tg("sendMessage", {
+      chat_id: chat.id,
+      text: "Привет! Чтобы сюда приходили вопросы из «Поддержки» и заявки на галочку, админ Mintly отправляет здесь /support.",
+    });
+    return res.status(200).json({ ok: true });
+  }
+
   // Служебный чат команды: всё, что здесь пишут реплаем, — ответы людям.
-  if (SUPPORT_CHAT_ID && String(chat.id) === String(SUPPORT_CHAT_ID)) {
+  const чат = чатКоманды();
+  if (чат && String(chat.id) === String(чат)) {
     await handleTeamReply(message);
     return res.status(200).json({ ok: true });
   }

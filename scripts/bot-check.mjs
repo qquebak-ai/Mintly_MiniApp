@@ -13,6 +13,9 @@
  */
 
 import http from "node:http";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import assert from "node:assert/strict";
 
 const сейчас = Date.now();
@@ -42,7 +45,11 @@ const таблицы = {
   trades: [],
   launch_drafts: [],
   pending_referrals: [],
-  support_relay: [],
+  support_relay: [{ admin_message_id: 777, user_id: "u1" }],
+  support_messages: [],
+  x_verification_requests: [
+    { id: "66666666-6666-4666-8666-666666666666", user_id: "u2", handle: "someone", full_name: "Someone", proof_url: "https://x.com/someone", note: null, audience: 1200, activity: "creator", status: "pending", created_at: минутНазад(90) },
+  ],
 };
 
 /* --- Подделка PostgREST ------------------------------------------- */
@@ -117,7 +124,11 @@ Object.assign(process.env, {
   SOLANA_RPC: "https://api.devnet.solana.com",
   APP_URL: "https://mintly.company",
   TG_BOT: "MintlyCobot",
+  ADMIN_TG_IDS: "111",
+  // Чат команды, подключённый командой /support, ложится сюда, а не в .state проекта.
+  LIVE_STATE_DIR: fs.mkdtempSync(path.join(os.tmpdir(), "bot-check-")),
 });
+delete process.env.SUPPORT_CHAT_ID;
 delete process.env.TG_APP;
 delete process.env.EVM_MAINNET;
 
@@ -318,7 +329,24 @@ for (const [что, адрес] of [["EVM", `/api/chart?token=${ТОКЕНЫ[2].
   проверить(к.код === 200 && Buffer.isBuffer(к.тело) && к.тело.length > 1000, `график ${что}: ${к.код}`);
 }
 
-/* 15. Подключение: вебхук и визитка нового бота. */
+/* 15. Чат команды: /support подключает группу, заявки досылаются, реплаи доходят. */
+ход = await прислать(сообщение("/support"));
+проверить(/в группе команды/.test(текстВсех(ход)), "/support в личке — подсказка, куда его слать");
+const чужак = { id: 222, first_name: "Чужой" };
+ход = await прислать({ update_id: 9, message: { message_id: 30, from: чужак, chat: группа, text: "/support" } });
+проверить(/только админ/.test(текстВсех(ход)), "постороннему подключить чат нельзя");
+ход = await прислать({ update_id: 10, message: { message_id: 31, from: от, chat: { ...группа, title: "Команда" }, new_chat_members: [{ id: 1, is_bot: true, username: "MintlyCobot" }] } });
+проверить(/отправляет здесь \/support/.test(текстВсех(ход)), "бота добавили в группу — подсказка про /support");
+ход = await прислать(сообщение("/support@MintlyCobot", { ...группа, title: "Команда" }));
+т = текстВсех(ход);
+проверить(/Чат подключён/.test(т) && /Ждут решения: 1/.test(т), "админ подключил группу");
+проверить(ход.some((о) => String(о.тело.chat_id) === String(группа.id) && /Заявка на галочку/.test(о.тело.text || "")), "ждущая заявка дослана в новый чат");
+const записано = JSON.parse(fs.readFileSync(path.join(process.env.LIVE_STATE_DIR, "support-chat.json"), "utf8"));
+проверить(записано.id === String(группа.id), "чат команды записан на диск");
+ход = await прислать(сообщение("Привет, деньги дошли?", группа, { reply_to_message: { message_id: 777 } }));
+проверить(таблицы.support_messages.some((с) => с.user_id === "u1" && с.from_admin === true) && /Сохранено в приложении|Отправлено/.test(текстВсех(ход)), "реплай в чате команды дошёл человеку");
+
+/* 16. Подключение: вебхук и визитка нового бота. */
 ушло.length = 0;
 const res = ответ();
 await handler({ method: "GET", url: "/api/telegram-bot?setup=secret", headers: { host: "mintly.company" } }, res);

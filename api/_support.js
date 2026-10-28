@@ -10,10 +10,14 @@
  *   SUPABASE_URL              — тот же адрес, что и во VITE_SUPABASE_URL
  *   SUPABASE_SERVICE_ROLE_KEY — service_role ключ проекта Supabase
  *   SUPPORT_CHAT_ID           — куда складывать вопросы: чат команды
- *                               (узнать его id — команда /id в этом чате)
+ *                               (узнать его id — команда /id в этом чате).
+ *                               Проще — /support от админа в самой группе:
+ *                               бот подключит её сам (см. чатКоманды).
  *   APP_URL                   — адрес приложения для кнопки в ответе
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 export const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -33,6 +37,39 @@ export function normalizeChatId(raw) {
 }
 
 export const SUPPORT_CHAT_ID = normalizeChatId(process.env.SUPPORT_CHAT_ID);
+
+/* Чат команды, подключённый из самого Telegram.
+ *
+ * Переменная SUPPORT_CHAT_ID задаёт его на сервере, но меняется чат
+ * чаще, чем хочется трогать окружение: группу удалили — и вопросы с
+ * заявками на галочку перестали доходить, а для новой нужно было править
+ * .env.server и перезапускать службу. Теперь админ отправляет /support в
+ * новой группе (api/telegram-bot.js), и бот запоминает её здесь — в
+ * .state рядом с остальным состоянием сервера, которое переживает
+ * выкладки. Подключённый так чат важнее переменной: он всегда свежее. */
+const ФАЙЛ_ЧАТА = path.join(process.env.LIVE_STATE_DIR || path.join(process.cwd(), ".state"), "support-chat.json");
+let подключённый; // undefined — файл ещё не читали
+
+export function чатКоманды() {
+  if (подключённый === undefined) {
+    try { подключённый = normalizeChatId(JSON.parse(fs.readFileSync(ФАЙЛ_ЧАТА, "utf8")).id) || null; } catch { подключённый = null; }
+  }
+  return подключённый || SUPPORT_CHAT_ID;
+}
+
+export function подключитьЧатКоманды(id, { кто = null, название = null } = {}) {
+  const чат = normalizeChatId(id);
+  if (!/^-\d+$/.test(чат)) return false;
+  try {
+    fs.mkdirSync(path.dirname(ФАЙЛ_ЧАТА), { recursive: true });
+    fs.writeFileSync(ФАЙЛ_ЧАТА, JSON.stringify({ id: чат, by: кто, title: название, at: new Date().toISOString() }), { mode: 0o600 });
+  } catch (e) {
+    console.warn("[support] чат команды не записался:", e && e.message);
+    return false;
+  }
+  подключённый = чат;
+  return true;
+}
 export const APP_URL = process.env.APP_URL || "https://mintly.company";
 
 // Пределы для одного человека. Не про защиту базы, а про живого
@@ -125,9 +162,10 @@ export async function acceptQuestion(admin, { profile, body }) {
  * Telegram и внутренний id — этого хватает, чтобы найти профиль, не
  * переспрашивая. */
 async function forwardToTeam(admin, { profile, text, first }) {
-  if (!SUPPORT_CHAT_ID) {
-    console.error("[support] SUPPORT_CHAT_ID не задан — вопросы отправлять некуда");
-    return { ok: false, detail: "SUPPORT_CHAT_ID не задан" };
+  const чат = чатКоманды();
+  if (!чат) {
+    console.error("[support] чат команды не подключён — вопросы отправлять некуда");
+    return { ok: false, detail: "чат команды не подключён: /support в группе с ботом" };
   }
   const кто = esc(profile.nickname || "без ника");
   const ссылка = profile.telegram_id
@@ -138,7 +176,7 @@ async function forwardToTeam(admin, { profile, text, first }) {
   const шапка = `🆘 <b>${кто}</b>${first ? " · первое обращение" : ""}\n<code>${esc(profile.id)}</code>${ссылка ? ` · ${ссылка}` : ""}`;
 
   const ответ = await tg("sendMessage", {
-    chat_id: SUPPORT_CHAT_ID,
+    chat_id: чат,
     text: `${шапка}\n\n${esc(text)}\n\n<i>Ответить — реплаем на это сообщение.</i>`,
     parse_mode: "HTML",
     disable_web_page_preview: true,
