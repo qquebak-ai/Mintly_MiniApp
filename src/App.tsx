@@ -16532,77 +16532,6 @@ function ЗначокРынка({ рынок, size = 40 }) {
     loading="lazy" onError={() => setНет(true)} style={{ ...круг, display: "block", background: T.surface, objectFit: "cover" }} />;
 }
 
-/* Плашка торгового счёта: сколько всего, сколько свободно, сколько в
-   позициях и их итог; две кнопки — пополнить с карты и вывести на неё. */
-function ПлашкаСчёта({ счёт, рынки = null, onПеревод }) {
-  const цены = new Map((рынки || []).map((р) => [р.coin, р.price]));
-  const позиции = (счёт && счёт.positions) || [];
-  // Итог позиций — по живым ценам списка рынков, он свежее опроса счёта.
-  const итог = позиции.reduce((s, п) => s + (цены.get(п.coin) > 0 ? п.size * (цены.get(п.coin) - п.entry) : п.pnl), 0);
-  const вПозициях = позиции.reduce((s, п) => s + п.margin, 0);
-  const свободно = счёт ? Number(счёт.cash ?? счёт.withdrawable) || 0 : 0;
-  const всего = счёт ? (счёт.demo ? свободно + вПозициях + итог : Number(счёт.equity) || свободно) : 0;
-  const кнопка = (подпись, Значок, что) => (
-    <button onClick={() => { haptic("light"); onПеревод(что); }} className="fx-tap flex items-center justify-center"
-      style={{ flex: 1, gap: 8, height: 46, borderRadius: 14, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: displayFont, fontSize: 15, fontWeight: 800 }}>
-      <Значок size={17} strokeWidth={2.4} /> {подпись}
-    </button>
-  );
-  return (
-    <div className="flex flex-col" style={{ gap: 14, padding: 16, borderRadius: 20, background: T.surface }}>
-      <div className="flex items-center justify-between" style={{ gap: 10 }}>
-        <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 14.5, fontWeight: 800 }}>Торговый счёт</span>
-        {счёт && счёт.demo && (
-          <span style={{ padding: "4px 10px", borderRadius: 999, background: hexA(ЦВЕТ_ЛИКВИДАЦИИ, 0.14), color: ЦВЕТ_ЛИКВИДАЦИИ, fontFamily: bodyFont, fontSize: 12, fontWeight: 800 }}>
-            Учебный · девнет
-          </span>
-        )}
-      </div>
-      <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 36, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-        {счёт ? долларыБиржи(всего) : "—"}
-      </span>
-      <div className="flex" style={{ gap: 18, flexWrap: "wrap" }}>
-        {[
-          ["Свободно", долларыБиржи(свободно), T.ice],
-          ["В позициях", долларыБиржи(вПозициях), T.ice],
-          ...(позиции.length ? [["Итог", итогБиржи(итог), цветИтога(итог)]] : []),
-        ].map(([к, з, цвет]) => (
-          <span key={к} className="flex flex-col" style={{ gap: 3 }}>
-            <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, fontWeight: 600 }}>{к}</span>
-            <span style={{ fontFamily: monoFont, color: цвет, fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{з}</span>
-          </span>
-        ))}
-      </div>
-      <div className="flex" style={{ gap: 8 }}>
-        {кнопка("Пополнить", ArrowDownLeft, "in")}
-        {кнопка("Вывести", ArrowUpRight, "out")}
-      </div>
-    </div>
-  );
-}
-
-function СтрокаПозиции({ п, рынок, onOpen }) {
-  const цена = рынок && рынок.price > 0 ? рынок.price : п.price;
-  const итог = п.size * (цена - п.entry);
-  const roe = п.margin > 0 ? итог / п.margin : 0;
-  return (
-    <button onClick={onOpen} className="fx-tap w-full flex items-center text-left"
-      style={{ gap: 12, padding: "12px 2px", border: "none", background: "transparent", borderBottom: `1px solid ${T.line}` }}>
-      <ЗначокРынка рынок={рынок || { coin: п.coin, name: п.name }} size={40} />
-      <span className="flex-1 min-w-0 flex flex-col" style={{ gap: 3 }}>
-        <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>{п.name}</span>
-        <span style={{ fontFamily: monoFont, fontSize: 13, fontWeight: 700, color: п.size > 0 ? T.up : T.down }}>
-          {п.size > 0 ? "Лонг" : "Шорт"} · {п.leverage}× <span style={{ color: T.faint }}>· {долларыБиржи(Math.abs(п.size) * цена)}</span>
-        </span>
-      </span>
-      <span className="flex flex-col items-end" style={{ gap: 3 }}>
-        <span style={{ fontFamily: monoFont, color: цветИтога(итог), fontSize: 16, fontWeight: 800 }}>{итогБиржи(итог)}</span>
-        <span style={{ fontFamily: monoFont, color: цветИтога(итог), fontSize: 12.5, fontWeight: 700, opacity: 0.85 }}>{roe >= 0 ? "+" : "−"}{Math.abs(roe * 100).toFixed(2)}%</span>
-      </span>
-    </button>
-  );
-}
-
 /* Перевод между картой и торговым счётом — из кошелька и с биржи.
  * Пополнение — в SOL с карты, вывод — в долларах со счёта: так человек
  * видит ровно ту сумму, которая у него есть в каждом из мест. Учебный
@@ -16722,7 +16651,6 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
   const [перевод, setПеревод] = useState(null); // "in" | "out" | null
   const [строка, setСтрока] = useState(null);
   const [тик, setТик] = useState(0);
-  const [всяИстория, setВсяИстория] = useState(false);
   const счёт = useТорговыйСчёт(открыт, 4000);
   const события = useСобытияБиржи(открыт, null, тик);
   const обновитьСчёт = useCallback(() => { обновитьТорговыйСчёт(); setТик((т) => т + 1); }, []);
@@ -16774,9 +16702,6 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
   const есть = РАЗДЕЛЫ_РЫНКОВ.filter(([к]) => (рынки || []).some((р) => р.section === к));
   const список = (рынки || []).filter((р) => р.section === раздел);
   const рынок = естьВыбор ? (рынки || []).find((р) => р.asset === выбран) || null : null;
-  const поМонете = new Map((рынки || []).map((р) => [р.coin, р]));
-  const позиции = (счёт && счёт.positions) || [];
-  const история = (события || []).map(строкаБиржи);
 
   const тело = (
     <div ref={кореньРынков} className={вкладка ? "fx-view" : "fx-sheet-in no-scrollbar"} style={вкладка ? { padding: "8px 16px 40px" } : { position: "fixed", inset: 0, zIndex: 455, background: T.bg, overflowY: "auto", overscrollBehavior: "contain",
@@ -16793,30 +16718,8 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
         ) : (
           <>
             <ЗаголовокРаздела>Биржа</ЗаголовокРаздела>
-            <ПлашкаСчёта счёт={счёт} рынки={рынки} onПеревод={setПеревод} />
-            {позиции.length > 0 && (
-              <section className="flex flex-col">
-                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 20, fontWeight: 800, marginBottom: 2 }}>Позиции</span>
-                {позиции.map((п) => {
-                  const р = поМонете.get(п.coin);
-                  return <СтрокаПозиции key={п.coin} п={п} рынок={р} onOpen={() => { haptic("light"); if (р) setВыбран(р.asset); }} />;
-                })}
-              </section>
-            )}
-            {/* История — сразу под счётом и позициями: под списком из сотни
-                рынков её никто бы не нашёл. */}
-            {история.length > 0 && (
-              <section className="flex flex-col" style={{ gap: 2 }}>
-                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 20, fontWeight: 800, marginBottom: 2 }}>История</span>
-                {история.slice(0, всяИстория ? 80 : 4).map((с) => <СтрокаИстории key={с.id} с={с} курсы={{}} onOpen={() => { haptic("light"); setСтрока(с); }} />)}
-                {история.length > 4 && (
-                  <button onClick={() => { haptic("light"); setВсяИстория((б) => !б); }} className="fx-tap self-start"
-                    style={{ marginTop: 6, padding: "9px 16px", borderRadius: 999, border: "none", background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 13.5, fontWeight: 700 }}>
-                    {всяИстория ? "Свернуть" : `Показать все · ${история.length}`}
-                  </button>
-                )}
-              </section>
-            )}
+            {/* На главной биржи — только фильтры и рынки. Счёт, его баланс и
+                история живут в кошельке, позиция — на странице своего рынка. */}
             <div className="flex" style={{ gap: 8, flexWrap: "wrap" }}>
               {есть.map(([к, подпись]) => (
                 <button key={к} onClick={() => { haptic("light"); setРаздел(к); }} className="fx-tap rounded-full"
@@ -21459,7 +21362,10 @@ function WalletView({ активен = true, onOpenToken = null, connected, wall
   /* На карте — весь кошелёк одной суммой в долларах. Монет две, и
      показывать одну из них значило врать про остаток: человек видел
      ноль SOL и считал, что кошелёк пуст, пока на нём лежал GRAM. */
-  const всегоВДолларах = солНаКошельке * курсSol + тонНаКошельке * tonPriceUsd + вДолларахEVM;
+  /* Торговый счёт — тоже деньги человека, только у биржи: без него в
+     балансе карта «теряла» всё, что переведено на биржу. */
+  const наТорговом = торговыйСчёт ? Math.max(0, Number(торговыйСчёт.equity) || 0) : 0;
+  const всегоВДолларах = солНаКошельке * курсSol + тонНаКошельке * tonPriceUsd + вДолларахEVM + наТорговом;
   // Без счётчика: сумма сменяется умным текстом — общие цифры стоят,
   // новые проступают из размытия.
   const итог = адресВнутри ? всегоВДолларах : 0;
@@ -22046,6 +21952,31 @@ function WalletView({ активен = true, onOpenToken = null, connected, wall
           </span>
         </div>
         <div className="flex flex-col" style={{ gap: 2, marginBottom: 22 }}>
+          {/* Торговый счёт — первой строкой активов: это тоже деньги
+              человека, только лежат они у биржи, и баланс его виден здесь,
+              а не на бирже. Нажатие — перевод. */}
+          {userId && (
+            <div role="button" onClick={() => { haptic("light"); setТорговыйОткрыт(true); }} className="w-full flex items-center fx-tap"
+              style={{ gap: 14, padding: "13px 2px", cursor: "pointer" }}>
+              <span className="flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: "50%", background: T.surfaceHi, flexShrink: 0 }}>
+                <ЗначокБиржа size={22} color={T.ice} strokeWidth={2} />
+              </span>
+              <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>{t("walletTradingTitle")}</span>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
+                  {торговыйСчёт && торговыйСчёт.demo ? t("walletTradingDemo") : t("walletTradingSub")}
+                </span>
+              </span>
+              <span className="flex flex-col items-end" style={{ gap: 3, flexShrink: 0, ...туман }}>
+                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                  <УмныйТекст text={торговыйСчёт ? долларыБиржи(Number(торговыйСчёт.equity) || 0) : "—"} />
+                </span>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                  {торговыйСчёт && (торговыйСчёт.positions || []).length ? tf("walletTradingPositions", { n: торговыйСчёт.positions.length }) : t("walletTradingNone")}
+                </span>
+              </span>
+            </div>
+          )}
           {[
             { ключ: "sol", монета: "sol", тикер: "SOL", имя: "Solana", лого: "/coins/sol.png", сколько: солНаКошельке, курс: курсSol },
             { ключ: "ton", монета: "gram", тикер: ТИКЕР_TON, имя: "Gram", лого: "/coins/gram.png", сколько: тонНаКошельке, курс: tonPriceUsd },
@@ -22104,30 +22035,6 @@ function WalletView({ активен = true, onOpenToken = null, connected, wall
               </span>
             </div>
           ))}
-          {/* Торговый счёт — строкой среди активов: это тоже деньги
-              человека, только лежат они у биржи. Нажатие — перевод. */}
-          {userId && (
-            <div role="button" onClick={() => { haptic("light"); setТорговыйОткрыт(true); }} className="w-full flex items-center fx-tap"
-              style={{ gap: 14, padding: "13px 2px", cursor: "pointer" }}>
-              <span className="flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: "50%", background: T.surfaceHi, flexShrink: 0 }}>
-                <ЗначокБиржа size={22} color={T.ice} strokeWidth={2} />
-              </span>
-              <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>{t("walletTradingTitle")}</span>
-                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
-                  {торговыйСчёт && торговыйСчёт.demo ? t("walletTradingDemo") : t("walletTradingSub")}
-                </span>
-              </span>
-              <span className="flex flex-col items-end" style={{ gap: 3, flexShrink: 0, ...туман }}>
-                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
-                  <УмныйТекст text={торговыйСчёт ? долларыБиржи(Number(торговыйСчёт.equity) || 0) : "—"} />
-                </span>
-                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                  {торговыйСчёт && (торговыйСчёт.positions || []).length ? tf("walletTradingPositions", { n: торговыйСчёт.positions.length }) : t("walletTradingNone")}
-                </span>
-              </span>
-            </div>
-          )}
         </div>
 
         <div style={{ marginBottom: 6 }}>
