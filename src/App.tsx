@@ -16010,6 +16010,14 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
   const грузимСтарые = useRef(false);
   const касания = useRef(new Map());
   const жест = useRef(null);
+  /* Шкала цены справа — как в терминалах и на графике токена: тянешь по
+     ней вверх — свечи вытягиваются, вниз — сжимаются. С этого момента
+     размах ручной (за свечами сам не ходит, а палец по графику двигает
+     его и вверх-вниз); двойное касание по шкале или «авто» — обратно. */
+  const [шкала, setШкала] = useState(null); // { мин, макс } | null — по свечам
+  const тянемШкалу = useRef(null);
+  const тапШкалы = useRef(0);
+  const полосаЦен = useRef(null);
 
   useLayoutEffect(() => {
     const el = корень.current;
@@ -16024,7 +16032,7 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
   useEffect(() => {
     let живо = true;
     ещё.current = true;
-    setСвечи(null); setСдвиг(-3); setВидно(64);
+    setСвечи(null); setСдвиг(-3); setВидно(64); setШкала(null);
     const читать = () => запросРынков(`candles&coin=${encodeURIComponent(coin)}&interval=${шаг}`)
       .then((j) => { if (живо) setСвечи((было) => слитьСвечи(было, j.candles || [])); })
       .catch(() => { if (живо) setСвечи((было) => было || []); });
@@ -16074,16 +16082,19 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
   const с1 = Math.min(N - 1, Math.ceil(правый) + 1);
   const видимые = N ? ряд.slice(с0, с1 + 1) : [];
   let мин = Infinity, макс = -Infinity;
-  for (const с of видимые) { if (с.l < мин) мин = с.l; if (с.h > макс) макс = с.h; }
-  if (!Number.isFinite(мин)) { мин = цена > 0 ? цена * 0.99 : 0; макс = цена > 0 ? цена * 1.01 : 1; }
-  if (цена > 0) { мин = Math.min(мин, цена); макс = Math.max(макс, цена); }
-  /* Линии позиции раздвигают шкалу, если стоят рядом; далёкую (ликвидация
-     при 1–2× плече) не тянем — иначе свечи сплющились бы в полоску, её
-     метка просто прижимается к краю со стрелкой. */
-  const размах0 = Math.max(1e-12, макс - мин);
-  for (const л of линии) if (л.цена > 0 && л.цена > мин - размах0 * 0.6 && л.цена < макс + размах0 * 0.6) { мин = Math.min(мин, л.цена); макс = Math.max(макс, л.цена); }
-  const поле = (макс - мин) * 0.08 || мин * 0.01 || 1;
-  мин -= поле; макс += поле;
+  if (шкала) { мин = шкала.мин; макс = шкала.макс; }
+  else {
+    for (const с of видимые) { if (с.l < мин) мин = с.l; if (с.h > макс) макс = с.h; }
+    if (!Number.isFinite(мин)) { мин = цена > 0 ? цена * 0.99 : 0; макс = цена > 0 ? цена * 1.01 : 1; }
+    if (цена > 0) { мин = Math.min(мин, цена); макс = Math.max(макс, цена); }
+    /* Линии позиции раздвигают шкалу, если стоят рядом; далёкую (ликвидация
+       при 1–2× плече) не тянем — иначе свечи сплющились бы в полоску, её
+       метка просто прижимается к краю со стрелкой. */
+    const размах0 = Math.max(1e-12, макс - мин);
+    for (const л of линии) if (л.цена > 0 && л.цена > мин - размах0 * 0.6 && л.цена < макс + размах0 * 0.6) { мин = Math.min(мин, л.цена); макс = Math.max(макс, л.цена); }
+    const поле = (макс - мин) * 0.08 || мин * 0.01 || 1;
+    мин -= поле; макс += поле;
+  }
   const шагЦены = шагСетки(макс - мин, 4);
   const уровни = [];
   for (let v = Math.ceil(мин / шагЦены) * шагЦены; v <= макс; v += шагЦены) уровни.push(v);
@@ -16103,7 +16114,11 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
   /* Метки цен на полосе справа: текущая — главная, остальные расступаются,
      чтобы не лезть друг на друга. Линия вне шкалы — метка у края со стрелкой. */
   const ярлыки = [];
-  if (цена > 0) ярлыки.push({ y: y(цена), текст: ценаРынка(цена), фон: T.ice, цвет: T.bg, главная: true });
+  // Шкалу растянули так, что цена ушла за край, — метка ждёт у края со стрелкой.
+  if (цена > 0) {
+    const внутри = цена >= мин && цена <= макс;
+    ярлыки.push({ y: внутри ? y(цена) : цена > макс ? 9 : ВЫС - 9, текст: `${внутри ? "" : цена > макс ? "↑" : "↓"}${ценаРынка(цена)}`, фон: T.ice, цвет: T.bg, главная: true });
+  }
   for (const л of линии) {
     if (!(л.цена > 0)) continue;
     const внутри = л.цена >= мин && л.цена <= макс;
@@ -16123,7 +16138,7 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     касания.current.set(e.pointerId, { x: e.clientX });
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* уже захвачен */ }
-    if (касания.current.size === 1) жест.current = { тип: "листаем", x0: e.clientX, сдвиг0: сдвиг };
+    if (касания.current.size === 1) жест.current = { тип: "листаем", x0: e.clientX, y0: e.clientY, сдвиг0: сдвиг, шкала0: шкала };
     else if (касания.current.size === 2) {
       const [a, b] = [...касания.current.values()];
       жест.current = { тип: "щипок", d0: Math.max(12, Math.abs(a.x - b.x)), видно0: видно };
@@ -16134,7 +16149,14 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
     касания.current.set(e.pointerId, { x: e.clientX });
     const ж = жест.current;
     if (!ж) return;
-    if (ж.тип === "листаем") setСдвиг(огрСдвиг(ж.сдвиг0 + (e.clientX - ж.x0) / шагX));
+    if (ж.тип === "листаем") {
+      setСдвиг(огрСдвиг(ж.сдвиг0 + (e.clientX - ж.x0) / шагX));
+      // Ручной размах палец двигает и вверх-вниз — как на графике токена.
+      if (ж.шкала0) {
+        const цен = ((e.clientY - ж.y0) * (ж.шкала0.макс - ж.шкала0.мин)) / (ВЫС - 12);
+        setШкала({ мин: ж.шкала0.мин + цен, макс: ж.шкала0.макс + цен });
+      }
+    }
     else {
       const [a, b] = [...касания.current.values()];
       const d = Math.max(12, Math.abs(a.x - b.x));
@@ -16146,9 +16168,53 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
     if (!касания.current.size) жест.current = null;
     else {
       const [a] = [...касания.current.values()];
-      жест.current = { тип: "листаем", x0: a.x, сдвиг0: сдвиг };
+      жест.current = { тип: "листаем", x0: a.x, y0: e.clientY, сдвиг0: сдвиг, шкала0: шкала };
     }
   };
+  // Шкала цены: своё касание, мимо листания графика.
+  const начатьШкалу = (e) => {
+    e.stopPropagation();
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* уже захвачен */ }
+    const сейчас = performance.now();
+    if (сейчас - тапШкалы.current < 320) {
+      тапШкалы.current = 0; тянемШкалу.current = null;
+      setШкала(null); haptic("light");
+      return;
+    }
+    тапШкалы.current = сейчас;
+    тянемШкалу.current = { y0: e.clientY, мин, макс };
+  };
+  const тянутьШкалу = (e) => {
+    e.stopPropagation();
+    const т = тянемШкалу.current;
+    if (!т) return;
+    const dy = e.clientY - т.y0;
+    if (Math.abs(dy) < 2) return;
+    // Вниз — шире (свечи сжимаются), вверх — уже (вытягиваются).
+    const множитель = Math.exp(dy * 0.006);
+    const середина = (т.мин + т.макс) / 2;
+    const пол = ((т.макс - т.мин) / 2) * множитель;
+    setШкала({ мин: середина - пол, макс: середина + пол });
+  };
+  const кончитьШкалу = (e) => { e.stopPropagation(); тянемШкалу.current = null; };
+  /* Колесо над шкалой на компьютере — тот же размах. Свой слушатель, не
+     onWheel: у React он пассивный, и вместе со шкалой листалась бы страница. */
+  const колесоШкалы = useRef(null);
+  колесоШкалы.current = (e) => {
+    e.preventDefault();
+    const множитель = Math.exp(Math.max(-60, Math.min(60, e.deltaY)) * 0.004);
+    const середина = (мин + макс) / 2;
+    const пол = ((макс - мин) / 2) * множитель;
+    setШкала({ мин: середина - пол, макс: середина + пол });
+  };
+  useEffect(() => {
+    const el = полосаЦен.current;
+    if (!el) return undefined;
+    const ф = (e) => колесоШкалы.current && колесоШкалы.current(e);
+    el.addEventListener("wheel", ф, { passive: false });
+    return () => el.removeEventListener("wheel", ф);
+  }, [!!свечи]); // eslint-disable-line react-hooks/exhaustive-deps
   // Колесо на компьютере: вбок — листает, с Ctrl — приближает; просто вниз — страница.
   const колесо = (e) => {
     if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) setСдвиг((с) => огрСдвиг(с - e.deltaX / шагX));
@@ -16158,7 +16224,7 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
   const сеткаЦвет = hexA(T.ice, 0.06);
   return (
     <div className="flex flex-col" style={{ gap: 10 }}>
-      <div ref={корень} style={{ height: В, position: "relative", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", cursor: жест.current ? "grabbing" : "grab" }}
+      <div ref={корень} style={{ height: В, position: "relative", touchAction: шкала ? "none" : "pan-y", userSelect: "none", WebkitUserSelect: "none", cursor: жест.current ? "grabbing" : "grab" }}
         onPointerDown={начало} onPointerMove={ход} onPointerUp={конец} onPointerCancel={конец} onWheel={колесо}>
         {!свечи ? <ЗагрузкаБлока высота={В} /> : (
           <svg width={ширина} height={В} viewBox={`0 0 ${ширина} ${В}`} style={{ display: "block", overflow: "hidden" }} aria-label={`График ${coin}`}>
@@ -16195,6 +16261,17 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
               </g>
             ))}
           </svg>
+        )}
+        {свечи && (
+          <div ref={полосаЦен} role="slider" aria-label="Шкала цены" aria-valuetext={шкала ? "вручную" : "по свечам"}
+            onPointerDown={начатьШкалу} onPointerMove={тянутьШкалу} onPointerUp={кончитьШкалу} onPointerCancel={кончитьШкалу}
+            style={{ position: "absolute", top: 0, right: 0, width: ГУТ, height: ВЫС, touchAction: "none", cursor: "ns-resize" }} />
+        )}
+        {свечи && шкала && (
+          <button onClick={(e) => { e.stopPropagation(); haptic("light"); setШкала(null); }} onPointerDown={(e) => e.stopPropagation()} className="fx-tap"
+            style={{ position: "absolute", right: 6, bottom: 6, padding: "4px 9px", borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: bodyFont, fontSize: 11.5, fontWeight: 800 }}>
+            авто
+          </button>
         )}
         {свечи && сдвиг > 2 && (
           <button onClick={() => { haptic("light"); setСдвиг(-3); }} onPointerDown={(e) => e.stopPropagation()} className="fx-tap flex items-center"
@@ -16435,6 +16512,18 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
         </div>
       )}
       <div className="flex flex-col" style={{ gap: 12, padding: 14, borderRadius: 18, background: T.surface }}>
+        {/* Баланс торгового счёта — прямо в сделке: с главной биржи его убрали,
+            а сколько можно поставить, нужно видеть на любом рынке. */}
+        <div className="flex items-center justify-between" style={{ gap: 10, padding: "2px 2px 0" }}>
+          <span className="flex flex-col min-w-0" style={{ gap: 2 }}>
+            <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 12.5, fontWeight: 600 }}>Торговый счёт{счёт && счёт.demo ? " · учебный" : ""}</span>
+            <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 19, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{свободно != null ? долларыБиржи(свободно) : "—"}</span>
+          </span>
+          <button onClick={() => { haptic("light"); onПополнить && onПополнить(); }} className="fx-tap flex items-center"
+            style={{ gap: 6, flexShrink: 0, padding: "9px 14px", borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: displayFont, fontSize: 14, fontWeight: 800 }}>
+            <Plus size={15} strokeWidth={2.6} /> Пополнить
+          </button>
+        </div>
         <div className="flex rounded-[20px] p-1" style={{ position: "relative", background: T.bg }}>
           <span aria-hidden style={{ position: "absolute", top: 4, bottom: 4, left: 4, width: "calc(50% - 4px)", borderRadius: 16, background: лонг ? T.up : T.down,
             transform: сторона === "short" ? "translateX(100%)" : "none", transition: "transform 320ms cubic-bezier(0.34, 1.3, 0.64, 1), background 220ms ease" }} />
@@ -16503,9 +16592,6 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
             {кнопкаТекст}
           </button>
         )}
-        <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5, textAlign: "center" }}>
-          На счёте {свободно != null ? долларыБиржи(свободно) : "—"}{счёт && счёт.demo ? " · учебный счёт" : ""}
-        </span>
       </div>
       {рядСобытий.length > 0 && (
         <section className="flex flex-col" style={{ gap: 2 }}>
