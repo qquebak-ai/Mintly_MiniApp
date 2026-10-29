@@ -1992,20 +1992,6 @@ function fmtPrice(p) {
   }
   return "$" + n.toFixed(4);
 }
-/* Подпись деления на оси времени. Формат зависит от шага: на минутах
-   важен час и минута, на днях — дата, а год не нужен нигде — история у
-   мемкоина короче него. */
-function подписьВремени(sec, tf) {
-  const д = new Date(sec * 1000);
-  const дв = (v) => String(v).padStart(2, "0");
-  // На секундах соседние свечи — одна и та же минута: без секунд все
-  // подписи под ними были бы одинаковыми.
-  if (tf === "S1" || tf === "S15") return `${дв(д.getHours())}:${дв(д.getMinutes())}:${дв(д.getSeconds())}`;
-  if (tf === "D1" || tf === "W1" || tf === "MN1") return `${дв(д.getDate())}.${дв(д.getMonth() + 1)}`;
-  if (tf === "H4" || tf === "H1") return `${дв(д.getDate())}.${дв(д.getMonth() + 1)} ${дв(д.getHours())}:00`;
-  return `${дв(д.getHours())}:${дв(д.getMinutes())}`;
-}
-
 function fmtCountdown(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(total / 3600);
@@ -6126,7 +6112,9 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     }
     const { min, max } = yViewRef.current;
     const range = (max - min) || (max * 0.02) || 1;
-    const padTop = height * 0.08, padBottom = height * 0.1;
+    // Снизу — только поле, без полосы под подписи времени: её убрали, и
+    // свечам достаётся вся высота.
+    const padTop = height * 0.08, padBottom = height * 0.05;
     const drawHeight = height - padTop - padBottom;
     // Ширина шкалы — под самую длинную подпись. Считается по крайним
     // значениям всего ряда, а не текущего окна: при прокрутке окно
@@ -6285,7 +6273,7 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
     // width so they stay readable at any zoom level. Plotted only within
     // plotW, so nothing ever draws underneath the price-axis gutter.
     // Свечи — только внутри поля графика: утянутые рукой вниз, они
-    // иначе залезали на подписи времени под ним.
+    // иначе вылезали бы за его нижний край.
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, plotW, height - padBottom + 6);
@@ -6446,35 +6434,6 @@ const TerminalChart = React.memo(function TerminalChart({ candles, height = 340,
       }
     }
     ctx.textAlign = "left";
-
-    /* Ось времени под свечами.
-       Без неё нижний край графика обрывался пустой полосой: свечи есть,
-       а к какому часу они относятся — негде посмотреть. Подписи ставим
-       по свечам, а не по ровным отрезкам времени, — иначе на прокрутке
-       они разъезжались бы с самими свечами. */
-    {
-      const шагПодписей = Math.max(1, Math.ceil((endI - startI) / Math.max(2, Math.round(plotW / 78))));
-      ctx.font = "9px " + monoFont;
-      ctx.fillStyle = T.faint;
-      ctx.textAlign = "center";
-      let правыйКрай = -Infinity;
-      for (let i = startI; i < endI; i += шагПодписей) {
-        const c = candles[i];
-        if (!c || !Number.isFinite(c.time)) continue;
-        const текст = подписьВремени(c.time, tf);
-        const половина = ctx.measureText(текст).width / 2;
-        const x = xFor(i);
-        // Крайние подписи не режем краем поля: половина числа за
-        // границей выглядит хуже, чем её отсутствие. Соседние разводим
-        // по фактической ширине, а не по одному числу на все форматы —
-        // «04.09 22:00» вдвое длиннее «22:00».
-        if (x - половина < 2 || x + половина > plotW - 4) continue;
-        if (x - половина < правыйКрай + 14) continue;
-        правыйКрай = x + половина;
-        ctx.fillText(текст, x, height - padBottom + 16);
-      }
-      ctx.textAlign = "left";
-    }
 
     /* Плашка текущей цены. Обратного отсчёта до следующей свечи в ней
        больше нет: он не говорит ни о цене, ни о сделках — просто
@@ -16028,21 +15987,16 @@ function слитьСвечи(старые, новые) {
 }
 const ШАГИ_ГРАФИКА = [["1m", "1м"], ["5m", "5м"], ["15m", "15м"], ["1h", "1ч"], ["4h", "4ч"], ["1d", "1д"]];
 const МС_СВЕЧИ = { "1m": 60e3, "5m": 300e3, "15m": 900e3, "1h": 3600e3, "4h": 14400e3, "1d": 86400e3 };
+// Вертикальная сетка — каждые столько свечей, сколько займут не меньше 66 точек.
 const МЕТКИ_ВРЕМЕНИ = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 288];
-function подписьВремениБиржи(t, мс) {
-  const д = new Date(t);
-  const дата = () => д.toLocaleDateString("ru-RU", { day: "numeric", month: "short" }).replace(".", "");
-  if (мс >= 86400e3 || (д.getHours() === 0 && д.getMinutes() === 0)) return дата();
-  return `${String(д.getHours()).padStart(2, "0")}:${String(д.getMinutes()).padStart(2, "0")}`;
-}
-
 /* График рынка.
  *
  * Свечи листаются пальцем вбок и сводятся/разводятся двумя пальцами;
  * дошли до левого края — сервер подгружает историю раньше. Цены — на
  * своей полосе справа, а не поверх свечей: раньше метка текущей цены и
  * подписи линий лежали прямо на последних свечах и закрывали их. Сетка —
- * круглыми шагами цены и времени. Линии позиции (вход, ликвидация, тейк,
+ * круглыми шагами цены и времени; полосы с подписями времени снизу нет —
+ * она отнимала высоту у свечей. Линии позиции (вход, ликвидация, тейк,
  * стоп) — во всю ширину, их цены — метками на той же полосе, а названия —
  * строкой под графиком. */
 function ГрафикРынка({ coin, линии = [], цена = 0 }) {
@@ -16114,7 +16068,8 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
       .finally(() => { грузимСтарые.current = false; });
   }, [левый, N, coin, шаг]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const В = 252, ОСЬ = 22, ВЫС = В - ОСЬ;
+  // Высота — целиком под свечи: полосы с подписями времени снизу нет.
+  const В = 240, ВЫС = В;
   const с0 = Math.max(0, Math.floor(левый) - 1);
   const с1 = Math.min(N - 1, Math.ceil(правый) + 1);
   const видимые = N ? ряд.slice(с0, с1 + 1) : [];
@@ -16142,8 +16097,8 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
   const y = (v) => 6 + (1 - (v - мин) / Math.max(1e-12, макс - мин)) * (ВЫС - 12);
   const мсСвечи = МС_СВЕЧИ[шаг] || 900e3;
   const каждые = МЕТКИ_ВРЕМЕНИ.find((k) => k * шагX >= 66) || 288;
-  // Подпись времени у самого края обрезалась бы наполовину — такие не ставим.
-  const метки = видимые.filter((с, k) => Math.round(с.t / мсСвечи) % каждые === 0 && x(с0 + k) > 20 && x(с0 + k) < A - 20);
+  // Линии вертикальной сетки — на круглых отметках времени, не у самого края.
+  const метки = видимые.filter((с, k) => Math.round(с.t / мсСвечи) % каждые === 0 && x(с0 + k) > 4 && x(с0 + k) < A - 4);
 
   /* Метки цен на полосе справа: текущая — главная, остальные расступаются,
      чтобы не лезть друг на друга. Линия вне шкалы — метка у края со стрелкой. */
@@ -16211,7 +16166,6 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
             {уровни.map((v) => <line key={`г${v}`} x1={0} x2={A} y1={y(v)} y2={y(v)} stroke={сеткаЦвет} strokeWidth={1} />)}
             {метки.map((с) => <line key={`в${с.t}`} x1={x(с0 + видимые.indexOf(с))} x2={x(с0 + видимые.indexOf(с))} y1={0} y2={ВЫС} stroke={сеткаЦвет} strokeWidth={1} />)}
             <line x1={A + 0.5} x2={A + 0.5} y1={0} y2={ВЫС} stroke={T.line} strokeWidth={1} />
-            <line x1={0} x2={ширина} y1={ВЫС + 0.5} y2={ВЫС + 0.5} stroke={T.line} strokeWidth={1} />
             <g clipPath={`url(#поле-${coin})`}>
               {видимые.map((с, k) => {
                 const i = с0 + k;
@@ -16234,9 +16188,6 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
             {подписиСетки.map((v) => (
               <text key={`п${v}`} x={A + 8} y={y(v) + 3.5} fill={T.faint} fontFamily={monoFont} fontSize={10.5} fontWeight={600}>{подписьСетки(v, шагЦены)}</text>
             ))}
-            {метки.map((с) => (
-              <text key={`т${с.t}`} x={x(с0 + видимые.indexOf(с))} y={ВЫС + 15} fill={T.faint} fontFamily={monoFont} fontSize={10.5} fontWeight={600} textAnchor="middle">{подписьВремениБиржи(с.t, мсСвечи)}</text>
-            ))}
             {ярлыки.map((я, i) => (
               <g key={`я${i}`}>
                 <rect x={A + 3} y={я.y - 8.5} width={ГУТ - 5} height={17} rx={6} fill={я.фон} />
@@ -16247,7 +16198,7 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
         )}
         {свечи && сдвиг > 2 && (
           <button onClick={() => { haptic("light"); setСдвиг(-3); }} onPointerDown={(e) => e.stopPropagation()} className="fx-tap flex items-center"
-            style={{ position: "absolute", right: ГУТ + 8, bottom: ОСЬ + 8, gap: 4, padding: "6px 10px", borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
+            style={{ position: "absolute", right: ГУТ + 8, bottom: 8, gap: 4, padding: "6px 10px", borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
             Сейчас <ChevronRight size={14} />
           </button>
         )}
