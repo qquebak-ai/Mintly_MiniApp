@@ -31,12 +31,22 @@ import { encode } from "@msgpack/msgpack";
 import { ТЕСТОВЫЕ, подписьEVMЧеловека } from "./wallet-evm.js";
 import { отправитьНаБиржу, кошелёкДляБота, SOLANA_ТЕСТОВАЯ } from "./wallet-solana.js";
 import { занять } from "./_walletLock.js";
+import * as торговый from "./_tradingAccount.js";
+import { наТорговый, сТоргового, довестиПереводы, МИН_ПЕРЕВОДА_USD } from "./_tradingTransfer.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const БОЕВАЯ = process.env.HYPERLIQUID_MAINNET === "1" || (!ТЕСТОВЫЕ && process.env.HYPERLIQUID_MAINNET !== "0");
+/* Учебный счёт (api/_tradingAccount.js): в тестовых сетях позиции ведёт
+   сам сервер, а цены, рынки и свечи берёт с основной биржи. Тестовая
+   Hyperliquid для этого не годится: её цены и рынки — пробные (золото по
+   $3, сотни площадок «test»), а пополнить её нечем — девнет-SOL мост Unit
+   не принимает, и позиция с ним не открывалась вовсе. HYPERLIQUID_DEMO=0
+   возвращает прежний путь через тестовую биржу. */
+const ДЕМО = !БОЕВАЯ && process.env.HYPERLIQUID_DEMO !== "0";
 const API = БОЕВАЯ ? "https://api.hyperliquid.xyz" : "https://api.hyperliquid-testnet.xyz";
-const СОКЕТ = БОЕВАЯ ? "wss://api.hyperliquid.xyz/ws" : "wss://api.hyperliquid-testnet.xyz/ws";
+const API_ДАННЫХ = БОЕВАЯ || ДЕМО ? "https://api.hyperliquid.xyz" : API;
+const СОКЕТ = БОЕВАЯ || ДЕМО ? "wss://api.hyperliquid.xyz/ws" : "wss://api.hyperliquid-testnet.xyz/ws";
 // Мост Hyperliquid и USDC в Arbitrum: депозит — обычный перевод USDC на мост.
 const ARB_RPC = process.env.ARBITRUM_RPC || (БОЕВАЯ ? "https://arb1.arbitrum.io/rpc" : "https://sepolia-rollup.arbitrum.io/rpc");
 const МОСТ = БОЕВАЯ ? "0x2Df1c51E09aECF9cacB7bc98cB1742757f163dF7" : "0x08cfc1B6b2dCF36A1480b99353A354AA8AC56f89";
@@ -84,11 +94,15 @@ async function хозяин(req, db) {
 }
 async function ethersLib() { return import("ethers"); }
 
-async function инфо(тело) {
-  const r = await fetch(`${API}/info`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(тело), signal: AbortSignal.timeout(8000) });
+async function инфоС(адрес, тело) {
+  const r = await fetch(`${адрес}/info`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(тело), signal: AbortSignal.timeout(8000) });
   if (!r.ok) throw new Error(`hyperliquid info ${r.status}`);
   return r.json();
 }
+// Счёт и заявки — у биржи, где лежат деньги; рынки, свечи и цены — у той,
+// откуда их берёт экран (в учебном режиме это основная).
+const инфо = (тело) => инфоС(API, тело);
+const инфоРынка = (тело) => инфоС(API_ДАННЫХ, тело);
 const состояние = (адрес, dex) => инфо(dex ? { type: "clearinghouseState", user: адрес, dex } : { type: "clearinghouseState", user: адрес });
 
 /* Живые цены — по сокету биржи: подписка allMids на основную биржу (там
@@ -96,6 +110,9 @@ const состояние = (адрес, dex) => инфо(dex ? { type: "clearing
    весь сервер; оборвался — через три секунды открывается снова. */
 const живые = new Map();
 let живыеПри = 0;
+// Когда последний раз пришли цены каждой площадки ("" — основная биржа):
+// сделка учебного счёта берёт цену, только если она свежая.
+const живыеПоПлощадке = new Map();
 let сокетЦен = null;
 let сокетЖдёт = false;
 const подписаны = new Set();
@@ -118,6 +135,8 @@ function открытьСокетЦен() {
     if (!j || j.channel !== "allMids" || !j.data || !j.data.mids) return;
     for (const [к, v] of Object.entries(j.data.mids)) живые.set(к, Number(v));
     живыеПри = Date.now();
+    живыеПоПлощадке.set(j.data.dex || "", живыеПри);
+    сторож(j.data.mids);
   };
   с.onclose = () => {
     clearInterval(пинг);
@@ -162,19 +181,20 @@ const МУСОР = /(^|:)(TEST\d*|ABC|TOKEN\w*)$|^(test|scam|angry):/i;
 let основа = { at: 0, рынки: [], площадки: [""] };
 let идёт = null;
 async function обновитьОснову() {
-  const площадки = await инфо({ type: "perpDexs" }).catch(() => [null]);
+  const площадки = await инфоРынка({ type: "perpDexs" }).catch(() => [null]);
   const индексы = ПЛОЩАДКИ.map((имя) => (Array.isArray(площадки) ? площадки.findIndex((п) => п && п.name === имя) : -1)).filter((i) => i > 0);
   const ответы = await Promise.all([
-    инфо({ type: "metaAndAssetCtxs" }).catch(() => null),
-    ...индексы.map((i) => инфо({ type: "metaAndAssetCtxs", dex: площадки[i].name }).catch(() => null)),
+    инфоРынка({ type: "metaAndAssetCtxs" }).catch(() => null),
+    ...индексы.map((i) => инфоРынка({ type: "metaAndAssetCtxs", dex: площадки[i].name }).catch(() => null)),
   ]);
   const рынкиСписок = [];
   const взятые = [""];
   ответы.forEach((о, к) => {
     if (!Array.isArray(о) || !о[0] || !Array.isArray(о[0].universe)) return;
     const i = к === 0 ? 0 : индексы[к - 1];
-    // Залог площадки — не USDC (номер токена 0): пополнить её нечем.
-    if (i && Number(о[0].collateralToken || 0) !== 0) return;
+    // Залог площадки — не USDC (номер токена 0): пополнить её нечем. На
+    // учебном счёте залог свой, в долларах, — там годится любая площадка.
+    if (i && !ДЕМО && Number(о[0].collateralToken || 0) !== 0) return;
     if (i) взятые.push(площадки[i].name);
     о[0].universe.forEach((р, n) => {
       const ц = (о[1] || [])[n] || {};
@@ -256,16 +276,22 @@ async function значокМонеты(coin) {
 
 /* Свечи — общим кешем на всех: один и тот же график у десяти человек —
    один запрос к бирже, а не десять (свечи весят 20+ из 1200 в минуту).
-   Последнюю свечу телефон и так двигает живой ценой из списка рынков. */
+   Последнюю свечу телефон и так двигает живой ценой из списка рынков.
+   Свечей — 300: график теперь листается пальцем назад, и сотни хватало
+   на пару движений. До — конец окна для подгрузки истории левее; такие
+   окна прошлого не меняются, их кеш живёт дольше. */
+const СВЕЧЕЙ = 300;
 const свечиКеш = new Map();
-async function свечиРынка(coin, interval) {
-  const ключ = `${coin}|${interval}`;
-  const было = свечиКеш.get(ключ);
-  const срок = interval === "1m" ? 10_000 : 30_000;
-  if (было && Date.now() - было.at < срок) return было.ждём || было.свечи;
+async function свечиРынка(coin, interval, до = null) {
   const шаг = { "1m": 60e3, "5m": 300e3, "15m": 900e3, "1h": 3600e3, "4h": 14400e3, "1d": 86400e3 }[interval];
-  const конец = Date.now();
-  const ждём = инфо({ type: "candleSnapshot", req: { coin, interval, startTime: конец - шаг * 120, endTime: конец } })
+  // Конец окна прошлого — по границе свечи: иначе каждый запрос был бы новым ключом кеша.
+  const конецПрошлого = до ? Math.floor(Number(до) / шаг) * шаг - 1 : null;
+  const ключ = `${coin}|${interval}|${конецПрошлого || ""}`;
+  const было = свечиКеш.get(ключ);
+  const срок = конецПрошлого ? 600_000 : interval === "1m" ? 10_000 : 30_000;
+  if (было && Date.now() - было.at < срок) return было.ждём || было.свечи;
+  const конец = конецПрошлого || Date.now();
+  const ждём = инфоРынка({ type: "candleSnapshot", req: { coin, interval, startTime: конец - шаг * СВЕЧЕЙ, endTime: конец } })
     .then((с) => (с || []).map((x) => ({ t: x.t, o: +x.o, h: +x.h, l: +x.l, c: +x.c, v: +x.v })));
   свечиКеш.set(ключ, { at: Date.now(), ждём, свечи: было ? было.свечи : [] });
   try {
@@ -713,6 +739,282 @@ async function картаЧеловека(id) {
   return к;
 }
 
+/* --- Торговый счёт (api/_tradingAccount.js) ---------------------------- */
+
+const площадкаМонеты = (coin) => { const м = /^([a-z0-9]+):/i.exec(String(coin || "")); return м ? м[1] : ""; };
+const ценаТекстом = (v) => (v >= 1000 ? v.toFixed(1) : v >= 1 ? v.toFixed(3) : Number(v).toPrecision(4));
+
+/* Свежая цена монеты для сделки. Из сокета — если площадка присылала цены
+   последние 10 секунд; иначе спрашиваем биржу напрямую (вес 2), не чаще
+   раза в две секунды на площадку. Устаревшая цена — ноль: сделка по ней не
+   пройдёт (price_stale), иначе по старой цене можно было бы купить то, что
+   уже подорожало. */
+const опросЦен = new Map();
+async function свежаяЦена(coin) {
+  const dex = площадкаМонеты(coin);
+  const свежо = () => Date.now() - (живыеПоПлощадке.get(dex) || 0) < 10_000;
+  if (свежо() && живые.get(coin) > 0) return живые.get(coin);
+  следитьЗаЦенами([dex]);
+  let о = опросЦен.get(dex);
+  if (!о || Date.now() - о.at > 2000) {
+    о = {
+      at: Date.now(),
+      ждём: инфоРынка(dex ? { type: "allMids", dex } : { type: "allMids" }).then((mids) => {
+        if (!mids || typeof mids !== "object") return;
+        for (const [к, v] of Object.entries(mids)) живые.set(к, Number(v));
+        живыеПоПлощадке.set(dex, Date.now());
+        сторож(mids);
+      }),
+    };
+    опросЦен.set(dex, о);
+  }
+  try { await о.ждём; } catch { return 0; }
+  return свежо() && живые.get(coin) > 0 ? живые.get(coin) : 0;
+}
+// Для показа счёта годится и цена минутной давности.
+const ценаДляЭкрана = (coin) => (Date.now() - (живыеПоПлощадке.get(площадкаМонеты(coin)) || 0) < 60_000 ? живые.get(coin) || 0 : 0);
+
+/* Сторож позиций: каждое сообщение цен проверяет тейки, стопы и
+   ликвидации на этих рынках — сразу, а не опросом раз в минуту: иначе стоп
+   срабатывал бы по цене, далёкой от своей, а ликвидация — уже за точкой
+   банкротства. */
+function сторож(mids) {
+  if (!ДЕМО && !БОЕВАЯ) return;
+  let нужные;
+  try { нужные = торговый.монетыСПозициями(); } catch { return; }
+  if (!нужные.size) return;
+  const цены = new Map();
+  for (const coin of нужные) { const v = Number(mids[coin]); if (v > 0) цены.set(coin, v); }
+  if (!цены.size) return;
+  if (ДЕМО) {
+    for (const с of торговый.проверитьЦены(цены)) сообщитьОСрабатывании(с.uid, с.event).catch(() => {});
+  } else {
+    for (const т of торговый.сработавшиеБоевые(цены)) закрытьПоУровню(т).catch((e) => console.warn("[hyperliquid] тейк/стоп", e && e.message));
+  }
+}
+
+const СЛОВО_УРОВНЯ = { tp: "Тейк", sl: "Стоп", liq: "Ликвидация" };
+async function сообщитьОСрабатывании(uid, з) {
+  if (!з || !СЛОВО_УРОВНЯ[з.kind]) return;
+  const db = admin();
+  if (!db) return;
+  const { data } = await db.from("profiles").select("telegram_id").eq("id", uid).maybeSingle();
+  if (!data || !data.telegram_id) return;
+  const { уведомить } = await import("./_trading.js");
+  const pnl = Number(з.pnl) || 0;
+  await уведомить(data.telegram_id,
+    `${СЛОВО_УРОВНЯ[з.kind]} <b>${з.name}</b>: ${pnl >= 0 ? "+" : "−"}$${Math.abs(pnl).toFixed(2)} · ${з.side > 0 ? "лонг" : "шорт"} закрыт по $${ценаТекстом(Number(з.price) || 0)}`,
+    "wallet");
+}
+
+/* Тейк или стоп на основной бирже сработал: закрываем позицию заявкой «по
+   рынку». Позиции уже нет или она перевернулась — уровень снимаем: он был
+   про ту, прежнюю. */
+const закрываем = new Set();
+async function закрытьПоУровню({ uid, coin, причина }) {
+  const метка = `${uid}|${coin}`;
+  if (закрываем.has(метка)) return;
+  закрываем.add(метка);
+  let отпустить = null;
+  try {
+    try { отпустить = занять(`hl:${uid}`, 60_000); } catch { return; } // занят — попробует следующая цена
+    const db = admin();
+    if (!db) return;
+    const w = await подписьEVMЧеловека(db, { id: uid });
+    const р = await собратьРынки();
+    const рынок = р.список.find((м) => м.coin === coin);
+    if (!рынок) return;
+    const с = await состояние(w.address, рынок.dex);
+    const п = ((с && с.assetPositions) || []).map((x) => x.position).find((x) => x && x.coin === coin);
+    const szi = п ? Number(п.szi) : 0;
+    const уровень = торговый.тейкСтопыБоевые(uid)[coin];
+    if (!szi || !уровень || Math.sign(szi) !== уровень.сторона) { торговый.тейкСтопБоевой(uid, { coin }); return; }
+    await заявкаПозиции(w, рынок, szi < 0, Math.abs(szi), true);
+    торговый.тейкСтопБоевой(uid, { coin });
+    const з = торговый.записатьСобытие(uid, {
+      kind: причина, coin, name: рынок.name, dex: рынок.dex, side: Math.sign(szi), size: Math.abs(szi),
+      price: рынок.price, entry: Number(п.entryPx) || 0, pnl: Number(п.unrealizedPnl) || 0,
+      lev: (п.leverage && Number(п.leverage.value)) || 1,
+    });
+    сообщитьОСрабатывании(uid, з).catch(() => {});
+  } finally {
+    if (отпустить) отпустить();
+    закрываем.delete(метка);
+  }
+}
+
+function проверитьУровни(сторона, цена, liq, tp, sl) {
+  const ош = (к) => Object.assign(new Error(к), { код: 400 });
+  if (tp != null && !(сторона > 0 ? tp > цена : tp < цена)) throw ош("tp_side");
+  if (sl != null && !(сторона > 0 ? sl < цена : sl > цена)) throw ош("sl_side");
+  if (sl != null && liq > 0 && (сторона > 0 ? sl <= liq : sl >= liq)) throw ош("sl_beyond_liq");
+}
+const уровеньИз = (v) => (v == null || v === "" || !(Number(v) > 0) ? null : Number(v));
+
+// Ключ запроса из тела: повтор того же нажатия узнаётся по нему.
+const ключЗапроса = (тело) => {
+  const к = String((тело && тело.requestKey) || "");
+  return /^[A-Za-z0-9_-]{8,48}$/.test(к) ? к : crypto.randomUUID();
+};
+
+/* Учебный счёт: всё, что касается денег человека на бирже, — здесь, без
+   Hyperliquid. Сделка — мгновенная: проверка и списание в памяти, запись
+   на диск, ответ. */
+const последнийУчебный = new Map();
+async function учебный(req, res, действие, user) {
+  if (действие === "account") {
+    const [, кош, sol] = await Promise.all([
+      собратьРынки().catch(() => null),
+      картаЧеловека(user.id),
+      свежаяЦена("SOL").catch(() => 0),
+    ]);
+    const с = торговый.счётДляЭкрана(user.id, ценаДляЭкрана);
+    // Площадки открытых позиций держат сокет цен подписанным — сторожу нужны цены.
+    if (с.positions.length) следитьЗаЦенами([...new Set(с.positions.map((п) => п.dex || ""))]);
+    return res.status(200).json({
+      demo: true, network: "demo", ...с,
+      wallet: кош ? { address: кош.address, sol: кош.sol } : null,
+      solPrice: sol || ценаДляЭкрана("SOL"),
+      fee: торговый.КОМИССИЯ, spread: торговый.СПРЕД, minNotional: торговый.МИН_ОБЪЁМ,
+      minMargin: торговый.МИН_ЗАЛОГ, minTransfer: МИН_ПЕРЕВОДА_USD, tpsl: true,
+    });
+  }
+  if (действие === "trades") {
+    const coin = req.query && req.query.coin ? String(req.query.coin).slice(0, 40) : null;
+    return res.status(200).json({ events: торговый.журнал(user.id, { coin, предел: 80 }) });
+  }
+  if (req.method !== "POST") return res.status(405).json({ error: "method" });
+  const тело = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+  const ключ = ключЗапроса(тело);
+  // Повтор уже исполненного нажатия — тот же ответ, раньше предела частоты:
+  // иначе переспрос после обрыва связи получал бы «слишком быстро».
+  const было = торговый.ответПоКлючу(user.id, ключ);
+  if (было) return res.status(200).json(было);
+  const сейчас = Date.now();
+  if (сейчас - (последнийУчебный.get(user.id) || 0) < 250) return res.status(429).json({ error: "too_fast" });
+  последнийУчебный.set(user.id, сейчас);
+  if (последнийУчебный.size > 50000) последнийУчебный.clear();
+
+  if (действие === "order" || действие === "close" || действие === "tpsl") {
+    const р = await собратьРынки();
+    const рынок = р.поНомеру.get(Number(тело.asset)) || (тело.coin ? р.список.find((м) => м.coin === String(тело.coin)) : null);
+    if (!рынок) return res.status(400).json({ error: "no_market" });
+    const цена = await свежаяЦена(рынок.coin);
+    if (действие === "order") {
+      const ответ = торговый.открыть(user.id, {
+        рынок, цена, isBuy: !!тело.isBuy, usd: тело.usd, плечо: тело.leverage, tp: тело.tp, sl: тело.sl, ключ,
+      });
+      следитьЗаЦенами([рынок.dex || ""]);
+      return res.status(200).json(ответ);
+    }
+    if (действие === "close") return res.status(200).json(торговый.закрыть(user.id, { coin: рынок.coin, цена, ключ }));
+    return res.status(200).json(торговый.тейкСтоп(user.id, { coin: рынок.coin, цена, tp: тело.tp, sl: тело.sl }));
+  }
+  if (действие === "transfer") {
+    // Свой замок, не замок сделок: перевод ждёт сеть до полуминуты, а
+    // сделки в это время должны идти.
+    let отпустить;
+    try { отпустить = занять(`ta:${user.id}`, 120_000); } catch { return res.status(409).json({ error: "busy" }); }
+    try {
+      const цена = await свежаяЦена("SOL");
+      const ответ = тело.direction === "out"
+        ? await сТоргового({ uid: user.id, usd: тело.amount, ключ, цена })
+        : await наТорговый({ uid: user.id, sol: тело.amount, ключ, цена });
+      карты.delete(user.id);
+      return res.status(200).json(ответ);
+    } finally { отпустить(); }
+  }
+  // Мост, спот и Arbitrum — пути настоящей биржи; у учебного счёта их нет.
+  return res.status(400).json({ error: "demo_mode" });
+}
+
+/* Сделки основной биржи для истории — её же журнал исполнений. Тейк и
+   стоп приложения узнаются по своей записи рядом по времени. */
+async function сделкиБоевые(w, uid, coin = null) {
+  const заявки = await инфо({ type: "userFills", user: w.address }).catch(() => []);
+  const свои = торговый.журнал(uid, { предел: 200 });
+  return (Array.isArray(заявки) ? заявки : [])
+    .filter((f) => f && !String(f.coin).startsWith("@") && (!coin || f.coin === coin))
+    .slice(0, 80)
+    .map((f) => {
+      const dir = String(f.dir || "");
+      const закрытие = /^Close/i.test(dir);
+      let kind = f.liquidation ? "liq" : закрытие ? "close" : "open";
+      if (kind === "close") {
+        const з = свои.find((x) => (x.kind === "tp" || x.kind === "sl") && x.coin === f.coin && Math.abs(x.at - f.time) < 15_000);
+        if (з) kind = з.kind;
+      }
+      return {
+        id: `f-${f.tid || f.hash}`, at: Number(f.time) || 0, kind, coin: f.coin,
+        name: String(f.coin).replace(/^[a-z0-9]+:/i, ""), side: /Short/i.test(dir) ? -1 : 1,
+        size: Number(f.sz) || 0, price: Number(f.px) || 0, fee: Number(f.fee) || 0,
+        pnl: закрытие || f.liquidation ? (Number(f.closedPnl) || 0) - (Number(f.fee) || 0) : 0,
+      };
+    });
+}
+
+/* События биржи для истории кошелька (api/wallet-history.js): сделки,
+   тейки, стопы и ликвидации. Переводы карта ⇄ счёт там уже есть — из
+   журнала кошелька, с подписью транзакции. */
+export async function событияДляИстории(user) {
+  if (ДЕМО) return торговый.журнал(user.id, { предел: 80 }).filter((з) => з.kind !== "in" && з.kind !== "out");
+  if (!БОЕВАЯ) return [];
+  const db = admin();
+  if (!db) return [];
+  const w = await подписьEVMЧеловека(db, user);
+  return сделкиБоевые(w, user.id);
+}
+
+/* Сторож запускается вместе с сервером (server/index.mjs): позиции и
+   тейки должны жить и тогда, когда экран биржи никто не открыл. */
+let сторожЗапущен = false;
+export function запуститьСторожа() {
+  if (сторожЗапущен || (!ДЕМО && !БОЕВАЯ)) return false;
+  сторожЗапущен = true;
+  const площадкиПозиций = () => [...new Set([...торговый.монетыСПозициями()].map(площадкаМонеты))];
+  const есть = площадкиПозиций();
+  if (есть.length) следитьЗаЦенами(есть);
+  // Сокет молчит — сторож всё равно должен видеть цену: опрос раз в 5 секунд.
+  const опрос = setInterval(() => {
+    const монеты = [...торговый.монетыСПозициями()];
+    for (const dex of new Set(монеты.map(площадкаМонеты))) {
+      if (Date.now() - (живыеПоПлощадке.get(dex) || 0) > 15_000) свежаяЦена(монеты.find((c) => площадкаМонеты(c) === dex)).catch(() => {});
+    }
+  }, 5000);
+  if (опрос.unref) опрос.unref();
+  if (ДЕМО) {
+    довестиПереводы().catch((e) => console.warn("[торговый счёт] сверка", e && e.message));
+    const сверка = setInterval(() => { довестиПереводы().catch((e) => console.warn("[торговый счёт] сверка", e && e.message)); }, 15_000);
+    if (сверка.unref) сверка.unref();
+  }
+  return true;
+}
+
+/* Пополнение через мост на основной бирже: пришедший SOL сервер сам
+   продаёт в доллары и кладёт на счёт фьючерсов — человеку не нужно для
+   этого держать открытым экран биржи. */
+const сводим = new Map();
+let таймерСвода = null;
+function свестиПозже(user, w) {
+  сводим.set(user.id, { w, до: Date.now() + 15 * 60e3 });
+  if (таймерСвода) return;
+  таймерСвода = setInterval(async () => {
+    if (!сводим.size) { clearInterval(таймерСвода); таймерСвода = null; return; }
+    for (const [id, з] of сводим) {
+      if (Date.now() > з.до) { сводим.delete(id); continue; }
+      let отпустить = null;
+      try { отпустить = занять(`hl:${id}`, 60_000); } catch { continue; }
+      try {
+        const и = await свести(з.w);
+        if (и && и.usdc > 0) сводим.delete(id);
+      } catch (e) {
+        console.warn("[hyperliquid] свод пополнения", e && e.message);
+      } finally { отпустить(); }
+    }
+  }, 15_000);
+  if (таймерСвода.unref) таймерСвода.unref();
+}
+
 // Не чаще раза в 700 мс на человека: подписи и заявки не для очереди кликов.
 const последний = new Map();
 
@@ -724,7 +1026,7 @@ export default async function handler(req, res) {
     if (действие === "markets") {
       const р = await собратьРынки();
       res.setHeader("Cache-Control", "public, max-age=1");
-      return res.status(200).json({ network: БОЕВАЯ ? "mainnet" : "testnet", markets: р.список.slice(0, 300) });
+      return res.status(200).json({ network: БОЕВАЯ ? "mainnet" : ДЕМО ? "demo" : "testnet", demo: ДЕМО, markets: р.список.slice(0, 300) });
     }
     if (действие === "icon") {
       const coin = String(req.query.coin || "");
@@ -743,8 +1045,11 @@ export default async function handler(req, res) {
       const coin = String(req.query.coin || "");
       const interval = ["1m", "5m", "15m", "1h", "4h", "1d"].includes(req.query.interval) ? req.query.interval : "15m";
       if (!/^[A-Za-z0-9:@]{1,40}$/.test(coin)) return res.status(400).json({ error: "bad_request" });
-      const свечи = await свечиРынка(coin, interval);
-      res.setHeader("Cache-Control", "public, max-age=5");
+      // Подгрузка истории левее: конец окна — время самой левой свечи на экране.
+      const до = Number(req.query.before) || null;
+      if (до && !(до > 1.5e12 && до < Date.now() + 86400e3)) return res.status(400).json({ error: "bad_request" });
+      const свечи = await свечиРынка(coin, interval, до);
+      res.setHeader("Cache-Control", до ? "public, max-age=300" : "public, max-age=5");
       return res.status(200).json({ candles: свечи });
     }
 
@@ -752,6 +1057,7 @@ export default async function handler(req, res) {
     if (!db) return res.status(503).json({ error: "not_configured" });
     const user = await хозяин(req, db);
     if (!user) return res.status(401).json({ error: "unauthorized" });
+    if (ДЕМО) return await учебный(req, res, действие, user);
     const w = await подписьEVMЧеловека(db, user);
 
     if (действие === "account") {
@@ -781,9 +1087,15 @@ export default async function handler(req, res) {
       }
       const итог = итогиОжидания.get(user.id);
       if (итог) итогиОжидания.delete(user.id);
+      const уровни = торговый.тейкСтопыБоевые(user.id);
+      for (const п of позиции) {
+        const у = уровни[п.coin];
+        п.tp = у && Math.sign(п.size) === у.сторона ? у.tp : null;
+        п.sl = у && Math.sign(п.size) === у.сторона ? у.sl : null;
+      }
       return res.status(200).json({
-        address: w.address, network: БОЕВАЯ ? "mainnet" : "testnet",
-        equity, withdrawable, positions: позиции,
+        address: w.address, network: БОЕВАЯ ? "mainnet" : "testnet", demo: false, tpsl: БОЕВАЯ,
+        equity, withdrawable, cash: withdrawable, positions: позиции, minNotional: 10, minMargin: 10, fee: КОМИССИЯ,
         // Спот: SOL с моста, ещё не проданный, и доллары вне фьючерсов.
         spot: { sol: (спот && спот.get("USOL")) || 0, usdc: (спот && спот.get("USDC")) || 0 },
         wallet: кош ? { address: кош.address, sol: кош.sol } : null,
@@ -819,13 +1131,18 @@ export default async function handler(req, res) {
       /* Не хватает чуть-чуть (комиссия, копейки курса) — открываем на то,
          что есть, а не гоняем SOL по мосту ради пары долларов. */
       if (свободно < залогСКомиссией(usd, плечо) && свободно >= usd * 0.97) usd = вниз2(свободно / (1 + плечо * КОМИССИЯ) - 0.06);
+      const tp = уровеньИз(тело.tp), sl = уровеньИз(тело.sl);
+      if (tp || sl) проверитьУровни(тело.isBuy ? 1 : -1, рынок.price, 0, tp, sl);
       if (свободно >= залогСКомиссией(usd, плечо)) {
         if (!(usd >= 10)) return res.status(400).json({ error: "min_10_usd" });
         const ответ = await открытьПозицию(w, рынок, !!тело.isBuy, usd, плечо);
+        if (tp || sl) торговый.тейкСтопБоевой(user.id, { coin: рынок.coin, сторона: тело.isBuy ? 1 : -1, tp, sl });
         return res.status(200).json({ ok: true, usd, response: ответ.response });
       }
-      /* Не хватает на бирже — добираем с карты приложения: SOL уходит по
-         мосту, а позиция откроется сама, как только он дойдёт. */
+      /* Деньги на сделку лежат на торговом счёте — его пополняют заранее
+         (action=transfer). Добор с карты по мосту остался только для
+         прежних клиентов, которые просят его явно. */
+      if (!тело.сКарты) return res.status(400).json({ error: "not_enough" });
       if (ждут.has(user.id)) return res.status(409).json({ error: "pending" });
       const sol = await пополнитьСКарты(user, w, залогСКомиссией(usd, плечо) - свободно);
       ждут.set(user.id, { w, user, asset: рынок.asset, isBuy: !!тело.isBuy, usd, плечо, было: свободно, до: Date.now() + 10 * 60e3 });
@@ -842,6 +1159,7 @@ export default async function handler(req, res) {
       const szi = п ? Number(п.szi) : 0;
       if (!szi) return res.status(400).json({ error: "no_position" });
       const ответ = await заявкаПозиции(w, рынок, szi < 0, Math.abs(szi), true);
+      торговый.тейкСтопБоевой(user.id, { coin: рынок.coin });
       /* Последняя позиция закрыта — деньги возвращаются на карту, чтобы
          весь баланс жил в одном месте. Без ожидания ответа: мост — минуты.
          Под тем же замком, что и остальные денежные шаги. */
@@ -851,6 +1169,44 @@ export default async function handler(req, res) {
         try { await вернутьНаКарту(w, user); } catch (e) { console.warn("[hyperliquid] возврат на карту", e && e.message); } finally { свой(); }
       }, 1500);
       return res.status(200).json({ ok: true, response: ответ.response });
+    }
+
+    if (действие === "tpsl") {
+      const р = await собратьРынки();
+      const рынок = р.поНомеру.get(Number(тело.asset));
+      if (!рынок) return res.status(400).json({ error: "no_market" });
+      const с = await состояние(w.address, рынок.dex);
+      const п = ((с && с.assetPositions) || []).map((x) => x.position).find((x) => x && x.coin === рынок.coin);
+      const szi = п ? Number(п.szi) : 0;
+      if (!szi) return res.status(400).json({ error: "no_position" });
+      const было = торговый.тейкСтопыБоевые(user.id)[рынок.coin] || {};
+      const tp = тело.tp === undefined ? было.tp ?? null : уровеньИз(тело.tp);
+      const sl = тело.sl === undefined ? было.sl ?? null : уровеньИз(тело.sl);
+      проверитьУровни(Math.sign(szi), рынок.price, Number(п.liquidationPx) || 0, tp, sl);
+      торговый.тейкСтопБоевой(user.id, { coin: рынок.coin, сторона: Math.sign(szi), tp, sl });
+      return res.status(200).json({ ok: true, tp, sl });
+    }
+
+    if (действие === "trades") {
+      const coin = req.query && req.query.coin ? String(req.query.coin).slice(0, 40) : null;
+      return res.status(200).json({ events: await сделкиБоевые(w, user.id, coin) });
+    }
+
+    /* Торговый счёт на основной бирже — это сам счёт Hyperliquid: пополнение
+       идёт SOL по мосту Unit (минуты), вывод — обратно на карту. */
+    if (действие === "transfer") {
+      if (тело.direction === "out") {
+        const usd = вниз2(Number(тело.amount) || 0);
+        return res.status(200).json({ ok: true, sol: await вывестиНаКарту(w, user, usd) });
+      }
+      const сумма = Math.floor((Number(тело.amount) || 0) * 1e6) / 1e6;
+      if (!(сумма >= МИН_SOL)) return res.status(400).json({ error: "min_sol", min: МИН_SOL });
+      if (SOLANA_ТЕСТОВАЯ === БОЕВАЯ) return res.status(400).json({ error: "network_mismatch" });
+      const куда = await адресUnit({ откуда: "solana", куда: "hyperliquid", кому: w.address, вид: "solana" });
+      const итог = await отправитьНаБиржу({ user_id: user.id, сумма, куда, ключЗапроса: `hl:in:${ключЗапроса(тело)}`, вид: "trading_in" });
+      свестиПозже(user, w);
+      карты.delete(user.id);
+      return res.status(200).json({ ok: true, pending: true, bridge: true, signature: итог.signature, amount: сумма });
     }
 
     if (действие === "deposit-sol") {

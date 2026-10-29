@@ -1646,7 +1646,10 @@ export default async function handler(req, res) {
    «на сторону» — деньги остаются у него же, только на бирже, поэтому
    привязанный адрес вывода и второй ключ тут не спрашиваются. Адрес
    моста проверяет вызывающий — подписями хранителей Unit. */
-export async function отправитьНаБиржу({ user_id, сумма, куда, ключЗапроса = null }) {
+/* вид — запись в журнале: для моста это «вывод», для торгового счёта
+   (api/_tradingTransfer.js) — trading_in, и история кошелька подписывает
+   её «На торговый счёт», а не безликим «Отправлено». */
+export async function отправитьНаБиржу({ user_id, сумма, куда, ключЗапроса = null, вид = "withdraw" }) {
   const db = admin();
   const набор = ключи();
   if (!db || !набор) throw new Error("not_configured");
@@ -1657,8 +1660,7 @@ export async function отправитьНаБиржу({ user_id, сумма, к
     const строка = await освежитьПривязку(db, await кошелёк(db, user, набор));
     const есть = await баланс(строка.address);
     if (!(сумма > 0) || сумма > есть - ЗАПАС_НА_КОМИССИЮ) throw Object.assign(new Error("not_enough"), { код: 400, есть });
-    // В журнале — как вывод: для истории кошелька это «Отправлено».
-    const оп = await начать(db, user, { дело: "withdraw", сумма, адрес: куда, ключЗапроса });
+    const оп = await начать(db, user, { дело: вид === "trading_in" ? "trading_in" : "withdraw", сумма, адрес: куда, ключЗапроса });
     if (оп.повтор) return { signature: оп.signature, repeat: true };
     const лямпорты = Math.floor(сумма * LAMPORTS);
     const base64 = await собратьВывод({ откуда: строка.address, куда, лямпорты });

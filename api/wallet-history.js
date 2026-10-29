@@ -539,7 +539,29 @@ export default async function handler(req, res) {
   const изСети = await сверкаTON(входящие, свои);
   await людиПереводов(db, свои);
 
-  const всё = [...свои, ...изСети]
+  /* Сделки на бирже — тоже движение денег человека, только на торговом
+     счёте. Без них история молчала о позициях, тейках и ликвидациях, хотя
+     переводы на этот счёт в ней уже были. */
+  const биржа = await неДольше((async () => {
+    const { событияДляИстории } = await import("./hyperliquid.js");
+    return событияДляИстории(user);
+  })(), ЖДЁМ_СЕТЬ_МС, []).catch(() => []);
+  const сделкиБиржи = (биржа || []).map((з) => ({
+    id: `perp-${з.id}`,
+    chain: "perp",
+    kind: "perp",
+    amount: Math.abs(Number(з.pnl) || 0) || Number(з.margin) || 0,
+    signature: null,
+    address: null,
+    createdAt: new Date(Number(з.at) || 0).toISOString(),
+    perp: {
+      kind: з.kind, coin: з.coin, name: з.name, side: з.side, size: Number(з.size) || 0,
+      price: Number(з.price) || 0, entry: Number(з.entry) || 0, margin: Number(з.margin) || 0,
+      lev: Number(з.lev) || 0, pnl: Number(з.pnl) || 0, fee: Number(з.fee) || 0, payout: Number(з.payout) || 0, add: !!з.add,
+    },
+  }));
+
+  const всё = [...свои, ...изСети, ...сделкиБиржи]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, ПРЕДЕЛ);
 

@@ -495,6 +495,9 @@ const STR = {
     authGotIt: "Понятно",
     walletActSwap: "Обменять",
     walletActHistory: "История",
+    walletActTrading: "Торговый",
+    walletTradingTitle: "Торговый счёт", walletTradingSub: "Для сделок на бирже", walletTradingDemo: "Биржа · учебный, девнет",
+    walletTradingPositions: "позиций: {n}", walletTradingNone: "без позиций",
     walletHoldingsEmpty: "Пока пусто. Купи токен в мемпаде — он появится здесь.",
     saveFailed: "Не удалось сохранить — попробуй ещё раз",
     langFullNote: "Интерфейс переведён на выбранный язык.",
@@ -853,6 +856,14 @@ const STR = {
     histGraduate: "Выход на биржу", histBind: "Привязка адреса вывода", histOther: "Операция",
     histAll: "Все", histBuys: "Покупки", histSells: "Продажи", histTransfers: "Переводы", histLaunches: "Запуски",
     histIn: "Получено", histOut: "Отправлено", histFromUser: "от @{n}", histToUser: "@{n}",
+    histPerpLong: "Лонг {t}", histPerpShort: "Шорт {t}", histPerpAddLong: "Добор лонга {t}", histPerpAddShort: "Добор шорта {t}",
+    histPerpCloseLong: "Закрытие лонга {t}", histPerpCloseShort: "Закрытие шорта {t}",
+    histTake: "Тейк {t}", histStop: "Стоп {t}", histLiq: "Ликвидация {t}",
+    histToTrading: "На торговый счёт", histFromTrading: "С торгового счёта", histExchange: "Биржа",
+    histMarket: "Рынок", histSide: "Сторона", histSize: "Размер", histEntry: "Вход", histExit: "Выход",
+    histMargin: "Залог", histResult: "Итог", histPayout: "Вернулось на счёт", histPerpFee: "Комиссия биржи",
+    histLong: "Лонг", histShort: "Шорт", histMarginWord: "залог", histResultWord: "итог",
+    histLevEntry: "{l}× · вход ${p}", histExitAt: "выход ${p}", histLiqAt: "по ${p}", histExchangeNet: "Биржа · торговый счёт",
     sendOrNick: "или @ник", sendToUserLabel: "Пользователь Mintly — перевод по нику", sendUserNotFound: "Такого ника в Mintly нет",
     sendUserSelf: "Это ваш ник", sendUserLocked: "Включена привязка адреса вывода — переводы людям закрыты",
     histToday: "Сегодня", histYesterday: "Вчера", histTo: "на", histFrom: "от", histEmpty: "Здесь пока пусто",
@@ -1246,6 +1257,9 @@ const STR = {
     authGotIt: "Got it",
     walletActSwap: "Swap",
     walletActHistory: "History",
+    walletActTrading: "Trading",
+    walletTradingTitle: "Trading account", walletTradingSub: "For exchange trades", walletTradingDemo: "Exchange · demo, devnet",
+    walletTradingPositions: "positions: {n}", walletTradingNone: "no positions",
     walletHoldingsEmpty: "Nothing yet. Buy a token in the mempad and it shows up here.",
     saveFailed: "Could not save — try again",
     langFullNote: "The interface is translated into the selected language.",
@@ -1603,6 +1617,14 @@ const STR = {
     histGraduate: "DEX listing", histBind: "Payout address linked", histOther: "Operation",
     histAll: "All", histBuys: "Buys", histSells: "Sells", histTransfers: "Transfers", histLaunches: "Launches",
     histIn: "Received", histOut: "Sent", histFromUser: "from @{n}", histToUser: "to @{n}",
+    histPerpLong: "Long {t}", histPerpShort: "Short {t}", histPerpAddLong: "Added to long {t}", histPerpAddShort: "Added to short {t}",
+    histPerpCloseLong: "Closed long {t}", histPerpCloseShort: "Closed short {t}",
+    histTake: "Take profit {t}", histStop: "Stop loss {t}", histLiq: "Liquidation {t}",
+    histToTrading: "To trading account", histFromTrading: "From trading account", histExchange: "Exchange",
+    histMarket: "Market", histSide: "Side", histSize: "Size", histEntry: "Entry", histExit: "Exit",
+    histMargin: "Margin", histResult: "Result", histPayout: "Back to account", histPerpFee: "Exchange fee",
+    histLong: "Long", histShort: "Short", histMarginWord: "margin", histResultWord: "result",
+    histLevEntry: "{l}× · entry ${p}", histExitAt: "exit ${p}", histLiqAt: "at ${p}", histExchangeNet: "Exchange · trading account",
     sendOrNick: "or @nickname", sendToUserLabel: "Mintly user — send by nickname", sendUserNotFound: "No Mintly user with this nickname",
     sendUserSelf: "That's your own nickname", sendUserLocked: "Payout address lock is on — transfers to people are off",
     histToday: "Today", histYesterday: "Yesterday", histTo: "to", histFrom: "from", histEmpty: "Nothing here yet",
@@ -13249,8 +13271,8 @@ function КарточкаМонеты({ монета: монетаВход, ск
       className="fx-tap flex flex-col items-center"
       style={{ gap: 8, flex: 1, background: "transparent", border: "none", color: T.ice, fontFamily: bodyFont, fontSize: 13.5, fontWeight: 600 }}
     >
-      <span style={{ width: 60, height: 60, borderRadius: "50%", background: T.ice, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Icon size={22} color={T.bg} strokeWidth={2.4} />
+      <span style={{ width: 60, height: 60, borderRadius: "50%", background: T.surfaceHi, boxShadow: `inset 0 0 0 1px ${hexA(T.ice, 0.08)}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Icon size={22} color={T.ice} strokeWidth={2.2} />
       </span>
       {подпись}
     </button>
@@ -14290,6 +14312,8 @@ function useСделки(userId, предел, тик = 0, сделочные = 
             token_address: null,
             chain: о.chain,
             address: о.address || null,
+            // Сделка на бирже: рынок, сторона, цены и итог — для строки истории.
+            перп: о.perp || null,
             сделочная: ОПЕРАЦИИ_СДЕЛОК.has(о.kind),
           })));
         setСвои(свежиеОперации());
@@ -15835,24 +15859,28 @@ function useУведомленияПодключены() {
 /* Баннеры главной: две широкие двери наружу (канал и уведомления в
    боте) и две плитки внутрь — к запуску и в мемпад. Появляются по
    одной, с небольшим сдвигом: экран собирается, а не выпрыгивает. */
-/* Рынки — фьючерсы на крипту, золото, серебро, индексы и акции через
-   Hyperliquid (api/hyperliquid.js). Своей биржи нет: заявки уходят туда,
-   а счёт — тот же EVM-кошелёк приложения. Страница во весь экран: список
-   с фильтрами, страница рынка с графиком, позицией и сделкой. */
+/* Биржа — фьючерсы на крипту, золото, серебро, индексы и акции
+   (api/hyperliquid.js). Деньги на сделки лежат на торговом счёте — втором
+   счёте человека в приложении (api/_tradingAccount.js): его пополняют с
+   карты заранее, кнопкой в кошельке или здесь же, и позиция открывается с
+   него сразу, без моста и ожидания сети. В тестовых сетях счёт учебный:
+   цены настоящие, с основной Hyperliquid, а деньги — девнет-SOL.
+   Страница во весь экран: счёт, позиции, рынки, история; страница рынка —
+   график, позиция с тейком и стопом, сделка. */
 const РАЗДЕЛЫ_РЫНКОВ = [["crypto", "Крипта"], ["metals", "Металлы"], ["indices", "Индексы"], ["stocks", "Акции"]];
-/* Сколько на карте для биржи — по тому же курсу SOL, что и на самой
-   карте, чтобы суммы совпадали. Сервер считал по цене SOL на споте
-   биржи, а у тестовой биржи она своя (~$41 вместо ~$100) — карта
-   показывала одно, биржа втрое меньше. */
-function наКарте(счёт) {
-  const кош = счёт && счёт.wallet;
-  const курс = solUsd();
-  if (кош && курс > 0) return Math.max(0, кош.sol - 0.01) * курс;
-  return (счёт && счёт.walletUsd) || 0;
+// Ликвидация — жёлтым везде: на графике, в позиции и в истории.
+const ЦВЕТ_ЛИКВИДАЦИИ = "#F5C04E";
+
+/* Ключ нажатия: сервер по нему узнаёт повтор (обрыв связи, двойной тап) и
+   отдаёт прежний ответ, а не открывает вторую позицию. */
+function ключСделки() {
+  try { if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID(); } catch { /* старый движок */ }
+  return `k${Date.now().toString(36)}${Math.random().toString(36).slice(2, 14)}`;
 }
+
 async function запросРынков(путь, тело) {
   const заголовки = {};
-  if (тело || путь === "account") {
+  if (тело || /^(account|trades)/.test(путь)) {
     const { data } = await supabase.auth.getSession();
     const ключ = data && data.session && data.session.access_token;
     if (!ключ) throw new Error("no_session");
@@ -15869,17 +15897,42 @@ async function запросРынков(путь, тело) {
 }
 /* Ответы биржи и сервера — словами: раньше человек видел «min_10_usd»
    или английское «Insufficient margin to place order». */
+const СЛОВА_БИРЖИ = {
+  pending: "Прошлая сделка ещё ждёт денег с карты",
+  not_enough: "Не хватает денег на торговом счёте",
+  network_mismatch: "Сеть карты и биржи не совпадает",
+  wallet_busy: "Подождите — идёт прошлая операция",
+  busy: "Подождите — идёт прошлая операция",
+  too_fast: "Слишком быстро — нажмите ещё раз",
+  min_10_usd: "Позиция — от $10 вместе с плечом",
+  min_margin: "Залог — от $1",
+  too_small: "Слишком маленькая сумма для этого рынка",
+  min_sol: "Слишком маленькая сумма для моста — минимум ~0.13 SOL",
+  min_transfer: "Перевод — от $1",
+  no_position: "Позиция уже закрыта",
+  opposite_position: "Сначала закройте открытую позицию",
+  too_many_positions: "Слишком много открытых позиций",
+  tp_side: "Тейк лонга — выше цены, шорта — ниже",
+  sl_side: "Стоп лонга — ниже цены, шорта — выше",
+  sl_beyond_liq: "Стоп за ликвидацией не сработает — поставьте ближе к цене",
+  bad_tp: "Неверная цена тейка",
+  bad_sl: "Неверная цена стопа",
+  price_stale: "Цена не обновляется — попробуйте через минуту",
+  storage: "Счёт временно недоступен — попробуйте через минуту",
+  account_unavailable: "Счёт временно недоступен — напишите в поддержку",
+  treasury_low: "Учебная казна пуста — попробуйте позже",
+  rejected: "Сеть отклонила перевод",
+  payout_failed: "Вывод не прошёл — деньги остались на торговом счёте",
+  demo_mode: "На учебном счёте это недоступно",
+  no_wallet: "Сначала заведите кошелёк",
+  too_many_transfers: "Слишком много переводов в пути — подождите",
+  no_market: "Рынок сейчас недоступен",
+  no_session: "Войдите в аккаунт",
+  unauthorized: "Войдите в аккаунт",
+};
 function текстОшибкиБиржи(e, иначе) {
   const м = String((e && e.message) || "");
-  if (м === "pending") return "Прошлая сделка ещё ждёт денег с карты";
-  if (м === "not_enough") return "Не хватает SOL на карте";
-  if (м === "network_mismatch") return "Сеть карты и биржи не совпадает";
-  if (м === "wallet_busy" || м === "busy") return "Подождите — идёт прошлая операция";
-  if (м === "too_fast") return "Слишком быстро — нажмите ещё раз";
-  if (м === "min_10_usd") return "Минимум $10";
-  if (м === "min_sol") return "Слишком маленькая сумма для моста — минимум ~0.13 SOL";
-  if (м === "no_position") return "Позиция уже закрыта";
-  if (м === "no_session" || м === "unauthorized") return "Войдите в аккаунт";
+  if (СЛОВА_БИРЖИ[м]) return СЛОВА_БИРЖИ[м];
   if (/insufficient margin|not enough margin/i.test(м)) return "Не хватает залога — уменьшите сумму или плечо";
   if (/could not immediately match|no liquidity/i.test(м)) return "Нет встречных заявок по этой цене — попробуйте ещё раз";
   if (/reduce only/i.test(м)) return "Позиция уже закрыта";
@@ -15892,83 +15945,328 @@ function ценаРынка(p) {
   if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 3 });
   return n.toPrecision(4);
 }
+const долларыБиржи = (v) => `$${(Number(v) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const итогБиржи = (v) => `${v >= 0 ? "+" : "−"}${долларыБиржи(Math.abs(v))}`;
+const цветИтога = (v) => (Math.abs(v) < 0.005 ? T.ice : v > 0 ? T.up : T.down);
 
+/* Торговый счёт — один на всё приложение: биржа и кошелёк показывают одни
+   и те же цифры и спрашивают сервер одним запросом, а не каждый своим. */
+const торговыйКеш = { данные: null, ждём: null, слушатели: new Set() };
+function обновитьТорговыйСчёт() {
+  if (торговыйКеш.ждём) return торговыйКеш.ждём;
+  торговыйКеш.ждём = запросРынков("account")
+    .then((j) => { торговыйКеш.данные = j; for (const ф of торговыйКеш.слушатели) ф(j); return j; })
+    .catch(() => торговыйКеш.данные)
+    .finally(() => { торговыйКеш.ждём = null; });
+  return торговыйКеш.ждём;
+}
+function useТорговыйСчёт(активен = true, шаг = 5000) {
+  const [данные, setДанные] = useState(торговыйКеш.данные);
+  useEffect(() => {
+    торговыйКеш.слушатели.add(setДанные);
+    return () => { торговыйКеш.слушатели.delete(setДанные); };
+  }, []);
+  useEffect(() => {
+    if (!активен) return undefined;
+    обновитьТорговыйСчёт();
+    const id = setInterval(() => {
+      if (typeof document === "undefined" || document.visibilityState === "visible") обновитьТорговыйСчёт();
+    }, шаг);
+    return () => clearInterval(id);
+  }, [активен, шаг]);
+  return данные;
+}
+
+/* Журнал биржи: сделки, тейки, стопы, ликвидации и переводы счёта. */
+function useСобытияБиржи(активен, coin = null, тик = 0) {
+  const [события, setСобытия] = useState(null);
+  useEffect(() => {
+    if (!активен) return undefined;
+    let живо = true;
+    const читать = () => запросРынков(`trades${coin ? `&coin=${encodeURIComponent(coin)}` : ""}`)
+      .then((j) => { if (живо) setСобытия(j.events || []); })
+      .catch(() => { if (живо) setСобытия((было) => было || []); });
+    читать();
+    const id = setInterval(читать, 10000);
+    return () => { живо = false; clearInterval(id); };
+  }, [активен, coin, тик]);
+  return события;
+}
+
+/* Событие биржи — строкой истории: той же, что в кошельке, чтобы подписи
+   и цвета читались одинаково в обоих местах. */
+function строкаБиржи(з) {
+  const перевод = з.kind === "in" || з.kind === "out";
+  return {
+    id: `perp-${з.id}`, вид: "perp", причина: з.kind, сеть: перевод ? "solana" : "perp", монета: "USD",
+    тикер: з.name || null, coin: з.coin || null, сторона: Number(з.side) || 0,
+    размер: Number(з.size) || 0, цена: Number(з.price) || 0, вход: Number(з.entry) || 0,
+    залог: Number(з.margin) || 0, плечо: Number(з.lev) || 0, pnl: Number(з.pnl) || 0,
+    комиссия: Number(з.fee) || 0, выплата: Number(з.payout) || 0, добор: !!з.add,
+    usd: Number(з.usd) || 0, sol: Number(з.sol) || 0,
+    сумма: перевод ? Number(з.usd) || 0 : Math.abs(Number(з.pnl) || 0),
+    время: new Date(Number(з.at) || Date.now()).toISOString(), подпись: перевод ? з.sig || null : null, адрес: null,
+  };
+}
+
+/* Круглый шаг сетки цены: 1, 2, 2.5, 5 × 10ⁿ — подписи читаются сразу. */
+function шагСетки(размах, линий = 4) {
+  const сырой = Math.max(1e-12, размах / Math.max(1, линий));
+  const п = 10 ** Math.floor(Math.log10(сырой));
+  for (const м of [1, 2, 2.5, 5, 10]) if (м * п >= сырой) return м * п;
+  return 10 * п;
+}
+function подписьСетки(v, шаг) {
+  const знаков = Math.max(0, Math.min(8, -Math.floor(Math.log10(шаг)) + (Math.abs(шаг / 10 ** Math.floor(Math.log10(шаг)) - 2.5) < 1e-9 ? 1 : 0)));
+  return v.toLocaleString("en-US", { minimumFractionDigits: знаков, maximumFractionDigits: знаков });
+}
+function слитьСвечи(старые, новые) {
+  const м = new Map();
+  for (const с of старые || []) м.set(с.t, с);
+  for (const с of новые || []) м.set(с.t, с);
+  return [...м.values()].sort((a, b) => a.t - b.t);
+}
+const ШАГИ_ГРАФИКА = [["1m", "1м"], ["5m", "5м"], ["15m", "15м"], ["1h", "1ч"], ["4h", "4ч"], ["1d", "1д"]];
+const МС_СВЕЧИ = { "1m": 60e3, "5m": 300e3, "15m": 900e3, "1h": 3600e3, "4h": 14400e3, "1d": 86400e3 };
+const МЕТКИ_ВРЕМЕНИ = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 288];
+function подписьВремениБиржи(t, мс) {
+  const д = new Date(t);
+  const дата = () => д.toLocaleDateString("ru-RU", { day: "numeric", month: "short" }).replace(".", "");
+  if (мс >= 86400e3 || (д.getHours() === 0 && д.getMinutes() === 0)) return дата();
+  return `${String(д.getHours()).padStart(2, "0")}:${String(д.getMinutes()).padStart(2, "0")}`;
+}
+
+/* График рынка.
+ *
+ * Свечи листаются пальцем вбок и сводятся/разводятся двумя пальцами;
+ * дошли до левого края — сервер подгружает историю раньше. Цены — на
+ * своей полосе справа, а не поверх свечей: раньше метка текущей цены и
+ * подписи линий лежали прямо на последних свечах и закрывали их. Сетка —
+ * круглыми шагами цены и времени. Линии позиции (вход, ликвидация, тейк,
+ * стоп) — во всю ширину, их цены — метками на той же полосе, а названия —
+ * строкой под графиком. */
 function ГрафикРынка({ coin, линии = [], цена = 0 }) {
   const [шаг, setШаг] = useState("15m");
   const [свечи, setСвечи] = useState(null);
+  const [видно, setВидно] = useState(64);
+  const [сдвиг, setСдвиг] = useState(-3);
+  const [ширина, setШирина] = useState(360);
+  const корень = useRef(null);
+  const ещё = useRef(true);
+  const грузимСтарые = useRef(false);
+  const касания = useRef(new Map());
+  const жест = useRef(null);
+
+  useLayoutEffect(() => {
+    const el = корень.current;
+    if (!el) return undefined;
+    const мерить = () => setШирина(Math.max(220, Math.round(el.clientWidth || 360)));
+    мерить();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(мерить) : null;
+    if (ro) ro.observe(el);
+    return () => { if (ro) ro.disconnect(); };
+  }, []);
+
   useEffect(() => {
     let живо = true;
-    const читать = () => запросРынков(`candles&coin=${encodeURIComponent(coin)}&interval=${шаг}`).then((j) => { if (живо) setСвечи(j.candles || []); }).catch(() => {});
-    setСвечи(null); читать();
+    ещё.current = true;
+    setСвечи(null); setСдвиг(-3); setВидно(64);
+    const читать = () => запросРынков(`candles&coin=${encodeURIComponent(coin)}&interval=${шаг}`)
+      .then((j) => { if (живо) setСвечи((было) => слитьСвечи(было, j.candles || [])); })
+      .catch(() => { if (живо) setСвечи((было) => было || []); });
+    читать();
     // Последнюю свечу двигает живая цена из списка рынков — свечи целиком реже.
     const id = setInterval(читать, шаг === "1m" ? 10000 : 20000);
     return () => { живо = false; clearInterval(id); };
   }, [coin, шаг]);
-  const Ш = 360, В = 240;
-  const ряд = (свечи || []).slice(-80);
-  // Последняя свеча — по живой цене из списка рынков, чтобы не ждать опроса свечей.
-  if (ряд.length && цена > 0) {
-    const п = ряд[ряд.length - 1];
-    ряд[ряд.length - 1] = { ...п, c: цена, h: Math.max(п.h, цена), l: Math.min(п.l, цена) };
-  }
-  let мин = Math.min(...ряд.map((с) => с.l)), макс = Math.max(...ряд.map((с) => с.h));
+
+  const ряд0 = свечи || [];
+  const ряд = useMemo(() => {
+    const n = ряд0.length;
+    if (!n || !(цена > 0)) return ряд0;
+    const копия = ряд0.slice();
+    const п = копия[n - 1];
+    const мс = МС_СВЕЧИ[шаг] || 900e3;
+    /* Свеча закончилась, а новая с сервера ещё не пришла — начинаем её сами
+       по живой цене: иначе минуту-другую цена рисовалась бы хвостом старой. */
+    if (Date.now() >= п.t + мс) копия.push({ t: п.t + Math.floor((Date.now() - п.t) / мс) * мс, o: п.c, h: Math.max(п.c, цена), l: Math.min(п.c, цена), c: цена, v: 0 });
+    else копия[n - 1] = { ...п, c: цена, h: Math.max(п.h, цена), l: Math.min(п.l, цена) };
+    return копия;
+  }, [свечи, цена, шаг]); // eslint-disable-line react-hooks/exhaustive-deps
+  const N = ряд.length;
+
+  const огрСдвиг = useCallback((v) => Math.max(-Math.round(видно / 3), Math.min(Math.max(0, N - Math.round(видно / 2)), v)), [видно, N]);
+  const правый = N - 1 - сдвиг;
+  const левый = правый - видно + 1;
+
+  // Дошли до левого края — подгружаем историю раньше самой левой свечи.
+  useEffect(() => {
+    if (!N || грузимСтарые.current || !ещё.current || левый > 12) return;
+    грузимСтарые.current = true;
+    const до = ряд0[0].t;
+    запросРынков(`candles&coin=${encodeURIComponent(coin)}&interval=${шаг}&before=${до}`)
+      .then((j) => {
+        const старые = (j.candles || []).filter((с) => с.t < до);
+        if (!старые.length) ещё.current = false;
+        else setСвечи((было) => слитьСвечи(старые, было));
+      })
+      .catch(() => { ещё.current = false; })
+      .finally(() => { грузимСтарые.current = false; });
+  }, [левый, N, coin, шаг]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const В = 252, ОСЬ = 22, ВЫС = В - ОСЬ;
+  const с0 = Math.max(0, Math.floor(левый) - 1);
+  const с1 = Math.min(N - 1, Math.ceil(правый) + 1);
+  const видимые = N ? ряд.slice(с0, с1 + 1) : [];
+  let мин = Infinity, макс = -Infinity;
+  for (const с of видимые) { if (с.l < мин) мин = с.l; if (с.h > макс) макс = с.h; }
+  if (!Number.isFinite(мин)) { мин = цена > 0 ? цена * 0.99 : 0; макс = цена > 0 ? цена * 1.01 : 1; }
+  if (цена > 0) { мин = Math.min(мин, цена); макс = Math.max(макс, цена); }
   /* Линии позиции раздвигают шкалу, если стоят рядом; далёкую (ликвидация
      при 1–2× плече) не тянем — иначе свечи сплющились бы в полоску, её
      метка просто прижимается к краю со стрелкой. */
-  const размах = Math.max(1e-12, макс - мин);
-  for (const л of линии) if (л.цена > 0 && л.цена > мин - размах && л.цена < макс + размах) { мин = Math.min(мин, л.цена); макс = Math.max(макс, л.цена); }
-  const поле = (макс - мин) * 0.06;
+  const размах0 = Math.max(1e-12, макс - мин);
+  for (const л of линии) if (л.цена > 0 && л.цена > мин - размах0 * 0.6 && л.цена < макс + размах0 * 0.6) { мин = Math.min(мин, л.цена); макс = Math.max(макс, л.цена); }
+  const поле = (макс - мин) * 0.08 || мин * 0.01 || 1;
   мин -= поле; макс += поле;
-  const y = (v) => В - ((v - мин) / Math.max(1e-12, макс - мин)) * В;
-  const ш = Ш / Math.max(1, ряд.length);
-  const метка = (v) => Math.max(0, Math.min(100, (y(v) / В) * 100));
+  const шагЦены = шагСетки(макс - мин, 4);
+  const уровни = [];
+  for (let v = Math.ceil(мин / шагЦены) * шагЦены; v <= макс; v += шагЦены) уровни.push(v);
+  // Полоса цен — по самой длинной подписи: у BTC это «80,150», у мемкоина «0.00001234».
+  const длиннейшая = Math.max(...уровни.map((v) => подписьСетки(v, шагЦены).length), цена > 0 ? ценаРынка(цена).length + 1 : 4,
+    ...линии.filter((л) => л.цена > 0).map((л) => ценаРынка(л.цена).length + 1));
+  const ГУТ = Math.min(96, Math.max(50, Math.round(длиннейшая * 6.6 + 16)));
+  const A = ширина - ГУТ;
+  const шагX = A / видно;
+  const x = (i) => A - (правый - i) * шагX - шагX / 2;
+  const y = (v) => 6 + (1 - (v - мин) / Math.max(1e-12, макс - мин)) * (ВЫС - 12);
+  const мсСвечи = МС_СВЕЧИ[шаг] || 900e3;
+  const каждые = МЕТКИ_ВРЕМЕНИ.find((k) => k * шагX >= 66) || 288;
+  // Подпись времени у самого края обрезалась бы наполовину — такие не ставим.
+  const метки = видимые.filter((с, k) => Math.round(с.t / мсСвечи) % каждые === 0 && x(с0 + k) > 20 && x(с0 + k) < A - 20);
+
+  /* Метки цен на полосе справа: текущая — главная, остальные расступаются,
+     чтобы не лезть друг на друга. Линия вне шкалы — метка у края со стрелкой. */
+  const ярлыки = [];
+  if (цена > 0) ярлыки.push({ y: y(цена), текст: ценаРынка(цена), фон: T.ice, цвет: T.bg, главная: true });
+  for (const л of линии) {
+    if (!(л.цена > 0)) continue;
+    const внутри = л.цена >= мин && л.цена <= макс;
+    ярлыки.push({ y: внутри ? y(л.цена) : л.цена > макс ? 9 : ВЫС - 9, текст: `${внутри ? "" : л.цена > макс ? "↑" : "↓"}${ценаРынка(л.цена)}`, фон: л.цвет, цвет: "#000000" });
+  }
+  ярлыки.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ярлыки.length; i++) if (ярлыки[i].y - ярлыки[i - 1].y < 17) ярлыки[i].y = ярлыки[i - 1].y + 17;
+  for (let i = ярлыки.length - 1; i >= 0; i--) {
+    const предел = i === ярлыки.length - 1 ? ВЫС - 9 : ярлыки[i + 1].y - 17;
+    if (ярлыки[i].y > предел) ярлыки[i].y = предел;
+  }
+  // Подпись сетки под меткой цены не видна — её и не рисуем.
+  const подписиСетки = уровни.filter((v) => ярлыки.every((я) => Math.abs(я.y - y(v)) > 13) && y(v) > 7 && y(v) < ВЫС - 7);
+
+  // Палец: один — листает, два — сводит и разводит.
+  const начало = (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    касания.current.set(e.pointerId, { x: e.clientX });
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* уже захвачен */ }
+    if (касания.current.size === 1) жест.current = { тип: "листаем", x0: e.clientX, сдвиг0: сдвиг };
+    else if (касания.current.size === 2) {
+      const [a, b] = [...касания.current.values()];
+      жест.current = { тип: "щипок", d0: Math.max(12, Math.abs(a.x - b.x)), видно0: видно };
+    }
+  };
+  const ход = (e) => {
+    if (!касания.current.has(e.pointerId)) return;
+    касания.current.set(e.pointerId, { x: e.clientX });
+    const ж = жест.current;
+    if (!ж) return;
+    if (ж.тип === "листаем") setСдвиг(огрСдвиг(ж.сдвиг0 + (e.clientX - ж.x0) / шагX));
+    else {
+      const [a, b] = [...касания.current.values()];
+      const d = Math.max(12, Math.abs(a.x - b.x));
+      setВидно(Math.max(20, Math.min(240, Math.round((ж.видно0 * ж.d0) / d))));
+    }
+  };
+  const конец = (e) => {
+    касания.current.delete(e.pointerId);
+    if (!касания.current.size) жест.current = null;
+    else {
+      const [a] = [...касания.current.values()];
+      жест.current = { тип: "листаем", x0: a.x, сдвиг0: сдвиг };
+    }
+  };
+  // Колесо на компьютере: вбок — листает, с Ctrl — приближает; просто вниз — страница.
+  const колесо = (e) => {
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) setСдвиг((с) => огрСдвиг(с - e.deltaX / шагX));
+    else if (e.ctrlKey || e.metaKey) setВидно((в) => Math.max(20, Math.min(240, Math.round(в * (1 + e.deltaY * 0.003)))));
+  };
+
+  const сеткаЦвет = hexA(T.ice, 0.06);
   return (
     <div className="flex flex-col" style={{ gap: 10 }}>
-      <div style={{ height: В, position: "relative" }}>
+      <div ref={корень} style={{ height: В, position: "relative", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", cursor: жест.current ? "grabbing" : "grab" }}
+        onPointerDown={начало} onPointerMove={ход} onPointerUp={конец} onPointerCancel={конец} onWheel={колесо}>
         {!свечи ? <ЗагрузкаБлока высота={В} /> : (
-          <>
-            <svg viewBox={`0 0 ${Ш} ${В}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
-              {ряд.map((с, i) => {
+          <svg width={ширина} height={В} viewBox={`0 0 ${ширина} ${В}`} style={{ display: "block", overflow: "hidden" }} aria-label={`График ${coin}`}>
+            <defs><clipPath id={`поле-${coin}`}><rect x={0} y={0} width={A} height={ВЫС} /></clipPath></defs>
+            {уровни.map((v) => <line key={`г${v}`} x1={0} x2={A} y1={y(v)} y2={y(v)} stroke={сеткаЦвет} strokeWidth={1} />)}
+            {метки.map((с) => <line key={`в${с.t}`} x1={x(с0 + видимые.indexOf(с))} x2={x(с0 + видимые.indexOf(с))} y1={0} y2={ВЫС} stroke={сеткаЦвет} strokeWidth={1} />)}
+            <line x1={A + 0.5} x2={A + 0.5} y1={0} y2={ВЫС} stroke={T.line} strokeWidth={1} />
+            <line x1={0} x2={ширина} y1={ВЫС + 0.5} y2={ВЫС + 0.5} stroke={T.line} strokeWidth={1} />
+            <g clipPath={`url(#поле-${coin})`}>
+              {видимые.map((с, k) => {
+                const i = с0 + k;
                 const рост = с.c >= с.o;
                 const цвет = рост ? СВЕЧА_РОСТ : СВЕЧА_ПАДЕНИЕ;
-                const x = i * ш + ш / 2;
+                const cx = x(i);
+                const тело = Math.max(1, шагX * 0.64);
                 return (
                   <g key={с.t}>
-                    <line x1={x} x2={x} y1={y(с.h)} y2={y(с.l)} stroke={цвет} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-                    <rect x={x - ш * 0.32} width={ш * 0.64} y={Math.min(y(с.o), y(с.c))} height={Math.max(1, Math.abs(y(с.o) - y(с.c)))} fill={цвет} rx={0.6} />
+                    <line x1={cx} x2={cx} y1={y(с.h)} y2={y(с.l)} stroke={цвет} strokeWidth={1} />
+                    <rect x={cx - тело / 2} width={тело} y={Math.min(y(с.o), y(с.c))} height={Math.max(1, Math.abs(y(с.o) - y(с.c)))} fill={цвет} rx={Math.min(1.5, тело / 4)} />
                   </g>
                 );
               })}
-              {цена > 0 && <line x1={0} x2={Ш} y1={y(цена)} y2={y(цена)} stroke={hexA(T.ice, 0.35)} strokeWidth={1} strokeDasharray="2 4" vectorEffect="non-scaling-stroke" />}
-              {линии.filter((л) => л.цена > мин && л.цена < макс).map((л, i) => (
-                <line key={i} x1={0} x2={Ш} y1={y(л.цена)} y2={y(л.цена)} stroke={л.цвет} strokeWidth={1.4} strokeDasharray={л.пунктир ? "6 5" : undefined} vectorEffect="non-scaling-stroke" />
+              {линии.filter((л) => л.цена >= мин && л.цена <= макс).map((л, i) => (
+                <line key={`л${i}`} x1={0} x2={A} y1={y(л.цена)} y2={y(л.цена)} stroke={л.цвет} strokeWidth={1.4} strokeDasharray={л.пунктир ? "6 5" : undefined} />
               ))}
-            </svg>
-            {/* Подписи линий — HTML поверх: текст в растянутом SVG тянулся бы. */}
-            {линии.filter((л) => л.цена > 0).map((л, i) => {
-              const внутри = л.цена > мин && л.цена < макс;
-              return (
-                <span key={i} style={{
-                  position: "absolute", left: 0, top: `${метка(л.цена)}%`, transform: `translateY(${внутри ? "-50%" : метка(л.цена) <= 0 ? "0" : "-100%"})`,
-                  padding: "3px 8px", borderRadius: 8, background: л.цвет, color: "#000000",
-                  fontFamily: monoFont, fontSize: 11.5, fontWeight: 800, whiteSpace: "nowrap", pointerEvents: "none",
-                }}>
-                  {внутри ? "" : л.цена > макс ? "↑ " : "↓ "}{л.подпись} ${ценаРынка(л.цена)}
-                </span>
-              );
-            })}
-            {цена > 0 && (
-              <span style={{ position: "absolute", right: 0, top: `${метка(цена)}%`, transform: "translateY(-50%)", padding: "3px 7px", borderRadius: 8, background: T.ice, color: T.bg, fontFamily: monoFont, fontSize: 11.5, fontWeight: 800, pointerEvents: "none" }}>
-                ${ценаРынка(цена)}
-              </span>
-            )}
-          </>
+              {цена > 0 && <line x1={0} x2={A} y1={y(цена)} y2={y(цена)} stroke={hexA(T.ice, 0.45)} strokeWidth={1} strokeDasharray="2 4" />}
+            </g>
+            {подписиСетки.map((v) => (
+              <text key={`п${v}`} x={A + 8} y={y(v) + 3.5} fill={T.faint} fontFamily={monoFont} fontSize={10.5} fontWeight={600}>{подписьСетки(v, шагЦены)}</text>
+            ))}
+            {метки.map((с) => (
+              <text key={`т${с.t}`} x={x(с0 + видимые.indexOf(с))} y={ВЫС + 15} fill={T.faint} fontFamily={monoFont} fontSize={10.5} fontWeight={600} textAnchor="middle">{подписьВремениБиржи(с.t, мсСвечи)}</text>
+            ))}
+            {ярлыки.map((я, i) => (
+              <g key={`я${i}`}>
+                <rect x={A + 3} y={я.y - 8.5} width={ГУТ - 5} height={17} rx={6} fill={я.фон} />
+                <text x={A + 3 + (ГУТ - 5) / 2} y={я.y + 3.8} fill={я.цвет} fontFamily={monoFont} fontSize={10.5} fontWeight={800} textAnchor="middle">{я.текст}</text>
+              </g>
+            ))}
+          </svg>
+        )}
+        {свечи && сдвиг > 2 && (
+          <button onClick={() => { haptic("light"); setСдвиг(-3); }} onPointerDown={(e) => e.stopPropagation()} className="fx-tap flex items-center"
+            style={{ position: "absolute", right: ГУТ + 8, bottom: ОСЬ + 8, gap: 4, padding: "6px 10px", borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700 }}>
+            Сейчас <ChevronRight size={14} />
+          </button>
         )}
       </div>
-      <div className="flex" style={{ gap: 6 }}>
-        {[["1m", "1м"], ["15m", "15м"], ["1h", "1ч"], ["4h", "4ч"], ["1d", "1д"]].map(([к, подпись]) => (
+      {линии.some((л) => л.цена > 0) && (
+        <div className="flex" style={{ gap: "6px 14px", flexWrap: "wrap" }}>
+          {линии.filter((л) => л.цена > 0).map((л, i) => (
+            <span key={i} className="flex items-center" style={{ gap: 6, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 600, color: T.muted }}>
+              <span style={{ width: 12, height: 3, borderRadius: 2, background: л.цвет, opacity: л.пунктир ? 0.7 : 1 }} />
+              {л.подпись}
+              <span style={{ fontFamily: monoFont, color: T.ice }}>${ценаРынка(л.цена)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex" style={{ gap: 4 }}>
+        {ШАГИ_ГРАФИКА.map(([к, подпись]) => (
           <button key={к} onClick={() => { haptic("light"); setШаг(к); }} className="fx-tap"
-            style={{ padding: "7px 13px", borderRadius: 999, border: "none", background: шаг === к ? hexA(T.ice, 0.12) : "transparent", color: шаг === к ? T.ice : T.muted, fontFamily: bodyFont, fontSize: 13.5, fontWeight: 700 }}>
+            style={{ padding: "7px 12px", borderRadius: 999, border: "none", background: шаг === к ? hexA(T.ice, 0.12) : "transparent", color: шаг === к ? T.ice : T.muted, fontFamily: bodyFont, fontSize: 13.5, fontWeight: 700 }}>
             {подпись}
           </button>
         ))}
@@ -15977,46 +16275,111 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
   );
 }
 
-function СтраницаРынка({ рынок, счёт, onОбновить, showToast }) {
+/* Поле цены тейка или стопа с подсказками в процентах от цены. */
+function ПолеУровня({ подпись, цвет, значение, onChange, цена, вверх, ошибка = "" }) {
+  const доли = [1, 2, 5, 10];
+  return (
+    <div className="flex flex-col" style={{ gap: 7 }}>
+      <div className="flex items-center" style={{ gap: 8, padding: "10px 12px", borderRadius: 14, background: T.bg, boxShadow: ошибка ? `inset 0 0 0 1px ${hexA(T.down, 0.6)}` : "none" }}>
+        <span style={{ fontFamily: displayFont, color: цвет, fontSize: 14, fontWeight: 800, minWidth: 44 }}>{подпись}</span>
+        <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 15, fontWeight: 800 }}>$</span>
+        <input value={значение} onChange={(e) => onChange(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" placeholder="—"
+          style={{ fontFamily: displayFont, fontWeight: 800, color: T.ice, fontSize: 16, background: "transparent", border: "none", outline: "none", flex: 1, minWidth: 0 }} />
+        {значение && (
+          <button onClick={() => onChange("")} className="fx-tap" aria-label="Убрать" style={{ border: "none", background: "transparent", color: T.muted, padding: 2 }}>
+            <X size={15} />
+          </button>
+        )}
+      </div>
+      <div className="flex" style={{ gap: 6 }}>
+        {доли.map((д) => (
+          <button key={д} onClick={() => { haptic("light"); onChange(String(Number((цена * (1 + (вверх ? д : -д) / 100)).toPrecision(6)))); }} className="fx-tap"
+            style={{ flex: 1, padding: "6px 0", borderRadius: 10, border: "none", background: hexA(цвет, 0.1), color: цвет, fontFamily: monoFont, fontSize: 12.5, fontWeight: 700 }}>
+            {вверх ? "+" : "−"}{д}%
+          </button>
+        ))}
+      </div>
+      {ошибка && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 12.5, fontWeight: 600 }}>{ошибка}</span>}
+    </div>
+  );
+}
+
+/* Ошибка уровня до отправки — та же проверка, что на сервере, чтобы
+   кнопка сразу говорила, что не так, а не после нажатия. */
+function ошибкаУровней(лонг, цена, ликвидация, тейк, стоп) {
+  if (тейк > 0 && (лонг ? тейк <= цена : тейк >= цена)) return { тейк: лонг ? "Тейк лонга — выше цены" : "Тейк шорта — ниже цены" };
+  if (стоп > 0 && (лонг ? стоп >= цена : стоп <= цена)) return { стоп: лонг ? "Стоп лонга — ниже цены" : "Стоп шорта — выше цены" };
+  if (стоп > 0 && ликвидация > 0 && (лонг ? стоп <= ликвидация : стоп >= ликвидация)) return { стоп: "Стоп за ликвидацией не сработает" };
+  return null;
+}
+
+function СтраницаРынка({ рынок, счёт, onОбновить, showToast, onПополнить, события = null, onОткрыть = () => {} }) {
   const [сторона, setСторона] = useState("long");
   const [сумма, setСумма] = useState("");
   const [плечо, setПлечо] = useState(1);
+  const [уровниОткрыты, setУровниОткрыты] = useState(false);
+  const [тейк, setТейк] = useState("");
+  const [стоп, setСтоп] = useState("");
   const [шлём, setШлём] = useState(false);
+  const [правка, setПравка] = useState(false);
+  const [тейкП, setТейкП] = useState("");
+  const [стопП, setСтопП] = useState("");
   const позиция = (счёт && счёт.positions || []).find((п) => п.coin === рынок.coin) || null;
   const usd = parseAmount(сумма);
-  // Доступно — биржа плюс карта приложения: недостающее сделка добирает с карты.
-  const свободно = счёт ? счёт.withdrawable + наКарте(счёт) : null;
-  const можно = usd >= 10 && (свободно == null || usd <= свободно + 1e-9) && !шлём && !(счёт && счёт.pending);
-  /* Что будет, если открыть: размер, вход, ликвидация, комиссия. Вход —
-     текущая цена (заявка «по рынку»); ликвидация — грубо, как у
-     отдельной маржи: цена, при которой убыток съедает залог за вычетом
-     поддерживающей маржи (половина от 1/максимального плеча). */
+  const свободно = счёт ? Number(счёт.cash ?? счёт.withdrawable) || 0 : null;
+  const ставка = (счёт && счёт.fee) || 0.00045;
+  const минОбъём = (счёт && счёт.minNotional) || 10;
+  // Учебный счёт берёт залог от $1, настоящая биржа — от $10.
+  const минЗалог = (счёт && счёт.minMargin) || 1;
   const лонг = сторона === "long";
+  const цена = рынок.price;
   const объём = usd * плечо;
-  const монет = рынок.price > 0 ? объём / рынок.price : 0;
+  const нужно = usd + объём * ставка;
+  const монет = цена > 0 ? объём / цена : 0;
   const поддержка = 1 / (2 * Math.max(1, рынок.maxLeverage));
-  const ликвидация = рынок.price > 0 && плечо > 1
-    ? рынок.price * (лонг ? 1 - 1 / плечо + поддержка : 1 + 1 / плечо - поддержка) : null;
-  const комиссия = объём * 0.00045;
-  const сКарты = счёт ? Math.max(0, usd - счёт.withdrawable) : 0;
-  const подробно = usd >= 10;
-  // Линии на графике: своя позиция — вход и ликвидация; набираемая сделка — пунктиром.
+  /* Ликвидация — как у сервера: цена, где капитал позиции сравнялся с
+     поддерживающей маржой. Лонг при 1× не ликвидируется. */
+  const ликвидация = цена > 0 && плечо > 1 ? (лонг ? (цена * (1 - 1 / плечо)) / (1 - поддержка) : (цена * (1 + 1 / плечо)) / (1 + поддержка))
+    : цена > 0 && !лонг ? (цена * 2) / (1 + поддержка) : null;
+  const тп = уровниОткрыты ? parseAmount(тейк) : 0;
+  const сл = уровниОткрыты ? parseAmount(стоп) : 0;
+  const бедаУровня = ошибкаУровней(лонг, цена, ликвидация, тп, сл);
+  const встречная = !!(позиция && (позиция.size > 0) !== лонг);
+  const мало = свободно != null && usd > 0 && нужно > свободно + 1e-9;
+  const можно = usd >= минЗалог && объём >= минОбъём && свободно != null && !мало && !шлём && !встречная && !бедаУровня;
+  const подробно = usd > 0;
+  const макс = свободно != null ? Math.floor((свободно / (1 + плечо * ставка)) * 100) / 100 : 0;
+  const тейкСтопЕсть = !(счёт && счёт.tpsl === false);
+
+  // Живой итог позиции — по цене из списка рынков, она свежее опроса счёта.
+  const живая = позиция ? { ...позиция, pnl: позиция.size * (цена - позиция.entry) } : null;
+  if (живая) живая.roe = живая.margin > 0 ? живая.pnl / живая.margin : 0;
+
+  // Линии на графике: своя позиция — сплошные; набираемая сделка — пунктиром.
   const линии = [];
   if (позиция) {
-    линии.push({ цена: позиция.entry, цвет: позиция.size > 0 ? T.up : T.down, подпись: `Вход ${позиция.size > 0 ? "лонг" : "шорт"}` });
-    if (позиция.liquidation) линии.push({ цена: позиция.liquidation, цвет: "#FF9F43", подпись: "Ликвидация" });
+    линии.push({ цена: позиция.entry, цвет: позиция.size > 0 ? T.up : T.down, подпись: "Вход" });
+    if (позиция.liquidation) линии.push({ цена: позиция.liquidation, цвет: ЦВЕТ_ЛИКВИДАЦИИ, подпись: "Ликвидация" });
+    if (позиция.tp) линии.push({ цена: позиция.tp, цвет: T.up, подпись: "Тейк" });
+    if (позиция.sl) линии.push({ цена: позиция.sl, цвет: T.down, подпись: "Стоп" });
+  } else if (подробно) {
+    линии.push({ цена, цвет: лонг ? T.up : T.down, подпись: лонг ? "Вход лонг" : "Вход шорт", пунктир: true });
+    if (ликвидация) линии.push({ цена: ликвидация, цвет: ЦВЕТ_ЛИКВИДАЦИИ, подпись: "Ликвидация", пунктир: true });
+    if (тп > 0) линии.push({ цена: тп, цвет: T.up, подпись: "Тейк", пунктир: true });
+    if (сл > 0) линии.push({ цена: сл, цвет: T.down, подпись: "Стоп", пунктир: true });
   }
-  if (подробно && !позиция) {
-    линии.push({ цена: рынок.price, цвет: лонг ? T.up : T.down, подпись: лонг ? "Вход лонг" : "Вход шорт", пунктир: true });
-    if (ликвидация) линии.push({ цена: ликвидация, цвет: "#FF9F43", подпись: "Ликвидация", пунктир: true });
-  }
+
   async function открыть() {
     if (!можно) return;
     setШлём(true); haptic("medium");
     try {
-      const j = await запросРынков("order", { asset: рынок.asset, isBuy: сторона === "long", usd, leverage: плечо });
-      haptic("success"); setСумма("");
-      showToast && showToast(j && j.pending ? "Берём с карты — позиция откроется через минуту" : сторона === "long" ? "Лонг открыт" : "Шорт открыт");
+      const тело = { asset: рынок.asset, isBuy: лонг, usd, leverage: плечо, requestKey: ключСделки() };
+      if (тп > 0) тело.tp = тп;
+      if (сл > 0) тело.sl = сл;
+      const j = await запросРынков("order", тело);
+      haptic("success"); setСумма(""); setТейк(""); setСтоп("");
+      const размер = j && j.fill ? j.fill.size * j.fill.price : объём;
+      showToast && showToast(`${лонг ? "Лонг" : "Шорт"} ${рынок.name} открыт · ${долларыБиржи(размер)}`);
       onОбновить();
     } catch (e) {
       haptic("error"); showToast && showToast(текстОшибкиБиржи(e, "Сделка не прошла"));
@@ -16025,41 +16388,108 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
   async function закрыть() {
     setШлём(true); haptic("medium");
     try {
-      await запросРынков("close", { asset: рынок.asset });
-      haptic("success"); showToast && showToast("Позиция закрыта"); onОбновить();
+      const j = await запросРынков("close", { asset: рынок.asset, requestKey: ключСделки() });
+      haptic("success");
+      showToast && showToast(j && typeof j.pnl === "number" ? `Позиция закрыта · ${итогБиржи(j.pnl)}` : "Позиция закрыта");
+      setПравка(false);
+      onОбновить();
     } catch (e) {
       haptic("error"); showToast && showToast(текстОшибкиБиржи(e, "Не закрылась"));
     } finally { setШлём(false); }
   }
+  const тпП = parseAmount(тейкП), слП = parseAmount(стопП);
+  const бедаПравки = позиция ? ошибкаУровней(позиция.size > 0, цена, позиция.liquidation || 0, тпП, слП) : null;
+  async function сохранитьУровни() {
+    if (бедаПравки) return;
+    setШлём(true); haptic("medium");
+    try {
+      await запросРынков("tpsl", { asset: рынок.asset, tp: тпП > 0 ? тпП : null, sl: слП > 0 ? слП : null });
+      haptic("success"); showToast && showToast(тпП > 0 || слП > 0 ? "Тейк и стоп сохранены" : "Тейк и стоп сняты");
+      setПравка(false); onОбновить();
+    } catch (e) {
+      haptic("error"); showToast && showToast(текстОшибкиБиржи(e, "Не сохранилось"));
+    } finally { setШлём(false); }
+  }
+  const начатьПравку = () => {
+    haptic("light");
+    setТейкП(позиция && позиция.tp ? String(позиция.tp) : "");
+    setСтопП(позиция && позиция.sl ? String(позиция.sl) : "");
+    setПравка(true);
+  };
+
+  const кнопкаТекст = шлём ? "Открываем…"
+    : встречная ? `Сначала закройте ${позиция.size > 0 ? "лонг" : "шорт"}`
+    : usd > 0 && usd < минЗалог ? `Залог — от $${минЗалог}`
+    : usd > 0 && объём < минОбъём ? `Позиция — от $${минОбъём} с плечом`
+    : бедаУровня ? (бедаУровня.тейк || бедаУровня.стоп)
+    : лонг ? `Открыть лонг${подробно ? ` · ${долларыБиржи(объём)}` : ""}` : `Открыть шорт${подробно ? ` · ${долларыБиржи(объём)}` : ""}`;
+
+  const рядСобытий = (события || []).map(строкаБиржи);
   return (
     <div className="flex flex-col" style={{ gap: 22 }}>
       <div className="flex flex-col" style={{ gap: 4 }}>
-        <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 34, fontWeight: 800 }}>{рынок.name}</span>
+        <span className="flex items-center" style={{ gap: 12 }}>
+          <ЗначокРынка рынок={рынок} size={36} />
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 32, fontWeight: 800 }}>{рынок.name}</span>
+        </span>
         <span className="flex items-baseline" style={{ gap: 10 }}>
-          <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 26, fontWeight: 700 }}>${ценаРынка(рынок.price)}</span>
+          <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 26, fontWeight: 700 }}>${ценаРынка(цена)}</span>
           <span style={{ fontFamily: monoFont, fontSize: 15, fontWeight: 700, color: рынок.change >= 0 ? T.up : T.down }}>{рынок.change >= 0 ? "+" : ""}{рынок.change.toFixed(2)}%</span>
         </span>
       </div>
-      <ГрафикРынка coin={рынок.coin} линии={линии} цена={рынок.price} />
-      {позиция && (
-        <div className="flex flex-col" style={{ gap: 10, padding: 14, borderRadius: 16, background: T.surface }}>
-          <div className="flex items-center justify-between">
-            <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800 }}>{позиция.size > 0 ? "Лонг" : "Шорт"} · {позиция.leverage}×</span>
-            <span style={{ fontFamily: monoFont, fontSize: 15, fontWeight: 700, color: Math.abs(позиция.pnl) < 0.005 ? T.ice : позиция.pnl > 0 ? T.up : T.down }}>{позиция.pnl >= 0 ? "+" : "−"}${Math.abs(позиция.pnl).toFixed(2)}</span>
+      <ГрафикРынка coin={рынок.coin} линии={линии} цена={цена} />
+      {живая && (
+        <div className="flex flex-col" style={{ gap: 12, padding: 16, borderRadius: 18, background: T.surface }}>
+          <div className="flex items-center justify-between" style={{ gap: 10 }}>
+            <span className="flex items-center" style={{ gap: 8 }}>
+              <span style={{ padding: "4px 10px", borderRadius: 999, background: hexA(живая.size > 0 ? T.up : T.down, 0.14), color: живая.size > 0 ? T.up : T.down, fontFamily: displayFont, fontSize: 14, fontWeight: 800 }}>
+                {живая.size > 0 ? "Лонг" : "Шорт"} · {живая.leverage}×
+              </span>
+            </span>
+            <span className="flex flex-col items-end">
+              <span style={{ fontFamily: monoFont, fontSize: 17, fontWeight: 800, color: цветИтога(живая.pnl) }}>{итогБиржи(живая.pnl)}</span>
+              <span style={{ fontFamily: monoFont, fontSize: 12.5, fontWeight: 700, color: цветИтога(живая.pnl), opacity: 0.85 }}>{живая.roe >= 0 ? "+" : "−"}{Math.abs(живая.roe * 100).toFixed(2)}%</span>
+            </span>
           </div>
-          <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 13.5, fontWeight: 600 }}>
-            {Math.abs(позиция.size)} {рынок.name} · вход ${ценаРынка(позиция.entry)}{позиция.liquidation ? ` · ликвидация $${ценаРынка(позиция.liquidation)}` : ""}
-          </span>
-          <button onClick={закрыть} disabled={шлём} className="fx-tap w-full" style={{ height: 46, borderRadius: 14, border: "none", background: T.bg, color: T.ice, fontFamily: displayFont, fontSize: 15, fontWeight: 800 }}>Закрыть позицию</button>
+          <div className="flex flex-col" style={{ gap: 7 }}>
+            {[
+              ["Размер", `${Math.abs(живая.size)} ${рынок.name} · ${долларыБиржи(Math.abs(живая.size) * цена)}`, T.ice],
+              ["Вход", `$${ценаРынка(живая.entry)}`, T.ice],
+              ["Залог", долларыБиржи(живая.margin), T.ice],
+              ["Ликвидация", живая.liquidation ? `$${ценаРынка(живая.liquidation)}` : "нет", ЦВЕТ_ЛИКВИДАЦИИ],
+              ...(тейкСтопЕсть ? [["Тейк", живая.tp ? `$${ценаРынка(живая.tp)}` : "—", T.up], ["Стоп", живая.sl ? `$${ценаРынка(живая.sl)}` : "—", T.down]] : []),
+            ].map(([к, з, цвет]) => (
+              <span key={к} className="flex items-center justify-between" style={{ gap: 10 }}>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, fontWeight: 600 }}>{к}</span>
+                <span style={{ fontFamily: monoFont, color: цвет, fontSize: 13.5, fontWeight: 700, textAlign: "right" }}>{з}</span>
+              </span>
+            ))}
+          </div>
+          {правка && (
+            <div className="fx-step-in flex flex-col" style={{ gap: 12 }}>
+              <ПолеУровня подпись="Тейк" цвет={T.up} значение={тейкП} onChange={setТейкП} цена={цена} вверх={живая.size > 0} ошибка={бедаПравки && бедаПравки.тейк} />
+              <ПолеУровня подпись="Стоп" цвет={T.down} значение={стопП} onChange={setСтопП} цена={цена} вверх={живая.size < 0} ошибка={бедаПравки && бедаПравки.стоп} />
+            </div>
+          )}
+          <div className="flex" style={{ gap: 8 }}>
+            {тейкСтопЕсть && (правка ? (
+              <button onClick={сохранитьУровни} disabled={шлём || !!бедаПравки} className="fx-tap" style={{ flex: 1, height: 46, borderRadius: 14, border: "none", background: бедаПравки ? T.surfaceHi : T.ice, color: бедаПравки ? T.muted : T.bg, fontFamily: displayFont, fontSize: 15, fontWeight: 800 }}>Сохранить</button>
+            ) : (
+              <button onClick={начатьПравку} className="fx-tap" style={{ flex: 1, height: 46, borderRadius: 14, border: "none", background: T.bg, color: T.ice, fontFamily: displayFont, fontSize: 15, fontWeight: 800 }}>Тейк и стоп</button>
+            ))}
+            <button onClick={правка ? () => setПравка(false) : закрыть} disabled={шлём} className="fx-tap" style={{ flex: 1, height: 46, borderRadius: 14, border: "none", background: T.bg, color: правка ? T.muted : T.ice, fontFamily: displayFont, fontSize: 15, fontWeight: 800 }}>
+              {правка ? "Отмена" : шлём ? "Закрываем…" : "Закрыть"}
+            </button>
+          </div>
         </div>
       )}
-      <div className="flex flex-col" style={{ gap: 12, padding: 14, borderRadius: 16, background: T.surface }}>
+      <div className="flex flex-col" style={{ gap: 12, padding: 14, borderRadius: 18, background: T.surface }}>
         <div className="flex rounded-[20px] p-1" style={{ position: "relative", background: T.bg }}>
-          <span aria-hidden style={{ position: "absolute", top: 4, bottom: 4, left: 4, width: "calc(50% - 4px)", borderRadius: 16, background: T.ice,
-            transform: сторона === "short" ? "translateX(100%)" : "none", transition: "transform 320ms cubic-bezier(0.34, 1.3, 0.64, 1)" }} />
+          <span aria-hidden style={{ position: "absolute", top: 4, bottom: 4, left: 4, width: "calc(50% - 4px)", borderRadius: 16, background: лонг ? T.up : T.down,
+            transform: сторона === "short" ? "translateX(100%)" : "none", transition: "transform 320ms cubic-bezier(0.34, 1.3, 0.64, 1), background 220ms ease" }} />
           {[["long", "Лонг"], ["short", "Шорт"]].map(([к, подпись]) => (
             <button key={к} onClick={() => { haptic("light"); setСторона(к); }} className="fx-tap flex-1 rounded-[16px] py-2"
-              style={{ position: "relative", zIndex: 1, background: "transparent", border: "none", fontFamily: displayFont, fontWeight: 800, fontSize: 15, color: сторона === к ? T.bg : T.muted, transition: "color 220ms ease" }}>
+              style={{ position: "relative", zIndex: 1, background: "transparent", border: "none", fontFamily: displayFont, fontWeight: 800, fontSize: 15, color: сторона === к ? "#000000" : T.muted, transition: "color 220ms ease" }}>
               {подпись}
             </button>
           ))}
@@ -16069,8 +16499,8 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
           <input value={сумма} onChange={(e) => setСумма(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" placeholder="10"
             style={{ fontFamily: displayFont, fontWeight: 800, color: T.ice, fontSize: 20, background: "transparent", border: "none", outline: "none", flex: 1, minWidth: 0 }} />
           {свободно != null && (
-            <button onClick={() => setСумма(String(Math.floor(свободно * 100) / 100))} className="fx-tap" style={{ border: "none", background: "transparent", color: T.ice, fontFamily: monoFont, fontSize: 13.5, fontWeight: 700 }}>
-              макс ${свободно.toFixed(2)}
+            <button onClick={() => { haptic("light"); setСумма(String(Math.max(0, макс))); }} className="fx-tap" style={{ border: "none", background: "transparent", color: T.ice, fontFamily: monoFont, fontSize: 13.5, fontWeight: 700 }}>
+              макс {долларыБиржи(Math.max(0, макс))}
             </button>
           )}
         </div>
@@ -16080,32 +16510,58 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
           </span>
           <Ползунок value={плечо} min={1} max={Math.max(1, рынок.maxLeverage)} step={1} onChange={(v) => setПлечо(Math.round(v))} формат={(v) => `${Math.round(v)}×`} ariaLabel="Плечо" />
         </div>
+        {тейкСтопЕсть && (
+          <button onClick={() => { haptic("light"); setУровниОткрыты((б) => !б); }} className="fx-tap flex items-center justify-between w-full"
+            style={{ padding: "4px 2px", border: "none", background: "transparent", fontFamily: displayFont, color: T.ice, fontSize: 14.5, fontWeight: 800 }}>
+            <span>Тейк и стоп</span>
+            <span className="flex items-center" style={{ gap: 6, color: T.muted, fontFamily: bodyFont, fontSize: 13, fontWeight: 600 }}>
+              {уровниОткрыты ? "скрыть" : тп || сл ? `${тп ? "тейк" : ""}${тп && сл ? " · " : ""}${сл ? "стоп" : ""}` : "по желанию"}
+              <ChevronDown size={16} style={{ transform: уровниОткрыты ? "rotate(180deg)" : "none", transition: "transform 200ms ease" }} />
+            </span>
+          </button>
+        )}
+        {тейкСтопЕсть && уровниОткрыты && (
+          <div className="fx-step-in flex flex-col" style={{ gap: 12 }}>
+            <ПолеУровня подпись="Тейк" цвет={T.up} значение={тейк} onChange={setТейк} цена={цена} вверх={лонг} ошибка={бедаУровня && бедаУровня.тейк} />
+            <ПолеУровня подпись="Стоп" цвет={T.down} значение={стоп} onChange={setСтоп} цена={цена} вверх={!лонг} ошибка={бедаУровня && бедаУровня.стоп} />
+          </div>
+        )}
         {подробно && (
           <div className="fx-step-in flex flex-col" style={{ gap: 9, padding: "12px 14px", borderRadius: 14, background: T.bg }}>
             {[
-              ["Размер позиции", `$${объём.toFixed(2)}`],
-              ["В монетах", `${монет < 1 ? монет.toPrecision(3) : монет.toFixed(3)} ${рынок.name}`],
-              ["Цена входа", `≈ $${ценаРынка(рынок.price)}`],
-              ["Ликвидация", ликвидация ? `≈ $${ценаРынка(ликвидация)}` : "нет при 1×"],
-              ["Залог", `$${usd.toFixed(2)}`],
-              ["Комиссия биржи", `≈ $${комиссия.toFixed(2)}`],
-              ...(сКарты > 0.005 ? [["С карты", `≈ $${сКарты.toFixed(2)} в SOL · ~1 мин`]] : []),
-            ].map(([к, з]) => (
+              ["Размер позиции", долларыБиржи(объём), T.ice],
+              ["В монетах", `${монет < 1 ? монет.toPrecision(3) : монет.toFixed(3)} ${рынок.name}`, T.ice],
+              ["Цена входа", `≈ $${ценаРынка(цена)}`, T.ice],
+              ["Ликвидация", ликвидация ? `≈ $${ценаРынка(ликвидация)}` : "нет при 1×", ЦВЕТ_ЛИКВИДАЦИИ],
+              ["Залог", долларыБиржи(usd), T.ice],
+              ["Комиссия", `≈ ${долларыБиржи(объём * ставка)}`, T.ice],
+            ].map(([к, з, цвет]) => (
               <span key={к} className="flex items-center justify-between" style={{ gap: 10 }}>
                 <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13.5, fontWeight: 600 }}>{к}</span>
-                <span style={{ fontFamily: monoFont, color: к === "Ликвидация" && ликвидация ? "#FF9F43" : T.ice, fontSize: 13.5, fontWeight: 700, textAlign: "right" }}>{з}</span>
+                <span style={{ fontFamily: monoFont, color: цвет, fontSize: 13.5, fontWeight: 700, textAlign: "right" }}>{з}</span>
               </span>
             ))}
           </div>
         )}
-        <button onClick={открыть} disabled={!можно} className="fx-tap w-full" style={{ height: 52, borderRadius: 16, border: "none", background: можно ? (лонг ? T.up : T.down) : T.surfaceHi, color: можно ? "#000000" : T.muted, fontFamily: displayFont, fontSize: 16, fontWeight: 800 }}>
-          {счёт && счёт.pending ? "Пополняем с карты… позиция откроется сама"
-            : шлём ? (сКарты > 0.005 ? "Берём SOL с карты…" : "Открываем…")
-            : usd > 0 && usd < 10 ? "Минимум $10"
-            : свободно != null && usd > свободно + 1e-9 ? "Не хватает на карте"
-            : лонг ? `Открыть лонг${подробно ? ` · $${объём.toFixed(0)}` : ""}` : `Открыть шорт${подробно ? ` · $${объём.toFixed(0)}` : ""}`}
-        </button>
+        {мало || (свободно != null && свободно < 1 && !usd) ? (
+          <button onClick={() => { haptic("light"); onПополнить && onПополнить(); }} className="fx-tap w-full" style={{ height: 52, borderRadius: 16, border: "none", background: T.ice, color: T.bg, fontFamily: displayFont, fontSize: 16, fontWeight: 800 }}>
+            {мало ? "Не хватает — пополнить счёт" : "Пополнить торговый счёт"}
+          </button>
+        ) : (
+          <button onClick={открыть} disabled={!можно} className="fx-tap w-full" style={{ height: 52, borderRadius: 16, border: "none", background: можно ? (лонг ? T.up : T.down) : T.surfaceHi, color: можно ? "#000000" : T.muted, fontFamily: displayFont, fontSize: 16, fontWeight: 800 }}>
+            {кнопкаТекст}
+          </button>
+        )}
+        <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5, textAlign: "center" }}>
+          На счёте {свободно != null ? долларыБиржи(свободно) : "—"}{счёт && счёт.demo ? " · учебный счёт" : ""}
+        </span>
       </div>
+      {рядСобытий.length > 0 && (
+        <section className="flex flex-col" style={{ gap: 2 }}>
+          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800, marginBottom: 4 }}>Сделки {рынок.name}</span>
+          {рядСобытий.slice(0, 20).map((с) => <СтрокаИстории key={с.id} с={с} курсы={{}} onOpen={() => { haptic("light"); onОткрыть(с); }} />)}
+        </section>
+      )}
     </div>
   );
 }
@@ -16125,33 +16581,220 @@ function ЗначокРынка({ рынок, size = 40 }) {
     loading="lazy" onError={() => setНет(true)} style={{ ...круг, display: "block", background: T.surface, objectFit: "cover" }} />;
 }
 
+/* Плашка торгового счёта: сколько всего, сколько свободно, сколько в
+   позициях и их итог; две кнопки — пополнить с карты и вывести на неё. */
+function ПлашкаСчёта({ счёт, рынки = null, onПеревод }) {
+  const цены = new Map((рынки || []).map((р) => [р.coin, р.price]));
+  const позиции = (счёт && счёт.positions) || [];
+  // Итог позиций — по живым ценам списка рынков, он свежее опроса счёта.
+  const итог = позиции.reduce((s, п) => s + (цены.get(п.coin) > 0 ? п.size * (цены.get(п.coin) - п.entry) : п.pnl), 0);
+  const вПозициях = позиции.reduce((s, п) => s + п.margin, 0);
+  const свободно = счёт ? Number(счёт.cash ?? счёт.withdrawable) || 0 : 0;
+  const всего = счёт ? (счёт.demo ? свободно + вПозициях + итог : Number(счёт.equity) || свободно) : 0;
+  const кнопка = (подпись, Значок, что) => (
+    <button onClick={() => { haptic("light"); onПеревод(что); }} className="fx-tap flex items-center justify-center"
+      style={{ flex: 1, gap: 8, height: 46, borderRadius: 14, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: displayFont, fontSize: 15, fontWeight: 800 }}>
+      <Значок size={17} strokeWidth={2.4} /> {подпись}
+    </button>
+  );
+  return (
+    <div className="flex flex-col" style={{ gap: 14, padding: 16, borderRadius: 20, background: T.surface }}>
+      <div className="flex items-center justify-between" style={{ gap: 10 }}>
+        <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 14.5, fontWeight: 800 }}>Торговый счёт</span>
+        {счёт && счёт.demo && (
+          <span style={{ padding: "4px 10px", borderRadius: 999, background: hexA(ЦВЕТ_ЛИКВИДАЦИИ, 0.14), color: ЦВЕТ_ЛИКВИДАЦИИ, fontFamily: bodyFont, fontSize: 12, fontWeight: 800 }}>
+            Учебный · девнет
+          </span>
+        )}
+      </div>
+      <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 36, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+        {счёт ? долларыБиржи(всего) : "—"}
+      </span>
+      <div className="flex" style={{ gap: 18, flexWrap: "wrap" }}>
+        {[
+          ["Свободно", долларыБиржи(свободно), T.ice],
+          ["В позициях", долларыБиржи(вПозициях), T.ice],
+          ...(позиции.length ? [["Итог", итогБиржи(итог), цветИтога(итог)]] : []),
+        ].map(([к, з, цвет]) => (
+          <span key={к} className="flex flex-col" style={{ gap: 3 }}>
+            <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, fontWeight: 600 }}>{к}</span>
+            <span style={{ fontFamily: monoFont, color: цвет, fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{з}</span>
+          </span>
+        ))}
+      </div>
+      <div className="flex" style={{ gap: 8 }}>
+        {кнопка("Пополнить", ArrowDownLeft, "in")}
+        {кнопка("Вывести", ArrowUpRight, "out")}
+      </div>
+    </div>
+  );
+}
+
+function СтрокаПозиции({ п, рынок, onOpen }) {
+  const цена = рынок && рынок.price > 0 ? рынок.price : п.price;
+  const итог = п.size * (цена - п.entry);
+  const roe = п.margin > 0 ? итог / п.margin : 0;
+  return (
+    <button onClick={onOpen} className="fx-tap w-full flex items-center text-left"
+      style={{ gap: 12, padding: "12px 2px", border: "none", background: "transparent", borderBottom: `1px solid ${T.line}` }}>
+      <ЗначокРынка рынок={рынок || { coin: п.coin, name: п.name }} size={40} />
+      <span className="flex-1 min-w-0 flex flex-col" style={{ gap: 3 }}>
+        <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>{п.name}</span>
+        <span style={{ fontFamily: monoFont, fontSize: 13, fontWeight: 700, color: п.size > 0 ? T.up : T.down }}>
+          {п.size > 0 ? "Лонг" : "Шорт"} · {п.leverage}× <span style={{ color: T.faint }}>· {долларыБиржи(Math.abs(п.size) * цена)}</span>
+        </span>
+      </span>
+      <span className="flex flex-col items-end" style={{ gap: 3 }}>
+        <span style={{ fontFamily: monoFont, color: цветИтога(итог), fontSize: 16, fontWeight: 800 }}>{итогБиржи(итог)}</span>
+        <span style={{ fontFamily: monoFont, color: цветИтога(итог), fontSize: 12.5, fontWeight: 700, opacity: 0.85 }}>{roe >= 0 ? "+" : "−"}{Math.abs(roe * 100).toFixed(2)}%</span>
+      </span>
+    </button>
+  );
+}
+
+/* Перевод между картой и торговым счётом — из кошелька и с биржи.
+ * Пополнение — в SOL с карты, вывод — в долларах со счёта: так человек
+ * видит ровно ту сумму, которая у него есть в каждом из мест. Учебный
+ * счёт пополняется девнет-SOL за пару секунд; настоящий — через мост Unit,
+ * минуты и от 0.12 SOL. */
+const ЗАПАС_SOL_ПЕРЕВОДА = 0.0015;
+function ОкноТорговогоСчёта({ открыт, onClose, направление = "in", showToast = () => {}, insetTop = 0, insetBottom = 0 }) {
+  const счёт = useТорговыйСчёт(открыт, 4000);
+  const [куда, setКуда] = useState(направление);
+  const [ввод, setВвод] = useState("");
+  const [идёт, setИдёт] = useState(false);
+  const [беда, setБеда] = useState("");
+  useEffect(() => { if (открыт) { setКуда(направление); setВвод(""); setБеда(""); setИдёт(false); } }, [открыт, направление]);
+  const демо = !!(счёт && счёт.demo);
+  const курс = (счёт && счёт.solPrice) || solUsd() || 0;
+  const наКарте = (счёт && счёт.wallet && Number(счёт.wallet.sol)) || 0;
+  const наСчёте = счёт ? Number(счёт.cash ?? счёт.withdrawable) || 0 : 0;
+  const минUsd = (счёт && счёт.minTransfer) || 1;
+  const сумма = parseAmount(ввод);
+  const пополняем = куда === "in";
+  const вДолларах = пополняем ? сумма * курс : сумма;
+  const вSol = пополняем ? сумма : курс > 0 ? сумма / курс : 0;
+  const максКарта = Math.max(0, Math.floor((наКарте - ЗАПАС_SOL_ПЕРЕВОДА) * 1e4) / 1e4);
+  const максСчёт = Math.floor(наСчёте * 100) / 100;
+  const мост = счёт && !демо;
+  const минМоста = 0.12;
+  const ошибка = !сумма ? ""
+    : пополняем && сумма > максКарта + 1e-9 ? "Не хватает SOL на карте"
+    : !пополняем && сумма > максСчёт + 1e-9 ? "На счёте меньше"
+    : мост && пополняем && сумма < минМоста ? `Через мост — от ${минМоста} SOL`
+    : вДолларах < минUsd ? `Перевод — от $${минUsd}`
+    : "";
+  const можно = !!счёт && сумма > 0 && !ошибка && !идёт && курс > 0;
+  async function перевести() {
+    if (!можно) return;
+    setИдёт(true); setБеда(""); haptic("medium");
+    try {
+      const j = await запросРынков("transfer", { direction: куда, amount: сумма, requestKey: ключСделки() });
+      haptic("success");
+      if (j && j.pending) showToast(j.bridge ? "SOL ушёл на мост — счёт пополнится через пару минут" : "Перевод в пути — зачислим, как только подтвердит сеть");
+      else if (пополняем) showToast(`На торговом счёте +${долларыБиржи(j && j.usd != null ? j.usd : вДолларах)}`);
+      else showToast(`На карту ${fmtСумма(j && j.sol != null ? j.sol : вSol)} SOL`);
+      обновитьТорговыйСчёт();
+      try { window.dispatchEvent(new CustomEvent("mintly:сделка")); } catch { /* старый движок */ }
+      onClose();
+    } catch (e) {
+      haptic("error");
+      const м = String((e && e.message) || "");
+      setБеда(м === "not_enough" ? (пополняем ? "Не хватает SOL на карте" : "На счёте меньше") : текстОшибкиБиржи(e, "Перевод не прошёл"));
+    } finally { setИдёт(false); }
+  }
+  const место = (подпись, значение, лого) => (
+    <span className="flex items-center" style={{ gap: 10, flex: 1, minWidth: 0 }}>
+      <span className="flex items-center justify-center" style={{ width: 36, height: 36, borderRadius: "50%", background: T.surfaceHi, flexShrink: 0 }}>{лого}</span>
+      <span className="flex flex-col min-w-0" style={{ gap: 2 }}>
+        <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12, fontWeight: 600 }}>{подпись}</span>
+        <span className="truncate" style={{ fontFamily: monoFont, color: T.ice, fontSize: 14, fontWeight: 700 }}>{значение}</span>
+      </span>
+    </span>
+  );
+  const карта = место("Карта", счёт ? `${fmtСумма(наКарте)} SOL` : "—", <img src="/coins/sol.png" alt="" width={22} height={22} style={{ borderRadius: "50%" }} />);
+  const торговый = место("Торговый счёт", счёт ? долларыБиржи(наСчёте) : "—", <ЗначокБиржа size={18} color={T.ice} />);
+  return (
+    <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок="Торговый счёт" insetTop={insetTop} insetBottom={insetBottom}>
+      <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "4px 18px 28px" }}>
+        <div className="flex flex-col" style={{ gap: 16 }}>
+          <div className="flex rounded-[20px] p-1" style={{ position: "relative", background: T.surface }}>
+            <span aria-hidden style={{ position: "absolute", top: 4, bottom: 4, left: 4, width: "calc(50% - 4px)", borderRadius: 16, background: T.ice,
+              transform: пополняем ? "none" : "translateX(100%)", transition: "transform 320ms cubic-bezier(0.34, 1.3, 0.64, 1)" }} />
+            {[["in", "Пополнить"], ["out", "Вывести"]].map(([к, подпись]) => (
+              <button key={к} onClick={() => { haptic("light"); setКуда(к); setВвод(""); setБеда(""); }} className="fx-tap flex-1 rounded-[16px] py-2"
+                style={{ position: "relative", zIndex: 1, background: "transparent", border: "none", fontFamily: displayFont, fontWeight: 800, fontSize: 15, color: куда === к ? T.bg : T.muted, transition: "color 220ms ease" }}>
+                {подпись}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center" style={{ gap: 10, padding: 14, borderRadius: 18, background: T.surface }}>
+            {пополняем ? карта : торговый}
+            <ChevronRight size={18} color={T.muted} style={{ flexShrink: 0 }} />
+            {пополняем ? торговый : карта}
+          </div>
+          <div className="flex flex-col" style={{ gap: 8, padding: "14px 16px", borderRadius: 18, background: T.surface }}>
+            <div className="flex items-center" style={{ gap: 8 }}>
+              {!пополняем && <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 26, fontWeight: 800 }}>$</span>}
+              <input value={ввод} onChange={(e) => { setВвод(e.target.value.replace(/[^0-9.,]/g, "")); setБеда(""); }} inputMode="decimal" placeholder="0"
+                style={{ fontFamily: displayFont, fontWeight: 800, color: T.ice, fontSize: 26, background: "transparent", border: "none", outline: "none", flex: 1, minWidth: 0 }} />
+              {пополняем && <span style={{ fontFamily: displayFont, color: T.muted, fontSize: 18, fontWeight: 800 }}>SOL</span>}
+              <button onClick={() => { haptic("light"); setВвод(String(пополняем ? максКарта : максСчёт)); setБеда(""); }} className="fx-tap"
+                style={{ padding: "6px 12px", borderRadius: 999, border: "none", background: T.surfaceHi, color: T.ice, fontFamily: bodyFont, fontSize: 13, fontWeight: 800 }}>
+                Макс
+              </button>
+            </div>
+            <span style={{ fontFamily: monoFont, color: ошибка ? T.down : T.muted, fontSize: 13.5, fontWeight: 600 }}>
+              {ошибка || (сумма > 0 ? (пополняем ? `≈ ${долларыБиржи(вДолларах)} по $${ценаРынка(курс)} за SOL` : `≈ ${fmtСумма(вSol)} SOL на карту`) : курс > 0 ? `1 SOL ≈ $${ценаРынка(курс)}` : "Курс загружается…")}
+            </span>
+          </div>
+          <span style={{ fontFamily: bodyFont, color: T.faint, fontSize: 13, lineHeight: 1.5 }}>
+            {демо
+              ? "Учебный счёт: цены на бирже настоящие, а деньги — девнет-SOL. Перевод проходит за пару секунд, сделки с него открываются сразу."
+              : "Перевод идёт по мосту Unit: пара минут и от 0.12 SOL. Сделки открываются с торгового счёта сразу, без ожидания."}
+          </span>
+          {беда && <span style={{ fontFamily: bodyFont, color: T.down, fontSize: 13.5, fontWeight: 700 }}>{беда}</span>}
+          <button onClick={перевести} disabled={!можно} className="fx-tap w-full"
+            style={{ height: 54, borderRadius: 16, border: "none", background: можно ? T.ice : T.surfaceHi, color: можно ? T.bg : T.muted, fontFamily: displayFont, fontSize: 16, fontWeight: 800 }}>
+            {идёт ? "Переводим…" : пополняем ? `Пополнить${сумма > 0 && !ошибка ? ` на ${долларыБиржи(вДолларах)}` : ""}` : `Вывести${сумма > 0 && !ошибка ? ` ${fmtСумма(вSol)} SOL` : ""} на карту`}
+          </button>
+        </div>
+      </div>
+    </ЭкранСнизу>
+  );
+}
+
 function СтраницаРынков({ открыт, onClose = () => {}, showToast, insetTop = 0, insetBottom = 0, вкладка = false }) {
   const [рынки, setРынки] = useState(null);
-  const [сеть, setСеть] = useState(null);
   const [раздел, setРаздел] = useState("crypto");
   const [выбран, setВыбран] = useState(null);
-  const [счёт, setСчёт] = useState(null);
-  const тостРеф = useRef(showToast);
-  тостРеф.current = showToast;
-  const обновитьСчёт = useCallback(() => {
-    запросРынков("account").then((j) => {
-      setСчёт(j);
-      // Сделка, ждавшая денег с карты, открылась или нет — скажем один раз.
-      const и = j && j.pendingResult;
-      if (и && тостРеф.current) {
-        тостРеф.current(и.ok ? `${и.isBuy ? "Лонг" : "Шорт"} ${и.name || ""} открыт · $${Number(и.usd || 0).toFixed(2)}`
-          : `Позиция не открылась: ${текстОшибкиБиржи({ message: и.error === "timeout" ? "Деньги с карты не дошли за 10 минут — они на бирже" : и.error }, "ошибка")}`);
-      }
-    }).catch(() => {});
-  }, []);
+  const [перевод, setПеревод] = useState(null); // "in" | "out" | null
+  const [строка, setСтрока] = useState(null);
+  const [тик, setТик] = useState(0);
+  const [всяИстория, setВсяИстория] = useState(false);
+  const счёт = useТорговыйСчёт(открыт, 4000);
+  const события = useСобытияБиржи(открыт, null, тик);
+  const обновитьСчёт = useCallback(() => { обновитьТорговыйСчёт(); setТик((т) => т + 1); }, []);
   useEffect(() => {
     if (!открыт) return undefined;
     let живо = true;
-    const читать = () => запросРынков("markets").then((j) => { if (живо) { setРынки(j.markets || []); setСеть(j.network); } }).catch(() => {});
-    читать(); обновитьСчёт();
-    const a = setInterval(читать, 2000), b = setInterval(обновитьСчёт, 5000);
-    return () => { живо = false; clearInterval(a); clearInterval(b); };
-  }, [открыт, обновитьСчёт]);
+    const читать = () => запросРынков("markets").then((j) => { if (живо) setРынки(j.markets || []); }).catch(() => {});
+    читать();
+    const a = setInterval(читать, 2000);
+    return () => { живо = false; clearInterval(a); };
+  }, [открыт]);
+  // Сработал тейк, стоп или ликвидация — журнал узнаёт первым; скажем один раз.
+  const виденоСобытие = useRef(null);
+  useEffect(() => {
+    if (!события || !события.length) return;
+    const последнее = события[0];
+    if (виденоСобытие.current && последнее.id !== виденоСобытие.current && ["tp", "sl", "liq"].includes(последнее.kind) && Date.now() - последнее.at < 60_000) {
+      const слово = { tp: "Тейк", sl: "Стоп", liq: "Ликвидация" }[последнее.kind];
+      showToast && showToast(`${слово} ${последнее.name}: ${итогБиржи(Number(последнее.pnl) || 0)}`);
+      обновитьТорговыйСчёт();
+    }
+    виденоСобытие.current = последнее.id;
+  }, [события, showToast]);
   /* Рынок открывается с верха страницы: список мог быть пролистан, и
      страница рынка открывалась там же — имя уезжало под шапку Telegram. */
   const кореньРынков = useRef(null);
@@ -16160,45 +16803,69 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
     while (э && !(э.scrollHeight > э.clientHeight && /auto|scroll/.test(getComputedStyle(э).overflowY))) э = э.parentElement;
     if (э) э.scrollTop = 0; else if (typeof window !== "undefined") window.scrollTo(0, 0);
   }, [выбран]);
-  useНазадТелеграм(открыт && !!выбран, () => setВыбран(null));
-  useНазадТелеграм(открыт && !выбран && !вкладка, onClose);
-  if (!открыт && !вкладка) return null;
-  const есть = РАЗДЕЛЫ_РЫНКОВ.filter(([к]) => (рынки || []).some((р) => р.section === к));
-  const список = (рынки || []).filter((р) => р.section === раздел);
-  const рынок = выбран ? (рынки || []).find((р) => р.asset === выбран) : null;
-  /* SOL, пришедший с моста, сам становится долларами на счёте: как только
-     он виден на споте биржи, просим сервер продать его и перевести. */
+  /* Номер рынка BTC — ноль, поэтому «выбран» сравниваем с null: проверка на
+     правду пропускала BTC, и его страница не открывалась вовсе. */
+  const естьВыбор = выбран != null;
+  useНазадТелеграм(открыт && естьВыбор && !перевод && !строка, () => setВыбран(null));
+  useНазадТелеграм(открыт && !естьВыбор && !вкладка && !перевод && !строка, onClose);
+  /* SOL, пришедший с моста на настоящую биржу, сам становится долларами
+     на счёте: как только он виден на споте биржи, просим сервер продать его
+     и перевести. У учебного счёта моста нет. */
   const спот = счёт && счёт.spot;
-  const зачисляется = !!(спот && !счёт.pending && (спот.sol * (счёт.solPrice || 0) >= 10.5 || спот.usdc >= 1));
+  const зачисляется = !!(счёт && !счёт.demo && спот && !счёт.pending && (спот.sol * (счёт.solPrice || 0) >= 10.5 || спот.usdc >= 1));
   const свожу = useRef(0);
   useEffect(() => {
     if (!зачисляется || Date.now() - свожу.current < 10000) return;
     свожу.current = Date.now();
     запросРынков("settle", {}).then(обновитьСчёт).catch(() => {});
   }, [зачисляется, счёт, обновитьСчёт]);
+  if (!открыт && !вкладка) return null;
+  const есть = РАЗДЕЛЫ_РЫНКОВ.filter(([к]) => (рынки || []).some((р) => р.section === к));
+  const список = (рынки || []).filter((р) => р.section === раздел);
+  const рынок = естьВыбор ? (рынки || []).find((р) => р.asset === выбран) || null : null;
+  const поМонете = new Map((рынки || []).map((р) => [р.coin, р]));
+  const позиции = (счёт && счёт.positions) || [];
+  const история = (события || []).map(строкаБиржи);
 
   const тело = (
     <div ref={кореньРынков} className={вкладка ? "fx-view" : "fx-sheet-in no-scrollbar"} style={вкладка ? { padding: "8px 16px 40px" } : { position: "fixed", inset: 0, zIndex: 455, background: T.bg, overflowY: "auto", overscrollBehavior: "contain",
       padding: `calc(${insetTop}px + 10px) 16px calc(${insetBottom}px + 40px)` }}>
       <div className="flex flex-col" style={{ gap: 22, maxWidth: 560, margin: "0 auto" }}>
-        {!hasTelegramBack() && (!вкладка || выбран) && (
-          <button onClick={() => (выбран ? setВыбран(null) : onClose())} className="fx-tap flex items-center gap-1 self-start" style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.muted, background: "none", border: "none" }}>
+        {!hasTelegramBack() && (!вкладка || естьВыбор) && (
+          <button onClick={() => (естьВыбор ? setВыбран(null) : onClose())} className="fx-tap flex items-center gap-1 self-start" style={{ fontFamily: bodyFont, fontSize: 14.5, color: T.muted, background: "none", border: "none" }}>
             <ChevronLeft size={16} /> {t("back")}
           </button>
         )}
         {рынок ? (
-          <СтраницаРынка key={рынок.asset} рынок={рынок} счёт={счёт} onОбновить={обновитьСчёт} showToast={showToast} />
+          <СтраницаРынка key={рынок.asset} рынок={рынок} счёт={счёт} onОбновить={обновитьСчёт} showToast={showToast}
+            onПополнить={() => setПеревод("in")} события={(события || []).filter((з) => з.coin === рынок.coin)} onОткрыть={setСтрока} />
         ) : (
           <>
             <ЗаголовокРаздела>Биржа</ЗаголовокРаздела>
-            {/* Отдельного счёта у человека нет: сделки берут деньги с карты
-                приложения, закрытие последней позиции возвращает их туда же. */}
-            <div className="flex items-center justify-between" style={{ padding: "14px 16px", borderRadius: 16, background: T.surface }}>
-              <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 800 }}>
-                {счёт && счёт.pending ? "Пополняем с карты…" : `Доступно${сеть === "testnet" ? " · тест" : ""}`}
-              </span>
-              <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 20, fontWeight: 700 }}>{счёт ? `$${(счёт.withdrawable + наКарте(счёт)).toFixed(2)}` : "—"}</span>
-            </div>
+            <ПлашкаСчёта счёт={счёт} рынки={рынки} onПеревод={setПеревод} />
+            {позиции.length > 0 && (
+              <section className="flex flex-col">
+                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 20, fontWeight: 800, marginBottom: 2 }}>Позиции</span>
+                {позиции.map((п) => {
+                  const р = поМонете.get(п.coin);
+                  return <СтрокаПозиции key={п.coin} п={п} рынок={р} onOpen={() => { haptic("light"); if (р) setВыбран(р.asset); }} />;
+                })}
+              </section>
+            )}
+            {/* История — сразу под счётом и позициями: под списком из сотни
+                рынков её никто бы не нашёл. */}
+            {история.length > 0 && (
+              <section className="flex flex-col" style={{ gap: 2 }}>
+                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 20, fontWeight: 800, marginBottom: 2 }}>История</span>
+                {история.slice(0, всяИстория ? 80 : 4).map((с) => <СтрокаИстории key={с.id} с={с} курсы={{}} onOpen={() => { haptic("light"); setСтрока(с); }} />)}
+                {история.length > 4 && (
+                  <button onClick={() => { haptic("light"); setВсяИстория((б) => !б); }} className="fx-tap self-start"
+                    style={{ marginTop: 6, padding: "9px 16px", borderRadius: 999, border: "none", background: T.surface, color: T.ice, fontFamily: bodyFont, fontSize: 13.5, fontWeight: 700 }}>
+                    {всяИстория ? "Свернуть" : `Показать все · ${история.length}`}
+                  </button>
+                )}
+              </section>
+            )}
             <div className="flex" style={{ gap: 8, flexWrap: "wrap" }}>
               {есть.map(([к, подпись]) => (
                 <button key={к} onClick={() => { haptic("light"); setРаздел(к); }} className="fx-tap rounded-full"
@@ -16229,6 +16896,8 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
           </>
         )}
       </div>
+      <ОкноТорговогоСчёта открыт={!!перевод} направление={перевод || "in"} onClose={() => { setПеревод(null); обновитьСчёт(); }} showToast={showToast} insetTop={insetTop} insetBottom={insetBottom} />
+      <ОкноОперации строка={строка} onClose={() => setСтрока(null)} курсы={{}} insetTop={insetTop} insetBottom={insetBottom} />
     </div>
   );
   return вкладка ? тело : createPortal(тело, document.body);
@@ -18783,26 +19452,26 @@ function ПилюляИзменения({ значение, подпись }) {
   );
 }
 
-/* Кнопка действия под картой: тёмный квадрат со значком и подписью под
-   ним. Подпись снаружи квадрата — так значок остаётся крупным, а слово
-   не жмётся к его краям. */
+/* Кнопка действия под картой: тёмный круг со значком и подписью под ним.
+   Белые круги выделялись сильнее самой карты и спорили с ней — тёмный
+   графит с тонкой кромкой читается частью кошелька, а не наклейкой.
+   Подпись снаружи круга — так значок остаётся крупным, а слово не жмётся
+   к его краям. */
 
 function ДействиеКошелька({ icon: Icon, label, onClick }) {
   return (
     <button
       onClick={onClick}
       className="fx-tap flex flex-col items-center"
-      style={{ gap: 7, background: "transparent", border: "none", padding: 0, flex: 1 }}
+      style={{ gap: 7, background: "transparent", border: "none", padding: 0, flex: 1, minWidth: 0 }}
     >
       <span
         className="flex items-center justify-center"
-        // Светлый круг вместо серой плитки: действие видно сразу, и
-        // подпись под ним белая, а не серая приписка.
-        style={{ width: 56, height: 56, borderRadius: "50%", background: T.ice }}
+        style={{ width: 54, height: 54, borderRadius: "50%", background: T.surfaceHi, boxShadow: `inset 0 0 0 1px ${hexA(T.ice, 0.08)}` }}
       >
-        <Icon size={21} strokeWidth={2.3} color={T.bg} />
+        <Icon size={21} strokeWidth={2.2} color={T.ice} />
       </span>
-      <span style={{ fontFamily: bodyFont, fontSize: 12.5, fontWeight: 600, color: T.ice }}>{label}</span>
+      <span className="truncate" style={{ maxWidth: "100%", fontFamily: bodyFont, fontSize: 12, fontWeight: 600, color: T.muted }}>{label}</span>
     </button>
   );
 }
@@ -18854,7 +19523,7 @@ const ЛОГО_МОНЕТЫ_СЕТИ = { solana: "/coins/sol.png", ton: "/coins/
 const ИМЯ_СЕТИ_ИСТОРИИ = { solana: "Solana", ton: "TON", bsc: "BNB Chain", base: "Base", eth: "Ethereum" };
 const КУРС_МОНЕТЫ_ИСТОРИИ = { SOL: "sol", [ТИКЕР_TON]: "gram", TON: "gram", BNB: "bnb", ETH: "eth" };
 const СЕТЬ_МОНЕТЫ_ИСТОРИИ = { SOL: "solana", [ТИКЕР_TON]: "ton", TON: "ton", BNB: "bsc", ETH: "eth" };
-const ВИД_ОПЕРАЦИИ = { launch: "launch", withdraw: "withdraw", deposit: "deposit", transfer: "transfer", transfer_in: "transfer_in", sweep: "sweep", graduate: "graduate", payout_bind: "bind" };
+const ВИД_ОПЕРАЦИИ = { launch: "launch", withdraw: "withdraw", deposit: "deposit", transfer: "transfer", transfer_in: "transfer_in", sweep: "sweep", graduate: "graduate", payout_bind: "bind", trading_in: "trading_in", trading_out: "trading_out" };
 
 /* Курс на момент сделки — только правдоподобный. Раньше у сделок Solana
    в эту колонку писали курс TON, и доллары по старым строкам врали в
@@ -18943,6 +19612,11 @@ function собратьИсторию(ряд, запуски) {
 
   for (const с of обычные) {
     if (этоСделка(с) || занятые.has(с.id)) continue;
+    // Сделка на бирже — своей строкой, с рынком и итогом позиции.
+    if (с.side === "perp" && с.перп) {
+      итог.push(строкаБиржи({ ...с.перп, id: String(с.id).replace(/^perp-/, ""), at: new Date(с.created_at).getTime() }));
+      continue;
+    }
     const сеть = сетьОп(с);
     const вид = ВИД_ОПЕРАЦИИ[с.side] || "other";
     // Запуск без стартовой покупки — подписываем токеном, заведённым
@@ -18962,7 +19636,7 @@ function собратьИсторию(ряд, запуски) {
       тикер, лого, сумма: Number(с.ton_amount) || 0,
       // Выход на биржу — деньги кривой, а не кошелька; привязка адреса
       // денег не двигает вовсе.
-      знак: вид === "deposit" || вид === "transfer_in" ? 1 : вид === "graduate" || вид === "bind" ? 0 : -1,
+      знак: вид === "deposit" || вид === "transfer_in" || вид === "trading_out" ? 1 : вид === "graduate" || вид === "bind" ? 0 : -1,
       токенов: null, курсТогда: 0, время: с.created_at, подпись: с.signature || null, адрес: с.address || null,
       кто: с.кто || null,
     });
@@ -18970,8 +19644,45 @@ function собратьИсторию(ряд, запуски) {
   return итог.sort((a, b) => new Date(b.время) - new Date(a.время));
 }
 
+/* Сделка на бирже словами: открыли лонг или шорт, закрыли его сами,
+   по тейку, по стопу или ликвидацией; перевод между картой и счётом. */
+function заголовокБиржи(с) {
+  const т = с.тикер || "";
+  switch (с.причина) {
+    case "open": return с.добор ? tf(с.сторона > 0 ? "histPerpAddLong" : "histPerpAddShort", { t: т }) : tf(с.сторона > 0 ? "histPerpLong" : "histPerpShort", { t: т });
+    case "close": return tf(с.сторона > 0 ? "histPerpCloseLong" : "histPerpCloseShort", { t: т });
+    case "tp": return tf("histTake", { t: т });
+    case "sl": return tf("histStop", { t: т });
+    case "liq": return tf("histLiq", { t: т });
+    case "in": return t("histToTrading");
+    case "out": return t("histFromTrading");
+    default: return t("histOther");
+  }
+}
+
+/* Цвет заголовка — смысл строки: покупка зелёным, продажа красным; на
+   бирже открытие лонга и закрытие шорта — покупки, открытие шорта и
+   закрытие лонга — продажи; тейк зелёным, стоп красным, ликвидация
+   жёлтым. Запуск и переводы — белым. Значков у аватарок больше нет:
+   смысл несёт цвет, а не стрелка в углу. */
+function цветЗаголовка(с) {
+  if (с.вид === "buy") return T.up;
+  if (с.вид === "sell") return T.down;
+  if (с.вид === "perp") {
+    if (с.причина === "liq") return ЦВЕТ_ЛИКВИДАЦИИ;
+    if (с.причина === "tp") return T.up;
+    if (с.причина === "sl") return T.down;
+    if (с.причина === "open") return с.сторона > 0 ? T.up : T.down;
+    if (с.причина === "close") return с.сторона > 0 ? T.down : T.up;
+  }
+  return T.ice;
+}
+
 function заголовокСтроки(с) {
+  if (с.вид === "perp") return заголовокБиржи(с);
   switch (с.вид) {
+    case "trading_in": return t("histToTrading");
+    case "trading_out": return t("histFromTrading");
     case "buy": return tf("histBuy", { t: с.тикер || "?" });
     case "sell": return tf("histSell", { t: с.тикер || "?" });
     case "launch": return с.тикер ? tf("histLaunch", { t: с.тикер }) : t("histLaunchToken");
@@ -19008,6 +19719,14 @@ function fmtЦеныИстории(v) {
 
 function подписьСтроки(с) {
   const часы = new Date(с.время).toLocaleTimeString(локальИстории(), { hour: "2-digit", minute: "2-digit" });
+  if (с.вид === "perp") {
+    const п = ценаРынка(с.цена);
+    const хвостБиржи = с.причина === "open" ? tf("histLevEntry", { l: Math.round(с.плечо * 10) / 10, p: п })
+      : с.причина === "liq" ? tf("histLiqAt", { p: п })
+        : с.причина === "in" || с.причина === "out" ? `${fmtСумма(с.sol)} SOL`
+          : tf("histExitAt", { p: п });
+    return `${часы} · ${хвостБиржи}`;
+  }
   let хвост = "";
   if ((с.вид === "buy" || с.вид === "launch") && с.токенов > 0 && с.тикер) хвост = `+${fmtТокеновИстории(с.токенов)} ${с.тикер}`;
   else if (с.вид === "sell" && с.токенов > 0 && с.тикер) хвост = `−${fmtТокеновИстории(с.токенов)} ${с.тикер}`;
@@ -19029,6 +19748,8 @@ const ФИЛЬТРЫ_ИСТОРИИ = [
   { id: "in", ключ: "histIn", годится: (с) => с.вид === "deposit" || с.вид === "transfer_in" },
   { id: "out", ключ: "histOut", годится: (с) => ["withdraw", "transfer", "sweep"].includes(с.вид) },
   { id: "launch", ключ: "histLaunches", годится: (с) => с.вид === "launch" || с.вид === "graduate" },
+  // Биржа: сделки на торговом счёте и переводы на него и обратно.
+  { id: "exchange", ключ: "histExchange", годится: (с) => с.вид === "perp" || с.вид === "trading_in" || с.вид === "trading_out" },
 ];
 
 function деньИстории(iso) {
@@ -19058,24 +19779,10 @@ function useКурсыИстории() {
 }
 
 function долларыСтроки(с, курсы) {
-  const курс = курсТогда(с) || курсы[КУРС_МОНЕТЫ_ИСТОРИИ[с.монета]] || 0;
+  // У сделок биржи суммы уже в долларах — пересчитывать нечего.
+  if (с.вид === "perp") return 0;
+  const курс = курсТогда(с) || (курсы && курсы[КУРС_МОНЕТЫ_ИСТОРИИ[с.монета]]) || 0;
   return (Number(с.сумма) || 0) * курс;
-}
-
-/* Значок действия в углу аватарки. Пришли деньги — зелёный, всё
-   остальное — светлый: цвет говорит только о приходе. */
-function значокДействия(вид) {
-  switch (вид) {
-    case "buy": return { Icon: ArrowDownLeft, приход: false };
-    case "sell": return { Icon: ArrowUpRight, приход: true };
-    case "launch": return { Icon: Rocket, приход: false, запуск: true };
-    case "swap": return { Icon: Repeat, приход: false };
-    case "deposit":
-    case "transfer_in": return { Icon: ArrowDownLeft, приход: true };
-    case "graduate": return { Icon: Rocket, приход: true };
-    case "bind": return { Icon: Link2, приход: false };
-    default: return { Icon: ArrowUpRight, приход: false };
-  }
 }
 
 /* Логотипы токенов для истории по адресу. У части сделок в базе нет
@@ -19107,12 +19814,15 @@ function useЛогоИстории(ряд) {
 
 function АватарСтроки({ с, size = 40 }) {
   const [сломан, setСломан] = useState(false);
+  // Сделка на бирже — значок самого рынка, как в списке биржи.
+  if (с.вид === "perp" && с.coin) return <ЗначокРынка рынок={{ coin: с.coin, name: с.тикер }} size={size} />;
   // Перевод человеку Mintly — его лицо, как контакт в Phantom.
   const лицо = с.кто ? (с.кто.avatar || null) : null;
   const поАдресу = с.адресТокена ? логоПоАдресу.get(с.адресТокена) : null;
-  const картинка = !сломан && (с.кто ? лицо : (с.лого || (поАдресу && поАдресу.лого) || (!с.тикер ? ЛОГО_МОНЕТЫ_СЕТИ[с.сеть] : null)));
-  const з = значокДействия(с.вид);
-  const бейдж = Math.round(size * 0.44);
+  const монетаСети = с.вид === "perp" ? ЛОГО_МОНЕТЫ_СЕТИ.solana : ЛОГО_МОНЕТЫ_СЕТИ[с.сеть];
+  const картинка = !сломан && (с.кто ? лицо : (с.лого || (поАдресу && поАдресу.лого) || (!с.тикер || с.вид === "perp" ? монетаСети : null)));
+  /* Без значка в углу: что это за строка, говорит цвет заголовка. Стрелки
+     и ракета рядом с аватаркой токена спорили с ним и читались шумом. */
   return (
     <span style={{ position: "relative", width: size, height: size, flexShrink: 0, display: "inline-block" }}>
       {картинка ? (
@@ -19132,33 +19842,41 @@ function АватарСтроки({ с, size = 40 }) {
           {String((с.кто && с.кто.nick) || с.тикер || с.монета || "?").slice(0, 1).toUpperCase()}
         </span>
       )}
-      <span
-        className="flex items-center justify-center"
-        style={{
-          position: "absolute", right: -3, bottom: -3, width: бейдж, height: бейдж, borderRadius: "50%",
-          // Запуск — своим переливом, как главная кнопка приложения: это
-          // не трата, а рождение токена, и белая стрелка его не отличала.
-          ...(з.запуск ? ВОЛНА(ЦВЕТ_КНОПКИ) : { background: з.приход ? T.up : T.ice }), border: `2px solid ${T.bg}`,
-        }}
-      >
-        <з.Icon size={Math.round(бейдж * (з.запуск ? 0.66 : 0.6))} strokeWidth={з.запуск ? 2.4 : 3} color={з.приход ? "#000000" : з.запуск ? PRISM_TEXT : T.bg} />
-      </span>
     </span>
   );
 }
 
+// Сумма строки биржи: залог при открытии, итог при закрытии, доллары перевода.
+function суммаБиржи(с) {
+  if (с.причина === "open") return долларыБиржи(с.залог);
+  if (с.причина === "in") return `+${долларыБиржи(с.usd)}`;
+  if (с.причина === "out") return `−${долларыБиржи(с.usd)}`;
+  if (с.причина === "liq") return `−${долларыБиржи(с.залог)}`;
+  return итогБиржи(с.pnl);
+}
+function цветСуммыБиржи(с) {
+  if (с.причина === "open" || с.причина === "out") return T.ice;
+  if (с.причина === "in") return T.up;
+  if (с.причина === "liq") return T.down;
+  return цветИтога(с.pnl);
+}
+
 function суммаСтроки(с) {
+  if (с.вид === "perp") return суммаБиржи(с);
   if (с.вид === "bind") return "";
   const знак = с.знак > 0 ? "+" : с.знак < 0 ? "−" : "";
   return `${знак}${fmtСумма(с.сумма)} ${с.монета}`;
 }
 
 function цветСуммы(с) {
+  if (с.вид === "perp") return цветСуммыБиржи(с);
   return с.знак > 0 ? T.up : с.знак < 0 ? T.ice : T.muted;
 }
 
 function СтрокаИстории({ с, курсы, onOpen }) {
   const доллары = долларыСтроки(с, курсы);
+  // Под суммой биржи — что это за число: залог или итог позиции.
+  const пометка = с.вид === "perp" ? (с.причина === "open" || с.причина === "liq" ? t("histMarginWord") : с.причина === "in" || с.причина === "out" ? "" : t("histResultWord")) : "";
   return (
     <button
       type="button"
@@ -19168,7 +19886,7 @@ function СтрокаИстории({ с, курсы, onOpen }) {
     >
       <АватарСтроки с={с} />
       <div className="flex-1 min-w-0">
-        <div className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em" }}>
+        <div className="truncate" style={{ fontFamily: displayFont, color: цветЗаголовка(с), fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em" }}>
           {заголовокСтроки(с)}
         </div>
         <div className="truncate" style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5, marginTop: 3 }}>
@@ -19183,6 +19901,9 @@ function СтрокаИстории({ с, курсы, onOpen }) {
           <div style={{ fontFamily: monoFont, fontSize: 12, color: T.faint, marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
             {fmtUsdИстории(доллары)}
           </div>
+        )}
+        {пометка && (
+          <div style={{ fontFamily: bodyFont, fontSize: 12, color: T.faint, marginTop: 3 }}>{пометка}</div>
         )}
       </div>
     </button>
@@ -19239,8 +19960,28 @@ function ОкноОперации({ строка, onClose, курсы, insetTop 
   const поля = [];
   if (с) {
     поля.push({ имя: t("histDate"), значение: new Date(с.время).toLocaleString(локальИстории(), { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) });
-    поля.push({ имя: t("histNetwork"), значение: ИМЯ_СЕТИ_ИСТОРИИ[с.сеть] || с.сеть });
-    if (с.вид === "buy" || с.вид === "launch") {
+    поля.push({ имя: t("histNetwork"), значение: с.сеть === "perp" ? t("histExchangeNet") : ИМЯ_СЕТИ_ИСТОРИИ[с.сеть] || с.сеть });
+    if (с.вид === "perp" && (с.причина === "in" || с.причина === "out")) {
+      поля.push({ имя: с.причина === "in" ? t("histGave") : t("histGot"), значение: `${fmtСумма(с.sol)} SOL` });
+      поля.push({ имя: с.причина === "in" ? t("histGot") : t("histGave"), значение: долларыБиржи(с.usd) });
+    } else if (с.вид === "perp") {
+      поля.push({ имя: t("histMarket"), значение: с.тикер || с.coin || "—" });
+      поля.push({ имя: t("histSide"), значение: `${с.сторона > 0 ? t("histLong") : t("histShort")}${с.плечо ? ` · ${Math.round(с.плечо * 10) / 10}×` : ""}` });
+      if (с.размер > 0) поля.push({ имя: t("histSize"), значение: `${с.размер} ${с.тикер || ""} · ${долларыБиржи(с.размер * с.цена)}` });
+      if (с.причина === "open") поля.push({ имя: t("histEntry"), значение: `$${ценаРынка(с.цена)}` });
+      else {
+        if (с.вход > 0) поля.push({ имя: t("histEntry"), значение: `$${ценаРынка(с.вход)}` });
+        поля.push({ имя: t("histExit"), значение: `$${ценаРынка(с.цена)}` });
+      }
+      if (с.залог > 0) поля.push({ имя: t("histMargin"), значение: долларыБиржи(с.залог) });
+      if (с.причина !== "open") {
+        поля.push({ имя: t("histResult"), значение: итогБиржи(с.pnl) });
+        if (с.выплата > 0) поля.push({ имя: t("histPayout"), значение: долларыБиржи(с.выплата) });
+      }
+      if (с.комиссия > 0) поля.push({ имя: t("histPerpFee"), значение: долларыБиржи(с.комиссия) });
+    } else if (с.вид === "trading_in" || с.вид === "trading_out") {
+      поля.push({ имя: с.вид === "trading_in" ? t("histSent") : t("histReceived"), значение: `${fmtСумма(с.сумма)} ${с.монета}` });
+    } else if (с.вид === "buy" || с.вид === "launch") {
       поля.push({ имя: t("histGave"), значение: `${fmtСумма(с.сумма)} ${с.монета}` });
       if (с.токенов > 0) поля.push({ имя: t("histGot"), значение: `${fmtТокеновИстории(с.токенов)} ${с.тикер || ""}` });
     } else if (с.вид === "sell") {
@@ -19360,7 +20101,7 @@ function ОкноОперации({ строка, onClose, курсы, insetTop 
             ))}
           </div>
 
-          {!с.подпись && с.вид !== "bind" && (
+          {!с.подпись && с.вид !== "bind" && с.вид !== "perp" && (
             <div style={{ fontFamily: bodyFont, color: T.faint, fontSize: 12.5, lineHeight: 1.5, marginTop: 12, padding: "0 4px" }}>{t("histNoSig")}</div>
           )}
 
@@ -20382,7 +21123,7 @@ function МастерФразы({
   );
 }
 
-function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none", фраза = null, setФраза = () => {}, запросФразы = 0, onСтрелкаФразы = () => {}, ник = "" }) {
+function WalletView({ активен = true, onOpenToken = null, connected, walletAddress, tonBalance = 0, tonPriceUsd = 0, onCopy, holdings = [], holdingsReady = false, showToast = () => {}, userId = null, onGoTab = () => {}, insetTop = 0, insetBottom = 0, тик = 0, скинКарты = "none", фраза = null, setФраза = () => {}, запросФразы = 0, onСтрелкаФразы = () => {}, ник = "" }) {
   // Тариф (выбранная скорость) красит шёлк на карте баланса.
   const [скоростьКарты] = useСкорость();
   // Вид карты берём из купленного в магазине; неизвестный id — обычная
@@ -20437,6 +21178,11 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
   // История — своя страница, а не хвост кошелька: список длинный, и в
   // столбце под токенами его всё равно никто не дочитывал.
   const [историяОткрыта, setИсторияОткрыта] = useState(false);
+  /* Торговый счёт — второй счёт для биржи. Перевод на него и обратно — тут
+     же, кнопкой под картой; остаток счёта виден в «Моих активах». */
+  const [торговыйОткрыт, setТорговыйОткрыт] = useState(false);
+  // Опрос — только пока кошелёк на экране: вкладка живёт и в фоне.
+  const торговыйСчёт = useТорговыйСчёт(!!userId && активен, 15000);
   /* Волны от касаний карты. Каждая живёт своё время и убирается сама —
      иначе их накапливались бы десятки за один сеанс. */
   /* Ход перелива у каждого запуска свой: одинаковая на всех устройствах
@@ -21293,6 +22039,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
         <ДействиеКошелька icon={ArrowUpRight} label={t("walletActBuy")} onClick={() => { setСетьДействия(null); setВыводОткрыт(true); }} />
         <ДействиеКошелька icon={ArrowDownLeft} label={t("walletActReceive")} onClick={() => { setСетьДействия(null); setПолучитьОткрыт(true); }} />
         <ДействиеКошелька icon={Repeat} label={t("walletActSwap")} onClick={() => setОбменОткрыт(true)} />
+        <ДействиеКошелька icon={ЗначокБиржа} label={t("walletActTrading")} onClick={() => { haptic("light"); setТорговыйОткрыт(true); }} />
         <ДействиеКошелька
           icon={Clock}
           label={t("walletActHistory")}
@@ -21406,6 +22153,30 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
               </span>
             </div>
           ))}
+          {/* Торговый счёт — строкой среди активов: это тоже деньги
+              человека, только лежат они у биржи. Нажатие — перевод. */}
+          {userId && (
+            <div role="button" onClick={() => { haptic("light"); setТорговыйОткрыт(true); }} className="w-full flex items-center fx-tap"
+              style={{ gap: 14, padding: "13px 2px", cursor: "pointer" }}>
+              <span className="flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: "50%", background: T.surfaceHi, flexShrink: 0 }}>
+                <ЗначокБиржа size={22} color={T.ice} strokeWidth={2} />
+              </span>
+              <span className="flex flex-col text-left" style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800 }}>{t("walletTradingTitle")}</span>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13 }}>
+                  {торговыйСчёт && торговыйСчёт.demo ? t("walletTradingDemo") : t("walletTradingSub")}
+                </span>
+              </span>
+              <span className="flex flex-col items-end" style={{ gap: 3, flexShrink: 0, ...туман }}>
+                <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                  <УмныйТекст text={торговыйСчёт ? долларыБиржи(Number(торговыйСчёт.equity) || 0) : "—"} />
+                </span>
+                <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                  {торговыйСчёт && (торговыйСчёт.positions || []).length ? tf("walletTradingPositions", { n: торговыйСчёт.positions.length }) : t("walletTradingNone")}
+                </span>
+              </span>
+            </div>
+          )}
         </div>
 
         <div style={{ marginBottom: 6 }}>
@@ -21468,6 +22239,7 @@ function WalletView({ onOpenToken = null, connected, walletAddress, tonBalance =
 
       </div>
 
+      <ОкноТорговогоСчёта открыт={торговыйОткрыт} onClose={() => setТорговыйОткрыт(false)} showToast={showToast} insetTop={insetTop} insetBottom={insetBottom} />
       <ЗакрытьПриТокене onЗакрыть={() => setИсторияОткрыта(false)} />
       <ЭкранСнизу
         открыт={историяОткрыта}
@@ -36708,6 +37480,7 @@ function mapTokenRow(row) {
                 чужой кошелёк, хотя в базе у него ничего нет. */}
             <WalletView
               key={userId || "гость"}
+              активен={view === "wallet"}
               onOpenToken={openToken}
               ник={accountCreated && profile ? profile.nickname : ""}
               скинКарты="none"

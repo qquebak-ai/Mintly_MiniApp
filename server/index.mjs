@@ -519,6 +519,16 @@ if (process.env.LIMIT_ORDERS !== "0") {
     .catch((err) => console.warn("[лимиты]", err && err.message));
 }
 
+/* Сторож торгового счёта: тейки, стопы и ликвидации позиций на бирже
+   (api/hyperliquid.js, api/_tradingAccount.js) и сверка переводов карта ⇄
+   счёт. Живёт с сервером: позиция должна закрыться по стопу и тогда,
+   когда экран биржи никто не открыл. */
+if (process.env.TRADING_GUARD !== "0") {
+  import("../api/hyperliquid.js")
+    .then(({ запуститьСторожа }) => { if (запуститьСторожа()) console.log("[биржа] сторож позиций запущен"); })
+    .catch((err) => console.warn("[биржа]", err && err.message));
+}
+
 /* Чужие запуски (pump.fun, letsbonk) — поток в том же процессе: лента
    «Новые» берёт их из памяти (api/_launchStream.js, api/new-launches.js). */
 if (process.env.LAUNCH_STREAM !== "0") {
