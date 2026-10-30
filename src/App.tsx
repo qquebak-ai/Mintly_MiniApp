@@ -12541,6 +12541,8 @@ function useЧужиеЗапуски(активно) {
         if (Number(j.solUsd) > 0) setКурсСервера((б) => (Math.abs(б - j.solUsd) > 0.01 ? Number(j.solUsd) : б));
         let сдвиг = false;
         for (const з of j.items || []) {
+          // Токен слили в ноль — сервер просит убрать его из ленты (см. живой в api/_launchStream.js).
+          if (з && з.gone && з.mint) { if (карта.delete(з.mint)) сдвиг = true; continue; }
           if (!з || !з.mint || !з.symbol) continue;
           карта.set(з.mint, з);
           сдвиг = true;
