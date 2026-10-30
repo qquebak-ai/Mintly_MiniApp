@@ -191,6 +191,12 @@ function нарисовать() {
             // своё окно само.
             returnStrategy: "back",
             skipRedirectToWallet: "never",
+            /* Свои всплывашки TonConnect выключены: после возврата из
+               кошелька мост часто не дожидался ответа и показывал
+               «Transaction was not sent», хотя перевод ушёл. Об исходе
+               говорит само приложение — по сети, а не по мосту. */
+            modals: ["before"],
+            notifications: [],
           }}
         >
           <Корень />

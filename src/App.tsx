@@ -7778,6 +7778,27 @@ const ЖИЗНЬ_ТОСТА = 4000;
  * «не удалось», остальное — удача или весть. Так вызывающему коду не
  * нужно ничего знать о видах: showToast("…") работает как работал.
  */
+/* Ложные ошибки связи. Свернули Telegram — запросы, что были в пути,
+   обрываются, и после возврата сыпалось «Нет связи с сервером», хотя
+   связь в порядке, а всё нужное переспрашивается само (деньги — тем же
+   ключом, см. src/appWallet.js). Пока приложение свёрнуто и первые
+   секунды после возврата такие сообщения не показываем. */
+let вернулисьВ = 0;
+if (typeof document !== "undefined") {
+  const отметить = () => { if (document.visibilityState === "visible") вернулисьВ = Date.now(); };
+  document.addEventListener("visibilitychange", отметить);
+  window.addEventListener("pageshow", отметить);
+  window.addEventListener("focus", отметить);
+  // Telegram сворачивает мини-приложение, не меняя видимость страницы, — у него свои события.
+  try { const tg = window.Telegram && window.Telegram.WebApp; if (tg && tg.onEvent) { tg.onEvent("activated", () => { вернулисьВ = Date.now(); }); tg.onEvent("deactivated", () => { вернулисьВ = Infinity; }); } } catch { /* старый клиент */ }
+}
+const СБОЙ_СВЯЗИ = /нет связи|сеть не ответила|failed to fetch|load failed|networkerror|network error|network connection was lost|timed? ?out|aborted|ошибка 50[234]/i;
+function ложнаяОшибкаСвязи(текст) {
+  if (!СБОЙ_СВЯЗИ.test(String(текст || ""))) return false;
+  if (typeof document === "undefined") return false;
+  return document.visibilityState !== "visible" || Date.now() - вернулисьВ < 6000;
+}
+
 function разобратьТост(сообщение) {
   const строка = String(сообщение || "").trim();
   const отказ = /^(не вышло|не удалось|не отправилось|не получилось|ошибка|неверный|нет |сеть не|x не ответил|didn'?t|couldn'?t|failed|error|wrong)/i.test(строка)
@@ -15861,6 +15882,20 @@ function ключСделки() {
   return `k${Date.now().toString(36)}${Math.random().toString(36).slice(2, 14)}`;
 }
 
+/* Сделка, закрытие и перевод несут ключ нажатия — и переживают обрыв
+   связи: свернули Telegram, связь моргнула, ответ потерялся, а сервер
+   сделку уже провёл. Раньше человек читал «Сделка не прошла» при
+   открытой позиции. Теперь тем же ключом спрашиваем ещё раз (до минуты,
+   когда приложение снова на экране) — сервер по ключу отдаёт исход
+   первой попытки, а не делает вторую. */
+const ЖДЁМ_ИСХОДА_БИРЖИ_МС = 60_000;
+function биржаНаЭкране() {
+  return new Promise((готово) => {
+    if (typeof document === "undefined" || document.visibilityState === "visible") { готово(); return; }
+    const ф = () => { if (document.visibilityState === "visible") { document.removeEventListener("visibilitychange", ф); готово(); } };
+    document.addEventListener("visibilitychange", ф);
+  });
+}
 async function запросРынков(путь, тело) {
   const заголовки = {};
   if (тело || /^(account|trades|ticket)/.test(путь)) {
@@ -15869,14 +15904,34 @@ async function запросРынков(путь, тело) {
     if (!ключ) throw new Error("no_session");
     заголовки.Authorization = `Bearer ${ключ}`;
   }
-  const r = await fetch(апи(`/api/hyperliquid?action=${путь}`), {
-    method: тело ? "POST" : "GET",
-    headers: { ...заголовки, ...(тело ? { "Content-Type": "application/json" } : {}) },
-    body: тело ? JSON.stringify(тело) : undefined,
-  });
-  const j = await r.json().catch(() => null);
-  if (!r.ok) throw new Error((j && (j.detail || j.error)) || `ошибка ${r.status}`);
-  return j;
+  const сКлючом = !!(тело && тело.requestKey);
+  const начало = Date.now();
+  for (let попытка = 1; ; попытка += 1) {
+    const ещёЖдём = сКлючом && Date.now() - начало < ЖДЁМ_ИСХОДА_БИРЖИ_МС;
+    let r;
+    try {
+      r = await fetch(апи(`/api/hyperliquid?action=${путь}`), {
+        method: тело ? "POST" : "GET",
+        headers: { ...заголовки, ...(тело ? { "Content-Type": "application/json" } : {}) },
+        body: тело ? JSON.stringify(тело) : undefined,
+      });
+    } catch (e) {
+      if (!ещёЖдём) throw e;
+      await биржаНаЭкране();
+      await new Promise((готово) => setTimeout(готово, Math.min(4000, 700 * попытка)));
+      continue;
+    }
+    const j = await r.json().catch(() => null);
+    if (ещёЖдём && ([502, 503, 504].includes(r.status) || (r.ok && j == null))) {
+      await биржаНаЭкране();
+      await new Promise((готово) => setTimeout(готово, Math.min(4000, 700 * попытка)));
+      continue;
+    }
+    // «Слишком быстро» — предел частоты сервера, а не отказ: та же просьба чуть позже проходит.
+    if (ещёЖдём && r.status === 429 && j && j.error === "too_fast") { await new Promise((готово) => setTimeout(готово, 400)); continue; }
+    if (!r.ok) throw new Error((j && (j.detail || j.error)) || `ошибка ${r.status}`);
+    return j;
+  }
 }
 /* Ответы биржи и сервера — словами: раньше человек видел «min_10_usd»
    или английское «Insufficient margin to place order». */
@@ -16895,7 +16950,13 @@ function ОкноТорговогоСчёта({ открыт, onClose, напр�
   useEffect(() => { if (открыт) { setКуда(направление); setВвод(""); setБеда(""); setИдёт(false); } }, [открыт, направление]);
   const демо = !!(счёт && счёт.demo);
   const курс = (счёт && счёт.solPrice) || solUsd() || 0;
-  const наКарте = (счёт && счёт.wallet && Number(счёт.wallet.sol)) || 0;
+  /* SOL на карте — из ответа счёта, а если сервер его не дочитал (узел
+     сети не ответил) — из общей памяти кошелька. Раньше вместо него стоял
+     ноль, и на любую сумму окно писало «Не хватает SOL на карте». */
+  const solСчёта = счёт && счёт.wallet && счёт.wallet.sol != null ? Number(счёт.wallet.sol) : null;
+  const solКарты = solСчёта != null ? solСчёта : остатокКошелька("sol");
+  const картаИзвестна = solКарты != null;
+  const наКарте = solКарты || 0;
   const наСчёте = счёт ? Number(счёт.cash ?? счёт.withdrawable) || 0 : 0;
   const минUsd = (счёт && счёт.minTransfer) || 1;
   const сумма = parseAmount(ввод);
@@ -16907,7 +16968,7 @@ function ОкноТорговогоСчёта({ открыт, onClose, напр�
   const мост = счёт && !демо;
   const минМоста = 0.12;
   const ошибка = !сумма ? ""
-    : пополняем && сумма > максКарта + 1e-9 ? "Не хватает SOL на карте"
+    : пополняем && картаИзвестна && сумма > максКарта + 1e-9 ? "Не хватает SOL на карте"
     : !пополняем && сумма > максСчёт + 1e-9 ? "На счёте меньше"
     : мост && пополняем && сумма < минМоста ? `Через мост — от ${минМоста} SOL`
     : вДолларах < минUsd ? `Перевод — от $${минUsd}`
@@ -16940,7 +17001,7 @@ function ОкноТорговогоСчёта({ открыт, onClose, напр�
       </span>
     </span>
   );
-  const карта = место("Карта", счёт ? `${fmtСумма(наКарте)} SOL` : "—", <img src="/coins/sol.png" alt="" width={22} height={22} style={{ borderRadius: "50%" }} />);
+  const карта = место("Карта", картаИзвестна ? `${fmtСумма(наКарте)} SOL` : "—", <img src="/coins/sol.png" alt="" width={22} height={22} style={{ borderRadius: "50%" }} />);
   const торговый = место("Торговый счёт", счёт ? долларыБиржи(наСчёте) : "—", <ЗначокБиржа size={18} color={T.ice} />);
   return (
     <ЭкранСнизу открыт={открыт} onClose={onClose} заголовок="Торговый счёт" insetTop={insetTop} insetBottom={insetBottom}>
@@ -18088,7 +18149,7 @@ function адресTonОк(строка) {
 function ЭкранВывода({
   открыт, onClose, сеть: сетьПоУмолчанию = "sol", остаток = 0, курс = 0, единица = "SOL", свой = "",
   остатки = null, курсы = null, пределЗаСутки: пределСнаружи = null, пределы = null, userId = null,
-  showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0,
+  showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0, известно = null,
 }) {
   // Три шага: «кому», «сколько» и код с почты. Один экран с обоими полями
   // заставлял держать в голове и адрес, и сумму, а промах в адресе — это
@@ -18175,7 +18236,10 @@ function ЭкранВывода({
   // Сколько монет уйдёт на самом деле.
   const монет = вДолларах ? (курсСети2 > 0 ? набрано / курсСети2 : 0) : набрано;
   const вДеньгах = вДолларах ? набрано : набрано * курсСети2;
-  const многовато = монет > свободно + 1e-9;
+  /* Остаток ещё не приехал (первый вход, узел молчит) — это не ноль:
+     красное «не хватает» на любую сумму было ложным. Решит сервер. */
+  const остатокИзвестен = !известно || известно[сеть] !== false;
+  const многовато = остатокИзвестен && монет > свободно + 1e-9;
   /* Разбор адреса. Пока человек набирает первые знаки, молчим: красная
      строка под наполовину введённым адресом ругается на то, что ещё не
      дописано. */
@@ -19197,7 +19261,7 @@ async function записатьОбмен({ отдал, получил, сумм
   } catch { /* история не должна ронять сам обмен */ }
 }
 
-function ЭкранОбмена({ открыт, onClose, солНаКошельке = 0, showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0 }) {
+function ЭкранОбмена({ открыт, onClose, солНаКошельке = 0, солИзвестен = true, showToast = () => {}, onГотово = () => {}, insetTop = 0, insetBottom = 0 }) {
   const [отдаю, setОтдаю] = useState(МОНЕТЫ_ОБМЕНА[0]);
   const [беру, setБеру] = useState(МОНЕТЫ_ОБМЕНА[1]);
   const [сумма, setСумма] = useState("");
@@ -19303,7 +19367,8 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
   const свободно = Math.max(0, Number(солНаКошельке) - 0.01);  // запас на комиссию сети
   /* Нехватку показываем на вводе, а не по нажатию: узнать, что денег
      мало, после того как потянулся к кнопке, — обидно и лишний шаг. */
-  const нехватка = солью && доли > 0n && Number(String(сумма).replace(",", ".")) > свободно;
+  // Пока остаток SOL не приехал, «не хватает» не пишем — это был бы ложный отказ.
+  const нехватка = солью && солИзвестен && доли > 0n && Number(String(сумма).replace(",", ".")) > свободно;
 
   function клавиша(к) {
     setСумма((было) => {
@@ -19333,7 +19398,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
 
   async function обменять() {
     if (идёт || доли <= 0n) return;
-    if (солью && Number(сумма.replace(",", ".")) > свободно) { showToast(t("swapNotEnough")); return; }
+    if (нехватка) { showToast(t("swapNotEnough")); return; }
     setИдёт(true);
     try {
       if (межСетями) {
@@ -19406,7 +19471,7 @@ function ЭкранОбмена({ открыт, onClose, солНаКошель�
               transition: `color ${EASE}`,
               animation: нехватка ? "строкаВходит 260ms ease-out both" : "none",
             }}>
-              <ТекстСЧислами text={нехватка ? t("swapNotEnough") : `${t("swapAvailable")}: ${свободно.toFixed(4)} SOL`} />
+              <ТекстСЧислами text={нехватка ? t("swapNotEnough") : `${t("swapAvailable")}: ${солИзвестен ? свободно.toFixed(4) : "…"} SOL`} />
             </div>
           )}
         </div>
@@ -21697,6 +21762,9 @@ function WalletView({ активен = true, onOpenToken = null, connected, wall
     : (память != null ? память : 0));
   const солНаКошельке = сПоправкой("sol", изОпроса(внутр, "sol", solПамять));
   const тонНаКошельке = сПоправкой("ton", изОпроса(внутрTON, "ton", tonПамять));
+  // Известен ли остаток вообще: окна вывода и обмена не пишут «не хватает» по нулю-заглушке.
+  const солИзвестен = !!(внутр && !внутр.нуженВход && !внутр.ошибка && внутр.sol != null) || solПамять != null;
+  const тонИзвестен = !!(внутрTON && !внутрTON.нуженВход && !внутрTON.ошибка && внутрTON.ton != null) || tonПамять != null;
   /* Кошелёк EVM: один адрес на BNB Chain, Base и Ethereum, остатки по
      каждой сети отдельно. Спрашиваем реже, чем свои сети: здесь три узла
      за один ответ. */
@@ -22523,6 +22591,7 @@ function WalletView({ активен = true, onOpenToken = null, connected, wall
         сеть={сетьДействия || (вTON ? "ton" : "sol")}
         свой={адресВнутри}
         userId={userId}
+        известно={{ sol: солИзвестен, ton: тонИзвестен, ...Object.fromEntries(Object.keys(СЕТИ_EVM).map((к) => [к, !!(остатокEVM(к) && остатокEVM(к).native != null)])) }}
         остатки={{
           sol: солНаКошельке, ton: тонНаКошельке,
           ...Object.fromEntries(Object.keys(СЕТИ_EVM).map((к) => [к, Number(остатокEVM(к) && остатокEVM(к).native) || 0])),
@@ -22572,6 +22641,7 @@ function WalletView({ активен = true, onOpenToken = null, connected, wall
         открыт={обменОткрыт}
         onClose={() => setОбменОткрыт(false)}
         солНаКошельке={солНаКошельке}
+        солИзвестен={солИзвестен}
         showToast={showToast}
         onГотово={() => { обновитьВнутренний(); setСвоиОбновления((н) => н + 1); }}
         insetTop={insetTop}
@@ -34186,6 +34256,7 @@ const FEE_PERCENT = 0; // комиссии площадки нет
   function showToast(msg) {
     const текст = String(msg == null ? "" : msg);
     if (!текст) return;
+    if (ложнаяОшибкаСвязи(текст)) return;
     const теперь = Date.now();
     const своё = последнийToast.current;
     // Тот же текст дважды подряд — одно сообщение, а не два.

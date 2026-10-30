@@ -82,22 +82,67 @@ export async function подтвердитьКодПочты(код) {
   return true;
 }
 
+/* Денежная просьба переживает обрыв связи. Telegram свернули, связь
+   моргнула — ответ терялся, хотя сервер сделку уже провёл, и человек
+   читал «не прошла», а деньги ушли. Ключ запроса делает повтор
+   безопасным: сервер узнаёт его и отдаёт исход первой попытки, а не
+   делает вторую. Поэтому при обрыве спрашиваем тем же ключом ещё раз —
+   до минуты, дождавшись, пока приложение снова на экране. «Первая ещё в
+   пути» (повтор без подписи) — тоже не отказ: ждём её исхода. */
+const ЖДЁМ_ИСХОДА_МС = 60_000;
+const пауза = (мс) => new Promise((готово) => setTimeout(готово, мс));
+function наЭкране() {
+  return new Promise((готово) => {
+    if (typeof document === "undefined" || document.visibilityState === "visible") { готово(); return; }
+    const ф = () => {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", ф);
+      готово();
+    };
+    document.addEventListener("visibilitychange", ф);
+  });
+}
 async function запрос(путь, тело) {
   const t = await токен();
   if (!t) throw new Error("нужен вход в аккаунт");
-  const билет = второйКлюч && второйКлюч.до > Date.now() + 5000 ? второйКлюч.билет : null;
-  const res = await fetch(путь, {
-    method: тело ? "POST" : "GET",
-    headers: {
-      Authorization: `Bearer ${t}`,
-      ...(билет ? { "X-Second-Key": билет } : {}),
-      ...(тело ? { "Content-Type": "application/json" } : {}),
-    },
-    body: тело ? JSON.stringify(тело) : undefined,
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error((json && (json.detail || json.error)) || `ошибка ${res.status}`);
-  return json;
+  const сКлючом = !!(тело && тело.requestKey);
+  const начало = Date.now();
+  // Был обрыв — значит, «кошелёк занят» дальше скорее всего наша же первая попытка.
+  let былОбрыв = false;
+  for (let попытка = 1; ; попытка += 1) {
+    const ещёЖдём = сКлючом && Date.now() - начало < ЖДЁМ_ИСХОДА_МС;
+    const билет = второйКлюч && второйКлюч.до > Date.now() + 5000 ? второйКлюч.билет : null;
+    let res;
+    try {
+      res = await fetch(путь, {
+        method: тело ? "POST" : "GET",
+        headers: {
+          Authorization: `Bearer ${t}`,
+          ...(билет ? { "X-Second-Key": билет } : {}),
+          ...(тело ? { "Content-Type": "application/json" } : {}),
+        },
+        body: тело ? JSON.stringify(тело) : undefined,
+      });
+    } catch (e) {
+      if (!ещёЖдём) throw e;
+      былОбрыв = true;
+      await наЭкране();
+      await пауза(Math.min(4000, 700 * попытка));
+      continue;
+    }
+    const json = await res.json().catch(() => null);
+    // Сервер перезапускается или ответ оборвался на полуслове — тот же ключ ещё раз.
+    if (ещёЖдём && ([502, 503, 504].includes(res.status) || (res.ok && json == null))) {
+      былОбрыв = true;
+      await наЭкране();
+      await пауза(Math.min(4000, 700 * попытка));
+      continue;
+    }
+    if (ещёЖдём && былОбрыв && res.status === 409 && json && /busy|in_flight|in_progress/.test(String(json.error || ""))) { await пауза(1500); continue; }
+    if (!res.ok) throw new Error((json && (json.detail || json.error)) || `ошибка ${res.status}`);
+    if (ещёЖдём && json && json.repeat && !json.signature && !json.ok) { await пауза(1500); continue; }
+    return json;
+  }
 }
 
 /* Одноразовая метка операции. Живёт ровно одно нажатие: сервер по ней
