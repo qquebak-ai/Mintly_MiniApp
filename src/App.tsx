@@ -856,9 +856,12 @@ const STR = {
     histGraduate: "Выход на биржу", histBind: "Привязка адреса вывода", histOther: "Операция",
     histAll: "Все", histBuys: "Покупки", histSells: "Продажи", histTransfers: "Переводы", histLaunches: "Запуски",
     histIn: "Получено", histOut: "Отправлено", histFromUser: "от @{n}", histToUser: "@{n}",
-    histPerpLong: "Лонг {t}", histPerpShort: "Шорт {t}", histPerpAddLong: "Добор лонга {t}", histPerpAddShort: "Добор шорта {t}",
+    histPerpLong: "Открытие лонга {t}", histPerpShort: "Открытие шорта {t}", histPerpAddLong: "Добор лонга {t}", histPerpAddShort: "Добор шорта {t}",
     histPerpCloseLong: "Закрытие лонга {t}", histPerpCloseShort: "Закрытие шорта {t}",
-    histTake: "Тейк {t}", histStop: "Стоп {t}", histLiq: "Ликвидация {t}",
+    histTakeLong: "Тейк по лонгу {t}", histTakeShort: "Тейк по шорту {t}", histStopLong: "Стоп по лонгу {t}", histStopShort: "Стоп по шорту {t}",
+    histLiqLong: "Ликвидация лонга {t}", histLiqShort: "Ликвидация шорта {t}",
+    histEvent: "Событие", histEvOpen: "Открытие сделки", histEvAdd: "Добор позиции", histEvClose: "Закрытие сделки",
+    histEvTake: "Закрытие по тейку", histEvStop: "Закрытие по стопу", histEvLiq: "Ликвидация",
     histToTrading: "На торговый счёт", histFromTrading: "С торгового счёта", histExchange: "Биржа",
     histMarket: "Рынок", histSide: "Сторона", histSize: "Размер", histEntry: "Вход", histExit: "Выход",
     histMargin: "Залог", histResult: "Итог", histPayout: "Вернулось на счёт", histPerpFee: "Комиссия биржи",
@@ -1617,9 +1620,12 @@ const STR = {
     histGraduate: "DEX listing", histBind: "Payout address linked", histOther: "Operation",
     histAll: "All", histBuys: "Buys", histSells: "Sells", histTransfers: "Transfers", histLaunches: "Launches",
     histIn: "Received", histOut: "Sent", histFromUser: "from @{n}", histToUser: "to @{n}",
-    histPerpLong: "Long {t}", histPerpShort: "Short {t}", histPerpAddLong: "Added to long {t}", histPerpAddShort: "Added to short {t}",
+    histPerpLong: "Opened long {t}", histPerpShort: "Opened short {t}", histPerpAddLong: "Added to long {t}", histPerpAddShort: "Added to short {t}",
     histPerpCloseLong: "Closed long {t}", histPerpCloseShort: "Closed short {t}",
-    histTake: "Take profit {t}", histStop: "Stop loss {t}", histLiq: "Liquidation {t}",
+    histTakeLong: "Take profit · long {t}", histTakeShort: "Take profit · short {t}", histStopLong: "Stop loss · long {t}", histStopShort: "Stop loss · short {t}",
+    histLiqLong: "Liquidated long {t}", histLiqShort: "Liquidated short {t}",
+    histEvent: "Event", histEvOpen: "Position opened", histEvAdd: "Added to position", histEvClose: "Position closed",
+    histEvTake: "Closed by take profit", histEvStop: "Closed by stop loss", histEvLiq: "Liquidation",
     histToTrading: "To trading account", histFromTrading: "From trading account", histExchange: "Exchange",
     histMarket: "Market", histSide: "Side", histSize: "Size", histEntry: "Entry", histExit: "Exit",
     histMargin: "Margin", histResult: "Result", histPayout: "Back to account", histPerpFee: "Exchange fee",
@@ -19932,16 +19938,19 @@ function собратьИсторию(ряд, запуски) {
   return итог.sort((a, b) => new Date(b.время) - new Date(a.время));
 }
 
-/* Сделка на бирже словами: открыли лонг или шорт, закрыли его сами,
-   по тейку, по стопу или ликвидацией; перевод между картой и счётом. */
+/* Сделка на бирже словами: открытие лонга или шорта, закрытие руками,
+   по тейку, по стопу или ликвидацией — и всегда, какая позиция; перевод
+   между картой и счётом. Раньше открытие читалось просто «Лонг BTC», а
+   у тейка и стопа не было видно, что закрылось. */
 function заголовокБиржи(с) {
   const т = с.тикер || "";
+  const лонг = с.сторона > 0;
   switch (с.причина) {
-    case "open": return с.добор ? tf(с.сторона > 0 ? "histPerpAddLong" : "histPerpAddShort", { t: т }) : tf(с.сторона > 0 ? "histPerpLong" : "histPerpShort", { t: т });
-    case "close": return tf(с.сторона > 0 ? "histPerpCloseLong" : "histPerpCloseShort", { t: т });
-    case "tp": return tf("histTake", { t: т });
-    case "sl": return tf("histStop", { t: т });
-    case "liq": return tf("histLiq", { t: т });
+    case "open": return с.добор ? tf(лонг ? "histPerpAddLong" : "histPerpAddShort", { t: т }) : tf(лонг ? "histPerpLong" : "histPerpShort", { t: т });
+    case "close": return tf(лонг ? "histPerpCloseLong" : "histPerpCloseShort", { t: т });
+    case "tp": return tf(лонг ? "histTakeLong" : "histTakeShort", { t: т });
+    case "sl": return tf(лонг ? "histStopLong" : "histStopShort", { t: т });
+    case "liq": return tf(лонг ? "histLiqLong" : "histLiqShort", { t: т });
     case "in": return t("histToTrading");
     case "out": return t("histFromTrading");
     default: return t("histOther");
@@ -20009,10 +20018,11 @@ function подписьСтроки(с) {
   const часы = new Date(с.время).toLocaleTimeString(локальИстории(), { hour: "2-digit", minute: "2-digit" });
   if (с.вид === "perp") {
     const п = ценаРынка(с.цена);
+    // Закрытие любого рода — путь цены: вход → выход (или цена ликвидации).
     const хвостБиржи = с.причина === "open" ? tf("histLevEntry", { l: Math.round(с.плечо * 10) / 10, p: п })
-      : с.причина === "liq" ? tf("histLiqAt", { p: п })
-        : с.причина === "in" || с.причина === "out" ? `${fmtСумма(с.sol)} SOL`
-          : tf("histExitAt", { p: п });
+      : с.причина === "in" || с.причина === "out" ? `${fmtСумма(с.sol)} SOL`
+        : с.вход > 0 ? `$${ценаРынка(с.вход)} → $${п}`
+          : с.причина === "liq" ? tf("histLiqAt", { p: п }) : tf("histExitAt", { p: п });
     return `${часы} · ${хвостБиржи}`;
   }
   let хвост = "";
@@ -20253,6 +20263,8 @@ function ОкноОперации({ строка, onClose, курсы, insetTop 
       поля.push({ имя: с.причина === "in" ? t("histGave") : t("histGot"), значение: `${fmtСумма(с.sol)} SOL` });
       поля.push({ имя: с.причина === "in" ? t("histGot") : t("histGave"), значение: долларыБиржи(с.usd) });
     } else if (с.вид === "perp") {
+      const событие = { open: с.добор ? "histEvAdd" : "histEvOpen", close: "histEvClose", tp: "histEvTake", sl: "histEvStop", liq: "histEvLiq" }[с.причина];
+      if (событие) поля.push({ имя: t("histEvent"), значение: t(событие) });
       поля.push({ имя: t("histMarket"), значение: с.тикер || с.coin || "—" });
       поля.push({ имя: t("histSide"), значение: `${с.сторона > 0 ? t("histLong") : t("histShort")}${с.плечо ? ` · ${Math.round(с.плечо * 10) / 10}×` : ""}` });
       if (с.размер > 0) поля.push({ имя: t("histSize"), значение: `${с.размер} ${с.тикер || ""} · ${долларыБиржи(с.размер * с.цена)}` });
