@@ -2972,6 +2972,10 @@ function GlobalStyle() {
       @keyframes вкладкаВход { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
       @keyframes вкладкаВход2 { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
       .fx-step-in { animation: шагВход 280ms cubic-bezier(0.22,1,0.36,1) backwards; }
+      /* Цена рынка вспыхивает цветом сдвига и гаснет (см. ЦенаВспышкой). */
+      .fx-тик { animation: тикЦены 900ms ease-out; }
+      @keyframes тикЦены { from { color: var(--fx-tick); } }
+      @media (prefers-reduced-motion: reduce) { .fx-тик { animation: none; } }
       @keyframes шагВход { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
       /* Страница въезжает плавно, как в iOS: одно движение с мягким
          торможением, без масштаба — масштаб большого слоя заставлял
@@ -14222,6 +14226,18 @@ const ЖДЁМ_ИСТОРИЮ_МС = 8000;
    подменяют их, когда доедут. Раньше каждый заход начинался с размытых
    заготовок, даже если данные не менялись. */
 const памятьИстории = new Map(); // `${userId}:${предел}` -> строки
+/* И на телефоне, под id человека: первый заход в историю после запуска
+   тоже начинается с прошлых строк, а не с заготовок. */
+const КЛЮЧ_ИСТОРИИ = "mintly_history_";
+function историяИзПамяти(ключ) {
+  const в = памятьИстории.get(ключ);
+  if (в) return в;
+  try { const к = JSON.parse(localStorage.getItem(КЛЮЧ_ИСТОРИИ + ключ) || "null"); return Array.isArray(к) && к.length ? к : null; } catch { return null; }
+}
+function запомнитьИсторию(ключ, ряд) {
+  памятьИстории.set(ключ, ряд);
+  try { localStorage.setItem(КЛЮЧ_ИСТОРИИ + ключ, JSON.stringify(ряд.slice(0, 100))); } catch { /* приватный режим или место кончилось */ }
+}
 
 /* сделочные — отдать и операции кошелька, которые повторяют сделки
    (trade, buy, sell, swap). Списку они не нужны, а истории нужны: у них
@@ -14235,13 +14251,13 @@ function useСделки(userId, предел, тик = 0, сделочные = 
      стоял размытым всё это время. */
   const [сделкиРяд, setСделкиРяд] = useState(null);
   const [операцииРяд, setОперацииРяд] = useState(null);
-  const [изПамяти, setИзПамяти] = useState(() => памятьИстории.get(ключПамяти) || null);
+  const [изПамяти, setИзПамяти] = useState(() => (userId ? историяИзПамяти(ключПамяти) : null));
   // Свои только что отправленные переводы — из памяти вкладки.
   const [свои, setСвои] = useState(свежиеОперации);
 
   useEffect(() => {
     if (!userId) { setСделкиРяд([]); setОперацииРяд([]); return; }
-    setИзПамяти(памятьИстории.get(ключПамяти) || null);
+    setИзПамяти(историяИзПамяти(ключПамяти));
     let брошено = false;
     const прочитать = () => {
       setСвои(свежиеОперации());
@@ -14302,7 +14318,13 @@ function useСделки(userId, предел, тик = 0, сделочные = 
     if (сделкиРяд == null && операцииРяд == null) {
       return свои.length ? свои.slice(0, предел) : изПамяти;
     }
-    const сСервера = [...(сделкиРяд || []), ...(операцииРяд || []).filter((о) => сделочные || !о.сделочная)];
+    /* Пришла одна половина — вторая пока из прошлого раза: иначе сделки из
+       базы (они быстрее) на миг показывали список без переводов и биржи.
+       Строки операций узнаём по полю «сделочная» — у сделок его нет. */
+    const прошлые = изПамяти || [];
+    const сделкиСейчас = сделкиРяд ?? прошлые.filter((о) => !("сделочная" in о));
+    const операцииСейчас = операцииРяд ?? прошлые.filter((о) => "сделочная" in о);
+    const сСервера = [...сделкиСейчас, ...операцииСейчас.filter((о) => сделочные || !о.сделочная)];
     const известные = new Set(сСервера.map((о) => о.signature).filter(Boolean));
     const мои = свои.filter((о) => !о.signature || !известные.has(о.signature));
     const всё = [...мои, ...сСервера]
@@ -14313,7 +14335,7 @@ function useСделки(userId, предел, тик = 0, сделочные = 
   }, [сделкиРяд, операцииРяд, предел, изПамяти, свои, сделочные]);
 
   useEffect(() => {
-    if (ряд && userId) памятьИстории.set(ключПамяти, ряд);
+    if (ряд && userId) запомнитьИсторию(ключПамяти, ряд);
   }, [ряд, userId, ключПамяти]);
 
   return ряд;
@@ -15839,7 +15861,7 @@ function ключСделки() {
 
 async function запросРынков(путь, тело) {
   const заголовки = {};
-  if (тело || /^(account|trades)/.test(путь)) {
+  if (тело || /^(account|trades|ticket)/.test(путь)) {
     const { data } = await supabase.auth.getSession();
     const ключ = data && data.session && data.session.access_token;
     if (!ключ) throw new Error("no_session");
@@ -15898,26 +15920,114 @@ function текстОшибкиБиржи(e, иначе) {
   if (/leverage/i.test(м)) return "Такое плечо на этом рынке недоступно";
   return (м || иначе).slice(0, 120);
 }
+/* Цена рынка — пять значащих цифр, ровно столько, сколько их у самой
+   биржи: каждый её шаг виден (раньше у монет дешевле доллара последняя
+   цифра пряталась, и цена «стояла»), а число знаков после точки не
+   скачет от сделки к сделке. */
 function ценаРынка(p) {
   const n = Number(p) || 0;
-  if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 1 });
-  if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 3 });
-  return n.toPrecision(4);
+  if (n >= 1) {
+    const знаков = Math.max(0, 5 - (Math.floor(Math.log10(n)) + 1));
+    return n.toLocaleString("en-US", { minimumFractionDigits: знаков, maximumFractionDigits: знаков });
+  }
+  return n.toPrecision(5);
 }
 const долларыБиржи = (v) => `$${(Number(v) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const итогБиржи = (v) => `${v >= 0 ? "+" : "−"}${долларыБиржи(Math.abs(v))}`;
 const цветИтога = (v) => (Math.abs(v) < 0.005 ? T.ice : v > 0 ? T.up : T.down);
 
 /* Торговый счёт — один на всё приложение: биржа и кошелёк показывают одни
-   и те же цифры и спрашивают сервер одним запросом, а не каждый своим. */
-const торговыйКеш = { данные: null, ждём: null, слушатели: new Set() };
+   и те же цифры и спрашивают сервер одним запросом, а не каждый своим.
+   Последний ответ лежит и на телефоне, у каждого человека свой: кошелёк
+   и биржа открываются сразу с цифрами, а свежие приезжают следом, —
+   раньше там секунду-другую стояло «—». */
+const торговыйКеш = { данные: null, ждём: null, слушатели: new Set(), uid: null };
+const КЛЮЧ_ТОРГОВОГО = "mintly_trading_";
+function привязатьТорговыйСчёт(uid) {
+  if (торговыйКеш.uid === (uid || null)) return;
+  торговыйКеш.uid = uid || null;
+  let копия = null;
+  try { копия = uid ? JSON.parse(localStorage.getItem(КЛЮЧ_ТОРГОВОГО + uid) || "null") : null; } catch { /* приватный режим */ }
+  торговыйКеш.данные = копия;
+  for (const ф of торговыйКеш.слушатели) ф(копия);
+}
 function обновитьТорговыйСчёт() {
   if (торговыйКеш.ждём) return торговыйКеш.ждём;
+  const uid = торговыйКеш.uid;
   торговыйКеш.ждём = запросРынков("account")
-    .then((j) => { торговыйКеш.данные = j; for (const ф of торговыйКеш.слушатели) ф(j); return j; })
+    .then((j) => {
+      // Пока ждали, вошёл другой человек — его цифры придут своим запросом.
+      if (uid !== торговыйКеш.uid) return торговыйКеш.данные;
+      торговыйКеш.данные = j;
+      for (const ф of торговыйКеш.слушатели) ф(j);
+      try { if (uid) localStorage.setItem(КЛЮЧ_ТОРГОВОГО + uid, JSON.stringify(j)); } catch { /* приватный режим */ }
+      return j;
+    })
     .catch(() => торговыйКеш.данные)
     .finally(() => { торговыйКеш.ждём = null; });
   return торговыйКеш.ждём;
+}
+
+/* Список рынков — так же: общий на приложение и с копией на телефоне.
+   Биржа открывается сразу со списком, цены в нём оживают первым же
+   сообщением потока. */
+const рынкиКеш = { данные: null, ждём: null, слушатели: new Set() };
+const КЛЮЧ_РЫНКОВ = "mintly_markets";
+try {
+  const копия = typeof localStorage !== "undefined" && JSON.parse(localStorage.getItem(КЛЮЧ_РЫНКОВ) || "null");
+  if (копия && Array.isArray(копия.markets) && копия.markets.length) рынкиКеш.данные = копия.markets;
+} catch { /* приватный режим */ }
+function загрузитьРынки() {
+  if (рынкиКеш.ждём) return рынкиКеш.ждём;
+  рынкиКеш.ждём = запросРынков("markets")
+    .then((j) => {
+      const список = (j && j.markets) || [];
+      if (!список.length) return рынкиКеш.данные;
+      рынкиКеш.данные = список;
+      for (const ф of рынкиКеш.слушатели) ф(список);
+      try { localStorage.setItem(КЛЮЧ_РЫНКОВ, JSON.stringify({ at: Date.now(), markets: список })); } catch { /* приватный режим */ }
+      return список;
+    })
+    .catch(() => рынкиКеш.данные)
+    .finally(() => { рынкиКеш.ждём = null; });
+  return рынкиКеш.ждём;
+}
+
+/* Свечи — в памяти на всё время работы, а восемь последних графиков ещё
+   и на телефоне: открытый раньше рынок рисуется сразу. Касание строки
+   рынка начинает грузить его свечи ещё до того, как палец отпустят. */
+const свечиКеш = new Map(); // `${coin}|${шаг}` -> { свечи, ждём }
+const КЛЮЧ_СВЕЧЕЙ = "mintly_perp_candles";
+function свечиНаТелефоне() {
+  try { const к = JSON.parse(localStorage.getItem(КЛЮЧ_СВЕЧЕЙ) || "{}"); return к && typeof к === "object" ? к : {}; } catch { return {}; }
+}
+function свечиИзКеша(ключ) {
+  const з = свечиКеш.get(ключ);
+  if (з && з.свечи) return з.свечи;
+  const к = свечиНаТелефоне()[ключ];
+  return к && Array.isArray(к.c) && к.c.length ? к.c : null;
+}
+function загрузитьСвечи(coin, шаг) {
+  const ключ = `${coin}|${шаг}`;
+  const з = свечиКеш.get(ключ) || {};
+  if (з.ждём) return з.ждём;
+  з.ждём = запросРынков(`candles&coin=${encodeURIComponent(coin)}&interval=${шаг}`)
+    .then((j) => {
+      const ряд = (j && j.candles) || [];
+      з.свечи = ряд;
+      try {
+        const все = свечиНаТелефоне();
+        delete все[ключ];
+        все[ключ] = { at: Date.now(), c: ряд.slice(-150) };
+        const ключи = Object.keys(все);
+        for (const к of ключи.slice(0, Math.max(0, ключи.length - 8))) delete все[к];
+        localStorage.setItem(КЛЮЧ_СВЕЧЕЙ, JSON.stringify(все));
+      } catch { /* приватный режим или место кончилось */ }
+      return ряд;
+    })
+    .finally(() => { з.ждём = null; });
+  свечиКеш.set(ключ, з);
+  return з.ждём;
 }
 function useТорговыйСчёт(активен = true, шаг = 5000) {
   const [данные, setДанные] = useState(торговыйКеш.данные);
@@ -15946,11 +16056,148 @@ function useСобытияБиржи(активен, coin = null, тик = 0) {
       .then((j) => { if (живо) setСобытия(j.events || []); })
       .catch(() => { if (живо) setСобытия((было) => было || []); });
     читать();
-    const id = setInterval(читать, 10000);
-    return () => { живо = false; clearInterval(id); };
+    // Новые события приходят сигналом потока («счёт изменился»); опрос —
+    // только страховка, если поток не поднялся.
+    const id = setInterval(() => { if (!потокОткрыт()) читать(); }, 10000);
+    const редко = setInterval(читать, 60000);
+    return () => { живо = false; clearInterval(id); clearInterval(редко); };
   }, [активен, coin, тик]);
   return события;
 }
+
+/* Поток биржи (api/hyperliquid.js, action=stream) — одно соединение на всё
+   приложение. Экраны говорят, какие монеты им нужны, какую свечу они рисуют
+   и нужен ли сигнал о своём счёте, — и получают цены лучших заявок по мере
+   их изменения (пачкой раз в четверть секунды), живую свечу и «счёт
+   изменился» сразу после сделки, тейка, стопа, ликвидации или перевода.
+   Раньше всё это опрашивалось раз в две–двадцать секунд. */
+const потокБиржи = { es: null, адрес: "", монеты: new Map(), разделы: new Map(), свечи: new Map(), счёт: 0, билет: null, билетДо: 0, слушатели: new Set(), таймер: null, цены: new Map(), открыт: false };
+const потокОткрыт = () => !!(потокБиржи.es && потокБиржи.es.readyState === 1 && потокБиржи.открыт);
+function собратьПоток() {
+  clearTimeout(потокБиржи.таймер);
+  потокБиржи.таймер = setTimeout(() => { переподключитьПоток().catch(() => {}); }, 120);
+}
+async function переподключитьПоток() {
+  if (typeof EventSource === "undefined") return;
+  const монеты = [...потокБиржи.монеты.keys()].sort().slice(0, 80);
+  const разделы = [...потокБиржи.разделы.keys()].sort();
+  const свеча = [...потокБиржи.свечи.keys()].pop() || "";
+  const нуженСчёт = потокБиржи.счёт > 0;
+  if (!монеты.length && !разделы.length && !свеча && !нуженСчёт) {
+    if (потокБиржи.es) потокБиржи.es.close();
+    потокБиржи.es = null; потокБиржи.адрес = ""; потокБиржи.открыт = false;
+    return;
+  }
+  let билет = "";
+  if (нуженСчёт) {
+    if (!потокБиржи.билет || Date.now() > потокБиржи.билетДо - 60_000) {
+      try {
+        const j = await запросРынков("ticket");
+        потокБиржи.билет = j.ticket; потокБиржи.билетДо = j.expires;
+      } catch { потокБиржи.билет = null; }
+    }
+    билет = потокБиржи.билет || "";
+  }
+  const адрес = апи(`/api/hyperliquid?action=stream&coins=${encodeURIComponent(монеты.join(","))}${разделы.length ? `&sections=${разделы.join(",")}` : ""}${свеча ? `&candle=${encodeURIComponent(свеча)}` : ""}${билет ? `&ticket=${билет}` : ""}`);
+  if (адрес === потокБиржи.адрес && потокБиржи.es && потокБиржи.es.readyState !== 2) return;
+  if (потокБиржи.es) потокБиржи.es.close();
+  потокБиржи.адрес = адрес;
+  потокБиржи.открыт = false;
+  const es = new EventSource(адрес);
+  потокБиржи.es = es;
+  es.onopen = () => { if (потокБиржи.es === es) потокБиржи.открыт = true; };
+  es.onmessage = (e) => {
+    let j;
+    try { j = JSON.parse(e.data); } catch { return; }
+    if (j && j.m) for (const [к, v] of Object.entries(j.m)) потокБиржи.цены.set(к, Number(v));
+    for (const ф of потокБиржи.слушатели) { try { ф(j); } catch { /* экран не мешает остальным */ } }
+  };
+  es.onerror = () => {
+    if (потокБиржи.es !== es) return;
+    потокБиржи.открыт = false;
+    // Сервер закрыл поток насовсем (например, истёк билет) — свой повтор с новым билетом.
+    if (es.readyState === 2) {
+      потокБиржи.билет = null; потокБиржи.адрес = ""; потокБиржи.es = null;
+      setTimeout(собратьПоток, 2000);
+    }
+  };
+}
+// Счётчик ссылок: экранов много, а соединение одно — отписка не должна выбить соседа.
+const прибавить = (карта, к, d) => { const n = (карта.get(к) || 0) + d; if (n > 0) карта.set(к, n); else карта.delete(к); };
+function useПотокБиржи({ монеты = [], разделы = [], свеча = null, счёт = false } = {}, обработчик) {
+  const ref = useRef(обработчик);
+  ref.current = обработчик;
+  const ключМонет = монеты.filter(Boolean).join(",");
+  const ключРазделов = разделы.filter(Boolean).join(",");
+  useEffect(() => {
+    const ф = (j) => ref.current && ref.current(j);
+    потокБиржи.слушатели.add(ф);
+    const список = ключМонет ? ключМонет.split(",") : [];
+    const своиРазделы = ключРазделов ? ключРазделов.split(",") : [];
+    for (const c of список) прибавить(потокБиржи.монеты, c, 1);
+    for (const р of своиРазделы) прибавить(потокБиржи.разделы, р, 1);
+    if (свеча) прибавить(потокБиржи.свечи, свеча, 1);
+    if (счёт) потокБиржи.счёт += 1;
+    собратьПоток();
+    return () => {
+      потокБиржи.слушатели.delete(ф);
+      for (const c of список) прибавить(потокБиржи.монеты, c, -1);
+      for (const р of своиРазделы) прибавить(потокБиржи.разделы, р, -1);
+      if (свеча) прибавить(потокБиржи.свечи, свеча, -1);
+      if (счёт) потокБиржи.счёт -= 1;
+      собратьПоток();
+    };
+  }, [ключМонет, ключРазделов, свеча, счёт]);
+}
+// Живая цена монеты из потока — или та, что пришла с последним списком.
+const живаяЦена = (coin, запасная = 0) => {
+  const v = потокБиржи.цены.get(coin);
+  return v > 0 ? v : запасная;
+};
+/* Капитал торгового счёта по живым ценам: свободные деньги плюс залог и
+   итог каждой позиции. Для кошелька и карты — без ожидания опроса. */
+function капиталСчёта(счёт) {
+  if (!счёт) return 0;
+  if (!счёт.demo) return Math.max(0, Number(счёт.equity) || 0);
+  const позиции = счёт.positions || [];
+  return Math.max(0, (Number(счёт.cash) || 0) + позиции.reduce((сумма, п) => сумма + п.margin + п.size * (живаяЦена(п.coin, п.price) - п.entry), 0));
+}
+
+/* Цена, которая вспыхивает на каждом изменении: вверх — зелёным, вниз —
+   красным, и за секунду гаснет до обычного цвета. Без вспышки сдвиг на
+   одну цифру не замечали, и казалось, что цена стоит. */
+function ЦенаВспышкой({ цена, style = undefined }) {
+  const текст = ценаРынка(цена);
+  const было = useRef({ текст, цена, знак: 0 });
+  if (текст !== было.current.текст) было.current = { текст, цена, знак: цена > было.current.цена ? 1 : -1 };
+  const знак = было.current.знак;
+  return (
+    <span key={знак ? текст : "покой"} className={знак ? "fx-тик" : undefined} style={{ ...style, "--fx-tick": знак > 0 ? T.up : T.down }}>
+      ${текст}
+    </span>
+  );
+}
+
+/* Строка списка рынков. Отдельной и запомненной: поток обновляет цены
+   четыре раза в секунду, и перерисовываются только строки, чья цена
+   сдвинулась, а не все полторы сотни. */
+const СтрокаРынка = React.memo(function СтрокаРынка({ р, onВыбрать }) {
+  return (
+    <button onPointerDown={() => { загрузитьСвечи(р.coin, "15m").catch(() => {}); }} onClick={() => { haptic("light"); onВыбрать(р.asset); }}
+      className="fx-tap w-full flex items-center text-left"
+      style={{ gap: 12, padding: "14px 2px", border: "none", background: "transparent", borderBottom: `1px solid ${T.line}` }}>
+      <ЗначокРынка рынок={р} size={40} />
+      <span className="flex-1 min-w-0 flex flex-col" style={{ gap: 2 }}>
+        <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800 }}>{р.name}</span>
+        <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 13, fontWeight: 600, opacity: 0.7 }}>до {р.maxLeverage}×</span>
+      </span>
+      <span className="flex flex-col items-end" style={{ gap: 2 }}>
+        <ЦенаВспышкой цена={р.price} style={{ fontFamily: monoFont, color: T.ice, fontSize: 17, fontWeight: 700, fontVariantNumeric: "tabular-nums" }} />
+        <span style={{ fontFamily: monoFont, fontSize: 13.5, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: Math.abs(р.change) < 0.005 ? T.ice : р.change > 0 ? T.up : T.down }}>{р.change >= 0 ? "+" : ""}{р.change.toFixed(2)}%</span>
+      </span>
+    </button>
+  );
+});
 
 /* Событие биржи — строкой истории: той же, что в кошельке, чтобы подписи
    и цвета читались одинаково в обоих местах. */
@@ -16001,7 +16248,9 @@ const МЕТКИ_ВРЕМЕНИ = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96,
  * строкой под графиком. */
 function ГрафикРынка({ coin, линии = [], цена = 0 }) {
   const [шаг, setШаг] = useState("15m");
-  const [свечи, setСвечи] = useState(null);
+  const [свечи, setСвечи] = useState(() => свечиИзКеша(`${coin}|15m`));
+  // Свечи с сервера в этот заход уже пришли — до них живую свечу к старой копии не клеим.
+  const свежие = useRef(false);
   const [видно, setВидно] = useState(64);
   const [сдвиг, setСдвиг] = useState(-3);
   const [ширина, setШирина] = useState(360);
@@ -16032,15 +16281,33 @@ function ГрафикРынка({ coin, линии = [], цена = 0 }) {
   useEffect(() => {
     let живо = true;
     ещё.current = true;
-    setСвечи(null); setСдвиг(-3); setВидно(64); setШкала(null);
-    const читать = () => запросРынков(`candles&coin=${encodeURIComponent(coin)}&interval=${шаг}`)
-      .then((j) => { if (живо) setСвечи((было) => слитьСвечи(было, j.candles || [])); })
+    свежие.current = false;
+    // Копия с прошлого раза — сразу на экран; свежие свечи заменят её следом.
+    setСвечи(свечиИзКеша(`${coin}|${шаг}`)); setСдвиг(-3); setВидно(64); setШкала(null);
+    const мс = МС_СВЕЧИ[шаг] || 900e3;
+    const читать = () => загрузитьСвечи(coin, шаг)
+      .then((ряд) => {
+        if (!живо) return;
+        свежие.current = true;
+        setСвечи((было) => {
+          if (!ряд.length) return было || [];
+          /* Догруженную листанием историю оставляем, если она вплотную к
+             свежему окну; старую копию с телефона — нет: между ней и
+             свежими свечами мог лежать разрыв в дни. */
+          const старше = (было || []).filter((с) => с.t < ряд[0].t);
+          return старше.length && старше[старше.length - 1].t >= ряд[0].t - мс * 1.5 ? [...старше, ...ряд] : ряд;
+        });
+      })
       .catch(() => { if (живо) setСвечи((было) => было || []); });
     читать();
-    // Последнюю свечу двигает живая цена из списка рынков — свечи целиком реже.
-    const id = setInterval(читать, шаг === "1m" ? 10000 : 20000);
+    // Живая свеча приходит потоком; целиком — раз в минуту, на случай обрыва.
+    const id = setInterval(читать, 60000);
     return () => { живо = false; clearInterval(id); };
   }, [coin, шаг]);
+  useПотокБиржи({ свеча: `${coin}|${шаг}` }, (j) => {
+    if (!j.c || j.k !== `${coin}|${шаг}` || !свежие.current) return;
+    setСвечи((было) => (было ? слитьСвечи(было, [j.c]) : было));
+  });
 
   const ряд0 = свечи || [];
   const ряд = useMemo(() => {
@@ -16341,7 +16608,7 @@ function ошибкаУровней(лонг, цена, ликвидация, т
   return null;
 }
 
-function СтраницаРынка({ рынок, счёт, onОбновить, showToast, onПополнить, события = null, onОткрыть = () => {} }) {
+function СтраницаРынка({ рынок, счёт, onОбновить, showToast, onПополнить }) {
   const [сторона, setСторона] = useState("long");
   const [сумма, setСумма] = useState("");
   const [плечо, setПлечо] = useState(1);
@@ -16452,7 +16719,6 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
     : бедаУровня ? (бедаУровня.тейк || бедаУровня.стоп)
     : лонг ? `Открыть лонг${подробно ? ` · ${долларыБиржи(объём)}` : ""}` : `Открыть шорт${подробно ? ` · ${долларыБиржи(объём)}` : ""}`;
 
-  const рядСобытий = (события || []).map(строкаБиржи);
   return (
     <div className="flex flex-col" style={{ gap: 22 }}>
       <div className="flex flex-col" style={{ gap: 4 }}>
@@ -16461,8 +16727,8 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
           <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 32, fontWeight: 800 }}>{рынок.name}</span>
         </span>
         <span className="flex items-baseline" style={{ gap: 10 }}>
-          <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 26, fontWeight: 700 }}>${ценаРынка(цена)}</span>
-          <span style={{ fontFamily: monoFont, fontSize: 15, fontWeight: 700, color: рынок.change >= 0 ? T.up : T.down }}>{рынок.change >= 0 ? "+" : ""}{рынок.change.toFixed(2)}%</span>
+          <ЦенаВспышкой цена={цена} style={{ fontFamily: monoFont, color: T.ice, fontSize: 26, fontWeight: 700, fontVariantNumeric: "tabular-nums" }} />
+          <span style={{ fontFamily: monoFont, fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: рынок.change >= 0 ? T.up : T.down }}>{рынок.change >= 0 ? "+" : ""}{рынок.change.toFixed(2)}%</span>
         </span>
       </div>
       <ГрафикРынка coin={рынок.coin} линии={линии} цена={цена} />
@@ -16593,12 +16859,6 @@ function СтраницаРынка({ рынок, счёт, onОбновить, 
           </button>
         )}
       </div>
-      {рядСобытий.length > 0 && (
-        <section className="flex flex-col" style={{ gap: 2 }}>
-          <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800, marginBottom: 4 }}>Сделки {рынок.name}</span>
-          {рядСобытий.slice(0, 20).map((с) => <СтрокаИстории key={с.id} с={с} курсы={{}} onOpen={() => { haptic("light"); onОткрыть(с); }} />)}
-        </section>
-      )}
     </div>
   );
 }
@@ -16731,23 +16991,58 @@ function ОкноТорговогоСчёта({ открыт, onClose, напр�
 }
 
 function СтраницаРынков({ открыт, onClose = () => {}, showToast, insetTop = 0, insetBottom = 0, вкладка = false }) {
-  const [рынки, setРынки] = useState(null);
+  // Список — сразу из общей копии (с телефона), свежий приезжает следом.
+  const [рынки, setРынки] = useState(рынкиКеш.данные);
   const [раздел, setРаздел] = useState("crypto");
   const [выбран, setВыбран] = useState(null);
   const [перевод, setПеревод] = useState(null); // "in" | "out" | null
-  const [строка, setСтрока] = useState(null);
   const [тик, setТик] = useState(0);
-  const счёт = useТорговыйСчёт(открыт, 4000);
+  const [версияЦен, setВерсияЦен] = useState(0);
+  // Счёт сам приходит сигналом потока, итог позиции считается по живой цене —
+  // опрос остаётся редкой страховкой.
+  const счёт = useТорговыйСчёт(открыт, 15000);
   const события = useСобытияБиржи(открыт, null, тик);
   const обновитьСчёт = useCallback(() => { обновитьТорговыйСчёт(); setТик((т) => т + 1); }, []);
   useEffect(() => {
+    рынкиКеш.слушатели.add(setРынки);
+    return () => { рынкиКеш.слушатели.delete(setРынки); };
+  }, []);
+  useEffect(() => {
     if (!открыт) return undefined;
-    let живо = true;
-    const читать = () => запросРынков("markets").then((j) => { if (живо) setРынки(j.markets || []); }).catch(() => {});
-    читать();
-    const a = setInterval(читать, 2000);
-    return () => { живо = false; clearInterval(a); };
+    let прошлый = Date.now();
+    загрузитьРынки();
+    // Цены идут потоком; список целиком (плечи, объёмы, новые рынки) — раз
+    // в полминуты, а без потока — как раньше, каждые две секунды.
+    const a = setInterval(() => {
+      if (потокОткрыт() && Date.now() - прошлый < 30000) return;
+      прошлый = Date.now();
+      загрузитьРынки();
+    }, 2000);
+    return () => clearInterval(a);
   }, [открыт]);
+  /* Поток: весь раздел списка (его монеты называет сервер — в адрес
+     полторы сотни не влезли бы), монеты своих позиций и открытый рынок.
+     Раздел держим и на странице рынка: назад к списку — и цены в нём уже
+     свежие, без переподключения. */
+  const монетыПотока = useMemo(() => {
+    const нужные = new Set(((счёт && счёт.positions) || []).map((п) => п.coin));
+    const выбранный = выбран != null ? (рынки || []).find((р) => р.asset === выбран) : null;
+    if (выбранный) нужные.add(выбранный.coin);
+    return [...нужные].sort();
+  }, [рынки, выбран, счёт]);
+  useПотокБиржи({ монеты: открыт ? монетыПотока : [], разделы: открыт ? [раздел] : [], счёт: открыт }, (j) => {
+    if (j.a) обновитьСчёт();
+    if (!j.m) return;
+    // На странице рынка перерисовываемся только от его цены и цен своих позиций.
+    if (выбран != null && !монетыПотока.some((c) => c in j.m)) return;
+    setВерсияЦен((в) => в + 1);
+  });
+  // Список с живыми ценами: изменение за сутки — от вчерашней цены биржи.
+  const рынкиЖивые = useMemo(() => (рынки ? рынки.map((р) => {
+    const v = потокБиржи.цены.get(р.coin);
+    if (!(v > 0) || v === р.price) return р;
+    return { ...р, price: v, change: р.prev > 0 ? ((v - р.prev) / р.prev) * 100 : р.change };
+  }) : рынки), [рынки, версияЦен, выбран]); // eslint-disable-line react-hooks/exhaustive-deps
   // Сработал тейк, стоп или ликвидация — журнал узнаёт первым; скажем один раз.
   const виденоСобытие = useRef(null);
   useEffect(() => {
@@ -16771,8 +17066,8 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
   /* Номер рынка BTC — ноль, поэтому «выбран» сравниваем с null: проверка на
      правду пропускала BTC, и его страница не открывалась вовсе. */
   const естьВыбор = выбран != null;
-  useНазадТелеграм(открыт && естьВыбор && !перевод && !строка, () => setВыбран(null));
-  useНазадТелеграм(открыт && !естьВыбор && !вкладка && !перевод && !строка, onClose);
+  useНазадТелеграм(открыт && естьВыбор && !перевод, () => setВыбран(null));
+  useНазадТелеграм(открыт && !естьВыбор && !вкладка && !перевод, onClose);
   /* SOL, пришедший с моста на настоящую биржу, сам становится долларами
      на счёте: как только он виден на споте биржи, просим сервер продать его
      и перевести. У учебного счёта моста нет. */
@@ -16785,9 +17080,9 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
     запросРынков("settle", {}).then(обновитьСчёт).catch(() => {});
   }, [зачисляется, счёт, обновитьСчёт]);
   if (!открыт && !вкладка) return null;
-  const есть = РАЗДЕЛЫ_РЫНКОВ.filter(([к]) => (рынки || []).some((р) => р.section === к));
-  const список = (рынки || []).filter((р) => р.section === раздел);
-  const рынок = естьВыбор ? (рынки || []).find((р) => р.asset === выбран) || null : null;
+  const есть = РАЗДЕЛЫ_РЫНКОВ.filter(([к]) => (рынкиЖивые || []).some((р) => р.section === к));
+  const список = (рынкиЖивые || []).filter((р) => р.section === раздел);
+  const рынок = естьВыбор ? (рынкиЖивые || []).find((р) => р.asset === выбран) || null : null;
 
   const тело = (
     <div ref={кореньРынков} className={вкладка ? "fx-view" : "fx-sheet-in no-scrollbar"} style={вкладка ? { padding: "8px 16px 40px" } : { position: "fixed", inset: 0, zIndex: 455, background: T.bg, overflowY: "auto", overscrollBehavior: "contain",
@@ -16800,7 +17095,7 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
         )}
         {рынок ? (
           <СтраницаРынка key={рынок.asset} рынок={рынок} счёт={счёт} onОбновить={обновитьСчёт} showToast={showToast}
-            onПополнить={() => setПеревод("in")} события={(события || []).filter((з) => з.coin === рынок.coin)} onОткрыть={setСтрока} />
+            onПополнить={() => setПеревод("in")} />
         ) : (
           <>
             <ЗаголовокРаздела>Биржа</ЗаголовокРаздела>
@@ -16817,27 +17112,13 @@ function СтраницаРынков({ открыт, onClose = () => {}, showTo
             </div>
             {!рынки ? <ЗагрузкаБлока высота={240} /> : (
               <div className="flex flex-col">
-                {список.map((р) => (
-                  <button key={р.asset} onClick={() => { haptic("light"); setВыбран(р.asset); }} className="fx-tap w-full flex items-center text-left"
-                    style={{ gap: 12, padding: "14px 2px", border: "none", background: "transparent", borderBottom: `1px solid ${T.line}` }}>
-                    <ЗначокРынка рынок={р} size={40} />
-                    <span className="flex-1 min-w-0 flex flex-col" style={{ gap: 2 }}>
-                      <span className="truncate" style={{ fontFamily: displayFont, color: T.ice, fontSize: 18, fontWeight: 800 }}>{р.name}</span>
-                      <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 13, fontWeight: 600, opacity: 0.7 }}>до {р.maxLeverage}×</span>
-                    </span>
-                    <span className="flex flex-col items-end" style={{ gap: 2 }}>
-                      <span style={{ fontFamily: monoFont, color: T.ice, fontSize: 17, fontWeight: 700 }}>${ценаРынка(р.price)}</span>
-                      <span style={{ fontFamily: monoFont, fontSize: 13.5, fontWeight: 700, color: Math.abs(р.change) < 0.005 ? T.ice : р.change > 0 ? T.up : T.down }}>{р.change >= 0 ? "+" : ""}{р.change.toFixed(2)}%</span>
-                    </span>
-                  </button>
-                ))}
+                {список.map((р) => <СтрокаРынка key={р.asset} р={р} onВыбрать={setВыбран} />)}
               </div>
             )}
           </>
         )}
       </div>
       <ОкноТорговогоСчёта открыт={!!перевод} направление={перевод || "in"} onClose={() => { setПеревод(null); обновитьСчёт(); }} showToast={showToast} insetTop={insetTop} insetBottom={insetBottom} />
-      <ОкноОперации строка={строка} onClose={() => setСтрока(null)} курсы={{}} insetTop={insetTop} insetBottom={insetBottom} />
     </div>
   );
   return вкладка ? тело : createPortal(тело, document.body);
@@ -21123,6 +21404,20 @@ function WalletView({ активен = true, onOpenToken = null, connected, wall
   const [торговыйОткрыт, setТорговыйОткрыт] = useState(false);
   // Опрос — только пока кошелёк на экране: вкладка живёт и в фоне.
   const торговыйСчёт = useТорговыйСчёт(!!userId && активен, 15000);
+  /* Открытые позиции — на потоке биржи: итог счёта в строке и на карте
+     идёт за ценой, а тейк, стоп или ликвидация видны сразу. Кошелёк
+     большой, поэтому перерисовываем его от цен не чаще раза в секунду. */
+  const монетыСчёта = useMemo(() => [...new Set(((торговыйСчёт && торговыйСчёт.positions) || []).map((п) => п.coin))].sort(), [торговыйСчёт]);
+  const [, setЦеныСчёта] = useState(0);
+  const прошлаяПерерисовка = useRef(0);
+  const живойСчёт = !!userId && активен && монетыСчёта.length > 0;
+  useПотокБиржи({ монеты: живойСчёт ? монетыСчёта : [], счёт: живойСчёт }, (j) => {
+    if (j.a) обновитьТорговыйСчёт();
+    if (j.m && монетыСчёта.some((c) => c in j.m) && Date.now() - прошлаяПерерисовка.current > 1000) {
+      прошлаяПерерисовка.current = Date.now();
+      setЦеныСчёта((в) => в + 1);
+    }
+  });
   /* Волны от касаний карты. Каждая живёт своё время и убирается сама —
      иначе их накапливались бы десятки за один сеанс. */
   /* Ход перелива у каждого запуска свой: одинаковая на всех устройствах
@@ -21450,7 +21745,7 @@ function WalletView({ активен = true, onOpenToken = null, connected, wall
      ноль SOL и считал, что кошелёк пуст, пока на нём лежал GRAM. */
   /* Торговый счёт — тоже деньги человека, только у биржи: без него в
      балансе карта «теряла» всё, что переведено на биржу. */
-  const наТорговом = торговыйСчёт ? Math.max(0, Number(торговыйСчёт.equity) || 0) : 0;
+  const наТорговом = капиталСчёта(торговыйСчёт);
   const всегоВДолларах = солНаКошельке * курсSol + тонНаКошельке * tonPriceUsd + вДолларахEVM + наТорговом;
   // Без счётчика: сумма сменяется умным текстом — общие цифры стоят,
   // новые проступают из размытия.
@@ -22055,7 +22350,7 @@ function WalletView({ активен = true, onOpenToken = null, connected, wall
               </span>
               <span className="flex flex-col items-end" style={{ gap: 3, flexShrink: 0, ...туман }}>
                 <span style={{ fontFamily: displayFont, color: T.ice, fontSize: 17, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
-                  <УмныйТекст text={торговыйСчёт ? долларыБиржи(Number(торговыйСчёт.equity) || 0) : "—"} />
+                  <УмныйТекст text={торговыйСчёт ? долларыБиржи(наТорговом) : "—"} />
                 </span>
                 <span style={{ fontFamily: bodyFont, color: T.muted, fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
                   {торговыйСчёт && (торговыйСчёт.positions || []).length ? tf("walletTradingPositions", { n: торговыйСчёт.positions.length }) : t("walletTradingNone")}
@@ -33929,6 +34224,17 @@ const FEE_PERCENT = 0; // комиссии площадки нет
      бы регистрация. */
   const [нужнаРегистрация, setНужнаРегистрация] = useState(false);
   const [userId, setUserId] = useState(null);
+
+  /* Торговый счёт и список рынков — заранее, как только известно, кто
+     вошёл: кошелёк и биржа открываются уже с цифрами. Копия счёта с
+     прошлого раза подставляется сразу, свежая — через пару секунд после
+     запуска, когда первая загрузка уже не делит с ней сеть. */
+  useEffect(() => {
+    привязатьТорговыйСчёт(userId);
+    if (!userId) return undefined;
+    const id = setTimeout(() => { обновитьТорговыйСчёт(); загрузитьРынки(); }, 2500);
+    return () => clearTimeout(id);
+  }, [userId]);
 
   // Адрес подключённого кошелька уходит в профиль: по нему бот в
   // переписке показывает баланс и собирает продажу. Ключей это не

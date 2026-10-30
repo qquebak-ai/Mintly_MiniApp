@@ -85,12 +85,25 @@ function admin() {
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return null;
   return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 }
-async function хозяин(req, db) {
+/* Кто спрашивает — по токену у Supabase. Для чтения (счёт, журнал,
+   билет потока) ответ помним минуту: экран спрашивает счёт часто, и
+   каждый раз ждать Supabase — лишние сотни миллисекунд до цифр. Всё, что
+   двигает деньги (сделки, переводы, тейк и стоп), проверяет токен заново. */
+const знакомые = new Map(); // sha256(токен) -> { user, до }
+async function хозяин(req, db, { помнить = false } = {}) {
   const з = req.headers.authorization || "";
   const токен = з.startsWith("Bearer ") ? з.slice(7).trim() : "";
   if (!токен) return null;
+  const ключ = crypto.createHash("sha256").update(токен).digest("hex");
+  const был = знакомые.get(ключ);
+  if (помнить && был && был.до > Date.now()) return был.user;
   const { data, error } = await db.auth.getUser(токен);
-  return error || !data ? null : data.user;
+  const user = error || !data ? null : data.user;
+  if (user) {
+    знакомые.set(ключ, { user, до: Date.now() + 60_000 });
+    if (знакомые.size > 5000) for (const [к, б] of знакомые) if (б.до < Date.now()) знакомые.delete(к);
+  } else знакомые.delete(ключ);
+  return user;
 }
 async function ethersLib() { return import("ethers"); }
 
@@ -116,9 +129,70 @@ const живыеПоПлощадке = new Map();
 let сокетЦен = null;
 let сокетЖдёт = false;
 const подписаны = new Set();
-function подписатьЦены(dex) {
-  try { сокетЦен.send(JSON.stringify({ method: "subscribe", subscription: dex ? { type: "allMids", dex } : { type: "allMids" } })); } catch { /* переподпишемся при открытии */ }
+function вСокет(сообщение) {
+  try { if (сокетЦен && сокетЦен.readyState === 1) сокетЦен.send(JSON.stringify(сообщение)); } catch { /* переподпишемся при открытии */ }
 }
+function подписатьЦены(dex) {
+  вСокет({ method: "subscribe", subscription: dex ? { type: "allMids", dex } : { type: "allMids" } });
+}
+/* Лучшие заявки (bbo) и живые свечи — по запросу экранов и сторожа.
+   allMids биржа присылает раз в несколько секунд, а лучшая цена спроса и
+   предложения приходит на каждое её изменение — несколько раз в секунду:
+   по ней цена на экране и тейк со стопом срабатывают сразу. Подписка одна
+   на всех зрителей монеты; ушёл последний — снимаем через минуту. */
+const лучшие = new Map(); // монета -> { n, подписан, снятьВ }
+const живыеКогда = new Map(); // монета -> когда пришла её лучшая цена
+const свечиПотоком = new Map(); // `${монета}|${шаг}` -> { n, подписан, снятьВ, последняя }
+/* Биржа держит на одном адресе не больше тысячи подписок: лучшим ценам —
+   до 600 (все рынки списка — около трёхсот), живым свечам — до 250,
+   остальное — общие цены площадок. Сверх предела монета живёт на общих
+   ценах, пока не освободится место. */
+const ЛУЧШИХ_НЕ_БОЛЬШЕ = 600;
+const СВЕЧЕЙ_НЕ_БОЛЬШЕ = 250;
+const подписано = (карта) => { let n = 0; for (const з of карта.values()) if (з.подписан) n += 1; return n; };
+function следитьЛучшей(coin, шаг) {
+  const з = лучшие.get(coin) || { n: 0, подписан: false, снятьВ: 0 };
+  з.n = Math.max(0, з.n + шаг);
+  if (з.n > 0 && !з.подписан && подписано(лучшие) < ЛУЧШИХ_НЕ_БОЛЬШЕ) {
+    з.подписан = true;
+    вСокет({ method: "subscribe", subscription: { type: "bbo", coin } });
+  }
+  if (з.n === 0) з.снятьВ = Date.now() + 60_000;
+  лучшие.set(coin, з);
+  открытьСокетЦен();
+}
+function следитьСвечой(ключ, шаг) {
+  const з = свечиПотоком.get(ключ) || { n: 0, подписан: false, снятьВ: 0, последняя: null };
+  з.n = Math.max(0, з.n + шаг);
+  if (з.n > 0 && !з.подписан && подписано(свечиПотоком) < СВЕЧЕЙ_НЕ_БОЛЬШЕ) {
+    з.подписан = true;
+    const [coin, interval] = ключ.split("|");
+    вСокет({ method: "subscribe", subscription: { type: "candle", coin, interval } });
+  }
+  if (з.n === 0) з.снятьВ = Date.now() + 60_000;
+  свечиПотоком.set(ключ, з);
+  открытьСокетЦен();
+}
+// Снимаем подписки, на которые давно никто не смотрит, и подписываем
+// тех, кто ждал места сверх предела.
+setInterval(() => {
+  const сейчас = Date.now();
+  for (const [coin, з] of лучшие) if (з.n > 0 && !з.подписан && подписано(лучшие) < ЛУЧШИХ_НЕ_БОЛЬШЕ) { з.подписан = true; вСокет({ method: "subscribe", subscription: { type: "bbo", coin } }); }
+  for (const [ключ, з] of свечиПотоком) if (з.n > 0 && !з.подписан && подписано(свечиПотоком) < СВЕЧЕЙ_НЕ_БОЛЬШЕ) {
+    з.подписан = true;
+    const [coin, interval] = ключ.split("|");
+    вСокет({ method: "subscribe", subscription: { type: "candle", coin, interval } });
+  }
+  for (const [coin, з] of лучшие) if (з.n === 0 && з.снятьВ < сейчас) {
+    if (з.подписан) вСокет({ method: "unsubscribe", subscription: { type: "bbo", coin } });
+    лучшие.delete(coin);
+  }
+  for (const [ключ, з] of свечиПотоком) if (з.n === 0 && з.снятьВ < сейчас) {
+    const [coin, interval] = ключ.split("|");
+    if (з.подписан) вСокет({ method: "unsubscribe", subscription: { type: "candle", coin, interval } });
+    свечиПотоком.delete(ключ);
+  }
+}, 15_000).unref?.();
 function открытьСокетЦен() {
   if (typeof WebSocket === "undefined" || сокетЦен || сокетЖдёт) return;
   const с = new WebSocket(СОКЕТ);
@@ -126,15 +200,44 @@ function открытьСокетЦен() {
   let пинг = null;
   с.onopen = () => {
     for (const dex of подписаны) подписатьЦены(dex);
+    // После обрыва — заново всё, что смотрят экраны и сторож.
+    for (const [coin, з] of лучшие) if (з.подписан) вСокет({ method: "subscribe", subscription: { type: "bbo", coin } });
+    for (const [ключ, з] of свечиПотоком) if (з.подписан) { const [coin, interval] = ключ.split("|"); вСокет({ method: "subscribe", subscription: { type: "candle", coin, interval } }); }
     // Молчащий сокет биржа закрывает через минуту — пингуем.
     пинг = setInterval(() => { try { с.send('{"method":"ping"}'); } catch { /* закрывается */ } }, 30_000);
   };
   с.onmessage = (e) => {
     let j;
     try { j = JSON.parse(String(e.data)); } catch { return; }
-    if (!j || j.channel !== "allMids" || !j.data || !j.data.mids) return;
-    for (const [к, v] of Object.entries(j.data.mids)) живые.set(к, Number(v));
-    живыеПри = Date.now();
+    if (!j || !j.data) return;
+    if (j.channel === "bbo" && j.data.coin && Array.isArray(j.data.bbo)) {
+      const [спрос, предложение] = j.data.bbo;
+      const b = Number(спрос && спрос.px), a = Number(предложение && предложение.px);
+      const mid = b > 0 && a > 0 ? (b + a) / 2 : b > 0 ? b : a;
+      if (!(mid > 0)) return;
+      живые.set(j.data.coin, mid);
+      живыеКогда.set(j.data.coin, Date.now());
+      изменились.add(j.data.coin);
+      сторож({ [j.data.coin]: mid });
+      return;
+    }
+    if (j.channel === "candle" && j.data.s) {
+      const ключ = `${j.data.s}|${j.data.i}`;
+      const з = свечиПотоком.get(ключ);
+      if (!з) return;
+      з.последняя = { t: j.data.t, o: +j.data.o, h: +j.data.h, l: +j.data.l, c: +j.data.c, v: +j.data.v };
+      разослатьСвечу(ключ, з.последняя);
+      return;
+    }
+    if (j.channel !== "allMids" || !j.data.mids) return;
+    const сейчас = Date.now();
+    for (const [к, v] of Object.entries(j.data.mids)) {
+      // Свежая лучшая цена точнее общего снимка — его не пускаем поверх.
+      if (сейчас - (живыеКогда.get(к) || 0) < 3000) continue;
+      живые.set(к, Number(v));
+      изменились.add(к);
+    }
+    живыеПри = сейчас;
     живыеПоПлощадке.set(j.data.dex || "", живыеПри);
     сторож(j.data.mids);
   };
@@ -239,7 +342,7 @@ async function собратьРынки() {
     const цена = живая > 0 ? живая : р.цена;
     const рынок = {
       asset: р.asset, coin: р.coin, name: р.name, dex: р.dex, section: р.section,
-      price: цена, change: р.вчера > 0 ? ((цена - р.вчера) / р.вчера) * 100 : 0,
+      price: цена, prev: р.вчера, change: р.вчера > 0 ? ((цена - р.вчера) / р.вчера) * 100 : 0,
       volume: р.volume, maxLeverage: р.maxLeverage, szDecimals: р.szDecimals, isolated: р.isolated,
     };
     список.push(рынок);
@@ -752,7 +855,7 @@ const ценаТекстом = (v) => (v >= 1000 ? v.toFixed(1) : v >= 1 ? v.toF
 const опросЦен = new Map();
 async function свежаяЦена(coin) {
   const dex = площадкаМонеты(coin);
-  const свежо = () => Date.now() - (живыеПоПлощадке.get(dex) || 0) < 10_000;
+  const свежо = () => Date.now() - Math.max(живыеПоПлощадке.get(dex) || 0, живыеКогда.get(coin) || 0) < 10_000;
   if (свежо() && живые.get(coin) > 0) return живые.get(coin);
   следитьЗаЦенами([dex]);
   let о = опросЦен.get(dex);
@@ -772,7 +875,7 @@ async function свежаяЦена(coin) {
   return свежо() && живые.get(coin) > 0 ? живые.get(coin) : 0;
 }
 // Для показа счёта годится и цена минутной давности.
-const ценаДляЭкрана = (coin) => (Date.now() - (живыеПоПлощадке.get(площадкаМонеты(coin)) || 0) < 60_000 ? живые.get(coin) || 0 : 0);
+const ценаДляЭкрана = (coin) => (Date.now() - Math.max(живыеПоПлощадке.get(площадкаМонеты(coin)) || 0, живыеКогда.get(coin) || 0) < 60_000 ? живые.get(coin) || 0 : 0);
 
 /* Сторож позиций: каждое сообщение цен проверяет тейки, стопы и
    ликвидации на этих рынках — сразу, а не опросом раз в минуту: иначе стоп
@@ -974,11 +1077,22 @@ export function запуститьСторожа() {
   const площадкиПозиций = () => [...new Set([...торговый.монетыСПозициями()].map(площадкаМонеты))];
   const есть = площадкиПозиций();
   if (есть.length) следитьЗаЦенами(есть);
+  // Монеты с открытыми позициями — на лучших заявках: тейк, стоп и
+  // ликвидация срабатывают по цене, пришедшей доли секунды назад.
+  const сторожСледит = new Set();
+  const держатьЛучшие = () => {
+    const нужно = торговый.монетыСПозициями();
+    for (const coin of нужно) if (!сторожСледит.has(coin)) { сторожСледит.add(coin); следитьЛучшей(coin, 1); }
+    for (const coin of [...сторожСледит]) if (!нужно.has(coin)) { сторожСледит.delete(coin); следитьЛучшей(coin, -1); }
+  };
+  держатьЛучшие();
   // Сокет молчит — сторож всё равно должен видеть цену: опрос раз в 5 секунд.
   const опрос = setInterval(() => {
+    держатьЛучшие();
     const монеты = [...торговый.монетыСПозициями()];
     for (const dex of new Set(монеты.map(площадкаМонеты))) {
-      if (Date.now() - (живыеПоПлощадке.get(dex) || 0) > 15_000) свежаяЦена(монеты.find((c) => площадкаМонеты(c) === dex)).catch(() => {});
+      const монета = монеты.find((c) => площадкаМонеты(c) === dex);
+      if (Date.now() - Math.max(живыеПоПлощадке.get(dex) || 0, живыеКогда.get(монета) || 0) > 15_000) свежаяЦена(монета).catch(() => {});
     }
   }, 5000);
   if (опрос.unref) опрос.unref();
@@ -1015,6 +1129,106 @@ function свестиПозже(user, w) {
   if (таймерСвода.unref) таймерСвода.unref();
 }
 
+/* --- Поток для экранов: цены, живая свеча, «счёт изменился» -------------
+   Server-Sent Events, как у кривых (api/curve-stream.js): обычный HTTP,
+   переживает прокси и сам переподключается. Экран говорит, какие монеты
+   ему нужны и какую свечу он рисует, — и получает только их, без опроса:
+   цены — пачкой раз в четверть секунды (только изменившиеся), свечу — на
+   каждое её изменение, а о своём счёте — сигнал, как только тот изменился
+   (сделка, тейк, стоп, ликвидация, перевод). Сам счёт в поток не идёт:
+   только «перечитай», поэтому для сигнала хватает билета без токена в
+   адресе (EventSource не умеет заголовки, а токен в адресе осел бы в
+   журналах прокси). */
+const изменились = new Set();
+const зрители = new Set(); // { res, монеты:Set, свеча, uid }
+const ЗРИТЕЛЕЙ_НЕ_БОЛЬШЕ = 3000;
+const билеты = new Map(); // билет -> { uid, до }
+function написатьЗрителю(з, данные) {
+  try { з.res.write(`data: ${JSON.stringify(данные)}\n\n`); } catch { /* зритель ушёл */ }
+}
+function разослатьСвечу(ключ, свеча) {
+  for (const з of зрители) if (з.свеча === ключ) написатьЗрителю(з, { c: свеча, k: ключ });
+}
+setInterval(() => {
+  if (!изменились.size) return;
+  /* Обходим изменившиеся (их за четверть секунды — десятки), а не монеты
+     зрителя (у списка их сотни): тысячи зрителей не должны стоить
+     миллионов проверок в секунду. */
+  for (const з of зрители) {
+    let есть = false;
+    const цены = {};
+    for (const coin of изменились) if (з.монеты.has(coin)) { const v = живые.get(coin); if (v > 0) { цены[coin] = v; есть = true; } }
+    if (есть) написатьЗрителю(з, { m: цены });
+  }
+  изменились.clear();
+}, 250).unref?.();
+торговый.наИзменение((uid) => {
+  for (const з of зрители) if (з.uid === uid) написатьЗрителю(з, { a: 1 });
+});
+
+function открытьПоток(req, res) {
+  if (зрители.size >= ЗРИТЕЛЕЙ_НЕ_БОЛЬШЕ) return res.status(503).json({ error: "busy" });
+  const монеты = new Set(String((req.query && req.query.coins) || "").split(",")
+    .map((c) => c.trim()).filter((c) => /^[A-Za-z0-9:]{1,40}$/.test(c)).slice(0, 80));
+  const свеча = /^[A-Za-z0-9:]{1,40}\|(1m|5m|15m|1h|4h|1d)$/.test(String((req.query && req.query.candle) || "")) ? String(req.query.candle) : null;
+  /* Раздел целиком («crypto», «stocks»…) — сотни монет: списком в адресе
+     они не влезли бы в строку запроса, поэтому их называет сервер сам. */
+  const разделы = [...new Set(String((req.query && req.query.sections) || "").split(","))].filter((р) => ["crypto", "metals", "indices", "stocks"].includes(р));
+  const билет = String((req.query && req.query.ticket) || "");
+  let uid = null;
+  if (билет) {
+    const б = билеты.get(билет);
+    // Билет истёк — 401: экран возьмёт новый и переподключится.
+    if (!б || б.до < Date.now()) return res.status(401).json({ error: "ticket" });
+    uid = б.uid;
+  }
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  // Nginx иначе копит поток в буфере и отдаёт его пачкой.
+  res.setHeader("X-Accel-Buffering", "no");
+  if (res.flushHeaders) res.flushHeaders();
+  res.write(": ok\n\n");
+  const з = { res, монеты, свеча, uid };
+  зрители.add(з);
+  for (const coin of монеты) следитьЛучшей(coin, 1);
+  if (свеча) следитьСвечой(свеча, 1);
+  следитьЗаЦенами([...new Set([...монеты].map(площадкаМонеты))]);
+  // Последнее известное — сразу, не дожидаясь следующего изменения.
+  const снимок = {};
+  for (const coin of монеты) { const v = живые.get(coin); if (v > 0) снимок[coin] = v; }
+  написатьЗрителю(з, { m: снимок });
+  const сСвечой = свеча && свечиПотоком.get(свеча);
+  if (сСвечой && сСвечой.последняя) написатьЗрителю(з, { c: сСвечой.последняя, k: свеча });
+  if (разделы.length) {
+    собратьРынки().then((р) => {
+      // Ушёл, пока собирали список, — подписывать нечего.
+      if (!зрители.has(з)) return;
+      const снимокРаздела = {};
+      for (const м of р.список.slice(0, 300)) {
+        if (!разделы.includes(м.section) || з.монеты.has(м.coin)) continue;
+        з.монеты.add(м.coin);
+        следитьЛучшей(м.coin, 1);
+        const v = живые.get(м.coin);
+        if (v > 0) снимокРаздела[м.coin] = v;
+      }
+      следитьЗаЦенами([...new Set([...з.монеты].map(площадкаМонеты))]);
+      if (Object.keys(снимокРаздела).length) написатьЗрителю(з, { m: снимокРаздела });
+    }).catch(() => { /* без раздела — только названные монеты */ });
+  }
+  const пульс = setInterval(() => { try { res.write(": пульс\n\n"); } catch { /* ушёл */ } }, 20_000);
+  const закрыть = () => {
+    clearInterval(пульс);
+    if (!зрители.delete(з)) return;
+    for (const coin of монеты) следитьЛучшей(coin, -1);
+    if (свеча) следитьСвечой(свеча, -1);
+    try { res.end(); } catch { /* уже закрыт */ }
+  };
+  req.on("close", закрыть);
+  req.on("error", закрыть);
+  return undefined;
+}
+
 // Не чаще раза в 700 мс на человека: подписи и заявки не для очереди кликов.
 const последний = new Map();
 
@@ -1028,6 +1242,7 @@ export default async function handler(req, res) {
       res.setHeader("Cache-Control", "public, max-age=1");
       return res.status(200).json({ network: БОЕВАЯ ? "mainnet" : ДЕМО ? "demo" : "testnet", demo: ДЕМО, markets: р.список.slice(0, 300) });
     }
+    if (действие === "stream") return открытьПоток(req, res);
     if (действие === "icon") {
       const coin = String(req.query.coin || "");
       if (!/^[A-Za-z0-9:]{1,40}$/.test(coin)) return res.status(400).json({ error: "bad_request" });
@@ -1055,8 +1270,16 @@ export default async function handler(req, res) {
 
     const db = admin();
     if (!db) return res.status(503).json({ error: "not_configured" });
-    const user = await хозяин(req, db);
+    const user = await хозяин(req, db, { помнить: req.method === "GET" && ["account", "trades", "ticket"].includes(действие) });
     if (!user) return res.status(401).json({ error: "unauthorized" });
+    // Билет на сигнал «счёт изменился» в потоке: полчаса, только для своего счёта.
+    if (действие === "ticket") {
+      const билет = crypto.randomBytes(18).toString("hex");
+      const до = Date.now() + 30 * 60e3;
+      билеты.set(билет, { uid: user.id, до });
+      if (билеты.size > 20000) for (const [к, б] of билеты) if (б.до < Date.now()) билеты.delete(к);
+      return res.status(200).json({ ticket: билет, expires: до });
+    }
     if (ДЕМО) return await учебный(req, res, действие, user);
     const w = await подписьEVMЧеловека(db, user);
 
